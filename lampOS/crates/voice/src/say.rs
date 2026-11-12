@@ -381,6 +381,13 @@ pub enum Words {
     /// connection, `true` lifts it (`listen`, [`crate::control_mute`]).
     /// Taken on the client's thread, never queued for the voice.
     Listen(bool),
+    /// lamp-control opens a computer's stream of sound for the speaker
+    /// (`stream`, [`TURN_SKILL`] only): held on the client's thread for as
+    /// long as the connection is, never queued for the voice
+    /// ([`crate::speaker_stream`]).
+    Stream {
+        by: String,
+    },
 }
 
 impl Words {
@@ -402,7 +409,8 @@ impl Words {
             | Self::ClipAt(_)
             | Self::TurnStart { .. }
             | Self::TurnEnd(_)
-            | Self::Listen(_) => None,
+            | Self::Listen(_)
+            | Self::Stream { .. } => None,
         }
     }
 }
@@ -519,6 +527,13 @@ enum TurnWire {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
+struct StreamWire {
+    /// The paired computer's name.
+    by: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Wire {
     skill: String,
     #[serde(default)]
@@ -582,6 +597,10 @@ struct Wire {
     /// ([`TURN_SKILL`] only, alone).
     #[serde(default)]
     listen: Option<bool>,
+    /// A computer's stream of sound for the speaker ([`TURN_SKILL`] only,
+    /// alone but for `expires_in_ms`, [`crate::speaker_stream`]).
+    #[serde(default)]
+    stream: Option<StreamWire>,
     /// The paired computer that asks an exact `text` (lamp-control's alone):
     /// its name, so that the lamp can say whose words they were (#4209).
     #[serde(default)]
@@ -655,6 +674,9 @@ pub fn parse_from(line: &str, caller: Caller) -> Result<Request, String> {
     }
     if let Some(on) = wire.listen.take() {
         return parse_listen(skill, on, &wire);
+    }
+    if let Some(stream) = wire.stream.take() {
+        return parse_stream(skill, stream, &wire);
     }
     if let Some(turn) = wire.turn.take() {
         return parse_turn(skill, turn, wire);
@@ -976,28 +998,7 @@ fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String>
     if skill != TURN_SKILL {
         return Err("listen is lamp-control's only".into());
     }
-    if wire.note.is_some()
-        || wire.text.is_some()
-        || wire.quoted.is_some()
-        || wire.from.is_some()
-        || wire.task.is_some()
-        || wire.invitation.is_some()
-        || wire.sound.is_some()
-        || wire.clip.is_some()
-        || wire.recording.is_some()
-        || wire.cue.is_some()
-        || wire.cache
-        || wire.unplug_request.is_some()
-        || wire.priority.is_some()
-        || wire.expires_in_ms.is_some()
-        || wire.start_before_us.is_some()
-        || wire.turn.is_some()
-        || wire.id.is_some()
-        || wire.after.is_some()
-        || wire.exact
-        || wire.made
-        || wire.who
-    {
+    if asks_for_more(wire) || wire.expires_in_ms.is_some() {
         return Err("listen goes alone".into());
     }
     Ok(Request {
@@ -1014,6 +1015,64 @@ fn parse_listen(skill: String, on: bool, wire: &Wire) -> Result<Request, String>
         line: Default::default(),
         quiet: false,
     })
+}
+
+/// A stream for the speaker: lamp-control's alone, with its computer's
+/// name and the `expires_in_ms` every ask carries, and nothing else.
+fn parse_stream(skill: String, stream: StreamWire, wire: &Wire) -> Result<Request, String> {
+    if skill != TURN_SKILL {
+        return Err("stream is lamp-control's only".into());
+    }
+    if asks_for_more(wire) {
+        return Err("stream goes alone".into());
+    }
+    let Some(expires_in_ms) = wire.expires_in_ms else {
+        return Err("not a say request".into());
+    };
+    let by = stream.by;
+    if by.is_empty() || by.chars().count() > 64 || by.chars().any(char::is_control) {
+        return Err("by: a name of 1 to 64 characters, no control characters".into());
+    }
+    Ok(Request {
+        skill,
+        words: Words::Stream { by },
+        priority: NORMAL_PRIORITY,
+        expires_in_ms,
+        start_before_us: None,
+        task: None,
+        invitation: None,
+        unplug_request: None,
+        who: false,
+        question: false,
+        line: Default::default(),
+        quiet: false,
+    })
+}
+
+/// Whether `wire` asks for anything besides a `listen` or a `stream`
+/// (which both go alone, `expires_in_ms` aside).
+fn asks_for_more(wire: &Wire) -> bool {
+    wire.note.is_some()
+        || wire.text.is_some()
+        || wire.quoted.is_some()
+        || wire.from.is_some()
+        || wire.task.is_some()
+        || wire.invitation.is_some()
+        || wire.sound.is_some()
+        || wire.clip.is_some()
+        || wire.recording.is_some()
+        || wire.cue.is_some()
+        || wire.cache
+        || wire.unplug_request.is_some()
+        || wire.priority.is_some()
+        || wire.start_before_us.is_some()
+        || wire.turn.is_some()
+        || wire.id.is_some()
+        || wire.after.is_some()
+        || wire.exact
+        || wire.made
+        || wire.who
+        || wire.stream.is_some()
 }
 
 /// A request handed to the voice, with where its answer goes and when it
@@ -1911,6 +1970,7 @@ impl Says {
                     | Words::TurnStart { .. }
                     | Words::TurnEnd(_)
                     | Words::Listen(_)
+                    | Words::Stream { .. }
             )
         })
     }
@@ -2389,6 +2449,10 @@ fn serve_client(
                 words: Words::Listen(on),
                 ..
             }) => return serve_listen(stream, on, caller, kept, mutes),
+            Ok(Request {
+                words: Words::Stream { by },
+                ..
+            }) => return crate::speaker_stream::serve(stream, &by, kept),
             Ok(request) => {
                 let read_at_us = lamp_ipc::monotonic_us();
                 let expires_at_us = request.expires_at_us(read_at_us);
@@ -5834,6 +5898,54 @@ mod tests {
             r#"{"outcome":"lifted","why":"asked"}"#
         );
         assert_eq!(Outcome::NothingHeld.line(), r#"{"outcome":"nothing_held"}"#);
+    }
+
+    #[test]
+    fn stream_is_lamp_controls_alone_with_its_name_and_expiry() {
+        let words = |line: &str| parse(line).map(|request| request.words);
+        assert_eq!(
+            words(r#"{"skill":"control","stream":{"by":"desk"},"expires_in_ms":30000}"#),
+            Ok(Words::Stream { by: "desk".into() })
+        );
+        assert_eq!(
+            parse(r#"{"skill":"pomodoro","stream":{"by":"desk"},"expires_in_ms":30000}"#),
+            Err("stream is lamp-control's only".into())
+        );
+        // Without an expiry it is no say request, as every ask.
+        assert_eq!(
+            parse(r#"{"skill":"control","stream":{"by":"desk"}}"#),
+            Err("not a say request".into())
+        );
+        for line in [
+            r#"{"skill":"control","stream":{"by":"desk"},"expires_in_ms":9,"text":"Hi."}"#,
+            r#"{"skill":"control","stream":{"by":"desk"},"expires_in_ms":9,"turn":"end","id":3}"#,
+            r#"{"skill":"control","stream":{"by":"desk"},"expires_in_ms":9,"priority":3}"#,
+            r#"{"skill":"control","stream":{"by":"desk"},"expires_in_ms":9,"exact":true}"#,
+        ] {
+            assert_eq!(parse(line), Err("stream goes alone".into()), "{line}");
+        }
+        // With a listen, the listen's own word: one line asks for one thing.
+        assert_eq!(
+            parse(r#"{"skill":"control","stream":{"by":"desk"},"listen":false}"#),
+            Err("listen goes alone".into())
+        );
+        for by in ["", &"x".repeat(65), "a\u{7}b"] {
+            let line = serde_json::json!({
+                "skill": "control", "stream": {"by": by}, "expires_in_ms": 30000,
+            });
+            assert_eq!(
+                parse(&line.to_string()),
+                Err("by: a name of 1 to 64 characters, no control characters".into())
+            );
+        }
+        // A name is required and nothing else is known there.
+        for line in [
+            r#"{"skill":"control","stream":{},"expires_in_ms":30000}"#,
+            r#"{"skill":"control","stream":{"by":"d","rate":1},"expires_in_ms":30000}"#,
+            r#"{"skill":"control","stream":true,"expires_in_ms":30000}"#,
+        ] {
+            assert_eq!(parse(line), Err("not a say request".into()), "{line}");
+        }
     }
 
     /// A say service whose computers' mutes are this test's own, served as
