@@ -96,3 +96,22 @@ fn forgetting_removes_the_index() {
     session_index::record(&file, MACHINE, &id(1), Some("Christmas dates"), 1_000);
     assert_eq!(session_index::read(&file)[MACHINE].len(), 1);
 }
+
+/// Signed out (the Reviewer-lead's P3 on #6447): only the machines kept
+/// stay; nothing is written when none goes.
+#[test]
+fn forgetting_machines_keeps_only_those_kept() {
+    let folder = tempfile::tempdir().unwrap();
+    let file = folder.path().join("sessions-started.json");
+    session_index::record(&file, "account", "a1", Some("Christmas dates"), 1);
+    session_index::record(&file, "here", "h1", Some("Login fix"), 2);
+    session_index::forget_machines(&file, |machine| machine == "here");
+    let kept = session_index::read(&file);
+    assert_eq!(kept.keys().collect::<Vec<_>>(), ["here"]);
+    let before = std::fs::metadata(&file).unwrap().modified().unwrap();
+    session_index::forget_machines(&file, |machine| machine == "here");
+    assert_eq!(
+        std::fs::metadata(&file).unwrap().modified().unwrap(),
+        before
+    );
+}
