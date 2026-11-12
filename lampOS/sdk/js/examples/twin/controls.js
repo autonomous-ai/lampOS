@@ -84,7 +84,7 @@ export function quietTone(ms) {
   return wav;
 }
 // The hum the page plays for `sound` (a stand-in: the lamp's real hum is made by its voice, not a file): two low tones, about
-// 0.6 s, 16-bit mono PCM at 24 kHz, peak 1000 (-30 dBFS, as the quiet clip), faded in and out so it does not click.
+// 0.6 s, 16-bit mono PCM at 24 kHz, two tones of amplitude 500 each so the sum peaks at 1000 (-30 dBFS, as the quiet clip), faded in and out so it does not click.
 export function humWav(ms = 600) {
   const frames = Math.round((24_000 * ms) / 1000);
   const wav = Buffer.alloc(44 + frames * 2);
@@ -195,12 +195,12 @@ export const CONTROLS = [
   { id: 'hold_light_stop', group: 'Light', ops: [], shows: [], label: 'Stop the held light', fields: [],
     run: async () => { const was = held !== null; held?.stop(); held = null; return `held.stop() (${was ? 'a held light ended' : 'none was held'})`; } },
   { id: 'say', group: 'Voice', ops: ['say'], shows: ['lamp.said'], label: 'Say', fields: [text('text', 200, 'Hello, I am the virtual lamp.')],
-    hint: "spoken by your browser (the lamp's real voice sounds different)", hintReal: "a real lamp says it through its own speaker",
+    hint: "spoken by your browser when 'Hear the lamp in this page' is on (the lamp's real voice sounds different; the stand-in voice may speak it too)", hintReal: "a real lamp says it through its own speaker",
     run: async ({ lamp }, a) => { await lamp.say(a.text); return `lamp.say(${q(a.text)})`; } },
   // The computer's own turn: the lamp's voice takes the prompt as if it were said to it; `done` follows, and
   // ending it gives the turn back (with none of this computer's, the lamp's own `busy` shows).
   { id: 'turn_start', group: 'Voice', ops: ['turn.start'], shows: [], label: 'Ask the lamp (start a turn)', fields: [text('prompt', 200, 'What can you do?')],
-    hint: 'the virtual lamp has no model, so it gives no spoken answer: the log says done; a real lamp answers aloud',
+    hint: 'the virtual lamp has no model unless it runs with --real-voice, so otherwise it gives no spoken answer and the log says done; a real lamp answers aloud',
     run: async ({ lamp }, a) => { await lamp.startTurn(a.prompt); return `lamp.startTurn(${q(a.prompt)})`; } },
   { id: 'turn_end', group: 'Voice', ops: ['turn.end'], shows: [], label: 'End my turn', fields: [], run: async ({ lamp }) => { await lamp.endTurn(); return 'lamp.endTurn()'; } },
   { id: 'volume_to', group: 'Voice', ops: ['volume'], shows: ['volume.changed'], label: 'Volume to', fields: [number('to', 0, 100, 40, { integer: true })],
