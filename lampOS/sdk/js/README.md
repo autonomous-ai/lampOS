@@ -630,6 +630,7 @@ and send it again. Without `retryMs`, it is a held part, as above.
 | `lamp skill push FOLDER [LAMP_ID]` | a skill folder, put on the paired lamp (`skills` grant). Push, list and remove work on customer lamps from stable 11091 on |
 | `lamp skill list [LAMP_ID]` | this computer's own pushed skills |
 | `lamp skill remove NAME [LAMP_ID]` | takes one of them off the lamp |
+| `lamp help` (also `lamp --help`, `lamp -h`) | none: prints the commands and exits 0. A misspelt option is one line and the same list, exit 2 |
 | `lamp fake [--every 10] [--cycles N] [--everything] [--hands]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet. `--hands`: a hand waves for 3 s after each arrival, and looks are answered, as on a lamp with the body's lease socket |
 
 `lamp skill check` is the Python SDK's. `LAMPOS_HOME` sets where the key and
