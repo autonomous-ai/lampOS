@@ -137,6 +137,20 @@ async function release() {
 // in controls.js, and the log says the call and the lamp's own answer, a refusal in its words.
 const refuse = (why) => new LampError(why, { code: 'bad_request' });
 const said = (id, call, ok, answer) => tell({ type: 'result', id, call, ok, answer });
+// Sound for the listener (the try-it page's "Hear the lamp in this page"): a page that turned it on (`page.hear`, off on every
+// connection, never remembered) gets the WAV a row made for it, as one message to that page alone as a picture goes, never
+// logged and never kept. It is this app making the sound, not the lamp's voice reaching the browser. Never the microphone's
+// sound: no `microphone.audio` frame is read here (the stream row only counts), so none can reach a page.
+const hearing = (page, message) => {
+  const on = message.on === true;
+  page.hear = on;
+  page.send(JSON.stringify({ type: 'hear', on, language: lamp.info?.language ?? lamp.language }));
+};
+const audioTo = (page, id) => (what, wav) => {
+  if (!page?.hear || page.readyState !== 1) return 0;
+  page.send(JSON.stringify({ type: 'audio', id, what, wav: Buffer.from(wav).toString('base64') }));
+  return wav.length;
+};
 let stimulating = Promise.resolve();
 const lastStimulus = new Map();
 async function press(message, page) {
@@ -147,7 +161,7 @@ async function press(message, page) {
       if (!control) throw refuse(`no button ${name}`);
       // A picture goes to the page that pressed, as one message to it: not through `tell`, never logged, never kept.
       const show = (jpeg) => page?.send(JSON.stringify({ type: 'picture', id, jpeg: Buffer.from(jpeg).toString('base64') }));
-      const call = await control.run({ lamp, release, listenFor, show }, checked(control.fields, args));
+      const call = await control.run({ lamp, release, listenFor, show, audio: audioTo(page, id) }, checked(control.fields, args));
       said(id, call, true, 'taken');
     } else {
       const stimulus = findStimulus(name);
@@ -311,6 +325,7 @@ wss.on('connection', (page) => {
     if (message.type === 'drag') drag(message.joint, Number(message.deg));
     if (message.type === 'let_go') release();
     if (message.type === 'camera_on') cameraAskedAt = Date.now();
+    if (message.type === 'hear') hearing(page, message);
     if (stimDir && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message, page);
   });
   page.on('close', () => pages.delete(page));
