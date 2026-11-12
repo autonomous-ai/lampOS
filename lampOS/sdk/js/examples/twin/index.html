@@ -313,7 +313,7 @@ function connect() {
   ws.onmessage = (message) => {
     const data = JSON.parse(message.data);
     if (data.type === 'said') return log(data.text);
-    if (data.type === 'result' || data.type === 'event') return window.dispatchEvent(new CustomEvent('twin-message', { detail: data }));
+    if (data.type === 'result' || data.type === 'event' || data.type === 'picture') return window.dispatchEvent(new CustomEvent('twin-message', { detail: data }));
     if (data.type !== 'state') return;
     const { joints = {}, lamp = {} } = data.state;
     for (const [name, joint] of Object.entries(joints)) {

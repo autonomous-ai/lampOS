@@ -6,10 +6,13 @@
 // An entry: `{ id, group, label, fields, run }`; a field: `{ name, label, type, ... }` with type
 //   'select' (`options`, `default`), 'number' (`min`, `max`, `integer`, `default`) or 'text' (`max`, `default`);
 // `optional: true` lets a field be left empty. `run(ctx, values)` makes the SDK call and returns the call as the
-// log says it; `ctx` is `{ lamp, release, listenFor }` (`release()` gives back the twin's own slider lease first).
+// log says it; `ctx` is `{ lamp, release, listenFor, show }` (`release()` gives back the twin's own slider lease first).
 // `ops` are the control.schema.json ops the entry sends (the SDK's `withLease` sends `lease.take` and `lease.release`)
 // and `shows` the events its action should bring up in the log; a stimulus has `shows` only. test/controls-cover.test.js
 // fails for an op or an event that no entry names, unless controls-exceptions.js lists it with its reason.
+// `needs: 'camera'` or `'microphone'` (optional): the page shows the row only when the lamp has that grant (try.json's
+// `camera`/`microphone`); a press without it gets the lamp's own refusal. `ctx.show(jpeg)` puts a picture on the page
+// that pressed, under its row and nowhere else: not in the log, not on disk, not in the checklist's export.
 // A refusal comes back as the lamp's own words; a value outside its field is refused here, before any call.
 import { fileURLToPath } from 'node:url';
 import { LampError, schema } from 'lampos';
@@ -134,6 +137,55 @@ export const CONTROLS = [
   { id: 'turn_end', group: 'Voice', ops: ['turn.end'], shows: [], label: 'End my turn', fields: [], run: async ({ lamp }) => { await lamp.endTurn(); return 'lamp.endTurn()'; } },
   // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
   { id: 'sound', group: 'Voice', ops: ['sound'], shows: [], label: 'Sound (hum)', fields: [], run: async ({ lamp }) => { await lamp.sound('hum'); return "lamp.sound('hum')"; } },
+  // The camera and the microphone (their grants; one press, one use, nothing kept). The lamp's own rules hold: never while
+  // it is private, the ring shows the mark, and the microphone only with one person in view (its refusal in its words).
+  // A picture goes to the page that pressed, under the row, and is not logged; sound is only counted, never played or kept.
+  { id: 'camera_snapshot', group: 'Camera and microphone', needs: 'camera', ops: ['camera.snapshot'], shows: [], label: 'Camera: one picture', fields: [],
+    run: async ({ lamp, show }) => {
+      const jpeg = await lamp.cameraSnapshot();
+      show?.(jpeg);
+      return `lamp.cameraSnapshot() -> a JPEG of ${jpeg.length} bytes, on this page only`;
+    } },
+  { id: 'camera_stream', group: 'Camera and microphone', needs: 'camera', ops: ['camera.stream'], shows: [], label: 'Camera: a short stream', fields: [number('seconds', 1, 10, 2, { integer: true }), number('fps', 1, 5, 2, { integer: true })],
+    run: async ({ lamp, show }, a) => {
+      let frames = 0;
+      let last = null;
+      let ended = null;
+      const onFrame = (frame) => { frames += 1; last = frame.data ?? (frame.jpeg ? Buffer.from(frame.jpeg, 'base64') : last); };
+      const onEnded = (frame) => { ended = frame?.why ?? 'ended'; };
+      await lamp.on('camera.frame', onFrame);
+      await lamp.on('camera.ended', onEnded);
+      try {
+        await lamp.cameraStream(true, a.fps);
+        await new Promise((resolve) => setTimeout(resolve, a.seconds * 1000));
+      } finally {
+        await lamp.cameraStream(false).catch(() => {});
+        lamp.off('camera.frame', onFrame);
+        lamp.off('camera.ended', onEnded);
+      }
+      if (last) show?.(last);
+      return `lamp.cameraStream(true, ${a.fps}) for ${a.seconds} s -> ${frames} frames${ended ? `, ended: ${ended}` : ''}; the last is on this page only`;
+    } },
+  { id: 'microphone_stream', group: 'Camera and microphone', needs: 'microphone', ops: ['microphone.stream'], shows: [], label: 'Microphone: count the sound', fields: [number('seconds', 1, 10, 2, { integer: true })],
+    run: async ({ lamp }, a) => {
+      let blocks = 0;
+      let bytes = 0;
+      let lost = 0;
+      let ended = null;
+      const onAudio = (frame) => { blocks += 1; bytes += frame.data?.length ?? frame.bytes ?? 0; lost += frame.lost ?? 0; };
+      const onEnded = (frame) => { ended = frame?.why ?? 'ended'; };
+      await lamp.on('microphone.audio', onAudio);
+      await lamp.on('microphone.ended', onEnded);
+      try {
+        await lamp.microphoneStream(true);
+        await new Promise((resolve) => setTimeout(resolve, a.seconds * 1000));
+      } finally {
+        await lamp.microphoneStream(false).catch(() => {});
+        lamp.off('microphone.audio', onAudio);
+        lamp.off('microphone.ended', onEnded);
+      }
+      return `lamp.microphoneStream(true) for ${a.seconds} s -> ${blocks} blocks, ${bytes} bytes, ${lost} lost${ended ? `, ended: ${ended}` : ''} (counted, not played or kept)`;
+    } },
   { id: 'skill_push', group: 'Skills', ops: ['skill.push'], shows: [], label: 'Push the try-wave skill', fields: [],
     run: async ({ lamp }) => {
       const skill = await lamp.pushSkill(TRY_SKILL);
@@ -172,7 +224,7 @@ export const STIMULI = [
 
 // What the page needs to draw the buttons: the entries without their code.
 export const describe = () => ({
-  controls: CONTROLS.map(({ id, group, label, fields }) => ({ id, group, label, fields })),
+  controls: CONTROLS.map(({ id, group, label, fields, needs }) => ({ id, group, label, fields, ...(needs ? { needs } : {}) })),
   stimuli: STIMULI.map(({ id, group, label, fields }) => ({ id, group, label, fields })),
 });
 
