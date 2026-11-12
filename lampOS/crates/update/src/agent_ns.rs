@@ -19,7 +19,10 @@
 //! ([`remove_hook_shim`]).
 //!
 //! [`wrapper`]: the one wrapper and namespace script for every engine
-//! Harness reports (#6510 Part 1, step 1).
+//! Harness reports (#6510 Part 1, step 1). [`rounds`]: that wrapper
+//! written by a round for each engine Harness says is installed, with
+//! `LAMP_AGENT_NS=on`.
+pub mod rounds;
 pub mod wrapper;
 
 use crate::records::write_whole;
