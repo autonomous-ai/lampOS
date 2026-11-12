@@ -1286,6 +1286,10 @@ fn worker_command(
             role,
             var(crate::made_skill::AGENT_SERVICES_ENVIRONMENT).as_deref(),
         ))
+        .envs(made_code_at_once_worker_environment(
+            role,
+            var(crate::made_skill::CODE_AT_ONCE_ENVIRONMENT).as_deref(),
+        ))
         .envs(skill_loose_worker_environment(
             role,
             var(crate::made_skill::LOOSE_ENVIRONMENT).as_deref(),
@@ -1393,6 +1397,18 @@ fn made_scripts_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::SCRIPTS_ENVIRONMENT, "on"))
+}
+
+// A made skill's code put on at once (`LAMP_MADE_CODE_ON_AT_ONCE`), passed
+// the same narrow way: the exact `on`, to the two routes whose
+// `make_skill` makes a skill with code and puts it on
+// (`made_skill::code_on_at_once`).
+fn made_code_at_once_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::CODE_AT_ONCE_ENVIRONMENT, "on"))
 }
 
 // A skill's tasks (#6305), passed the same narrow way: the exact `on`, to
@@ -2571,6 +2587,10 @@ mod tests {
             ),
             (
                 crate::made_skill::AGENT_SERVICES_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::made_skill::CODE_AT_ONCE_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
             (

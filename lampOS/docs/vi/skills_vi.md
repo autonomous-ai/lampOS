@@ -687,7 +687,7 @@ sau:
      `made_skill::RUNS_AFTER_YES`; không có chữ "yes"). Câu nói là "I made
      photo booth: …", không bao giờ là "it's on"; `uses` của ứng dụng mang
      `code` và `grants`.
-   - **Không bao giờ bật ngay.** `made_skill::put_on` từ chối nó và giữ lý
+   - **Không bao giờ bật ngay** (trừ khi `LAMP_MADE_CODE_ON_AT_ONCE=on`, bên dưới). `made_skill::put_on` từ chối nó và giữ lý
      do (`made_skill::CODE_BY_VOICE`), nên câu trả lời `made` của ứng dụng
      vẫn là `not_kept`, lý do "it couldn't be put on: a skill that runs its
      own code goes on only once you agree to it out loud at the lamp, after
@@ -744,6 +744,49 @@ sau:
      đọc lại thì nói `made_skill::cut_code_line` ("… so it isn't on."), và
      không có gì chờ. Một kỹ năng có mã còn tắt chưa có đọc lại theo yêu
      cầu.
+   - **Bật ngay, khi `LAMP_MADE_CODE_ON_AT_ONCE=on`** (chủ nhân yêu cầu
+     trong chat: một kỹ năng tự tạo được bật ngay, và dù được hay không,
+     đèn chỉ nói vậy, không cần xác nhận; chỉ `on`, tắt nếu không đặt,
+     không có trong unit sản phẩm nào; trong `lamp-voice` được truyền cho
+     cả hai route, chỉ được đọc khi `LAMP_MADE_SCRIPTS=on`,
+     `made_skill::code_on_at_once`). Phán quyết của first builder trên
+     #6059 (19:14) vạch ranh giới (`made_skill::code_goes_on_at_once`): mã
+     chỉ có các quyền ánh sáng của đèn, loại âm thanh nó nghe thấy hoặc
+     đầu và tay của nó (`made_skill::CODE_AT_ONCE_GRANTS`: `light`,
+     `sound`, `body`; hẹn giờ là một trigger và không cần quyền) được bật
+     ngay; mã có bất kỳ quyền nào khác, trước hết là camera hay micro
+     (`made_skill::CODE_YES_GRANTS`), hoặc bất kỳ lần gửi nào (một lần ghi,
+     tin nhắn tới điện thoại) vẫn giữ lời đồng ý bằng giọng nói đúng như khi
+     công tắc tắt. Một lần tạo như vậy, bằng giọng nói hay từ MAKE IT của
+     ứng dụng (`app_make::put_on_line`), được bật ngay khi tạo xong, qua đúng đường của lời đồng ý
+     (`make_skill_local::code_on_at_once`, rồi `code_on_here` và
+     `code_approve`): đúng package đó theo SHA-256 của nó
+     (`made_skill::put_on_agreed`, cùng các bước kiểm tra pack và giới hạn
+     của helper quản lý), rồi, khi `LAMP_SKILL_TASKS=on`, lamp-control ghi
+     lời đồng ý cho task của nó (`task_yes_record`) theo thư mục lúc vừa
+     bật và các quyền đã nói, như một lời đồng ý bằng giọng nói ghi, nên
+     lần chạy đầu không hỏi gì. Đèn nói là đã tạo và đã bật, nó làm gì và
+     mã của nó được dùng gì, bản thân mã không bao giờ được đọc ra ("I made
+     photo booth, and it's on: … The lamp's model wrote its code, and that
+     code may use its light."; `made_skill::code_said` không có
+     `RUNS_AFTER_YES`); một task không được giữ thì thêm "But this lamp
+     doesn't run its code yet." (`made_skill::CODE_RUNS_NOWHERE_YET`).
+     Không có gì chờ: không lời đồng ý, không `approve_id`, không ghi chú
+     trên route thứ hai (`make_skill_local::app_code_asked` để nguyên
+     câu), và ứng dụng được báo `on`. Một kỹ năng không tạo được thì đèn
+     nói vậy kèm lý do (`made_skill::not_made_line`); một kỹ năng không bật
+     được thì nói vậy kèm lý do ("I made it but couldn't put it on: …",
+     `made_skill::not_on_line`). Không đổi: lời đọc lại và lời đồng ý của
+     một lần ghi, namespace chạy bị giữ lại, các quyền và các giới hạn.
+     Khi tắt: như trên. Kiểm thử:
+     `with_the_switch_a_voice_code_make_goes_on_at_once_and_its_first_run_asks_nothing`,
+     `with_the_switch_a_code_make_not_made_or_not_on_says_so_plainly`,
+     `with_the_switch_a_send_still_waits_for_its_yes`,
+     `with_the_switch_a_voice_code_make_with_the_camera_still_waits_for_its_yes`,
+     `the_grants_that_go_on_at_once_never_hold_the_camera_or_the_microphone`,
+     `app_make::tests::with_the_switch_an_app_make_with_code_goes_on_at_once`,
+     `app_make::tests::with_the_switch_an_app_make_with_the_camera_still_waits_for_its_yes`,
+     và, khi tắt, `a_made_skill_with_code_waits_for_a_later_yes_and_goes_on_by_its_sha256`.
    - **Cái chạy nó** là `do.task` của #6305: `lamp-skills` chỉ nạp task của
      một kỹ năng `made: here` khi `LAMP_MADE_SCRIPTS=on`, và chỉ khi nó được
      bật dưới dạng package, không bao giờ từ Store, được đẩy lên hay bật từ
