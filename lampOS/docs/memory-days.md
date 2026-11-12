@@ -375,7 +375,14 @@ word, because every turn's session was shown it. Now it takes the evidence,
 "avoid peanuts because of your allergy" and an unlinked "I'm allergic to
 peanuts", and leaves the weather turns. The first builder's condition
 (#3504): a copy left behind is the failure that matters, so a linked row
-goes on a single shared word, a few unrelated ones with it. An unlinked
+goes on a single shared word, a few unrelated ones with it. That word is
+never one of the observation writer's opening verbs (`days::OPENERS`:
+want, ask, like, prefer, enjoy and their forms, as `tidy` reads them
+generic): on lamp-06c1 (12 Nov, C136) forgetting "Wants the light a little
+warmer." took five linked "Wants an event …" calendar asks and a "Wants a
+long story …" line on "want" alone. A fact of nothing but such verbs
+keeps them, so the walk is never wider than before; search and the copy
+rule below keep them too. An unlinked
 row needs every word, or "favourite colour is violet" would take every
 "favourite" the person said. A fact with no distinctive word takes the old
 broad walk, plus its literal copies (whole words; a text under three
