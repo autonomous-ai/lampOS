@@ -1146,10 +1146,12 @@ sau:
     này lấn ánh sáng của cái kia). Một lời gọi `make_skill` bằng giọng nói
     được so với các lời nhờ trước nó trong cùng thư mục
     (`make_skill_local::OneAsk`): câu nghe được hoặc request của nó là cùng
-    một lời nhờ với một lời nhờ trước khi chữ của chúng (chữ thường, chữ cái
-    và chữ số) giống nhau, hoặc câu có ít nhất 5 từ nằm trọn, đúng thứ tự,
-    trong câu kia (câu được mang sang có tên đèn hoặc một mảnh trước đó ở
-    đầu, hoặc không có). Khi lần tạo trước còn đang chạy, lời gọi không tạo
+    một lời nhờ với một lời nhờ trước khi câu có ít nhất 5 từ (chữ thường,
+    chữ cái và chữ số) nằm trọn, đúng thứ tự, trong câu kia: cùng các từ,
+    hoặc câu được mang sang có tên đèn hoặc một mảnh trước đó ở đầu, hoặc
+    không có. Hai câu giống nhau dưới 5 từ không phải một lời nhờ, nên hai
+    lần tạo cùng kết thúc bằng một câu trả lời ngắn giống nhau cho câu hỏi
+    của đèn ("green", "yes", "do it") đều được tạo. Khi lần tạo trước còn đang chạy, lời gọi không tạo
     gì và được báo là đang tạo (`"making": true`), câu của nó vẫn do lần
     tạo trước nói. Khi lần tạo đó đã được giữ và bật (hoặc đang chờ lời
     "có"), trong 3 phút (`make_skill_local::ONE_ASK_WITHIN`) và khi kỹ năng

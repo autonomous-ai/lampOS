@@ -3490,10 +3490,12 @@ gone ([switches.md](switches.md)). What happens:
     each outranking the other's light). A voice `make_skill` call is held
     to the asks before it in the same folder (`make_skill_local::OneAsk`):
     its heard line or its request is the same ask as an earlier one when
-    their words (lower case, letters and digits) are the same, or the one
-    of at least 5 words is held whole, in order, in the other (the carried
-    line with the lamp's name or an earlier piece before it, or without
-    them). While the earlier make is under way, the call makes nothing and
+    the one of at least 5 words (lower case, letters and digits) is held
+    whole, in order, in the other: the same words, or the carried line
+    with the lamp's name or an earlier piece before it, or without them.
+    Lines alike of fewer than 5 words are no one ask, so two makes each
+    ending on the same short answer to the lamp's question ("green",
+    "yes", "do it") are both made. While the earlier make is under way, the call makes nothing and
     is told it is being made (`"making": true`), its line still said by
     the earlier make. Once that make is kept and on (or waits for its yes),
     for 3 minutes (`make_skill_local::ONE_ASK_WITHIN`) and while the skill
