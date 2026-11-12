@@ -1835,6 +1835,40 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `agent_tasks::tests::the_lamp_engines_are_read_from_the_targets_answer`,
     `agent_tasks::tests::an_engine_is_said_by_its_name_or_its_id_with_a_capital`,
     `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
+  - **Named in the heard words, by code (#6492, the lead's V2).** While
+    the lamp has its own target, the voice reads the person's own heard
+    line for the request (a line the lamp wrote is not read) and sets
+    `where`/`engine`/`who` itself, so a model that leaves them out can't
+    send the task elsewhere. The names come only from what this lamp has:
+    the lamp's engines as last read (by id or the name it is called) and
+    the computer staff (Claude Code when none is read); never a fixed list
+    of agents. A name counts only as the doer: after "ask", "have", "tell",
+    "get" or "let", or "with", "using", "via" or "use" (not "don't ask …",
+    "did you ask …"), or first in the line before a comma ("Hey Lamp,
+    Hermes, …"); any case, its words together or apart ("Open Claw"). One
+    of the lamp's engines named: `where` `lamp` and that `engine`, whatever
+    the model sent. One of the staff named: `where` `computer`, `who` them,
+    no `engine`. A name on both the lamp and a computer is the lamp's,
+    unless the computer is named as the place or the words need the
+    computer's things: "my" + repo, repository, codebase, code, project,
+    folder, files or branch, or "the repo/repository/codebase" (general
+    words only; such a cue alone sets nothing). "On/use my/the computer",
+    "Mac", "MacBook", "laptop" or "PC" (a word may come between: "my office
+    computer") sets `where` `computer` and drops `engine` (and a `who`
+    naming only the lamp's engine); negated ("don't use my computer") or
+    "on the lamp", "yourself", "right here" sets `where` `lamp`, the model's
+    `engine` kept. A mention names nothing ("what is Hermes?", "OpenClaw's
+    update"), nor a name in no list; words that disagree (two agents, the
+    lamp and the computer, an agent only on the lamp with "on my computer",
+    one only on a computer with "on the lamp") set nothing, leaving the
+    model's args. Each override logs one line with what was set and what
+    the model sent, never the words. The read-back says where it runs, as
+    before ("OpenClaw on the lamp", "Claude Code on the office computer").
+    A turn where the model calls no `start_agent_task` is not changed.
+    Tests: `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
+    `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
+    `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
+    `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
   - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
     `runtime::tests::hermes_settings_are_written_at_start_only_with_a_token`,

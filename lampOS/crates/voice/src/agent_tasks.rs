@@ -695,6 +695,397 @@ fn named_lamp_engine(args: &Value) -> Option<String> {
         .cloned()
 }
 
+/// A place the person's own words name for a hand-over (#6492, the lead's
+/// V2): the lamp itself, or their computer.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NamedPlace {
+    Lamp,
+    Computer,
+}
+
+/// What the person's own heard words name for a hand-over ([`named_in`],
+/// #6492, the lead's V2), set by code so a model that leaves `engine` or
+/// `where` out can't send the task somewhere else.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+struct Named {
+    /// One of the lamp's engines (its id), said as the one to do the work;
+    /// [`Named::place`] is then the lamp.
+    lamp_engine: Option<String>,
+    /// One of the computer staff (as the person calls them), said as the
+    /// one to do the work; [`Named::place`] is then the computer.
+    computer_who: Option<String>,
+    place: Option<NamedPlace>,
+}
+
+/// The words right before a name that ask it to do the work ("ask Hermes
+/// …", "have OpenClaw …").
+const DOER_ASKING: [&str; 5] = ["ask", "have", "tell", "get", "let"];
+/// The words right before a name that make it the tool the work is done
+/// with ("… with Hermes", "… using OpenClaw", "… via Codex", "use Pi to …").
+const DOER_WITH: [&str; 4] = ["with", "using", "via", "use"];
+/// What the person calls their computer as a place ("on my Mac").
+const COMPUTER_WORDS: [&str; 5] = ["computer", "mac", "macbook", "laptop", "pc"];
+/// The most words a name may be heard as ("Open Claw" is two).
+const MOST_NAME_WORDS: usize = 3;
+/// What only the person's computer has, after "my" ("my repo", "my
+/// code") or, for the plainly computer ones, "the" ("the repo"): general
+/// words, never an agent's name. A cue that the work needs the computer's
+/// things (the lead's V2 rule, 10:51 on #6492).
+const COMPUTER_THINGS: [&str; 9] = [
+    "repo",
+    "repos",
+    "repository",
+    "codebase",
+    "code",
+    "project",
+    "folder",
+    "files",
+    "branch",
+];
+/// [`COMPUTER_THINGS`] a "the" may come before ("the repo"); "the code" or
+/// "the files" may be the lamp's own work.
+const COMPUTER_THINGS_THE: [&str; 3] = ["repo", "repository", "codebase"];
+
+/// [`Named`] in `heard` (#6492, the lead's V2). The names come only from
+/// what this lamp has: `lamp_engines` (Harness engine ids, matched by id or
+/// [`display_name`]) and `staff_names` (the computer staff as the person
+/// calls them); never a fixed list of agents. Any case, word-bounded, the
+/// words of a name said together or apart ("OpenClaw", "Open Claw"). A
+/// name counts only as the doer: after "ask", "have", "tell", "get" or
+/// "let", or "with", "using", "via" or "use" (not "don't ask …", "never ask
+/// …", "did you ask …"), or first in the line before a comma, after an opening
+/// ("Hey Lamp, Hermes, …"). A mention names nothing ("what is Hermes?",
+/// "OpenClaw's update", "Hermes the Greek god"). The place: "on/use my/the
+/// computer", "Mac", "MacBook", "laptop" or "PC" (one word may come between:
+/// "on my office computer") is the computer, and the lamp when negated
+/// ("don't use my computer"); "on the/my lamp", "yourself" or "right here"
+/// is the lamp. A name both on the lamp and among the staff is the lamp's,
+/// unless the computer is named as the place or the work needs its things
+/// ("my repo", "my code", "the codebase": [`COMPUTER_THINGS`]; the lead's V2
+/// rule, 10:51); such a cue alone sets no place. Where the
+/// words disagree (two agents said, the lamp and the computer, an agent
+/// only on the lamp with "on my computer", one only on a computer with "on
+/// the lamp"), nothing is named and the model's own args stand.
+fn named_in(heard: &str, lamp_engines: &[String], staff_names: &[&str]) -> Named {
+    // Each agent the words may name: its forms (plain), and whether it is
+    // one of the lamp's engines (its id) or of the staff (its name). The
+    // lamp's engine and one of the staff the person calls the same are one.
+    struct Agent {
+        forms: Vec<String>,
+        lamp: Option<String>,
+        computer: Option<String>,
+    }
+    let mut agents: Vec<Agent> = Vec::new();
+    for engine in lamp_engines {
+        let forms: Vec<String> = [plain(engine), plain(display_name(engine))]
+            .into_iter()
+            .filter(|form| !form.is_empty())
+            .collect();
+        if forms.is_empty() {
+            continue;
+        }
+        agents.push(Agent {
+            forms,
+            lamp: Some(engine.clone()),
+            computer: None,
+        });
+    }
+    for name in staff_names {
+        let form = plain(name);
+        if form.is_empty() {
+            continue;
+        }
+        match agents.iter_mut().find(|agent| agent.forms.contains(&form)) {
+            Some(agent) => agent.computer = Some((*name).to_owned()),
+            None => agents.push(Agent {
+                forms: vec![form],
+                lamp: None,
+                computer: Some((*name).to_owned()),
+            }),
+        }
+    }
+    // Each word, lower case ("Hermès" is "hermes"), whether a stop or comma
+    // comes right before it, and whether a comma comes right after it.
+    let mut words: Vec<String> = Vec::new();
+    let mut stopped: Vec<bool> = Vec::new();
+    let mut comma_after: Vec<bool> = Vec::new();
+    let mut stop = false;
+    for piece in heard.split_inclusive(|letter: char| !letter.is_alphanumeric()) {
+        let word: String = piece
+            .chars()
+            .filter(|letter| letter.is_alphanumeric())
+            .map(|letter| match letter {
+                'è' | 'é' | 'ê' | 'È' | 'É' | 'Ê' => 'e',
+                other => other,
+            })
+            .collect::<String>()
+            .to_lowercase();
+        if !word.is_empty() {
+            words.push(word);
+            stopped.push(stop);
+            comma_after.push(false);
+            stop = false;
+        }
+        if piece.contains(',')
+            && let Some(last) = comma_after.last_mut()
+        {
+            *last = true;
+        }
+        stop |= piece.chars().any(|letter| ".!?,;:".contains(letter));
+    }
+    let word = |at: Option<usize>| at.and_then(|at| words.get(at)).map(String::as_str);
+    // Whether the words from `at` for `count` are said together, no stop
+    // between them; past the line's end they are not.
+    let together = |at: usize, count: usize| {
+        (at + 1..at + count).all(|next| stopped.get(next).is_some_and(|stop| !stop))
+    };
+    // Whether a "not", "never" or "don't" comes in the few words before
+    // `at`, in the same sentence ("don't use my computer").
+    let negated_before = |at: usize| {
+        let mut back = at;
+        while back > 0 && at - back < 4 && !stopped[back] {
+            back -= 1;
+            let here = words[back].as_str();
+            if NOT.contains(&here) || (here == "t" && word(back.checked_sub(1)) == Some("don")) {
+                return true;
+            }
+        }
+        false
+    };
+    let first = words
+        .iter()
+        .position(|word| !OPENING.contains(&word.as_str()))
+        .unwrap_or(words.len());
+    let doer = |at: usize, count: usize| -> bool {
+        let after = at + count;
+        // "OpenClaw's update": a possessive is a mention.
+        if word(Some(after)) == Some("s") {
+            return false;
+        }
+        if at == first {
+            return comma_after[after - 1] && after < words.len();
+        }
+        if stopped[at] {
+            return false;
+        }
+        let before = words[at - 1].as_str();
+        if !DOER_ASKING.contains(&before) && !DOER_WITH.contains(&before) {
+            return false;
+        }
+        let before_verb = word(at.checked_sub(2)).unwrap_or_default();
+        let negated = NOT.contains(&before_verb)
+            || (before_verb == "t" && word(at.checked_sub(3)) == Some("don"));
+        let did_you =
+            before_verb == "you" && DID_YOU.contains(&word(at.checked_sub(3)).unwrap_or_default());
+        !negated && !did_you
+    };
+    // The agents said at all, and those said as the doer, by index.
+    let mut mentioned: Vec<usize> = Vec::new();
+    let mut doers: Vec<usize> = Vec::new();
+    let mut places: Vec<NamedPlace> = Vec::new();
+    // Whether the words need the computer's things ("in my repo").
+    let mut computer_cue = false;
+    let mut at = 0;
+    while at < words.len() {
+        // The longest name said from here.
+        let found = (1..=MOST_NAME_WORDS.min(words.len() - at))
+            .rev()
+            .filter(|&count| together(at, count))
+            .find_map(|count| {
+                let said = words[at..at + count].concat();
+                agents
+                    .iter()
+                    .position(|agent| agent.forms.contains(&said))
+                    .map(|agent| (agent, count))
+            });
+        if let Some((agent, count)) = found {
+            if !mentioned.contains(&agent) {
+                mentioned.push(agent);
+            }
+            if doer(at, count) && !doers.contains(&agent) {
+                doers.push(agent);
+            }
+            at += count;
+            continue;
+        }
+        let here = words[at].as_str();
+        let thing = word(Some(at + 1)).unwrap_or_default();
+        if together(at, 2)
+            && ((here == "my" && COMPUTER_THINGS.contains(&thing))
+                || (here == "the" && COMPUTER_THINGS_THE.contains(&thing)))
+        {
+            computer_cue = true;
+        }
+        let place = if matches!(here, "on" | "use") {
+            // "on my computer", "on the Mac", "on my office laptop".
+            let owned = matches!(word(Some(at + 1)), Some("my" | "the"));
+            let thing = if owned { at + 2 } else { at + 1 };
+            let named =
+                |at: usize, words: &[&str]| word(Some(at)).is_some_and(|w| words.contains(&w));
+            let thing = if named(thing, &COMPUTER_WORDS) || named(thing, &[LAMP_TARGET]) {
+                Some(thing)
+            } else if owned
+                && (named(thing + 1, &COMPUTER_WORDS) || named(thing + 1, &[LAMP_TARGET]))
+            {
+                Some(thing + 1)
+            } else {
+                None
+            };
+            thing
+                .filter(|&thing| together(at, thing + 1 - at))
+                .and_then(|thing| {
+                    if words[thing] == LAMP_TARGET {
+                        (!negated_before(at)).then_some(NamedPlace::Lamp)
+                    } else if negated_before(at) {
+                        Some(NamedPlace::Lamp)
+                    } else {
+                        Some(NamedPlace::Computer)
+                    }
+                })
+        } else if here == "yourself" || (here == "right" && word(Some(at + 1)) == Some("here")) {
+            (!negated_before(at)).then_some(NamedPlace::Lamp)
+        } else {
+            None
+        };
+        if let Some(place) = place
+            && !places.contains(&place)
+        {
+            places.push(place);
+        }
+        at += 1;
+    }
+    let place = match places.as_slice() {
+        [place] => Some(*place),
+        [] => None,
+        _ => return Named::default(),
+    };
+    match doers.as_slice() {
+        [] => Named {
+            place,
+            ..Named::default()
+        },
+        // Another agent said beside the doer ("ask Hermes, not OpenClaw")
+        // is words that disagree.
+        [doer] if mentioned.len() == 1 => {
+            let agent = &agents[*doer];
+            match (place, &agent.lamp, &agent.computer) {
+                // On both: the lamp, unless the computer is named or the
+                // work needs its things (the lead's V2 rule, 10:51).
+                (Some(NamedPlace::Computer), _, Some(who))
+                | (None, None, Some(who))
+                | (None, Some(_), Some(who))
+                    if place.is_some() || agent.lamp.is_none() || computer_cue =>
+                {
+                    Named {
+                        computer_who: Some(who.clone()),
+                        place: Some(NamedPlace::Computer),
+                        ..Named::default()
+                    }
+                }
+                (Some(NamedPlace::Lamp) | None, Some(engine), _) => Named {
+                    lamp_engine: Some(engine.clone()),
+                    place: Some(NamedPlace::Lamp),
+                    ..Named::default()
+                },
+                _ => Named::default(),
+            }
+        }
+        _ => Named::default(),
+    }
+}
+
+/// `args` with `where`, `engine` and `who` as the heard words name them
+/// ([`named_in`], #6492), and a line saying what code set, or `None` when
+/// the words name nothing or the model already sent the same. One of the
+/// lamp's engines named: `where` the lamp and that `engine`, whatever the
+/// model sent. One of the staff named: `where` `"computer"`, `who` them,
+/// no `engine`. The computer alone: `where` `"computer"`, no `engine`, and
+/// no `who` naming the lamp or only one of its engines. The lamp alone:
+/// `where` the lamp, the model's `engine` kept. The line names what was set
+/// and what the model sent, never the person's words.
+fn set_by_the_words(
+    args: &Value,
+    named: &Named,
+    lamp_engines: &[String],
+    staff_names: &[&str],
+) -> Option<(Value, String)> {
+    let place = named.place?;
+    let sent = |args: &Value, key: &str| {
+        args.get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|said| !said.is_empty())
+            .map(str::to_owned)
+    };
+    let mut set = if args.is_object() {
+        args.clone()
+    } else {
+        json!({})
+    };
+    match place {
+        NamedPlace::Lamp => {
+            set["where"] = json!(LAMP_TARGET);
+            if let Some(engine) = &named.lamp_engine {
+                set["engine"] = json!(engine);
+            }
+        }
+        NamedPlace::Computer => {
+            set["where"] = json!("computer");
+            if let Some(fields) = set.as_object_mut() {
+                fields.remove("engine");
+            }
+            if let Some(who) = &named.computer_who {
+                set["who"] = json!(who);
+            } else if let Some(who) = sent(&set, "who") {
+                let bare = who.trim_start_matches("the ").trim();
+                let staff = staff_names.iter().any(|name| plain(name) == plain(bare));
+                let lamp = bare.eq_ignore_ascii_case(LAMP_TARGET)
+                    || lamp_engine_called(lamp_engines, &who).is_some();
+                if lamp
+                    && !staff
+                    && let Some(fields) = set.as_object_mut()
+                {
+                    fields.remove("who");
+                }
+            }
+        }
+    }
+    if set == *args {
+        return None;
+    }
+    let shown = |args: &Value, key: &str| sent(args, key).unwrap_or_else(|| "none".to_owned());
+    let line = format!(
+        "the heard words set where={} engine={} who={} (the model sent where={} engine={} who={})",
+        shown(&set, "where"),
+        shown(&set, "engine"),
+        shown(&set, "who"),
+        shown(args, "where"),
+        shown(args, "engine"),
+        shown(args, "who"),
+    );
+    Some((set, line))
+}
+
+/// The words the person said in the line `request` answers, when a person
+/// said it (`heard`); a test sets its own, on its own thread.
+fn heard_words(request: u64, heard: bool) -> Option<String> {
+    if !heard {
+        return None;
+    }
+    #[cfg(test)]
+    {
+        let _ = request;
+        tests::HEARD_HERE
+            .with(std::cell::Cell::get)
+            .map(str::to_owned)
+    }
+    #[cfg(not(test))]
+    {
+        let thread = crate::thread::THREAD.lock().ok()?;
+        thread.heard_for(request, Instant::now())
+    }
+}
+
 /// What the model is told when the tasks part refuses a hand-over to the
 /// lamp naming an engine (#6492): `engine_not_here`, that engine is off or
 /// not installed on the lamp, or else `engine_unknown`; `name` is how the
@@ -3475,6 +3866,40 @@ fn run_for_asked(
             )
         }
         START => {
+            // A named agent or place goes by the person's heard words, not
+            // by the model alone (#6492, the lead's V2): only while the lamp
+            // has its own target, where `where` and `engine` are declared.
+            let by_the_words = (lamp_there() || declared_with_the_lamp())
+                .then(|| heard_words(request, heard))
+                .flatten()
+                .and_then(|words| {
+                    let engines = lamp_engines();
+                    // Without staff read, the one who does the work on the
+                    // computer, as the person calls them.
+                    let mut staff_names: Vec<&str> = Vec::new();
+                    for member in staff {
+                        if !staff_names.contains(&member.kind.name) {
+                            staff_names.push(member.kind.name);
+                        }
+                    }
+                    if staff_names.is_empty() {
+                        staff_names.push(CLAUDE_CODE);
+                    }
+                    let named = named_in(&words, &engines, &staff_names);
+                    set_by_the_words(&call.args, &named, &engines, &staff_names)
+                });
+            let set;
+            let call = match by_the_words {
+                Some((args, line)) => {
+                    eprintln!("lamp-voice provider: request {request}: {line}");
+                    set = ToolCall {
+                        args,
+                        ..call.clone()
+                    };
+                    &set
+                }
+                None => call,
+            };
             // The session the person named (#5535): only with the switch,
             // and refused, not cut, when it can't be a session's name.
             let session = match named_session_of(place, &call.args) {
@@ -4841,6 +5266,10 @@ pub(crate) mod tests {
         /// a test on this thread only ([`super::declared_with_the_lamp`]).
         pub(crate) static DECLARED_HERE: std::cell::Cell<bool> =
             const { std::cell::Cell::new(false) };
+        /// The person's heard words, for a test on this thread only
+        /// ([`super::heard_words`], #6492).
+        pub(crate) static HEARD_HERE: std::cell::Cell<Option<&'static str>> =
+            const { std::cell::Cell::new(None) };
     }
     /// Sets the lamp's engines, the default first, for a test on this
     /// thread only (#6492); `None` goes back to the engines as last read.
@@ -11689,6 +12118,339 @@ pub(crate) mod tests {
             Some("openclaw")
         );
         lamp_engines_here(None);
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #6492, the lead's V2: what the heard words name, by code, from the
+    /// lamp's engines and the computer staff only. A name counts only as
+    /// the doer; a bare mention or a name in no list names nothing; where
+    /// the words disagree, nothing is named.
+    #[test]
+    fn the_heard_words_name_the_doer_and_the_place() {
+        let engines: Vec<String> = ["hermes", "openclaw", "codex"].map(str::to_owned).to_vec();
+        let staff = ["Claude Code", "Devin"];
+        let lamp = |engine: &str| Named {
+            lamp_engine: Some(engine.to_owned()),
+            place: Some(NamedPlace::Lamp),
+            ..Named::default()
+        };
+        let computer = |who: &str| Named {
+            computer_who: Some(who.to_owned()),
+            place: Some(NamedPlace::Computer),
+            ..Named::default()
+        };
+        let at = |place: NamedPlace| Named {
+            place: Some(place),
+            ..Named::default()
+        };
+        let none = Named::default();
+        let table: Vec<(&str, Named)> = vec![
+            // The doer, by each asking word, any case.
+            ("Ask Hermes to summarise my inbox.", lamp("hermes")),
+            (
+                "have OpenClaw write a packing list to a file",
+                lamp("openclaw"),
+            ),
+            ("Tell hermes to check the weather", lamp("hermes")),
+            ("let OPENCLAW handle it", lamp("openclaw")),
+            ("Write a poem with Hermes.", lamp("hermes")),
+            ("Plan my week using OpenClaw", lamp("openclaw")),
+            ("send it via open claw", lamp("openclaw")),
+            ("get Open Claw to tidy up my notes", lamp("openclaw")),
+            ("can you ask Hermes to turn on the light", lamp("hermes")),
+            // First in the line before a comma, after an opening.
+            ("Hermes, write me a haiku.", lamp("hermes")),
+            ("Hey Lamp, OpenClaw, plan my day.", lamp("openclaw")),
+            ("Lamp, ask Hermès to read my mail", lamp("hermes")),
+            // A third engine from the lamp's list, by id.
+            ("ask Codex to fix the tests", lamp("codex")),
+            ("ask Hermes to do it on the lamp", lamp("hermes")),
+            // One of the staff on the computer.
+            ("ask Claude Code to tidy the repo", computer("Claude Code")),
+            ("have devin open a pull request", computer("Devin")),
+            (
+                "ask Claude Code on my computer to run it",
+                computer("Claude Code"),
+            ),
+            // A bare mention, a negation, a question about it.
+            ("What is Hermes?", none.clone()),
+            ("Tell me about OpenClaw's update.", none.clone()),
+            ("Hermes the Greek god had wings", none.clone()),
+            ("I like hermes scarves", none.clone()),
+            ("Open the door. Claw machines are fun.", none.clone()),
+            ("don't ask Hermes to do that", none.clone()),
+            ("did you ask OpenClaw to start?", none.clone()),
+            ("I asked Hermes yesterday", none.clone()),
+            // Names in no list: never named by code.
+            ("ask Pi to write a poem", none.clone()),
+            ("ask OpenCode to reply", none.clone()),
+            // Places.
+            (
+                "on my computer, clean up downloads",
+                at(NamedPlace::Computer),
+            ),
+            ("Run the tests on the Mac", at(NamedPlace::Computer)),
+            ("put it on my work laptop please", at(NamedPlace::Computer)),
+            ("Do it on the lamp.", at(NamedPlace::Lamp)),
+            ("just do it yourself", at(NamedPlace::Lamp)),
+            ("write it right here", at(NamedPlace::Lamp)),
+            ("don't use my computer for this", at(NamedPlace::Lamp)),
+            ("what is Hermes? do it on my Mac", at(NamedPlace::Computer)),
+            // Words that disagree.
+            ("ask Hermes on my computer to check it", none.clone()),
+            ("ask Claude Code to do it on the lamp", none.clone()),
+            ("ask Hermes and OpenClaw to compare notes", none.clone()),
+            ("ask Hermes, not OpenClaw", none.clone()),
+            ("on the lamp or on my Mac, whichever", none.clone()),
+        ];
+        assert!(table.len() >= 25);
+        for (heard, named) in &table {
+            assert_eq!(&named_in(heard, &engines, &staff), named, "{heard}");
+        }
+        // A name both on the lamp and among the staff: the lamp's, unless
+        // the computer is named as the place.
+        let both: Vec<String> = ["hermes", "claude"].map(str::to_owned).to_vec();
+        let staff = ["Claude Code"];
+        assert_eq!(
+            named_in("ask Claude Code to write a poem", &both, &staff),
+            lamp("claude")
+        );
+        assert_eq!(
+            named_in("ask Claude Code to write a poem on my Mac", &both, &staff),
+            computer("Claude Code")
+        );
+    }
+
+    /// #6492, the lead's V2 rule (10:51): an agent on both the lamp and a
+    /// computer works on the lamp unless the words need the computer's
+    /// things, by general words only; a place alone is that place; neither
+    /// names nothing, so the lamp's default stands.
+    #[test]
+    fn an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed() {
+        let both: Vec<String> = ["hermes", "claude", "codex"].map(str::to_owned).to_vec();
+        let staff = ["Claude Code", "Codex"];
+        let lamp = |engine: &str| Named {
+            lamp_engine: Some(engine.to_owned()),
+            place: Some(NamedPlace::Lamp),
+            ..Named::default()
+        };
+        let computer = |who: &str| Named {
+            computer_who: Some(who.to_owned()),
+            place: Some(NamedPlace::Computer),
+            ..Named::default()
+        };
+        let at = |place: NamedPlace| Named {
+            place: Some(place),
+            ..Named::default()
+        };
+        let table: [(&str, Named); 14] = [
+            // A name only: the lamp.
+            ("ask Claude Code to write a poem", lamp("claude")),
+            ("have Codex plan my week", lamp("codex")),
+            ("ask Codex to explain the code you wrote", lamp("codex")),
+            // A name and a cue that needs the computer: the computer.
+            (
+                "ask Claude Code to fix the bug in my repo",
+                computer("Claude Code"),
+            ),
+            ("have Codex tidy up my code", computer("Codex")),
+            ("ask Codex to add tests to the codebase", computer("Codex")),
+            (
+                "ask Claude Code to clean my project folder",
+                computer("Claude Code"),
+            ),
+            ("have Codex fix the file on my Mac", computer("Codex")),
+            (
+                "ask Claude Code on my laptop to run it",
+                computer("Claude Code"),
+            ),
+            // An agent only on the lamp keeps the lamp, cue or not.
+            ("ask Hermes to read my code", lamp("hermes")),
+            // A place only: that place; a cue alone sets none.
+            ("do it on my computer", at(NamedPlace::Computer)),
+            ("do it yourself", at(NamedPlace::Lamp)),
+            ("fix the bug in my repo", Named::default()),
+            // Neither: nothing, the lamp's default.
+            ("write me a poem", Named::default()),
+        ];
+        for (heard, named) in &table {
+            assert_eq!(&named_in(heard, &both, &staff), named, "{heard}");
+        }
+        // Nothing read: nothing named but the place.
+        assert_eq!(
+            named_in("ask Hermes to write a poem", &[], &[]),
+            Named::default()
+        );
+        assert_eq!(
+            named_in("do it on my computer", &[], &[]),
+            at(NamedPlace::Computer)
+        );
+    }
+
+    /// #6492, the lead's V2: what code sets over the model's args, and
+    /// nothing when the model already sent it or the words name nothing.
+    #[test]
+    fn the_heard_words_set_where_engine_and_who() {
+        let engines: Vec<String> = ["hermes", "openclaw"].map(str::to_owned).to_vec();
+        let staff = ["Claude Code"];
+        let set = |args: Value, heard: &str| {
+            set_by_the_words(&args, &named_in(heard, &engines, &staff), &engines, &staff)
+                .map(|(args, _)| args)
+        };
+        assert_eq!(
+            set(json!({"task":"t"}), "have OpenClaw write a list"),
+            Some(json!({"task":"t","where":"lamp","engine":"openclaw"}))
+        );
+        assert_eq!(
+            set(
+                json!({"task":"t","where":"computer","engine":"hermes"}),
+                "ask OpenClaw to tidy up my notes"
+            ),
+            Some(json!({"task":"t","where":"lamp","engine":"openclaw"}))
+        );
+        assert_eq!(
+            set(
+                json!({"task":"t","where":"lamp","engine":"hermes","who":"Hermes"}),
+                "on my computer, clean up downloads"
+            ),
+            Some(json!({"task":"t","where":"computer"}))
+        );
+        assert_eq!(
+            set(
+                json!({"task":"t","engine":"hermes"}),
+                "ask Claude Code to tidy the repo"
+            ),
+            Some(json!({"task":"t","where":"computer","who":"Claude Code"}))
+        );
+        assert_eq!(
+            set(json!({"task":"t","engine":"openclaw"}), "do it yourself"),
+            Some(json!({"task":"t","where":"lamp","engine":"openclaw"}))
+        );
+        // The model already sent the same, or the words name nothing.
+        assert_eq!(
+            set(
+                json!({"task":"t","where":"lamp","engine":"hermes"}),
+                "ask Hermes to write"
+            ),
+            None
+        );
+        assert_eq!(
+            set(json!({"task":"t","where":"computer"}), "What is Hermes?"),
+            None
+        );
+        let (_, line) = set_by_the_words(
+            &json!({"task":"secret words"}),
+            &named_in("ask Hermes to write secret words", &engines, &staff),
+            &engines,
+            &staff,
+        )
+        .unwrap();
+        assert_eq!(
+            line,
+            "the heard words set where=lamp engine=hermes who=none (the model sent where=none engine=none who=none)"
+        );
+    }
+
+    /// #6492, the lead's V2, through the hand-over: the heard words fix a
+    /// model that sent no engine, the wrong engine or the wrong place; a
+    /// bare mention leaves the model's args as they are.
+    #[test]
+    fn the_heard_words_set_the_engine_and_place_over_the_model() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory = std::env::temp_dir().join(format!("agent-heard-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let prepared = json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1});
+        let mut answers = Vec::new();
+        for _ in 0..6 {
+            answers.push(("request.sock", status.clone()));
+            answers.push(("request.sock", prepared.clone()));
+        }
+        let seen = tasks_part(&directory, answers);
+        let at = place(&directory, false);
+        let run_with = |heard: &'static str, args: Value, request: u64| {
+            LAMP_THERE_HERE.with(|here| here.set(Some(true)));
+            lamp_engines_here(Some(&["hermes", "openclaw", "codex"]));
+            HEARD_HERE.with(|here| here.set(Some(heard)));
+            let call = ToolCall {
+                id: "c".into(),
+                name: START.into(),
+                args,
+            };
+            let told = run(&at, &call, request, true, PEER_WAIT).0;
+            HEARD_HERE.with(|here| here.set(None));
+            lamp_engines_here(None);
+            LAMP_THERE_HERE.with(|here| here.set(None));
+            told
+        };
+        let prepare = || loop {
+            let line = seen.recv_timeout(PEER_WAIT).unwrap();
+            if line["op"] == "prepare" {
+                return line;
+            }
+        };
+        // The model sent no engine.
+        let no_engine = run_with(
+            "Have OpenClaw write a packing list to a file.",
+            json!({"task":"Write a packing list to a file"}),
+            3,
+        );
+        assert_eq!(no_engine["where"], "OpenClaw on the lamp", "{no_engine}");
+        let sent = prepare();
+        assert_eq!(
+            (&sent["target"], &sent["engine"]),
+            (&json!("lamp"), &json!("openclaw"))
+        );
+        // The model sent the wrong engine and the computer.
+        let wrong = run_with(
+            "Ask Codex to fix the tests.",
+            json!({"task":"Fix the tests","where":"computer","engine":"hermes"}),
+            4,
+        );
+        assert_eq!(wrong["where"], "Codex on the lamp", "{wrong}");
+        let sent = prepare();
+        assert_eq!(
+            (&sent["target"], &sent["engine"]),
+            (&json!("lamp"), &json!("codex"))
+        );
+        // The model sent the lamp; the person named their computer.
+        let to_computer = run_with(
+            "On my computer, clean up downloads.",
+            json!({"task":"Clean up downloads","where":"lamp","engine":"hermes"}),
+            5,
+        );
+        assert_eq!(
+            to_computer["where"], "Claude Code on the office computer",
+            "{to_computer}"
+        );
+        let sent = prepare();
+        assert_eq!(sent["target"], "office");
+        assert_eq!(sent.get("engine"), None, "{sent}");
+        // A bare mention: the model's args stand.
+        let mention = run_with(
+            "What is Hermes?",
+            json!({"task":"Write a poem","where":"computer"}),
+            6,
+        );
+        assert_eq!(
+            mention["where"], "Claude Code on the office computer",
+            "{mention}"
+        );
+        let sent = prepare();
+        assert_eq!(sent["target"], "office");
+        assert_eq!(sent.get("engine"), None, "{sent}");
+        let unchanged = run_with(
+            "Tell me about OpenClaw's update, then write a poem.",
+            json!({"task":"Write a poem","engine":"hermes"}),
+            7,
+        );
+        assert_eq!(unchanged["where"], "Hermes on the lamp", "{unchanged}");
+        assert_eq!(prepare()["engine"], "hermes");
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }
