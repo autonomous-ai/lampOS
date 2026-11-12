@@ -646,6 +646,14 @@ impl Records {
         self.log_entry(serde_json::json!({"at_unix_ms": unix_ms(), "event": event, "line": line}));
     }
 
+    /// What a round said, in one line of the log (#6266 5b): `lines`, in
+    /// order. Not a round's end (no `"round"`), so `last_round` passes it over.
+    pub fn log_lines(&self, event: &str, lines: &[String]) {
+        self.log_entry(
+            serde_json::json!({"at_unix_ms": unix_ms(), "event": event, "lines": lines}),
+        );
+    }
+
     /// A round's end in the log, marked as one and with the build it was
     /// about: what `update/status` says as the last result, read back when
     /// lamp-update starts again (#2194, `crate::status`).

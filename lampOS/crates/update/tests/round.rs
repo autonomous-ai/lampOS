@@ -69,6 +69,8 @@ mod reset_hold;
 mod restart_order;
 #[path = "round/restart_quiet.rs"]
 mod restart_quiet;
+#[path = "round/round_lines.rs"]
+mod round_lines;
 #[path = "round/self_after_parts.rs"]
 mod self_after_parts;
 #[path = "round/self_cuts.rs"]
