@@ -15,9 +15,12 @@ use std::collections::VecDeque;
 /// Its own name on `name/heard`: `voice` is the second look's.
 pub const SUBSCRIBER: &str = "voice_faint";
 
-/// The detector's blocks are kept this long: a hearing is said a tenth of a
-/// second or more after the name began, and the name is a second or so.
-const KEPT_US: u64 = 3_000_000;
+/// The detector's blocks are kept this long. A hearing is said a tenth of a
+/// second or more after the name began, but a woken grid's late score can
+/// date it about 3.4 s back (`hear.rs`' late cut in lamp-name, #6114), and a
+/// hearing runs up to 800 ms (lamp-name's `said::LONGEST`). Neither is
+/// reachable from this crate, so 5 s covers both with the 0.3 s slack.
+const KEPT_US: u64 = 5_000_000;
 /// A block this long before the name's beginning still counts for it: when
 /// the name began is the listener's own estimate.
 const SLACK_US: u64 = 300_000;
@@ -134,7 +137,14 @@ mod tests {
     #[test]
     fn nothing_is_said_without_a_name_or_when_the_floor_turned_nothing_away() {
         let mut heard = FaintNamed::default();
-        // A quiet room: blocks under the floor, no name.
+        // A quiet room: blocks under the floor, no name. Nothing is said
+        // until a name comes, however long the blocks go on.
+        under_the_floor(&mut heard);
+        for index in 40..400u64 {
+            heard.block(1_000_000 + index * BLOCK_US, 0.9, 135, Some(150), true);
+        }
+        assert_eq!(heard.said_until_us, None, "no line without a name");
+        let mut heard = FaintNamed::default();
         under_the_floor(&mut heard);
         // A name over the floor: the line was heard.
         let mut over = FaintNamed::default();
@@ -150,6 +160,25 @@ mod tests {
             no_floor.block(1_000_000 + index * BLOCK_US, 0.9, 135, None, false);
         }
         assert_eq!(no_floor.named(1_050_000, 1_500_000, 0.99), None);
+    }
+
+    #[test]
+    fn a_late_hearing_dated_far_back_is_still_said() {
+        // A woken grid's late score dates the name 3.8 s back (#6114): the
+        // call's blocks, turned away, are still kept when it is said.
+        let mut heard = FaintNamed::default();
+        under_the_floor(&mut heard);
+        let began = 1_050_000;
+        let now = began + 3_800_000;
+        for index in 0..345u64 {
+            heard.block(1_400_000 + index * BLOCK_US, 0.1, 40, Some(150), true);
+        }
+        let line = heard.named(began, now, 0.95);
+        assert!(
+            line.as_deref()
+                .is_some_and(|line| line.contains("40 of 40 speech blocks")),
+            "{line:?}"
+        );
     }
 
     #[test]
