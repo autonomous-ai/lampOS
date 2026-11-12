@@ -401,8 +401,9 @@ impl Speaker {
         true
     }
 
-    /// Ends `conn`'s stream, if it runs, without an event: its own `off`,
-    /// `stop`, the connection closing, or a re-pairing without the grant.
+    /// Ends `conn`'s stream, if it runs, without an event: its own `off` or
+    /// `stop` (not the connection closing: that is [`Speaker::end_conn`]'s, and
+    /// plays out what is held). The voice is told to cut the sound now.
     pub fn end_of(&self, conn: u64, client: &str) {
         let mut slot = self.open.slot.lock().expect("slot");
         if let Some(turn) = slot
@@ -609,6 +610,10 @@ impl Run {
         if *hard == Some(self.turn) {
             *hard = None;
             voice.cancel();
+            eprintln!(
+                "lamp-control: speaker stream of {} cut at the computer's off, stop or revoke",
+                self.client
+            );
         }
     }
 
@@ -1305,6 +1310,9 @@ mod tests {
         let first = replaced.said.clone();
         replaced.on(2, "c_2", Some(24_000)).unwrap();
         assert!(wait(|| !replaced.told_ev("speaker.ended").is_empty()));
+        // The old stream's thread has left (its stream is dropped: `closed`;
+        // the second still runs) before "not cancelled" can mean anything.
+        assert!(wait(|| first.closed.load(Ordering::SeqCst)));
         assert!(!first.cancelled.load(Ordering::SeqCst));
     }
 

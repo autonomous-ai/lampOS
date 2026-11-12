@@ -199,8 +199,9 @@ pub(crate) fn hold(
     answered: mpsc::Receiver<Answer>,
     cancel: Cancel,
     by: String,
+    already: Vec<u8>,
 ) {
-    hold_with(stream, answered, cancel, by, bus, STATS_EVERY);
+    hold_with(stream, answered, cancel, by, already, bus, STATS_EVERY);
 }
 
 /// The lamp's bus; a test's own, when it has one.
@@ -229,6 +230,7 @@ pub(crate) fn hold_with(
     answered: mpsc::Receiver<Answer>,
     cancel: Cancel,
     by: String,
+    already: Vec<u8>,
     bus: impl FnOnce() -> io::Result<Bus>,
     stats_every: Duration,
 ) {
@@ -238,7 +240,12 @@ pub(crate) fn hold_with(
     let mut sound: Option<Sound> = None;
     let mut last_said = Instant::now();
     let mut closed = false;
-    let mut said_so_far: Vec<u8> = Vec::new();
+    let mut stopped = false;
+    // What the computer wrote after its request line, in the read that took it.
+    let mut said_so_far = Said {
+        held: already,
+        dropping: false,
+    };
     let outcome = loop {
         match answered.recv_timeout(LOOK) {
             Ok(Answer::Begun(_)) => {
@@ -299,6 +306,7 @@ pub(crate) fn hold_with(
                 // voice answers `dropped`, as it does for any say's asker.
                 Asked::Stop => {
                     closed = true;
+                    stopped = true;
                     cancel.store(true, Ordering::Release);
                     if let Some(feed) = feed.as_ref() {
                         feed.close();
@@ -327,9 +335,15 @@ pub(crate) fn hold_with(
         }
     };
     let _ = writeln!(stream, "{}", outcome.line());
+    // The journal says a cut from a close: the same counts, and why.
     eprintln!(
-        "[voice] speaker stream of {:?} closed: {:?}",
+        "[voice] speaker stream of {:?} closed{}: {:?}",
         by,
+        if stopped {
+            " (stopped by its asker)"
+        } else {
+            ""
+        },
         sound.map(|sound| sound.counts)
     );
 }
@@ -346,22 +360,48 @@ enum Asked {
     Stop,
 }
 
-/// Reads what its computer wrote without waiting, whole lines kept in `held`.
+/// What its computer wrote that is not yet a whole line.
+struct Said {
+    held: Vec<u8>,
+    /// Past the most a line may be: what comes is dropped up to its newline,
+    /// so the tail of an over-long line is never read as a line of its own.
+    dropping: bool,
+}
+
+/// Reads what its computer wrote without waiting, whole lines kept in `said`.
 /// A line is its stop when it is [`crate::say::CANCEL_LINE`]'s; any other line
-/// is dropped; one past the most a line may be is dropped too.
-fn asked(stream: &UnixStream, held: &mut Vec<u8>) -> Asked {
+/// is dropped; a line past [`MOST_LINE`] is dropped whole, as it comes. A look
+/// reads at most [`MOST_READS`] pieces, so a computer that never stops writing
+/// cannot hold this thread in it.
+fn asked(stream: &UnixStream, said: &mut Said) -> Asked {
     if stream.set_nonblocking(true).is_err() {
         return Asked::Nothing;
     }
     let mut piece = [0u8; 512];
     let mut found = Asked::Nothing;
-    loop {
+    for _ in 0..MOST_READS {
         match (&*stream).read(&mut piece) {
             Ok(0) => {
                 found = Asked::Closed;
                 break;
             }
-            Ok(read) => held.extend_from_slice(&piece[..read]),
+            Ok(read) => {
+                let mut fresh = &piece[..read];
+                if said.dropping {
+                    match fresh.iter().position(|&byte| byte == b'\n') {
+                        Some(end) => {
+                            said.dropping = false;
+                            fresh = &fresh[end + 1..];
+                        }
+                        None => continue,
+                    }
+                }
+                said.held.extend_from_slice(fresh);
+                if said.held.len() > MOST_LINE && !said.held.contains(&b'\n') {
+                    said.held.clear();
+                    said.dropping = true;
+                }
+            }
             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
             Err(error) => {
                 if error.kind() != io::ErrorKind::WouldBlock {
@@ -372,17 +412,17 @@ fn asked(stream: &UnixStream, held: &mut Vec<u8>) -> Asked {
         }
     }
     let _ = stream.set_nonblocking(false);
-    while let Some(end) = held.iter().position(|&byte| byte == b'\n') {
-        let line: Vec<u8> = held.drain(..=end).collect();
+    while let Some(end) = said.held.iter().position(|&byte| byte == b'\n') {
+        let line: Vec<u8> = said.held.drain(..=end).collect();
         if is_cancel(&line) {
             return Asked::Stop;
         }
     }
-    if held.len() > MOST_LINE {
-        held.clear();
-    }
     found
 }
+
+/// The most pieces one look reads.
+const MOST_READS: usize = 64;
 
 /// The most of a line from its computer that is kept waiting for its newline.
 const MOST_LINE: usize = 4096;
@@ -474,6 +514,21 @@ mod tests {
         UnixStream,
         thread::JoinHandle<()>,
     ) {
+        held_after(bus, Vec::new())
+    }
+
+    /// [`held`], with `already` the bytes that came with the request line.
+    #[allow(clippy::type_complexity)]
+    fn held_after(
+        bus: Bus,
+        already: Vec<u8>,
+    ) -> (
+        mpsc::Sender<Answer>,
+        Cancel,
+        BufReader<UnixStream>,
+        UnixStream,
+        thread::JoinHandle<()>,
+    ) {
         let (voice, computer) = UnixStream::pair().unwrap();
         let (answer, answered) = mpsc::channel();
         let cancel = Cancel::default();
@@ -484,6 +539,7 @@ mod tests {
                 answered,
                 held_cancel,
                 "desk".to_owned(),
+                already,
                 move || Ok(bus),
                 Duration::from_millis(50),
             );
@@ -642,6 +698,58 @@ mod tests {
             .unwrap();
         served.join().unwrap();
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_stop_that_came_with_the_request_line_is_its_stop_and_an_over_long_lines_tail_is_not() {
+        let _turn = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        // Bytes that arrived in the same read as the request line count.
+        let (bus, dir) = temp_bus("stop-with-request");
+        let (answer, cancel, _said, _computer, served) =
+            held_after(bus, b"{\"cancel\":true}\n".to_vec());
+        let began = Instant::now();
+        while !cancel.load(Ordering::Acquire) {
+            assert!(
+                began.elapsed() < Duration::from_secs(2),
+                "the stop that came with the request was lost"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        answer
+            .send(Answer::Done(Outcome::Dropped("stopped".into())))
+            .unwrap();
+        served.join().unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+        // A line past the most is dropped whole: its tail, which here is a
+        // cancel line, is no line of its own; the next real one is the stop.
+        let (bus, dir) = temp_bus("long-line");
+        let (answer, cancel, _said, mut computer, served) = held(bus);
+        for _ in 0..12 {
+            computer.write_all(&[b'a'; 512]).unwrap();
+        }
+        thread::sleep(Duration::from_millis(200));
+        computer.write_all(b"{\"cancel\":true}\n").unwrap();
+        thread::sleep(Duration::from_millis(300));
+        assert!(
+            !cancel.load(Ordering::Acquire),
+            "the tail of an over-long line was read as a stop"
+        );
+        computer.write_all(b"{\"cancel\":true}\n").unwrap();
+        let began = Instant::now();
+        while !cancel.load(Ordering::Acquire) {
+            assert!(
+                began.elapsed() < Duration::from_secs(2),
+                "the stop after it was not seen"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        answer
+            .send(Answer::Done(Outcome::Dropped("stopped".into())))
+            .unwrap();
+        served.join().unwrap();
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
