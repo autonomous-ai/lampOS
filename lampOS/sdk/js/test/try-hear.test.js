@@ -105,9 +105,9 @@ test('the sound rows ask the page for the sound and say what was sent; with no p
   assert.match(kept, /a 300 ms quiet tone\) -> \{.*\}  \/\/ audio: 14,444 bytes to this page \(the clip saved on the lamp\)$/);
   await run('sound_remove');
   // The labels the lead fixed, each at most 200 characters.
-  assert.equal(row('say').hint, "spoken by your browser (the lamp's real voice sounds different)");
+  assert.equal(row('say').hint, "spoken by your browser when 'Hear the lamp in this page' is on (the lamp's real voice sounds different; the stand-in voice may speak it too)");
   assert.match(row('sound').hint, /^a stand-in for the lamp's hum/);
-  assert.match(row('turn_start').hint, /^the virtual lamp has no model, so it gives no spoken answer: the log says done; a real lamp answers aloud$/);
+  assert.match(row('turn_start').hint, /^the virtual lamp has no model unless it runs with --real-voice, so otherwise it gives no spoken answer and the log says done; a real lamp answers aloud$/);
   for (const c of CONTROLS) for (const key of ['hint', 'hintReal']) assert.ok(!c[key] || c[key].length <= 200, `${c.id} ${key}`);
 });
 
