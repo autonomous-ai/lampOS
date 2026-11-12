@@ -464,3 +464,134 @@ fn services_are_read_by_their_names() {
     // Monday alone is a day, and a drive alone is not Google Drive.
     assert!(services_read("On Monday, drive to work.").is_empty());
 }
+
+/// A photobooth file that names its key and token as variables, as the
+/// owner's names them, with no value.
+fn photobooth_with_names() -> String {
+    format!(
+        "{}\n## Keys\n\nThe image API key is read from `$GEMINI_API_KEY`, and the bot's from \
+         os.environ[\"TELEGRAM_BOT_TOKEN\"]. Set both in the app.\n",
+        photobooth()
+    )
+}
+
+/// `LAMP_SKILL_SECRETS`: the file's variables' names (never a value) are
+/// its `skill.toml`'s `secrets`, said to the app with the upload, the
+/// tool's note says a key is never taken by voice, and the cap holds them.
+/// Off, no name is read and the file is as before.
+#[test]
+fn with_the_keys_switch_a_files_variables_are_its_secrets_by_name() {
+    switches(true, true);
+    set_secrets_here(Some(true));
+    let (files, _) = files(&photobooth_with_names()).unwrap();
+    assert!(
+        files
+            .toml
+            .contains("secrets = [\"GEMINI_API_KEY\", \"TELEGRAM_BOT_TOKEN\"]\n"),
+        "{}",
+        files.toml
+    );
+    assert_eq!(
+        secrets_of_toml(&files.toml),
+        ["GEMINI_API_KEY", "TELEGRAM_BOT_TOKEN"]
+    );
+    assert!(capped(&files.toml).is_ok());
+    assert!(
+        files
+            .card
+            .contains("Never ask for, take or repeat a key or token by voice")
+    );
+    assert!(files.card.len() < 1_100);
+    // The upload tells the app the names.
+    let (root, keeping) = keeping("agent-secret-names");
+    let asked = json!({"upload": {"skill_md": photobooth_with_names()}});
+    let (told, _) =
+        crate::upload_skill::line(&asked, true, true, &place(&root), &keeping, NOW).unwrap();
+    assert_eq!(
+        told["kept"]["secrets"],
+        json!(["GEMINI_API_KEY", "TELEGRAM_BOT_TOKEN"]),
+        "{told}"
+    );
+    // A cap that names a reserved one, or a name twice, is refused.
+    for bad in [
+        "secrets = [\"PATH\"]",
+        "secrets = [\"GOOD_KEY\", \"GOOD_KEY\"]",
+        "secrets = \"GOOD_KEY\"",
+    ] {
+        let toml = files.toml.replace(
+            "secrets = [\"GEMINI_API_KEY\", \"TELEGRAM_BOT_TOKEN\"]",
+            bad,
+        );
+        assert!(capped(&toml).is_err(), "{bad}");
+    }
+    // Off: no names read, the toml as before.
+    set_secrets_here(Some(false));
+    let (off, _) = super::files(&photobooth_with_names()).unwrap();
+    assert!(!off.toml.contains("secrets"));
+    assert!(!off.card.contains("by voice"));
+    let _ = std::fs::remove_dir_all(&root);
+    set_secrets_here(None);
+    switches(false, false);
+}
+
+/// With the keys switch, a file carrying a value is still refused, and
+/// told plainly to take the value out and add it in the app.
+#[test]
+fn with_the_keys_switch_a_value_in_the_file_is_told_to_go_in_the_app() {
+    switches(true, true);
+    set_secrets_here(Some(true));
+    let fake = ["FAKE", "Key", "0000", "1111", "abcd", "2222", "efgh"].concat();
+    let card = format!("{}\nGEMINI_API_KEY={fake}\n", photobooth());
+    let why = files(&card).unwrap_err().0;
+    assert_eq!(why, HAS_SECRET_VALUE);
+    assert!(why.contains("add the value in the app"));
+    assert!(!why.contains(&fake));
+    set_secrets_here(None);
+    switches(false, false);
+}
+
+/// The voice never takes a key: an agent skill's tool called while a key
+/// it needs isn't in the app is told, by name, to add it there, and
+/// nothing runs; with them all set, or the switch off, it runs.
+#[test]
+fn a_tool_missing_a_key_says_to_add_it_in_the_app_and_never_by_voice() {
+    switches(true, true);
+    set_secrets_here(Some(true));
+    let (root, keeping) = keeping("agent-keys-missing");
+    let made = take(&place(&root), &keeping, None, &photobooth_with_names(), NOW).unwrap();
+    let asked = manage_helper(&keeping.manage);
+    made_skill::put_on(&keeping, &made).unwrap();
+    asked.join().unwrap();
+    let needed = json!(["GEMINI_API_KEY", "TELEGRAM_BOT_TOKEN"]);
+    let told = keys_missing_with(&keeping.directory, "photo_booth", |skill| {
+        assert_eq!(skill, "photo-booth");
+        Some(json!({"skill": skill, "needed": needed, "set": ["GEMINI_API_KEY"]}))
+    })
+    .unwrap();
+    let line = told["refused"].as_str().unwrap();
+    assert!(
+        line.contains("needs TELEGRAM_BOT_TOKEN added in the app"),
+        "{line}"
+    );
+    assert!(
+        line.contains("Never ask for the key or token by voice"),
+        "{line}"
+    );
+    assert!(!line.contains("GEMINI_API_KEY"), "{line}");
+    // All set: it runs.
+    assert!(
+        keys_missing_with(&keeping.directory, "photo_booth", |skill| Some(
+            json!({"skill": skill, "needed": needed, "set": needed})
+        ))
+        .is_none()
+    );
+    // The lamp's services can't say: left to lamp-tasks.
+    assert!(keys_missing_with(&keeping.directory, "photo_booth", |_| None).is_none());
+    // Another tool, or the switch off: nothing asked.
+    assert!(keys_missing_with(&keeping.directory, "other_tool", |_| panic!()).is_none());
+    set_secrets_here(Some(false));
+    assert!(keys_missing_with(&keeping.directory, "photo_booth", |_| panic!()).is_none());
+    let _ = std::fs::remove_dir_all(&root);
+    set_secrets_here(None);
+    switches(false, false);
+}

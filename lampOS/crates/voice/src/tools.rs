@@ -1683,6 +1683,12 @@ fn run_spoken_call_inner(
     {
         // An agent skill added from a file (`LAMP_UPLOAD_TO_AGENT`) whose
         // task's yes isn't kept: its first run asks it, and nothing runs.
+        // One that needs a key not yet added in the app
+        // (`LAMP_SKILL_SECRETS`): told so plainly, never asked by voice,
+        // and nothing runs.
+        if let Some(told) = crate::upload_agent::keys_missing(&call.name) {
+            return ("the agent skill's keys", ToolAnswer::plain(told), true);
+        }
         if let Some(told) = crate::upload_agent::first_run(&call.name, request, heard, lease) {
             return ("the agent skill's yes", ToolAnswer::plain(told), true);
         }
