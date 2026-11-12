@@ -1358,6 +1358,16 @@ mô hình được hỏi lại một lần, lần thứ hai thì lamp nói «I d
 Tell me again and I'll remember it.». Chi tiết ở
 [second-voice.md](../second-voice.md).
 
+Các vòng đã xong của một câu trả lời bị cắt, được mang sang một câu bị giữ
+(#5026), cũng tính là của lượt đó: một lệnh mang sang đã làm được việc (kết
+quả của chính vòng của nó, khớp theo id trong vòng đó vì id lặp lại giữa các
+vòng, không phải `remembered:false` hay một lỗi) chống lưng cho «Kept: …» của
+câu bị giữ, và một `remember_my_face` mang sang đã lưu chống lưng cho lời
+nói đã lưu khuôn mặt; một lệnh giữ mang sang bị từ chối hay lỗi thì không
+(C135, lamp-06c1, 12/11, bản 12226: yêu cầu 26 đã giữ chiếc ô, mục 1665, một
+câu mới cắt nó trước khi kịp nói, và «Kept: …» của yêu cầu 27 bị nói thành
+`NOT_KEPT_LINE`).
+
 ## Lời bị cắt giữ phạm vi mà câu của nó đã định (lamp-0c4e, 10/11)
 
 Trên lamp-0c4e, một câu hỏi được mang theo (yêu cầu 238, về trà nhài) đã
