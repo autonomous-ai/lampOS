@@ -1845,21 +1845,27 @@ mod tests {
             .unwrap();
         let mut out = BusOut::on(&bus).unwrap();
         // Passed on: steps 0, 4, 8, 12, 16. Pushed on 4 and 8 (and 12, 16 not).
+        // Each passed-on step's hand is waited for before the next is
+        // offered. Offering all five at once queued them behind each
+        // other's file writes, and on a loaded CI runner the last ones
+        // aged past LASTS in the queue and were rightly not said.
+        let mut said: Vec<Hand> = Vec::new();
         for step in 0..20 {
             let mut seen = glimpse(step);
             seen.hand = (4..12).contains(&step);
             out.offer(&seen);
+            if offered(&seen) {
+                said.push(
+                    hands
+                        .recv(Duration::from_secs(20))
+                        .unwrap()
+                        .expect("a hand")
+                        .parse()
+                        .unwrap(),
+                );
+            }
         }
-        let said: Vec<Hand> = (0..5)
-            .map(|_| {
-                hands
-                    .recv(Duration::from_secs(5))
-                    .unwrap()
-                    .expect("a hand")
-                    .parse()
-                    .unwrap()
-            })
-            .collect();
+        assert_eq!(out.let_go, 0, "every passed-on step had room");
         assert_eq!(
             said.iter().map(|h| h.pushed).collect::<Vec<_>>(),
             [false, true, true, false, false]

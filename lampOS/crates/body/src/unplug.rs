@@ -1035,8 +1035,10 @@ mod tests {
                 }
                 assert!(shared.latched.load(Ordering::SeqCst));
                 let took = Duration::from_micros(offset - began);
+                // The 2 s bound is on the fake timeline and is what the test
+                // proves; it does not depend on how fast the host runs.
                 assert!(
-                    took < Duration::from_secs(2) && host_began.elapsed() < Duration::from_secs(2),
+                    took < Duration::from_secs(2),
                     "{label}: no {want:?} in 2 s: {:?}",
                     phase()
                 );
@@ -1046,6 +1048,15 @@ mod tests {
                     }
                     assert_ne!(now, Phase::Failed, "{label}: waiting for {want:?}: {why}");
                 }
+                // The host bound only stops a hang. It was 2 s and judged
+                // before the phase was read: a loaded CI runner spent over
+                // 2 s of wall time on the ~60 bus round trips of the first
+                // proof and failed with Ready already published.
+                assert!(
+                    host_began.elapsed() < Duration::from_secs(20),
+                    "{label}: hung for 20 s waiting for {want:?}: {:?}",
+                    phase()
+                );
                 // Read the synchronous bus result before advancing time.
                 elapsed.set(offset + 10_000);
             }
