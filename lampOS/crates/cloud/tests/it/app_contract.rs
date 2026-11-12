@@ -727,6 +727,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
                     commit: "5b40a1523".into(),
                 }),
             }),
+            refused: None,
             engines: None,
         },
     )
@@ -783,6 +784,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         last: None,
         harness: None,
         round: None,
+        refused: None,
         engines: None,
     };
     says.publish_json(0, &idle).unwrap();
@@ -957,6 +959,7 @@ fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
         last: None,
         harness: None,
         round: None,
+        refused: None,
         engines: Some(std::collections::BTreeMap::from([(
             "hermes".to_owned(),
             lamp_msgs::EngineInstall {

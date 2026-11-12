@@ -880,8 +880,8 @@ impl Lamp for Real {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
 
-    fn check_update(&mut self, now: Instant) -> Result<(), String> {
-        self.update_checks.ask(self.bus.as_ref(), now)
+    fn check_update(&mut self, now: Instant, retry: Option<u64>) -> Result<(), String> {
+        self.update_checks.ask(self.bus.as_ref(), now, retry)
     }
 
     fn engines_page(&self) -> bool {

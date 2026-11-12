@@ -161,7 +161,7 @@ lamp says so.
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
 | `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale", "round"?: {"started_at_unix_ms", "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}}`, from lamp-update's kept `update/status`; `round` only while a round runs (#5473, "The round under way" below); `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below); with `LAMP_APP_ENGINES=on` here and in lamp-update, also `"engines": {"hermes": {"state", "version"?, "reason"?, "at_unix_ms"?}, "openclaw": {…}, ENGINE: {…}…}`, every other engine the lamp's Harness has too ("The lamp's agents" below). Without the switch, V1's "not on this lamp" |
-| `update.check` (`{}`) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
+| `update.check` (`{}`, or `{"retry": SEQUENCE}` for a refused build, #6266) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
 | `engines.install` (`{"engine": "hermes"}` or `"openclaw"`) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on` (#6240, "The lamp's agents" below): asks `lamp-update serve` to install a missing agent at its next round. `{"install": "started"}`, or `failure` with `no such agent on this lamp` (lamp-update says no such engine), `the agent is not missing or failed` (its `state` is not `not_installed` or `failed`), `asked less than a minute ago`, `not installable from the app on this build` (an agent this build has no installer for: any but Hermes and OpenClaw), or `lamp-update is not listening for a check`. Without the switches, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
@@ -627,6 +627,21 @@ before any switch (nobody heard or answered for 45 s, or the lamp asleep or
 muted), and `--apply` as set, so a tap never installs in the middle of a
 conversation. The reply is `update.status`'s object with
 `"check": "started"`; the app then follows the round on `update.status`.
+
+**A refused build and the owner's retry (#6266).** `update.status` says
+`refused` when the lamp has put back a build newer than the one it runs and
+will not take it again: `{"sequence", "reason", "at_unix_ms"}`, `reason` a
+fixed name and never the refusal's text (which names paths and parts):
+`cut_short` (switches cut short by power loss or a reboot, three in a row),
+`held` (a part held still by a passing local state, a kept unplug request,
+right after the switch), `part_unwell` (a part not well after it) or `other`
+(the switch's own steps). Absent when none is. The app offers a retry:
+`update.check` with `{"retry": SEQUENCE}`, a whole number, which drops that
+build's refusal before the round, so the round takes it again. A sequence that
+is not refused is a plain check, and a build that is really unwell is refused
+again by the round itself, so a retry never loops. A `retry` that is not a
+whole number is refused, `retry must be the refused build's sequence, a whole
+number`, and nothing is sent. The same minute and the same refusals apply.
 
 It is refused, in V1's failure shape with the reason the app shows:
 
