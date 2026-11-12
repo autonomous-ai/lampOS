@@ -185,10 +185,11 @@ pub const INSTALL_PATH: &str = "/var/lib/lampos-openclaw/node/bin:/usr/bin:/bin"
 /// (crates/update/src/harness_install) once both have landed.
 pub const NODE_VERSION: &str = "24.22.2";
 /// Where it is fetched: the same tarball Harness's Node pin fetches, on
-/// lampOS's own storage (58030966 bytes, root `node-v24.22.2-linux-arm64`),
+/// lampOS's own CDN (#6414; 58030966 bytes, root `node-v24.22.2-linux-arm64`),
 /// byte-for-byte nodejs.org's ([`NODE_ORIGIN`]). Only its path is shared
 /// with Harness: Harness's own Node is under lampos-tasks' 0700 home.
-pub const NODE_URL: &str = "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/node/v24.22.2/node-v24.22.2-linux-arm64.tar.gz";
+pub const NODE_URL: &str =
+    "https://cdn.autonomous.ai/harness/runtime/node/v24.22.2/node-v24.22.2-linux-arm64.tar.gz";
 /// Where [`NODE_URL`]'s bytes come from: said, never fetched.
 pub const NODE_ORIGIN: &str = "https://nodejs.org/dist/v24.22.2/node-v24.22.2-linux-arm64.tar.gz";
 /// Its SHA-256, from nodejs.org's `SHASUMS256.txt` for v24.22.2 (the

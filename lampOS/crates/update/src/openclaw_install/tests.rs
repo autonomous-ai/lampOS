@@ -649,9 +649,7 @@ fn the_pins_are_node_24_and_the_measured_package() {
             "{url}"
         );
     }
-    assert!(NODE_URL.starts_with(
-        "https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/runtime/node/"
-    ));
+    assert!(NODE_URL.starts_with("https://cdn.autonomous.ai/harness/runtime/node/"));
     assert!(NODE_SHA256.len() == 64 && NODE_SHA256.bytes().all(|b| b.is_ascii_hexdigit()));
     assert_eq!(VERSION, "2026.11.2");
     assert_eq!(
