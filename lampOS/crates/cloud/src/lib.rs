@@ -10,6 +10,7 @@ pub mod chat;
 pub mod consent;
 pub mod control;
 pub mod engine_default;
+pub mod face_remove;
 pub mod faces;
 pub mod guard;
 pub mod harness_sign_in;

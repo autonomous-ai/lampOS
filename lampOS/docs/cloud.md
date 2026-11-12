@@ -491,6 +491,24 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
   a remove then answers "the lamp doesn't know that face", and memory isn't
   asked. Their memories stay until "forget everything" at the lamp, or an
   ask for memory alone, which isn't built.
+- **By hand on the lamp, with no app: `lamp-cloud face-remove NAME`**
+  (`face_remove.rs`, A8). The same remove the app's "Remove" makes with
+  `entirely: true` (`faces::remove`): the eyes' forget, then memory's
+  `forget_person` for each id the eyes' answer names, and no reminders (as
+  the product, without `LAMP_APP_SCHEDULE`). No switch, no broker and no
+  socket of its own: it only connects to the eyes' socket
+  (`/run/lampos-eyes/who.sock`, or `LAMP_EYES_WHO_SOCKET`) and memory's
+  (`/run/lampos-memory/memory.sock`, 0600 to memory's user, or
+  `LAMP_MEMORY_FORGET_SOCKET`'s narrow one). So it runs as root; `lampos`
+  only where memory's narrow socket is open and named. Any other user is
+  refused before a socket is touched. Stricter than the app's: a name the
+  eyes don't list (`{"list":true,"waiting":true}`, any case) is refused
+  with the names they know, and nothing is forgotten, so a mistyped name
+  never forgets a by-name id. It prints one line, `removed: ` and the app's
+  answer with `people`, the memory ids asked, or `refused: WHY`. The exit
+  is 0 only when the face and memory both went, 1 otherwise (memory `kept`
+  included), 2 for a wrong call. `LAMP_FACES_PAGE` and the units are left
+  as they are.
 - **The waiting names are by convention:** only lamp-cloud sends
   `{"list":true,"waiting":true}`, but the eyes don't check who asks. It's
   the same trust their socket already has (anything running as `lampos`).
@@ -504,7 +522,11 @@ when both were done; both asked over the sockets, and nobody answering
 said. `tests/it/app_contract.rs` pins what the page reads of both (`memory`,
 and `reason` with `kept`), in V1's envelope, and both refused without the
 switch. `online.rs`: only the lamp's own account channel commands it
-(`commanded`).
+(`commanded`). `face_remove.rs`: root and `lampos` only, the product's
+sockets unless given absolute, an unknown name refused with nothing asked to
+forget, a known one in any case removed from the eyes (in their spelling) and
+memory with each id said, a waiting face removed, memory's refusal a failure,
+and eyes that don't answer refused.
 
 ## The lamp's timers and reminders (#2195, `schedule.list`, `schedule.cancel`)
 
