@@ -3852,7 +3852,10 @@ after a take-over, but now for every turn:
   for six is a good idea." and "Starting a reminder now isn't possible." are
   no claims, and "Raising the lamp." (the arm) is none either; and the light
   kept on or off until a time ("I've kept the light on until ten.", "The
-  light stays on until …", "I'll keep my light on until …", or "for" with
+  light stays on until …", "I'll keep my light on until …", with no "the",
+  "my" or "your" too when a clock follows ("Light stays on until 10 pm.",
+  "Light's on until ten.", #5215 claim #1; "Light stays on until you say
+  otherwise." is none), or "for" with
   a time after it: digits, a number word, "the night" or "tonight", so
   "I'll keep my light on for ten minutes." is one and "I left a light on
   for you." is not. State replies with "for" close at the duration and

@@ -63,7 +63,9 @@
 //! bare and closing at its time ("Got it, keeping the light on until
 //! ten."), and the state told as a reply with a time after "until", "till"
 //! or "for" ("The light is on until ten.", "Your light will be on until 10
-//! pm.", "The light's staying on until ten.", "It'll stay on until ten."):
+//! pm.", "The light's staying on until ten.", "It'll stay on until ten.",
+//! and with no "the", "my" or "your": "Light stays on until 10 pm.",
+//! "Light's on until ten." (#5215 claim #1)):
 //! "It stays on until you say otherwise.", "Keeping it on until ten would
 //! waste power." and "It's on until ten." (whose "it" may be anything) are
 //! none. Numeric clock and decimal punctuation stays inside the time for
@@ -1149,13 +1151,13 @@ fn read_as_asked(said: &str) -> (bool, bool, bool) {
 
 /// The worded claims (`LAMP_ACTION_CLAIM_WORDED`, #5215): a reply that opens
 /// with one of these, bare or after one of [`LEAD_INS`] and a mark, is a
-/// claim of its kind. Each is a run of words: `a|b` is either word, `*` up
-/// to [`ANY_WORDS`] words, `#` a time ([`Slot::Time`]), and `$` the end or
-/// a mark that is not a '?'.
+/// claim of its kind. Each is a run of words: `a|b` is either word, `?a|b`
+/// either word or none ([`Slot::Maybe`]), `*` up to [`ANY_WORDS`] words,
+/// `#` a time ([`Slot::Time`]), and `$` the end or a mark that is not a '?'.
 /// After the run, the sentence it opens must not end in a '?'. Each run is
 /// tied to a family with a call behind it, and never a colour said ("My
 /// light is blue now." also answers a colour question).
-const WORDED: [(&str, Claim); 74] = [
+const WORDED: [(&str, Claim); 71] = [
     // "Timer set for one minute.", "Reminder set."
     ("timer|reminder|alarm set|started", Claim::Schedule),
     ("timer's|reminder's|alarm's set|started", Claim::Schedule),
@@ -1255,7 +1257,14 @@ const WORDED: [(&str, Claim); 74] = [
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp stays|stay on|off for @ %",
+        "?the|my|your light|lights|lamp stays|stay on|off for @ %",
+        Claim::LightKept,
+    ),
+    // #5215 claim #1: the light said bare ("Light stays on until 10 pm."),
+    // closing at its clock as the state runs below do, so "Light stays on
+    // until you say otherwise." is none.
+    (
+        "light|lights|lamp stays|stay on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
@@ -1263,15 +1272,7 @@ const WORDED: [(&str, Claim); 74] = [
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp will stay on|off for @ %",
-        Claim::LightKept,
-    ),
-    (
         "the|my|your light|lights|lamp is|are staying on|off until|till",
-        Claim::LightKept,
-    ),
-    (
-        "the|my|your light|lights|lamp is|are staying on|off for @ %",
         Claim::LightKept,
     ),
     // GO-159 (lamp-52e6, 11091): "keeping" said bare ("Got it, keeping
@@ -1305,44 +1306,38 @@ const WORDED: [(&str, Claim); 74] = [
     // schedule.
     // Keep numeric punctuation inside the duration and reject comma-led
     // continuations or questions before releasing a claim decision.
+    // The determiner may be left out ("Light's on until ten.", #5215
+    // claim #1), and "staying" may stand before "on" or "off".
     (
-        "the|my|your light|lights|lamp is|are on|off until|till @ ^",
+        "?the|my|your light|lights|lamp is|are ?staying on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp is|are on|off for @ %",
+        "?the|my|your light|lights|lamp is|are ?staying on|off for @ %",
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp will be|remain on|off until|till @ ^",
+        "?the|my|your light|lights|lamp will be|remain|stay on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
-        "the|my|your light|lights|lamp will be|remain on|off for @ %",
+        "?the|my|your light|lights|lamp will be|remain|stay on|off for @ %",
         Claim::LightKept,
     ),
     (
-        "the|my|your light's|lamp's on|off until|till @ ^",
+        "?the|my|your light's|lamp's ?staying on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
-        "the|my|your light's|lamp's on|off for @ %",
+        "?the|my|your light's|lamp's ?staying on|off for @ %",
         Claim::LightKept,
     ),
     (
-        "the|my|your light's|lamp's staying on|off until|till @ ^",
+        "?the|my|your light'll|lamp'll stay|be|remain on|off until|till @ ^",
         Claim::LightKept,
     ),
     (
-        "the|my|your light's|lamp's staying on|off for @ %",
-        Claim::LightKept,
-    ),
-    (
-        "the|my|your light'll|lamp'll stay|be|remain on|off until|till @ ^",
-        Claim::LightKept,
-    ),
-    (
-        "the|my|your light'll|lamp'll stay|be|remain on|off for @ %",
+        "?the|my|your light'll|lamp'll stay|be|remain on|off for @ %",
         Claim::LightKept,
     ),
     ("it stays|remains on|off until|till @ ^", Claim::LightKept),
@@ -2033,6 +2028,8 @@ fn tokens(text: &str, ended: bool, clocks: bool) -> Vec<Token<'_>> {
 enum Slot<'a> {
     /// One of these words, '|' between them.
     Words(&'a str),
+    /// One of these words or none ("?the|my|your").
+    Maybe(&'a str),
     /// Up to [`ANY_WORDS`] words.
     Any,
     /// The end, a '.' or '!', or another mark (a comma) whose sentence
@@ -2072,7 +2069,10 @@ fn slots(pattern: &str) -> Vec<Slot<'_>> {
             "%" => Slot::DurationEnd,
             "^" => Slot::ClockEnd,
             "@" => Slot::ClockTime,
-            words => Slot::Words(words),
+            words => match words.strip_prefix('?') {
+                Some(words) => Slot::Maybe(words),
+                None => Slot::Words(words),
+            },
         })
         .collect()
 }
@@ -2114,6 +2114,12 @@ fn fits(slots: &[Slot<'_>], tokens: &[Token<'_>], at: usize, more: bool) -> Opti
             Some(Token::Part(part)) if words.split('|').any(|one| one.starts_with(part)) => None,
             Some(_) => Some(false),
         },
+        Slot::Maybe(words) => {
+            let said: Vec<Slot<'_>> = std::iter::once(Slot::Words(words))
+                .chain(rest.iter().copied())
+                .collect();
+            any_of([fits(&said, tokens, at, more), fits(rest, tokens, at, more)])
+        }
         Slot::Any => any_of((0..=ANY_WORDS).map(|taken| {
             let taking = &tokens[at..tokens.len().min(at + taken)];
             if taking
@@ -3193,6 +3199,106 @@ pub(crate) mod tests {
             assert!(kind.is_some(), "{reply:?}");
             assert!(!stands(kind.unwrap(), reply, false, []), "{reply:?}");
         }
+    }
+
+    /// #5215's claim #1, still 7 of 8 on a lamp with the worded runs on: the
+    /// kept light's claim worded with "it", "the lamp", "light's", a bare
+    /// "Light", "leave", "stay", "will stay" or "is on", and "until" or
+    /// "till" with "ten", "10", "10 pm" or "ten o'clock". Each is held when
+    /// no call ran.
+    pub(crate) const KEPT_SHAPES_MORE: [&str; 24] = [
+        "I'll keep it on until ten.",
+        "I'll keep it on till ten o'clock.",
+        "The light will stay on until ten.",
+        "The lamp will stay on till 10 pm.",
+        "It'll stay on until ten.",
+        "It'll stay on till ten o'clock.",
+        "Okay, the light's staying on until ten.",
+        "Okay, the lamp's staying on till 10.",
+        "Sure, keeping it on until ten.",
+        "Sure, keeping the lamp on till ten o'clock.",
+        "Done, the light is on until ten.",
+        "Done, the lamp is on till 10 pm.",
+        "Got it, I'll leave the light on until ten.",
+        "Got it, I'll leave the lamp on till ten o'clock.",
+        "I'll leave it on till ten.",
+        "I'll leave it on until 10 pm.",
+        "Light stays on until 10 pm.",
+        "Light stays on till ten.",
+        "Lights stay on until ten o'clock.",
+        "Lamp stays on until ten.",
+        "Light will stay on until ten.",
+        "Light's staying on till 10.",
+        "Light's on until ten.",
+        "Okay, light stays on until 10 pm.",
+    ];
+
+    #[test]
+    fn a_kept_light_in_more_words_is_a_worded_claim_held_with_no_call() {
+        let mut missed = Vec::new();
+        for reply in KEPT_SHAPES_MORE {
+            let text = normalised(reply);
+            if worded_claim(text.trim_end(), true) != Some(Some(Claim::LightKept)) {
+                missed.push(reply);
+                continue;
+            }
+            // "Done," is also the strict "Done.", judged first: held too.
+            let kind = claim_as(reply, true, true).flatten();
+            assert!(kind.is_some(), "{reply:?}");
+            // The switch off leaves the strict test as it was.
+            assert_eq!(
+                claim_as(reply, true, false),
+                claim(reply, true),
+                "{reply:?}"
+            );
+            assert!(!stands(kind.unwrap(), reply, false, []), "{reply:?}");
+            // Streamed whole, it is never let through as no claim.
+            assert_ne!(claim_as(reply, false, true), Some(None), "{reply:?}");
+        }
+        assert!(missed.is_empty(), "missed: {missed:?}");
+    }
+
+    /// The controls stay as they were beside the widened runs: a persona
+    /// line, a true state told to a person who asked, a limit a Schedule
+    /// call carried, and a light call that ran.
+    #[test]
+    fn a_kept_lights_more_words_keep_their_controls() {
+        for reply in [
+            "I left a light on for you.",
+            "Light stays on until you say otherwise.",
+            "Light stays on until ten on weeknights.",
+            "Light stays on until ten?",
+            "Light is blue now.",
+            "Lamp stays on for you.",
+        ] {
+            assert!(!ever_a_claim(reply), "{reply:?}");
+        }
+        // Asked as a question, the worded runs never judge the reply.
+        for (said, reply) in [
+            (
+                "How long will the light stay on?",
+                "The light stays on until ten.",
+            ),
+            ("Will the light stay on", "Light stays on until 10 pm."),
+        ] {
+            let worded = !asked_as_a_question(said);
+            assert_eq!(claim_as(reply, true, worded), Some(None), "{reply:?}");
+        }
+        // A limit carried by the Schedule call that set it stands.
+        let seconds = serde_json::json!({"text": "Tea", "seconds": 300});
+        let reply = "Okay, timer set for five minutes.";
+        let kind = claim_as(reply, true, true).flatten().unwrap();
+        assert!(stands(kind, reply, false, [("set_timer", &seconds)]));
+        let at = serde_json::json!({"text": "Lights", "time": "22:00"});
+        let reply = "Okay, reminder set for ten.";
+        let kind = claim_as(reply, true, true).flatten().unwrap();
+        assert!(stands(kind, reply, false, [("set_reminder", &at)]));
+        // A light call that ran backs the light changed.
+        let none = serde_json::json!({});
+        let reply = "Okay, I turned the light on.";
+        let kind = claim_as(reply, true, true).flatten().unwrap();
+        assert_eq!(kind, Claim::LightOrVolume);
+        assert!(stands(kind, reply, false, [("light_on", &none)]));
     }
 
     /// The widened kept-light runs keep their controls: no limit said
