@@ -1952,6 +1952,17 @@ introduction. Both the heard line and raw requested name are limited to
 4 KiB. Existing spelling and letter-count checks still apply. A word name
 that collides with the refusal vocabulary needs a spelling-only response.
 Earlier exchanges and model-supplied face identifiers are not evidence.
+At setup (while "who you are" is open), a name alone keeps no face
+(B3472, after #3472): the same line must also give the speaker's own leave
+for their face. Either it asks to keep their own face ("My name is Kess,
+remember my face."), or the lamp's last line was setup's face question
+("May I remember your face, so I know you next time?") and the line agrees
+to it without asking anything ("Yes, my name is Kess."). A refusal word
+anywhere in the line, someone else's face ("remember her face") or a plain
+"I'm Kess." refuses before Eyes is asked, and the model is told to ask the
+face question and wait for a yes that includes the name. The lamp's last
+line is its own words and never supplies a name. Past setup, and with the
+switch off, nothing changes.
 With `LAMP_MEMORY_ROOM_SPEAKER` also on, its background attribution keeps
 this same request's enrollment proof through the live scope check. It does
 not replace the proof with visibility or a room speaker. A cancelled,
