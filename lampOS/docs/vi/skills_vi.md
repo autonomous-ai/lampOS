@@ -470,7 +470,7 @@ sau:
    10/11, với các điều kiện của first builder lúc 21:44;
    `LAMP_SKILL_WRITES=on` trong `lamp-voice`, được chuyển cho cả hai
    route, cũng như trong `lamp-services`, `lamp-skills` và helper quản lý
-   của nó; bật trong sản phẩm từ 11/11). Khi tắt, một `"write"` trong
+   của nó; tắt trong mọi unit sản phẩm). Khi tắt, một `"write"` trong
    `services` hay một bước `write` được trả lời "I can't do that yet:
    sending or writing on its own", không bao giờ bị sửa, và system prompt
    dặn mô hình tạo kỹ năng trả lời yêu cầu đó như vậy (`cannot:`). Khi bật:
@@ -793,7 +793,7 @@ sau:
 
    Bước `write = { service, action, ... }` (`lamp-skills`, `service_write`;
    #6066, `LAMP_SKILL_WRITES=on` trong `lamp-skills`, helper quản lý của nó
-   và `lamp-services`, bật trong sản phẩm từ 11/11): một thư (`send_mail`
+   và `lamp-services`, tắt trong mọi unit sản phẩm): một thư (`send_mail`
    của `gmail` hay `gmail-app`: `to`, `cc`, `subject`, `text`), một sự kiện
    lịch (`create_event` của `google_calendar`), một issue hay bình luận
    GitHub, một issue Linear, một task Asana hay một bình luận Figma
