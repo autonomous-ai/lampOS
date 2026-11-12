@@ -5594,10 +5594,12 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
 /// installable skill under the skills folder, never pushed, whose
 /// `SKILL.md` front matter says `made: here` (the lamp's own line, inside
 /// the package its SHA-256 binds; the model's is dropped, and a shared one
-/// has it taken out, `lamp-cloud`'s `share`) and not `added: file` nor
-/// `written: app`, with a [`package::INSTALLED_FROM`] record not from the
-/// Store. A core, Store, add-on, pushed, file-added or written skill is
-/// none.
+/// has it taken out, `lamp-cloud`'s `share`) and not `added: file`,
+/// `written: app` nor `limits: asked`, with a [`package::INSTALLED_FROM`]
+/// record not from the Store. A core, Store, add-on, pushed, file-added or
+/// written skill is none, nor one whose request asked for limits
+/// (`made_skill::LIMITS_ASKED`, written on its card as it was made): its
+/// limits, the defaults among them, are the person's own.
 pub fn made_by_ask(skill: &Skill, folder: &Path) -> bool {
     if skill.kind != SkillKind::Installable || skill.pushed_by.is_some() {
         return false;
@@ -5615,6 +5617,7 @@ pub fn made_by_ask(skill: &Skill, folder: &Path) -> bool {
     marks.contains(&"made: here")
         && !marks.contains(&lamp_voice::made_skill::ADDED_FROM_FILE)
         && !marks.contains(&lamp_voice::made_skill::WRITTEN_MARK)
+        && !marks.contains(&lamp_voice::made_skill::LIMITS_ASKED)
         && package::installed_from(folder).is_some_and(|installed| !installed.from_store)
 }
 
@@ -10667,6 +10670,18 @@ mod tests {
             Some(false),
         );
         marked_skill(&root, "by-hand", "made: here\n", MADE_LIGHT_OFF, None);
+        // Made with the switch on, its request asking for limits ("not too
+        // often"): the lamp's defaults, the person's ask, kept.
+        marked_skill(
+            &root,
+            "limits-asked",
+            &format!(
+                "made: here\nmade_by: voice\n{}\n",
+                lamp_voice::made_skill::LIMITS_ASKED
+            ),
+            MADE_LIGHT_OFF,
+            Some(false),
+        );
         marked_skill(&root, "plain", "", MADE_LIGHT_OFF, Some(false));
         marked_skill(
             &root,
@@ -10729,7 +10744,14 @@ mod tests {
         assert_eq!(gapped.budget, Some(("wellbeing".into(), 1)));
         assert_eq!(gapped.most_a_day, None);
         assert_eq!(gapped.manners_shed, ["most_a_day = 3"]);
-        for name in ["store", "from-file", "by-hand", "plain", "core-nudge"] {
+        for name in [
+            "store",
+            "from-file",
+            "by-hand",
+            "plain",
+            "core-nudge",
+            "limits-asked",
+        ] {
             let kept = skill(name);
             assert_eq!(kept.budget, Some(("wellbeing".into(), 1)), "{name}");
             assert_eq!(kept.most_a_day, Some(3), "{name}");
