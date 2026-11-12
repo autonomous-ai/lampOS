@@ -124,9 +124,11 @@ pub const MEASURED_REST_TASKS: u64 = 91;
 /// The cgroup's peak `TasksCurrent` through the task: 126 on lamp-9adf
 /// (#6059), +35 over rest, sampled every 2 s, so a floor.
 pub const MEASURED_TASKS: u64 = 126;
-/// The task's CPU, in percent of one core: about 1.2 cores for 80 s on
-/// lamp-9adf (Fourteen through the first builder, 13:14 on #6059).
-pub const MEASURED_PEAK_CPU_PERCENT: u64 = 120;
+/// The task's CPU, in percent of one core: about 1.2 cores on lamp-9adf
+/// (Fourteen through the first builder, 13:14 on #6059). An average over
+/// the 80 s run from the cgroup's `CPUUsageNSec`, not a peak, and an upper
+/// bound: the cgroup's other work in that time is counted too.
+pub const MEASURED_CPU_PERCENT: u64 = 120;
 /// The least MemAvailable on the lamp through the task, in MB: 3,285,476
 /// kB on lamp-9adf (#6059).
 pub const MEASURED_MIN_AVAILABLE_MB: u64 = 3208;
@@ -154,20 +156,21 @@ pub const fn two_tasks_cap(rest: u64, peak: u64, step: u64) -> u64 {
 /// [`MEASURED_PEAK_MEMORY_MB`], each with half again, rounded up to 100 MB:
 /// 632 + 2 × 732 = 2096, so 2100. Past it the kernel throttles and reclaims
 /// the part's own memory, never kills it (no `MemoryMax`), so the voice's
-/// hand-overs never lose lamp-tasks to the cap.
+/// hand-overs never lose lamp-tasks to the cap. The lamp has no swap, so
+/// (inferred, not measured) past it every process in lamp-tasks.service,
+/// serve included, stalls in reclaim until the cgroup is back under it.
 pub const MEMORY_HIGH_MB: u64 = 2100;
 /// [`MEMORY_HIGH_MB`] as the unit's line.
 pub const MEMORY_HIGH: &str = "MemoryHigh=2100M";
-/// The most `CPUQuota` this part is given, in percent of one core: three of
-/// a 4-core lamp's cores, so one whole core is always left to the voice.
-pub const CPU_QUOTA_MOST_PERCENT: u64 = 300;
-/// `CPUQuota`, in percent of one core: two tasks' [`MEASURED_PEAK_CPU_PERCENT`]
-/// and half again (2 × 120 × 1.5 = 360%), held to [`CPU_QUOTA_MOST_PERCENT`]:
-/// 360% would leave the voice 0.4 of a core while both tasks are busy, and
-/// 300% still holds both tasks' measured 240% with a quarter to spare.
-pub const CPU_QUOTA_PERCENT: u64 = 300;
+/// The lamp's cores: the Allwinner A733 has all eight, two Cortex-A76 and
+/// six Cortex-A55 (`crates/turn-end/src/cores.rs`).
+pub const LAMP_CORES: u64 = 8;
+/// `CPUQuota`, in percent of one core: two tasks' [`MEASURED_CPU_PERCENT`]
+/// and half again, rounded up to 10%: 2 × 120 × 1.5 = 360%, which leaves
+/// over 4 of the lamp's [`LAMP_CORES`] to the voice.
+pub const CPU_QUOTA_PERCENT: u64 = 360;
 /// [`CPU_QUOTA_PERCENT`] as the unit's line.
-pub const CPU_QUOTA: &str = "CPUQuota=300%";
+pub const CPU_QUOTA: &str = "CPUQuota=360%";
 /// The least `TasksMax` (Heron on #6566): past the cap a fork or a new
 /// thread in the part fails, lamp-tasks' own included, and a tool-heavy run
 /// (Python, Node, a browser's threads) can pass 100 at once, more than the
@@ -1997,7 +2000,7 @@ mod tests {
 
     /// #6306: the memory and tasks caps are rest plus two task deltas,
     /// each with half again (`rest + 2 × delta × 1.5`, rounded up), and
-    /// CPU two tasks' measure and half again, held to three cores, so
+    /// CPU two tasks' measure and half again, so
     /// changing a measure (#6059) without its cap fails.
     #[test]
     fn each_cap_holds_two_tasks_with_half_again() {
@@ -2015,12 +2018,12 @@ mod tests {
         assert_eq!(half_again(2 * 120, 10), 360);
         assert_eq!(
             CPU_QUOTA_PERCENT,
-            half_again(TASKS_AT_ONCE * MEASURED_PEAK_CPU_PERCENT, 10).min(CPU_QUOTA_MOST_PERCENT)
+            half_again(TASKS_AT_ONCE * MEASURED_CPU_PERCENT, 10)
         );
         // The first builder's bound: at or under 2200M.
         const { assert!(MEMORY_HIGH_MB <= 2200) };
         // Both tasks' measured CPU still fits under the quota.
-        const { assert!(CPU_QUOTA_PERCENT >= TASKS_AT_ONCE * MEASURED_PEAK_CPU_PERCENT) };
+        const { assert!(CPU_QUOTA_PERCENT >= TASKS_AT_ONCE * MEASURED_CPU_PERCENT) };
     }
 
     /// #6306: with a second task's delta on top of the measured least
@@ -2035,8 +2038,8 @@ mod tests {
             )
         };
         assert!(half_again(MEASURED_RUN_SECS, 1) <= RUN_LIFETIME.as_secs());
-        // Under a 4-core lamp's whole CPU, so the voice keeps a core.
-        const { assert!(CPU_QUOTA_MOST_PERCENT < 4 * 100) };
-        const { assert!(CPU_QUOTA_MOST_PERCENT <= (4 - 1) * 100) };
+        // The quota leaves the voice at least one of the lamp's cores.
+        assert_eq!(LAMP_CORES, 8);
+        const { assert!(CPU_QUOTA_PERCENT < (LAMP_CORES - 1) * 100) };
     }
 }

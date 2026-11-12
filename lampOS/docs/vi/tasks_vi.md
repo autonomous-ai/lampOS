@@ -349,7 +349,7 @@ unit của harnessd, không ở đây. Một việc của kỹ năng có thể c
 cho hai phần tăng của việc cùng lúc (`skill_task::TASKS_AT_ONCE`): giới hạn
 bộ nhớ và task là **lúc nghỉ + 2 × phần tăng × 1,5**, làm tròn lên
 (`skill_task::two_tasks_cap`), còn giới hạn CPU là CPU của hai việc nhân
-1,5, giữ ở tối đa ba nhân. Các số đo là của Fourteen cho một việc Hermes thật
+1,5. Các số đo là của Fourteen cho một việc Hermes thật
 bằng giọng nói (một danh sách đồ cần mang, 80 s) trên lamp-9adf, một đèn
 6 GB chạy build 12255, đọc từ cgroup của lamp-tasks.service bằng
 `systemctl show`; số CPU do first builder chuyển (13:14 trên #6059). Các
@@ -358,9 +358,9 @@ nằm giữa hai lần lấy mẫu. Sau khi việc đóng, cgroup giữ 727 MiB 
 
 | Số đo (`skill_task::`) | Đã đo | Nguồn | Giới hạn trong unit sản phẩm |
 |---|---|---|---|
-| Bộ nhớ cgroup, `MemoryCurrent` (`MEASURED_REST_MEMORY_MB`, `MEASURED_PEAK_MEMORY_MB`) | 632 MiB lúc nghỉ, đỉnh 1120 MiB (+488; mức sàn: mẫu mỗi 2 s) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | `MemoryHigh=2100M` (`MEMORY_HIGH`): 632 + 2 × 488 × 1,5 = 2096, làm tròn lên 100 MB. Vượt mức này kernel làm chậm và thu hồi bộ nhớ của chính phần này, không bao giờ kill: không có `MemoryMax` |
+| Bộ nhớ cgroup, `MemoryCurrent` (`MEASURED_REST_MEMORY_MB`, `MEASURED_PEAK_MEMORY_MB`) | 632 MiB lúc nghỉ, đỉnh 1120 MiB (+488; mức sàn: mẫu mỗi 2 s) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | `MemoryHigh=2100M` (`MEMORY_HIGH`): 632 + 2 × 488 × 1,5 = 2096, làm tròn lên 100 MB. Vượt mức này kernel làm chậm và thu hồi bộ nhớ của chính phần này, không bao giờ kill: không có `MemoryMax`. Đèn không có swap, nên vượt mức này mọi tiến trình trong lamp-tasks.service, kể cả serve, bị dừng chờ thu hồi bộ nhớ cho tới khi cgroup xuống lại dưới mức (suy luận, chưa đo) |
 | Task của cgroup, `TasksCurrent`, tiến trình gồm cả thread (`MEASURED_REST_TASKS`, `MEASURED_TASKS`) | 91 lúc nghỉ, đỉnh 126 (+35; mức sàn: mẫu mỗi 2 s) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | `TasksMax=512` (`TASKS_MAX`): 91 + 2 × 53 = 197, làm tròn lên 10 thành 200, nâng lên mức tối thiểu 512 (`TASKS_MAX_LEAST`): một lần chạy nhiều công cụ (Python, Node, các thread của trình duyệt) có thể vượt 100 ngay. Vượt mức này thì fork thất bại, kể cả của chính lamp-tasks; không gì bị kill |
-| CPU (`MEASURED_PEAK_CPU_PERCENT`) | khoảng 1,2 nhân trong 80 s (120%) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059); first builder, 13:14 | `CPUQuota=300%` (`CPU_QUOTA`): 2 × 120 × 1,5 = 360%, giữ ở 300% (`CPU_QUOTA_MOST_PERCENT`), vì 360% chỉ để lại 0,4 nhân cho giọng nói khi cả hai việc đều bận; 300% giữ một trong 4 nhân của đèn cho giọng nói mà vẫn đủ 240% của hai việc |
+| CPU (`MEASURED_CPU_PERCENT`) | khoảng 1,2 nhân (120%): trung bình trên cả lần chạy 80 s từ `CPUUsageNSec` của cgroup, là cận trên, không phải đỉnh | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059); first builder, 13:14 | `CPUQuota=360%` (`CPU_QUOTA`): 2 × 120 × 1,5 = 360%, để lại hơn 4 trong 8 nhân của đèn (`LAMP_CORES`, chip A733) cho giọng nói; một kiểm thử giữ nó dưới 7 nhân |
 | MemAvailable thấp nhất (`MEASURED_MIN_AVAILABLE_MB`) | 3208 MB (3.285.476 kB) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | không có; một kiểm thử giữ nó, trừ 488 MB của việc thứ hai (2720 MB), bằng hoặc trên mức sàn khi cài Hermes (`HERMES_FLOOR_MB`, ≥1.350 MB) |
 | Thời gian chạy, từ `new` tới khi đóng (`MEASURED_RUN_SECS`) | 75 s | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | không có; một kiểm thử giữ nó, nhân 1,5, trong vòng đời một lần chạy (`RUN_LIFETIME`, 14 phút) |
 | Kích thước thư mục làm việc (`MEASURED_WORK_FOLDER_MB`) | 1 MB, làm tròn lên (36K trước, 40K sau) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | không có; chỉ ghi lại |
