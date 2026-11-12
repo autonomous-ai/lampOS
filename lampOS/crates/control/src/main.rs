@@ -449,10 +449,12 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         },
         _ => None,
     };
-    // What the app's grants screen may offer: wired streams (and the microphone's switch).
+    // What the app's grants screen may offer: wired streams (and the microphone's
+    // and the speaker's switches).
     let features = server::Features {
         camera: sight.is_some(),
         microphone: hearing.is_some() && microphone,
+        speaker: speaker_for_door.is_some() && speaker_switch,
     };
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
         let lamp = parts::Lamp::new(body, light, say, clock_id, events)

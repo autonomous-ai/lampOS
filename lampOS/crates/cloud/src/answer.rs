@@ -486,8 +486,8 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 info["recovery"] = json!(true);
             }
             // `developer` (App Only's C): only while lamp-control's admin socket is
-            // there (developer access on); whether a camera or microphone stream
-            // is usable, so the app's grants screen can disable that tick.
+            // there (developer access on); whether a camera, microphone or speaker
+            // stream is usable, so the app's grants screen can disable that tick.
             if let Some(door) = lamp.control()
                 && let Some(developer) = crate::control::developer(&door)
             {

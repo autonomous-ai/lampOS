@@ -93,12 +93,13 @@ impl Door {
     }
 }
 
-/// `system.info`'s `developer`: `{"camera": bool, "microphone": bool}`, whether a
-/// camera or microphone stream is usable on this lamp (wired, and the owner's
-/// switch for the microphone), asked of lamp-control; `None` while its admin
+/// `system.info`'s `developer`: `{"camera": bool, "microphone": bool, "speaker": bool}`,
+/// whether a camera, microphone or speaker stream is usable on this lamp (wired, and
+/// the owner's switch for the microphone and the speaker), asked of lamp-control; `None` while its admin
 /// socket is gone (developer access off), so the app offers no grants screen.
-/// A lamp-control that can't say (an older one) reads as both false: the ticks
-/// stay off rather than promise a stream the lamp may refuse.
+/// A lamp-control that can't say (an older one) reads as all false, and one that
+/// says nothing of the speaker reads it false: the ticks stay off rather than
+/// promise a stream the lamp may refuse.
 pub fn developer(door: &Door) -> Option<Value> {
     if !door.here() {
         return None;
@@ -119,7 +120,11 @@ pub fn developer(door: &Door) -> Option<Value> {
             .and_then(Value::as_bool)
             .unwrap_or(false)
     };
-    Some(json!({"camera": flag("camera"), "microphone": flag("microphone")}))
+    Some(json!({
+        "camera": flag("camera"),
+        "microphone": flag("microphone"),
+        "speaker": flag("speaker"),
+    }))
 }
 
 /// `kind`, one of [`KINDS`], with the app's `data`: its reply's `data`, or
@@ -832,14 +837,18 @@ mod tests {
     }
 
     /// `developer` says what lamp-control says about its streams; an older
-    /// lamp-control (an error) reads as both false; no socket, none.
+    /// lamp-control (an error) reads as all false, one that does not know the
+    /// speaker reads it false; no socket, none.
     #[test]
     fn developer_says_which_streams_are_usable() {
         let dir = folder("developer");
-        let (door, asked) = admin(&dir, |_| json!({"camera": true, "microphone": false}));
+        let (door, asked) = admin(
+            &dir,
+            |_| json!({"camera": true, "microphone": false, "speaker": true}),
+        );
         assert_eq!(
             developer(&door),
-            Some(json!({"camera": true, "microphone": false}))
+            Some(json!({"camera": true, "microphone": false, "speaker": true}))
         );
         assert_eq!(asked.recv().unwrap(), json!({"features": true}));
         let _ = std::fs::remove_dir_all(dir);
@@ -850,7 +859,15 @@ mod tests {
         );
         assert_eq!(
             developer(&door),
-            Some(json!({"camera": false, "microphone": false}))
+            Some(json!({"camera": false, "microphone": false, "speaker": false}))
+        );
+        let _ = std::fs::remove_dir_all(dir);
+        // A lamp-control from before the speaker says camera and microphone only.
+        let dir = folder("developer-no-speaker");
+        let (door, _asked) = admin(&dir, |_| json!({"camera": true, "microphone": true}));
+        assert_eq!(
+            developer(&door),
+            Some(json!({"camera": true, "microphone": true, "speaker": false}))
         );
         let _ = std::fs::remove_dir_all(dir);
         let gone = Door {
