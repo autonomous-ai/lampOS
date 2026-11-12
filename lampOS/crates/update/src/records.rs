@@ -618,11 +618,15 @@ impl Records {
     /// build and time. Lines a round did not write are passed over.
     pub fn last_round(&self) -> Option<(String, Option<u64>, u64)> {
         for name in ["log.jsonl", "log.jsonl.1"] {
-            let Ok(text) = fs::read_to_string(self.folder.join(name)) else {
+            // As bytes, a line at a time: a write cut short (power lost) can
+            // leave a broken last line, even one that stops inside a
+            // character, and that one line must not make the whole log
+            // unreadable (#6266).
+            let Ok(bytes) = fs::read(self.folder.join(name)) else {
                 continue;
             };
-            let found = text.lines().rev().find_map(|line| {
-                let entry: serde_json::Value = serde_json::from_str(line).ok()?;
+            let found = bytes.rsplit(|byte| *byte == b'\n').find_map(|line| {
+                let entry: serde_json::Value = serde_json::from_slice(line).ok()?;
                 (entry["round"] == true).then(|| {
                     (
                         entry["event"].as_str().unwrap_or_default().to_owned(),
@@ -644,15 +648,40 @@ impl Records {
         if fs::metadata(&path).is_ok_and(|found| found.len() > MOST_LOG_BYTES) {
             let _ = fs::rename(&path, self.folder.join("log.jsonl.1"));
         }
+        // A last line cut short by a power loss has no newline: a line written
+        // after it must start on a line of its own, or both would be lost to
+        // one broken line (#6266).
+        let cut = ends_cut(&path);
         if let Ok(mut file) = OpenOptions::new()
             .append(true)
             .create(true)
             .mode(0o600)
             .open(&path)
         {
-            let _ = writeln!(file, "{entry}");
+            let _ = if cut {
+                writeln!(file, "\n{entry}")
+            } else {
+                writeln!(file, "{entry}")
+            };
         }
     }
+}
+
+/// Whether the file at `path` has a last line with no newline: a write cut
+/// short. Reads only its last byte; a file that is not there or empty is not.
+fn ends_cut(path: &Path) -> bool {
+    use std::io::{Read as _, Seek as _, SeekFrom};
+    let Ok(mut file) = File::open(path) else {
+        return false;
+    };
+    let Ok(length) = file.metadata().map(|meta| meta.len()) else {
+        return false;
+    };
+    if length == 0 || file.seek(SeekFrom::Start(length - 1)).is_err() {
+        return false;
+    }
+    let mut last = [0u8; 1];
+    file.read_exact(&mut last).is_ok() && last[0] != b'\n'
 }
 
 #[cfg(test)]
@@ -1006,5 +1035,51 @@ mod tests {
                 "{day}"
             );
         }
+    }
+
+    /// A log whose last line was cut short by a power loss (#6266): the round's
+    /// end before it is still read back, even if the cut stopped inside a
+    /// character; and the next line written starts on a line of its own, so it
+    /// is read too and not lost with the broken one.
+    #[test]
+    fn a_broken_last_line_is_skipped_and_the_next_line_is_not_lost_with_it() {
+        let folder = tempfile::tempdir().unwrap();
+        let records = Records::new(folder.path().to_owned());
+        records.log_round("switched", "build 5 switched", Some(5));
+        assert_eq!(records.last_round().map(|r| r.0), Some("switched".into()));
+        let log = folder.path().join("log.jsonl");
+        // A write cut inside a JSON line: valid text, no newline.
+        {
+            use std::io::Write as _;
+            let mut file = fs::OpenOptions::new().append(true).open(&log).unwrap();
+            file.write_all(b"{\"at_unix_ms\":1,\"event\":\"refus")
+                .unwrap();
+        }
+        let before = records.last_round().expect("the round before the cut");
+        assert_eq!((before.0.as_str(), before.1), ("switched", Some(5)));
+        // The next round's end is written on a line of its own and is read back.
+        records.log_round("refused", "build 6 refused", Some(6));
+        let after = records.last_round().expect("the new round's end");
+        assert_eq!((after.0.as_str(), after.1), ("refused", Some(6)));
+        let text = fs::read_to_string(&log).unwrap();
+        assert_eq!(text.lines().count(), 3, "{text}");
+        assert!(text.ends_with('\n'));
+
+        // A cut inside a multi-byte character: not text at all, and the one
+        // line does not make the whole log unreadable.
+        {
+            use std::io::Write as _;
+            let mut file = fs::OpenOptions::new().append(true).open(&log).unwrap();
+            file.write_all(b"{\"line\":\"caf\xc3").unwrap();
+        }
+        let again = records.last_round().expect("still readable");
+        assert_eq!((again.0.as_str(), again.1), ("refused", Some(6)));
+        records.log_round("switched", "build 7", Some(7));
+        assert_eq!(records.last_round().map(|r| r.1), Some(Some(7)));
+        // A whole log and an empty or missing one read as before.
+        assert!(!ends_cut(&log));
+        assert!(!ends_cut(&folder.path().join("none")));
+        fs::write(folder.path().join("empty"), b"").unwrap();
+        assert!(!ends_cut(&folder.path().join("empty")));
     }
 }
