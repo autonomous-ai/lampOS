@@ -119,6 +119,52 @@ impl FromStr for MicrophoneDevice {
     }
 }
 
+/// `--speaker-device NAME`, for a developer's computer: the ALSA device the speaker worker plays to, instead of the
+/// board's `plug:device_speaker` (on a laptop `default` or `pulse` plays through PulseAudio or PipeWire's ALSA plugin).
+/// Absent, which is every product unit's, the worker is named exactly as before. A name starts with an ASCII letter or
+/// digit and is 1 to 64 of ASCII letters, digits and `: , . _ = -` (what an ALSA device name is made of; never a leading
+/// `-`, which would read as an option), kept in place so the options stay `Copy`.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SpeakerDevice {
+    bytes: [u8; Self::LONGEST],
+    len: u8,
+}
+impl SpeakerDevice {
+    /// The board's speaker, the default.
+    pub const BOARD: &'static str = "plug:device_speaker";
+    const LONGEST: usize = 64;
+
+    pub fn as_str(&self) -> &str {
+        // Only ASCII went in (`from_str`).
+        std::str::from_utf8(&self.bytes[..usize::from(self.len)]).unwrap_or(Self::BOARD)
+    }
+}
+impl FromStr for SpeakerDevice {
+    type Err = io::Error;
+    fn from_str(value: &str) -> io::Result<Self> {
+        let fit = value
+            .as_bytes()
+            .first()
+            .is_some_and(u8::is_ascii_alphanumeric)
+            && value.len() <= Self::LONGEST
+            && value
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b":,._=-".contains(&b));
+        if !fit {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "--speaker-device takes an ALSA device name: 1 to 64 of letters, digits and : , . _ = -, starting with a letter or digit",
+            ));
+        }
+        let mut bytes = [0u8; Self::LONGEST];
+        bytes[..value.len()].copy_from_slice(value.as_bytes());
+        Ok(Self {
+            bytes,
+            len: value.len() as u8,
+        })
+    }
+}
+
 /// The bus's sound would be published back onto the topic it is read from.
 fn refuse_bus_microphone_with_bus_audio(
     device: MicrophoneDevice,
@@ -359,6 +405,9 @@ pub struct DirectedOptions {
     /// `--microphone-device bus:mic1`: a developer's computer. Absent, the board's ALSA
     /// device and every argument as before.
     pub microphone_device: MicrophoneDevice,
+    /// `--speaker-device NAME`: a developer's computer. Absent, the board's `plug:device_speaker`
+    /// and every argument as before.
+    pub speaker_device: Option<SpeakerDevice>,
     pub playout_start: PlayoutStart,
     pub turn_taking: TurnTaking,
     pub reference_clock: ReferenceClock,
@@ -409,6 +458,13 @@ impl DirectedOptions {
         }
     }
 
+    /// The device the speaker worker is named: the board's, or the one `--speaker-device` gave.
+    pub fn speaker_device(&self) -> &str {
+        self.speaker_device
+            .as_ref()
+            .map_or(SpeakerDevice::BOARD, SpeakerDevice::as_str)
+    }
+
     /// Used directly by the real capture-worker spawn path. The default keeps
     /// its exact previous device and arguments; no extra process or I/O.
     /// The capture worker's argv. `stop_words`: what each frame also
@@ -442,6 +498,7 @@ impl DirectedOptions {
         let mut continuation_seen = false;
         let mut microphone_seen = false;
         let mut microphone_device_seen = false;
+        let mut speaker_device_seen = false;
         let mut arguments = arguments.iter();
         while let Some(argument) = arguments.next() {
             match argument.as_str() {
@@ -452,6 +509,10 @@ impl DirectedOptions {
                 "--microphone-device" if !microphone_device_seen => {
                     options.microphone_device = required_value(&mut arguments)?.parse()?;
                     microphone_device_seen = true;
+                }
+                "--speaker-device" if !speaker_device_seen => {
+                    options.speaker_device = Some(required_value(&mut arguments)?.parse()?);
+                    speaker_device_seen = true;
                 }
                 "--diagnostics" if !options.diagnostics => options.diagnostics = true,
                 "--playout-start-ms" if !playout_seen => {
@@ -991,6 +1052,87 @@ mod tests {
     use super::*;
     fn args(values: &[&str]) -> Vec<String> {
         values.iter().map(|value| (*value).to_owned()).collect()
+    }
+    #[test]
+    fn the_speaker_device_is_an_alsa_name_and_absent_changes_nothing() {
+        let absent = DirectedOptions::parse(&args(&[])).unwrap();
+        assert_eq!(absent.speaker_device, None);
+        assert_eq!(absent.speaker_device(), "plug:device_speaker");
+        // The speaker worker's argv with no flag is the one the supervisor always built.
+        let speaker = |options: &DirectedOptions| {
+            AudioWorkerOptions::default()
+                .child_arguments(options.speaker_device(), false)
+                .unwrap()
+        };
+        let board = speaker(&absent);
+        assert_eq!(board, vec!["plug:device_speaker".to_owned()]);
+        for name in [
+            "0",
+            "default",
+            "pulse",
+            "plug:default",
+            "sysdefault:CARD=PCH",
+            "hw:0,0",
+            "plughw:1,0",
+            "a_b-c.d=e",
+        ] {
+            let chosen = DirectedOptions::parse(&args(&["--speaker-device", name])).unwrap();
+            assert_eq!(chosen.speaker_device(), name);
+            // Only the device differs.
+            assert_eq!(speaker(&chosen)[0], name);
+            assert_eq!(speaker(&chosen)[1..], board[1..]);
+            // The capture side is untouched by it.
+            assert_eq!(chosen.capture_device(), absent.capture_device());
+        }
+        // The microphone's flag and this one together.
+        let both = DirectedOptions::parse(&args(&[
+            "--microphone-device",
+            "bus:mic1",
+            "--speaker-device",
+            "default",
+        ]))
+        .unwrap();
+        assert_eq!(
+            (both.capture_device(), both.speaker_device()),
+            ("bus:mic1", "default")
+        );
+        let longest = "a".repeat(64);
+        assert_eq!(
+            DirectedOptions::parse(&args(&["--speaker-device", &longest]))
+                .unwrap()
+                .speaker_device(),
+            longest
+        );
+        for bad in [
+            vec!["--speaker-device"],
+            vec!["--speaker-device", ""],
+            vec!["--speaker-device", "has space"],
+            vec!["--speaker-device", "semi;colon"],
+            vec!["--speaker-device", "quo\"te"],
+            vec!["--speaker-device", "tab\t"],
+            vec!["--speaker-device", "../x"],
+            vec!["--speaker-device", "-leading;"],
+            vec!["--speaker-device", "-x"],
+            vec!["--speaker-device", "-"],
+            vec!["--speaker-device", ":default"],
+            vec!["--speaker-device", ".x"],
+            vec!["--speaker-device", "=a"],
+            vec!["--speaker-device", "caf\u{e9}"],
+        ] {
+            assert!(DirectedOptions::parse(&args(&bad)).is_err(), "{bad:?}");
+        }
+        let too_long = "a".repeat(65);
+        assert!(DirectedOptions::parse(&args(&["--speaker-device", &too_long])).is_err());
+        // Twice is an error, as every flag here.
+        assert!(
+            DirectedOptions::parse(&args(&[
+                "--speaker-device",
+                "default",
+                "--speaker-device",
+                "pulse"
+            ]))
+            .is_err()
+        );
     }
     #[test]
     fn the_microphone_device_is_bus_mic1_only_and_absent_changes_nothing() {
@@ -1857,6 +1999,7 @@ mod tests {
                         faint_level: None,
                         microphone: Microphone::Mic2,
                         microphone_device: MicrophoneDevice::Board,
+                        speaker_device: None,
                         playout_start: PlayoutStart::default(),
                         turn_taking: TurnTaking::VadOnly,
                         reference_clock: ReferenceClock::Fixed,
