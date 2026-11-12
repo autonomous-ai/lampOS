@@ -832,7 +832,7 @@ fn person_lines(kept: &Pending) -> u32 {
 
 /// The words of `text` as a read-back is checked: lower case, letters and
 /// digits only, with an address's "at" and "dot" said or written alike.
-fn check_words(text: &str) -> Vec<String> {
+pub(crate) fn check_words(text: &str) -> Vec<String> {
     text.to_lowercase()
         .chars()
         .map(|letter| {

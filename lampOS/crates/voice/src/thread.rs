@@ -940,15 +940,24 @@ impl Thread {
         // not something the lamp said: neither that piece nor what follows
         // it in the same answer is kept, told again or taken for a
         // conversation going on.
-        if self.unsaid == Some(request)
-            || self.count_only == Some(request)
-            || self.quoted == Some(request)
-        {
-            return;
-        }
-        // An answer cut, kept as what was heard of it: what it still sends
-        // was never heard.
-        if self.cut == Some(request) {
+        let guard = if self.unsaid == Some(request) {
+            Some("it opened with a function's name")
+        } else if self.count_only == Some(request) {
+            Some("onboarding's sentence")
+        } else if self.quoted == Some(request) {
+            Some("an add-on's quoted line")
+        } else if self.cut == Some(request) {
+            // An answer cut, kept as what was heard of it: what it still
+            // sends was never heard.
+            Some("its answer was cut")
+        } else {
+            None
+        };
+        if let Some(guard) = guard {
+            // Journalled while a skill's yes waits (#6715).
+            if let Some(line) = crate::skill_write_yes::skipped_line(request, guard) {
+                eprintln!("{line}");
+            }
             return;
         }
         // A write waiting for its "send" hears what the lamp said of its
