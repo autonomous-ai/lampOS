@@ -2218,7 +2218,7 @@ fn the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there() {
             .insert("a".repeat(32), Ok(rows));
     };
     let office = json!([{"alias":"office","engine":"claude","name":"Office iMac"}]);
-    let both = json!([{"alias":"lamp","engine":"hermes"},{"alias":"office","engine":"claude","name":"Office iMac"}]);
+    let both = json!([{"alias":"lamp","engine":"hermes","engines":["hermes"]},{"alias":"office","engine":"claude","name":"Office iMac"}]);
     // Off: Hermes installed on the lamp changes nothing.
     let (mut off, _) = engines_running(true);
     office_engines(&off, Ok(vec![row("claude", Some(true), Some(true))]));
@@ -2311,7 +2311,10 @@ fn a_lamp_with_no_computer_hands_work_to_its_own_hermes() {
         .unwrap()
         .insert("a".repeat(32), Ok(vec![row("hermes", Some(true), None)]));
     s.start();
-    targets_until(&s, json!([{"alias":"lamp","engine":"hermes"}]));
+    targets_until(
+        &s,
+        json!([{"alias":"lamp","engine":"hermes","engines":["hermes"]}]),
+    );
     let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     let targets = written["targets"].as_object().unwrap();
     assert_eq!(targets.len(), 1, "{written}");
@@ -2350,6 +2353,7 @@ fn the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_install
         (None, only_openclaw, Openclaw),
         (Some("openclaw"), only_hermes, Hermes),
     ] {
+        let rows_names: Vec<String> = rows.iter().map(|row| row.engine.clone()).collect();
         let home = tempfile::tempdir().unwrap();
         let side = lamp_side(Some("on"), Some("on"), chosen, Some(home.path().to_owned()));
         let (mut s, _) = engines_running(true);
@@ -2366,7 +2370,17 @@ fn the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_install
         } else {
             "hermes"
         };
-        targets_until(&s, json!([{"alias":"lamp","engine":name}]));
+        // Every engine of the lamp's Harness reports, the default first
+        // (#6492).
+        let engines: Vec<&str> = match (want, rows_names.len()) {
+            (Openclaw, 2) => vec!["openclaw", "hermes"],
+            (Hermes, 2) => vec!["hermes", "openclaw"],
+            _ => vec![name],
+        };
+        targets_until(
+            &s,
+            json!([{"alias":"lamp","engine":name,"engines":engines}]),
+        );
         let guidance =
             fs::read_to_string(home.path().join("harnesses/lamp-tasks/lamp/AGENTS.md")).unwrap();
         let who = if want == Openclaw {
@@ -2443,7 +2457,10 @@ fn a_lamp_never_signed_in_hands_work_to_its_own_engine() {
     // Hermes alone installed: the lamp is its own target with Hermes,
     // under its own id.
     install("hermes");
-    targets_until(&s, json!([{"alias":"lamp","engine":"hermes"}]));
+    targets_until(
+        &s,
+        json!([{"alias":"lamp","engine":"hermes","engines":["hermes"]}]),
+    );
     let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     let targets = written["targets"].as_object().unwrap();
     assert_eq!(targets.len(), 1, "{written}");
@@ -2470,7 +2487,10 @@ fn a_lamp_never_signed_in_hands_work_to_its_own_engine() {
     );
     // OpenClaw installed too: the one chosen first, still under its own id.
     install("openclaw");
-    targets_until(&s, json!([{"alias":"lamp","engine":"openclaw"}]));
+    targets_until(
+        &s,
+        json!([{"alias":"lamp","engine":"openclaw","engines":["openclaw","hermes"]}]),
+    );
     let written: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     assert_eq!(written["targets"]["lamp"]["machine_id"], COMPUTER);
     assert_eq!(written["targets"]["lamp"]["engine"], "openclaw");

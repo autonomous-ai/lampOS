@@ -2241,7 +2241,7 @@ pub mod tests {
     }
 
     /// #6492: `engines.default` is answered only with both switches; the
-    /// engine goes to lamp-tasks and its answer comes back; an unknown one
+    /// engine goes to lamp-tasks and its answer comes back; an empty one
     /// is refused before lamp-tasks is asked; lamp-tasks' refusal passes
     /// through; `update.status` carries the default lamp-tasks says, and
     /// leaves it out when lamp-tasks is not reached.
@@ -2280,7 +2280,7 @@ pub mod tests {
             json!({"op": "app_engine_default", "engine": "openclaw"})
         );
         assert_eq!(
-            answer(&mut lamp, "engines.default", &json!({"engine": "gpt"})),
+            answer(&mut lamp, "engines.default", &json!({"engine": ""})),
             Err(crate::engine_default::ENGINE_UNKNOWN.to_owned())
         );
         assert_eq!(
@@ -2290,7 +2290,7 @@ pub mod tests {
         assert_eq!(
             serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
             json!({"op": "app_engine_default", "engine": "hermes"}),
-            "the unknown name was never forwarded"
+            "the empty name was never forwarded"
         );
         // update.status: the default beside the agents.
         let mut says = bus

@@ -163,7 +163,7 @@ lamp says so.
 | `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale", "round"?: {"started_at_unix_ms", "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}}`, from lamp-update's kept `update/status`; `round` only while a round runs (#5473, "The round under way" below); `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below); with `LAMP_APP_ENGINES=on` here and in lamp-update, also `"engines": {"hermes": {"state", "version"?, "reason"?, "at_unix_ms"?}, "openclaw": {…}, ENGINE: {…}…, "default"?: ENGINE, "default_chosen_in_app"?: BOOL}`, every other engine the lamp's Harness has too ("The lamp's agents" below; `default` from lamp-tasks, left out when it is not reached, "The lamp's default agent" below). Without the switch, V1's "not on this lamp" |
 | `update.check` (`{}`, or `{"retry": SEQUENCE}` for a refused build, #6266) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
 | `engines.install` (`{"engine": "hermes"}` or `"openclaw"`) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on` (#6240, "The lamp's agents" below): asks `lamp-update serve` to install a missing agent at its next round. `{"install": "started"}`, or `failure` with `no such agent on this lamp` (lamp-update says no such engine), `the agent is not missing or failed` (its `state` is not `not_installed` or `failed`), `asked less than a minute ago`, `not installable from the app on this build` (an agent this build has no installer for: any but Hermes and OpenClaw), or `lamp-update is not listening for a check`. Without the switches, V1's "not on this lamp" |
-| `engines.default` (`{"engine": "hermes"}` or `"openclaw"`) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on`, as `engines.install` (#6492, "The lamp's default agent" below): the owner's choice of the lamp's default agent, handed to lamp-tasks (`app_engine_default`). `{"default": "<engine>", "chosen_in_app": true}`, or `failure` with lamp-tasks' code and a `message` the app shows: `engine_unknown` (any other name, refused here before lamp-tasks is asked; "That isn't an agent this lamp knows."), `engine_not_installed` ("That engine isn't installed on the lamp."), `engine_default_unsaved` (lamp-tasks could not keep it), or `unreachable` and other codes ("The lamp could not be reached just now. Try again in a moment."). Without the switches, V1's "not on this lamp" |
+| `engines.default` (`{"engine": "<engine>"}`, any engine Harness reports on the lamp) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on`, as `engines.install` (#6492, "The lamp's default agent" below): the owner's choice of the lamp's default agent, handed to lamp-tasks (`app_engine_default`). `{"default": "<engine>", "chosen_in_app": true}`, or `failure` with lamp-tasks' code and a `message` the app shows: `engine_unknown` (an empty or missing name, refused here before lamp-tasks is asked, or a name lamp-tasks does not know; "That isn't an agent this lamp knows."), `engine_not_installed` ("That engine isn't installed on the lamp."), `engine_default_unsaved` (lamp-tasks could not keep it), or `unreachable` and other codes ("The lamp could not be reached just now. Try again in a moment."). Without the switches, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `keys.set` (`{"service": "deepseek" \| "deepgram", "key", "base_url"?, "request_id"?}`), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works", "answer"}` (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "since": {"deepseek", "deepgram"}, "deepseek_host"}`, or `failure` with `error` and `data.code`: `refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
@@ -781,19 +781,21 @@ taken up once the record leaves `absent` and `failed`. Tests: lamp-msgs'
 
 ### The lamp's default agent
 
-`engines.default` (`{"engine": "hermes"}` or `{"engine": "openclaw"}`,
-#6492) is the owner's choice, in the app, of the agent the lamp uses by
-default. It is answered under `engines.install`'s switches
+`engines.default` (`{"engine": "<engine>"}`, #6492) is the owner's
+choice, in the app, of the agent the lamp uses by default: any engine
+Harness reports on the lamp ("hermes", "openclaw", "claude", "codex", …;
+Harness has many agents, so lamp-cloud keeps no list of them). It is answered under `engines.install`'s switches
 (`LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on`) and, like every call on
-`fd_channel`, only from the owner's app. lamp-cloud checks the name first:
-anything but `hermes` or `openclaw` is refused with `engine_unknown`, and
-lamp-tasks is not asked. A known name goes to lamp-tasks' route for the app
+`fd_channel`, only from the owner's app. lamp-cloud checks only that a name is
+given: an empty or missing one is refused with `engine_unknown`, and
+lamp-tasks is not asked. Any other name, trimmed, goes to lamp-tasks' route for the app
 (`/run/lampos-tasks/app.sock`, the same socket and 2 s wait as Harness's
 sign-in) as one line, `{"op":"app_engine_default","engine":"hermes"}`.
-lamp-tasks decides and keeps the choice, and its answer is the reply:
+lamp-tasks decides whether that engine is on the lamp, and keeps the
+choice; its answer is the reply:
 `{"default": "hermes", "chosen_in_app": true}`. Its refusal's code is the
-call's `error` as it is (`engine_unknown`, `engine_not_installed`, or
-`unreachable` when lamp-tasks does not answer), with a short `message` the
+call's `error` as it is (`engine_unknown`, `engine_not_installed`,
+`engine_default_unsaved`, or `unreachable` when lamp-tasks does not answer), with a short `message` the
 app shows ("That engine isn't installed on the lamp.").
 
 `update.status`'s `engines`, when it is there, also carries the default as
@@ -818,8 +820,8 @@ Tests: `engine_default.rs`'s
 `the_default_joins_the_engines_only_when_lamp_tasks_says_one`,
 `answer.rs`'s `the_app_chooses_the_default_agent_through_lamp_tasks`, the
 `engines` row of the `can` test, and `app_contract.rs`'s
-`the_lamps_agents_are_answered_and_a_missing_one_installed` (a name lamp-cloud
-does not know refused in the reply the app reads, and the kind not here
+`the_lamps_agents_are_answered_and_a_missing_one_installed` (an empty name
+refused in the reply the app reads, and the kind not here
 without the switch).
 
 ## A skill typed in the app (#2813, `skills.make`, `skills.made`)
