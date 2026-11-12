@@ -34,6 +34,16 @@ test('one camera snapshot is one picture handed to show(), and the answer says i
   assert.equal(fake.asked('camera.snapshot').length, 1, 'one press, one ask');
 });
 
+test('the camera stream row takes the lamp\'s own 1 to 30 frames a second and its two sizes, and sends exactly what was asked', async (t) => {
+  const { run, fake } = await lampWith(t, ['camera']);
+  const said = await run('camera_stream', { seconds: 1, fps: 30, size: '1280x720' });
+  assert.match(said, /^lamp\.cameraStream\(true, 30, "1280x720"\) for 1 s -> /);
+  assert.deepEqual(fake.asked('camera.stream')[0], { on: true, fps: 30, size: '1280x720' });
+  await run('camera_stream', { seconds: 1, fps: 12 });
+  assert.deepEqual(fake.asked('camera.stream')[2], { on: true, fps: 12 }, 'no size when none was chosen: the lamp\'s own default');
+  for (const bad of [{ fps: 31 }, { fps: 0 }, { size: '1920x1080' }]) assert.throws(() => run('camera_stream', bad), /one of|a number from 1 to/, JSON.stringify(bad));
+});
+
 test('a short camera stream counts frames, shows the last one, and turns the stream off', async (t) => {
   const { run, shown, fake } = await lampWith(t, ['camera']);
   const said = await run('camera_stream', { seconds: 1, fps: 2 });
