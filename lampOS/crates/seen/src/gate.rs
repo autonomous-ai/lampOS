@@ -2,7 +2,10 @@
 //! asked of the camera unless every one of these holds, each read from the
 //! bus and the opt-in, never from the eyes' private files:
 //!
-//! 1. the owner's opt-in is on ([`crate::opt_in`]);
+//! 1. the owner's opt-in is on ([`crate::opt_in`]), and the lamp has begun
+//!    saying so for this yes ([`crate::said_back`]), so the ring's first
+//!    camera mark is never one the person was not told of. A lamp with no
+//!    say service never opens the gate;
 //! 2. the camera's privacy is open: a fresh `voice/privacy` lease that
 //!    permits capture (the camera looks exactly while the microphone may
 //!    listen, docs/eyes.md); a frame's own grant is checked again when it
@@ -27,6 +30,9 @@
 pub struct Inputs {
     /// The owner's opt-in is on (and no forget has come since it was given).
     pub opted_in: bool,
+    /// The on line for the kept yes has begun (said back, in this run or
+    /// kept from an earlier one).
+    pub said_on: bool,
     /// `voice/privacy`: a fresh, valid lease, and whether it permits.
     pub privacy_open: Option<bool>,
     /// `room/presence`: someone at the lamp.
@@ -46,6 +52,8 @@ pub struct Inputs {
 pub enum Closed {
     /// The owner has not opted in, or a forget came after.
     NoOptIn,
+    /// Opted in, but the on line for this yes has not begun yet.
+    NotSaidYet,
     /// The privacy slide is closed, or the voice muted capture.
     PrivacyClosed,
     /// No fresh privacy lease: not known to be open.
@@ -67,6 +75,7 @@ impl Closed {
     pub fn as_str(self) -> &'static str {
         match self {
             Closed::NoOptIn => "no_opt_in",
+            Closed::NotSaidYet => "not_said_yet",
             Closed::PrivacyClosed => "privacy_closed",
             Closed::PrivacyUnknown => "privacy_unknown",
             Closed::Nobody => "nobody",
@@ -83,6 +92,9 @@ impl Closed {
 pub fn may_request(inputs: &Inputs) -> Result<(), Closed> {
     if !inputs.opted_in {
         return Err(Closed::NoOptIn);
+    }
+    if !inputs.said_on {
+        return Err(Closed::NotSaidYet);
     }
     match inputs.privacy_open {
         Some(true) => {}
@@ -112,6 +124,7 @@ mod tests {
     fn clear() -> Inputs {
         Inputs {
             opted_in: true,
+            said_on: true,
             privacy_open: Some(true),
             someone: Some(true),
             faces: Some(1),
@@ -137,6 +150,40 @@ mod tests {
             ..clear()
         };
         assert_eq!(may_request(&inputs), Err(Closed::NoOptIn));
+    }
+
+    #[test]
+    fn opted_in_but_the_on_line_not_begun_no_frame() {
+        let inputs = Inputs {
+            said_on: false,
+            ..clear()
+        };
+        assert_eq!(may_request(&inputs), Err(Closed::NotSaidYet));
+        // Not opted in is said first, said back or not.
+        let inputs = Inputs {
+            opted_in: false,
+            said_on: false,
+            ..clear()
+        };
+        assert_eq!(may_request(&inputs), Err(Closed::NoOptIn));
+    }
+
+    #[test]
+    fn every_closed_reason_has_its_own_word() {
+        let all = [
+            Closed::NoOptIn,
+            Closed::NotSaidYet,
+            Closed::PrivacyClosed,
+            Closed::PrivacyUnknown,
+            Closed::Nobody,
+            Closed::PresenceUnknown,
+            Closed::Stranger,
+            Closed::Asleep,
+            Closed::SleepUnknown,
+        ];
+        let words: std::collections::BTreeSet<_> = all.iter().map(|c| c.as_str()).collect();
+        assert_eq!(words.len(), all.len());
+        assert_eq!(Closed::NotSaidYet.as_str(), "not_said_yet");
     }
 
     #[test]

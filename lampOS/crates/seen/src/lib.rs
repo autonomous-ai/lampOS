@@ -7,13 +7,18 @@
 //! - [`gate`]: the "no frames" gate, a pure function of what the bus says
 //!   and the opt-in. No frame is even asked for unless it is open.
 //! - [`opt_in`]: the owner's opt-in, off unless a kept yes says otherwise,
-//!   and off again after a forget.
+//!   read every 2 s and never written, and off again after a forget.
 //! - [`frames`]: a client of the camera's frame link
 //!   (`lamp_camera::frames`), following its rules: one request at a time,
 //!   copy before anything else, the frame's grant kept and checked, and
 //!   everything dropped on a privacy close. Each copy goes to a
 //!   [`frames::Sink`], the one place a frame would go to the server; in
 //!   phase 1 that is [`frames::Discard`].
+//! - [`mark`]: the ring's mark before any frame: a [`frames::Sink`] that
+//!   asks the ring for it and takes no frame until the ring said it drew
+//!   it (fails closed).
+//! - [`said_back`]: the opt-in said back once each way, through the voice's
+//!   say service, when it is turned on and when it is turned off.
 //! - [`crypto`]: V1's encryption, byte for byte: a session AES-256-GCM key
 //!   sent under the server's RSA key (OAEP, SHA-256). No plaintext path.
 //! - [`backoff`]: the server's 503 and `Retry-After`, as V1 paused on it.
@@ -23,7 +28,9 @@ pub mod backoff;
 pub mod crypto;
 pub mod frames;
 pub mod gate;
+pub mod mark;
 pub mod opt_in;
+pub mod said_back;
 pub mod watch;
 pub mod wire;
 
