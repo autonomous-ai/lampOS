@@ -1150,7 +1150,12 @@ pub fn read_back(
         return json!({ "error": READ_BACK_NOT_ASKED });
     }
     let Some(made) = made_skill::kept_on_named(directory, name) else {
-        eprintln!("lamp-voice: request {request}: a made skill to read back was not found");
+        // Only the name asked, as a skill's name is written (Seventh on
+        // #6071: nothing showed what the model passed).
+        eprintln!(
+            "lamp-voice: request {request}: a made skill to read back was not found by the name asked: {}",
+            made_skill::name_asked(name)
+        );
         if !asking.owner_hears {
             return json!({
                 "error": NO_SKILL_BY_THAT_NAME,
@@ -1810,6 +1815,7 @@ pub fn answer(
             && let Some(told) = crate::skill_task_yes::read_back(
                 name,
                 asking,
+                &made_skill::pushed(&keeping.installed),
                 |asked| {
                     crate::skill_task_yes::asks_by(
                         &keeping.manage,
