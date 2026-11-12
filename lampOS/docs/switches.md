@@ -957,7 +957,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SERVICES_WRITE` | The lamp sends a mail or post you asked for facing it, after reading it back in full and hearing you say send. |
 | `LAMP_CALENDAR_EDITS` | The lamp can move or cancel a calendar event for you, after reading the change back and hearing your yes. |
 | `LAMP_GMAIL_DRAFT_EDITS` | The lamp can change or delete a Gmail draft it saved, after reading it back and hearing your yes. |
-| `LAMP_SERVICES_LINKED_TOOLS` | Nothing you'd notice, except a slightly quicker answer: the lamp is told only about the services you linked. Not turned on in any product unit yet: with it on, someone other than you talking to the lamp could learn which services you linked, so it waits until that is closed off or accepted (#6476). |
+| `LAMP_SERVICES_LINKED_TOOLS` | Nothing you'd notice, except a slightly quicker answer: the lamp is told only about the services you linked. |
 | `LAMP_SKILL_READS` | A skill you make can read you a linked service, like your calendar, only when you are alone with the lamp. |
 | `LAMP_SKILL_LINK_NOTE` | A skill you made that reads a service you haven't linked tells you once where to link it in the app. |
 | `LAMP_SKILL_LINK_APP` | A skill that needs a service you haven't linked opens that service's Connect in the app for you. |
