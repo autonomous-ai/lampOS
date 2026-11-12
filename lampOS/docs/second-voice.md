@@ -6205,6 +6205,28 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   count (#2733). Nothing of the read is kept past the note: no person, no
   picture. The journal, at that first audio: `request N is told how the
   person seems`.
+- **What a known person was last seen doing (`LAMP_SECOND_DOING=on`,
+  #6543):** off. With `LAMP_BUS=on`, `humans/doing` is read every 2 s
+  (`worker::doing_task`, `crate::doing_told`), a value fresh within the
+  message's 90 s (`HumanDoing::LASTS`), with `last` not `none` and a
+  `confidence` of 0.5 or over (`SURE_FROM`: a drink told that wasn't
+  costs more than one missed), and only while exactly one face is in view
+  (`humans/faces`), since with two it may be the other's. Only the last
+  thing seen is told, as a kind (drinking, eating, stretching) and a
+  rounded time ("just now", "about 5 minutes ago", "about an hour ago"),
+  never the raw label, a count or a name. The note is context only: the
+  model is told not to mention it unless the person brings it up, never to
+  say it saw it, never to comment on it or on their body, and to use it
+  only so a reply fits. The lamp never volunteers it, so it never says
+  "enjoy your lunch" (the PM's calls on #6543: no reaction to a seen drink
+  or meal, no per-person history, never speak of the body). It goes to a
+  spoken request whose scope is a known person in view, as for how they
+  seem (`Engine::noting_what_they_did`, `worker::doing_noting`); not in a
+  busy room, never a written turn. Spent once an answer given it begins to
+  be heard, and each sighting is told once (a sighting is its kind and the
+  time it was seen, within 60 s). Nothing of it is kept past the note. The
+  journal, at that first audio: `request N is told what the person was
+  last seen doing`.
 - **An answer may leave a soft door** (`LAMP_OPENS_FURTHER=on`, #5194;
   [`opens_further`](../crates/voice/src/opens_further.rs)). The lead's
   testers, 4 Nov: "whatever you ask the lamp, it only answers that; it never
