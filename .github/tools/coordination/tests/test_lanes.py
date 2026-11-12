@@ -58,7 +58,7 @@ case "$*" in
   *"--json body"*) echo '{"login":"","body":"","pr_body":true}' ;;
   *title,createdAt*) n=$(echo "$*" | sed -E 's/^pr view ([0-9]+).*/\1/'); if [ -f "$FAKE_DIR/title-$n.txt" ]; then cat "$FAKE_DIR/title-$n.txt"; else printf 'lampOS: a change\t2026-11-04T01:00:00Z\n'; fi ;;
   *headRefOid*) cat "$FAKE_DIR/head.txt" ;;
-  *statusCheckRollup*) cat "$FAKE_DIR/checks.json" ;;
+  *statusCheckRollup*) n=$(echo "$*" | sed -E 's/^pr view ([0-9]+).*/\1/'); if [ -f "$FAKE_DIR/checks-$n.json" ]; then cat "$FAKE_DIR/checks-$n.json"; elif [ -f "$FAKE_DIR/checks.json" ]; then cat "$FAKE_DIR/checks.json"; else echo '{"statusCheckRollup":[]}'; fi ;;
   "run list"*) echo 0 ;;
   "pr merge"*) if [ -n "$FAKE_MERGE_5XX" ]; then n=$(cat "$FAKE_DIR/5xx" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "$FAKE_DIR/5xx"
                  [ "$n" -le "$FAKE_MERGE_5XX" ] && { [ -n "$FAKE_ON_5XX" ] && sh -c "$FAKE_ON_5XX"; echo "HTTP 502: Bad Gateway (https://api.github.com/graphql)" >&2; exit 1; }
