@@ -954,7 +954,11 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   của lamp-control. Lần chạy có `net` đi qua runner của lần tạo, giữ mạng
   (`skill_make::lamp_runner(home, false)`); lần khác vẫn `LAMP_NS_NET=run`.
   lamp-control giữ `net` trong lời đồng ý nhưng không bao giờ đặt nó vào
-  token. Tắt: `net` bị từ chối trước khi có token.
+  token, nên sau khi tạo token lamp-tasks hỏi lamp-control
+  (`task_yes_check` với SHA-256 thư mục và các quyền của dòng): chỉ khi
+  lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới giữ
+  mạng, nếu không thì `no_token` và không chạy gì. Tắt: `net` bị từ chối
+  trước khi có token.
 - **Lần chạy của kỹ năng agent** (`run` = `scripts/SKILL.md`): Hermes được
   bảo đọc tệp đó và làm theo, chỉ chạm tới đèn qua `control.sock` với token
   của lần chạy, không bao giờ hỏi khóa hay token bằng giọng nói. Nó bắt đầu

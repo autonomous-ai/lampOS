@@ -2176,8 +2176,8 @@ tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công 
 thư mục mới mỗi lần chạy, token riêng của lần chạy). Quyền được đọc thận
 trọng từ tệp: `camera`, `light`, `speak`, `sound`, và `net` khi tệp nhắc một
 API web, URL hay HTTP (cần `LAMP_TASK_NET=on`). Đèn nói lại các quyền khi bật.
-Chỉ đèn, âm thanh, thân và giọng thì bật ngay (giọng nói ghi lời đồng ý với
-lamp-control); camera, micro, gửi đi hoặc `net` thì hỏi lời đồng ý bằng
+Chỉ đèn, giọng (kể cả âm thanh nó phát) và thân thì bật ngay (giọng nói ghi lời đồng ý với
+lamp-control); `sound` (nghe các loại âm thanh), micro, camera, gửi đi hoặc `net` thì hỏi lời đồng ý bằng
 giọng nói một lần, ở lần chạy đầu. Khóa hay token không bao giờ được nói ra,
 hỏi bằng giọng nói hay giữ trong thư mục kỹ năng: tệp chứa giá trị giống
 khóa hay token bị từ chối (đưa bí mật qua app là việc tiếp theo).
