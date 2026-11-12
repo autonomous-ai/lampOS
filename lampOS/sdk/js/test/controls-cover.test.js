@@ -48,9 +48,9 @@ test('a new op or event in the schema fails the guard, saying what to do', () =>
 });
 
 test('an exception goes when its row is written, and one needs a real name and a reason', () => {
-  // An op that still has its line (listen.set: its row is not written yet).
-  const row = { id: 'listen', ops: ['listen.set'], shows: [] };
-  assert.match(gaps({ ...now, controls: [...CONTROLS, row] }).join('\n'), /op listen\.set has a row now: delete its line/);
+  // An op that still has its line (lease.renew: no row asks for it alone).
+  const row = { id: 'renew', ops: ['lease.renew'], shows: [] };
+  assert.match(gaps({ ...now, controls: [...CONTROLS, row] }).join('\n'), /op lease\.renew has a row now: delete its line/);
   assert.match(gaps({ ...now, exceptions: [...COVERAGE_EXCEPTIONS, { kind: 'op', name: 'no.such', reason: 'x' }] }).join('\n'), /not in control\.schema\.json/);
   assert.match(gaps({ ...now, exceptions: [...COVERAGE_EXCEPTIONS, { kind: 'op', name: 'pair', reason: '' }] }).join('\n'), /listed twice[\s\S]*no reason|no reason[\s\S]*listed twice/);
   assert.match(gaps({ ...now, controls: [...CONTROLS, { id: 'typo', ops: ['gestur'], shows: [] }] }).join('\n'), /entry typo names gestur/);

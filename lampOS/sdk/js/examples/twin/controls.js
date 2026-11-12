@@ -13,6 +13,8 @@
 // `needs: 'camera'` or `'microphone'` (optional): the page shows the row only when the lamp has that grant (try.json's
 // `camera`/`microphone`); a press without it gets the lamp's own refusal. `ctx.show(jpeg)` puts a picture on the page
 // that pressed, under its row and nowhere else: not in the log, not on disk, not in the checklist's export.
+// `hint` (optional, a string of at most 200 characters) is said under the row on the page, in `textContent`; `hintReal`,
+// when the page drives a real lamp (`describe('real')`), replaces it. For a row with an effect the label doesn't say.
 // A refusal comes back as the lamp's own words; a value outside its field is refused here, before any call.
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -184,6 +186,30 @@ export const CONTROLS = [
     run: async ({ lamp }, a) => answered(`lamp.volume({ step: ${q(a.step)} })`, await lamp.volume({ step: a.step })) },
   { id: 'volume_mute', group: 'Voice', ops: ['volume'], shows: ['volume.changed'], label: 'Mute', fields: [select('mute', ['on', 'off'], 'off')],
     run: async ({ lamp }, a) => answered(`lamp.volume({ mute: ${a.mute === 'on'} })`, await lamp.volume({ mute: a.mute === 'on' })) },
+  // The person's own volume, so this row puts it back: it reads the level, takes the one step (or the mute), then
+  // restores the level and the mute it found, even when the step is refused. Nothing is left changed.
+  { id: 'volume', group: 'Voice', ops: ['volume', 'get'], shows: ['volume.changed'], label: 'Volume (then back)',
+    hint: 'steps the volume once and puts it back (level and mute)', fields: [select('how', ['step down', 'step up', 'mute'], 'step down')],
+    run: async ({ lamp }, a) => {
+      const before = (await lamp.get('volume')).volume;
+      if (typeof before?.level !== 'number') throw refuse('the lamp did not say its volume: nothing was changed');
+      const arg = a.how === 'mute' ? { mute: true } : { step: a.how === 'step up' ? 'up' : 'down' };
+      let after;
+      let back;
+      try {
+        after = await lamp.volume(arg);
+      } finally {
+        back = await lamp.volume({ to: before.level });
+        if (before.muted) back = await lamp.volume({ mute: true });
+        else if (back.muted) back = await lamp.volume({ mute: false });
+      }
+      return `lamp.volume(${q(arg)}) -> ${q(after)}; put back: ${q(back)} (was ${q({ level: before.level, muted: Boolean(before.muted) })})`;
+    } },
+  // Mute this computer's hearing and give it back: `false` holds the lamp's mute, `true` lifts it. Needs the hear grant.
+  { id: 'listen', group: 'Voice', ops: ['listen.set'], shows: [], label: 'Listening',
+    hint: "the virtual lamp has no listening control: on is taken, off is refused here (a real lamp's off holds its mute until you press on)",
+    hintReal: "off holds the real lamp's mute: it stays deaf to the room until you press on", fields: [select('listen', ['on', 'off'], 'on')],
+    run: async ({ lamp }, a) => `lamp.setListening(${a.listen === 'on'}) -> ${q(await lamp.setListening(a.listen === 'on'))}` },
   // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
   { id: 'sound', group: 'Voice', ops: ['sound'], shows: [], label: 'Sound (hum)', fields: [], run: async ({ lamp }) => { await lamp.sound('hum'); return "lamp.sound('hum')"; } },
   // Clips (grant `speak`): this computer's own, kept on the lamp. The rows touch ONLY this run's scratch clip: upload makes it,
@@ -320,10 +346,13 @@ export const STIMULI = [
 ];
 
 // What the page needs to draw the buttons: the entries without their code.
-export const describe = () => ({
-  controls: CONTROLS.map(({ id, group, label, fields, needs }) => ({ id, group, label, fields, ...(needs ? { needs } : {}) })),
-  stimuli: STIMULI.map(({ id, group, label, fields }) => ({ id, group, label, fields })),
-});
+export const describe = (mode = 'lamp-sim') => {
+  const hinted = ({ hint, hintReal }) => ((mode === 'real' && hintReal) || hint ? { hint: (mode === 'real' && hintReal) || hint } : {});
+  return {
+    controls: CONTROLS.map((entry) => ({ id: entry.id, group: entry.group, label: entry.label, fields: entry.fields, ...(entry.needs ? { needs: entry.needs } : {}), ...hinted(entry) })),
+    stimuli: STIMULI.map((entry) => ({ id: entry.id, group: entry.group, label: entry.label, fields: entry.fields, ...hinted(entry) })),
+  };
+};
 
 // Whether the event log shows this event now: every line the lamp says (lamp.said) is shown, however fast they come
 // (a dropped line would be a line the page never saw); the others are thinned to one in 200 ms per event name.
