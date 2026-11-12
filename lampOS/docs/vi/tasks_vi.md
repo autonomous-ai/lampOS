@@ -686,6 +686,21 @@ và có `--targets-from-machines`:
 - **Chưa thử trên đèn:** chưa đăng nhập, "ask Hermes …" được trả lời và câu hỏi
   tiếp theo tới đúng session đó.
 
+## Engine của target mỗi máy: engine chạy được trước (#6657)
+
+Khi target được ghi từ danh sách máy (`--targets-from-machines ENGINE`), mỗi
+máy tính có một target, và engine của nó là một engine được biết đã cài trên
+máy đó, chọn theo việc có chạy được không (phương án (b) của first builder,
+không có công tắc; `readiness::Known::chosen`): trước hết engine được biết đã
+đăng nhập, rồi engine chưa biết đăng nhập hay chưa, rồi engine được biết chưa
+đăng nhập; trong mỗi nhóm, `ENGINE` trước, rồi claude, codex và opencode. Vì
+vậy một engine được biết chưa đăng nhập, mà lần giao việc sẽ bị từ chối
+(`engine_not_signed_in`), không bao giờ thắng một engine chạy được: trên một
+laptop có claude đã cài nhưng chưa đăng nhập và codex đã đăng nhập, target là
+codex, và quay về claude ở lần xem đầu tiên sau khi claude đăng nhập. Không
+engine nào được biết đã cài thì vẫn là `ENGINE` như trước. File do người khác
+ghi vẫn không bao giờ bị ghi đè. Test: `the_engine_chosen_is_one_that_can_run`.
+
 ## Mở hoặc hỏi một phiên đã có theo tên (#6274, tắt trừ khi `LAMP_TASKS_REPLY_NAMED=on`)
 
 Người dùng hay nói "mở phiên customer survey" hoặc "phiên customer survey đến
