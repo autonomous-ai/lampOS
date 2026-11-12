@@ -189,5 +189,119 @@ class Eligible(Red):
         self.assertEqual(lines[-1], "dry: would carry 7 onto " + self.base[:9], r.stdout + r.stderr)
 
 
+CI_YML = """name: CI
+on:
+  push:
+    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-*.py']
+  pull_request:
+    paths-ignore: ['lampOS/**', '.github/workflows/lampos-arm64.yml', '.github/scripts/lampos-*.py']
+jobs:
+"""
+INLINE_YML = """on:
+  pull_request:
+    branches: [lamp-voice]
+    paths: ['lampOS/sdk/**', "lampOS/docs/control*"]
+"""
+SCHEDULED_YML = """on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+"""
+
+
+class ReviewerLeadP3s(Red):
+    """The Reviewer-lead's four P3s on #6586 (12 Nov)."""
+
+    def workflows(self):
+        self.git("checkout", "-q", "--detach", self.base)
+        self.write(".github/workflows/ci.yml", CI_YML)
+        self.write(".github/workflows/inline.yml", INLINE_YML)
+        self.write(".github/workflows/watchdog.yml", SCHEDULED_YML)
+        self.commit("more workflows")
+        self.git("push", "-q", "origin", "HEAD:lamp-voice")
+        self.git("fetch", "-q", "origin")
+
+    def taken(self, wf, *prs):
+        r = run(["zsh", "-c", 'REPO=autonomous-ai/lampOS; source "$1"; shift; coord_prs_taken origin/lamp-voice "$@"', "x", LIB, wf, *prs],
+                self.work, env=self.env)
+        return r.stdout.split()
+
+    def test_1_paths_ignore_inline_takes_a_pr_with_a_file_not_ignored(self):
+        self.workflows()
+        self.fakefile("files-7.txt", "system/main.go\nlampOS/crates/x/src/lib.rs\n")
+        self.fakefile("files-8.txt", "lampOS/crates/x/src/lib.rs\n.github/scripts/lampos-route.py\n")
+        self.assertEqual(self.taken("ci.yml", "7", "8"), ["7"])
+
+    def test_1_an_inline_paths_list_reads_as_a_block_list(self):
+        self.workflows()
+        self.fakefile("files-7.txt", "lampOS/docs/controls.md\n")
+        self.fakefile("files-8.txt", "lampOS/crates/x/src/lib.rs\n")
+        self.assertEqual(self.taken("inline.yml", "7", "8"), ["7"])
+
+    def test_1_a_workflow_with_no_pull_request_trigger_takes_nobody(self):
+        self.workflows()
+        self.fakefile("files-7.txt", "system/main.go\n")
+        self.assertEqual(self.taken("watchdog.yml", "7"), [])
+
+    def sit(self, *prs):
+        so, cf, tf = (os.path.join(self.tmp, n) for n in ("sitout", "carried", "told"))
+        r = run(["zsh", "-c", 'REPO=autonomous-ai/lampOS; source "$1"; shift; coord_sit_out "$@"', "x", LIB, so, cf, tf,
+                 "Train 9 failed in the virtual lamp.", *prs], self.work, env=self.env)
+        return r.stdout.split(), (open(so).read() if os.path.exists(so) else "")
+
+    def test_2_a_pr_sits_out_on_the_head_the_train_carried(self):
+        carried = "a" * 40
+        # The PR's ref here has moved on (a push while the train ran); the carried head is the one kept out.
+        self.pr(7, [CRATE])
+        with open(os.path.join(self.tmp, "carried"), "w") as fh:
+            fh.write("7 %s\n" % carried)
+        out, so = self.sit("7")
+        self.assertEqual(out, ["7"])
+        self.assertEqual(so, "7 %s\n" % carried)
+
+    def test_3_each_sat_out_pr_is_told_once_per_head(self):
+        with open(os.path.join(self.tmp, "carried"), "w") as fh:
+            fh.write("7 %s\n8 %s\n" % ("a" * 40, "b" * 40))
+        self.sit("7", "8")
+        out, so = self.sit("7", "8")
+        self.assertEqual(out, ["7", "8"])
+        calls = self.calls()
+        self.assertEqual(calls.count("pr comment 7 "), 1, calls)
+        self.assertEqual(calls.count("pr comment 8 "), 1, calls)
+        self.assertIn("the next push to it brings it back", calls)
+        self.assertEqual(so.count("\n"), 2)
+
+    def test_3_the_sitout_keeps_only_open_prs_at_their_current_heads(self):
+        so, opn = os.path.join(self.tmp, "sitout"), os.path.join(self.tmp, "open")
+        with open(so, "w") as fh:
+            fh.write("7 aaa\n8 bbb\n9 ccc\n")
+        with open(opn, "w") as fh:
+            fh.write("7 aaa 2026-11-12T07:00:00Z\n8 zzz 2026-11-12T07:00:00Z\n")
+        run(["zsh", "-c", 'source "$1"; coord_sitout_trim "$2" "$3"', "x", LIB, so, opn], self.work, env=self.env)
+        self.assertEqual(open(so).read(), "7 aaa\n")
+
+    def wait(self):
+        out = os.path.join(self.tmp, "jobs.log")
+        r = run(["zsh", "-c", 'REPO=autonomous-ai/lampOS; source "$1"; coord_red_jobs_wait abc "$2"', "x", LIB, out],
+                self.work, env=dict(self.env, COORD_RED_WAIT_S="0"))
+        return r.stdout.splitlines(), open(out).read()
+
+    def test_4_one_empty_log_among_several_is_looked_at_again(self):
+        self.fakefile("runs.txt", "501 .github/workflows/lampos-arm64.yml\n")
+        self.fakefile("jobs-501.txt", "9001 build and test (1/3)\n9002 build and test (2/3)\n")
+        self.fakefile("joblog-9001.txt", "FAIL [   1.000s] ( 1/5) lamp-voice a::b\n")
+        lines, log = self.wait()
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(self.calls().count("actions/jobs/9002/logs"), 3)
+        self.assertIn("lamp-voice", log)
+
+    def test_4_every_log_served_is_one_look(self):
+        self.fakefile("runs.txt", "501 .github/workflows/lampos-arm64.yml\n")
+        self.fakefile("jobs-501.txt", "9001 build and test (1/3)\n")
+        self.fakefile("joblog-9001.txt", "FAIL [   1.000s] ( 1/5) lamp-voice a::b\n")
+        self.wait()
+        self.assertEqual(self.calls().count("actions/jobs/9001/logs"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

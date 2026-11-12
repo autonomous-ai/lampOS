@@ -77,7 +77,12 @@ eligible() {
   say "eligible: reading the open PRs" >&2
   # A PR whose head is in another repository is never carried (coord_head checks it again).
   # 12 Nov (#6556 C): the list also gives each PR's head and updatedAt, the cache's key.
-  for line in ${(f)"$(gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,isDraft,headRefName,isCrossRepository,headRefOid,updatedAt --jq '.[]|select(.isDraft|not)|select(.isCrossRepository|not)|select(.headRefName|startswith("first/train-")|not)|"\(.number) \(.headRefOid) \(.updatedAt)"')"}; do
+  local prl=$SP/elig-open.txt
+  gh pr list -R $REPO --base lamp-voice --state open --limit 200 --json number,isDraft,headRefName,isCrossRepository,headRefOid,updatedAt --jq '.[]|select(.isDraft|not)|select(.isCrossRepository|not)|select(.headRefName|startswith("first/train-")|not)|"\(.number) \(.headRefOid) \(.updatedAt)"' > $prl 2>/dev/null
+  # 12 Nov (the Reviewer-lead's P3 on #6586): a sat-out PR closed or pushed since leaves $sitout (only when the list
+  # carries heads; the test stand-in's bare numbers don't).
+  grep -q ' ' $prl && coord_sitout_trim $sitout $prl
+  for line in ${(f)"$(<$prl)"}; do
     p=${line%% *}; [[ $p == <-> ]] || continue
     lhead=${${line#* }%% *}; upd=${line##* }; [[ $lhead == $p || $upd == $lhead ]] && { lhead=""; upd=""; }
     npr=$((npr+1))
@@ -280,13 +285,17 @@ build_train() {
     git worktree prune; git worktree add -q -B $br $wt origin/lamp-voice || { say "worktree failed"; return 1; }
   fi
   carried=()
+  # 12 Nov (#6556 B, the Reviewer-lead's P3 on #6586): each carried PR's head as cherry-picked, so a PR a red check
+  # sits out is kept out on the head the train carried; one pushed while the train ran comes back on its new head.
+  : > $SP/train-carried-$lane.txt
   if [[ $lane == nc ]]; then body="No-crates train $tn, onto lamp-voice \`$LV\`, built by the train bot (#$COORD_QUEUE_POST, the Queue). Its PRs change no build input, so no ARM64 run: it merges by rebase once the checks that start on it pass.\n"
   else body="Merge train $n, onto lamp-voice \`$LV\`, built by the train bot (#$COORD_QUEUE_POST, the Queue). One ARM64 run, merged by rebase.\n"; fi
   for p in "$@"; do
     own=(${(f)"$(git -C $wt rev-list --reverse --cherry-pick --right-only --no-merges HEAD...refs/remotes/pr/$p)"})
     [[ -n ${own[1]} ]] || continue
     if git -C $wt cherry-pick $own >/dev/null 2>&1; then
-      carried+=$p; body+="\n- #$p: $(gh pr view $p -R $REPO --json title -q .title | sed 's/^lampOS: //' | cut -c1-200)"
+      carried+=$p; print -r -- "$p $(git -C $wt rev-parse refs/remotes/pr/$p 2>/dev/null)" >> $SP/train-carried-$lane.txt
+      body+="\n- #$p: $(gh pr view $p -R $REPO --json title -q .title | sed 's/^lampOS: //' | cut -c1-200)"
     else
       git -C $wt cherry-pick --abort
       # 28 Oct 16:4x: told once per PR, not once per lamp-voice head (#4042 got three in an hour): post less.
@@ -401,10 +410,10 @@ run_train() {
   # the ARM64 run tests on three shards, and the bot looked the moment one shard failed: `gh run view --log-failed`
   # serves nothing while the run's other shards still run, so 833's `FAIL [ 6.202s] ( 543/5515) lamp-body …` on shard 2
   # was never read and the bot stopped with "no failing test named". A job's log is served once that job has ended.
-  jl=$SP/train-jobs-$lane.log; : > $jl
-  red=(${(f)"$(coord_red_jobs $h $jl)"})
-  # A job that has just ended can take a few seconds to serve its log: one more look after 20 s (MWG_RETRY_S in tests).
-  if [[ ! -s $jl && ${#red} -gt 0 ]]; then sleep ${MWG_RETRY_S:-20}; : > $jl; red=(${(f)"$(coord_red_jobs $h $jl)"}); fi
+  # A job that has just ended can take a few seconds to serve its log: looked at again while any red job's came back
+  # empty, up to 3 looks 20 s apart (coord_red_jobs_wait).
+  jl=$SP/train-jobs-$lane.log
+  red=(${(f)"$(coord_red_jobs_wait $h $jl)"})
   redjobs=(); redwfs=(); for c in $red; do redjobs+="${c#* }"; redwfs+="${c%% *}"; done
   fails=$(grep -oE 'FAIL \[[^]]*\] *\( *[0-9]+/[0-9]+\) [a-z0-9_-]+' $jl | awk '{print $NF}' | sort -u)
   # A compile or lint error (clippy, or a test build): the files it names, and the PRs that touch those files.
@@ -455,9 +464,8 @@ run_train() {
       out=(${(u)out})
     fi
     if (( ${#out} )); then
-      for p in $out; do
-        git fetch -q origin "+refs/pull/$p/head:refs/remotes/pr/$p" 2>/dev/null
-        print -r -- "$p $(git rev-parse refs/remotes/pr/$p 2>/dev/null)" >> $sitout; say "  #$p sits out on its head (${(j:, :)redjobs})"
+      for p in ${(f)"$(coord_sit_out $sitout $SP/train-carried-$lane.txt $told "Train $n (#$tp) failed in ${(j:, :)redjobs}, a check that runs on files this PR changes, with no test or file named." $out)"}; do
+        say "  #$p sits out on the head train $n carried (${(j:, :)redjobs})"
       done
       queue_post "Train bot, $(date +%H:%M): train $n (#$tp) failed in ${(j:, :)redjobs}; the PRs that workflow takes sit out on their heads until a new push: #${(j:, #:)out}. The rest go again."
       return 0
