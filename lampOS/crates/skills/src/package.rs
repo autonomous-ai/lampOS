@@ -1551,6 +1551,18 @@ pub fn install_pushed_at(
     })();
     let _ = fs::remove_dir_all(&checking);
     let skill = checked?;
+    // A linked service's grant is a skill run's alone, from the owner's yes
+    // to a Store or made skill: a paired computer is never given one, so it
+    // never pushes one (#6432).
+    if let Some(grant) = skill
+        .grants
+        .iter()
+        .find(|grant| lamp_voice::made_skill::service_grant(grant).is_some())
+    {
+        return Err(format!(
+            "not installed: it asks {grant}, a linked service's grant (a skill run's alone), which this computer was not granted"
+        ));
+    }
     let asks = grants_asked(&skill);
     if let Some(shown) = &kept.asks
         && !shown

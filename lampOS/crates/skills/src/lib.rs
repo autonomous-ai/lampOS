@@ -10798,6 +10798,45 @@ mod tests {
         assert_eq!(lamp_voice::made_skill::MANNERS_MOST_A_DAY, 3);
     }
 
+    const MORNING_MAIL: &str = "version = \"1.0.0\"\ngrants = [\"gmail-read\", \"gmail-write\"]\n\
+        tool = \"morning_mail\"\n[permissions]\ntopics = [\"clock/local\"]\n\
+        [[do]]\ntask = { task = \"Sum up this morning's mail and send it to me\", run = \"scripts/main.py\" }\n";
+
+    /// LAMP_AGENT_SERVICES (#6432's grants): a connector skill's `do.task`
+    /// loads with its `<code>-read` / `<code>-write` grants only with the
+    /// switch on; an unknown service or kind is refused, and with the switch
+    /// off it is refused as before.
+    #[test]
+    fn a_connector_skills_task_loads_with_its_service_grants_only_on() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = task_skill(dir.path(), "morning-mail", MORNING_MAIL);
+        task::set_agent_services_here(Some(false));
+        assert!(
+            load(&folder)
+                .unwrap_err()
+                .contains("\"gmail-read\" is not a grant")
+        );
+        task::set_agent_services_here(Some(true));
+        let skill = load(&folder).unwrap();
+        assert_eq!(skill.grants, ["gmail-read", "gmail-write"]);
+        assert!(skill.task_step().is_some());
+        for (name, grant) in [
+            ("unknown-service", "\"myspace-read\""),
+            ("second-code", "\"gmail-app-read\""),
+            ("unknown-kind", "\"gmail-delete\""),
+            ("bare-code", "\"gmail\""),
+        ] {
+            let folder = task_skill(
+                dir.path(),
+                name,
+                &MORNING_MAIL.replace("\"gmail-write\"", grant),
+            );
+            let refused = load(&folder).unwrap_err();
+            assert!(refused.contains("is not a grant"), "{name}: {refused}");
+        }
+        task::set_agent_services_here(None);
+    }
+
     /// #6305: a `do.task` loads with its grants beside the skill's other
     /// steps, which stay steps of their own; its grants and its step are
     /// checked as it loads.
