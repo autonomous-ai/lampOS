@@ -1358,14 +1358,40 @@ thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguy
    `room/…`, `…/heard`): chúng luôn được nêu đúng tên, và phần không nêu đúng
    được thì bị từ chối như trước. Điều đèn chưa làm được và một lần đọc vẫn
    bị từ chối hay được nói trọn.
+5. **Kỹ năng im lặng và lặp lại theo yêu cầu** (`made_skill::say_paced_with`,
+   phán quyết của người xây dựng đầu tiên về các lần tạo trên lamp-9adf
+   ngày 12/11, 15:13-15:16). Kỹ năng không nói và không ngân (chỉ đèn, cử
+   động và nhìn) có cooldown ít nhất một phút (`LEAST_LOOSE_COOLDOWN_SECS`),
+   không bao giờ một giờ: `"1h"` trên "when I come back to my desk, blink
+   the light green twice" đến từ mô hình, vốn chép ví dụ trong system prompt
+   (`for = "5s"`, `cooldown = "1h"`, `rearm = "ends"`), không phải từ
+   `paced`. `paced` đặt `"1m"` khi thiếu hay ngắn hơn, và đặt cooldown dài
+   hơn về `"1m"` khi trigger chạy một lần mỗi lần nó đúng (`rearm`,
+   `when = "appears"`, một khuôn mặt, một lần đứng dậy) và lời yêu cầu
+   không nói tới giới hạn (`limits_asked`, có cả "once an hour"); trigger
+   không có `rearm` giữ cooldown đã viết, nếu không nó sẽ chạy mỗi phút
+   người còn ngồi. Không khí ngột ngạt giữ một giờ, và giờ trong ngày, vốn
+   chạy một lần đúng phút đó, không đổi. Lặp lại mà lời yêu cầu tự nói
+   (`made_skill::repeat_asked`: "every five minutes", "every 2 hours",
+   "every minute", "every half hour", "mỗi 10 phút") chạy trong lúc trigger
+   còn đúng: bỏ `rearm` và `cooldown` là khoảng được yêu cầu, ít nhất một
+   phút (không khí: một giờ); không bao giờ với giờ trong ngày hay khuôn mặt
+   xuất hiện, vốn chạy một lần mỗi lần. `rearm = "ends"` được giữ trên kỹ
+   năng "when I come back", `[rest] after_ignored = 2` được giữ trên mọi kỹ
+   năng tự tạo, cả khi lặp lại, và `[quiet]` được giữ cho kỹ năng có nói.
+   Lời thuật lại nói cooldown như trước ("at most once every 5 minutes").
 
 Không đổi khi bật: lời đọc lại của một lần ghi và lời đồng ý nói ra cho
 SHA-256 nội dung của nó; việc gửi, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng
 một ngày (`lamp-services`, không đọc công tắc này); các từ chối vì riêng tư;
 quyền mã và lời đồng ý của #6071.
 
-Test: `made_skill::tests::loosened_*` (bốn thay đổi, bật và tắt, và
-`loosened_never_takes_a_triggers_key_or_a_camera_steps_key_alone`), và với
+Test: `made_skill::tests::loosened_*` (bốn thay đổi, bật và tắt,
+`loosened_never_takes_a_triggers_key_or_a_camera_steps_key_alone`, và ba
+lần tạo trên lamp-9adf: `loosened_a_silent_made_skill_is_never_held_to_an_hour`,
+`loosened_an_asked_repeat_runs_while_its_trigger_holds`,
+`loosened_a_moving_made_skill_keeps_its_minute_and_rest`, cùng
+`a_repeat_is_read_from_the_requests_words`), và với
 `lamp-skills` thật `made::loosened_a_key_the_check_refuses_is_left_out_and_told`,
 `made::loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused`
 và `made::loosened_a_trigger_the_check_refuses_is_never_loosened`.
