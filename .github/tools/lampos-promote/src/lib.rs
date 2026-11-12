@@ -287,6 +287,8 @@ fn candidate(remote: &mut impl Remote, context: &Context) -> Result<Candidate> {
     };
     // A push that published the train pull request's tested build of the same
     // tree (#6556) skipped its own ARM64 jobs; its reuse job stands for them.
+    // The reuse job is green on a refusal too: publish's own condition (both
+    // ARM64 jobs green, or a reuse that named a run) guards what was signed.
     let reused = jobs
         .iter()
         .any(|j| j.name == "lampOS — reuse the train's tested ARM64 build" && good(&j));

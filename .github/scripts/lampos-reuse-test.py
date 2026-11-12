@@ -11,6 +11,7 @@ spec.loader.exec_module(reuse)
 REPO = "autonomous-ai/lampOS"
 PUSH, HEAD, TESTED, BASE = "a" * 40, "b" * 40, "c" * 40, "d" * 40
 TREE = "e" * 40
+KEY = "lampos-arm64-u2204-" + "1" * 64 + "-" + "2" * 40
 
 
 def world():
@@ -26,7 +27,11 @@ def world():
         "actions/runs/7/artifacts?per_page=100": {"artifacts": [
             {"name": f"lampos-arm64-{HEAD}", "expired": False},
             {"name": f"lampos-arm64-tested-{TESTED}", "expired": False},
-            {"name": "lampos-arm64-tests", "expired": False}]},
+            {"name": "lampos-arm64-tests", "expired": False},
+            {"name": f"lampos-arm64-cache-key-build-{KEY}", "expired": False}]},
+        f"actions/caches?key={KEY}&per_page=100": {"actions_caches": [
+            {"key": KEY, "ref": "refs/heads/lamp-voice"},
+            {"key": KEY + "0", "ref": "refs/pull/900/merge"}]},  # another key: a prefix match
         f"git/commits/{TESTED}": {"tree": {"sha": TREE}, "parents": [{"sha": BASE}, {"sha": HEAD}]},
         f"git/commits/{PUSH}": {"tree": {"sha": TREE}, "parents": [{"sha": BASE}, {"sha": HEAD}]},
     }
@@ -94,5 +99,28 @@ refused(w, "no single tested merge commit")
 w = world()
 w[f"git/commits/{TESTED}"]["parents"] = [{"sha": BASE}]
 refused(w, "is not a merge of")
+
+# The cache the build restored: lamp-voice's alone, or none (cold), or nothing reused.
+w = world()
+w[f"actions/caches?key={KEY}&per_page=100"]["actions_caches"].append({"key": KEY, "ref": "refs/pull/900/merge"})
+refused(w, "not lamp-voice's alone")
+w = world()
+w[f"actions/caches?key={KEY}&per_page=100"]["actions_caches"] = []
+refused(w, "not lamp-voice's alone")
+w = world()
+w["actions/runs/7/artifacts?per_page=100"]["artifacts"][3]["name"] = "lampos-arm64-cache-key-build-none"
+assert decide(w)[0] == 7
+w = world()
+del w["actions/runs/7/artifacts?per_page=100"]["artifacts"][3]
+refused(w, "no single restored cache")
+
+# The pull request's head from a fork; a run on another branch or by another event.
+w = world()
+w[f"commits/{PUSH}/pulls"][0]["head"]["repo"] = {"full_name": "someone/lampOS"}
+refused(w, "head is not in")
+for field, value in (("head_branch", "first/train-901"), ("event", "push")):
+    w = world()
+    w[f"actions/workflows/lampos-arm64.yml/runs?event=pull_request&head_sha={HEAD}&per_page=30"]["workflow_runs"][0][field] = value
+    refused(w, "no ARM64 run")
 
 print("lampos-reuse: every decision as expected")
