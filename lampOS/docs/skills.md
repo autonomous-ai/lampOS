@@ -4770,7 +4770,9 @@ bytes, as above):
   `do.task` (docs/tasks.md, "An agent skill's run and the `net` grant"):
   `task::origin_refuses` lets it through only with the switch on, as a
   package that is not the Store's and not pushed, its card marked and its
-  `skill.toml` within the cap (`task::agent_from_file`).
+  `skill.toml` within the cap (`task::agent_from_file`). Hermes then runs
+  it in a fresh home of its own, the person's Hermes data (memories,
+  sessions) hidden, as a make does (`skill_make::fresh_home`).
 
 Tests: `upload_agent::tests` (the 4 KB photobooth file, the switch off,
 a short light-and-speak file, the first run's yes, no secret written,

@@ -3367,18 +3367,36 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   for the folder as it is. Off, `net` is refused as an unknown grant
   (`bad_request`) before any token.
 - **An agent skill's run** (`run` = `scripts/SKILL.md`,
-  `AGENT_INSTRUCTIONS`): Hermes is told to read that file in the skill's
-  read-only folder and do what it says, as data, reaching the lamp only
+  `AGENT_INSTRUCTIONS`) follows the file only within its grants and its
+  network: the token holds lamp-control's grants, and the network is held
+  unless lamp-control's yes names `net`. Hermes is told to read that file
+  in the skill's read-only folder and do what it says, as data, reaching the lamp only
   through `control.sock` with the run's own token, never asking anyone for
-  a key or token by voice nor saying one aloud. It starts in a fresh
-  folder of its own, `agent-<run id>` in the work folder, 0700, removed
-  however the run ends (`skill_make::fresh_folder`, a make's folder's
-  rule). Its environment is lamp-tasks' cleared one, the control socket,
-  the token and the SDK's path: no key. `admin.sock` is never shown in
-  Hermes's namespace.
+  a key or token by voice nor saying one aloud. It goes through the make's
+  runner held off the network (`skill_make::lamp_runner(home, true)`)
+  unless granted `net`. Its environment is lamp-tasks' cleared one, the
+  control socket, the token, the SDK's path and its fresh home below: no
+  key. `admin.sock` is never shown in Hermes's namespace.
+- **Every agent skill's run, and every `net` run, starts in a fresh home
+  with the person's Hermes data hidden**, as a make does (the P1 #6643
+  closed for makes): `make-<run id>` in the work folder with only
+  `home/.hermes/config.yaml` (the lamp's provider, its key a variable's
+  name, and lamp-update's four settings, `MAKE_CONFIG`), each 0700 or
+  0600, removed however the run ends (`skill_make::fresh_home`). The run's
+  `HOME` and `HERMES_HOME` are that home's and `LAMP_NS_HOME` names it
+  (`skill_make::home_env`), so the wrapper takes it (`make-*/home`) and the
+  namespace script covers Hermes's lasting home (its memories and
+  sessions) with a tmpfs, puts the checkout back read-only, and leaves the
+  work folder read-only and hidden but for the run's own folder. The
+  make's runner checks the wrapper and namespace lines before every run
+  (told `NO_RUN_NAMESPACE`, an agent run's own home); with no work folder or make runner the run is refused
+  `run_failed` (`NO_FRESH_HOME`) before a token. A script's run without
+  `net` is unchanged.
 
 Tests: `skill_task::tests::the_net_grant_keeps_the_network_and_no_grant_holds_it`,
-`an_agent_run_follows_its_file_in_a_fresh_folder_with_no_key`.
+`a_net_run_has_a_fresh_home_of_its_own_never_the_lasting_one`,
+`a_fresh_home_is_taken_with_the_lasting_home_covered`,
+`an_agent_run_follows_its_file_in_a_fresh_home_with_no_key`.
 
 ## Devin (#1854)
 
