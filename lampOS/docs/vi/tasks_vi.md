@@ -529,8 +529,16 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   thứ hai, khi có phần tasks, một câu nói mà chính lời người nói nêu một
   agent để làm việc, đọc đúng như trên (chỉ tính người làm, lấy từ các
   engine của đèn khi đèn có target riêng và từ staff, Claude Code khi chưa
-  đọc được; chỉ nhắc tên như "What is Hermes?" thì không tính), có lời của
-  vòng 1 bị giữ đến hết vòng (`agent_tasks::named_for_work`,
+  đọc được; chỉ nhắc tên như "What is Hermes?" thì không tính; một agent
+  chỉ được gọi tên ở đầu câu, "Hermes, …", chỉ tính khi phần còn lại của
+  câu nhờ làm việc: một động từ làm việc như write, make, fix, list hay
+  look (`WORK_VERBS`), hoặc ít nhất `WHOLE_ASK_FEWEST` (4) từ nhờ việc
+  ngoài các từ đồng ý, đếm như `new_ask`, `agent_tasks::asks_for_work`;
+  nên "Hermes, what time is it?", "Hermes, how are you?", "Hey Hermes,
+  tell me a joke." và "Codex, what can you do?" không nêu ai và được trả
+  lời như bình thường, còn "Hermes, write a poem about rain into rain.md"
+  nêu Hermes; dạng "ask/have/tell Hermes to …" vẫn tính như trước; P2 của
+  Thirteen trên #6572), có lời của vòng 1 bị giữ đến hết vòng (`agent_tasks::named_for_work`,
   `Engine::catching_named_agents`). Nếu vòng 1 chỉ trả lời bằng lời, không
   gọi hàm nào, lời đó không được nói: lượt được hỏi lại một lần với một ghi
   chú hệ thống nêu tên agent ("the person asked Hermes to do this … Call
@@ -636,7 +644,10 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   nghe được đặt từ "on my computer") được chạy trên đèn khi đèn có target
   riêng, không bao giờ gửi tới máy tính không có; khi công tắc
   `LAMP_TASKS_WHO` tắt, nơi staff không bao giờ được đọc, nó đi tới target
-  đã cấu hình như trước. Test:
+  đã cấu hình như trước. Khi chưa có lần đọc staff nào trả về (chưa đọc
+  lần nào, hoặc mọi lần đến giờ đều lỗi), staff rỗng, tức là coi như chưa
+  ghép máy nào: `computer` bị bỏ khỏi `where`. Một lần đọc lỗi sau đó giữ
+  staff của lần đọc gần nhất. Test:
   `agent_tasks::tests::where_offers_no_computer_without_a_pairing`,
   `agent_tasks::tests::no_computer_paired_a_computer_named_goes_to_the_lamp`,
   `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
