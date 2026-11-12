@@ -213,8 +213,10 @@ jobs:
   # skipped and publish downloads that run's artifact. Anything else (not a
   # train's merge, lamp-voice moved under the train, the run not green, its
   # artifact expired, an API error) outputs nothing and the push builds and
-  # tests as before (.github/scripts/lampos-reuse.py). Never fails: lampos-promote
-  # counts this job in place of skipped ARM64 jobs.
+  # tests as before (.github/scripts/lampos-reuse.py), which outputs reused=false
+  # and says why in the summary. Doesn't fail on a refusal: lampos-promote counts
+  # this job in place of skipped ARM64 jobs, and publish's `if` (a non-empty
+  # run_id, or both ARM64 jobs green) is the guard on what gets signed.
   reuse:
     needs: route
     if: ${{ !cancelled() && github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice' && github.repository == 'autonomous-ai/lampOS' }}
@@ -228,6 +230,7 @@ jobs:
     outputs:
       run_id: ${{ steps.reuse.outputs.run_id }}
       artifact: ${{ steps.reuse.outputs.artifact }}
+      reused: ${{ steps.reuse.outputs.reused }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -235,7 +238,6 @@ jobs:
           persist-credentials: false
       - name: find the train's run that tested this tree
         id: reuse
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 -I .github/scripts/lampos-reuse.py
@@ -255,6 +257,9 @@ jobs:
     # Fourth on #3997).
     runs-on: ${{ github.run_attempt == '1' && fromJSON(needs.route.outputs.runner || '"ubuntu-22.04-arm"') || 'ubuntu-22.04-arm' }}
     timeout-minutes: 90
+    permissions:
+      actions: read  # a train's pull request lists lamp-voice's caches (#6556)
+      contents: read
     outputs:
       picked: ${{ steps.scope.outputs.filter }}
     steps:
@@ -306,22 +311,39 @@ jobs:
         run: python3 -B -I .github/scripts/lampos-publish-artifact-test.py
       - name: stable promotion tests (offline, disposable test key)
         run: cargo test --locked --manifest-path .github/tools/lampos-promote/Cargo.toml
+      # A train's pull request restores only a cache lamp-voice's push saved, by
+      # its exact key, or builds cold: lamp-voice may publish this build (#6556),
+      # and an entry an earlier head saved in the pull request's own scope must
+      # never reach it (the Reviewer-lead's HOLD on #6563). lampos-reuse.py
+      # checks the key it restored (the marker below) has no such entry.
+      - name: lamp-voice's newest cache (a train's pull request)
+        id: lv
+        if: ${{ runner.environment == 'github-hosted' && !inputs.full && startsWith(github.head_ref, 'first/train-') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREFIX: lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
+        run: |
+          key=$(gh api "repos/$GITHUB_REPOSITORY/actions/caches?ref=refs/heads/lamp-voice&key=$PREFIX&sort=created_at&direction=desc&per_page=100" \
+            --jq '[.actions_caches[] | select(.ref == "refs/heads/lamp-voice")][0].key // ""') || key=''
+          [[ "$key" =~ ^lampos-arm64-u2204-[0-9a-f]+-[0-9a-f]{40}$ ]] || key=''
+          echo "lamp-voice's cache: ${key:-none, cold}"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
       - name: restore the cache
         id: cache
         # Not for the full run, which builds cold (see the top). Not on the
         # Studio: it builds lamp-voice cold, and the cache job below renews
-        # this one for pull requests.
-        if: ${{ runner.environment == 'github-hosted' && !inputs.full }}
+        # this one for pull requests. A train's: lamp-voice's exact key, no prefix.
+        if: ${{ runner.environment == 'github-hosted' && !inputs.full && (!startsWith(github.head_ref, 'first/train-') || steps.lv.outputs.key != '') }}
         uses: actions/cache/restore@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             lampOS/target
-          key: lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-${{ github.sha }}
+          key: ${{ steps.lv.outputs.key || format('lampos-arm64-u2204-{0}-{1}', hashFiles('lampOS/Cargo.lock'), github.sha) }}
           restore-keys: |
-            lampos-arm64-u2204-${{ hashFiles('lampOS/Cargo.lock') }}-
-            lampos-arm64-u2204-
+            ${{ !startsWith(github.head_ref, 'first/train-') && format('lampos-arm64-u2204-{0}-', hashFiles('lampOS/Cargo.lock')) || '' }}
+            ${{ !startsWith(github.head_ref, 'first/train-') && 'lampos-arm64-u2204-' || '' }}
       - name: unchanged source files get the cached build's times back
         if: ${{ !inputs.full }}
         run: python3 -I .github/scripts/lampos-source-times.py
@@ -412,6 +434,15 @@ jobs:
         timeout-minutes: 10
         with:
           name: lampos-arm64-tested-${{ github.sha }}
+          path: ${{ runner.temp }}/tested-commit
+          retention-days: 7
+      # And the cache it restored, `none` when cold: lamp-voice's push reuses this
+      # build only when that key is lamp-voice's alone (lampos-reuse.py).
+      - uses: actions/upload-artifact@v4
+        if: startsWith(github.head_ref, 'first/train-')
+        timeout-minutes: 10
+        with:
+          name: lampos-arm64-cache-key-build-${{ steps.cache.outputs.cache-matched-key || 'none' }}
           path: ${{ runner.temp }}/tested-commit
           retention-days: 7
       # lamp-voice's own, and one onto #1712's that found none (see the top). Not
