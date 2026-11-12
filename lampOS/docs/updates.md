@@ -1464,9 +1464,11 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
 | `lamp-setup-recover.service could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
 | `started <unit>, added by build N` | the watch passed and the build is kept; a long-running part of `lampos.target` the switch added, enabled and inactive, was started with `--no-block` ("A part added over the air") |
+| `started <unit>, ended before build N, which changed it` | the watch passed and the build is kept; a long-running part of `lampos.target` the lamp had, that the switch changed and that had ended cleanly (inactive, last run a success), was started with `--no-block` (#6699, "A part added over the air") |
+| `started lamp-control.service, ended cleanly with SWITCH on` | a kept switch or an up-to-date round: lamp-control was enabled, had ended cleanly, and `LAMP_CONTROL` or `LAMP_SKILL_TASKS` (SWITCH) reads `on`; started with `--no-block`, changed by the build or not (#6699) |
 | `<unit> could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
-| `the parts build N added start with lampos.target, which is not running` | the lamp is not set up (or stopped): the added parts are left for the target |
-| `the parts build N added are not started: systemd cannot say how they are (…); they start at the next boot` | their states could not be read: none is started |
+| `the parts build N added or changed start with lampos.target, which is not running` | the lamp is not set up (or stopped): the added parts, and the changed ones that had ended, are left for the target |
+| `the parts build N added or changed are not started: systemd cannot say how they are (…); they start at the next boot` | their states could not be read: none is started |
 | `build N kept; held: <unit> held, nothing moves: …` | the watch passed with a unit held as before the switch (#6113, step 9): the round ends `held` |
 | **Putting a build back** | |
 | `putting build N back: …` | before a `put back` end, with why |
@@ -2257,6 +2259,28 @@ unit wanted only by another target (the waking face, the Wi-Fi restore,
 recovery) are left for the next start, as `install` leaves them. A lamp whose
 `lampos.target` is not running (not set up) starts none: the target starts
 them. A start that fails is said, and the round stays switched.
+
+The same start covers a part the lamp already had (#6699). A part has to be
+one the switch changed (its unit or its binary), meet the same three
+conditions above, and have **ended cleanly**: inactive, with its last run a
+success. On a test lamp on 12 Nov, lamp-control exited 0 under a build where its
+switch was off. The next three updates installed a lamp-control that stays
+up with `LAMP_SKILL_TASKS=on` (the no-door mode), but a round restarts only
+what runs, so lamp-control stayed dead and every skill's `do.task` failed
+until a manual restart. Now each such part is started once with the added
+ones. A failed part is still left, a part the build did not change is not
+this round's, and a part still off by its own switch exits again at once.
+
+lamp-control itself (`CONTROL_UNIT`) is started even when the build did not
+change it, whenever it ended cleanly, is enabled into `lampos.target`, and
+`LAMP_CONTROL` or `LAMP_SKILL_TASKS` reads `on` through its drop-ins (as
+install reads a switch). That covers lamps already stuck on an earlier
+build. Off by both switches, it exits 0 by design and is left alone. This
+runs on an **up-to-date** round too, not only after a switch: the round that
+installs a build is run by the updater the lamp had, and the new updater
+(after its own switch, "lamp-update switching itself") first finds the lamp
+up to date. So a lamp whose old updater lacks this gets lamp-control started
+by the new updater's first round, within one `--every-s`.
 
 All of it rides the switch's journal (`Switching::added`). A build put
 back, or a switch cut short and recovered at the next start, stops each

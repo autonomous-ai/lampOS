@@ -412,3 +412,212 @@ fn a_lamp_of_its_own_units_an_older_build_or_a_unit_install_leaves_out_gets_noth
     assert!(!lamp.exists(&format!("/etc/systemd/system/{KEYS}")));
     assert!(!lamp.channel.fetched.iter().any(|url| url.ends_with(KEYS)));
 }
+
+/// A lamp already given lamp-mood at build `text`, enabled into
+/// `lampos.target`, whose last run is in `running`.
+fn with_mood(mut lamp: Lamp, text: &str, running: Running) -> Lamp {
+    let build = sha(text);
+    let folder = lamp.root.join(format!("opt/lampOS/mood/{build}"));
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("lamp-mood"), text).unwrap();
+    std::os::unix::fs::symlink(&build, lamp.root.join("opt/lampOS/mood/current")).unwrap();
+    fs::write(lamp.root.join("etc/systemd/system").join(MOOD), mood()).unwrap();
+    let wants = lamp.root.join("etc/systemd/system/lampos.target.wants");
+    fs::create_dir_all(&wants).unwrap();
+    std::os::unix::fs::symlink(format!("/etc/systemd/system/{MOOD}"), wants.join(MOOD)).unwrap();
+    lamp.systemd.units.insert(MOOD.into(), running);
+    lamp
+}
+
+fn ended(result: &str) -> Running {
+    Running {
+        active: if result == "success" {
+            "inactive"
+        } else {
+            "failed"
+        }
+        .into(),
+        sub: if result == "success" {
+            "dead"
+        } else {
+            "failed"
+        }
+        .into(),
+        result: result.into(),
+        ..Running::default()
+    }
+}
+
+/// #6699: lamp-control exited 0 under a build where its switch was off, and
+/// three updates that changed it left it dead until a manual restart. A
+/// part the lamp had, that the switch changed and that ended cleanly, is
+/// started once the watch passed, as an added part is.
+#[test]
+fn a_changed_part_that_ended_cleanly_under_the_old_build_is_started_after_the_switch() {
+    let mut lamp = with_mood(product_lamp(), "mood 1", ended("success"));
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 2");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(link(&lamp, "/opt/lampOS/mood/current"), Some(sha("mood 2")));
+    // Not restarted inside the watch (it was not running), started after.
+    assert_eq!(
+        lamp.calls(),
+        ["reload", &format!("start --no-block {MOOD}")]
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line == &format!("started {MOOD}, ended before build 2, which changed it")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// A failed part is left as an added one is; one the build did not change
+/// is not this round's; on a lamp whose `lampos.target` does not run none
+/// is started.
+#[test]
+fn a_changed_part_failed_unchanged_or_on_a_lamp_not_running_is_not_started() {
+    // Failed under the old build: left for the person, as now.
+    let mut lamp = with_mood(product_lamp(), "mood 1", ended("exit-code"));
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 2");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(
+        !lamp.calls().iter().any(|call| call.contains(MOOD)),
+        "{:?}",
+        lamp.calls()
+    );
+
+    // Not changed by the build (the same binary and unit): not started.
+    let mut lamp = with_mood(product_lamp(), "mood 1", ended("success"));
+    publish_with_eyes(&mut lamp, manifest::ADDS_UPDATER, "eyes 2", "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(
+        !lamp.calls().iter().any(|call| call.contains(MOOD)),
+        "{:?}",
+        lamp.calls()
+    );
+
+    // lampos.target not running: the part starts with it.
+    let mut lamp = with_mood(product_lamp(), "mood 1", ended("success"));
+    lamp.systemd.units.remove("lampos.target");
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 2");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert!(
+        !lamp.calls().iter().any(|call| call.contains(MOOD)),
+        "{:?}",
+        lamp.calls()
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("start with lampos.target, which is not running")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+const CONTROL: &str = "lamp-control.service";
+
+/// lamp-control's unit as the product enables it, `switch` in its own
+/// environment (none for `""`), its last run in `running`.
+fn with_control(mut lamp: Lamp, switch: &str, running: Running) -> Lamp {
+    let environment = if switch.is_empty() {
+        String::new()
+    } else {
+        format!("Environment={switch}\n")
+    };
+    let build = sha("control 1");
+    let folder = lamp.root.join(format!("opt/lampOS/control/{build}"));
+    fs::create_dir_all(&folder).unwrap();
+    fs::write(folder.join("lamp-control"), "control 1").unwrap();
+    std::os::unix::fs::symlink(&build, lamp.root.join("opt/lampOS/control/current")).unwrap();
+    fs::write(
+        lamp.root.join("etc/systemd/system").join(CONTROL),
+        format!(
+            "[Service]\nUser=lampos\n{environment}ExecStart=/opt/lampOS/control/current/lamp-control serve\n[Install]\nWantedBy=lampos.target\n"
+        ),
+    )
+    .unwrap();
+    let wants = lamp.root.join("etc/systemd/system/lampos.target.wants");
+    fs::create_dir_all(&wants).unwrap();
+    std::os::unix::fs::symlink(
+        format!("/etc/systemd/system/{CONTROL}"),
+        wants.join(CONTROL),
+    )
+    .unwrap();
+    lamp.systemd.units.insert(CONTROL.into(), running);
+    lamp
+}
+
+fn control_starts(lamp: &Lamp) -> usize {
+    lamp.calls()
+        .iter()
+        .filter(|call| *call == &format!("start --no-block {CONTROL}"))
+        .count()
+}
+
+/// #6699, V2's case: a lamp-control that ended cleanly under an older build
+/// while a switch that keeps it up is on is started by a kept switch even
+/// when the build did not change it, and by an up-to-date round: the round
+/// that installs a build is run by the updater the lamp had, so the new
+/// updater's first round finds the lamp up to date.
+#[test]
+fn lamp_control_ended_cleanly_with_its_switch_on_is_started_by_a_switch_or_an_up_to_date_round() {
+    let mut lamp = with_control(product_lamp(), "LAMP_SKILL_TASKS=on", ended("success"));
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(control_starts(&lamp), 1, "{:?}", lamp.calls());
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line
+                == &format!("started {CONTROL}, ended cleanly with LAMP_SKILL_TASKS on")),
+        "{:?}",
+        lamp.said
+    );
+
+    // Running: an up-to-date round starts nothing.
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(control_starts(&lamp), 1, "{:?}", lamp.calls());
+
+    // Ended cleanly again: the next up-to-date round starts it.
+    lamp.systemd.units.insert(CONTROL.into(), ended("success"));
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(control_starts(&lamp), 2, "{:?}", lamp.calls());
+
+    // The developers' door through a drop-in keeps it up as well.
+    let drop_in = lamp.root.join(format!("etc/systemd/system/{CONTROL}.d"));
+    fs::create_dir_all(&drop_in).unwrap();
+    fs::write(
+        drop_in.join("off.conf"),
+        "[Service]\nEnvironment=LAMP_SKILL_TASKS=off\nEnvironment=LAMP_CONTROL=on\n",
+    )
+    .unwrap();
+    lamp.systemd.units.insert(CONTROL.into(), ended("success"));
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(control_starts(&lamp), 3, "{:?}", lamp.calls());
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line == &format!("started {CONTROL}, ended cleanly with LAMP_CONTROL on")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// Off by both switches it exits 0 by design and is left; a failed one is
+/// left as any failed part is.
+#[test]
+fn lamp_control_off_by_both_switches_or_failed_is_not_started() {
+    let mut lamp = with_control(product_lamp(), "", ended("success"));
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(control_starts(&lamp), 0, "{:?}", lamp.calls());
+
+    let mut lamp = with_control(product_lamp(), "LAMP_SKILL_TASKS=on", ended("exit-code"));
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(control_starts(&lamp), 0, "{:?}", lamp.calls());
+}
