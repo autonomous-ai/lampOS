@@ -294,11 +294,20 @@ These tests do not establish a real stable promotion or lamp acceptance.
   build and every test runner passed; the push skips `arm64` and `arm64-test`
   and `publish` downloads `lampos-arm64-<pull request head>` from that run.
   Every artifact carries `TREE`, its build's `HEAD^{tree}`, and publish
-  refuses one whose `TREE` is not `github.sha`'s tree. Anything else (not a
-  train's merge, lamp-voice moved under the train, a run not green, an
-  expired artifact, an API error) builds and tests on the push as before,
-  and saves the cache only then. Promotion counts the successful `reuse` job
-  in place of the skipped ARM64 jobs.
+  refuses one whose `TREE` is not `github.sha`'s tree. The train's build
+  restores no cache but one lamp-voice's push saved, by its exact key (the
+  newest under its `Cargo.lock`, from `actions/caches?ref=refs/heads/lamp-voice`),
+  with no prefix fallback, or builds cold; it records the key it restored
+  (`lampos-arm64-cache-key-<job>-<key>`, `none` when cold), and reuse refuses
+  unless every cache entry under that key is lamp-voice's, so nothing an
+  earlier head saved in the pull request's own scope reaches a signed build.
+  Anything else (not a train's merge, lamp-voice moved under the train, a run
+  not green, an expired artifact, no recorded key, an API error) builds and
+  tests on the push as before, and saves the cache only then. The `reuse` job
+  outputs `reused=true|false` and says why in its summary; it stays green on a
+  refusal. Promotion counts the successful `reuse` job in place of skipped
+  ARM64 jobs; what guards the signed bytes is `publish`'s condition: both
+  ARM64 jobs green, or a reuse that named a run.
 - A run eligible to publish builds on GitHub-hosted from the cache, like a
   pull request: it restores lamp-voice's newest build and gives unchanged
   source files their cached times back, so cargo rebuilds only the crates

@@ -6,9 +6,9 @@ run's own profile. When lamp-voice's push is that pull request's merge and its
 tree is the very tree the pull request's run built and tested, the push
 publishes that run's artifact instead of building and testing it again.
 
-Writes `run_id` and `artifact` to GITHUB_OUTPUT when every check holds, and
-nothing otherwise, with one line saying why: the push then builds and tests as
-before. Never fails: any error is a refusal.
+Writes `reused=true`, `run_id` and `artifact` to GITHUB_OUTPUT when every
+check holds, and `reused=false` otherwise, with one line saying why: the push
+then builds and tests as before. Never fails: any error is a refusal.
 
 The checks, in order:
   1. the pull request merged as this commit is a train's, from this repository;
@@ -17,7 +17,11 @@ The checks, in order:
   3. that run names the merge commit it tested (its `lampos-arm64-tested-<sha>`
      artifact), a merge of the pull request's head, whose tree equals this
      push's tree; the tree includes .github/, so the same workflow and tests ran;
-  4. the run's binaries artifact, `lampos-arm64-<head sha>`, is there, unexpired.
+  4. the run's binaries artifact, `lampos-arm64-<head sha>`, is there, unexpired;
+  5. the cache each of its build jobs restored (its `lampos-arm64-cache-key-<job>-<key>`
+     artifact, `none` when cold) is lamp-voice's alone: every cache entry under that
+     exact key is lamp-voice's, none the pull request's own scope's, which an
+     earlier head of it could have filled (the Reviewer-lead's HOLD on #6563).
 Publish checks the tree again, from the TREE file inside that artifact
 (lampos-publish.py), so a mismatch the API missed refuses to publish.
 
@@ -37,6 +41,8 @@ ARM64 = "lampOS — build and test on Linux ARM64 ("
 BUILD = ARM64 + "build)"
 SHARD = re.compile(re.escape(ARM64) + r"([1-9][0-9]*)/([1-9][0-9]*)\)")
 TESTED = re.compile(r"lampos-arm64-tested-([0-9a-f]{40})")
+CACHED = re.compile(r"lampos-arm64-cache-key-([a-z]+)-(none|lampos-arm64-u2204-[0-9a-f]+-[0-9a-f]{40})")
+CACHING = ["build"]  # the jobs that restore a cache, each recording the key it restored
 API_TIMEOUT = 15  # s per request
 
 
@@ -98,6 +104,14 @@ def decide(get, sha, repo):
             f"run {run['id']} tested tree {commit['tree']['sha']} ({tested[0]}), this push's is {mine}: lamp-voice moved under the train")
     name = f"lampos-arm64-{head}"
     require(any(a["name"] == name for a in artifacts), f"run {run['id']}'s artifact {name} is absent or expired")
+    keys = sorted(m.groups() for a in artifacts if (m := CACHED.fullmatch(a["name"])))
+    require([job for job, _ in keys] == CACHING, f"run {run['id']} records no single restored cache per job {CACHING}")
+    for job, key in keys:
+        if key == "none":
+            continue
+        refs = [c["ref"] for c in get(f"actions/caches?key={key}&per_page=100")["actions_caches"] if c["key"] == key]
+        require(refs and all(r == f"refs/heads/{BRANCH}" for r in refs),
+                f"run {run['id']}'s {job} restored {key}, which is not lamp-voice's alone ({sorted(set(refs))})")
     return run["id"], name, f"#{pr['number']}'s run {run['id']} tested this tree ({tested[0]}); publishing its {name}"
 
 
@@ -105,11 +119,11 @@ def main():
     try:
         sha, repo = os.environ["GITHUB_SHA"], os.environ["GITHUB_REPOSITORY"]
         run_id, artifact, reason = decide(api, sha, repo)
-        out = f"run_id={run_id}\nartifact={artifact}\n"
+        out = f"reused=true\nrun_id={run_id}\nartifact={artifact}\n"
     except Refused as refusal:
-        reason, out = f"build here: {refusal}", ""
+        reason, out = f"build here: {refusal}", "reused=false\n"
     except Exception as error:  # an API error or an odd answer: build as before
-        reason, out = f"build here: {type(error).__name__}: {error}", ""
+        reason, out = f"build here: {type(error).__name__}: {error}", "reused=false\n"
     print(reason)
     for name, text in (("GITHUB_OUTPUT", out), ("GITHUB_STEP_SUMMARY", f"ARM64 reuse: {reason}\n")):
         if os.environ.get(name):
