@@ -3043,6 +3043,80 @@ pub fn briefs_own_refusal(why: &str) -> bool {
         .any(|refusal| why.contains(&plain(refusal)))
 }
 
+/// The verbs of an ask the lamp itself would have to carry out, each with
+/// the forms a request says it in: a skill's say beginning with one of
+/// them, when the request asked the lamp to do it, tells the person to do
+/// what they asked for ([`echoes_the_ask`]).
+const ASKED_VERBS: [(&str, &[&str]); 7] = [
+    ("check", &["check", "checks", "checking"]),
+    ("look up", &["look up", "looks up", "looking up"]),
+    ("find", &["find", "finds", "finding"]),
+    ("read", &["read", "reads", "reading"]),
+    ("search", &["search", "searches", "searching"]),
+    (
+        "summarize",
+        &["summarize", "summarizes", "summarizing", "summarise"],
+    ),
+    ("get", &["get", "gets", "getting"]),
+];
+
+/// How a request asks to be told to do something itself: a reminder, never
+/// the lamp's own work.
+const TOLD_TO: [&str; 5] = [
+    "remind me",
+    "tell me to",
+    "ask me to",
+    "nudge me to",
+    "get me to",
+];
+
+/// Why a made skill is refused when its say only hands the ask back
+/// ([`echoes_the_ask`]): the lamp's own "can't do that yet", so the person
+/// hears it plainly and, with `LAMP_MAKE_SKILL_AGENT`, the make goes to the
+/// lamp's agent (lamp-9adf, 12 Nov 18:10: "check the weather and tell me if
+/// I need an umbrella" was kept as a say "Check the weather now, please.").
+pub const ECHOES_THE_ASK: &str =
+    "I can't do that yet: doing that itself, rather than telling you to do it";
+
+/// Whether a made skill's `toml` only tells the person to do what the
+/// request `words` asked the lamp to do: a say beginning (after "please"
+/// or "now") with one of [`ASKED_VERBS`] that the request says too, in a
+/// request that asks for no reminder ([`TOLD_TO`]) and doesn't give those
+/// words to say itself. Its say text and verb, for the repair's lines.
+pub fn echoes_the_ask(toml: &str, words: &str) -> Option<(String, &'static str)> {
+    let table: toml::Table = toml::from_str(toml).ok()?;
+    let ask = words_of(words);
+    let phrase = |text: &str| text.split(' ').map(str::to_owned).collect::<Vec<_>>();
+    if TOLD_TO.iter().any(|told| said_in(&phrase(told), &ask)) {
+        return None;
+    }
+    table
+        .get("do")?
+        .as_array()?
+        .iter()
+        .filter_map(|step| say_text(step.get("say")?))
+        .find_map(|text| {
+            let said = words_of(&text);
+            // Words the person gave the lamp to say are theirs.
+            if said_in(&said, &ask) {
+                return None;
+            }
+            let mut said = &said[..];
+            while let [lead, rest @ ..] = said
+                && ["please", "now"].contains(&lead.as_str())
+            {
+                said = rest;
+            }
+            ASKED_VERBS
+                .iter()
+                .find(|(verb, forms)| {
+                    said.starts_with(&phrase(verb))
+                        && forms.iter().any(|form| said_in(&phrase(form), &ask))
+                })
+                .map(|(verb, _)| (text.clone(), *verb))
+        })
+}
+
 /// [`CANT_YET`] with what: "I can't do that yet: sending a message".
 pub fn cant_yet(what: &str) -> String {
     format!("{CANT_YET} {what}")
@@ -6435,6 +6509,23 @@ pub fn keep_asked(
         });
     }
     let (_, uses) = capped(&files.toml)?;
+    // A say that only tells the person to do what they asked the lamp to
+    // do is no skill of it (lamp-9adf, 12 Nov 18:10): refused with its
+    // lines, so it is repaired or goes to the lamp's agent.
+    let words = match request.heard {
+        Some(heard) => format!("{} {heard}", request.request),
+        None => request.request.to_owned(),
+    };
+    if let Some((text, verb)) = echoes_the_ask(&files.toml, &words) {
+        eprintln!("lamp-voice: a made skill was not kept: its say tells the person to {verb}");
+        return Err(Refused(
+            ECHOES_THE_ASK.into(),
+            Some(format!(
+                "say \"{text}\" tells the person to {verb}, which the request asks the skill \
+                 to do: no step does it, so answer one line, {CANNOT} and one short sentence"
+            )),
+        ));
+    }
     // Its code only with a task step to run it, and that step's file one
     // it wrote (#6307).
     code_matches(&files, &uses)?;
@@ -8184,6 +8275,57 @@ fn cut_chars(text: &str, most: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A say that hands the ask back as an instruction (lamp-9adf, 12 Nov
+    /// 18:10) is caught; a reminder the person asked to be told, or words
+    /// they gave to say, is not.
+    #[test]
+    fn a_say_handing_the_ask_back_is_caught_and_a_reminder_is_not() {
+        let with = |say: &str| {
+            format!(
+                "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\nspeak = true\n\n\
+                 [[do]]\nsay = {{ text = \"{say}\" }}\n"
+            )
+        };
+        let umbrella =
+            "every morning at eight, check the weather and tell me if I need an umbrella";
+        assert_eq!(
+            echoes_the_ask(&with("Check the weather now, please."), umbrella),
+            Some(("Check the weather now, please.".to_owned(), "check"))
+        );
+        assert_eq!(
+            echoes_the_ask(
+                &with("Please look up the news."),
+                "at nine, look up the news for me"
+            )
+            .map(|(_, verb)| verb),
+            Some("look up")
+        );
+        assert_eq!(
+            echoes_the_ask(&with("Read your mail."), "read my mail every morning")
+                .map(|(_, verb)| verb),
+            Some("read")
+        );
+        for (say, ask) in [
+            (
+                "Time to drink some water.",
+                "remind me to drink water every hour",
+            ),
+            (
+                "Stand up and stretch.",
+                "tell me to stand up and stretch at three",
+            ),
+            ("Check your mail.", "remind me to check my mail at nine"),
+            ("Get ready for lunch.", "at noon say get ready for lunch"),
+            (
+                "Check the weather now, please.",
+                "say hello when I sit down",
+            ),
+            ("It may rain today.", umbrella),
+        ] {
+            assert_eq!(echoes_the_ask(&with(say), ask), None, "{say} / {ask}");
+        }
+    }
 
     /// What a made skill does, as [`plainly`] says it, before how often it
     /// starts on its own.

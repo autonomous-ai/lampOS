@@ -1498,6 +1498,24 @@ cả hai người viết.
   trong `made_skill::BRIEFS_OWN_REFUSALS`, giữ cạnh brief và được một test
   đối chiếu với prompt) được nói nguyên như vậy và không bao giờ giao cho
   agent. Mọi `cannot:` khác được giao cho agent.
+- **Điều một skill phải tự tìm ra được giao cho agent.** Đèn không có topic
+  nào mang thời tiết, tin tức hay bất cứ gì từ internet. System prompt nói
+  rằng một yêu cầu cần thông tin chỉ có lúc chạy mà không bước nào cho (thời
+  tiết hoặc dự báo, tin tức, tra cứu web, giá cả, tóm tắt nội dung thư hoặc
+  lịch mà không lần đọc nào cho) được trả lời `cannot:` với "I can't do that
+  yet:" và điều gì. Câu đó không thuộc những lời từ chối của chính brief, nên
+  được giao cho agent. Kiểm tra của đèn cũng từ chối một câu nói trả lại yêu
+  cầu dưới dạng lời bảo (`made_skill::echoes_the_ask`): câu nói bắt đầu (sau
+  "please" hoặc "now") bằng check, look up, find, read, search, summarize
+  hoặc get, và yêu cầu đã bảo đèn làm việc đó. Khi đó skill không được giữ:
+  nó được giao cho agent, hoặc, khi không có agent, cho lần sửa của DeepSeek,
+  và người dùng nghe "I can't do that yet: doing that itself, rather than
+  telling you to do it" (`ECHOES_THE_ASK`). Một yêu cầu nhắc việc ("remind
+  me to", "tell me to", "ask me to", "nudge me to", "get me to") và những
+  lời người dùng đưa để nói không bao giờ bị từ chối theo cách này. Trên
+  lamp-9adf, 12/11 18:10, "every morning at eight, check the weather and tell
+  me if I need an umbrella" được giữ là của DeepSeek, một skill chỉ nói
+  "Check the weather now, please."
 - **`cannot:` của chính agent không bao giờ được nói nguyên văn.** Đèn nói
   câu cố định của nó, "I couldn't make that one."
   (`make_skill_agent::CANNOT_LINE`).
