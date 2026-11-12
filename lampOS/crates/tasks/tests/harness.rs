@@ -6179,6 +6179,34 @@ fn indexed(rig: &mut Rig) -> PathBuf {
     file
 }
 
+/// The Reviewer-lead's P3 on #6447: Harness read as signed out lets the
+/// account machines' sessions in the index go, as the next sign-in may be
+/// another account's; those on this computer's own id stay, and a read
+/// signed in or offline keeps every one.
+#[test]
+fn signed_out_the_account_machines_sessions_are_let_go() {
+    let mut rig = Rig::new();
+    let file = indexed(&mut rig);
+    session_index::record(&file, MACHINE, AGENT, Some("Christmas dates"), 1_000);
+    session_index::record(&file, COMPUTER, OTHER, Some("Login fix"), 2_000);
+    for reply in [
+        json!({"loggedIn":true,"computerId":COMPUTER,"machineId":MACHINE}),
+        json!({"loggedIn":true,"offline":true,"computerId":COMPUTER}),
+    ] {
+        rig.plan(json!({"auth":step(reply.clone())}));
+        assert!(rig.cli().signed_in_here().is_ok(), "{reply}");
+        assert_eq!(session_index::read(&file).len(), 2, "{reply}");
+    }
+    rig.plan(json!({"auth":step(json!({"loggedIn":false,"computerId":COMPUTER}))}));
+    assert_eq!(
+        rig.cli().signed_in_here().map(|(sign_in, _)| sign_in),
+        Ok(SignIn::Out)
+    );
+    let kept = session_index::read(&file);
+    assert!(!kept.contains_key(MACHINE), "{kept:?}");
+    assert_eq!(kept[COMPUTER][0].id, OTHER);
+}
+
 /// What `harness show --json` gives of a session by its id, as Harness
 /// 0.6.12 answers it: its name and state among the rest.
 fn shown_as(id: &str, name: &str, state: &str) -> Value {
