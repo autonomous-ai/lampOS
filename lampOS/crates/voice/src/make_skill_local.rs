@@ -1432,6 +1432,147 @@ pub fn read_back(
     }
 }
 
+/// The words before a skill's name that make a line a question about it
+/// ([`read_back_asked`]).
+const READ_BACK_QUESTIONS: [&str; 2] = ["what", "which"];
+
+/// The words after a skill's name that ask what it reaches
+/// ([`read_back_asked`]): "what does desk check use?", "what can it reach",
+/// "what does it do with my mail". Never "say": what a skill says is not
+/// what it reaches.
+const READ_BACK_ASKS: [&str; 15] = [
+    "use", "uses", "using", "need", "needs", "access", "accesses", "reach", "reaches", "touch",
+    "touches", "do", "does", "send", "sends",
+];
+
+/// The most words a skill's name is said in ([`read_back_asked`]).
+const READ_BACK_NAME_WORDS: usize = 6;
+
+/// A heard line's words, lower case, split on anything but a letter or a
+/// digit.
+fn heard_words(heard: &str) -> Vec<String> {
+    heard
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// The skill among `names` (kept made skills and pushed ones, as written:
+/// `desk-check`) that a heard line asks what it uses, needs, does,
+/// reaches or sends (V2 on #6413, lamp-52e6 at 12337: "what does desk
+/// check use?" was answered by running the skill, "Hey Lamp, what does
+/// desk check use?" by nothing): "what" or "which", then the name, then
+/// one of [`READ_BACK_ASKS`]. The name is matched loosely, number words as
+/// digits and the dashes left out ([`made_skill::name_digits`]: "desk
+/// check", "deskcheck", "skill two"). The longest name said wins; two
+/// different names said as long, none. "Use desk check", "run desk check"
+/// and "what time is it" ask none. The name as written.
+pub fn read_back_asked(heard: &str, names: &[String]) -> Option<String> {
+    let words = heard_words(heard);
+    let question = words
+        .iter()
+        .position(|word| READ_BACK_QUESTIONS.contains(&word.as_str()))?;
+    let loose = |name: &str| made_skill::name_digits(name).replace('-', "");
+    let mut best: Option<(usize, &String)> = None;
+    let mut tied = false;
+    for name in names {
+        let wanted = loose(name);
+        if wanted.is_empty() {
+            continue;
+        }
+        for start in question + 1..words.len() {
+            for length in 1..=READ_BACK_NAME_WORDS.min(words.len() - start) {
+                let end = start + length;
+                if loose(&words[start..end].join("-")) != wanted
+                    || !words[end..]
+                        .iter()
+                        .any(|word| READ_BACK_ASKS.contains(&word.as_str()))
+                {
+                    continue;
+                }
+                match best {
+                    Some((longest, _)) if longest > length => {}
+                    Some((longest, kept)) if longest == length => tied |= kept != name,
+                    _ => {
+                        best = Some((length, name));
+                        tied = false;
+                    }
+                }
+            }
+        }
+    }
+    best.filter(|_| !tied).map(|(_, name)| name.clone())
+}
+
+/// The skill a heard line asks what it uses ([`read_back_asked`]), among
+/// the made skills kept on the lamp ([`made_skill::kept_on_names`]) and
+/// those pushed from a computer ([`crate::skill_task_yes::pushed_names`]),
+/// with the read-back on (`LAMP_SKILL_WRITES` or `LAMP_SKILL_TASKS`): the
+/// second route reads it back in code, never left to the model (V2 on
+/// #6413). The skills' folders are read only for a line with a question
+/// word and an ask word.
+pub fn read_back_heard(heard: &str) -> Option<String> {
+    if !made_skill::writes_on() && !crate::skill_task_yes::on() {
+        return None;
+    }
+    let words = heard_words(heard);
+    let shaped = words
+        .iter()
+        .any(|word| READ_BACK_QUESTIONS.contains(&word.as_str()))
+        && words
+            .iter()
+            .any(|word| READ_BACK_ASKS.contains(&word.as_str()));
+    if !shaped {
+        return None;
+    }
+    let keeping = Keeping::when(true)?;
+    let mut names = made_skill::kept_on_names(&keeping.directory);
+    names.extend(crate::skill_task_yes::pushed_names(&made_skill::pushed(
+        &keeping.installed,
+    )));
+    read_back_asked(heard, &names)
+}
+
+/// Whether a model's call `name` with `args` is the skill `asked` run or
+/// read back again, in a turn whose heard words already read it back in
+/// code ([`read_back_asked`]): a `use_skill` of it (lamp-52e6 at 12337
+/// ran it instead), or a `make_skill` read-back of it. Names match as
+/// [`made_skill::name_asked`] writes them, number words as digits and
+/// dashes left out.
+pub fn same_skill_again(name: &str, args: &Value, asked: &str) -> bool {
+    let named = match name {
+        crate::use_skill::NAME => args.get("skill"),
+        made_skill::MAKE => args.get(READ_BACK),
+        _ => None,
+    };
+    let loose =
+        |name: &str| made_skill::name_digits(&made_skill::name_asked(name)).replace('-', "");
+    named
+        .and_then(Value::as_str)
+        .is_some_and(|named| loose(named) == loose(asked))
+}
+
+/// What a model's call of the skill already read back in code is told
+/// ([`same_skill_again`]): not run, and the read-back's own result to say.
+pub fn read_back_already(told: &Value) -> Value {
+    json!({
+        "error": "Not run: they asked what this skill uses, not to run it, and it was read back already.",
+        "read_back": told,
+        "next": "Say only what the read-back above tells you to say. Call nothing."
+    })
+}
+
+/// The note round 1 gets once the heard words read `spoken` back in code
+/// ([`read_back_asked`]), with its result `told`.
+pub fn read_back_note(spoken: &str, told: &Value) -> String {
+    format!(
+        "(For you to know: they asked what {spoken} uses, so it was read back for them now, with \
+         this result: {told}. Do as its \"next\" says. Do not run the skill, and do not call \
+         use_skill or make_skill for it.)"
+    )
+}
+
 /// What the model is told of a made skill whose writes wait for the yes
 /// (#6066): its say-back said whole, every address and quoted word as
 /// written, then nothing asked to repeat; on an agreement in any words, a
@@ -2089,6 +2230,77 @@ pub(crate) mod tests {
         assert_eq!(told["approved"], true, "{told}");
         // Nothing waiting: not asked whose it is.
         assert_eq!(not_owners_yes_refused(&id, || panic!("asked whose")), None);
+    }
+
+    /// V2 on #6413: the heard words, not the model, ask for a read-back.
+    /// A question word, the skill's name said loosely, then what it
+    /// reaches; asking to run it, or another question, asks none.
+    #[test]
+    fn the_heard_words_ask_what_a_skill_uses_by_its_name() {
+        let names: Vec<String> = ["desk-check", "skill-2", "desk", "leaving-mail"]
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
+        for (heard, asked) in [
+            ("what does desk check use?", Some("desk-check")),
+            ("Hey Lamp, what does desk check use?", Some("desk-check")),
+            ("What does my desk check skill need?", Some("desk-check")),
+            ("what can desk check reach", Some("desk-check")),
+            ("Which files does deskcheck access?", Some("desk-check")),
+            ("what does desk check do with my mail", Some("desk-check")),
+            ("What does skill two touch?", Some("skill-2")),
+            (
+                "what does my leaving mail skill send?",
+                Some("leaving-mail"),
+            ),
+            ("what does desk use", Some("desk")),
+            ("use desk check", None),
+            ("run desk check", None),
+            ("what time is it", None),
+            ("what does desk check say?", None),
+            ("what do you think of desk check", None),
+            ("run desk check and tell me what it uses", None),
+            ("what does the weather skill use", None),
+        ] {
+            assert_eq!(read_back_asked(heard, &names).as_deref(), asked, "{heard}");
+        }
+    }
+
+    /// The model's `use_skill` or `make_skill` read-back of the skill the
+    /// words read back already is the same skill, however it is written.
+    #[test]
+    fn a_call_of_the_skill_read_back_is_the_same_skill_again() {
+        let use_skill = crate::use_skill::NAME;
+        assert!(same_skill_again(
+            use_skill,
+            &json!({"skill": "desk_check"}),
+            "desk-check"
+        ));
+        assert!(same_skill_again(
+            use_skill,
+            &json!({"skill": "desk-check"}),
+            "desk-check"
+        ));
+        assert!(same_skill_again(
+            made_skill::MAKE,
+            &json!({ READ_BACK: "my desk check skill" }),
+            "desk-check"
+        ));
+        assert!(!same_skill_again(
+            use_skill,
+            &json!({"skill": "dance"}),
+            "desk-check"
+        ));
+        assert!(!same_skill_again(
+            made_skill::MAKE,
+            &json!({"request": "desk check"}),
+            "desk-check"
+        ));
+        assert!(!same_skill_again(
+            "light_on",
+            &json!({"skill": "desk-check"}),
+            "desk-check"
+        ));
     }
 
     /// Thirteen's P2 on #5985: with no spoken yes, a `make_skill` call in a

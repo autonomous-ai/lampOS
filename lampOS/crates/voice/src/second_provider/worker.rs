@@ -2927,6 +2927,9 @@ pub fn serve(
         .clone()
         .filter(|_| crate::agent_tasks::named_ask_on());
     let declines = tools.decline;
+    // A skill the heard words ask what it uses, by name, read back in code
+    // with the voice's own `make_skill` (V2 on #6413).
+    let reads_back_by_words = tools.make_skill;
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
     // (#1712).
@@ -3623,6 +3626,9 @@ pub fn serve(
             );
         }
         engine = engine.undoing_doubted_keeps(by_id);
+    }
+    if reads_back_by_words {
+        engine = engine.reading_back_by_words(Arc::new(crate::make_skill_local::read_back_heard));
     }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {

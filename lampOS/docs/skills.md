@@ -1435,8 +1435,25 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   loads with its task, its script said to come from "the lamp's own model"
   ("Made by voice", "Code of its own").
 - **Said back, and the yes.** Asked what such a skill uses ("what does my
-  photo booth skill use?"), the model calls `make_skill` with only
-  `read_back`. A name the helper doesn't know is looked for among the
+  photo booth skill use?"), the read-back is a `make_skill` call with only
+  `read_back`. On the second route it is run **in code from the heard
+  words**, never left to the model (V2 on #6413: on lamp-52e6 at 12337,
+  "what does desk check use?" got `use_skill`, which ran the skill, and
+  "Hey Lamp, what does desk check use?" got no call). A spoken line with
+  "what" or "which", then the name of a made skill kept on the lamp or a
+  pushed one (matched loosely, as below), then one of use, need, access,
+  reach, touch, do or send (and their -s forms, "using")
+  (`make_skill_local::read_back_asked`) has that skill read back before
+  round 1, through the turn's own runner; round 1 is told its result and
+  says what its `next` says (`read_back_note`). A `use_skill` or
+  `make_skill` read-back of that same skill the model calls in the turn
+  is not run; it is given the read-back instead (`same_skill_again`).
+  "Use desk check", "run desk check" and "what time is it" read nothing
+  back. The skills' folders are read only for a line with a question word
+  and an ask word. Tests: `the_heard_words_ask_what_a_skill_uses_by_its_name`,
+  `second_provider::tests::read_back_words`. The Live route is unchanged:
+  there the model still calls `make_skill` with `read_back` itself. A name
+  the helper doesn't know is looked for among the
   skills pushed from a computer (`skills-dev/<name>/` with a `skill.toml`,
   beside the installed skills; `skill_task_yes::pushed_named`): the exact
   name first, else the one alone whose name matches with number words as
