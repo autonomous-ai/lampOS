@@ -943,6 +943,37 @@ mà riêng quy tắc ghi nhớ cho chạm tới phạm vi của họ
 (`ScopeLease::reached_by_one_face`); mô hình được báo là không quên gì và hãy
 nhờ họ nhìn vào đèn nói lại. Câu ấy không giữ lệnh quên nào chờ lời «có», và
 lời yêu cầu của nó không tính là yêu cầu ngay trước (`forget_asker`).
+**Trừ lệnh quên gọi tên một điều đã giữ: đèn hỏi lại một lần** (quyết định về
+cái giá của PM trên #5627, sau khi 9 trên 9 lệnh quên của chính người chủ bị
+từ chối trên lamp-c0a4): ở đường thứ hai, một `forget` mà câu nghe được (hoặc
+id mà `recall` đưa) gọi đúng một điều đã giữ của họ
+(`remember::one_face_forget_target`, với bộ nhớ Days và
+`LAMP_MEMORY_FORGET_ALL`) không bị từ chối cũng không chạy ngay. Không gì bị
+xoá; lệnh được giữ như một lệnh quên theo id của điều ấy
+(`second_provider::ask_once_forget`, `HeldForget::one_face`), và mô hình được
+báo hỏi một lần, chỉ nêu chủ đề bằng chính lời của họ, bằng ngôn ngữ của họ
+(«Mình có nên quên điều đã giữ về mã khóa xe của bạn không?»). Nội dung đã giữ
+không bao giờ được báo cho mô hình hay nói ra: người nói không được nhìn thấy
+(P2 của Reviewer-lead trên #6673). Chỉ một lời «có» rõ ràng ở câu sau trong vòng 30 giây
+(`remember::ONE_FACE_FORGET_YES_FOR`), của cùng người trong cùng phiên, khi
+thấy mặt họ nói, hoặc trong phòng riêng (`LAMP_PRIVATE_ROOM`) trên một câu là
+của họ vì mặt họ một mình trong khung, mới chạy đúng lệnh quên theo id ấy
+trong phạm vi của họ (`ScopeLease::mark_forget_agreed`, không bao giờ
+`forget_last`). Lời «có» cũng có thể nói luôn việc quên
+(`known_faces::plain_agreement_to_forget`, P2 của Thirteen trên #6673): «Yes,
+forget it.», «Ừ, quên đi.», «Vâng, quên đi ạ.», và cả việc quên nói lại một
+mình, «Forget it.» hay «Quên đi.», vốn chỉ được đọc như câu trả lời cho câu hỏi
+ấy, của người ấy, trong 30 giây ấy. Bất kỳ lời «không», «giữ», «khoan»,
+«đừng» hay một câu hỏi đều không phải lời «có». Nếu lúc lệnh quên chạy câu
+không còn là của họ (một khuôn mặt hay giọng khác xuất hiện), không gì bị quên
+và mô hình được báo điều ấy vẫn được giữ; nó không bao giờ chạy trong phạm vi
+của căn phòng (`remember::AGREED_FORGET_NOT_NOW`, P3 của Thirteen). Lời
+«không», câu khác, im lặng hay quá 30 giây thì giữ lại;
+lời «có» của khuôn mặt khác, hay lời «có» không thấy miệng ngoài phòng riêng,
+không chạy gì. Lệnh quên trống, nhiều hoặc không điều nào khớp, hai khuôn mặt
+trong khung (câu không là của ai theo một khuôn mặt) và đường Live bị từ chối
+hoặc chạy như trước. Vậy TV nói «quên cái ô của tôi» chỉ được hỏi lại, không
+bao giờ chạy.
 **Cũng không gì mang tính xoá bỏ, hay làm thay họ ngoài việc lưu và nhớ lại**
 (lần đọc riêng tư trên #5592): một `remember` sửa một điều đã giữ theo id
 (`replaces`, `remember::corrects`) bị từ chối như lệnh quên, và khi không có

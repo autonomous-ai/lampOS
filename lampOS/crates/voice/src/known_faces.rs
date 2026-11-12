@@ -383,6 +383,91 @@ pub(crate) fn plain_agreement_to_keep(turn: &str) -> bool {
     })
 }
 
+/// What a yes to a held forget may say it forgets, right after "forget"
+/// ([`plain_agreement_to_forget`]): "forget it", "forget that".
+const FORGET_WHAT: &[&str] = &["it", "that", "this", "those", "them"];
+
+/// What may stand beside a yes, or a forget said back alone, in the answer
+/// to the lamp's "Shall I forget …?" ([`plain_agreement_to_forget`]):
+/// "Yes, please go ahead and forget it.", "Ừ, quên nó đi nhé.", "Vâng,
+/// quên đi ạ.". "Quên" is Vietnamese "forget"; "đi" makes it a go-ahead.
+const BESIDE_A_FORGET: &[&str] = &[
+    "please",
+    "lamp",
+    "go",
+    "ahead",
+    "and",
+    "just",
+    "thanks",
+    "thank",
+    "you",
+    "qu\u{ea}n",
+    "\u{111}i",
+    "n\u{f3}",
+    "\u{1ea1}",
+    "nh\u{e9}",
+    "lu\u{f4}n",
+    "gi\u{fa}p",
+    "m\u{ec}nh",
+];
+
+/// Words that make an answer to the lamp's "Shall I forget …?" anything but
+/// a yes to it ([`plain_agreement_to_forget`]): any no ([`DISAGREE`]),
+/// "don't" in Vietnamese ("đừng"), and a keep or a wait.
+const NOT_A_FORGET: &[&str] = &[
+    "never",
+    "keep",
+    "wait",
+    "stop",
+    "later",
+    "\u{111}\u{1eeb}ng",
+    "gi\u{1eef}",
+    "khoan",
+];
+
+/// [`plain_agreement`], or a plain yes that also says to forget it, the
+/// natural answer to the lamp's "Shall I forget what you kept about …?" on
+/// a one-face line (Thirteen's P2 on #6673, as lamp-06c1's S4 taught for
+/// keeps, [`plain_agreement_to_keep`]): "Yes, forget it.", "Yes, please
+/// forget that.", "Sure, go ahead and forget it.", "Ừ, quên đi.", "Vâng,
+/// quên đi ạ.". The forget said back alone, with no yes word, counts too
+/// ("Forget it.", "Quên đi."): it is only ever read as the answer to that
+/// question, by the same person, within its 30 s, and one that says no,
+/// keep, wait or stop never counts. Any such word ([`DISAGREE`],
+/// [`NOT_A_FORGET`]) or a question refuses.
+pub(crate) fn plain_agreement_to_forget(turn: &str) -> bool {
+    if turn.trim_end().ends_with('?') {
+        return false;
+    }
+    let words = lower_words(turn);
+    if words.is_empty() {
+        return false;
+    }
+    let covered = agreeing_words(&words);
+    // A no inside a yes's own phrase ("no problem") takes nothing back.
+    if words.iter().zip(&covered).any(|(word, covered)| {
+        !covered && (DISAGREE.contains(&word.as_str()) || NOT_A_FORGET.contains(&word.as_str()))
+    }) {
+        return false;
+    }
+    let after_forget = |at: usize| {
+        at > 0 && words[at - 1] == "forget" && FORGET_WHAT.contains(&words[at].as_str())
+    };
+    let says_forget = words
+        .iter()
+        .any(|word| word == "forget" || word == "qu\u{ea}n");
+    if !agrees(turn) && !says_forget {
+        return false;
+    }
+    (0..words.len()).all(|at| {
+        covered[at]
+            || words[at] == "forget"
+            || after_forget(at)
+            || BESIDE_A_FORGET.contains(&words[at].as_str())
+            || (agrees(turn) && BESIDE_A_YES.contains(&words[at].as_str()))
+    })
+}
+
 /// What may stand around a keep said back with no yes word
 /// ([`plain_agreement_to_keep`]): "Please keep that for me, thanks.", "Lamp,
 /// keep it.". Not [`BESIDE_A_YES`]'s "do", "would", "i", "i'd" or a "you" of
