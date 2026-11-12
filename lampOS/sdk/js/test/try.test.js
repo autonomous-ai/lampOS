@@ -326,3 +326,15 @@ test('the skills rows: push the try-wave skill, list it, play its move, remove i
   assert.match(answers[1], /try-wave/);
   assert.match(answers[4], /none/);
 });
+
+test('the try-it page\'s three columns: the view\'s width is the one variable --view-w, and panel.js makes the columns', async (t) => {
+  const { port, token } = await started(t, (dir, stub) => ['--stim-dir', dir, '--lamp-sim', stub]);
+  const html = await (await fetch(`http://127.0.0.1:${port}/?t=${token}`)).text();
+  assert.equal((html.match(/--view-w\s*:/g) ?? []).length, 1, '--view-w is set once');
+  assert.match(html, /--view-w:\s*75%/);
+  assert.match(html, /body\.try \{ grid-template-columns: var\(--view-w\) minmax\(0, 1fr\) minmax\(0, 1fr\)/);
+  assert.equal(/classList\.add\('try'\)/.test(html), false, 'the class is made by panel.js alone');
+  const panel = await (await fetch(`http://127.0.0.1:${port}/panel.js?t=${token}`)).text();
+  assert.match(panel, /classList\.add\('try'\)/);
+  assert.match(panel, /id: 'col-log'/);
+});
