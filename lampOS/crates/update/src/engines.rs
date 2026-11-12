@@ -15,11 +15,15 @@
 //! freeze while someone speaks and its stop when the privacy reading is
 //! lost.
 //!
-//! OpenClaw (#6240, beside Hermes) is said from its own install's record,
-//! [`OPENCLAW_RECORD`] in the same records folder, only while that file is
-//! there and [`OPENCLAW_SWITCH`] is not `off` ([`openclaw`]). This build
-//! has no OpenClaw installer, so a tap for it is dropped with a line, and
-//! lamp-cloud refuses it as not installable on this build yet.
+//! OpenClaw (#6240, beside Hermes; V2's ask of 12 Nov, its installer #6226
+//! landed) is said and installed as Hermes is: always in `engines`
+//! ([`openclaw`]), from its own install's record ([`OPENCLAW_RECORD`] in
+//! the same records folder, none is `absent`), `off` with OpenClaw off on
+//! this lamp (its switch, or Harness's). A tap marks it asked
+//! ([`Engines::openclaw_pending`]): the next round's OpenClaw step opens
+//! [`crate::hermes_schedule::Window::Asked`], which a recent failure does
+//! not hold, takes its turn after Hermes's in Harness's one-shot, and runs
+//! under the same watch, with the same freeze, stop and floors.
 use crate::hermes_install::{self, HermesInstall};
 use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::{EngineInstall, EngineInstallAsk};
@@ -135,39 +139,51 @@ pub fn openclaw_record(records: &Path) -> Option<OpenClawInstall> {
     )
 }
 
-/// OpenClaw as the app is told it: none without its record or with its
-/// switch off; else as Hermes's ([`hermes`]): `absent` `not_installed`,
-/// `installing`, `installed` with its version, `failed` with its error
-/// when the app has a name for it, else `failed`. `at_unix_ms` is the
-/// record's (none for a record that did not read).
-pub fn openclaw(on: bool, record: Option<&OpenClawInstall>) -> Option<EngineInstall> {
-    let record = record.filter(|_| on)?;
-    let at_unix_ms = Some(record.at_unix_ms).filter(|at| *at > 0);
+/// OpenClaw as the app is told it, as Hermes is ([`hermes`]): `off` with
+/// OpenClaw off on this lamp; with its record (none is taken as `absent`),
+/// `not_installed`, `installing` or `frozen` while the install's watch
+/// holds a freeze, `installed` with its version, `failed` with its error
+/// when the app has a name for it, else `failed`, and `waiting` for a
+/// missing or failed one a tap asked for. `at_unix_ms` is the record's
+/// (none for a record that did not read).
+pub fn openclaw(
+    on: bool,
+    record: Option<&OpenClawInstall>,
+    frozen: bool,
+    pending: bool,
+) -> EngineInstall {
     let engine = |state: &str| EngineInstall {
         state: state.to_owned(),
         version: None,
         reason: None,
-        at_unix_ms,
+        at_unix_ms: record.map(|record| record.at_unix_ms).filter(|at| *at > 0),
     };
-    Some(match record.install.as_str() {
+    if !on {
+        return EngineInstall {
+            at_unix_ms: None,
+            ..engine("off")
+        };
+    }
+    match record.map_or("absent", |record| record.install.as_str()) {
+        "absent" | "failed" if pending => engine("waiting"),
         "absent" => engine("not_installed"),
+        "installing" if frozen => engine("frozen"),
         "installing" => engine("installing"),
         "installed" => EngineInstall {
-            version: record.version.clone(),
+            version: record.and_then(|record| record.version.clone()),
             ..engine("installed")
         },
         _ => EngineInstall {
             reason: Some(
                 record
-                    .error
-                    .as_deref()
+                    .and_then(|record| record.error.as_deref())
                     .filter(|error| SAID_REASONS.contains(error))
                     .unwrap_or("failed")
                     .to_owned(),
             ),
             ..engine("failed")
         },
-    })
+    }
 }
 
 /// [`OPENCLAW_SWITCH`]'s value: anything but `off` is on.
@@ -242,8 +258,10 @@ pub struct Engines {
     pub frozen: Arc<AtomicBool>,
     /// The app asked for Hermes and no round has started its install yet.
     pub pending: Arc<AtomicBool>,
-    /// OpenClaw's switch is not `off` ([`openclaw_on`]).
+    /// OpenClaw is on for this `serve` (its switch and Harness's).
     pub openclaw_on: bool,
+    /// The app asked for OpenClaw and no round has started its install yet.
+    pub openclaw_pending: Arc<AtomicBool>,
 }
 
 impl Engines {
@@ -258,10 +276,28 @@ impl Engines {
                 self.pending(),
             ),
         )]);
-        if let Some(said) = openclaw(self.openclaw_on, openclaw_record(records).as_ref()) {
-            engines.insert(OPENCLAW.to_owned(), said);
-        }
+        engines.insert(
+            OPENCLAW.to_owned(),
+            openclaw(
+                self.openclaw_on,
+                openclaw_record(records).as_ref(),
+                self.frozen.load(Ordering::Relaxed),
+                self.openclaw_pending(),
+            ),
+        );
         engines
+    }
+
+    /// Whether a tap waits for a round's OpenClaw step.
+    pub fn openclaw_pending(&self) -> bool {
+        self.openclaw_pending.load(Ordering::Relaxed)
+    }
+
+    /// After a round's OpenClaw step, as [`Engines::settle`] for Hermes.
+    pub fn settle_openclaw(&self, records: &Path) {
+        if !openclaw_missing(openclaw_record(records).as_ref()) {
+            self.openclaw_pending.store(false, Ordering::Relaxed);
+        }
     }
 
     /// Whether a tap waits for a round's Hermes step.
@@ -286,6 +322,11 @@ fn missing(record: Option<&HermesInstall>) -> bool {
     record.is_none_or(|record| matches!(record.install.as_str(), "absent" | "failed"))
 }
 
+/// OpenClaw missing or failed as its record says (none is missing).
+fn openclaw_missing(record: Option<&OpenClawInstall>) -> bool {
+    record.is_none_or(|record| matches!(record.install.as_str(), "absent" | "failed"))
+}
+
 /// `serve`'s side of the app's tap: its subscription to
 /// `update/engine_install`, and when a tap was last taken.
 pub struct Asks {
@@ -293,6 +334,7 @@ pub struct Asks {
     records: PathBuf,
     engines: Engines,
     last: Option<Instant>,
+    last_openclaw: Option<Instant>,
 }
 
 impl Asks {
@@ -321,6 +363,7 @@ impl Asks {
             records: records.to_owned(),
             engines,
             last: None,
+            last_openclaw: None,
         }
     }
 
@@ -329,12 +372,12 @@ impl Asks {
         self.asks.is_some()
     }
 
-    /// Takes every ask waiting, at `now`: one for Hermes, with Hermes on,
-    /// missing or failed, and not within [`EngineInstallAsk::AGAIN_AFTER`]
-    /// of the last taken, marks it [`Engines::pending`], and true is
-    /// returned (the wait between rounds ends). Any other is dropped with a
-    /// line: an engine this lamp has not, Hermes off, or Hermes not
-    /// missing.
+    /// Takes every ask waiting, at `now`: one for Hermes (or OpenClaw),
+    /// with it on, missing or failed, and not within
+    /// [`EngineInstallAsk::AGAIN_AFTER`] of that engine's last taken, marks
+    /// it [`Engines::pending`] (or [`Engines::openclaw_pending`]), and true
+    /// is returned (the wait between rounds ends). Any other is dropped with
+    /// a line: an engine this lamp has not, the engine off, or not missing.
     pub fn take(&mut self, now: Instant, say: &mut dyn FnMut(&str)) -> bool {
         let Some(asks) = &mut self.asks else {
             return false;
@@ -345,9 +388,24 @@ impl Asks {
                 continue;
             };
             if ask.engine == OPENCLAW {
-                say(
-                    "the app asked to install OpenClaw: ignored, it is not installable on this build yet",
-                );
+                if !self.engines.openclaw_on {
+                    say("the app asked to install OpenClaw: ignored, OpenClaw is off on this lamp");
+                    continue;
+                }
+                if !openclaw_missing(openclaw_record(&self.records).as_ref()) {
+                    say("the app asked to install OpenClaw: ignored, it is not missing or failed");
+                    continue;
+                }
+                if self.last_openclaw.is_some_and(|last| {
+                    now.saturating_duration_since(last) < EngineInstallAsk::AGAIN_AFTER
+                }) {
+                    continue;
+                }
+                self.last_openclaw = Some(now);
+                if !self.engines.openclaw_pending.swap(true, Ordering::Relaxed) {
+                    say("the app asked to install OpenClaw: the next round may start it");
+                }
+                taken = true;
                 continue;
             }
             if ask.engine != HERMES {
@@ -527,59 +585,82 @@ mod tests {
         std::fs::write(records.join(OPENCLAW_RECORD), text).unwrap();
     }
 
-    /// OpenClaw is said only while its record is there and its switch is
-    /// not off, mapped as Hermes is; an error the app has no name for, or
-    /// one this build does not know, is `failed`.
+    /// OpenClaw is said as Hermes is (#6240, V2's ask of 12 Nov): always,
+    /// `not_installed` with no record, `off` with OpenClaw off on this
+    /// lamp, `frozen` while the watch holds a freeze, `waiting` for a tap
+    /// not taken up yet; an error the app has no name for, or one this build
+    /// does not know, is `failed`.
     #[test]
-    fn openclaw_is_said_only_with_its_record_and_its_switch_not_off() {
+    fn openclaw_is_said_as_hermes_is() {
         let folder = tempfile::tempdir().unwrap();
         let engines = Engines {
             hermes_on: true,
             openclaw_on: true,
             ..Engines::default()
         };
-        // No record: Hermes only.
+        // No record: said, not installed.
+        let told = engines.read(folder.path());
+        assert_eq!(told.keys().collect::<Vec<_>>(), ["hermes", "openclaw"]);
         assert_eq!(
-            engines.read(folder.path()).keys().collect::<Vec<_>>(),
-            ["hermes"]
+            told["openclaw"],
+            EngineInstall {
+                state: "not_installed".into(),
+                version: None,
+                reason: None,
+                at_unix_ms: None,
+            }
         );
+        assert!(told["openclaw"].check());
+        // A tap not taken up: waiting.
+        engines.openclaw_pending.store(true, Ordering::Relaxed);
+        assert_eq!(engines.read(folder.path())["openclaw"].state, "waiting");
+        engines.openclaw_pending.store(false, Ordering::Relaxed);
         write_openclaw(
             folder.path(),
-            r#"{"install":"installed","revision":2,"at_unix_ms":9,"version":"2026.11.1","node":"22.11.0"}"#,
+            r#"{"install":"installed","revision":2,"at_unix_ms":9,"version":"2026.11.2","node":"24.11.0"}"#,
         );
         let told = engines.read(folder.path());
         assert_eq!(
             told["openclaw"],
             EngineInstall {
                 state: "installed".into(),
-                version: Some("2026.11.1".into()),
+                version: Some("2026.11.2".into()),
                 reason: None,
                 at_unix_ms: Some(9),
             }
         );
         assert!(told["openclaw"].check());
-        // Its switch off: not said, whatever the record.
+        // OpenClaw off on this lamp: `off`, whatever the record.
         let off = Engines {
-            openclaw_on: openclaw_on(Some("off")),
+            openclaw_on: false,
             ..engines.clone()
         };
-        assert!(!off.read(folder.path()).contains_key("openclaw"));
-        assert!(openclaw_on(None) && openclaw_on(Some("on")) && !openclaw_on(Some("off")));
-        for (text, state) in [
+        assert_eq!(off.read(folder.path())["openclaw"].state, "off");
+        assert!(off.read(folder.path())["openclaw"].check());
+        for (text, frozen, state) in [
             (
                 r#"{"install":"absent","revision":1,"at_unix_ms":3}"#,
+                false,
                 "not_installed",
             ),
             (
                 r#"{"install":"installing","revision":1,"at_unix_ms":3}"#,
+                false,
                 "installing",
+            ),
+            (
+                r#"{"install":"installing","revision":1,"at_unix_ms":3}"#,
+                true,
+                "frozen",
             ),
         ] {
             write_openclaw(folder.path(), text);
+            engines.frozen.store(frozen, Ordering::Relaxed);
             assert_eq!(engines.read(folder.path())["openclaw"].state, state);
         }
+        engines.frozen.store(false, Ordering::Relaxed);
         // Failed: a code the app knows is said, one it has no name for and
-        // one no build knows are `failed`.
+        // one no build knows are `failed`; a tap makes it `waiting`.
         for (error, reason) in [
             ("no_userns", "no_userns"),
             ("privacy_lost", "privacy_lost"),
@@ -599,6 +680,9 @@ mod tests {
             );
             assert!(said.check(), "{said:?}");
         }
+        engines.openclaw_pending.store(true, Ordering::Relaxed);
+        assert_eq!(engines.read(folder.path())["openclaw"].state, "waiting");
+        engines.openclaw_pending.store(false, Ordering::Relaxed);
         for error in OPENCLAW_ERRORS {
             let record = OpenClawInstall {
                 install: "failed".into(),
@@ -608,7 +692,10 @@ mod tests {
                 node: None,
                 error: Some(error.into()),
             };
-            assert!(openclaw(true, Some(&record)).unwrap().check(), "{error}");
+            assert!(
+                openclaw(true, Some(&record), false, false).check(),
+                "{error}"
+            );
         }
         // A file that does not read is a failed install, never a crash.
         write_openclaw(folder.path(), "not json");
@@ -667,6 +754,72 @@ mod tests {
         }
     }
 
+    /// A tap for OpenClaw (#6240, V2's ask of 12 Nov), on and missing or
+    /// failed, marks it pending at most once a minute, as Hermes's does,
+    /// and the next round's OpenClaw step settles it; one with OpenClaw
+    /// there is dropped with a line. Hermes's own tap is left as it was.
+    #[test]
+    fn a_tap_for_a_missing_openclaw_marks_it_pending() {
+        let root = tempfile::tempdir().unwrap();
+        let records = tempfile::tempdir().unwrap();
+        let engines = Engines {
+            hermes_on: true,
+            openclaw_on: true,
+            ..Engines::default()
+        };
+        let mut asks = Asks::new(root.path(), records.path(), engines.clone(), &mut |_| {});
+        let mut cloud = cloud(&Bus::new(root.path()).unwrap());
+        let mut lines = Vec::new();
+        let mut say = |line: &str| lines.push(line.to_owned());
+        let now = Instant::now();
+        // No record: missing.
+        cloud.publish_json(0, &ask("openclaw")).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(asks.take(now, &mut say));
+        assert!(engines.openclaw_pending() && !engines.pending());
+        assert_eq!(engines.read(records.path())["openclaw"].state, "waiting");
+        // Again within the minute: dropped.
+        engines.openclaw_pending.store(false, Ordering::Relaxed);
+        cloud.publish_json(0, &ask("openclaw")).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(!asks.take(now + Duration::from_secs(1), &mut say));
+        assert!(!engines.openclaw_pending());
+        // Failed, a minute on: taken; the round's step starts it, settled.
+        write_openclaw(
+            records.path(),
+            r#"{"install":"failed","revision":2,"at_unix_ms":5,"error":"no_memory"}"#,
+        );
+        cloud.publish_json(0, &ask("openclaw")).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(asks.take(now + EngineInstallAsk::AGAIN_AFTER, &mut say));
+        engines.settle_openclaw(records.path());
+        assert!(engines.openclaw_pending(), "still failed: still waiting");
+        write_openclaw(
+            records.path(),
+            r#"{"install":"installing","revision":3,"at_unix_ms":6}"#,
+        );
+        engines.settle_openclaw(records.path());
+        assert!(!engines.openclaw_pending());
+        // There: dropped.
+        write_openclaw(
+            records.path(),
+            r#"{"install":"installed","revision":4,"at_unix_ms":7,"version":"2026.11.2","node":"24.11.0"}"#,
+        );
+        cloud.publish_json(0, &ask("openclaw")).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(!asks.take(now + 2 * EngineInstallAsk::AGAIN_AFTER, &mut say));
+        assert_eq!(lines.len(), 3, "{lines:?}");
+        assert!(
+            lines[0].contains("the next round may start it"),
+            "{lines:?}"
+        );
+        assert!(
+            lines[1].contains("the next round may start it"),
+            "{lines:?}"
+        );
+        assert!(lines[2].contains("not missing"), "{lines:?}");
+    }
+
     /// A tap for Hermes, on and missing, marks it pending at most once a
     /// minute; one for an engine the lamp has not, or with Hermes off or
     /// there, is dropped with a line.
@@ -692,7 +845,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
         assert!(!asks.take(now, &mut say));
         assert!(!engines.pending());
-        // OpenClaw: this build has no installer for it.
+        // OpenClaw off on this lamp: dropped.
         cloud.publish_json(0, &ask("openclaw")).unwrap();
         std::thread::sleep(Duration::from_millis(100));
         assert!(!asks.take(now, &mut say));
@@ -718,10 +871,7 @@ mod tests {
         assert!(!asks.take(now + EngineInstallAsk::AGAIN_AFTER, &mut say));
         assert_eq!(lines.len(), 4, "{lines:?}");
         assert!(lines[0].contains("does not have"), "{lines:?}");
-        assert!(
-            lines[1].contains("not installable on this build yet"),
-            "{lines:?}"
-        );
+        assert!(lines[1].contains("OpenClaw is off"), "{lines:?}");
         assert!(
             lines[2].contains("the next round may start it"),
             "{lines:?}"

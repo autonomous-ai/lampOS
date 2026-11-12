@@ -995,13 +995,10 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             .map(lamp_update::hermes_schedule::Watcher::frozen)
             .unwrap_or_default(),
         pending: Default::default(),
-        // OpenClaw beside Hermes: said while its record is there, unless
-        // LAMP_OPENCLAW_ON_LAMP=off.
-        openclaw_on: lamp_update::engines::openclaw_on(
-            std::env::var(lamp_update::engines::OPENCLAW_SWITCH)
-                .ok()
-                .as_deref(),
-        ),
+        // OpenClaw beside Hermes, said and installed as Hermes is (#6240,
+        // V2's ask of 12 Nov): on as its install is (its switch, Harness's).
+        openclaw_on: matches!(openclaw, Some((true, _))),
+        openclaw_pending: Default::default(),
     });
     if let Some(engines) = &engines {
         app_check = app_check.map(|check| {
@@ -1111,6 +1108,17 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 let now_unix_ms = lamp_update::records::unix_ms();
                 let window = hermes_schedule::window(&hermes_schedule::Moment {
                     walk_under_way: lamp_update::walk::under_way(&config),
+                })
+                // The app's tap (#6240): a recent failure does not hold it.
+                .map(|window| {
+                    if engines
+                        .as_ref()
+                        .is_some_and(lamp_update::engines::Engines::openclaw_pending)
+                    {
+                        hermes_schedule::Window::Asked
+                    } else {
+                        window
+                    }
                 });
                 openclaw_install::after_round(
                     &config.root,
@@ -1121,6 +1129,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     window,
                     &mut say,
                 );
+                if let Some(engines) = &engines {
+                    engines.settle_openclaw(&records);
+                }
             }
         }
         if matches!(hermes, Some((false, _)))

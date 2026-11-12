@@ -1189,3 +1189,36 @@ fn the_switch_on_enables_and_starts_the_gateway_and_off_disables_and_stops_it() 
     assert!(fs::symlink_metadata(lamp.at(WANTS)).is_err(), "disabled");
     assert_eq!(systemd.asked[..2], ["reload", "stop-gateway"]);
 }
+
+/// The app's tap (#6240, V2's ask of 12 Nov) is a deliberate try again, as
+/// for Hermes: a recent failure that waits a day for a round is started at
+/// once in the window the tap opens; an install under way is still left
+/// alone until it is taken as stuck.
+#[test]
+fn an_ask_from_the_app_tries_a_recent_openclaw_failure_again() {
+    const HOUR_MS: u64 = 60 * 60 * 1000;
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    write(&lamp.records(), failed(100, "no_memory"));
+    let mut systemd = Fake::default();
+    assert_eq!(round(&lamp, &mut systemd, false, 100 + HOUR_MS), None);
+    let asked = |systemd: &mut Fake, at: u64| {
+        after_round(
+            lamp.root(),
+            &lamp.records(),
+            false,
+            systemd,
+            at,
+            Ok(crate::hermes_schedule::Window::Asked),
+            &mut quiet(),
+        )
+    };
+    let mut tapped = Fake::default();
+    assert_eq!(
+        asked(&mut tapped, 100 + HOUR_MS).unwrap().install,
+        "installing"
+    );
+    // Under way: a tap starts nothing more.
+    let mut again = Fake::default();
+    assert_eq!(asked(&mut again, 100 + 2 * HOUR_MS), None);
+}
