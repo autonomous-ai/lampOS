@@ -2260,6 +2260,22 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   `lampos`'s home), where the lamp's skills keys point and the guidance
   (`AGENTS.md`) is written, as for Hermes.
 
+## Harness's hooks inside the lamp's agent namespace (#6530)
+
+Harness's hooks for an engine (`harness hook hermes session-start`,
+`harness hook hermes tool`) run inside the lamp's agent namespace, where
+Harness's CLI and state are hidden. The shared agent namespace piece
+(`crates/update/src/agent_ns.rs`, #6510's "one namespace for every engine",
+used today by Hermes's and OpenClaw's namespaces) puts a stand-in `harness`
+first on the namespace's `PATH`: `/usr/local/lib/lampos/ns-bin/harness`,
+root's, 0755, written by lamp-update. It answers `harness hook …` with
+nothing and exit 0, refuses anything else, and shows no Harness state. Each
+engine start writes one journal line: "Harness hooks aren't available inside
+the lamp's agent namespace yet (openharness#4194)". So Harness's hook-driven
+session tracking does not see a namespaced engine's sessions for now. The
+stand-in is removed once a sandbox hook mode (openharness#4194) ships in the
+pinned Harness (docs/install.md, "Hermes on the lamp").
+
 ## A skill's task on the lamp's Hermes (#6306, #6071's PR 3, off unless `LAMP_SKILL_TASKS=on`, on in the product)
 
 A made skill's `do.task` step (#6305, docs/skills.md, "A skill's task")

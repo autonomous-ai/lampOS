@@ -84,7 +84,7 @@
 //! package manager installs the dependencies from the checkout's
 //! hash-locked `uv.lock`.
 use crate::{
-    harness_install,
+    agent_ns, harness_install,
     install::{self, Runner, USER},
     records::write_whole,
     world::Systemd,
@@ -322,8 +322,9 @@ const WRAPPER_TASKS_EDITS: [(&str, &str); 2] = [
 ];
 
 /// [`WRAPPER`]'s text: [`WRAPPER_TEXT`], with [`WRAPPER_TASKS_EDITS`] when
-/// `tasks` ([`TASKS_SWITCH`]). Written by root beside [`ns_text`]'s, with
-/// the same switch.
+/// `tasks` ([`TASKS_SWITCH`]), and the shared namespace piece's journal
+/// line ([`agent_ns::with_hook_note`], #6530). Written by root beside
+/// [`ns_text`]'s, with the same switch.
 pub fn wrapper_text(tasks: bool) -> String {
     let mut text = WRAPPER_TEXT.to_owned();
     if tasks {
@@ -331,7 +332,7 @@ pub fn wrapper_text(tasks: bool) -> String {
             text = text.replacen(from, to, 1);
         }
     }
-    text
+    agent_ns::with_hook_note(&text, "hermes")
 }
 
 /// [`NS`]: only inside a user namespace (refused in the lamp's own, where
@@ -496,6 +497,9 @@ const TASKS_EDITS: [(&str, &str); 6] = [
 /// which also shows [`CONTROL_SOCKET`] alone, each read-only; both off,
 /// [`NS_TEXT`]. The switches live only in this text, which root writes
 /// and `lampos` cannot change: the script reads nothing to decide them.
+/// Last, the shared namespace piece's `PATH` ([`agent_ns::with_ns_path`],
+/// #6530) goes before the line that runs Hermes, so Harness's hooks find
+/// [`agent_ns::HOOK_SHIM`] as `harness`.
 pub fn ns_text(skills: bool, tasks: bool) -> String {
     let mut text = NS_TEXT.to_owned();
     for (on, edits) in [(skills, &SKILLS_EDITS[..]), (tasks, &TASKS_EDITS[..])] {
@@ -505,7 +509,7 @@ pub fn ns_text(skills: bool, tasks: bool) -> String {
             }
         }
     }
-    text
+    agent_ns::with_ns_path(&text)
 }
 
 /// Hermes's config set after its install, each with `hermes config set`
@@ -756,6 +760,7 @@ pub fn present(root: &Path, shown: Shown) -> bool {
         && holds(root, NS, &ns_text(shown.skills, shown.tasks))
         // The build's own lampos SDK, one copy for every agent (#6507).
         && crate::sdk_tree::present(root)
+        && agent_ns::hook_shim_there(root)
 }
 
 /// When `serve` starts: off, an earlier record and ask are taken away; on
@@ -1182,7 +1187,9 @@ fn install_with(
 }
 
 /// The wrapper and the namespace script taken out, the wrapper first, so
-/// `lampos` finds no `hermes`. Hermes's folder and Hermes in it stay.
+/// `lampos` finds no `hermes`, then the shared hook stand-in unless
+/// another engine's namespace script still uses it. Hermes's folder and
+/// Hermes in it stay.
 fn remove_entry_points(root: &Path, say: &mut dyn FnMut(&str)) {
     for path in [WRAPPER, NS] {
         match fs::remove_file(on(root, path)) {
@@ -1191,7 +1198,12 @@ fn remove_entry_points(root: &Path, say: &mut dyn FnMut(&str)) {
             Err(error) => say(&format!("{path} not taken out: {error}")),
         }
     }
+    agent_ns::remove_hook_shim(root, &NS_SCRIPTS, say);
 }
+
+/// Every engine's namespace script: the shared hook stand-in
+/// ([`agent_ns::HOOK_SHIM`]) stays while any of them is there.
+pub(crate) const NS_SCRIPTS: [&str; 2] = [NS, crate::openclaw_install::NS];
 
 /// The install, in order: the installer's bytes checked; `lampos` and its
 /// ids looked up; `git`, `curl`, `bash` and `unshare` looked for as
@@ -1553,7 +1565,8 @@ pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
     .collect()
 }
 
-/// The namespace script ([`ns_text`] for `shown`), then the wrapper: root's,
+/// The namespace script ([`ns_text`] for `shown`), the shared hook
+/// stand-in ([`agent_ns::write_hook_shim`]), then the wrapper: root's,
 /// 0755, each written whole beside and renamed in (never through a link),
 /// so `lampos` never finds a wrapper before what it runs.
 fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
@@ -1569,6 +1582,9 @@ fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
             return Err(format!("{}: no such folder", folder.display()));
         }
         write_whole(&place, text.as_bytes(), 0o755).map_err(|error| format!("{path}: {error}"))?;
+        if path == NS {
+            agent_ns::write_hook_shim(root)?;
+        }
     }
     Ok(())
 }

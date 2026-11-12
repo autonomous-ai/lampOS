@@ -408,7 +408,11 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
             .any(|line| line.starts_with("curl") && line.contains("runuser")),
         "fetched as root, into a root's folder"
     );
-    for (path, text) in [(WRAPPER, WRAPPER_TEXT.to_owned()), (NS, ns_text(true))] {
+    for (path, text) in [
+        (WRAPPER, wrapper_text()),
+        (NS, ns_text(true)),
+        (agent_ns::HOOK_SHIM, agent_ns::HOOK_SHIM_TEXT.to_owned()),
+    ] {
         assert_eq!(fs::read_to_string(lamp.at(path)).unwrap(), text);
         assert_eq!(mode(&lamp.at(path)), 0o755);
     }
@@ -805,7 +809,7 @@ fn the_switch_off_stops_the_gateway_and_takes_everything_out() {
     let lamp = Lamp::new();
     lamp.harness_there();
     fs::write(lamp.unit(), UNIT_TEXT).unwrap();
-    fs::write(lamp.at(WRAPPER), WRAPPER_TEXT).unwrap();
+    fs::write(lamp.at(WRAPPER), wrapper_text()).unwrap();
     fs::write(lamp.at(NS), ns_text(true)).unwrap();
     let mut systemd = Fake::default();
     assert!(after_round_off(
@@ -959,7 +963,10 @@ fn the_wrapper_puts_the_lamps_node_first_and_ends_in_exec() {
     lamp.ask();
     let runs = Runs::new(&lamp);
     install(&lamp, &runs, 4).unwrap();
-    assert_eq!(fs::read_to_string(lamp.at(WRAPPER)).unwrap(), WRAPPER_TEXT);
+    assert_eq!(
+        fs::read_to_string(lamp.at(WRAPPER)).unwrap(),
+        wrapper_text()
+    );
     assert_eq!(mode(&lamp.at(WRAPPER)), 0o755);
 }
 
@@ -1219,4 +1226,26 @@ fn an_ask_from_the_app_tries_a_recent_openclaw_failure_again() {
     // Under way: a tap starts nothing more.
     let mut again = Fake::default();
     assert_eq!(asked(&mut again, 100 + 2 * HOUR_MS), None);
+}
+
+/// (#6530) OpenClaw's namespace script and a pane's way into the running
+/// gateway's namespaces both put the shared stand-in's folder first on the
+/// `PATH`, once, before what runs OpenClaw; the wrapper says once, outside
+/// the namespace, that Harness's hooks aren't there yet.
+#[test]
+fn openclaw_finds_the_hook_stand_in_first_on_its_path() {
+    for skills in [false, true] {
+        let text = ns_text(skills);
+        assert_eq!(text.matches(agent_ns::PATH_LINES).count(), 1);
+        let path = text.find(agent_ns::PATH_LINES).unwrap();
+        assert!(path < text.rfind(RUN_LINE).unwrap());
+        assert!(path < text.find("if [ \"$M\" = on ]; then").unwrap());
+    }
+    let wrapper = wrapper_text();
+    assert_eq!(wrapper.matches(agent_ns::PATH_LINES).count(), 1);
+    assert!(wrapper.contains(&format!("{}exec /usr/bin/nsenter ", agent_ns::PATH_LINES)));
+    let note = agent_ns::hook_note_line("openclaw");
+    assert_eq!(wrapper.matches(&note).count(), 1);
+    assert!(wrapper.find(&note) < wrapper.find("LAMP_NS_UID="));
+    assert!(wrapper[..512].contains("Written by lamp-update."));
 }
