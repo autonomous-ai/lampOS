@@ -138,6 +138,19 @@ câu của phòng, của phòng. Một lần từ chối để hỏi là thứ n
 chuyện sau lệnh quên dưới dạng `asked_which=true`, nên mô hình hỏi lại thay
 vì gọi quên lần nữa (lamp-06c1, 12/11, bản 12226: «Lamp, forget that.» bị
 từ chối rồi được gọi lại trong cùng yêu cầu đã xóa chiếc ô).
+Một lệnh quên không nêu tên trên một câu nghe được mà không nêu tên thứ gì
+được đánh dấu là không nêu tên, dù câu đó có yêu cầu quên hay không: một
+câu «Yes.» đơn thuần của cùng người đó cho câu hỏi «The graduation date, or
+your coffee?» đi kèm `forget {}`, và đèn hỏi lại là thứ nào thay vì xóa thứ
+được giữ mới nhất (`forget_last`), có thể không phải thứ nào trong hai thứ
+đã hỏi (P2 của Reviewer-lead trên #6575). Một `source_id` đã gợi lại mà
+mô hình đưa ra theo câu «Yes.» đó là lựa chọn của chính mô hình, không bao
+giờ là của người đó, và cũng được đánh dấu là không nêu tên, nên khi bật
+`LAMP_MEMORY_FORGET_ALL` (như trong sản phẩm) đèn hỏi là thứ nào thay vì
+quên nó theo id (P2 của Reviewer-lead trên #6692). Một lệnh quên được giữ chạy theo
+câu đồng ý đó và lệnh quên của tuyến Live (`LAMP_VOICE_ROUTE=gemini`) đi qua
+cùng bước kiểm tra trong `tools::run_call_with_scope`, trong phạm vi của họ
+hay của phòng.
 
 ## Nhật ký dừng sau một lệnh quên, rồi chạy lại
 

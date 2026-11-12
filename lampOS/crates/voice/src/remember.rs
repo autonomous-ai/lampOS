@@ -4323,12 +4323,13 @@ fn named_forget_on(
     };
     // A recalled id for words that name nothing, with no named forget just
     // before: the model's guess at "that", marked for the memory to check.
+    // Whether or not the words ask to forget: a plain "Yes." to the lamp's
+    // which-question chose neither thing, so an id the model gives with it
+    // is its own pick (the Reviewer-lead's P2 on #6692).
     if call.name == FORGET
         && recent.named.is_none()
         && call.args.get("source_id").is_some_and(|id| !id.is_null())
-        && said.is_some_and(|said| {
-            asks_to_forget(said) && !line_only_keeps(said) && named_subject(said).is_none()
-        })
+        && said.is_some_and(|said| !line_only_keeps(said) && named_subject(said).is_none())
     {
         let mut args = call.args.clone();
         if let Some(about) = said.and_then(line_names) {
@@ -4346,11 +4347,13 @@ fn named_forget_on(
         // A forget the memory answers with the last kept thing, for words
         // that name nothing: marked, so the memory asks when "that" is
         // what a recall just gave instead (#3504, Friday's N1, lamp
-        // follow-up).
+        // follow-up). Whether or not the words ask to forget: a plain
+        // "Yes." to the lamp's which-question ("The graduation date, or
+        // your coffee?") names neither, and run as called it took their
+        // newest keep, maybe neither one offered (the Reviewer-lead's P2
+        // on #6575).
         ForgetPick::Last
-            if call.name == FORGET
-                && said
-                    .is_some_and(|said| asks_to_forget(said) && named_subject(said).is_none()) =>
+            if call.name == FORGET && said.is_some_and(|said| named_subject(said).is_none()) =>
         {
             let mut args = call.args.clone();
             // The model's `about`, never heard in the part that asks, is
@@ -14632,6 +14635,20 @@ mod tests {
         person: Option<&str>,
         given: Option<u64>,
     ) -> Option<ForgetTwice> {
+        forget_then_answer_through_the_tools(name, person, given, None)
+    }
+
+    /// [`forget_twice_through_the_tools`], the second forget on the same
+    /// person's next line when `answer` is given ("Yes.", with the model's
+    /// arguments for that forget), as a request of its own, else `forget {}`
+    /// in the first's request. A second forget with a `source_id` runs with
+    /// `LAMP_MEMORY_FORGET_ALL` on, as in the product.
+    fn forget_then_answer_through_the_tools(
+        name: &str,
+        person: Option<&str>,
+        given: Option<u64>,
+        answer: Option<(&str, Value)>,
+    ) -> Option<ForgetTwice> {
         if std::env::var(FORGET_TWICE_CHILD).ok().as_deref() != Some(name) {
             let output = std::process::Command::new(std::env::current_exe().unwrap())
                 .args(["--exact", name, "--nocapture"])
@@ -14696,6 +14713,13 @@ mod tests {
         DAYS_MODE.set(true).unwrap();
         let client = DaysClient::new(memory.clone()).unwrap();
         client.forget_just_kept.store(true, Ordering::Release);
+        if answer
+            .as_ref()
+            .is_some_and(|(_, args)| args.get("source_id").is_some())
+        {
+            client.forget_all.store(true, Ordering::Release);
+            assert!(FORGET_ALL.set(true).is_ok());
+        }
         let whose = person.map(person_id);
         {
             let mut context = client.context.lock().unwrap();
@@ -14707,18 +14731,34 @@ mod tests {
         }
         assert!(DAYS.set(Some(client)).is_ok());
         let route = crate::tools::Route::Memory(memory.clone(), None, None, None);
-        let scope = scoped_request(person, REQUEST);
         crate::thread::THREAD
             .lock()
             .unwrap()
             .line_of(REQUEST, "Lamp, forget that.");
-        let forget = call(FORGET, json!({}));
+        let bare = call(FORGET, json!({}));
+        let scope = scoped_request(person, REQUEST);
+        let next = answer.as_ref().map(|(_, args)| {
+            (
+                scoped_request(person, REQUEST + 1),
+                call(FORGET, args.clone()),
+            )
+        });
         let mut told = [Value::Null, Value::Null];
-        for answer in &mut told {
+        for (turn, told) in told.iter_mut().enumerate() {
+            let (request, scope, forget) = match (&answer, &next) {
+                (Some((answer, _)), Some((next, forget))) if turn == 1 => {
+                    crate::thread::THREAD
+                        .lock()
+                        .unwrap()
+                        .line_of(REQUEST + 1, answer);
+                    (REQUEST + 1, next, forget)
+                }
+                _ => (REQUEST, &scope, &bare),
+            };
             let (_, (said, answered)) =
-                crate::tools::run_call_scoped(&route, &forget, REQUEST, true, &scope.lease());
+                crate::tools::run_call_scoped(&route, forget, request, true, &scope.lease());
             assert!(answered, "{said}");
-            *answer = said;
+            *told = said;
         }
         done.store(true, Ordering::Release);
         let ops = served
@@ -14751,6 +14791,95 @@ mod tests {
         assert_eq!(twice.told[0], forget_which(true));
         assert_eq!(twice.told[1], forget_which(true));
         assert!(twice.ops.is_empty(), "{:?}", twice.ops);
+    }
+
+    /// The Reviewer-lead's P2 on #6575: "Lamp, forget that." asks "The
+    /// graduation date, or your coffee?", and the same person's plain
+    /// "Yes." comes with `forget {}`. Their line names nothing, so the lamp
+    /// asks which again and nothing is removed, never their newest keep
+    /// (`forget_last`), which may be neither one offered. A held forget run
+    /// on that yes (`second_provider::take_held_forget`) and the Live
+    /// route's (`LAMP_VOICE_ROUTE=gemini`) reach the memory through this
+    /// same `tools::run_call_with_scope`, on the same line.
+    #[test]
+    fn a_plain_yes_to_the_which_question_asks_again_never_takes_their_newest_keep() {
+        let Some(twice) = forget_then_answer_through_the_tools(
+            "remember::tests::a_plain_yes_to_the_which_question_asks_again_never_takes_their_newest_keep",
+            Some("Olivia"),
+            None,
+            Some(("Yes.", json!({}))),
+        ) else {
+            return;
+        };
+        assert_eq!(twice.told[0], forget_which(true));
+        assert_eq!(twice.told[1], forget_which(true));
+        assert!(twice.ops.is_empty(), "{:?}", twice.ops);
+    }
+
+    /// The same P2 in the room's scope (nobody known, as the Live route's
+    /// unknown voice): a plain "Yes." to the lamp's ask removes nothing.
+    #[test]
+    fn a_plain_yes_on_the_rooms_line_never_takes_the_rooms_newest_keep() {
+        let Some(twice) = forget_then_answer_through_the_tools(
+            "remember::tests::a_plain_yes_on_the_rooms_line_never_takes_the_rooms_newest_keep",
+            None,
+            None,
+            Some(("Yes.", json!({}))),
+        ) else {
+            return;
+        };
+        assert_eq!(twice.told[0]["forgotten"], false, "{}", twice.told[0]);
+        assert_eq!(twice.told[1]["forgotten"], false, "{}", twice.told[1]);
+        assert!(twice.ops.is_empty(), "{:?}", twice.ops);
+    }
+
+    /// The Reviewer-lead's P2 on #6692, the same "Yes." by the other door:
+    /// with `LAMP_MEMORY_FORGET_ALL` on (the product), the model answers
+    /// the which-question's plain "Yes." with `forget {source_id: 5}`, one
+    /// of the three shown. That id is the model's pick, never the
+    /// person's: it is marked bare, so the lamp asks which again and
+    /// nothing is removed.
+    #[test]
+    fn a_plain_yes_to_the_which_question_never_forgets_the_models_pick_by_id() {
+        let Some(twice) = forget_then_answer_through_the_tools(
+            "remember::tests::a_plain_yes_to_the_which_question_never_forgets_the_models_pick_by_id",
+            Some("Olivia"),
+            None,
+            Some(("Yes.", json!({"source_id": 5}))),
+        ) else {
+            return;
+        };
+        assert_eq!(twice.told[0], forget_which(true));
+        assert_eq!(twice.told[1], forget_which(true));
+        assert!(twice.ops.is_empty(), "{:?}", twice.ops);
+    }
+
+    /// The guard itself: a bare forget on a line that names nothing and
+    /// does not ask to forget ("Yes.", "Okay.") is marked bare, in their
+    /// scope and the room's, as "forget that" is; one that names a thing
+    /// is still that thing.
+    #[test]
+    fn a_bare_forget_on_a_line_naming_nothing_is_marked_bare() {
+        for person in [Some(MAI), None] {
+            for said in ["Yes.", "Okay.", "Yes, please.", "Lamp, forget that."] {
+                let marked = named_forget_with(
+                    &call(FORGET, json!({})),
+                    Some(said),
+                    person,
+                    &Carry::default(),
+                )
+                .unwrap();
+                assert_eq!(marked.args, json!({ HEARD_BARE: true }), "{said}");
+            }
+            let named = named_forget_with(
+                &call(FORGET, json!({})),
+                Some("Yes, forget my coffee."),
+                person,
+                &Carry::default(),
+            )
+            .unwrap();
+            assert_eq!(named.args[HEARD_NAMED], true);
+        }
     }
 
     /// C134 after C88: "that" right after their keep forgets that keep by

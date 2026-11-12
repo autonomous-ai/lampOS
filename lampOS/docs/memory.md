@@ -1891,6 +1891,23 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `a_second_bare_forget_after_their_keep_went_removes_nothing_else`,
     `a_second_bare_forget_on_the_rooms_line_never_takes_the_rooms_next_keep`
     and `a_forget_whose_line_is_let_go_is_marked_bare_or_unclear`.
+    A bare forget on a heard line that names nothing is marked bare whether
+    or not the line asks to forget: the same person's plain "Yes." to "The
+    graduation date, or your coffee?" comes with `forget {}`, and the lamp
+    asks which again rather than taking their newest keep (`forget_last`),
+    which may be neither one offered (the Reviewer-lead's P2 on #6575). A
+    recalled `source_id` the model gives on that "Yes." is its own pick,
+    never the person's, and is marked bare the same way, so with
+    `LAMP_MEMORY_FORGET_ALL` on (the product) the lamp asks which rather
+    than forgetting it by id (the Reviewer-lead's P2 on #6692). A
+    held forget run on that yes and the Live route's
+    (`LAMP_VOICE_ROUTE=gemini`) go through the same guard in
+    `tools::run_call_with_scope`, in their scope or the room's. Tests:
+    `remember::tests`
+    `a_plain_yes_to_the_which_question_asks_again_never_takes_their_newest_keep`,
+    `a_plain_yes_on_the_rooms_line_never_takes_the_rooms_newest_keep`,
+    `a_plain_yes_to_the_which_question_never_forgets_the_models_pick_by_id`
+    and `a_bare_forget_on_a_line_naming_nothing_is_marked_bare`.
   - **What is removed:** what the asker's own scope keeps and what was
     noticed of them (`kept` with `observations`) that has every one of
     those words, as `forget {about}` matches below, each by `forget {id}`,
