@@ -36,6 +36,12 @@ pub fn on(value: Option<&str>) -> bool {
 /// exactly `on`. Anything else is off: a file not text, too long, with a
 /// line of another form or quoted, or that doesn't name the switch.
 pub fn file_on(bytes: &[u8]) -> bool {
+    file_says_on(bytes, SWITCH)
+}
+
+/// Whether the switch file's text turns the switch `switch` on, by the rule
+/// of [`file_on`]: the last `switch=` line exactly `on`, the file well formed.
+pub fn file_says_on(bytes: &[u8], switch: &str) -> bool {
     if bytes.len() > MOST_FILE_BYTES {
         return false;
     }
@@ -57,7 +63,7 @@ pub fn file_on(bytes: &[u8]) -> bool {
         {
             return false;
         }
-        if name == SWITCH {
+        if name == switch {
             value = Some(rest);
         }
     }
@@ -67,8 +73,15 @@ pub fn file_on(bytes: &[u8]) -> bool {
 /// The switch file on the lamp, under `root`: off when it is missing, not
 /// a regular file, unreadable or garbled.
 pub fn lamp_file_on(root: &std::path::Path) -> bool {
+    lamp_file_says_on(root, crate::manifest::MODELS_ENV, SWITCH)
+}
+
+/// A switch file on the lamp (`file`, as the lamp names it, under `root`),
+/// for the switch `switch`: off when it is missing, not a regular file,
+/// unreadable or garbled.
+pub fn lamp_file_says_on(root: &std::path::Path, file: &str, switch: &str) -> bool {
     use std::io::Read;
-    let path = root.join(crate::manifest::MODELS_ENV.trim_start_matches('/'));
+    let path = root.join(file.trim_start_matches('/'));
     if !fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.is_file()) {
         return false;
     }
@@ -79,7 +92,7 @@ pub fn lamp_file_on(root: &std::path::Path) -> bool {
                 .read_to_end(&mut bytes)
         })
         .is_ok()
-        && file_on(&bytes)
+        && file_says_on(&bytes, switch)
 }
 
 /// A model's path as it was before a switch, to be put back.
