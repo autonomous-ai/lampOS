@@ -381,20 +381,24 @@ pub fn summary_on(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
-/// A `when`, or why it is refused: some text, at most [`WHEN_MOST_BYTES`],
-/// with no control characters.
-fn checked_when(when: Option<String>, whose: &str) -> Result<Option<String>, String> {
+/// A `when` as kept: some text, at most [`WHEN_MOST_BYTES`], with no
+/// control characters. Any other is left out with a journal line, never a
+/// refusal: the skill loads as it did without one, so a Store skill's
+/// stray `when:` never stops it loading with the switch off (Twelve's P3
+/// on #6521). The repo's own are held to the bound by its tests.
+fn checked_when(when: Option<String>, whose: &str) -> Option<String> {
     match when {
         Some(when)
             if when.trim().is_empty()
                 || when.len() > WHEN_MOST_BYTES
                 || when.chars().any(char::is_control) =>
         {
-            Err(format!(
-                "{whose} when is at most {WHEN_MOST_BYTES} bytes, not empty, with no control characters"
-            ))
+            eprintln!(
+                "lamp-skills: {whose} when is left out: at most {WHEN_MOST_BYTES} bytes, not empty, with no control characters"
+            );
+            None
         }
-        when => Ok(when),
+        when => when,
     }
 }
 /// The file in `--state-dir` that keeps the skills turned off: one line
@@ -2990,7 +2994,7 @@ fn front_matter(text: &str) -> Result<(String, String, Option<String>), String> 
             .filter(|value| !value.is_empty())
     };
     let field = |key: &str| optional(key).ok_or(format!("SKILL.md's front matter has no {key}"));
-    let when = checked_when(optional("when"), "SKILL.md's")?;
+    let when = checked_when(optional("when"), "SKILL.md's");
     Ok((field("name")?, field("description")?, when))
 }
 
@@ -4081,7 +4085,7 @@ fn manifest(
             Some(Stop {
                 tool: stop.tool,
                 about: stop.about,
-                when: checked_when(stop.when, "[stop]")?,
+                when: checked_when(stop.when, "[stop]"),
             })
         }
     };
