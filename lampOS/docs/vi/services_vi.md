@@ -2496,9 +2496,10 @@ qua một socket mở.
   được giữ nguyên từng byte, dù bật hay tắt (bật thì không thêm mục của
   đèn), và không bao giờ chặn phần còn lại của bước gộp, nên các dòng
   provider vẫn được ghi. Đặt công tắc giống nhau trong lamp-tasks,
-  lamp-voice và lamp-skills-manage@: lamp-voice làm kỹ năng kết nối thành
-  một `do.task` ([skills_vi.md](skills_vi.md)) và lamp-skills-manage@ cài
-  nó. Không unit sản phẩm nào đặt công tắc này.
+  lamp-skills, lamp-skills-manage@, lamp-voice và lamp-control: lamp-voice
+  làm kỹ năng kết nối thành một `do.task` ([skills_vi.md](skills_vi.md)),
+  lamp-skills và lamp-skills-manage@ nhận quyền dịch vụ của nó khi nạp và
+  cài, và lamp-control giữ chúng trong lời đồng ý và token. Không unit sản phẩm nào đặt công tắc này.
 - **Token và quyền.** Một lượt `do.task` của kỹ năng (lamp-tasks,
   `skill_task`) được chạy với `LAMP_CONTROL_SOCKET` và token một lượt
   `LAMP_CONTROL_TOKEN`, do lamp-control tạo từ lời đồng ý đã lưu của chủ cho
