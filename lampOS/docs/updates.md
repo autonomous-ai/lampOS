@@ -1307,7 +1307,8 @@ the link and the build it named; the way back by hand), `log.jsonl` (what a roun
 switched, held, put a build back, climbed or failed said, in one line with
 `lines` before its end (#6266: the journal is RAM on the product lamp, about the
 last 40 minutes and empty after a reboot; at most 200 lines of 400 characters,
-and none for a round that did nothing, was refused again or was not quiet); the end of
+and none for a round that did nothing, was refused again or was not quiet; a failed
+round that says what the last kept entry said keeps no lines again, its end still written); the end of
 every round that held the lock, marked `"round": true` with its build, a
 self-switch's `self-confirmed` and `self-put-back` too; and three lines that
 end no round: `journal-set-aside` for a `journal.json` it couldn't read,
