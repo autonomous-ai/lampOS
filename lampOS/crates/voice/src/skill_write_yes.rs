@@ -310,6 +310,78 @@ fn said_whole_before(waiting: &Waiting, request: u64) -> bool {
     })
 }
 
+/// The first word of `say_back` that `said` does not hold in order, as
+/// [`crate::services::read_back_said`] checks it; none when it holds all.
+fn first_missing(say_back: &str, said: &str) -> Option<String> {
+    let mut said = crate::services::check_words(said).into_iter();
+    crate::services::check_words(say_back)
+        .into_iter()
+        .find(|word| !said.any(|got| &got == word))
+}
+
+/// The journal's line of a yes in `request` not taken because the
+/// say-back was not heard whole (#6715): each of the lamp's answers kept
+/// toward it, by request, cut or not and its word count, and the first
+/// say-back word missing from the best of them (the one before `request`
+/// that holds the most of it in order, an uncut one on a tie). One word of the
+/// say-back at most, never the rest of it, nor what the lamp said.
+fn not_said_whole_line(waiting: &Waiting, request: u64) -> String {
+    let kept: Vec<String> = waiting
+        .said
+        .iter()
+        .map(|(id, said, cut)| {
+            format!(
+                "r{id} cut={cut} {} words",
+                crate::services::check_words(said).len()
+            )
+        })
+        .collect();
+    let held = |said: &str| {
+        let wanted = crate::services::check_words(&waiting.asks.say_back);
+        let mut words = crate::services::check_words(said).into_iter();
+        wanted
+            .iter()
+            .take_while(|word| words.any(|got| &got == *word))
+            .count()
+    };
+    let best = waiting
+        .said
+        .iter()
+        .filter(|(id, ..)| *id < request)
+        .max_by_key(|(_, said, cut)| (held(said), !cut));
+    let missing = match best {
+        None => "no answer kept".to_owned(),
+        Some((id, said, cut)) => match first_missing(&waiting.asks.say_back, said) {
+            Some(word) => format!("first missing word in r{id} \"{word}\""),
+            None if *cut => format!("r{id} held it all but was cut"),
+            None => format!("r{id} held it all"),
+        },
+    };
+    let kept = if kept.is_empty() {
+        "none".to_owned()
+    } else {
+        kept.join("; ")
+    };
+    format!(
+        "lamp-voice: request {request}: a made skill's yes not taken: its say-back was not heard whole (kept: {kept}; {missing})"
+    )
+}
+
+/// The journal's line when the lamp's words of `request` skip the thread
+/// (`second_provider::worker`, `guard` naming why) while a skill's yes
+/// waits (#6715): they never count toward its say-back. None while
+/// nothing waits.
+pub fn skipped_line(request: u64, guard: &str) -> Option<String> {
+    kept::waiting(|waiting| {
+        waiting.as_ref().map(|waiting| {
+            format!(
+                "lamp-voice: request {request}: the lamp's words skip the thread ({guard}) while a skill's yes waits (made in request {}): they don't count toward its say-back",
+                waiting.request
+            )
+        })
+    })
+}
+
 /// What the model is told to say of a made skill whose writes wait: `line`
 /// word for word, every part of it.
 pub fn say_whole(line: &str) -> String {
@@ -393,7 +465,7 @@ pub fn approve(
 ) -> Value {
     enum Took {
         Nothing,
-        NotSaid(String, String, bool),
+        NotSaid(String, String, bool, String),
         Waiting(Box<Waiting>),
     }
     let took = kept::waiting(|kept| {
@@ -408,6 +480,7 @@ pub fn approve(
                 waiting.id.clone(),
                 waiting.asks.say_back.clone(),
                 waiting.asks.grants.is_some(),
+                not_said_whole_line(waiting, request),
             );
         }
         kept.take()
@@ -418,10 +491,8 @@ pub fn approve(
             eprintln!("lamp-voice: request {request}: a made skill's yes found nothing waiting");
             return json!({ "error": NOT_APPROVED });
         }
-        Took::NotSaid(id, say_back, task) => {
-            eprintln!(
-                "lamp-voice: request {request}: a made skill's yes not taken: its say-back was not heard whole"
-            );
+        Took::NotSaid(id, say_back, task, line) => {
+            eprintln!("{line}");
             let wait = if task {
                 crate::skill_task_yes::then_wait(&id)
             } else {
@@ -649,6 +720,57 @@ mod tests {
         assert_eq!(
             approve(&id, 8, true, true, now, never)["error"],
             NOT_SAID_WHOLE
+        );
+    }
+
+    /// #6715: a yes refused for a say-back not heard whole journals each
+    /// answer kept toward it (request, cut, word count) and the first
+    /// say-back word missing from the best one, and no more of the
+    /// say-back; the words skipping the thread are journalled only while a
+    /// yes waits.
+    #[test]
+    fn a_refused_yes_journals_the_answers_kept_and_the_first_word_missing() {
+        let now = Instant::now();
+        assert_eq!(
+            skipped_line(3, "the lease's request"),
+            None,
+            "nothing waits"
+        );
+        let id = wait_for_yes(asks("leaving-mail", &[mail()]), 1, now);
+        let waiting = || kept::waiting(|waiting| waiting.clone().unwrap());
+        assert_eq!(
+            not_said_whole_line(&waiting(), 2),
+            "lamp-voice: request 2: a made skill's yes not taken: its say-back was not heard whole (kept: none; no answer kept)"
+        );
+        lamp_said(
+            1,
+            "it mails mai@example.com from your Gmail, subject “Leaving”",
+        );
+        lamp_said(2, "I need to read it back in full first.");
+        lamp_cut(2);
+        let line = not_said_whole_line(&waiting(), 3);
+        assert_eq!(
+            line,
+            "lamp-voice: request 3: a made skill's yes not taken: its say-back was not heard whole (kept: r1 cut=false 10 words; r2 cut=true 9 words; first missing word in r1 \"saying\")"
+        );
+        assert!(!line.contains("leaving now"), "{line}");
+        // Held whole but cut: said so.
+        lamp_said(3, SAY_BACK);
+        lamp_cut(3);
+        assert!(
+            not_said_whole_line(&waiting(), 4).ends_with("r3 held it all but was cut)"),
+            "{}",
+            not_said_whole_line(&waiting(), 4)
+        );
+        assert_eq!(
+            approve(&id, 4, true, true, now, never)["error"],
+            NOT_SAID_WHOLE
+        );
+        assert_eq!(
+            skipped_line(5, "no scope").as_deref(),
+            Some(
+                "lamp-voice: request 5: the lamp's words skip the thread (no scope) while a skill's yes waits (made in request 1): they don't count toward its say-back"
+            )
         );
     }
 
