@@ -2655,7 +2655,13 @@ fn serve_client(
                     // A stream holds the connection for its sound and counts
                     // ([`crate::speaker_stream`]), answered as any ask.
                     if let Some(by) = stream_by {
-                        return crate::speaker_stream::hold(stream, answered, cancel, by);
+                        return crate::speaker_stream::hold(
+                            stream,
+                            answered,
+                            cancel,
+                            by,
+                            std::mem::take(&mut kept),
+                        );
                     }
                     // The voice answers an ask not begun in time itself;
                     // begun, the turn may run on past its expiry, so the
