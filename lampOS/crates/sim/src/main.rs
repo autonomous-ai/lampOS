@@ -1,6 +1,6 @@
 //! `lamp-sim`: the virtual desktop lamp's hardware edge (docs/simulator-lamp.md).
 //!
-//! lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone]
+//! lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls]
 //!     Starts everything in DIR (short, private, outside a world-writable
 //!     folder): the simulated servo bus, the real lamp-body on it, the ring,
 //!     the voice and the volume, and the real lamp-control; prints a pairing
@@ -42,7 +42,7 @@ fn lamp_name(dir: &Path) -> String {
     format!("virtual-{:06x}", hash & 0xff_ffff)
 }
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -217,6 +217,10 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
                 .and_then(|p| p.parent().map(Path::to_path_buf))
                 .unwrap_or_default()
         });
+    // `--controls` without the binary is said before anything starts.
+    if lamp_sim::controls::wanted(args) {
+        lamp_sim::controls::present(&bin).map_err(std::io::Error::other)?;
+    }
     let listen = option(args, "--listen").unwrap_or_else(|| "127.0.0.1:7731".to_owned());
     // Say so here, not as a pairing failure later: another lamp-sim (or any
     // program) already has the door's address.
@@ -355,6 +359,20 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     let d = |name: &str| dir.join(name).display().to_string();
     let mut body = body_command(&bin, dir, &bus_root)?.spawn()?;
     thread::sleep(Duration::from_secs(1));
+    // `--controls`: the real lamp-controls, which publishes `controls/state` for a real voice (controls.rs);
+    // off unless asked. It ends with the lamp, as the others do.
+    let mut controls: Option<Child> = if lamp_sim::controls::wanted(args) {
+        let launch =
+            lamp_sim::controls::launch(&bin, &bus_root, &boot_id).map_err(std::io::Error::other)?;
+        let mut command = watched(launch.program);
+        command.args(&launch.args);
+        for (name, value) in &launch.env {
+            command.env(name, value);
+        }
+        Some(command.spawn()?)
+    } else {
+        None
+    };
     children.push(
         watched(bin.join("lamp-control"))
             .env("LAMP_CONTROL", "on")
@@ -449,10 +467,17 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             eprintln!("lamp-sim: lamp-control ended");
             ended = true;
         }
+        if let Some(child) = controls.as_mut()
+            && matches!(child.try_wait(), Ok(Some(_)))
+        {
+            eprintln!("lamp-sim: lamp-controls ended");
+            ended = true;
+        }
         if ended {
             // The parts run in their own process groups under a watcher shell:
             // end each group, not only the shell.
             children.push(body);
+            children.extend(controls);
             for child in &mut children {
                 if let Some(group) = rustix::process::Pid::from_raw(child.id() as i32) {
                     let _ =
