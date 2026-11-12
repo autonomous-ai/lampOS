@@ -10,6 +10,8 @@
 // `ops` are the control.schema.json ops the entry sends (the SDK's `withLease` sends `lease.take` and `lease.release`)
 // and `shows` the events its action should bring up in the log; a stimulus has `shows` only. test/controls-cover.test.js
 // fails for an op or an event that no entry names, unless controls-exceptions.js lists it with its reason.
+// `hint` (optional, a string of at most 200 characters) is said under the row on the page, in `textContent`; `hintReal`,
+// when the page drives a real lamp (`describe('real')`), replaces it. For a row with an effect the label doesn't say.
 // A refusal comes back as the lamp's own words; a value outside its field is refused here, before any call.
 import { fileURLToPath } from 'node:url';
 import { LampError, schema } from 'lampos';
@@ -81,6 +83,45 @@ export const CONTROLS = [
     } },
   { id: 'stop', group: 'Body', ops: ['stop'], shows: [], label: 'Stop', fields: [], run: async ({ lamp }) => { await lamp.stop(); return 'lamp.stop()'; } },
   // The owner's language the lamp said in hello: a read, so the log says the code it got.
+  // The person's own volume, so the row puts it back: it reads the level, takes the one step (or the mute), then
+  // restores the level and the mute it found, even when the step is refused. Nothing is left changed.
+  { id: 'volume', group: 'Voice', ops: ['volume', 'get'], shows: ['volume.changed'], label: 'Volume (then back)',
+    hint: 'steps the volume once and puts it back (level and mute)', fields: [select('how', ['step down', 'step up', 'mute'], 'step down')],
+    run: async ({ lamp }, a) => {
+      const before = (await lamp.get('volume')).volume;
+      if (typeof before?.level !== 'number') throw refuse('the lamp did not say its volume: nothing was changed');
+      const arg = a.how === 'mute' ? { mute: true } : { step: a.how === 'step up' ? 'up' : 'down' };
+      let after;
+      let back;
+      try {
+        after = await lamp.volume(arg);
+      } finally {
+        back = await lamp.volume({ to: before.level });
+        if (before.muted) back = await lamp.volume({ mute: true });
+        else if (back.muted) back = await lamp.volume({ mute: false });
+      }
+      return `lamp.volume(${q(arg)}) -> ${q(after)}; put back: ${q(back)} (was ${q({ level: before.level, muted: Boolean(before.muted) })})`;
+    } },
+  // Mute this computer's hearing and give it back: `false` holds the lamp's mute, `true` lifts it. Needs the hear grant.
+  { id: 'listen', group: 'Voice', ops: ['listen.set'], shows: [], label: 'Listening',
+    hint: 'off leaves the lamp not listening until you press on',
+    hintReal: "off holds the real lamp's mute: it stays deaf to the room until you press on", fields: [select('listen', ['on', 'off'], 'on')],
+    run: async ({ lamp }, a) => `lamp.setListening(${a.listen === 'on'}) -> ${q(await lamp.setListening(a.listen === 'on'))}` },
+  // A read of the lamp's states by name (some need a grant: the refusal is the lamp's words).
+  { id: 'get', group: 'Read', ops: ['get'], shows: [], label: 'Read a state', fields: [select('state', [...schema.states], 'lamp')],
+    run: async ({ lamp }, a) => {
+      const got = (await lamp.get(a.state))[a.state] ?? null;
+      const text = q(got);
+      return `lamp.get(${q(a.state)}) -> ${text.length > 600 ? `${text.slice(0, 600)}... (${text.length} characters)` : text}`;
+    } },
+  // Aim yaw and pitch under the body lease, in degrees, within a time: the lamp keeps its own limits.
+  { id: 'joints', group: 'Body', ops: ['joints', 'lease.take', 'lease.release'], shows: [], label: 'Aim the joints', fields: [number('yaw', -90, 90, 10), number('pitch', -45, 45, 0), number('within_ms', 200, 5000, 1000, { integer: true })],
+    run: async ({ lamp, release }, a) => {
+      const targets = { yaw: a.yaw, pitch: a.pitch };
+      await release();
+      await lamp.withLease(['body'], (lease) => lamp.joints(lease, a.within_ms, targets, { wait: true }));
+      return `lamp.withLease(['body'], (lease) => lamp.joints(lease, ${a.within_ms}, ${q(targets)}, { wait: true }))`;
+    } },
   { id: 'language', group: 'Voice', ops: [], shows: [], label: 'Language', fields: [], run: async ({ lamp }) => `lamp.language // ${q(lamp.language)}` },
   { id: 'light', group: 'Light', ops: ['light'], shows: ['lamp.changed'], label: 'Light',
     fields: [select('colour', COLOURS, 'warm'), number('level', 1, 5, 3, { integer: true }), select('pattern', ['', ...PATTERNS], '', { optional: true }), number('for_ms', 1, 30_000, 10_000, { integer: true })],
@@ -171,10 +212,10 @@ export const STIMULI = [
 ];
 
 // What the page needs to draw the buttons: the entries without their code.
-export const describe = () => ({
-  controls: CONTROLS.map(({ id, group, label, fields }) => ({ id, group, label, fields })),
-  stimuli: STIMULI.map(({ id, group, label, fields }) => ({ id, group, label, fields })),
-});
+export const describe = (mode = 'lamp-sim') => {
+  const shown = ({ id, group, label, fields, hint, hintReal }) => ({ id, group, label, fields, ...((mode === 'real' && hintReal) || hint ? { hint: (mode === 'real' && hintReal) || hint } : {}) });
+  return { controls: CONTROLS.map(shown), stimuli: STIMULI.map(shown) };
+};
 
 // Whether the event log shows this event now: every line the lamp says (lamp.said) is shown, however fast they come
 // (a dropped line would be a line the page never saw); the others are thinned to one in 200 ms per event name.

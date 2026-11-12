@@ -18,6 +18,7 @@ document.head.append(el('style', { textContent: `
   #panel input[type=text] { flex: 1; min-width: 120px; }
   #panel input[type=number] { width: 64px; }
   #panel .world button { border-style: dashed; }
+  #panel .hint { flex-basis: 100%; font-size: 11px; color: var(--soft); margin: -2px 0 2px 2px; }
   #events { height: 220px; overflow: auto; font: 12px/1.35 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; white-space: pre-wrap; }
   #events .ok { color: var(--accent); } #events .no { color: #d9534f; } #events .ev { color: var(--soft); }
 ` }));
@@ -43,6 +44,8 @@ function row(entry, kind) {
   const values = () => Object.fromEntries(inputs.map(([field, node]) => [field.name, field.type === 'number' ? Number(node.value) : node.value]));
   const children = inputs.map(([field, node]) => (field.type === 'text' ? node : el('label', {}, field.label ?? field.name, node)));
   children.push(el('button', { textContent: entry.label, onclick: () => send({ type: kind, id: ++counter, name: entry.id, args: values() }) }));
+  // What the row does that its label does not say, under it (textContent: never markup).
+  if (typeof entry.hint === 'string') children.push(el('div', { className: 'hint', textContent: entry.hint }));
   return el('div', { className: 'row' }, ...children);
 }
 

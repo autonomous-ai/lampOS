@@ -48,9 +48,9 @@ test('a new op or event in the schema fails the guard, saying what to do', () =>
 });
 
 test('an exception goes when its row is written, and one needs a real name and a reason', () => {
-  const row = { id: 'volume', ops: ['volume'], shows: [] };
-  assert.match(gaps({ ...now, controls: [...CONTROLS, row] }).join('\n'), /op volume has a row now: delete its line/);
+  const row = { id: 'sounds', ops: ['sound.list'], shows: [] };
+  assert.match(gaps({ ...now, controls: [...CONTROLS, row] }).join('\n'), /op sound\.list has a row now: delete its line/);
   assert.match(gaps({ ...now, exceptions: [...COVERAGE_EXCEPTIONS, { kind: 'op', name: 'no.such', reason: 'x' }] }).join('\n'), /not in control\.schema\.json/);
-  assert.match(gaps({ ...now, exceptions: [...COVERAGE_EXCEPTIONS, { kind: 'op', name: 'get', reason: '' }] }).join('\n'), /listed twice[\s\S]*no reason|no reason[\s\S]*listed twice/);
+  assert.match(gaps({ ...now, exceptions: [...COVERAGE_EXCEPTIONS, { kind: 'op', name: 'sound.list', reason: '' }] }).join('\n'), /listed twice[\s\S]*no reason|no reason[\s\S]*listed twice/);
   assert.match(gaps({ ...now, controls: [...CONTROLS, { id: 'typo', ops: ['gestur'], shows: [] }] }).join('\n'), /entry typo names gestur/);
 });
