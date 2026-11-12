@@ -1227,6 +1227,24 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 `app_make::tests::a_voice_make_line_is_asked_on_the_say_socket`, và
 `crates/skills/tests/it/made.rs` với `lamp-skills` thật.
 
+### Dịch vụ đã liên kết thành task cho agent của đèn (`LAMP_AGENT_SERVICES=on`, tắt)
+
+Yêu cầu của chủ, 12/11. Với `LAMP_AGENT_SERVICES=on` trong `lamp-voice`
+(đúng `on`; `made_skill::AGENT_SERVICES_ENVIRONMENT`) và
+`LAMP_MADE_SCRIPTS=on` bên cạnh (bước `task` của skill tự làm chịu giới hạn
+đó), một skill làm bằng giọng nói mà đọc hoặc ghi một dịch vụ đã liên kết
+(Gmail, Calendar, GitHub, ...) được làm thành một `do.task` cho agent của
+đèn (Hermes, với MCP connectors `lamp-services`: `services_connected`,
+`service_read`, `service_write`; thư gửi đi quay về giọng nói để chủ nói
+đồng ý), không còn là bước `do.read` hay `do.write`: `[permissions]` chỉ
+có topic của trigger, không `services`; `grants` đúng các dịch vụ nó dùng,
+`<code>-read` để đọc và `<code>-write` để gửi (phán quyết trên #6432; chỉ
+gửi thì chỉ `-write`), chỉ được giữ khi bật công tắc; đúng một bước
+`[[do]]` `task = { task = "...", run = "scripts/main.py" }` và một
+`scripts/main.py` chỉ in một dòng. Tắt (hoặc `LAMP_MADE_SCRIPTS` tắt),
+prompt và brief giữ nguyên như trước. Các skill đã làm với
+`do.read`/`do.write` vẫn tải và chạy như hôm nay, không được chuyển đổi.
+
 ### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, tắt, đề xuất trên #6059)
 
 Đề xuất trên #6059 (chủ sở hữu đồng ý, 11/11), first builder đã đồng ý

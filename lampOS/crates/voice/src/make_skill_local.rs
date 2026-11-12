@@ -161,13 +161,29 @@ fn system() -> String {
 
 /// [`system`], with a made skill's reads on or off.
 fn system_with(reads: bool) -> String {
+    system_for(reads, made_skill::agent_services_here())
+}
+
+/// [`system_with`], with a linked service made as a task for the lamp's
+/// agent or not (`agent`, [`made_skill::AGENT_SERVICES_ENVIRONMENT`]): on
+/// only with a made skill's code on too ([`made_skill::scripts_on`]), as a
+/// made `task` step is held to that cap; else the prompt is as before.
+fn system_for(reads: bool, agent: bool) -> String {
     let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
+    let agent = agent && made_skill::scripts_on();
     let writes = made_skill::writes_on();
     // Today and the offset only for a write's calendar event (#6066).
-    let today = writes
+    let today = (writes && !agent)
         .then(crate::local_time::today_and_offset_here)
         .flatten();
-    let services = services(reads, writes, &own_accounts(), today.as_ref());
+    let services = if agent {
+        agent_services()
+    } else {
+        services(reads, writes, &own_accounts(), today.as_ref())
+    };
+    // A send through the lamp's agent is one of what a skill may do, as a
+    // made write is.
+    let writes = writes || agent;
     // With a made skill's writes (#6066) a write to a linked service is
     // one of what a skill may do, told below; a text to a phone stays out
     // of reach. Its can't-yet example is then no send: on lamp-9adf, 11
@@ -272,6 +288,84 @@ fn code_rules() -> String {
         each = made_skill::MOST_SCRIPT_BYTES / 1024,
         all = made_skill::MOST_SCRIPTS_BYTES / 1024,
         grants = grants.join(", "),
+    )
+}
+
+/// The request [`AGENT_SERVICES_EXAMPLE`] is made for.
+const AGENT_SERVICES_ASKED: &str = "every morning at eight, read me my new mail";
+
+/// One whole service skill made as a task for the lamp's agent, shown the
+/// model with [`agent_services`].
+const AGENT_SERVICES_EXAMPLE: &str = "```skill.toml
+kind = \"installable\"
+version = \"1.0.0\"
+grants = [\"gmail-read\"]
+
+[permissions]
+topics = [\"clock/local\"]
+
+[trigger]
+topic = \"clock/local\"
+field = \"known\"
+equals = true
+rearm = \"ends\"
+during = { from = \"08:00\", to = \"08:01\" }
+
+[ask]
+policy = \"nudge\"
+
+[[do]]
+task = { task = \"Read the owner's new mail since yesterday and tell them who wrote and what about\", run = \"scripts/main.py\" }
+```
+
+```SKILL.md
+---
+name: morning-mail
+description: Every morning at eight, the lamp's agent reads me my new mail.
+---
+
+# Morning mail
+
+Every morning at eight, the lamp's agent reads the new mail and tells me.
+```
+
+```scripts/main.py
+print(\"The lamp's agent does this task with its lamp-services tools.\")
+```";
+
+/// What the making model is told of the person's linked services with
+/// [`made_skill::AGENT_SERVICES_ENVIRONMENT`] on (the owner's ask, 12 Nov):
+/// a skill that reads or writes one is one `do.task` for the lamp's agent,
+/// which reaches the linked services through its `lamp-services` tools; a
+/// send is read back by the lamp and goes only on the owner's spoken yes.
+/// Never a `read = {...}` or `write = {...}` step: those stay for the
+/// skills already made with them, which load and run as before.
+fn agent_services() -> String {
+    let cannot = made_skill::CANNOT;
+    let most = made_skill::MOST_TASK_CHARS;
+    format!(
+        "A skill that reads or writes the person's mail, calendar, GitHub or any other linked \
+         service hands that part to the lamp's agent, which reaches the linked services through \
+         its lamp-services tools (services_connected, service_read, service_write). Such a skill \
+         is made with code of its own as told at the end; its grants = [ ... ] exactly the \
+         services it uses, each CODE-read to read it or CODE-write to send with it (a send \
+         alone only CODE-write, CODE-read beside it only when it reads too), CODE one of: \
+         {codes}; no other grant, and no services in [permissions]: only its trigger's \
+         topics, and speak = true only beside a say step; its \
+         trigger the lamp's own (a time, someone coming or leaving, as above); and exactly one \
+         [[do]] step, alone in its step: task = {{ task = \"...\", run = \"scripts/main.py\" }}, \
+         the task's words, at most {most} characters, saying plainly for the lamp's agent what \
+         to read and what to tell the person, or what to send, in the request's own words, and \
+         to whom (an address the request says, or the person's own for me); and one \
+         ```scripts/main.py block that only prints a line, as in the example. Never a read = \
+         {{ ... }} or write = {{ ... }} step. What the agent finds comes back as the lamp's task \
+         news. Any send is read back by the lamp and goes only on the person's spoken yes. A \
+         request to delete or change anything already in a service is answered with one line \
+         and no blocks: {cannot} {cant_yet} deleting or changing what is in your services. \
+         Never tell them to link a service. A whole such skill, for \"{AGENT_SERVICES_ASKED}\":\
+         \n\n{AGENT_SERVICES_EXAMPLE}\n",
+        cant_yet = made_skill::CANT_YET,
+        codes = made_skill::SERVICE_GRANT_CODES.join(", "),
     )
 }
 
@@ -4546,6 +4640,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             services(true, false, &[], None),
             services(false, true, &[], Some(&today)),
             services(true, true, &[], None),
+            agent_services(),
         ]
         .join("\n");
         for refusal in made_skill::BRIEFS_OWN_REFUSALS {
@@ -4686,6 +4781,94 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(made.name, "example-only");
         assert!(system().contains(EXAMPLE));
         assert!(system().contains("never answer with it"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The owner's ask, 12 Nov (`LAMP_AGENT_SERVICES`): on, with a made
+    /// skill's code on, a service skill is steered to one `do.task` for the
+    /// lamp's agent and never to a read or write step; off, or with code
+    /// off, the prompt is as before, word for word.
+    #[test]
+    fn a_service_skill_is_made_as_a_task_for_the_agent_only_with_its_switch() {
+        assert!(made_skill::agent_services_on(Some("on")));
+        for var in [None, Some(""), Some("1"), Some("ON"), Some("true")] {
+            assert!(!made_skill::agent_services_on(var), "{var:?}");
+        }
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        let task = "task = { task = \"...\", run = \"scripts/main.py\" }";
+        for reads in [true, false] {
+            let on = system_for(reads, true);
+            for part in [
+                task,
+                "lamp-services tools (services_connected, service_read, service_write)",
+                "goes only on the person's spoken yes",
+                "Never a read = { ... } or write = { ... } step",
+                "no other grant, and no services in [permissions]",
+                "each CODE-read to read it or CODE-write to send with it",
+                "gmail, google_calendar, google_drive",
+                "grants = [\"gmail-read\"]",
+                AGENT_SERVICES_EXAMPLE,
+            ] {
+                assert!(on.contains(part), "{part}: {on}");
+            }
+            assert!(!on.contains("services = { CODE = \"read\" }"), "{on}");
+            assert!(!on.contains("services = { CODE = \"write\" }"), "{on}");
+            let off = system_for(reads, false);
+            assert!(!off.contains(task), "{off}");
+            assert!(!off.contains("lamp-services tools"), "{off}");
+            assert!(off.contains("services = { CODE = \"write\" }"), "{off}");
+            if reads {
+                assert!(off.contains("services = { CODE = \"read\" }"), "{off}");
+            }
+        }
+        // A made task step is held to the code's cap: with code off, the
+        // switch alone changes nothing.
+        made_skill::set_scripts_here(Some(false));
+        assert_eq!(system_for(true, true), system_for(true, false));
+        made_skill::set_scripts_here(None);
+        made_skill::set_writes_here(None);
+    }
+
+    /// With `LAMP_AGENT_SERVICES` on, a made "every morning read my new
+    /// mail" and "when I leave, email X that I'm out", each one `do.task`
+    /// for the lamp's agent, pass the same checks and keeping as any made
+    /// skill with code (`made_skill::keep`, its cap and say-back).
+    #[test]
+    fn a_service_skill_made_as_a_task_passes_the_lamps_checks() {
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_agent_services_here(Some(true));
+        let (root, keeping) = keeping("agent-services");
+        let made = made_skill::keep(AGENT_SERVICES_EXAMPLE, false, "local:1", &keeping).unwrap();
+        assert_eq!(made.name, "morning-mail");
+        assert_eq!(made.uses.grants, ["gmail-read"]);
+        let leave = AGENT_SERVICES_EXAMPLE
+            .replace("grants = [\"gmail-read\"]", "grants = [\"gmail-write\"]")
+            .replace("topics = [\"clock/local\"]", "topics = [\"room/presence\"]")
+            .replace(
+                "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+                 during = { from = \"08:00\", to = \"08:01\" }",
+                "topic = \"room/presence\"\nfield = \"someone\"\nequals = false\nfor = \"5m\"\n\
+                 cooldown = \"1h\"\nrearm = \"ends\"",
+            )
+            .replace(
+                "Read the owner's new mail since yesterday and tell them who wrote and what about",
+                "Email x@example.com saying I'm out",
+            )
+            .replace("morning-mail", "out-mail");
+        assert!(leave.contains("equals = false"), "{leave}");
+        let made = made_skill::keep(&leave, false, "local:2", &keeping).unwrap();
+        assert_eq!(made.name, "out-mail");
+        assert_eq!(made.uses.grants, ["gmail-write"]);
+        // Without the switch, a service grant is refused; without code on,
+        // the cap refuses a made task step, as before.
+        made_skill::set_agent_services_here(Some(false));
+        assert!(made_skill::keep(&leave, false, "local:3", &keeping).is_err());
+        made_skill::set_agent_services_here(Some(true));
+        made_skill::set_scripts_here(Some(false));
+        assert!(made_skill::keep(&leave, false, "local:4", &keeping).is_err());
+        made_skill::set_scripts_here(None);
+        made_skill::set_agent_services_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 
