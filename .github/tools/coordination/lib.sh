@@ -133,14 +133,19 @@ coord_head() {
 
 # ---- Build inputs and lanes (#5212 parts 2 and 3), shared by behind-unrelated.sh, merge-when-green.sh, lane.sh and
 # train-bot.sh, so "what the ARM64 run takes" is one test everywhere.
-# coord_wf_paths REF WORKFLOW: the pull_request `paths` of .github/workflows/WORKFLOW at REF, one pattern a line (the
-# block list form both workflows use). Prints nothing when it can't be read.
+# coord_wf_paths REF WORKFLOW [KEY]: the pull_request `paths` (or KEY, e.g. `paths-ignore`) of
+# .github/workflows/WORKFLOW at REF, one pattern a line. Prints nothing when it can't be read. 12 Nov (#6556 B, the
+# Reviewer-lead's P3 on #6586): an inline list (`paths-ignore: ['lampOS/**', ...]`, as ci.yml writes it) reads as the
+# block list form does.
 coord_wf_paths() {
-  git show "$1:.github/workflows/$2" 2>/dev/null | awk '
+  git show "$1:.github/workflows/$2" 2>/dev/null | awk -v key="${3:-paths}" '
+    function emit(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); gsub(/^'\''|'\''$/, "", s); gsub(/^"|"$/, "", s); if (s != "") print s }
     /^  pull_request:/ { pr = 1; next }
     pr && /^  [^ #]/ { pr = 0 }
-    pr && /^    paths:/ { p = 1; next }
-    pr && p && /^      - / { s = $0; sub(/^      - /, "", s); sub(/[[:space:]]+#.*$/, "", s); gsub(/^'\''|'\''$/, "", s); gsub(/^"|"$/, "", s); print s; next }
+    pr && $0 ~ ("^    " key ":[[:space:]]*\\[") {
+      s = $0; sub(/^[^[]*\[/, "", s); sub(/\].*$/, "", s); n = split(s, a, ","); for (k = 1; k <= n; k++) emit(a[k]); next }
+    pr && $0 ~ ("^    " key ":[[:space:]]*(#.*)?$") { p = 1; next }
+    pr && p && /^      - / { s = $0; sub(/^      - /, "", s); sub(/[[:space:]]+#.*$/, "", s); emit(s); next }
     pr && p && /^[[:space:]]*(#|$)/ { next }
     pr && p && /^    [^ ]/ { p = 0 }'
 }
@@ -171,26 +176,49 @@ coord_inputs_init() {
 # coord_wf_pats_init REF WORKFLOW: any one workflow's pull_request paths at REF into coord_wf_pats, as
 # coord_inputs_init reads the two. 12 Nov (#6556 B): the train bot reads the paths of a train's red workflow (SDK, doc
 # links, virtual lamp) to find the carried PRs that workflow takes. Empty when they can't be read.
+# 12 Nov (the Reviewer-lead's P3 on #6586): a workflow with only `paths-ignore` (ci.yml's V1 checks) takes a file none
+# of those patterns match: "+" everything, then a "-" for each, so a PR is taken when some changed file is not ignored.
+# A workflow with a pull_request trigger and neither list takes every PR: that names nobody here (empty), so the bot
+# stops for the first builder rather than sit out a whole train.
 coord_wf_pats_init() {
-  local p; typeset -ga coord_wf_pats; coord_wf_pats=()
+  local p ign; typeset -ga coord_wf_pats; coord_wf_pats=()
   for p in ${(f)"$(coord_wf_paths $1 $2)"}; do
     if [[ $p == '!'* ]]; then coord_wf_pats+="-$(coord_glob_re ${p#!})"; else coord_wf_pats+="+$(coord_glob_re $p)"; fi
   done
+  (( ${#coord_wf_pats} )) && return 0
+  ign=(${(f)"$(coord_wf_paths $1 $2 paths-ignore)"}); (( ${#ign} )) || return 0
+  coord_wf_pats=('+^.*$'); for p in $ign; do coord_wf_pats+="-$(coord_glob_re $p)"; done
 }
 # coord_red_jobs SHA LOG: every failed (or timed-out) job of every workflow run on SHA, one "<workflow path> <job name>"
 # a line, with each such job's own log appended to LOG. 12 Nov (#6556 B, train 833): a job's log is served as soon as
 # that job ends, while `gh run view --log-failed` serves nothing until the whole run has, and since #6513 a run's other
 # shards run on after one fails.
+# Returns 3 when any red job's log came back empty (just ended, not served yet), else 0.
 coord_red_jobs() {
-  local r rid rpath j
+  local r rid rpath j one empty=0
   for r in ${(f)"$(gh api "repos/$REPO/actions/runs?head_sha=$1&per_page=50" --jq '.workflow_runs[]|"\(.id) \(.path)"' 2>/dev/null)"}; do
     rid=${r%% *}; rpath=${r#* }; [[ $rid == <-> ]] || continue
     for j in ${(f)"$(gh api "repos/$REPO/actions/runs/$rid/jobs?per_page=100" --paginate --jq '.jobs[]|select(.conclusion=="failure" or .conclusion=="timed_out")|"\(.id) \(.name)"' 2>/dev/null)"}; do
       [[ ${j%% *} == <-> ]] || continue
       print -r -- "$rpath ${j#* }"
-      gh api "repos/$REPO/actions/jobs/${j%% *}/logs" >> $2 2>/dev/null
+      one=$(gh api "repos/$REPO/actions/jobs/${j%% *}/logs" 2>/dev/null)
+      if [[ -n $one ]]; then print -r -- $one >> $2; else empty=1; fi
     done
   done
+  (( empty )) && return 3
+  return 0
+}
+# coord_red_jobs_wait SHA LOG: coord_red_jobs, looked at again while any red job's log came back empty, at most
+# COORD_RED_TRIES looks (default 3) COORD_RED_WAIT_S apart (default 20; the tests set 0); LOG holds the last look's.
+# 12 Nov (the Reviewer-lead's P3 on #6586): one empty log among several used to be read as no failing test named.
+coord_red_jobs_wait() {
+  local i out rc
+  for (( i = 1; i <= ${COORD_RED_TRIES:-3}; i++ )); do
+    : > $2; out=$(coord_red_jobs $1 $2); rc=$?
+    (( rc == 3 && i < ${COORD_RED_TRIES:-3} )) || break
+    sleep ${COORD_RED_WAIT_S:-20}
+  done
+  [[ -n $out ]] && print -r -- $out
   return 0
 }
 # coord_prs_taken REF WORKFLOW PR...: the PRs (of those given) with a file WORKFLOW's pull_request paths at REF take,
@@ -201,6 +229,29 @@ coord_prs_taken() {
   for p in "$@"; do
     for f in ${(f)"$(gh pr diff $p -R $REPO --name-only 2>/dev/null)"}; do coord_takes $f coord_wf_pats && { print -r -- $p; break; }; done
   done
+  return 0
+}
+# coord_sit_out SITOUT CARRIED TOLD WHY PR...: sit each PR out on the head the train carried (CARRIED: "<PR> <head>"
+# lines, written as the train was built), one "<PR> <head>" line in SITOUT, and comment on it once per head, with WHY,
+# keyed in TOLD. 12 Nov (the Reviewer-lead's P3s on #6586): the head fetched after the failure could be a push made
+# while the train ran, which then sat out unseen; and a red virtual lamp (lampos-sim.yml takes lampOS/crates/**) sits
+# out every crate PR, so each one is told why and that a push brings it back. A PR missing from CARRIED is skipped.
+coord_sit_out() {
+  local so=$1 cf=$2 tf=$3 why=$4 p ch; shift 4
+  for p in "$@"; do
+    ch=$(awk -v p=$p '$1 == p { print $2; exit }' $cf 2>/dev/null); [[ -n $ch ]] || continue
+    grep -qx "$p $ch" $so 2>/dev/null || print -r -- "$p $ch" >> $so
+    print -r -- $p
+    grep -qx "$p sitout-told $ch" $tf 2>/dev/null && continue
+    gh pr comment $p -R $REPO --body "Train bot, $(date +%H:%M): $why This PR sits out at ${ch:0:9} with no HOLD, and the next push to it brings it back. If the failure isn't this PR's, a push of the same patch (a rebase onto lamp-voice) is enough." >/dev/null \
+      && print -r -- "$p sitout-told $ch" >> $tf
+  done
+}
+# coord_sitout_trim SITOUT OPEN: keep only SITOUT's lines whose PR is in OPEN ("<PR> <head> ..." lines, the round's open
+# PRs) at that same head, so a closed PR or a pushed one leaves the file.
+coord_sitout_trim() {
+  [[ -s $1 ]] || return 0
+  awk 'NR == FNR { h[$1] = $2; next } ($1 in h) && h[$1] == $2' $2 $1 > $1.new && mv $1.new $1
 }
 # coord_takes FILE ARRAY: does the workflow whose patterns are in ARRAY (coord_inputs_init) take FILE? The last
 # pattern that matches decides, as GitHub's own filter does.
