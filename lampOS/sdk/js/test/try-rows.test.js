@@ -69,11 +69,11 @@ test('the follow, joints, volume and read rows each answer in words, the lamp\'s
   assert.match((await press('volume_mute', { mute: 'on' })).call, /^lamp\.volume\(\{ mute: true \}\) -> \{"level":\d+,"muted":true\}$/);
   assert.match((await press('get', { state: 'light' })).call, /^lamp\.get\("light"\) -> \{"light":/);
   assert.match((await press('body_info')).call, /^lamp\.bodyInfo\(\) -> \{"known":true/);
-  // The air and device reads need their grants: the fake lamp has neither, and says so in the lamp's words.
+  // The air and device reads need their grants: the fake lamp has neither, and the server refuses them as the page draws them (off).
   for (const name of ['air', 'device']) {
     const read = await press(name);
     assert.equal(read.ok, false);
-    assert.match(read.answer, new RegExp(`^no_grant: .*\\b${name}$`));
+    assert.match(read.answer, new RegExp(`^bad_request: n/a: the lamp did not grant ${name}$`));
   }
   const refused = await press('volume_to', { to: 101 });
   assert.equal(refused.ok, false);

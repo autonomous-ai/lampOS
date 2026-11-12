@@ -11,7 +11,7 @@ const until = async (ready) => { for (let i = 0; i < 200 && !ready(); i++) await
 
 test('the speaker row is in the table the page is drawn from', () => {
   assert.ok(row);
-  assert.deepEqual(describe().controls.find((c) => c.id === 'speaker_tone'), { id: 'speaker_tone', group: row.group, label: row.label, fields: [] });
+  assert.deepEqual(describe().controls.find((c) => c.id === 'speaker_tone'), { id: 'speaker_tone', group: row.group, label: row.label, fields: [], needs: ['speaker'] });
 });
 
 test('the speaker row plays 1 s of 440 Hz at -20 dBFS and the log gets the lamp\'s stats and its end', async (t) => {

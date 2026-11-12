@@ -22,6 +22,8 @@ document.head.append(el('style', { textContent: `
   #panel .mark { font-size: 11px; padding: 1px 6px; opacity: .7; } #panel .on-pass { background: #2e7d32; color: #fff; opacity: 1; } #panel .on-fail { background: #c62828; color: #fff; opacity: 1; }
   #panel .note { max-width: 160px; font-size: 11px; }
   #panel .world button { border-style: dashed; }
+  #panel .why { flex-basis: 100%; font-size: 11px; color: #b26a00; margin: -2px 0 2px 2px; }
+  #panel button:disabled { opacity: .5; cursor: not-allowed; }
   #panel .hint { flex-basis: 100%; font-size: 11px; color: var(--soft); margin: -2px 0 2px 2px; }
   #panel img.shot { flex-basis: 100%; max-width: 320px; border-radius: 6px; border: 1px solid var(--line); }
   #events { height: 220px; overflow: auto; font: 12px/1.35 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; white-space: pre-wrap; }
@@ -31,9 +33,9 @@ document.head.append(el('style', { textContent: `
 // The lamp's own names and the table of buttons, from the server.
 const table = await (await fetch(`/try.json${location.search}`)).json();
 // The checklist (checklist.js, asked for with the page's own query: the token), kept in this origin's localStorage.
-const { keyFor, openChecklist, exportChecklist, rowsOf, visible } = await import(`/checklist.js${location.search}`);
+const { keyFor, openChecklist, exportChecklist, rowsOf, tickable } = await import(`/checklist.js${location.search}`);
 const rows = rowsOf(table);
-const checklist = openChecklist({ storage: (() => { try { return window.localStorage; } catch { return null; } })(), key: keyFor(table.lamp.id, table.mode), rowIds: rows.map((r) => r.id) });
+const checklist = openChecklist({ storage: (() => { try { return window.localStorage; } catch { return null; } })(), key: keyFor(table.lamp.id, table.mode), rowIds: tickable(rows) });
 const ticked = el('span', { id: 'ticked' });
 const refresh = [];
 const showCount = () => { const { ticked: n, of } = checklist.count(); ticked.textContent = `${n} of ${of} ticked`; };
@@ -91,9 +93,21 @@ function row(entry, kind) {
   const values = () => Object.fromEntries(inputs.map(([field, node]) => [field.name, field.type === 'number' ? Number(node.value) : node.value]));
   const children = inputs.map(([field, node]) => (field.type === 'text' ? node : el('label', {}, field.label ?? field.name, node)));
   const node = el('div', { className: 'row' });
-  children.push(el('button', { textContent: entry.label, onclick: () => { rowOf.set(counter + 1, node); send({ type: kind, id: ++counter, name: entry.id, args: values() }); } }));
+  children.push(el('button', {
+    textContent: entry.label,
+    disabled: Boolean(entry.disabled),
+    onclick: () => {
+      rowOf.set(counter + 1, node);
+      send({ type: kind, id: ++counter, name: entry.id, args: values() });
+    },
+  }));
   // What the row does that its label does not say, under it (textContent: never markup).
   if (typeof entry.hint === 'string') children.push(el('div', { className: 'hint', textContent: entry.hint }));
+  // A row the lamp or the run cannot do: drawn, off, with its reason, and no PASS/FAIL (it is n/a in the export).
+  if (entry.disabled) {
+    node.append(...children, el('div', { className: 'why', textContent: `n/a: ${entry.disabled}` }));
+    return node;
+  }
   node.append(...children, ...marks(`${kind === 'stim' ? 'stim' : 'call'}:${entry.id}`));
   return node;
 }
@@ -103,8 +117,6 @@ function section(entries, kind) {
   const nodes = [];
   let group;
   for (const entry of entries) {
-    // Drawn exactly when the checklist counts it (checklist.js `visible`).
-    if (!visible(table, entry)) continue;
     if (entry.group !== group) { group = entry.group; nodes.push(el('h3', { textContent: group })); }
     nodes.push(row(entry, kind));
   }
