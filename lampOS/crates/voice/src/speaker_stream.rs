@@ -15,9 +15,11 @@
 //! says `{"event":"stats",...}` once a second; the computer's door ends a
 //! stream by closing the connection, which the voice answers `dropped`.
 //!
-//! This step reads the sound and counts it (`blocks`, `lost`, `stray` in the
-//! stats line) and plays nothing: playing is the speaker worker's, by the
-//! voice's own path, in the step after. So it is off unless
+//! The sound is read off the bus into a [`Feed`] the voice plays as a turn of
+//! the lamp's own (`SpeechOrigin::ComputerStream`): the speaker takes it in
+//! chunks of 240 samples after a prefill, bounded at 300 ms of held sound,
+//! and the last chunk is faded when its computer closes the connection. The
+//! stats line says `blocks`, `lost` and `stray` once a second. It is off unless
 //! `LAMP_SPEAKER_STREAM=on`; off, a stream is refused with the words a voice
 //! from before it gives, "this lamp's voice does not take a stream".
 //!
@@ -27,9 +29,11 @@ use crate::say::{Answer, Cancel, Outcome, asker_went};
 use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::Audio;
 use std::{
+    collections::VecDeque,
     io::{self, Write},
     os::unix::net::UnixStream,
     sync::{
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
         mpsc,
     },
@@ -65,6 +69,114 @@ pub fn set(on: bool) {
 /// Whether the voice takes streams.
 pub fn on() -> bool {
     ON.load(Ordering::Relaxed)
+}
+
+/// The speaker's chunk, in samples: 10 ms at 24 kHz, as a lamp's own sound is
+/// handed to the speaker worker.
+pub const CHUNK: usize = 240;
+/// The sound held before the first chunk goes, so a block late by a few
+/// milliseconds is not heard as a gap: 120 ms.
+const PREFILL: usize = 2_880;
+/// The most sound held for the speaker, the jitter buffer the door is told
+/// of ([`BUFFER_MS`]): 300 ms. Sound past it is dropped, newest first, and
+/// counted: a computer that sends faster than real time loses sound, never
+/// the lamp's memory.
+const MOST_HELD: usize = 7_200;
+
+/// A stream's sound on its way to the speaker: the client's thread puts what
+/// it reads off the bus in, the voice's speaker handoff takes it out in
+/// [`CHUNK`]s ([`crate::coordinator`]'s sound path). Closed, what is left
+/// plays out and ends with one chunk faded to nothing.
+#[derive(Debug, Default)]
+pub struct Feed {
+    state: Mutex<Held>,
+}
+
+#[derive(Debug, Default)]
+struct Held {
+    samples: VecDeque<i16>,
+    closed: bool,
+    started: bool,
+    finished: bool,
+    dropped: u64,
+}
+
+/// A feed is its own: two are equal only if they are the same one.
+impl PartialEq for Feed {
+    fn eq(&self, other: &Self) -> bool {
+        std::ptr::eq(self, other)
+    }
+}
+
+impl Eq for Feed {}
+
+impl Feed {
+    pub fn new() -> Arc<Self> {
+        Arc::default()
+    }
+
+    fn held(&self) -> std::sync::MutexGuard<'_, Held> {
+        self.state
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// Sound read off the bus; what does not fit is dropped and counted.
+    pub fn push(&self, block: &[i16]) {
+        let mut held = self.held();
+        let room = MOST_HELD.saturating_sub(held.samples.len());
+        held.samples.extend(&block[..block.len().min(room)]);
+        held.dropped += block.len().saturating_sub(room) as u64;
+    }
+
+    /// No more sound comes: what is held plays out.
+    pub fn close(&self) {
+        self.held().closed = true;
+    }
+
+    /// Whether a chunk may go to the speaker now: a whole one is held (the
+    /// first only after the prefill), or the stream is closed and its end
+    /// has not gone yet.
+    pub fn ready(&self) -> bool {
+        let held = self.held();
+        if held.finished {
+            return false;
+        }
+        held.closed || held.samples.len() >= if held.started { CHUNK } else { PREFILL }
+    }
+
+    /// The next chunk and whether it is the last: always [`CHUNK`] samples,
+    /// padded with silence at the end, and the last faded to nothing.
+    pub fn take(&self) -> Option<(Vec<i16>, bool)> {
+        let mut held = self.held();
+        let ready = !held.finished
+            && (held.closed || held.samples.len() >= if held.started { CHUNK } else { PREFILL });
+        if !ready {
+            return None;
+        }
+        let count = held.samples.len().min(CHUNK);
+        let mut chunk: Vec<i16> = held.samples.drain(..count).collect();
+        chunk.resize(CHUNK, 0);
+        held.started = true;
+        let last = held.closed && held.samples.is_empty();
+        if last {
+            held.finished = true;
+            for (at, sample) in chunk.iter_mut().enumerate() {
+                *sample = (i32::from(*sample) * (CHUNK - at) as i32 / CHUNK as i32) as i16;
+            }
+        }
+        Some((chunk, last))
+    }
+
+    /// Whether the last chunk has gone.
+    pub fn finished(&self) -> bool {
+        self.held().finished
+    }
+
+    /// Sound dropped for want of room.
+    pub fn dropped(&self) -> u64 {
+        self.held().dropped
+    }
 }
 
 /// What a stream has taken in so far.
@@ -122,8 +234,10 @@ pub(crate) fn hold_with(
 ) {
     let _ = stream.set_write_timeout(Some(WRITE_WITHIN));
     let mut bus = Some(bus);
+    let mut feed: Option<Arc<Feed>> = None;
     let mut sound: Option<Sound> = None;
     let mut last_said = Instant::now();
+    let mut closed = false;
     let outcome = loop {
         match answered.recv_timeout(LOOK) {
             Ok(Answer::Begun(_)) => {
@@ -154,20 +268,35 @@ pub(crate) fn hold_with(
                     }
                 }
             }
+            Ok(Answer::Stream(taken)) => {
+                // Its computer may have closed before the feed came.
+                if closed {
+                    taken.close();
+                }
+                feed = Some(taken);
+            }
             Ok(Answer::Done(outcome)) => break outcome,
             Ok(_) | Err(mpsc::RecvTimeoutError::Timeout) => {}
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 break Outcome::Dropped("the voice has gone".into());
             }
         }
-        if !cancel.load(Ordering::Acquire) && asker_went(&stream) {
-            cancel.store(true, Ordering::Release);
+        // Its computer closing the connection ends the sound, not cuts it:
+        // the feed is closed with no cancel, so what is held plays out, its
+        // last chunk faded, and the voice answers `spoken` (a cancel would
+        // cut the turn at once, the held sound dropped).
+        if !closed && asker_went(&stream) {
+            closed = true;
+            if let Some(feed) = feed.as_ref() {
+                feed.close();
+            }
         }
         if let Some(sound) = sound.as_mut() {
-            if sound.take_in().is_err() {
+            // Blocks that come after the close are not played.
+            if sound.take_in(feed.as_deref().filter(|_| !closed)).is_err() {
                 cancel.store(true, Ordering::Release);
                 break Outcome::Dropped("the voice lost the sound's bus".into());
-            } else if last_said.elapsed() >= stats_every {
+            } else if !closed && last_said.elapsed() >= stats_every {
                 last_said = Instant::now();
                 let counts = sound.counts;
                 if writeln!(
@@ -204,8 +333,8 @@ impl Sound {
         })
     }
 
-    /// Takes in every block the bus has now, none waited for.
-    fn take_in(&mut self) -> io::Result<()> {
+    /// Takes in every block the bus has now, none waited for, into `feed`.
+    fn take_in(&mut self, feed: Option<&Feed>) -> io::Result<()> {
         while let Some(message) = self.blocks.recv(Duration::ZERO)? {
             let usable = message.header.source == SOURCE
                 && Audio::split(&message.payload).is_ok_and(|(header, bytes)| {
@@ -217,6 +346,13 @@ impl Sound {
             if usable {
                 self.counts.blocks += 1;
                 self.counts.lost += message.gap;
+                if let (Some(feed), Ok((_, bytes))) = (feed, Audio::split(&message.payload)) {
+                    let samples: Vec<i16> = bytes
+                        .chunks_exact(2)
+                        .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+                        .collect();
+                    feed.push(&samples);
+                }
             } else {
                 self.counts.stray += 1;
             }
@@ -358,28 +494,114 @@ mod tests {
     }
 
     #[test]
-    fn a_closed_connection_is_the_computers_cancel_and_the_voice_ends_it() {
+    fn a_closed_connection_closes_the_feed_without_a_cancel_so_what_is_held_plays_out() {
         let _turn = ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let (bus, dir) = temp_bus("close");
         let (answer, cancel, mut said, computer, served) = held(bus);
+        let feed = Feed::new();
         answer.send(Answer::Begun(1)).unwrap();
+        answer.send(Answer::Stream(Arc::clone(&feed))).unwrap();
         assert_eq!(line(&mut said)["state"], "open");
+        feed.push(&vec![1000i16; 500]);
         drop((said, computer));
         let began = Instant::now();
-        while !cancel.load(Ordering::Acquire) {
+        while !feed.ready() {
             assert!(
                 began.elapsed() < Duration::from_secs(2),
                 "the close was not seen"
             );
             thread::sleep(Duration::from_millis(5));
         }
-        // The voice reads the cancel and answers; the thread ends.
-        answer
-            .send(Answer::Done(Outcome::Dropped("closed".into())))
-            .unwrap();
+        // Closed, not cancelled: a cancel would cut the turn and drop what
+        // is held, with no fade, and the answer would never be `spoken`.
+        assert!(!cancel.load(Ordering::Acquire));
+        // The stats line is not written to the closed socket: several ticks
+        // (50 ms here) later it is still no cancel.
+        thread::sleep(Duration::from_millis(400));
+        assert!(!cancel.load(Ordering::Acquire));
+        // All 500 held samples come out as chunks, the last one faded.
+        let mut chunks = 0;
+        while let Some((_, last)) = feed.take() {
+            chunks += 1;
+            if last {
+                break;
+            }
+        }
+        assert_eq!(chunks, 3);
+        assert!(feed.finished());
+        // The voice answers once it has played out; the thread ends.
+        answer.send(Answer::Done(Outcome::Spoken)).unwrap();
         served.join().unwrap();
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_feed_that_comes_after_the_close_is_closed_too() {
+        let _turn = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (bus, dir) = temp_bus("late-feed");
+        let (answer, cancel, said, computer, served) = held(bus);
+        drop((said, computer));
+        thread::sleep(Duration::from_millis(300));
+        let feed = Feed::new();
+        answer.send(Answer::Stream(Arc::clone(&feed))).unwrap();
+        let began = Instant::now();
+        while !feed.ready() {
+            assert!(
+                began.elapsed() < Duration::from_secs(2),
+                "the late feed was not closed"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        assert!(!cancel.load(Ordering::Acquire));
+        answer.send(Answer::Done(Outcome::Spoken)).unwrap();
+        served.join().unwrap();
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_feed_holds_the_prefill_chunks_what_fits_and_ends_faded_at_its_close() {
+        let feed = Feed::new();
+        // Under the prefill nothing goes, not even a whole chunk.
+        feed.push(&vec![1000i16; PREFILL - 1]);
+        assert!(!feed.ready() && feed.take().is_none());
+        feed.push(&[1000]);
+        assert!(feed.ready());
+        // Whole chunks of 240 samples, none last while the stream is open.
+        let (chunk, last) = feed.take().unwrap();
+        assert_eq!((chunk.len(), last, chunk[0]), (CHUNK, false, 1000));
+        // Past the most held, the rest is dropped and counted.
+        feed.push(&vec![1000i16; MOST_HELD]);
+        assert!(feed.dropped() > 0);
+        // Once started, a single chunk is enough; fewer than one waits.
+        let held = {
+            let mut taken = 0;
+            while feed.take().is_some_and(|(_, last)| !last) {
+                taken += 1;
+                if !feed.ready() {
+                    break;
+                }
+            }
+            taken
+        };
+        assert!(held > 0);
+        feed.push(&[500; 100]);
+        assert!(
+            !feed.ready(),
+            "a part of a chunk waits while the stream is open"
+        );
+        // Closed, the rest plays out, padded, the last chunk faded to nothing.
+        feed.close();
+        let (chunk, last) = feed.take().unwrap();
+        assert!(last && feed.finished());
+        assert_eq!(chunk.len(), CHUNK);
+        assert!(chunk[0] > 0 && chunk[99] > 0 && chunk[CHUNK - 1] == 0);
+        assert!(
+            !feed.ready() && feed.take().is_none(),
+            "nothing after the last"
+        );
     }
 }

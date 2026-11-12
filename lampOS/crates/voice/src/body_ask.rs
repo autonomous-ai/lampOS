@@ -183,7 +183,7 @@ fn say(asks: &OwnAsks, line: &str) {
             let outcome = loop {
                 match answered.recv() {
                     Ok(Answer::Done(outcome)) => break outcome.line(),
-                    Ok(Answer::Begun(_) | Answer::BegunTurn { .. }) => {}
+                    Ok(Answer::Begun(_) | Answer::BegunTurn { .. } | Answer::Stream(_)) => {}
                     Err(_) => break "the voice has gone".into(),
                 }
             };
