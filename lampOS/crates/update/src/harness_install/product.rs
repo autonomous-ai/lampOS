@@ -83,6 +83,7 @@ pub struct Manifest {
 /// The Node runtime's, tmux's, grid's and hn's manifests, as Harness's CDN
 /// had them when [`INSTALLER`] was copied. Each names its files by their
 /// sha256, which the installer checks.
+// The origins stay on storage.googleapis.com: never fetched on a lamp, they must match the pinned installer's defaults; the files these manifests name still link there too (#6414, #6256 B5).
 pub const MANIFESTS: [Manifest; 4] = [
     Manifest {
         env: "HARNESS_RUNTIME_METADATA_URL",
