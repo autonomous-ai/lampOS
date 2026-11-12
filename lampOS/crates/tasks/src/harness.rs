@@ -96,6 +96,8 @@ const ENVIRONMENT: &[&str] = &[
     // Where Harness finds the lamp's own OpenClaw's sessions
     // (`LAMP_OPENCLAW_ON_LAMP`, crate::hold::OPENCLAW_STATE_DIR, #6226).
     crate::hold::OPENCLAW_STATE_DIR,
+    // The grid a held lamp keeps pinned (`crate::hold::GRID_BIN`, #6283).
+    crate::hold::GRID_BIN,
     // How Harness reads the engine's launch environment: `lampos` has a
     // nologin shell, so the hold gives it `/bin/sh` (crate::hold::SHELL).
     crate::hold::SHELL,
