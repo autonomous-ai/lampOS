@@ -6781,6 +6781,19 @@ fn conversation_with_gate_inner(
     // twentieths of the detector's score, the level, and whether the floor
     // turned the block away. Numbers only.
     let mut judged_blocks: VecDeque<(u8, u8, bool)> = VecDeque::new();
+    // The lamp's name heard in a line the faint floor turned away, said in
+    // one log line a hearing (#5540): only with the floor and the bus, read
+    // as its own subscriber so that no rule's reading of `name/heard` moves.
+    let mut faint_named = crate::faint_named::FaintNamed::default();
+    let mut faint_names_in = room_floor
+        .is_some()
+        .then(|| {
+            crate::bus_out::NameIn::from_environment_as(
+                lamp_msgs::NameHeard::TOPIC,
+                crate::faint_named::SUBSCRIBER,
+            )
+        })
+        .flatten();
     let mut turn_blocks: Vec<u8> = Vec::new();
     let mut loose_blocks: VecDeque<(u64, u8)> = VecDeque::new();
     let mut floor_turn: Option<u64> = None;
@@ -9603,6 +9616,15 @@ fn conversation_with_gate_inner(
                 heard_level,
                 under_floor,
             ));
+            if faint_names_in.is_some() {
+                faint_named.block(
+                    frame.read_completed_at_us,
+                    frame.probability,
+                    heard_level,
+                    faint,
+                    under_floor,
+                );
+            }
             let probability = if keeping_answer || under_floor {
                 0.0
             } else {
@@ -12385,6 +12407,14 @@ fn conversation_with_gate_inner(
                     "score":score,"sounding":sounding,"yields":yields}),
             )?;
             stop_began_us = stop_began_us.max(Some(began));
+        }
+        // The name heard in a line the faint floor turned away: one log
+        // line a hearing, nothing else (#5540).
+        if let Some(names) = faint_names_in.as_mut()
+            && let Some((began, score)) = names.newest_scored(clock)
+            && let Some(line) = faint_named.named(began, clock, score)
+        {
+            eprintln!("{line}");
         }
         if let Some(names) = name_in.as_mut()
             && let Some((began, score)) = names.newest_scored(clock)
