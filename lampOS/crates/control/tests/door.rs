@@ -3217,20 +3217,27 @@ impl session::Parts for Speaking {
 
 struct OpenVoice;
 
-struct OpenStream;
+/// The streams of the fake voice that were told to cut the sound now, by the
+/// computer that asked for them (a plain close is not in it).
+static CUT: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+struct OpenStream(String);
 
 impl lamp_control::speaker::Stream for OpenStream {
     fn poll(&mut self) -> Option<lamp_control::speaker::Note> {
         None
+    }
+    fn cancel(&mut self) {
+        CUT.lock().unwrap().push(self.0.clone());
     }
 }
 
 impl lamp_control::speaker::Voice for OpenVoice {
     fn open(
         &self,
-        _: &str,
+        by: &str,
     ) -> Result<Box<dyn lamp_control::speaker::Stream>, lamp_control::protocol::Error> {
-        Ok(Box::new(OpenStream))
+        Ok(Box::new(OpenStream(by.to_owned())))
     }
 }
 
@@ -3507,4 +3514,36 @@ async fn a_second_speaker_stream_replaces_the_first_and_the_door_still_answers()
     assert!(clients["clients"].is_array(), "{clients}");
     assert!(speaker.streaming(clients["clients"][0]["id"].as_str().unwrap()));
     finished.store(true, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// A computer's explicit `off` asks the voice for silence (its stop line),
+/// through the real door; a connection that only closes does not.
+#[tokio::test]
+async fn a_speaker_stream_off_through_the_door_tells_the_voice_to_cut_the_sound() {
+    let (lamp, _blocks, _speaker) = speaking_lamp("speaker-off-cuts").await;
+    let mut socket = paired(&lamp, json!(["speaker"]), 11).await;
+    let clients = admin(&lamp, json!({"clients": true})).await;
+    let client = clients["clients"][0]["id"].as_str().unwrap().to_owned();
+    let on = send(
+        &mut socket,
+        json!({"id": 3, "op": "speaker.stream", "on": true, "sample_rate": 24000}),
+    )
+    .await;
+    assert_eq!(on["ok"], true, "{on}");
+    let off = send(
+        &mut socket,
+        json!({"id": 4, "op": "speaker.stream", "on": false}),
+    )
+    .await;
+    assert_eq!(off["stream"], "off");
+    for _ in 0..100 {
+        if CUT.lock().unwrap().contains(&client) {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    }
+    panic!(
+        "the voice was not told to cut the sound: {client} not in {:?}",
+        CUT.lock().unwrap()
+    );
 }

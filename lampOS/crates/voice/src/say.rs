@@ -2769,7 +2769,7 @@ fn watch_for_cancel(stream: &UnixStream, rest: Vec<u8>, cancel: Cancel) -> Optio
 
 /// Whether a later line is the asker's cancel: an object whose `cancel` is
 /// `true`.
-fn is_cancel(line: &[u8]) -> bool {
+pub(crate) fn is_cancel(line: &[u8]) -> bool {
     serde_json::from_slice::<serde_json::Value>(line)
         .is_ok_and(|said| said.get("cancel") == Some(&serde_json::Value::Bool(true)))
 }
