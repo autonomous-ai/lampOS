@@ -12719,7 +12719,7 @@ fn thread_and_history_summed(
     withheld: Option<&str>,
     room_lines: bool,
     said_once: bool,
-    summary: impl FnOnce(Option<&str>, Instant, usize) -> (String, Option<u64>),
+    summary: impl FnOnce(Option<&str>, Instant, usize) -> (String, Option<crate::thread::NoteVersion>),
 ) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
@@ -22146,7 +22146,11 @@ mod tests {
     }
 
     /// No running summary, no note: for [`thread_and_history_summed`].
-    fn no_summary(_: Option<&str>, _: Instant, _: usize) -> (String, Option<u64>) {
+    fn no_summary(
+        _: Option<&str>,
+        _: Instant,
+        _: usize,
+    ) -> (String, Option<crate::thread::NoteVersion>) {
         (String::new(), None)
     }
 

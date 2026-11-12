@@ -1198,3 +1198,68 @@ fn folded_exchanges_come_back_when_their_note_is_not_told() {
         None
     );
 }
+
+/// #6218, the reviewer-lead's P3 on #6474: a turn reads note n of a
+/// lineage; the summary worker then keeps n+1 of the same lineage and folds
+/// its batch before the turn takes the thread's lock. That batch is in
+/// neither the note the turn tells nor out of its history: it stays told,
+/// and only the batch of the version told is left out.
+#[test]
+fn a_batch_folded_after_the_note_was_read_stays_told() {
+    let tom = Some("tom");
+    let start = Instant::now();
+    let summaries = own_summaries();
+    let thread = Mutex::new(Thread::new());
+    numbered(&mut thread.lock().unwrap(), 1, 11, tom, start);
+    let due = thread.lock().unwrap().summary_due(KEEP_VERBATIM, start);
+    for due in due {
+        summarize_now_folding(
+            summaries,
+            &thread,
+            due.whose,
+            due.exchanges,
+            &folding,
+            start,
+        );
+    }
+    numbered(&mut thread.lock().unwrap(), 12, 18, tom, start);
+    // The turn reads note n.
+    let (note, told) = told_with_lineage_from(summaries, tom, start, 64 * 1024);
+    assert!(
+        note.contains("line 07") && !note.contains("line 08"),
+        "{note}"
+    );
+    // The worker keeps n+1 of the same lineage and folds its batch.
+    let due = thread.lock().unwrap().summary_due(KEEP_VERBATIM, start);
+    for due in due {
+        summarize_now_folding(
+            summaries,
+            &thread,
+            due.whose,
+            due.exchanges,
+            &folding,
+            start,
+        );
+    }
+    let (newer, after) = told_with_lineage_from(summaries, tom, start, 64 * 1024);
+    assert!(newer.contains("line 14"), "{newer}");
+    assert_eq!(told.unwrap().0, after.unwrap().0, "the same lineage");
+    // The turn now takes the thread's lock with note n.
+    let lines = thread
+        .lock()
+        .unwrap()
+        .recall_after_note(tom, start, 64 * 1024, told)
+        .unwrap_or_default();
+    for request in 1..=7 {
+        assert!(!lines.contains(&format!("line {request:02}")), "{lines}");
+    }
+    for request in 8..=18 {
+        assert!(
+            lines.contains(&format!("line {request:02}")),
+            "{request}: {lines}"
+        );
+    }
+    // A turn told n+1 leaves both batches out.
+    let (_, lines) = told_after_note(summaries, &thread, tom, start);
+    assert_eq!(lines.matches("You: ").count(), 4, "{lines}");
+}

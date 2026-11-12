@@ -2173,8 +2173,8 @@ order is kept. A written turn is the same from the chat on.
   exchanges the note was made from are still in both. With the switch,
   those exchanges are left out of the thread's lines and the history,
   their kept calls with them, but only once the job that gave them had its
-  note kept (`Thread::folded`), and only while that note (its lineage) is
-  the one told: a dropped, failed, empty or forgotten job, or no note told,
+  note kept (`Thread::folded`), and only while that note (its lineage, at
+  the version they were folded into or a later one) is the one told: a dropped, failed, empty or forgotten job, or no note told,
   leaves every exchange told as before. The same newest exchanges are
   chosen, then the folded leave; the room's lines told to a person stay;
   a withheld name is taken out as before. The mark is RAM only, as the
