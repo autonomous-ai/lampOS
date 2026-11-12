@@ -177,7 +177,8 @@ Keys of a trigger:
 
 A `[[while]]` condition takes `topic`, `field`, `equals`, `not_equals`,
 `above`, `below`, `for`, `present = true` or `faces_at_most` (1 to 8) on
-`humans/faces/tracked`, `unknown = "holds"`, and `through` with
+`humans/faces/tracked`, `unknown = "holds"` or `unknown = "holds_stale"`
+(#6543: also holds on a value that has run out), and `through` with
 `broken_by`.
 
 ### Steps: the actions
