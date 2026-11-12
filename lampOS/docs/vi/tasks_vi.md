@@ -1004,6 +1004,10 @@ hay phát có khoảng trống vẫn gửi, miễn lời đã bắt đầu phát
 lời nào (không có âm thanh, hoặc chỉ có thông báo lỗi) thì không gửi, và
 harness để mở.
 
+Trong `tasks_now`, `told` của một việc đã xong nghĩa là tin của nó **đã bắt
+đầu** được kể, nghe trọn hay không (first builder, 23:14 trên #6059); việc
+nghe trọn chỉ quyết định có kể lại hay không (`LAMP_TASK_NEWS_RETELL`).
+
 - **Nghe trọn không còn quyết định việc đóng:** trên một đèn ngày 12/11, việc
   18 idle lúc 21:21:26, tin phát 21:21:32 đến 35 có khoảng trống
   (`audio_written_with_playback_gaps_unscored`, "was not heard whole: its
