@@ -312,6 +312,10 @@ pub struct Services<H, M> {
     /// whose `tools.json` names only the linked services, written again on
     /// each link, unlink and wipe ([`crate::tools::write_linked`]).
     pub linked_tools: Option<(std::path::PathBuf, crate::tools::Edits)>,
+    /// Held from reading what is linked to the file's rename, so admin
+    /// calls on other threads never write a list older than one already
+    /// written, nor share the temporary file (Jarvis's P3 on #6476).
+    linked_tools_write: Mutex<()>,
 }
 
 /// What a call to a service not linked is told, after its name: and where
@@ -418,6 +422,7 @@ impl<H: Http, M: Mail> Services<H, M> {
             calendar_edits: false,
             draft_edits: false,
             linked_tools: None,
+            linked_tools_write: Mutex::new(()),
             desk: Desk::default(),
         }
     }
@@ -661,6 +666,11 @@ impl<H: Http, M: Mail> Services<H, M> {
         let Some((dir, edits)) = &self.linked_tools else {
             return;
         };
+        // A poisoned lock still guards the write: the file is whole either way.
+        let _writing = self
+            .linked_tools_write
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let linked: Vec<String> = self
             .store
             .list(crate::now_secs())
@@ -3165,6 +3175,38 @@ mod tests {
             json!({"ok":true})
         );
         assert_eq!(std::fs::read_dir(dir.path().join("s")).unwrap().count(), 0);
+    }
+
+    /// Jarvis's P3 on #6476: writes from the admin socket's threads at once
+    /// each read what is linked and write it whole, one at a time, so the
+    /// file is never torn and the last one names what is linked.
+    #[test]
+    fn writes_of_the_voices_tools_at_once_leave_one_whole_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let tools_dir = dir.path().join("t");
+        std::fs::create_dir_all(&tools_dir).unwrap();
+        let services = services(dir.path(), "{}", false)
+            .with_linked_tools(tools_dir.clone(), crate::tools::Edits::default());
+        run(services.admin(&set_line(
+            "github",
+            json!({"auth_type":"oauth","access_token":"t"}),
+        )));
+        std::thread::scope(|threads| {
+            for _ in 0..8 {
+                threads.spawn(|| {
+                    for _ in 0..25 {
+                        services.write_linked_tools();
+                    }
+                });
+            }
+        });
+        let file = std::fs::read_to_string(tools_dir.join(crate::tools::CATALOG_FILE)).unwrap();
+        let catalog: Value = serde_json::from_str(&file).unwrap();
+        assert_eq!(
+            catalog["tools"][1]["parameters"]["properties"]["service"]["enum"],
+            json!(["github"])
+        );
+        assert!(!tools_dir.join(".tools.json").exists());
     }
 
     /// With `LAMP_SERVICES_LINKED_TOOLS=on` (#6218), the voice's tools name
