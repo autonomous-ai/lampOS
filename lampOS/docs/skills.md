@@ -2910,8 +2910,14 @@ gone ([switches.md](switches.md)). What happens:
      finds the kept skill on the lamp of that name, a number said in
      words matching its digits either way ("lamp test email two" finds
      `lamp-test-email-2`, zero to ninety-nine, `made_skill::name_digits`;
-     a skill's task is asked again by its digits when the name as said
-     has none). Not approved for what
+     the exact name first, so "skill two" with `skill-2` and `skill-two`
+     both on reads back `skill-two`; two on that match only so, neither the
+     name said (`room-1-light-two` and `room-one-light-2` for "room one
+     light two"), sound the same said back, so the voice says how each is
+     written and asks which, `SKILLS_ALIKE`, naming none to a line the
+     owner may not hear, `made_skill::kept_on_alike`; a skill's task is
+     asked again by its digits when the name as said has none). Not
+     approved for what
      it sends now, as `lamp-services` tells it (`skill_writes_approved`,
      the voice's own call, which approves nothing; not told counts as not
      approved), its make's own line (`made_skill::on_line`, "I made leaving
