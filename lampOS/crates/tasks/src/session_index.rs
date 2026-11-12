@@ -11,7 +11,8 @@
 //! whole beside it and renamed over it (mode 0600, never through a link),
 //! and removed by the owner's "forget everything" (`forget_sessions`, on
 //! the voice's route). Harness read as signed out lets the account
-//! machines' sessions go and keeps those on this computer's own id
+//! machines' sessions go and keeps those on this computer's own id, and a
+//! read of the account's machines lets an unpaired machine's go
 //! ([`forget_machines`]). A hand-over or look still running when the
 //! forget comes may keep its one session again after it: that is a use
 //! after the forget, as any later one is. Each change reads the file, changes it and writes it
@@ -131,9 +132,9 @@ pub fn drop_id(file: &Path, machine: &str, id: &str) {
     });
 }
 
-/// Harness signed out (the Reviewer-lead's P3 on #6447): the sessions kept
-/// on machines `keep` refuses let go, as the next sign-in may be another
-/// account's. Written only when one went.
+/// Harness signed out, or a machine unpaired (the P3s on #6447): the
+/// sessions kept on machines `keep` refuses let go. Written only when one
+/// went.
 pub fn forget_machines(file: &Path, keep: impl Fn(&str) -> bool) {
     change(file, |index| {
         let before = index.machines.len();

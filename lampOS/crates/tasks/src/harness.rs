@@ -2908,7 +2908,20 @@ impl Cli {
         if !reply.success {
             return Err("machines_failed".into());
         }
-        parse_machines(&reply.stdout).map_err(str::to_string)
+        let listed = parse_machines(&reply.stdout).map_err(str::to_string)?;
+        self.index_unpaired(&listed);
+        Ok(listed)
+    }
+
+    /// A read of the account's machines (Thirteen's P3 on #6447): the index
+    /// lets a machine no longer listed go, unpaired in the app, and keeps
+    /// the listed ones and this computer's own id.
+    fn index_unpaired(&self, listed: &[AccountMachine]) {
+        if let Some(file) = &self.config.session_index {
+            crate::session_index::forget_machines(file, |machine| {
+                this_computer(machine) || listed.iter().any(|one| one.machine_id == machine)
+            });
+        }
     }
 
     /// Start Harness's daemon (`harness start`; with `harness service
