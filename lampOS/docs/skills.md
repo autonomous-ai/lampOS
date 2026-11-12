@@ -3105,7 +3105,7 @@ gone ([switches.md](switches.md)). What happens:
      `made_skill::RUNS_AFTER_YES`; no "yes" in it). The line is "I made
      photo booth: …", never "it's on"; the app's `uses` carry `code` and
      `grants`.
-   - **Never on at once.** `made_skill::put_on` refuses it and keeps why
+   - **Never on at once** (unless `LAMP_MADE_CODE_ON_AT_ONCE=on`, below). `made_skill::put_on` refuses it and keeps why
      (`made_skill::CODE_BY_VOICE`), so the app's `made` answer stays
      `not_kept`, why "it couldn't be put on: a skill that runs its own code
      goes on only once you agree to it out loud at the lamp, after it says
@@ -3158,6 +3158,49 @@ gone ([switches.md](switches.md)). What happens:
      A turn cut before the say-back says `made_skill::cut_code_line` ("… so
      it isn't on."), and nothing waits. A skill made with code that is
      still off has no read-back yet.
+   - **On at once, with `LAMP_MADE_CODE_ON_AT_ONCE=on`** (the owner's ask
+     here in chat: a made skill goes on at once, and whether it worked or
+     not the lamp just says so, with no confirming; `on` only, off unless
+     set, in no product unit; in `lamp-voice` passed to both routes, read
+     only with `LAMP_MADE_SCRIPTS=on`, `made_skill::code_on_at_once`). The
+     first builder's ruling on #6059 (19:14) draws the line
+     (`made_skill::code_goes_on_at_once`): code whose grants are only its
+     light, the kinds of sound it hears or its head and arm
+     (`made_skill::CODE_AT_ONCE_GRANTS`: `light`, `sound`, `body`; a timer
+     is a trigger and needs no grant) goes on at once; code with any other
+     grant, the camera or the microphone above all
+     (`made_skill::CODE_YES_GRANTS`), or any send (a write, messages to the
+     phone) keeps its spoken yes exactly as with the switch off. Such a
+     make, by voice or from the app's MAKE IT
+     (`app_make::put_on_line`), goes on as it is made, through the yes's
+     own path (`make_skill_local::code_on_at_once`, then `code_on_here`
+     and `code_approve`): exactly that package by its SHA-256
+     (`made_skill::put_on_agreed`, the manage helper's same pack checks
+     and cap), then, with `LAMP_SKILL_TASKS=on`, its task's yes recorded
+     by lamp-control (`task_yes_record`) for its folder as it went on and
+     the grants said, as a spoken yes records it, so its first run asks
+     nothing. It is said as made and on, what it does and what its code
+     may use, the code itself never read out ("I made photo booth, and
+     it's on: … The lamp's model wrote its code, and that code may use
+     its light."; `made_skill::code_said` without `RUNS_AFTER_YES`); a
+     task not kept adds "But this lamp doesn't run its code yet."
+     (`made_skill::CODE_RUNS_NOWHERE_YET`). Nothing waits: no yes, no
+     `approve_id`, no note on the second route
+     (`make_skill_local::app_code_asked` passes the line as it is), and
+     the app is told `on`. One that couldn't be made says so with why
+     (`made_skill::not_made_line`); one that couldn't be put on says so
+     with why ("I made it but couldn't put it on: …",
+     `made_skill::not_on_line`). Unchanged: a write's read-back and yes,
+     the held-off run namespace, the grants and the bounds. Off: as
+     above. Tests:
+     `with_the_switch_a_voice_code_make_goes_on_at_once_and_its_first_run_asks_nothing`,
+     `with_the_switch_a_code_make_not_made_or_not_on_says_so_plainly`,
+     `with_the_switch_a_send_still_waits_for_its_yes`,
+     `with_the_switch_a_voice_code_make_with_the_camera_still_waits_for_its_yes`,
+     `the_grants_that_go_on_at_once_never_hold_the_camera_or_the_microphone`,
+     `app_make::tests::with_the_switch_an_app_make_with_code_goes_on_at_once`,
+     `app_make::tests::with_the_switch_an_app_make_with_the_camera_still_waits_for_its_yes`,
+     and, off, `a_made_skill_with_code_waits_for_a_later_yes_and_goes_on_by_its_sha256`.
    - **What runs it** is #6305's `do.task`: `lamp-skills` loads a
      `made: here` skill's task only with `LAMP_MADE_SCRIPTS=on`, and only
      one that went on as a package, never from the Store, pushed or put on

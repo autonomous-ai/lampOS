@@ -340,6 +340,84 @@ pub fn service_grant(grant: &str) -> Option<(&str, bool)> {
     SERVICE_GRANT_CODES.contains(&code).then_some((code, write))
 }
 
+/// The switch that puts a made skill with code of its own (#6307,
+/// [`SCRIPTS_ENVIRONMENT`]) on at once, by voice or from the app, with no
+/// spoken yes (the owner's ask: a made skill goes on at once, and the lamp
+/// says whether it worked, with no confirming). `on` only; off unless set,
+/// in no product unit. On, it goes on through its yes's own path
+/// (`make_skill_local::code_approve`: that package by its SHA-256, then its
+/// task's yes recorded), its say-back says it is on and what its code may
+/// use ([`code_said`], with no [`RUNS_AFTER_YES`]), and nothing waits. Off,
+/// it waits for the spoken yes as before.
+pub const CODE_AT_ONCE_ENVIRONMENT: &str = "LAMP_MADE_CODE_ON_AT_ONCE";
+
+#[cfg(test)]
+thread_local! {
+    /// [`CODE_AT_ONCE_ENVIRONMENT`] as a test of this thread sets it.
+    static CODE_AT_ONCE_HERE: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Whether a made skill with code of its own goes on at once in this
+/// process ([`CODE_AT_ONCE_ENVIRONMENT`]); only with [`scripts_on`].
+pub fn code_on_at_once() -> bool {
+    if !scripts_on() {
+        return false;
+    }
+    #[cfg(test)]
+    if let Some(on) = CODE_AT_ONCE_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(CODE_AT_ONCE_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`code_on_at_once`] for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_code_at_once_here(on: Option<bool>) {
+    CODE_AT_ONCE_HERE.with(|here| here.set(on));
+}
+
+/// The grants a made skill's code may hold and still go on at once with
+/// [`CODE_AT_ONCE_ENVIRONMENT`] (the first builder's ruling on #6059,
+/// 19:14): its light, the kinds of sound it hears and its head and arm; a
+/// timer is a trigger and needs no grant. Any other grant keeps the spoken
+/// yes ([`CODE_YES_GRANTS`] among them).
+pub const CODE_AT_ONCE_GRANTS: [&str; 3] = ["light", "sound", "body"];
+
+/// The grants that always keep a made skill's code to its spoken yes, the
+/// switch on or off (the same ruling): the camera and the microphone. A
+/// send (a write, or messages to the phone) keeps it too
+/// ([`code_goes_on_at_once`]).
+pub const CODE_YES_GRANTS: [&str; 2] = ["camera", "microphone"];
+
+/// Whether code granted `grants` may go on at once: the switch on and
+/// every grant one of [`CODE_AT_ONCE_GRANTS`] (none at all is one).
+pub fn grants_go_on_at_once(grants: &[String]) -> bool {
+    code_on_at_once()
+        && grants
+            .iter()
+            .all(|grant| CODE_AT_ONCE_GRANTS.contains(&grant.as_str()))
+}
+
+/// Whether the made skill `made`, with code of its own, goes on at once
+/// ([`CODE_AT_ONCE_ENVIRONMENT`]): its grants within
+/// [`CODE_AT_ONCE_GRANTS`] ([`grants_go_on_at_once`]), and no send, no
+/// camera and no microphone in what it uses. Anything else waits for the
+/// spoken yes, exactly as with the switch off.
+pub fn code_goes_on_at_once(made: &Made) -> bool {
+    made.uses.code
+        && made.uses.writes.is_empty()
+        && !made.uses.messages
+        && !made.uses.camera
+        && !made.uses.listens()
+        && grants_go_on_at_once(&made.uses.grants)
+}
+
+/// What the lamp adds of a skill with code of its own put on at once
+/// ([`code_goes_on_at_once`]) whose task wasn't kept (a skill's tasks off, or
+/// its folder's grants not those said): its code runs nowhere yet.
+pub const CODE_RUNS_NOWHERE_YET: &str = " But this lamp doesn't run its code yet.";
+
 /// What the lamp can't do yet with [`SCRIPTS_ENVIRONMENT`] off, said as
 /// [`cant_yet`]: "I can't do that yet: running code of its own".
 pub const CODE_OF_ITS_OWN: &str = "running code of its own";
@@ -1288,10 +1366,16 @@ fn grants_plainly(grants: &[String]) -> Option<String> {
 /// What the say-back of a skill with code of its own says of it (#6307),
 /// after its manners: who wrote its code and what it may use, then
 /// [`RUNS_AFTER_YES`]. What must be heard whole before the person's yes is
-/// taken (`crate::skill_write_yes`).
+/// taken (`crate::skill_write_yes`). Code that goes on at once
+/// ([`grants_go_on_at_once`]) has no wait, so it ends on what it may use.
 pub fn code_said(grants: &[String]) -> String {
     let uses = grants_plainly(grants).unwrap_or_else(|| "nothing of the lamp's".to_owned());
-    format!(" The lamp's model wrote its code, and that code may use {uses}.{RUNS_AFTER_YES}")
+    let waits = if grants_go_on_at_once(grants) {
+        ""
+    } else {
+        RUNS_AFTER_YES
+    };
+    format!(" The lamp's model wrote its code, and that code may use {uses}.{waits}")
 }
 
 /// A linked service a made skill may read, as the person hears it.
@@ -7437,7 +7521,15 @@ pub fn on_line(made: &Made) -> String {
     // One that sends or writes is said whole, its every recipient and word
     // in its description, and ends as that does: it waits for the
     // person's yes (#6066), never on a word for them to repeat.
-    // One with code of its own alike (#6307): its grants and its wait.
+    // One with code of its own alike (#6307): its grants and its wait;
+    // put on at once ([`code_goes_on_at_once`]), its grants and that it's on.
+    if code_goes_on_at_once(made) {
+        let mut said = format!("I made {name}, and it's on: {does}");
+        if !said.ends_with(['.', '!', '?']) {
+            said.push('.');
+        }
+        return said;
+    }
     if !made.uses.writes.is_empty() || made.uses.code {
         let mut said = format!("I made {name}: {does}");
         if !said.ends_with(['.', '!', '?']) {
