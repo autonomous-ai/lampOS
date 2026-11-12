@@ -13,6 +13,9 @@
 //! root (memory's main socket is 0600 to `lampos-memory`) or as `lampos`
 //! with `LAMP_MEMORY_FORGET_SOCKET` naming memory's narrow socket, when a
 //! lamp opens one; anyone else is refused before any socket is touched.
+//! Memory's socket is checked first: one this user can't open is refused
+//! before the eyes are asked anything, so the face never goes while memory
+//! keeps the person (Reviewer-lead's P3 on #6580).
 use crate::faces::{self, Eyes};
 use serde_json::{Value, json};
 use std::path::PathBuf;
@@ -48,6 +51,22 @@ pub fn eyes_from(var: impl Fn(&str) -> Option<String>) -> Eyes {
     }
 }
 
+/// Memory's socket, if this user may open it: write permission on it and a
+/// way through its directories (`access(2)`, as the real user), which a
+/// connect needs. `Err` is the refusal, nothing having been asked.
+pub fn memory_reachable(eyes: &Eyes) -> Result<(), String> {
+    let Some(socket) = &eyes.memory else {
+        return Err("refused: memory's socket isn't given; nothing was removed".to_owned());
+    };
+    rustix::fs::access(socket, rustix::fs::Access::WRITE_OK).map_err(|why| {
+        format!(
+            "refused: memory's socket {} can't be opened ({why}): run as root, or name memory's narrow socket in {}; nothing was removed",
+            socket.display(),
+            faces::MEMORY_ENVIRONMENT
+        )
+    })
+}
+
 /// `face-remove NAME` as the user running it, on the lamp's sockets.
 pub fn command(arguments: &[String]) -> (String, u8) {
     let passwd = std::fs::read_to_string("/etc/passwd").unwrap_or_default();
@@ -68,6 +87,9 @@ pub fn command_at(eyes: &Eyes, arguments: &[String]) -> (String, u8) {
         Ok(name) => name,
         Err(why) => return (format!("refused: {why}"), 1),
     };
+    if let Err(refused) = memory_reachable(eyes) {
+        return (refused, 1);
+    }
     let listed = match faces::list(eyes) {
         Ok(listed) => listed,
         Err(why) => return (format!("refused: {why}"), 1),
@@ -318,15 +340,49 @@ mod tests {
         assert!(line.contains(r#""memory":"kept""#), "{line}");
     }
 
+    /// Memory this user can't open (lampos on the product's main socket,
+    /// or none there): refused before the eyes are asked anything, so the
+    /// face stays with the memory (Reviewer-lead's P3 on #6580).
+    #[test]
+    fn memory_out_of_reach_is_refused_before_the_eyes_are_asked() {
+        let (who, asked) = stand_in(
+            "unreachable",
+            "who.sock",
+            vec![
+                json!({"people": ["Lan"], "waiting": []}),
+                json!({"forgot": true, "name_id_free": true}),
+            ],
+        );
+        for memory in [Some(PathBuf::from("/nonexistent/memory.sock")), None] {
+            let eyes = Eyes {
+                socket: who.clone(),
+                memory,
+            };
+            let (line, code) = command_at(&eyes, &arguments(&["Lan"]));
+            assert_eq!(code, 1, "{line}");
+            assert!(line.starts_with("refused: memory's socket"), "{line}");
+            assert!(line.ends_with("nothing was removed"), "{line}");
+        }
+        assert!(
+            asked
+                .recv_timeout(std::time::Duration::from_millis(200))
+                .is_err(),
+            "the eyes were asked"
+        );
+    }
+
     #[test]
     fn eyes_that_do_not_answer_are_refused() {
+        let memory = std::env::temp_dir().join(format!("fr-mute-{}.sock", std::process::id()));
+        std::fs::write(&memory, b"").unwrap();
         let eyes = Eyes {
             socket: "/nonexistent/who.sock".into(),
-            memory: Some("/nonexistent/memory.sock".into()),
+            memory: Some(memory.clone()),
         };
         assert_eq!(
             command_at(&eyes, &arguments(&["Lan"])),
             ("refused: the lamp's eyes did not answer".to_owned(), 1)
         );
+        let _ = std::fs::remove_file(memory);
     }
 }

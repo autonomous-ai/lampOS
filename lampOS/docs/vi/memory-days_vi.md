@@ -1475,7 +1475,12 @@ mắt (`/run/lampos-eyes/who.sock`, hoặc `LAMP_EYES_WHO_SOCKET`) và của b�
 (`/run/lampos-memory/memory.sock`, 0600 cho user của bộ nhớ, hoặc socket hẹp
 trong `LAMP_MEMORY_FORGET_SOCKET`). Vì vậy lệnh chạy bằng root; `lampos` chỉ
 chạy được khi socket hẹp của bộ nhớ đang mở và được chỉ ra. User khác bị từ
-chối trước khi chạm tới socket nào.
+chối trước khi chạm tới socket nào. Socket của bộ nhớ được kiểm tra trước
+tiên (`access(2)`, quyền ghi, theo user thật): nếu user này không mở được nó,
+hoặc nó không có ở đó, lệnh từ chối trước khi hỏi mắt bất cứ điều gì, nêu tên
+socket và bảo chạy bằng root hoặc chỉ ra socket hẹp; nhờ vậy khuôn mặt không
+bao giờ bị xóa trong khi bộ nhớ vẫn giữ người đó (P3 của Reviewer-lead trên
+#6580).
 
 Lệnh chặt hơn app ở một điểm: một tên mà mắt không liệt kê
 (`{"list":true,"waiting":true}`, không phân biệt hoa thường) bị từ chối, kèm
