@@ -14,6 +14,7 @@
 // `camera`/`microphone`); a press without it gets the lamp's own refusal. `ctx.show(jpeg)` puts a picture on the page
 // that pressed, under its row and nowhere else: not in the log, not on disk, not in the checklist's export.
 // A refusal comes back as the lamp's own words; a value outside its field is refused here, before any call.
+import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { LampError, schema } from 'lampos';
 
@@ -58,6 +59,31 @@ export function checked(fields, args = {}) {
 const select = (name, options, def, extra = {}) => ({ name, label: name, type: 'select', options, default: def ?? options[0], ...extra });
 const number = (name, min, max, def, extra = {}) => ({ name, label: name, type: 'number', min, max, default: def, ...extra });
 const text = (name, max, def, extra = {}) => ({ name, label: name, type: 'text', max, default: def, ...extra });
+
+// This run's one scratch clip: a name of its own (`try-` and six hex digits from this server's start), so a row never
+// touches a clip that was on the lamp before; made by `sound_upload`, removed by `sound_remove` (and `cleanScratch`).
+const SCRATCH_CLIP = `try-${randomBytes(3).toString('hex')}`;
+let clipKept = false;
+// The names this app gives its own test clips: the only ones a row removes.
+const TRY_CLIP = /^try-[0-9a-f]{6}$/;
+// A quiet tone as the lamp takes a clip: 16-bit mono PCM at 24 kHz, peak 1000 (-30 dBFS, under the voice's -12 dBFS cap and
+// its -30 dBFS RMS per 10 ms), made here, never read from a file.
+export function quietTone(ms) {
+  const frames = Math.round((24_000 * ms) / 1000);
+  const wav = Buffer.alloc(44 + frames * 2);
+  wav.write('RIFF', 0, 'ascii'); wav.writeUInt32LE(36 + frames * 2, 4); wav.write('WAVEfmt ', 8, 'ascii');
+  wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(24_000, 24);
+  wav.writeUInt32LE(48_000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36, 'ascii'); wav.writeUInt32LE(frames * 2, 40);
+  for (let k = 0; k < frames; k += 1) wav.writeInt16LE(Math.round(1000 * Math.sin((2 * Math.PI * 440 * k) / 24_000)), 44 + k * 2);
+  return wav;
+}
+// Takes this run's scratch clip off the lamp, if this run put it there (the end of a run, or the row).
+export async function cleanScratch(lamp) {
+  if (!clipKept) return false;
+  await lamp.removeSound(SCRATCH_CLIP);
+  clipKept = false;
+  return true;
+}
 
 // The held light of `hold_light` (its `stop()`), one at a time: this app has one lamp and one hand on it.
 let held = null;
@@ -137,6 +163,29 @@ export const CONTROLS = [
   { id: 'turn_end', group: 'Voice', ops: ['turn.end'], shows: [], label: 'End my turn', fields: [], run: async ({ lamp }) => { await lamp.endTurn(); return 'lamp.endTurn()'; } },
   // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
   { id: 'sound', group: 'Voice', ops: ['sound'], shows: [], label: 'Sound (hum)', fields: [], run: async ({ lamp }) => { await lamp.sound('hum'); return "lamp.sound('hum')"; } },
+  // Clips (grant `speak`): this computer's own, kept on the lamp. The rows touch ONLY this run's scratch clip: upload makes it,
+  // the list shows this computer's clips (a read), remove takes away the one this run made and nothing else.
+  { id: 'sound_upload', group: 'Voice', ops: ['sound.upload'], shows: [], label: 'Keep a quiet clip', fields: [number('ms', 100, 2000, 300, { integer: true })],
+    run: async ({ lamp }, a) => {
+      const kept = await lamp.uploadSound(SCRATCH_CLIP, quietTone(a.ms));
+      clipKept = true;
+      return `lamp.uploadSound(${q(SCRATCH_CLIP)}, a ${a.ms} ms quiet tone) -> ${q(kept)}`;
+    } },
+  { id: 'sound_list', group: 'Voice', ops: ['sound.list'], shows: [], label: 'List my clips', fields: [],
+    hint: 'clips named try-... are this app\'s test clips; remove them from the list',
+    run: async ({ lamp }) => `lamp.sounds() -> ${q((await lamp.sounds()).map((c) => `${c.name} ${c.ms} ms${c.name === SCRATCH_CLIP ? ' (this run\'s)' : TRY_CLIP.test(c.name) ? ' (an earlier run\'s test clip)' : ''}`))}` },
+  // Removes this run's clip, or one of this app's own earlier test clips named in `name` (`try-` and six hex digits): any
+  // other name (`hum`, a clip of the person's) is refused here, before the lamp is asked.
+  { id: 'sound_remove', group: 'Voice', ops: ['sound.remove'], shows: [], label: 'Remove a test clip', fields: [text('name', 64, '', { optional: true })],
+    hint: 'with no name, this run\'s clip; or a try-xxxxxx test clip from the list',
+    run: async ({ lamp }, a) => {
+      const name = a.name ?? SCRATCH_CLIP;
+      if (!TRY_CLIP.test(name)) throw refuse(`name: only this app's test clips, try- and six hex digits (try-0a1b2c); nothing was asked of the lamp`);
+      if (a.name === undefined && !clipKept) return `none of this run's clips is kept (nothing was removed; name an earlier test clip to remove it)`;
+      const answer = await lamp.removeSound(name);
+      if (name === SCRATCH_CLIP) clipKept = false;
+      return `lamp.removeSound(${q(name)}) -> ${q(answer?.removed ?? answer)}`;
+    } },
   // The camera and the microphone (their grants; one press, one use, nothing kept). The lamp's own rules hold: never while
   // it is private, the ring shows the mark, and the microphone only with one person in view (its refusal in its words).
   // A picture goes to the page that pressed, under the row, and is not logged; sound is only counted, never played or kept.
