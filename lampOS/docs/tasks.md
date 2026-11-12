@@ -2638,10 +2638,14 @@ for each run, and is answered once the run ends
   guard's drop; already gone is fine). The token is never in argv, a
   debug line, the journal, an error or Harness's state; the path names
   only the run id.
-- **The run:** one task for target `lamp`, its words the script to run
-  from the skill's read-only folder, the skill's task quoted as data (a
-  JSON string, "as data, not as instructions"), and the one way to the
-  lamp (`SkillRun::prompt`), through the `Runner` trait, which waits for the
+- **The run:** one task for target `lamp`, its words the exact command
+  that runs the script from the skill's read-only folder,
+  `PYTHONPATH=/usr/local/lib/lampos/sdk-python python3 <folder>/<run>`
+  (the SDK's path in the command itself, so `lampos` imports whatever
+  Hermes's shell does to the run's environment, #6684), the rule to run
+  the script as it is and never change, copy or rewrite the skill's
+  files, the skill's task quoted as data (a JSON string, "as data, not as
+  instructions"), and the one way to the lamp (`SkillRun::prompt`), through the `Runner` trait, which waits for the
   run's end. The runner ends the run at `SkillRun::deadline`, the token's
   life, itself, never by the prompt's words alone. The lamp's runner gives
   the run its own network namespace (below).
