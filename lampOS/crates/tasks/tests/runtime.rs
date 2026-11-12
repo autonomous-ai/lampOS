@@ -1800,10 +1800,21 @@ fn write_targets(path: &std::path::Path, bytes: &[u8]) {
 }
 
 fn told_targets(s: &Running) -> usize {
-    s.ask(json!({"op":"targets"}))["targets"]
-        .as_array()
-        .unwrap()
-        .len()
+    // A read the store's owner didn't take within its receipt deadline,
+    // busy with a durable write on a loaded disk, is answered "uncertain"
+    // (#6717); a read is safe to ask again.
+    let start = Instant::now();
+    loop {
+        let answer = s.ask(json!({"op":"targets"}));
+        if let Some(targets) = answer["targets"].as_array() {
+            return targets.len();
+        }
+        assert!(
+            answer["error"] == "uncertain" && start.elapsed() < Duration::from_secs(5),
+            "{answer}"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
 }
 
 /// #1676: with `serve --set-up-later` the part runs with no targets file,
