@@ -43,14 +43,14 @@ pub fn status(
     last: Option<&UpdateResult>,
     round: Option<UpdateRound>,
 ) -> UpdateStatus {
-    let running = Records::new(records.to_owned())
-        .peek_state()
-        .installed
-        .map(|build| UpdateBuild {
-            sequence: build.sequence,
-            commit: build.commit,
-        });
+    let state = Records::new(records.to_owned()).peek_state();
+    let refused = refused(&state);
+    let running = state.installed.map(|build| UpdateBuild {
+        sequence: build.sequence,
+        commit: build.commit,
+    });
     UpdateStatus {
+        refused,
         running,
         now: now.to_owned(),
         last: last.cloned(),
@@ -58,6 +58,24 @@ pub fn status(
         round,
         engines: None,
     }
+}
+
+/// The newest refusal of a build newer than the one the lamp runs (#6266), by
+/// its fixed name ([`crate::records::Refusal::reason`]) and never its text: the
+/// update that is blocked, for the app to say and offer a retry of. A refusal
+/// of an older build or the running one blocks nothing and is not said.
+pub fn refused(state: &crate::records::State) -> Option<lamp_msgs::UpdateRefused> {
+    let running = state.installed.as_ref().map_or(0, |build| build.sequence);
+    state
+        .refused
+        .iter()
+        .filter(|refusal| refusal.sequence > running)
+        .max_by_key(|refusal| (refusal.sequence, refusal.at_unix_ms))
+        .map(|refusal| lamp_msgs::UpdateRefused {
+            sequence: refusal.sequence,
+            reason: refusal.reason().to_owned(),
+            at_unix_ms: refusal.at_unix_ms,
+        })
 }
 
 /// [`status`], with the lamp's agents (#6240) when `engines` is given
@@ -350,6 +368,7 @@ mod tests {
                 last: None,
                 harness: None,
                 round: None,
+                refused: None,
                 engines: None,
             }
         );

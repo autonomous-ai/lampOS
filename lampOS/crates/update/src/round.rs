@@ -2915,12 +2915,17 @@ impl Run<'_, '_> {
             };
         }
         if !cut_short {
-            state.refuse(build, &why);
+            let kind = refusal_kind(&why, failed);
+            state.refuse_as(build, &why, Some(kind));
         } else {
             let times = state.count_cut_short(build);
             if times >= CUT_SHORTS_REFUSE {
                 state.cut_short = None;
-                state.refuse(build, &format!("{why}, {times} times in a row"));
+                state.refuse_as(
+                    build,
+                    &format!("{why}, {times} times in a row"),
+                    Some("cut_short"),
+                );
             } else {
                 self.say(&format!(
                     "build {} is not refused: cut short {times} of {CUT_SHORTS_REFUSE} times in a row; the next round tries it again",
@@ -4306,6 +4311,21 @@ fn conditions(text: &str) -> Vec<&str> {
         .map(str::trim)
         .filter(|line| line.starts_with("Condition"))
         .collect()
+}
+
+/// A refusal's fixed name for the app (#6266, `lamp_msgs::UpdateRefused`): a
+/// part held still by a passing local state right after the switch
+/// (`judge::HELD`, a kept unplug request) is `held`; any other part not well
+/// (`failed` names its unit) is `part_unwell`; the rest (the switch's own
+/// steps, the quiet moment) is `other`. Never the text.
+pub(crate) fn refusal_kind(why: &str, failed: Option<&str>) -> &'static str {
+    if why.contains(crate::judge::HELD) {
+        "held"
+    } else if failed.is_some() {
+        "part_unwell"
+    } else {
+        "other"
+    }
 }
 
 #[cfg(test)]
