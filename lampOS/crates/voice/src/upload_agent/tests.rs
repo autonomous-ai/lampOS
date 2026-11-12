@@ -298,7 +298,12 @@ fn no_secret_or_file_words_are_written_by_the_lamp() {
 fn grants_are_read_conservatively() {
     switches(true, true);
     assert!(grants_read("Tell me a joke.").is_empty());
-    assert_eq!(grants_read("Play a chime sound."), ["sound"]);
+    // Playing a sound is its voice; hearing a clap is `sound`, which keeps
+    // its yes, as the camera and net do.
+    assert_eq!(grants_read("Play a chime sound."), ["speak"]);
+    assert_eq!(grants_read("When I clap, glow."), ["light", "sound"]);
+    assert!(asks_yes(&grants_read("When I clap, glow.")));
+    assert!(!asks_yes(&["light".into(), "speak".into(), "body".into()]));
     assert_eq!(
         grants_read("Highlight the lightweight words."),
         Vec::<String>::new()
