@@ -652,7 +652,8 @@ fn settled(value: &Observation) -> bool {
 /// (#1390): a task this version made, whose newest answer was kept from an
 /// agent `idle` with an answer, and told: its claimed telling played, or
 /// is not known to have, or the voice told it in its own words
-/// ([`Request::Told`]). Harness's `ask` is what the agent was last asked,
+/// ([`Request::Told`]). On the lamp's own agent, told or not
+/// ([`closes_untold`], #6530). Harness's `ask` is what the agent was last asked,
 /// the lamp's own task text, so it says nothing here. One that waits for
 /// the person (`needs-input`) is left to them: Harness would refuse it
 /// anyway. The close itself first reads the agent again, and closes only if
@@ -687,11 +688,24 @@ fn close_due(task: &Task, now: &Clock) -> bool {
     newest.data.ask == first.data.ask
         && newest.data.state == "idle"
         && settled(&newest.data)
-        && match &newest.speech {
-            // A playout under way is not told yet.
-            Some(speech) => speech.state != SpeechState::Claimed,
-            None => newest.told.is_some(),
-        }
+        && (closes_untold(task)
+            || match &newest.speech {
+                // A playout under way is not told yet.
+                Some(speech) => speech.state != SpeechState::Claimed,
+                None => newest.told.is_some(),
+            })
+}
+
+/// Whether `task`'s harness is closed once its answer is kept, told or not
+/// (#6530): one on the lamp's own agent ([`crate::runtime::LAMP_TARGET`]),
+/// not joined on a computer. Nobody sits at the lamp's own harness to go on
+/// with it, and its session left open lingers (on 52e6 a Hermes chat stayed
+/// seven minutes after a ten-second turn whose news was cut short, so never
+/// told). The news is the kept answer's, told by the voice from the store,
+/// so the close cannot cut it. A computer's harness still waits for its
+/// telling: the person may be at that screen.
+fn closes_untold(task: &Task) -> bool {
+    task.dispatch.joined_on.is_none() && task.target_alias == crate::runtime::LAMP_TARGET
 }
 
 /// Whether a task is over, so that it may give way to a new one when the
@@ -2351,14 +2365,19 @@ impl<P: Persistence> Engine<P> {
                 // Told, from the store, so it holds across a restart: its
                 // telling played (a playout under way is not told yet), or
                 // the voice told it in its own words, or its harness was
-                // closed, which only follows a telling (#1390).
+                // closed, which follows a telling (#1390) except on the
+                // lamp's own agent, closed untold ([`closes_untold`]).
                 let told_at = newest.and_then(|seen| {
                     seen.speech
                         .as_ref()
                         .filter(|speech| speech.state != SpeechState::Claimed)
                         .map(|speech| speech.finished.as_ref().unwrap_or(&speech.claimed))
                         .or(seen.told.as_ref())
-                        .or(task.close.as_ref().map(|close| &close.attempted))
+                        .or(task
+                            .close
+                            .as_ref()
+                            .filter(|_| !closes_untold(task))
+                            .map(|close| &close.attempted))
                 });
                 Some(Recent {
                     task_id: task.id,
@@ -3908,6 +3927,65 @@ mod tests {
         assert_eq!(reply["told"], false);
         assert_eq!(engine.revision(), revision);
         assert_eq!(stored(&memory), before);
+    }
+
+    /// #6530: the lamp's own agent is closed once its one turn is done and
+    /// kept, its news still untold (on 52e6 a telling cut short left a
+    /// Hermes chat open seven minutes). One still working, or idle with no
+    /// answer yet, is not; a computer's harness still waits for its telling;
+    /// and the news of the closed one is still to tell.
+    #[test]
+    fn the_lamps_own_agent_is_closed_once_done_its_news_untold() {
+        // Handed to the lamp's own agent: its alias, and the digest kept
+        // with it.
+        let lamp = |engine: &mut Engine<Memory>| {
+            let store_id = engine.state.store_id.clone();
+            let task = &mut engine.state.tasks[0];
+            task.target_alias = crate::runtime::LAMP_TARGET.into();
+            task.prepared_digest = digest(&(&store_id, task.id, &task.target_alias, &task.launch));
+        };
+        let keep = |engine: &mut Engine<Memory>, id, at, state: &str, answer: &str| {
+            let read = request_read(engine, id, at);
+            let mut seen = data(answer);
+            seen.state = state.into();
+            engine.finish_observation(&read, seen, &clock(at)).unwrap();
+        };
+
+        // Still working, then idle with nothing said yet: left open.
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        lamp(&mut engine);
+        keep(&mut engine, id, 10, "working", "");
+        assert!(engine.begin_close(&clock(11)).unwrap().is_none());
+        keep(&mut engine, id, 20, "idle", "");
+        assert!(engine.begin_close(&clock(21)).unwrap().is_none());
+
+        // Done in one turn: closed at once, told or not.
+        keep(&mut engine, id, 30, "idle", "Done.");
+        let job = engine.begin_close(&clock(31)).unwrap().unwrap();
+        assert_eq!((job.task_id, job.agent_id.as_str()), (id, AGENT));
+        assert!(
+            engine.state.tasks[0]
+                .observations
+                .last()
+                .unwrap()
+                .told
+                .is_none()
+        );
+        engine
+            .finish_close(&job, Ok(crate::harness::Closed::Closed), &clock(32))
+            .unwrap();
+        // Its news is not taken as told by the close.
+        let recent = engine.recent(&clock(33));
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].settled.as_deref(), Some("idle"));
+        assert!(!recent[0].told);
+
+        // A computer's harness, done the same way, waits for its telling.
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        keep(&mut engine, id, 30, "idle", "Done.");
+        assert!(engine.begin_close(&clock(31)).unwrap().is_none());
     }
 
     /// One that waits for the person is left to them, however long; one the
