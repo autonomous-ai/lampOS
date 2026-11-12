@@ -571,6 +571,14 @@ pub const MOST_SESSION_BYTES: usize = 128;
 /// first message ([`Cli::first_message`]).
 const FIRST_MESSAGE_LOOK: Duration = Duration::from_millis(500);
 
+/// What `show` read of a harness just started ([`Cli::look_until_idle`]).
+enum Looked {
+    /// Asked its first prompt (`ask` set).
+    Asked,
+    /// Idle, nothing asked.
+    Idle,
+}
+
 /// Strict when stored too: an observation's `digest` is over what this
 /// build would write of it, so a later field would not match it anyway; a
 /// new one bumps the tasks state's `schema` (Jarvis on #1512). Harness's own
@@ -1324,10 +1332,12 @@ impl Cli {
             // argv: a Gateway handshake that times out loses it, and Harness
             // neither retries nor says so (#6226, lamp-c0a4). Looked at
             // with `show`: taken (`ask` set), it is as any launch; idle
-            // with none, it is typed in once, as Devin's is.
+            // with none, the empty harness is closed and started once more
+            // (#6499), since typing it in needs the person's own
+            // `programs-reply` switch, off on every product lamp.
             Ok(reply) if reply.success && launch.target.engine == EngineKind::Openclaw => {
                 let outcome = parse_launch(&reply.stdout, launch);
-                self.first_message_unless_asked(launch, outcome, until, seen, true)
+                self.openclaw_first_prompt(launch, &args, outcome, until, seen)
             }
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
             Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
@@ -2364,6 +2374,158 @@ impl Cli {
             LaunchOutcome::Pending { .. } => return uncertain("first_message_unsent"),
             other => return other,
         };
+        match self.look_until_idle(launch, &agent_id, until, seen, unless_asked) {
+            Ok(Looked::Asked) => return LaunchOutcome::Created { agent_id },
+            Ok(Looked::Idle) => {}
+            Err(code) => return uncertain(code),
+        }
+        self.type_first_message(launch, agent_id, until, seen)
+    }
+
+    /// OpenClaw's launch once `new` answered (#6499). Asked already
+    /// (`ask` set): as Harness answered it. Idle with no ask, its
+    /// `--message` was lost: that empty harness is closed, and `new` is
+    /// asked once more with the same words, in what is left of the
+    /// launch's bound; the first TUI on a lamp is the one that pairs with
+    /// the Gateway (12139, lamp-52e6), so the second one is given its
+    /// prompt. Lost again, it is typed in once, as before (#6226): that
+    /// needs the person's `programs-reply`, and is refused (`reply_off`)
+    /// without it. Nothing is ever started a third time.
+    fn openclaw_first_prompt(
+        &self,
+        launch: &Launch,
+        args: &[OsString],
+        outcome: LaunchOutcome,
+        until: Instant,
+        seen: &mut Seen,
+    ) -> LaunchOutcome {
+        let LaunchOutcome::Created { agent_id } = outcome else {
+            return self.first_message_unless_asked(launch, outcome, until, seen, true);
+        };
+        match self.look_until_idle(launch, &agent_id, until, seen, true) {
+            Ok(Looked::Asked) => return LaunchOutcome::Created { agent_id },
+            Ok(Looked::Idle) => {}
+            Err(code) => return LaunchOutcome::Uncertain { code: code.into() },
+        }
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return LaunchOutcome::Uncertain {
+                code: "never_idle".into(),
+            };
+        }
+        let closed = self.run(
+            &[
+                "close".into(),
+                "--machine".into(),
+                launch.target.machine_id.clone().into(),
+                agent_id.clone().into(),
+                "--json".into(),
+            ],
+            left,
+        );
+        seen.took(&closed);
+        let closed = match &closed {
+            Ok(reply) => match self::closed(reply.code) {
+                Ok(Closed::Closed) => "is closed".to_owned(),
+                Ok(Closed::Refused) => "was refused a close".to_owned(),
+                Ok(Closed::Gone | Closed::Left) => "is gone".to_owned(),
+                Err(code) => format!("wasn't closed ({code})"),
+            },
+            Err(error) => format!("wasn't closed ({})", error.code),
+        };
+        eprintln!(
+            "tasks: {}: OpenClaw's harness started idle with no ask, so its first prompt was lost: the empty harness {closed}, and it is started once more",
+            launch.name
+        );
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return LaunchOutcome::Uncertain {
+                code: "never_idle".into(),
+            };
+        }
+        let again = self.run(args, left);
+        seen.took(&again);
+        match again {
+            Ok(reply) if reply.success => {
+                let outcome = parse_launch(&reply.stdout, launch);
+                self.first_message_unless_asked(launch, outcome, until, seen, true)
+            }
+            // The first harness is closed (or was refused), and the second
+            // wasn't made: nothing runs this task, so it can be told failed
+            // and asked again by the person.
+            Ok(_) => LaunchOutcome::Uncertain {
+                code: "openclaw_new_again_failed".into(),
+            },
+            Err(error) => LaunchOutcome::Uncertain {
+                code: error.code.into(),
+            },
+        }
+    }
+
+    /// `show` read until the harness just started is idle (or, with
+    /// `unless_asked`, was asked its first prompt), within `until`.
+    /// `Err` is the uncertain code it ends with.
+    fn look_until_idle(
+        &self,
+        launch: &Launch,
+        agent_id: &str,
+        until: Instant,
+        seen: &mut Seen,
+        unless_asked: bool,
+    ) -> Result<Looked, &'static str> {
+        let show: Vec<OsString> = vec![
+            "show".into(),
+            "--machine".into(),
+            launch.target.machine_id.clone().into(),
+            agent_id.into(),
+            "--json".into(),
+        ];
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Err("never_idle");
+            }
+            let shown = self.run(&show, left.min(self.config.read_timeout));
+            seen.took(&shown);
+            let observation = match &shown {
+                Ok(reply) if reply.success => parse_observation(&reply.stdout, agent_id).ok(),
+                // Under its own code, not retried: `cancelled`,
+                // `cleanup_incomplete`, `executable_changed`, a timeout.
+                Err(error) => return Err(error.code),
+                _ => None,
+            };
+            if unless_asked && observation.as_ref().is_some_and(|seen| seen.ask.is_some()) {
+                return Ok(Looked::Asked);
+            }
+            match observation.as_ref().map(|seen| seen.state.as_str()) {
+                Some("idle") => return Ok(Looked::Idle),
+                // A Harness before the fresh-Devin fix (0.5.6) reads a Devin
+                // that has done nothing yet as `needs-input`: nothing is
+                // asked of it, so the reply is tried at once, and Harness
+                // takes or refuses it (`reply_not_idle`), never 60 s of looks
+                // (the Reviewer-lead's P2 on #4374).
+                Some("needs-input") if observation.as_ref().is_some_and(fresh) => {
+                    return Ok(Looked::Idle);
+                }
+                Some("stopped" | "failed" | "offline") => {
+                    return Err("stopped_before_message");
+                }
+                _ => {}
+            }
+            let left = until.saturating_duration_since(Instant::now());
+            std::thread::sleep(FIRST_MESSAGE_LOOK.min(left));
+        }
+    }
+
+    /// The task typed into a harness read idle, once, with `harness reply`.
+    fn type_first_message(
+        &self,
+        launch: &Launch,
+        agent_id: String,
+        until: Instant,
+        seen: &mut Seen,
+    ) -> LaunchOutcome {
+        let uncertain = |code: &str| LaunchOutcome::Uncertain { code: code.into() };
         let on = |verb: &str| -> Vec<OsString> {
             vec![
                 verb.into(),
@@ -2373,39 +2535,6 @@ impl Cli {
                 "--json".into(),
             ]
         };
-        loop {
-            let left = until.saturating_duration_since(Instant::now());
-            if left.is_zero() {
-                return uncertain("never_idle");
-            }
-            let shown = self.run(&on("show"), left.min(self.config.read_timeout));
-            seen.took(&shown);
-            let observation = match &shown {
-                Ok(reply) if reply.success => parse_observation(&reply.stdout, &agent_id).ok(),
-                // Under its own code, not retried: `cancelled`,
-                // `cleanup_incomplete`, `executable_changed`, a timeout.
-                Err(error) => return uncertain(error.code),
-                _ => None,
-            };
-            if unless_asked && observation.as_ref().is_some_and(|seen| seen.ask.is_some()) {
-                return LaunchOutcome::Created { agent_id };
-            }
-            match observation.as_ref().map(|seen| seen.state.as_str()) {
-                Some("idle") => break,
-                // A Harness before the fresh-Devin fix (0.5.6) reads a Devin
-                // that has done nothing yet as `needs-input`: nothing is
-                // asked of it, so the reply is tried at once, and Harness
-                // takes or refuses it (`reply_not_idle`), never 60 s of looks
-                // (the Reviewer-lead's P2 on #4374).
-                Some("needs-input") if observation.as_ref().is_some_and(fresh) => break,
-                Some("stopped" | "failed" | "offline") => {
-                    return uncertain("stopped_before_message");
-                }
-                _ => {}
-            }
-            let left = until.saturating_duration_since(Instant::now());
-            std::thread::sleep(FIRST_MESSAGE_LOOK.min(left));
-        }
         let left = until.saturating_duration_since(Instant::now());
         if left.is_zero() {
             return uncertain("never_idle");

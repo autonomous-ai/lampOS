@@ -457,10 +457,13 @@ fn devins_task_is_typed_in_with_reply_once_it_is_idle() {
 
 /// #6226, lamp-c0a4: OpenClaw's first prompt is lost when its Gateway's
 /// handshake times out. After `new`, `show` is read: asked already (`ask`
-/// set), nothing is typed; idle with no ask, the task is typed in once
-/// with `harness reply`.
+/// set), nothing is typed. Idle with no ask (#6499, 12139 on lamp-52e6):
+/// that empty harness is closed and `new` asked once more with the same
+/// words, never `reply` first, which needs the person's `programs-reply`.
+/// Lost twice, it is typed in once, as before, and never started a third
+/// time.
 #[test]
-fn openclaws_lost_first_prompt_is_typed_in_once_and_a_taken_one_is_left() {
+fn openclaws_lost_first_prompt_is_started_once_more_and_a_taken_one_is_left() {
     let mut request = launch();
     request.target.engine = EngineKind::Openclaw;
     let seen = |state: &str, ask: Value| {
@@ -488,11 +491,16 @@ fn openclaws_lost_first_prompt_is_typed_in_once_and_a_taken_one_is_left() {
     assert_eq!(verbs(&rig), ["machines", "new", "show"]);
     let new = rig.calls()[1]["args"].as_array().unwrap().clone();
     assert!(new.iter().any(|arg| arg == "--task"), "{new:?}");
-    // Lost: idle with no ask, typed in once.
+    // Lost once: the empty harness is closed, `new` is asked again with
+    // the same words, and the second one is asked its prompt. No reply.
     let rig = Rig::new();
     rig.plan(json!({
-        "machines":{"default":true},"new":{"default":true},
-        "show":{"each":[seen("starting", Value::Null), seen("idle", Value::Null)]},
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[
+            seen("starting", Value::Null),
+            seen("idle", Value::Null),
+            seen("working", json!("Inspect the authored fixture"))
+        ]},
         "reply":{"default":true}
     }));
     assert_eq!(
@@ -501,9 +509,73 @@ fn openclaws_lost_first_prompt_is_typed_in_once_and_a_taken_one_is_left() {
             agent_id: AGENT.into()
         }
     );
-    assert_eq!(verbs(&rig), ["machines", "new", "show", "show", "reply"]);
     assert_eq!(
-        rig.calls()[4]["args"],
+        verbs(&rig),
+        ["machines", "new", "show", "show", "close", "new", "show"]
+    );
+    let calls = rig.calls();
+    assert_eq!(
+        calls[4]["args"],
+        json!(["close", "--machine", MACHINE, AGENT, "--json"])
+    );
+    assert_eq!(calls[5]["args"], calls[1]["args"], "the same new again");
+    // The close refused or failing changes nothing: the task still gets
+    // its one more `new`.
+    for close in [json!({"exit":5}), json!({"exit":1})] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},"new":{"default":true},"close":close,
+            "show":{"each":[
+                seen("idle", Value::Null),
+                seen("working", json!("Inspect the authored fixture"))
+            ]}
+        }));
+        assert_eq!(
+            rig.cli().launch(&request),
+            LaunchOutcome::Created {
+                agent_id: AGENT.into()
+            },
+            "{close}"
+        );
+        assert_eq!(
+            verbs(&rig),
+            ["machines", "new", "show", "close", "new", "show"]
+        );
+    }
+    // The second `new` refused: nothing runs the task, uncertain under its
+    // own code, and no reply.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},"close":{"exit":0},
+        "new":{"each":[{"default":true},{"exit":1,"stdout":""}]},
+        "show":seen("idle", Value::Null)
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Uncertain {
+            code: "openclaw_new_again_failed".into()
+        }
+    );
+    assert_eq!(verbs(&rig), ["machines", "new", "show", "close", "new"]);
+    // Lost twice: typed in once, as before, and never a third `new`.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":seen("idle", Value::Null),
+        "reply":{"default":true}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    assert_eq!(
+        verbs(&rig),
+        ["machines", "new", "show", "close", "new", "show", "reply"]
+    );
+    assert_eq!(
+        rig.calls()[6]["args"],
         json!([
             "reply",
             "--machine",
