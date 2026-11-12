@@ -3115,7 +3115,8 @@ gone ([switches.md](switches.md)). What happens:
    Code of its own (#6307, #6071 PR 4, last of the five, the first
    builder's 12:45 condition 4; `LAMP_MADE_SCRIPTS=on` in `lamp-voice`,
    passed to both routes, in `lamp-skills` and in `lamp-skills-manage@`,
-   `on` only, off unless set and in every product unit; stacked on #6305's
+   `on` only, off unless set; on in all three product units (12 Nov, the
+   lead's ask on #6307); stacked on #6305's
    `do.task`, `LAMP_SKILL_TASKS`). Off, the making
    model is never told a skill may carry code (its system prompt and the
    brief are as before), and a `scripts/…` block in its answer, a `task`
