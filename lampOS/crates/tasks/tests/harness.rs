@@ -11,6 +11,9 @@ use lamp_tasks::runtime::{
     HarnessSwitches, NEW_FOLDER_FILE, SESSION_INDEX_FILE, targets_from_machines,
 };
 use lamp_tasks::session_index;
+use lamp_tasks::skill_task::{
+    self, HarnessRunner, Runner, SkillHarness, SkillHarnessSlot, SkillRun,
+};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
@@ -6540,4 +6543,243 @@ fn the_index_lives_in_the_tasks_folder_the_reset_wipes() {
             .any(|path| path == "/var/lib/lampos-tasks/store"),
         "the reset plan wipes the tasks folder"
     );
+}
+
+/// #6510 Part 1 step 2: a skill's run through Harness, with the fixture
+/// as Harness. The runner as the lamp's, in the rig's folders, with no
+/// wrapper to look at.
+fn skill_runner(rig: &Rig, engine: Option<EngineKind>) -> HarnessRunner {
+    let slot: SkillHarnessSlot = Arc::default();
+    let lamp = engine.map(|engine| Target {
+        machine_id: MACHINE.into(),
+        project: "~/harnesses/lamp-tasks/lamp".into(),
+        engine,
+    });
+    let _ = slot.set(SkillHarness::new(
+        rig.config.clone(),
+        "stable-session_123".into(),
+        Box::new(move || lamp.clone()),
+    ));
+    HarnessRunner {
+        project: rig.root.path().join("project"),
+        runs: rig.root.path().join("runs"),
+        harness: slot,
+        held_by: None,
+        retry: Duration::from_millis(20),
+    }
+}
+
+const RUN_SECRET: &str = "run-secret-6510";
+
+fn skill_run(deadline: Duration) -> SkillRun {
+    SkillRun {
+        run: "task-1".into(),
+        skill: "photo-booth".into(),
+        prompt: "Run `scripts/main.py` for the skill `photo-booth`.".into(),
+        folder: PathBuf::from("/var/lib/lampOS/skills/photo-booth"),
+        env: vec![
+            (skill_task::SOCKET_ENV, skill_task::CONTROL_SOCKET.into()),
+            (skill_task::TOKEN_ENV, RUN_SECRET.into()),
+        ],
+        deadline,
+    }
+}
+
+/// Nothing of the run is left: no `skill-*` folder, no token file.
+fn nothing_left(rig: &Rig) {
+    let folder = rig.root.path().join("project/skill-task-1");
+    assert!(fs::symlink_metadata(&folder).is_err(), "the run's folder");
+    assert!(
+        fs::symlink_metadata(rig.root.path().join("runs/task-1")).is_err(),
+        "the run's token file"
+    );
+}
+
+fn skill_ok_plan(rig: &Rig, waited_state: &str) {
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited(waited_state, AGENT)},
+        "close":{"exit":0},
+    }));
+}
+
+/// The run is `harness new hermes` in its own folder, `skill-<run-id>`,
+/// the positional argument, with no mode, no route and no token in any
+/// argument or environment Harness is given; then `wait` on its one
+/// agent; then, as it ended, `close --now`; and its folder and token file
+/// are gone.
+#[test]
+fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothing() {
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    // The token is ended before `close --now` (V2's order on #6510).
+    let ended_at = std::cell::Cell::new(None);
+    let end_token = || ended_at.set(Some(rig.calls().len()));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &end_token),
+        Ok(0)
+    );
+    assert_eq!(
+        ended_at.get(),
+        Some(3),
+        "ended after machines, new, wait; before close"
+    );
+    let calls = rig.calls();
+    let verbs: Vec<&str> = calls
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap())
+        .collect();
+    assert_eq!(verbs, ["machines", "new", "wait", "close"]);
+    let folder = rig.root.path().join("project/skill-task-1");
+    assert_eq!(
+        calls[1]["args"],
+        json!([
+            "new",
+            "hermes",
+            "--machine",
+            MACHINE,
+            folder.to_str().unwrap(),
+            "--name",
+            "skill-task-1",
+            "--json",
+            "--task",
+            "Run `scripts/main.py` for the skill `photo-booth`."
+        ])
+    );
+    assert_eq!(
+        calls[2]["args"],
+        json!([
+            "wait",
+            "--machine",
+            MACHINE,
+            AGENT,
+            "--any",
+            "--timeout",
+            "600s",
+            "--json"
+        ])
+    );
+    assert_eq!(
+        calls[3]["args"],
+        json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
+    );
+    for call in &calls {
+        assert!(!call.to_string().contains(RUN_SECRET), "{call}");
+    }
+    nothing_left(&rig);
+    // An agent Harness says is already gone is not closed again.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "gone");
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    assert!(rig.calls().iter().all(|call| call["args"][0] != "close"));
+    nothing_left(&rig);
+}
+
+/// At its deadline the run's `wait` is cancelled and its session closed
+/// with `close --now`, at once; its folder and token file go with it.
+#[test]
+fn a_skill_run_past_its_deadline_is_closed_now() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT),"delay_ms":5000},
+        "close":{"exit":0},
+    }));
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    let began = Instant::now();
+    let ended_at = std::cell::Cell::new(None);
+    let end_token = || {
+        if ended_at.get().is_none() {
+            ended_at.set(Some(rig.calls().len()));
+        }
+    };
+    let why = runner
+        .run(&skill_run(Duration::from_millis(400)), &end_token)
+        .unwrap_err();
+    // Revoked first, then `close --now`: no close was asked before it.
+    let before = ended_at.get().expect("the token was ended");
+    assert!(
+        rig.calls()[..before]
+            .iter()
+            .all(|call| call["args"][0] != "close"),
+        "the token is ended before the run is closed"
+    );
+    assert!(why.contains("deadline"), "{why}");
+    assert!(
+        began.elapsed() < Duration::from_secs(4),
+        "{:?}",
+        began.elapsed()
+    );
+    let closes: Vec<Value> = rig
+        .calls()
+        .into_iter()
+        .filter(|call| call["args"][0] == "close")
+        .collect();
+    assert_eq!(closes.len(), 1, "closed once");
+    assert_eq!(
+        closes[0]["args"],
+        json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
+    );
+    nothing_left(&rig);
+}
+
+/// A run Harness didn't start, or that failed or asked something, is an
+/// error, and leaves nothing either; one never started is never closed.
+#[test]
+fn a_skill_run_that_fails_leaves_nothing() {
+    let rig = Rig::new();
+    rig.plan(json!({"machines":{"default":true},"new":{"exit":1}}));
+    let why = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert_eq!(why, "Harness didn't start the run (new_failed)");
+    assert!(rig.calls().iter().all(|call| call["args"][0] != "close"));
+    nothing_left(&rig);
+    for (state, said) in [("failed", "failed"), ("needs-input", "ask something")] {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, state);
+        let why = skill_runner(&rig, Some(EngineKind::Hermes))
+            .run(&skill_run(Duration::from_secs(20)), &|| {})
+            .unwrap_err();
+        assert!(why.contains(said), "{state}: {why}");
+        assert!(rig.calls().iter().any(|call| call["args"][0] == "close"));
+        nothing_left(&rig);
+    }
+}
+
+/// Hermes only: OpenClaw (or any other engine) as the lamp's, no lamp
+/// target, no Harness set up, or a wrapper that doesn't find a run by its
+/// folder, is refused in words, with nothing made or asked.
+#[test]
+fn a_skill_run_is_refused_with_no_harness_or_an_old_wrapper() {
+    let refused = |runner: HarnessRunner, rig: &Rig, words: &str| {
+        let why = runner
+            .run(&skill_run(Duration::from_secs(20)), &|| {})
+            .unwrap_err();
+        assert!(why.contains(words), "{why}");
+        assert!(rig.calls().is_empty(), "nothing asked");
+        assert!(!rig.root.path().join("project").exists());
+        assert!(!rig.root.path().join("runs").exists());
+    };
+    let rig = Rig::new();
+    refused(skill_runner(&rig, None), &rig, "no Harness target");
+    let mut empty = skill_runner(&rig, Some(EngineKind::Hermes));
+    empty.harness = Arc::default();
+    refused(empty, &rig, "isn't set up");
+    let wrapper = rig.root.path().join("hermes");
+    fs::write(
+        &wrapper,
+        "#!/bin/sh\nexec /usr/bin/unshare --map-root-user $N --mount \"$@\"\n",
+    )
+    .unwrap();
+    let mut old = skill_runner(&rig, Some(EngineKind::Hermes));
+    old.held_by = Some(wrapper);
+    refused(old, &rig, skill_task::NOT_FOUND_BY_FOLDER);
 }
