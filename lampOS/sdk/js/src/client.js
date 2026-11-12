@@ -26,9 +26,18 @@ export function binaryFrame(message) {
 }
 
 // Events that come with a request, never subscribed to: a camera stream's,
-// and a microphone stream's.
+// a microphone stream's, and a speaker stream's.
 const CAMERA_EVENTS = ['camera.frame', 'camera.ended'];
 const MICROPHONE_EVENTS = ['microphone.audio', 'microphone.ended'];
+export const SPEAKER_EVENTS = ['speaker.stats', 'speaker.ended'];
+
+// A speaker stream's frames (docs/control.md, "The speaker"): at most 9,600 bytes of samples a message, 10 to 100 ms
+// each; this client sends 20 ms.
+export const SPEAKER_FRAME_MAX = 9600;
+export const SPEAKER_RATES = Object.freeze([16000, 24000]);
+const SPEAKER_FRAME_MS = 20;
+// How far ahead of real time a paced WAV is sent: the lamp buffers 300 ms before it plays, so it never runs dry.
+const SPEAKER_LEAD_MS = 100;
 
 // `keepConnected`'s pauses before connecting again, in seconds: the first after
 // a closed connection, then longer while the lamp can't be reached (a restart
@@ -159,7 +168,7 @@ function noEvent(name, on = false) {
   } else {
     // With `on`: what it takes: the schema's, the streams' and the two that come unasked.
     hint = on
-      ? `one of ${[...new Set([...schema.events, ...CAMERA_EVENTS, ...MICROPHONE_EVENTS])].sort().join(', ')}, or 'lease' or 'done'`
+      ? `one of ${[...new Set([...schema.events, ...CAMERA_EVENTS, ...MICROPHONE_EVENTS, ...SPEAKER_EVENTS])].sort().join(', ')}, or 'lease' or 'done'`
       : `one of ${[...schema.events].sort().join(', ')}`;
   }
   return new LampError(`no event '${name}': ${hint}`, { code: 'bad_request' });
@@ -193,6 +202,120 @@ function check(op, fields) {
   // A lease's parts; a `sound.upload`'s or `skill.push`'s `parts` is a count.
   for (const part of op === 'lease.take' ? fields.parts ?? [] : []) {
     if (!schema.parts.includes(part)) throw new LampError(`no part ${part}`, { code: 'bad_request' });
+  }
+}
+
+// The samples of a WAV of PCM16 mono at 16000 or 24000 Hz, and its rate; anything else is refused in words.
+export function wavSamples(wav) {
+  const bad = (why) => new LampError(`wav: ${why}`, { code: 'bad_request' });
+  if (wav.length < 12 || wav.toString('latin1', 0, 4) !== 'RIFF' || wav.toString('latin1', 8, 12) !== 'WAVE') throw bad('not a WAV file');
+  let format = null;
+  for (let at = 12; at + 8 <= wav.length;) {
+    const id = wav.toString('latin1', at, at + 4);
+    const size = wav.readUInt32LE(at + 4);
+    const body = at + 8;
+    if (id === 'fmt ' && size >= 16 && body + 16 <= wav.length) {
+      format = { tag: wav.readUInt16LE(body), channels: wav.readUInt16LE(body + 2), rate: wav.readUInt32LE(body + 4), bits: wav.readUInt16LE(body + 14) };
+    } else if (id === 'data') {
+      if (!format) throw bad('no fmt chunk before the sound');
+      if (format.tag !== 1 || format.bits !== 16 || format.channels !== 1) throw bad('16-bit mono PCM only');
+      if (!SPEAKER_RATES.includes(format.rate)) throw bad(`${format.rate} Hz: the speaker takes ${SPEAKER_RATES.join(' or ')} Hz`);
+      // A data chunk may claim more than the file holds (a stream's WAV): take what is there, whole samples.
+      const end = Math.min(body + size, wav.length);
+      return { rate: format.rate, samples: wav.subarray(body, end - ((end - body) % 2)) };
+    }
+    at = body + size + (size % 2);
+  }
+  throw bad('no sound in it');
+}
+
+/** A speaker stream's handle (`lamp.speakerStream()`). */
+export class SpeakerStream {
+  constructor(lamp, reply) {
+    this.lamp = lamp;
+    this.sampleRate = reply.sample_rate;
+    this.turn = reply.turn;
+    this.frameMs = reply.frame_ms;
+    this.bufferMs = reply.buffer_ms;
+    this.reply = reply;
+    this.sequence = 0;
+    this.endedWhy = null; // why the lamp ended it, once it has
+    this.stats = null; // the last `speaker.stats`
+    this.over = false;
+    // Only this stream's own end: a `speaker.ended` of another turn (an older stream's) is not it.
+    this.onEnded = (event) => { if (event.turn === this.turn) this.endedWhy = event.why ?? 'ended'; };
+    this.onStats = (event) => { if (event.turn === undefined || event.turn === this.turn) this.stats = event; };
+    lamp.on('speaker.ended', this.onEnded);
+    lamp.on('speaker.stats', this.onStats);
+  }
+
+  /** Whether the lamp (or `stop`) has ended it. */
+  get ended() { return this.over || this.endedWhy !== null; }
+
+  /** Send `pcm`, mono signed 16-bit little-endian samples at `sampleRate` (a Buffer or Uint8Array), as 20 ms frames
+   * of at most 9,600 bytes each. Resolves when sent, not when played. */
+  async speakerWrite(pcm) {
+    const data = Buffer.from(pcm);
+    if (data.length % 2) throw new LampError('speakerWrite: whole 16-bit samples', { code: 'bad_request' });
+    const step = Math.min(((this.sampleRate * SPEAKER_FRAME_MS) / 1000) * 2, SPEAKER_FRAME_MAX);
+    for (let at = 0; at < data.length; at += step) await this.frame(data.subarray(at, at + step));
+  }
+
+  async frame(samples) {
+    if (this.endedWhy !== null) throw new LampError(`the speaker stream ended: ${this.endedWhy}`, { code: 'closed' });
+    if (this.over) throw new LampError('the speaker stream was stopped', { code: 'closed' });
+    const ws = this.lamp.ws;
+    if (ws.readyState !== WebSocket.OPEN) throw new LampError('the connection to the lamp closed', { code: 'closed' });
+    const header = Buffer.from(JSON.stringify({ ev: 'speaker.audio', sequence: this.sequence }));
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(header.length);
+    this.sequence += 1;
+    debug.frame('->', { ev: 'speaker.audio', sequence: this.sequence - 1 });
+    await new Promise((resolve, reject) => ws.send(Buffer.concat([length, header, samples]), (error) => (error ? reject(new LampError(`the connection to the lamp closed: ${error.message}`, { code: 'closed' })) : resolve())));
+  }
+
+  /** Play a WAV file (PCM16 mono at this stream's rate, 16000 or 24000 Hz) in real time. Resolves to
+   * `{ ms, ended }`: the sound sent, and why the lamp ended the stream before the end of the file (else null). */
+  async playWav(path) {
+    const { rate, samples } = wavSamples(await readFile(path));
+    if (rate !== this.sampleRate) {
+      throw new LampError(`wav: ${rate} Hz, but this stream is ${this.sampleRate} Hz: open it with speakerStream(${rate})`, { code: 'bad_request' });
+    }
+    return this.playPcm(samples);
+  }
+
+  /** `speakerWrite` paced in real time (a little ahead, inside the lamp's 300 ms buffer), as `playWav` sends a file:
+   * resolves to `{ ms, ended }` as it does, once the sound has played (the stream's own count of it, then the lamp's
+   * buffer), so `stop()` right after does not cut its tail. */
+  async playPcm(pcm) {
+    const samples = Buffer.from(pcm);
+    if (samples.length % 2) throw new LampError('playPcm: whole 16-bit samples', { code: 'bad_request' });
+    const step = ((this.sampleRate * SPEAKER_FRAME_MS) / 1000) * 2;
+    const start = Date.now();
+    let sent = 0;
+    for (let at = 0; at < samples.length && this.endedWhy === null; at += step, sent += 1) {
+      // Frame k is due at its play time less the lead.
+      const wait = start + sent * SPEAKER_FRAME_MS - SPEAKER_LEAD_MS - Date.now();
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+      if (this.endedWhy !== null) break;
+      await this.frame(samples.subarray(at, at + step));
+    }
+    // Sent a little ahead of real time: wait for the last of it to play, then for the lamp's own buffer.
+    if (this.endedWhy === null) {
+      const playsUntil = start + (samples.length / 2 / this.sampleRate) * 1000 + (this.bufferMs ?? 0);
+      const wait = playsUntil - Date.now();
+      if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+    }
+    return { ms: (sent * SPEAKER_FRAME_MS), ended: this.endedWhy };
+  }
+
+  /** End the stream (`on: false`); safe after the lamp has ended it. */
+  async stop() {
+    if (this.over) return;
+    this.over = true;
+    this.lamp.off('speaker.ended', this.onEnded);
+    this.lamp.off('speaker.stats', this.onStats);
+    if (this.lamp.ws.readyState === WebSocket.OPEN) await this.lamp.request('speaker.stream', { on: false }).catch(() => {});
   }
 }
 
@@ -625,7 +748,7 @@ export class Lamp {
   // Call `handler(event)` for each `event` the lamp says; subscribes at once.
   on(event, handler, { phrases } = {}) {
     if (!schema.events.includes(event) && event !== 'lease' && event !== 'done' && !CAMERA_EVENTS.includes(event)
-      && !MICROPHONE_EVENTS.includes(event)) {
+      && !MICROPHONE_EVENTS.includes(event) && !SPEAKER_EVENTS.includes(event)) {
       throw noEvent(event, true);
     }
     const short = shortPhrase(phrases);
@@ -842,6 +965,23 @@ export class Lamp {
   microphoneStream(on = true) {
     return this.request('microphone.stream', { on });
   }
+  // The speaker (the `speaker` grant, a new one, never ticked for you): any sound through the lamp's speaker, not only
+  // its own voice, so a program can sound like a person. Never while the lamp is private or muted, only on the lamp's
+  // own network, and the ring shows a mark while it plays.
+
+  /** Open a speaker stream at `sampleRate` (16000, the default, or 24000; mono signed 16-bit little-endian) and give
+   * its handle: `speakerWrite(pcm)` sends sound (a Buffer of samples, cut into 20 ms frames), `playWav(path)` plays a
+   * PCM16 mono WAV in real time, `stop()` ends it. The lamp says `speaker.stats` every 2 s and `speaker.ended` with
+   * `why` (`lamp.on('speaker.stats', ...)`). Needs the `speaker` grant. The plain request is
+   * `lamp.request('speaker.stream', { on, sample_rate })`. */
+  async speakerStream(sampleRate = 16000) {
+    if (!SPEAKER_RATES.includes(sampleRate)) {
+      throw new LampError(`sample_rate: one of ${SPEAKER_RATES.join(', ')}`, { code: 'bad_request' });
+    }
+    const reply = await this.request('speaker.stream', { on: true, sample_rate: sampleRate });
+    return new SpeakerStream(this, reply);
+  }
+
   // `hum`, the lamp's own, or one of this computer's clips by name (`uploadSound`), once the person isn't talking.
   sound(name) { return this.act('sound', { name }); }
   // Keep a clip on the lamp as `name`, over one of the same name, to play with `sound(name)`: a WAV of 16-bit mono PCM

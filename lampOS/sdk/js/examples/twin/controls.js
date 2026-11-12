@@ -186,6 +186,24 @@ export const CONTROLS = [
       }
       return `lamp.microphoneStream(true) for ${a.seconds} s -> ${blocks} blocks, ${bytes} bytes, ${lost} lost${ended ? `, ended: ${ended}` : ''} (counted, not played or kept)`;
     } },
+  // The speaker (grant `speaker`, off unless the owner ticked it and the lamp serves it): a second of 440 Hz at -20 dBFS
+  // through a speaker stream, in real time; the log shows its `speaker.stats` and `speaker.ended` events. Without the
+  // grant, or while the lamp is private or muted, the lamp's refusal comes back in its words.
+  { id: 'speaker_tone', group: 'Voice', ops: ['speaker.stream'], shows: [], label: 'Speaker tone (1 s of 440 Hz)', fields: [],
+    run: async ({ lamp }) => {
+      const stream = await lamp.speakerStream(16000);
+      try {
+        const samples = Buffer.alloc(16000 * 2);
+        for (let n = 0; n < 16000; n += 1) samples.writeInt16LE(Math.round(3277 * Math.sin((2 * Math.PI * 440 * n) / 16000)), n * 2);
+        const { ms, ended } = await stream.playPcm(samples);
+        // Left open 2.5 s: the lamp says its `speaker.stats` (every 2 s) and then ends the idle stream (`speaker.ended`,
+        // `idle`, after 2 s with no frame), so the log shows both.
+        if (ended === null) await new Promise((resolve) => setTimeout(resolve, 2500));
+        return `lamp.speakerStream(16000).playPcm(440 Hz, 1 s) // ${ended === null ? `${ms} ms sent` : `ended: ${ended}`}`;
+      } finally {
+        await stream.stop();
+      }
+    } },
   { id: 'skill_push', group: 'Skills', ops: ['skill.push'], shows: [], label: 'Push the try-wave skill', fields: [],
     run: async ({ lamp }) => {
       const skill = await lamp.pushSkill(TRY_SKILL);

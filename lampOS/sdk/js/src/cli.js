@@ -4,9 +4,13 @@
 //   lamp pair 12345678 --pin <64 hex> [--host lamp-75c9.local] [--name "Dev's laptop"]
 //   lamp hello [LAMP_ID]
 //   lamp fake [--every 10] [--cycles N] [--everything] [--hands]
+//   lamp speaker FILE.wav|- [--rate 16000|24000]
 //   lamp skill push FOLDER [LAMP_ID] | lamp skill list [LAMP_ID] | lamp skill remove NAME [LAMP_ID]
 import { parseArgs } from 'node:util';
-import { Lamp } from './client.js';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Lamp, SPEAKER_RATES, wavSamples } from './client.js';
 import { find } from './discovery.js';
 import { PORT } from './schema.js';
 import { fake } from './fake.js';
@@ -15,11 +19,13 @@ const USAGE = `usage: lamp find
        lamp pair CODE --pin PIN [--host HOST] [--port PORT] [--name NAME]
        lamp hello [LAMP_ID]
        lamp fake [--every S] [--cycles N] [--everything] [--hands]
+       lamp speaker FILE.wav|- [LAMP_ID] [--rate N]
        lamp skill push FOLDER [LAMP_ID] | list [LAMP_ID] | remove NAME [LAMP_ID]
 
   find    lamps on this network
   pair    pair this computer with a lamp, with the owner's code
   hello   connect to a paired lamp and show its grants
+  speaker play a WAV (or raw PCM16 on stdin) through the lamp's speaker, in real time (the speaker grant)
   fake    a fake lamp here, paired at once, saying an arrival now and then
   skill   this computer's pushed skills (the skills grant): push, list, remove`;
 
@@ -27,7 +33,7 @@ let parsed;
 try {
   parsed = parseArgs({
     allowPositionals: true,
-    options: { help: { type: 'boolean', short: 'h' }, host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, hands: { type: 'boolean' } },
+    options: { help: { type: 'boolean', short: 'h' }, host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, hands: { type: 'boolean' }, rate: { type: 'string' } },
   });
 } catch (error) {
   // A misspelt option is one line and the usage, not a stack trace.
@@ -60,6 +66,42 @@ async function main() {
     console.log(`paired with ${pairing.lamp} (${pairing.name}) as ${pairing.client}: ${pairing.grants.join(', ')}`);
   } else if (command === 'fake') {
     return fake({ every: Number(values.every ?? 10), cycles: values.cycles === undefined ? undefined : Number(values.cycles), everything: Boolean(values.everything), hands: Boolean(values.hands) });
+  } else if (command === 'speaker' && arg) {
+    // Sound through the lamp's speaker (the `speaker` grant), in real time: a PCM16 mono WAV, or `-` for raw PCM16
+    // mono samples on stdin at --rate (16000 unless given).
+    const lamp = await Lamp.connect(third);
+    try {
+      let path = arg;
+      let rate;
+      let folder;
+      if (arg === '-') {
+        rate = Number(values.rate ?? 16000);
+        if (!SPEAKER_RATES.includes(rate)) throw new Error(`--rate: one of ${SPEAKER_RATES.join(', ')}`);
+        const pcm = readFileSync(0);
+        // A WAV header around the samples, so one path plays both.
+        const header = Buffer.alloc(44);
+        header.write('RIFF', 0); header.writeUInt32LE(36 + pcm.length, 4); header.write('WAVEfmt ', 8);
+        header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20); header.writeUInt16LE(1, 22);
+        header.writeUInt32LE(rate, 24); header.writeUInt32LE(rate * 2, 28); header.writeUInt16LE(2, 32); header.writeUInt16LE(16, 34);
+        header.write('data', 36); header.writeUInt32LE(pcm.length, 40);
+        folder = mkdtempSync(join(tmpdir(), 'lamp-speaker-'));
+        path = join(folder, 'stdin.wav');
+        writeFileSync(path, Buffer.concat([header, pcm]));
+      } else {
+        rate = wavSamples(readFileSync(arg)).rate;
+      }
+      try {
+        const stream = await lamp.speakerStream(rate);
+        const { ms, ended } = await stream.playWav(path);
+        await stream.stop();
+        console.log(ended === null ? `played ${ms} ms` : `the lamp ended the stream after ${ms} ms: ${ended}`);
+        if (ended !== null) return 1;
+      } finally {
+        if (folder) rmSync(folder, { recursive: true, force: true });
+      }
+    } finally {
+      await lamp.close();
+    }
   } else if (command === 'skill' && third && (arg === 'push' || arg === 'remove')) {
     // A skill of this computer's own on its paired lamp (the skills grant).
     const lamp = await Lamp.connect(fourth);

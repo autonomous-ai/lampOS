@@ -60,6 +60,16 @@ AUDIO_EVERY_S = 0.02
 # person in view (microphone.rs `SOMEONE_ELSE`).
 SOMEONE_ELSE = "someone else is here"
 
+# The fake's speaker, as lamp-control's speaker.rs takes it: mono S16LE at 16
+# kHz (the default) or 24 kHz, each binary frame at most 9,600 bytes of
+# samples; the voice buffers 300 ms, and frames of 10 to 100 ms are asked of a
+# program. Its words, as that file has them.
+SPEAKER_RATES = (16_000, 24_000)
+SPEAKER_FRAME_MAX = 9_600
+SPEAKER_BUFFER_MS = 300
+SPEAKER_PRIVATE = "the lamp is private"
+SPEAKER_MUTED = "the lamp is muted"
+
 
 def tone_block(sequence: int, hz: float = 440.0, level: int = 1000) -> bytes:
     """Block `sequence` of a quiet tone, as signed 16-bit little-endian
@@ -663,6 +673,19 @@ class FakeLamp:
         # made-up ears' next block's `sequence`.
         self.listening: dict[int, asyncio.Task] = {}
         self.audio_sequence = 0
+        # The one speaker stream (`speaker.stream`) of this lamp, if running:
+        # its connection, computer, turn, rate and counters; the sound played
+        # by each computer; and how long a stream may go with no frame and
+        # how often it says its stats (the lamp's 2 s each; a test may
+        # shorten them).
+        self.speaker: dict[str, Any] | None = None
+        self.speaker_turns = 0
+        self.speaker_played: dict[str, bytearray] = defaultdict(bytearray)
+        self.speaker_played_all = bytearray()
+        # Each accepted frame's (sequence, sample bytes), in order.
+        self.speaker_frames: list[tuple[Any, int]] = []
+        self.speaker_idle_after = 2.0
+        self.speaker_stats_every = 2.0
         self._next_lease = 1
         self._server = None
         self._connected: list = []
@@ -772,6 +795,8 @@ class FakeLamp:
         before, self.state["volume"] = self.state["volume"], now
         if before != now:
             await self.emit("volume.changed", **now)
+        if now["muted"]:
+            await self.end_speaker(SPEAKER_MUTED)
 
     def _show(self, request: dict, pixels: list[str] | None = None) -> None:
         """The ring shows a computer's light while it lasts; with `pixels`, a
@@ -840,6 +865,7 @@ class FakeLamp:
         self.state["lamp"]["private"] = private
         if private:
             await self._end_listening("the lamp is private")
+            await self.end_speaker(SPEAKER_PRIVATE)
 
     async def set_in_view(self, count: int) -> None:
         """How many people are in view (`presence`'s `count`): above one,
@@ -849,6 +875,122 @@ class FakeLamp:
         self.state["presence"]["count"] = count
         if count > 1:
             await self._end_listening(SOMEONE_ELSE)
+
+    def played_samples(self, client: str | None = None) -> bytes:
+        """The sound the speaker played: the samples (mono S16LE, as sent)
+        of every accepted frame, of `client`'s (a computer's id, `c_...`) or, with none given, of all of them in the order
+        they came."""
+        if client is not None:
+            return bytes(self.speaker_played.get(client, b""))
+        return bytes(self.speaker_played_all)
+
+    def speaker_stray_total(self) -> int:
+        """How many binary messages the speaker dropped as stray, over the
+        stream that runs (what its next `speaker.stats` says)."""
+        return self.speaker["stray"] if self.speaker is not None else 0
+
+    async def end_speaker(self, why: str) -> None:
+        """The speaker stream ends at once with `speaker.ended` (`why`: the
+        lamp's words, `private`, `muted`, `idle`, `limit`, ...) to its
+        computer, as lamp-control's does; nothing if none runs."""
+        run, self.speaker = self.speaker, None
+        if run is None:
+            return
+        run["task"].cancel()
+        with contextlib.suppress(ConnectionClosed):
+            await run["ws"].send(json.dumps({"ev": "speaker.ended", "why": why, "turn": run["turn"]}))
+
+    async def _speaker_watch(self, run: dict) -> None:
+        """What lamp-control's run thread does for a stream: `speaker.stats`
+        every `speaker_stats_every`, and the end, `idle`, once no frame of
+        sound has come for `speaker_idle_after`."""
+        loop = asyncio.get_running_loop()
+        next_stats = loop.time() + self.speaker_stats_every
+        while True:
+            now = loop.time()
+            until = min(next_stats, run["last_frame"] + self.speaker_idle_after)
+            await asyncio.sleep(max(until - now, 0))
+            if self.speaker is not run:
+                return
+            now = loop.time()
+            if now >= run["last_frame"] + self.speaker_idle_after:
+                self.speaker = None
+                with contextlib.suppress(ConnectionClosed):
+                    await run["ws"].send(json.dumps({"ev": "speaker.ended", "why": "idle", "turn": run["turn"]}))
+                return
+            if now >= next_stats:
+                next_stats = now + self.speaker_stats_every
+                with contextlib.suppress(ConnectionClosed):
+                    await run["ws"].send(json.dumps({
+                        "ev": "speaker.stats", "turn": run["turn"], "buffered_ms": 0, "lost": 0,
+                        "underruns": 0, "limited": 0, "stray": run["stray"],
+                    }))
+
+    def _speaker_frame(self, ws: ServerConnection, client: str, message: bytes) -> None:
+        """A binary message, as lamp-control's `Speaker::frame`: dropped with
+        no answer unless a stream runs; another connection's, or one of a
+        size a stream doesn't take (empty, odd, over 9,600 bytes of samples,
+        or a header that isn't `speaker.audio`'s), is counted `stray`; only
+        real sound keeps the stream's idle clock going."""
+        run = self.speaker
+        if run is None:
+            return
+        if run["ws"] is not ws:
+            run["stray"] += 1
+            return
+        samples = b""
+        try:
+            length = int.from_bytes(message[:4], "big")
+            header = json.loads(message[4 : 4 + length])
+            if len(message) >= 4 + length and header.get("ev") == "speaker.audio":
+                samples = message[4 + length :]
+        except (ValueError, AttributeError):
+            pass
+        if not samples or len(samples) > SPEAKER_FRAME_MAX or len(samples) % 2:
+            run["stray"] += 1
+            return
+        run["last_frame"] = asyncio.get_running_loop().time()
+        self.speaker_frames.append((header.get("sequence"), len(samples)))
+        self.speaker_played[client].extend(samples)
+        self.speaker_played_all.extend(samples)
+
+    async def _speaker_stream(self, ws: ServerConnection, client: str, id_, request: dict) -> None:
+        """`speaker.stream`, as lamp-control's speaker.rs: off ends this
+        connection's own stream with no event; on again, from any computer,
+        replaces the one that runs (its connection is told `speaker.ended`,
+        `replaced`); never while the lamp is private or muted."""
+        run = self.speaker
+        if not request["on"]:
+            if run is not None and run["ws"] is ws:
+                self.speaker = None
+                run["task"].cancel()
+            await self._ok(ws, id_, stream="off")
+            return
+        if self.state["lamp"]["private"]:
+            await self._refuse(ws, id_, "private", SPEAKER_PRIVATE)
+            return
+        if self.state["volume"]["muted"]:
+            await self._refuse(ws, id_, "refused", SPEAKER_MUTED)
+            return
+        rate = request.get("sample_rate", 16_000)
+        if rate not in SPEAKER_RATES:
+            await self._refuse(ws, id_, "bad_request", "sample_rate: 16000 or 24000")
+            return
+        self.speaker_turns += 1
+        new: dict[str, Any] = {
+            "ws": ws, "client": client, "turn": self.speaker_turns, "rate": rate, "stray": 0,
+            "last_frame": asyncio.get_running_loop().time(),
+        }
+        self.speaker = new
+        if run is not None:
+            run["task"].cancel()
+            with contextlib.suppress(ConnectionClosed):
+                await run["ws"].send(json.dumps({"ev": "speaker.ended", "why": "replaced", "turn": run["turn"]}))
+        new["task"] = asyncio.ensure_future(self._speaker_watch(new))
+        await self._ok(
+            ws, id_, stream="on", sample_rate=rate, channels=1, format="s16le", frame_ms=[10, 100],
+            buffer_ms=SPEAKER_BUFFER_MS, source="speaker", turn=new["turn"],
+        )
 
     async def _end_listening(self, why: str) -> None:
         for key, task in list(self.listening.items()):
@@ -978,6 +1120,12 @@ class FakeLamp:
         try:
             await ws.send(json.dumps({"ev": "welcome", "at": _now(), "nonce": b64(nonce), "lamp": self.lamp}))
             async for text in ws:
+                if isinstance(text, bytes):
+                    # Binary: sound for the speaker, from a computer known.
+                    known = self._client_of.get(id(ws))
+                    if known is not None:
+                        self._speaker_frame(ws, known, text)
+                    continue
                 try:
                     request = json.loads(text)
                 except json.JSONDecodeError:
@@ -1044,6 +1192,10 @@ class FakeLamp:
             if gone is not None and gone not in self._client_of.values():
                 self.mutes.pop(gone, None)
             self._stop_listening(ws)
+            # Its connection closed: its speaker stream ends, with no event.
+            if self.speaker is not None and self.speaker["ws"] is ws:
+                self.speaker["task"].cancel()
+                self.speaker = None
             for lease in [l for l, held in self.leases.items() if held["ws"] is ws]:
                 self.leases.pop(lease)
 
@@ -1149,6 +1301,7 @@ class FakeLamp:
             "listen.set": ["hear"],
             "volume": ["speak"],
             "microphone.stream": ["microphone"],
+            "speaker.stream": ["speaker"],
         }.get(op, [])
 
     def revoke(self, client: str) -> None:
@@ -1157,6 +1310,10 @@ class FakeLamp:
         self.clients.pop(client, None)
         self.clips.pop(client, None)
         self.notes.pop(client, None)
+        # Its speaker stream ends with it, with no event (`end_of`).
+        if self.speaker is not None and self.speaker["client"] == client:
+            self.speaker["task"].cancel()
+            self.speaker = None
 
     async def _notes(self, ws, client: str, request: dict) -> None:
         """One `notes.*` op, as lamp-control's notes.rs answers it: this
@@ -1370,6 +1527,10 @@ class FakeLamp:
             # and its microphone stream, with no event.
             self.stop_following(ws)
             self._stop_listening(ws)
+            # `stop` ends this connection's speaker stream too, with no event.
+            if self.speaker is not None and self.speaker["ws"] is ws:
+                self.speaker["task"].cancel()
+                self.speaker = None
             await self._ok(ws, id_)
         elif op == "play":
             # As lamp-control: one of this computer's pushed skills' moves,
@@ -1605,6 +1766,8 @@ class FakeLamp:
                     block_ms=int(AUDIO_EVERY_S * 1000), source="mic1",
                 )
                 self.listening[id(ws)] = asyncio.ensure_future(self._listen(ws))
+        elif op == "speaker.stream":
+            await self._speaker_stream(ws, client, id_, request)
         else:
             await self._ok(ws, id_)
             if op == "play" and self.auto_done:
