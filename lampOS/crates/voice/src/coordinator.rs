@@ -13068,6 +13068,19 @@ fn conversation_with_gate_inner(
                 },
                 says,
             );
+            // A computer's stream for the speaker: opened at rest or refused
+            // in words, as an exact line's gate says, and a held one ended
+            // when its computer closed the connection. It plays nothing yet.
+            if let Some(admitted) = says.admit_stream(&now_is, at_us) {
+                let (by, opened, why) = match &admitted {
+                    crate::say::Admitted::Opened { by } => (by, true, None),
+                    crate::say::Admitted::Refused { by, why } => (by, false, Some(why)),
+                };
+                record(
+                    trace,
+                    json!({"kind":"speaker_stream","at_us":at_us,"by":by,"opened":opened,"why":why}),
+                )?;
+            }
             // A paired computer's exact line first: it waits while the
             // person talks, where a skill's sound is refused.
             if let Some(now_state) = play_exact_line(
