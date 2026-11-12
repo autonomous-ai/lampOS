@@ -2573,7 +2573,8 @@ whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
 
-**Every engine's wrapper (#6510 Part 1, step 1, not yet used):** once a
+**Every engine's wrapper (#6510 Part 1, step 1, off unless
+`LAMP_AGENT_NS=on`):** once a
 skill's run goes through Harness, lamp-update's one wrapper for every
 engine (docs/install.md, "One agent namespace for every engine") is what
 picks up the run's token: with `LAMP_RUN_ID` (a provisional name) set, it
@@ -2582,7 +2583,10 @@ engine the token as `LAMP_CONTROL_TOKEN` in its environment only, with
 `LAMP_NS_NET=run`; the engine's `HOME` is its own
 `/var/lib/lampos-agents/<engine>`. An engine counts as present only when
 `lampos`'s login shell finds the wrapper first (not its own program in
-`~/.local/bin`). Hermes's runner above is unchanged until step 2.
+`~/.local/bin`). With lamp-update's own `LAMP_AGENT_NS=on` (and
+`LAMP_APP_ENGINES=on`), each round writes it for every engine Harness
+says is installed except Hermes and OpenClaw. No skill run uses it yet:
+Hermes's runner above is unchanged until step 2.
 
 ## Devin (#1854)
 

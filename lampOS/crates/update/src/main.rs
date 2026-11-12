@@ -1052,6 +1052,32 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             ))
         });
     }
+    // One agent namespace for every engine Harness reports (#6510 Part 1,
+    // step 1): only with lamp-update's own LAMP_AGENT_NS=on (no product unit
+    // sets it), by a `serve` that acts, beside the look at Harness's engines
+    // (LAMP_APP_ENGINES=on) that says which; the namespace shows what
+    // Hermes's does (its skills and tasks switches).
+    let agent_ns = {
+        use lamp_update::agent_ns::rounds;
+        let wanted = config.apply
+            && command == "serve"
+            && rounds::on(std::env::var(rounds::SWITCH).ok().as_deref());
+        if wanted && engines.is_none() {
+            say(&format!(
+                "the agent namespace for every engine: off, as {} (the look at Harness's engines) is off",
+                lamp_update::engines::SWITCH
+            ));
+        }
+        if wanted && harness.is_none() {
+            say("the agent namespace for every engine: off, as Harness before the sign-in is off");
+        }
+        match (wanted, &engines, hermes) {
+            (true, Some(engines), Some((_, shown))) if harness.is_some() => {
+                Some((engines.harness.clone(), shown))
+            }
+            _ => None,
+        }
+    };
     // `update/status` (#2194): where each round is, and how the last ended,
     // only for a round that acts; Harness's record looked at often only
     // with its switch on.
@@ -1178,6 +1204,20 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 if let Some(engines) = &engines {
                     engines.settle_openclaw(&records);
                 }
+            }
+            // Every other engine Harness says is installed, after Hermes's
+            // and OpenClaw's own installers (#6510): its wrapper, the
+            // namespace script and its home, written again when not there.
+            if let Some((look, shown)) = &agent_ns {
+                let look = look.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                lamp_update::agent_ns::rounds::after_round(
+                    &config.root,
+                    &look,
+                    *shown,
+                    &mut lamp_update::agent_ns::rounds::lampos_ids,
+                    &mut lamp_update::agent_ns::wrapper::login_finds,
+                    &mut say,
+                );
             }
         }
         if matches!(hermes, Some((false, _)))
