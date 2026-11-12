@@ -547,7 +547,18 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
                 "description": "What this skill should do and when, in the person's own words for this ask, nothing else: never a time, step or trigger of an earlier skill or turn."
             }
         },
-        "required": ["request"]
+        "required": []
+    });
+    // The person's choice on a made skill that clashes with one on the
+    // lamp (#6593, [`crate::made_clash`]): its id and the choice, alone.
+    parameters["properties"][crate::made_clash::CLASH_ID] = json!({
+        "type": "string",
+        "description": "Only when a skill you just made clashes with one on the lamp and the person then chooses: its clash_id, given with choice alone, with no request."
+    });
+    parameters["properties"][crate::made_clash::CHOICE] = json!({
+        "type": "string",
+        "enum": crate::made_clash::CHOICES,
+        "description": "With clash_id only: replace the other skill, keep both (the new one wins), or cancel, as the person chose in any words."
     });
     if writes || tasks || code {
         parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
@@ -819,6 +830,24 @@ fn make_with_by(
         .as_ref()
         .ok()
         .and_then(|made| made_skill::needs_link(&made.uses, linked));
+    // A skill made by voice that clashes with one on the lamp (#6593: the
+    // same trigger, both using the light or both moving the head) is not
+    // put on: the person is asked to replace the other, keep both or
+    // cancel ([`crate::made_clash`]). One with code of its own waits for
+    // its yes as it did.
+    if made_in != 0
+        && let Ok(made) = &made
+        && !made.uses.code
+        && let Some(clash) = crate::made_clash::found(keeping, made)
+    {
+        MADE_LINE.with(|kept| kept.replace(Some(crate::made_clash::cut_line(made, &clash))));
+        let told =
+            crate::made_clash::asked(keeping, made, &clash, made_in, std::time::Instant::now());
+        if let Some(asked) = asked {
+            asked.made(&made.name, &told, now_unix_ms);
+        }
+        return told;
+    }
     // One with code of its own (#6307) is not put on here: it waits for
     // the person's yes to its say-back, which puts on that package alone.
     let on = match &made {
@@ -1014,7 +1043,11 @@ impl Drop for OneAsk {
 fn already_made(name: &str, told: &Value) -> Value {
     let mut told = told.clone();
     told["already_made"] = json!(true);
-    if told.get(crate::skill_write_yes::APPROVE_ID).is_none() {
+    // One waiting for the person's yes, or for their choice on a clash
+    // (#6593), keeps its question, so the cut turn's question is asked.
+    if told.get(crate::skill_write_yes::APPROVE_ID).is_none()
+        && told.get(crate::made_clash::CLASH_ID).is_none()
+    {
         told["next"] = json!(format!(
             "{}Nothing new was made: this same ask made it a moment ago. Tell the person \
              this, in the language of the conversation, and add nothing else: \"{}\"",
@@ -2190,6 +2223,19 @@ pub fn answer(
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> Value {
+    // The person's choice on a made skill that clashes with one on the
+    // lamp (#6593): only the owner's own later line, as for a yes.
+    if let Some(id) = call.args[crate::made_clash::CLASH_ID].as_str() {
+        return crate::made_clash::chosen(
+            id,
+            call.args[crate::made_clash::CHOICE].as_str(),
+            request,
+            heard,
+            || crate::services::owners_yes_now(request, heard, lease),
+            std::time::Instant::now(),
+            &crate::made_clash::helper_hands(),
+        );
+    }
     // The person's yes to a made skill's writes (#6066): the waiting
     // skill's, in a later heard line, approved by the voice itself.
     if let Some(id) = call.args[crate::skill_write_yes::APPROVE_ID].as_str() {
@@ -3927,7 +3973,9 @@ light = { dim = 1 }
                 .get("approve_id")
                 .is_none()
         );
-        assert_eq!(parameters(false, false)["required"], json!(["request"]));
+        // A clash's choice (#6593) comes with no request: none required.
+        assert_eq!(parameters(false, false)["required"], json!([]));
+        assert!(parameters(false, false)["properties"]["clash_id"].is_object());
         made_skill::set_writes_here(Some(true));
         for reads in [true, false] {
             let on = system_with(reads);

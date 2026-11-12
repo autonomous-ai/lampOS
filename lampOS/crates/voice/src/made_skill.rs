@@ -5769,6 +5769,20 @@ pub(crate) fn pushed(installed: &Path) -> PathBuf {
     installed.with_file_name("skills-dev")
 }
 
+/// [`pushed`], for a made skill's clash (`crate::made_clash`).
+pub fn pushed_folder(installed: &Path) -> PathBuf {
+    pushed(installed)
+}
+
+/// The made skill called `name` taken off the lamp (`crate::made_clash`'s
+/// replace, once the manage helper removed it): dropped from the index,
+/// its package with it, so it is never told as on again.
+pub fn forget_named(directory: &Path, name: &str) {
+    if let Err(error) = forget_others(directory, name, "") {
+        eprintln!("lamp-voice: a replaced made skill wasn't dropped from the index: {error}");
+    }
+}
+
 /// Drop from the index every kept skill called `name` but the one from
 /// `from`, their packages with them.
 fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
@@ -6706,6 +6720,14 @@ fn packed_and_kept(
         if !writes.is_empty() {
             note_writes(&keeping.directory, &made.sha256, &writes).map_err(unkept)?;
         }
+        // What it starts on and uses, for a clash with a skill on the lamp
+        // (#6593, `crate::made_clash`).
+        note_clash(
+            &keeping.directory,
+            &made.sha256,
+            crate::made_clash::signature(toml),
+        )
+        .map_err(unkept)?;
         fs::rename(&new, &made.package).map_err(unkept)?;
         Ok(made)
     });
@@ -7145,6 +7167,18 @@ fn note_writes(directory: &Path, sha256: &str, writes: &[Value]) -> io::Result<(
     for entry in &mut entries {
         if entry["sha256"] == sha256 {
             entry["writes"] = json!(writes);
+        }
+    }
+    write_index(directory, &entries)
+}
+
+/// What the made skill `sha256` starts on and uses, kept as `"clash"`
+/// beside it (`crate::made_clash::signature`).
+fn note_clash(directory: &Path, sha256: &str, signature: Value) -> io::Result<()> {
+    let mut entries = index(directory);
+    for entry in &mut entries {
+        if entry["sha256"] == sha256 {
+            entry["clash"] = signature.clone();
         }
     }
     write_index(directory, &entries)
