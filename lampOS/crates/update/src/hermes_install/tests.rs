@@ -2423,8 +2423,18 @@ fn hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once() {
             ),
             "{cwd}"
         );
-        let (ok, out, _) = run(cwd, &[(NET_ENV, "run"), ("LAMP_CONTROL_TOKEN", "given")]);
+        let (ok, out, _) = run(
+            cwd,
+            &[
+                (NET_ENV, "run"),
+                ("LAMP_CONTROL_TOKEN", "given"),
+                ("HERMES_YOLO_MODE", "1"),
+            ],
+        );
         assert!(ok && out.contains(" --net ") && out.contains("LAMP_CONTROL_TOKEN=given\n"));
+        // Outside a skill's run folder (a spoken task, the owner's own
+        // Hermes, any other caller) Hermes keeps its approvals (#6684).
+        assert!(!out.contains("HERMES_YOLO_MODE"), "{cwd}: {out}");
     }
     assert!(top.join("runs/Run-2").exists());
     // Off: no run lines; a run's folder is any folder.
