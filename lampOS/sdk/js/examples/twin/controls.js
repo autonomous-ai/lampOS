@@ -195,7 +195,7 @@ export const CONTROLS = [
       show?.(jpeg);
       return `lamp.cameraSnapshot() -> a JPEG of ${jpeg.length} bytes, on this page only`;
     } },
-  { id: 'camera_stream', group: 'Camera and microphone', needs: 'camera', ops: ['camera.stream'], shows: [], label: 'Camera: a short stream', fields: [number('seconds', 1, 10, 2, { integer: true }), number('fps', 1, 5, 2, { integer: true })],
+  { id: 'camera_stream', group: 'Camera and microphone', needs: 'camera', ops: ['camera.stream'], shows: [], label: 'Camera: a short stream', fields: [number('seconds', 1, 10, 2, { integer: true }), number('fps', 1, 30, 2, { integer: true }), select('size', ['', '640x480', '1280x720'], '', { optional: true })],
     run: async ({ lamp, show }, a) => {
       let frames = 0;
       let last = null;
@@ -205,7 +205,7 @@ export const CONTROLS = [
       await lamp.on('camera.frame', onFrame);
       await lamp.on('camera.ended', onEnded);
       try {
-        await lamp.cameraStream(true, a.fps);
+        await lamp.cameraStream(true, a.fps, a.size || undefined);
         await new Promise((resolve) => setTimeout(resolve, a.seconds * 1000));
       } finally {
         await lamp.cameraStream(false).catch(() => {});
@@ -213,7 +213,7 @@ export const CONTROLS = [
         lamp.off('camera.ended', onEnded);
       }
       if (last) show?.(last);
-      return `lamp.cameraStream(true, ${a.fps}) for ${a.seconds} s -> ${frames} frames${ended ? `, ended: ${ended}` : ''}; the last is on this page only`;
+      return `lamp.cameraStream(true, ${a.fps}${a.size ? `, ${q(a.size)}` : ''}) for ${a.seconds} s -> ${frames} frames${ended ? `, ended: ${ended}` : ''}; the last is on this page only`;
     } },
   { id: 'microphone_stream', group: 'Camera and microphone', needs: 'microphone', ops: ['microphone.stream'], shows: [], label: 'Microphone: count the sound', fields: [number('seconds', 1, 10, 2, { integer: true })],
     run: async ({ lamp }, a) => {
