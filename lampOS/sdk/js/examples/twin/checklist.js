@@ -8,16 +8,14 @@ const PREFIX = 'lampos-try-checklist';
 // The key: the lamp's id and the mode (`lamp-sim` or `real`), each cut to safe characters.
 export const keyFor = (lampId, mode) => `${PREFIX}:${String(mode).replace(/[^\w.-]/g, '_')}:${String(lampId).replace(/[^\w.-]/g, '_').slice(0, 64)}`;
 
-// The rows of the page's table (`/try.json`): its controls then its stimuli, ids `call:ID` and `stim:ID`; a row that needs a
-// grant the lamp lacks (`needs`: 'camera' or 'microphone', and the table's flag of that name false) is not on the page, so it
-// is not a row of the checklist: not counted in "n of N ticked", not in the export.
-// ONE test for both: the page draws a row exactly when the checklist counts it.
-export const visible = (table, entry) => !entry.needs || table[entry.needs] === true;
+// The rows of the page's table (`/try.json`): its controls then its stimuli, ids `call:ID` and `stim:ID`, ALL of them: a row the
+// lamp or the run cannot do carries its `disabled` reason, is "n/a" in the export, and is not a row the person can tick.
 export function rowsOf(table) {
-  const shown = (entry) => visible(table, entry);
-  return [...table.controls.filter(shown).map((c) => ({ ...c, kind: 'call' })), ...table.stimuli.filter(shown).map((s) => ({ ...s, kind: 'stim' }))]
-    .map((r) => ({ id: `${r.kind}:${r.id}`, label: r.label, group: r.group, kind: r.kind }));
+  return [...table.controls.map((c) => ({ ...c, kind: 'call' })), ...table.stimuli.map((s) => ({ ...s, kind: 'stim' }))]
+    .map((r) => ({ id: `${r.kind}:${r.id}`, label: r.label, group: r.group, kind: r.kind, ...(r.disabled ? { disabled: r.disabled } : {}) }));
 }
+// The ids a person can tick: the enabled rows ("n of N ticked" counts only these).
+export const tickable = (rows) => rows.filter((r) => !r.disabled).map((r) => r.id);
 
 // A store over `storage` (the page's localStorage, or any object with getItem/setItem; throws are swallowed:
 // private windows and blocked storage give a checklist that works for this page's life only).
@@ -57,10 +55,12 @@ function clean({ result, note, at }) {
 
 // The export: JSON (rows in table order) and a markdown table, with the lamp's name and id, the mode and the time.
 export function exportChecklist({ lamp, mode, rows, marks, now = () => new Date().toISOString() }) {
-  const list = rows.map(({ id, label, group, kind }) => ({ row: id, label, group, kind, result: marks[id]?.result ?? 'not run', note: marks[id]?.note ?? '', time: marks[id]?.at ?? '' }));
+  const list = rows.map(({ id, label, group, kind, disabled }) => (disabled
+    ? { row: id, label, group, kind, result: 'n/a', note: disabled, time: '' }
+    : { row: id, label, group, kind, result: marks[id]?.result ?? 'not run', note: marks[id]?.note ?? '', time: marks[id]?.at ?? '' }));
   const json = { lamp: { id: String(lamp.id), name: String(lamp.name) }, mode, exported_at: now(), rows: list };
   const cell = (text) => String(text).replace(/\|/g, '\\|').replace(/\s+/g, ' ');
-  const markdown = [`# Try-it checklist: ${cell(lamp.name)} (${cell(lamp.id)}, ${mode})`, '', `${list.filter((r) => r.result !== 'not run').length} of ${list.length} ticked, ${json.exported_at}`, '', '| row | result | note | time |', '| --- | --- | --- | --- |',
+  const markdown = [`# Try-it checklist: ${cell(lamp.name)} (${cell(lamp.id)}, ${mode})`, '', `${list.filter((r) => r.result === 'pass' || r.result === 'fail').length} of ${list.filter((r) => r.result !== 'n/a').length} ticked, ${list.filter((r) => r.result === 'n/a').length} n/a, ${json.exported_at}`, '', '| row | result | note | time |', '| --- | --- | --- | --- |',
     ...list.map((r) => `| ${cell(r.row)} | ${r.result} | ${cell(r.note)} | ${cell(r.time)} |`), ''].join('\n');
   return { json: `${JSON.stringify(json, null, 2)}\n`, markdown };
 }

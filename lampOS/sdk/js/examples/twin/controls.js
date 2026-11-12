@@ -10,8 +10,8 @@
 // `ops` are the control.schema.json ops the entry sends (the SDK's `withLease` sends `lease.take` and `lease.release`)
 // and `shows` the events its action should bring up in the log; a stimulus has `shows` only. test/controls-cover.test.js
 // fails for an op or an event that no entry names, unless controls-exceptions.js lists it with its reason.
-// `needs: 'camera'` or `'microphone'` (optional): the page shows the row only when the lamp has that grant (try.json's
-// `camera`/`microphone`); a press without it gets the lamp's own refusal. `ctx.show(jpeg)` puts a picture on the page
+// `needs` (the grants the row's calls take, as the lamp checks them): a row the lamp did not grant is DRAWN, its button off,
+// with its reason beside it (`describe(mode, { grants })` adds `disabled`), and the server refuses a press of it. `ctx.show(jpeg)` puts a picture on the page
 // that pressed, under its row and nowhere else: not in the log, not on disk, not in the checklist's export.
 // `hint` (optional, a string of at most 200 characters) is said under the row on the page, in `textContent`; `hintReal`,
 // when the page drives a real lamp (`describe('real')`), replaces it. For a row with an effect the label doesn't say.
@@ -114,18 +114,18 @@ export async function cleanScratch(lamp) {
 let held = null;
 
 export const CONTROLS = [
-  { id: 'gesture', group: 'Body', ops: ['gesture'], shows: [], label: 'Gesture', fields: [select('name', GESTURES, 'nod')],
+  { id: 'gesture', group: 'Body', needs: ['body'], ops: ['gesture'], shows: [], label: 'Gesture', fields: [select('name', GESTURES, 'nod')],
     run: async ({ lamp }, a) => { await lamp.gesture(a.name); return `lamp.gesture(${q(a.name)})`; } },
-  { id: 'express', group: 'Body', ops: ['express'], shows: [], label: 'Express', fields: [select('feeling', FEELINGS)],
+  { id: 'express', group: 'Body', needs: ['body', 'light'], ops: ['express'], shows: [], label: 'Express', fields: [select('feeling', FEELINGS)],
     run: async ({ lamp }, a) => { await lamp.express(a.feeling); return `lamp.express(${q(a.feeling)})`; } },
-  { id: 'look', group: 'Body', ops: ['look', 'lease.take', 'lease.release'], shows: [], label: 'Look', fields: [number('yaw', -180, 180, 20), number('pitch', -90, 90, 0)],
+  { id: 'look', group: 'Body', needs: ['body'], ops: ['look', 'lease.take', 'lease.release'], shows: [], label: 'Look', fields: [number('yaw', -180, 180, 20), number('pitch', -90, 90, 0)],
     run: async ({ lamp, release }, a) => {
       const at = { yaw: a.yaw, pitch: a.pitch };
       await release();
       await lamp.withLease(['body'], () => lamp.look(at, { wait: true }));
       return `lamp.withLease(['body'], () => lamp.look(${q(at)}, { wait: true }))`;
     } },
-  { id: 'move', group: 'Body', ops: ['move', 'lease.take', 'lease.release'], shows: [], label: 'Move poses', fields: [],
+  { id: 'move', group: 'Body', needs: ['body'], ops: ['move', 'lease.take', 'lease.release'], shows: [], label: 'Move poses', fields: [],
     run: async ({ lamp, release }) => {
       const poses = [{ pitch: 12, yaw: -15 }, { pitch: -6, yaw: 15 }, { pitch: 8, yaw: 0 }];
       // A move needs the body lease at the door, as a look does.
@@ -135,13 +135,13 @@ export const CONTROLS = [
     } },
   // The head follows the hand the lamp sees until the lease runs out (`for_ms`) or Stop; the `hand` events and the
   // lease's end come in the log. The `hand` stimulus (room) puts one in view.
-  { id: 'follow_hand', group: 'Body', ops: ['look', 'lease.take', 'lease.release'], shows: ['hand'], label: 'Follow a hand', fields: [number('for_ms', 1000, 30_000, 8000, { integer: true })],
+  { id: 'follow_hand', group: 'Body', needs: ['body', 'look'], ops: ['look', 'lease.take', 'lease.release'], shows: ['hand'], label: 'Follow a hand', fields: [number('for_ms', 1000, 30_000, 8000, { integer: true })],
     run: async ({ lamp, release }, a) => {
       await release();
       await lamp.followHand({ forMs: a.for_ms }).start();
       return `lamp.followHand({ forMs: ${a.for_ms} }).start()`;
     } },
-  { id: 'joints', group: 'Body', ops: ['joints', 'lease.take', 'lease.release'], shows: [], label: 'Joints (yaw, pitch)', fields: [number('yaw', -180, 180, 10), number('pitch', -90, 90, 5), number('within_ms', 0, 5000, 1000, { integer: true })],
+  { id: 'joints', group: 'Body', needs: ['body'], ops: ['joints', 'lease.take', 'lease.release'], shows: [], label: 'Joints (yaw, pitch)', fields: [number('yaw', -180, 180, 10), number('pitch', -90, 90, 5), number('within_ms', 0, 5000, 1000, { integer: true })],
     run: async ({ lamp, release }, a) => {
       const targets = { yaw: a.yaw, pitch: a.pitch };
       await release();
@@ -151,14 +151,14 @@ export const CONTROLS = [
   { id: 'stop', group: 'Body', ops: ['stop'], shows: [], label: 'Stop', fields: [], run: async ({ lamp }) => { await lamp.stop(); return 'lamp.stop()'; } },
   // The owner's language the lamp said in hello: a read, so the log says the code it got.
   { id: 'language', group: 'Voice', ops: [], shows: [], label: 'Language', fields: [], run: async ({ lamp }) => `lamp.language // ${q(lamp.language)}` },
-  { id: 'light', group: 'Light', ops: ['light'], shows: ['lamp.changed'], label: 'Light',
+  { id: 'light', group: 'Light', needs: ['light'], ops: ['light'], shows: ['lamp.changed'], label: 'Light',
     fields: [select('colour', COLOURS, 'warm'), number('level', 1, 5, 3, { integer: true }), select('pattern', ['', ...PATTERNS], '', { optional: true }), number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => {
       await lamp.light(a.colour, a.level, a.for_ms, a.pattern);
       return `lamp.light(${q(a.colour)}, ${a.level}, ${a.for_ms}${a.pattern ? `, ${q(a.pattern)}` : ''})`;
     } },
   // A computer's own colours on the ring, one per pixel: a few presets (the SDK takes any 32 `#rrggbb`).
-  { id: 'light_pixels', group: 'Light', ops: ['light'], shows: ['lamp.changed'], label: 'Light pixels',
+  { id: 'light_pixels', group: 'Light', needs: ['light'], ops: ['light'], shows: ['lamp.changed'], label: 'Light pixels',
     fields: [select('preset', Object.keys(PIXEL_PRESETS), 'rainbow'), number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => {
       const count = lamp.ringPixels ?? 32;
@@ -166,26 +166,26 @@ export const CONTROLS = [
       await lamp.ring(pixels, { forMs: a.for_ms });
       return `lamp.ring(${q(a.preset)} // ${count} pixels, { forMs: ${a.for_ms} })`;
     } },
-  { id: 'light_off', group: 'Light', ops: ['light'], shows: ['lamp.changed'], label: 'Light off', fields: [number('for_ms', 1, 30_000, 10_000, { integer: true })],
+  { id: 'light_off', group: 'Light', needs: ['light'], ops: ['light'], shows: ['lamp.changed'], label: 'Light off', fields: [number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => { await lamp.lightOff({ forMs: a.for_ms }); return `lamp.lightOff({ forMs: ${a.for_ms} })`; } },
   // Notes: this computer's own small notes kept on the lamp (grant `notes`, no lease). The refusals (a bad key, a value over
   // 16 KiB, a second write at once) come back in the lamp's words.
-  { id: 'notes_set', group: 'Notes', ops: ['notes.set'], shows: [], label: 'Keep a note', fields: [text('key', 64, 'try'), text('value', 16_384, '{"hello": "world"}')],
+  { id: 'notes_set', group: 'Notes', needs: ['notes'], ops: ['notes.set'], shows: [], label: 'Keep a note', fields: [text('key', 64, 'try'), text('value', 16_384, '{"hello": "world"}')],
     run: async ({ lamp }, a) => {
       let value;
       try { value = JSON.parse(a.value); } catch { throw refuse('value: JSON, such as {"hello": "world"} or "text" or 3'); }
       await lamp.notesSet(a.key, value);
       return `lamp.notesSet(${q(a.key)}, ${q(value)})`;
     } },
-  { id: 'notes_get', group: 'Notes', ops: ['notes.get'], shows: [], label: 'Read a note', fields: [text('key', 64, 'try')],
+  { id: 'notes_get', group: 'Notes', needs: ['notes'], ops: ['notes.get'], shows: [], label: 'Read a note', fields: [text('key', 64, 'try')],
     run: async ({ lamp }, a) => `lamp.notesGet(${q(a.key)}) -> ${q((await lamp.notesGet(a.key, null)) ?? null)}` },
-  { id: 'notes_delete', group: 'Notes', ops: ['notes.delete'], shows: [], label: 'Delete a note', fields: [text('key', 64, 'try')],
+  { id: 'notes_delete', group: 'Notes', needs: ['notes'], ops: ['notes.delete'], shows: [], label: 'Delete a note', fields: [text('key', 64, 'try')],
     run: async ({ lamp }, a) => `lamp.notesDelete(${q(a.key)}) -> ${q(await lamp.notesDelete(a.key))}` },
-  { id: 'notes_list', group: 'Notes', ops: ['notes.list'], shows: [], label: 'List the notes', fields: [text('prefix', 64, '', { optional: true })],
+  { id: 'notes_list', group: 'Notes', needs: ['notes'], ops: ['notes.list'], shows: [], label: 'List the notes', fields: [text('prefix', 64, '', { optional: true })],
     run: async ({ lamp }, a) => `lamp.notesList(${q(a.prefix ?? '')}) -> ${q(await lamp.notesList(a.prefix ?? ''))}` },
   // A light kept on past the 30 s one ask lasts: asked again at half the lamp's hold limit until stopped. One hold at a
   // time here (a new one ends the last); a later refusal ends it and is said on the server's log.
-  { id: 'hold_light', group: 'Light', ops: ['light'], shows: ['lamp.changed'], label: 'Hold a light',
+  { id: 'hold_light', group: 'Light', needs: ['light'], ops: ['light'], shows: ['lamp.changed'], label: 'Hold a light',
     fields: [select('colour', COLOURS, 'warm'), number('level', 1, 5, 2, { integer: true }), select('pattern', ['', ...PATTERNS], '', { optional: true })],
     run: async ({ lamp }, a) => {
       held?.stop();
@@ -194,24 +194,24 @@ export const CONTROLS = [
     } },
   { id: 'hold_light_stop', group: 'Light', ops: [], shows: [], label: 'Stop the held light', fields: [],
     run: async () => { const was = held !== null; held?.stop(); held = null; return `held.stop() (${was ? 'a held light ended' : 'none was held'})`; } },
-  { id: 'say', group: 'Voice', ops: ['say'], shows: ['lamp.said'], label: 'Say', fields: [text('text', 200, 'Hello, I am the virtual lamp.')],
+  { id: 'say', group: 'Voice', needs: ['speak'], ops: ['say'], shows: ['lamp.said'], label: 'Say', fields: [text('text', 200, 'Hello, I am the virtual lamp.')],
     hint: "spoken by your browser when 'Hear the lamp in this page' is on (the lamp's real voice sounds different; the stand-in voice may speak it too)", hintReal: "a real lamp says it through its own speaker",
     run: async ({ lamp }, a) => { await lamp.say(a.text); return `lamp.say(${q(a.text)})`; } },
   // The computer's own turn: the lamp's voice takes the prompt as if it were said to it; `done` follows, and
   // ending it gives the turn back (with none of this computer's, the lamp's own `busy` shows).
-  { id: 'turn_start', group: 'Voice', ops: ['turn.start'], shows: [], label: 'Ask the lamp (start a turn)', fields: [text('prompt', 200, 'What can you do?')],
+  { id: 'turn_start', group: 'Voice', needs: ['speak', 'hear'], ops: ['turn.start'], shows: [], label: 'Ask the lamp (start a turn)', fields: [text('prompt', 200, 'What can you do?')],
     hint: 'the virtual lamp has no model unless it runs with --real-voice, so otherwise it gives no spoken answer and the log says done; a real lamp answers aloud',
     run: async ({ lamp }, a) => { await lamp.startTurn(a.prompt); return `lamp.startTurn(${q(a.prompt)})`; } },
-  { id: 'turn_end', group: 'Voice', ops: ['turn.end'], shows: [], label: 'End my turn', fields: [], run: async ({ lamp }) => { await lamp.endTurn(); return 'lamp.endTurn()'; } },
-  { id: 'volume_to', group: 'Voice', ops: ['volume'], shows: ['volume.changed'], label: 'Volume to', fields: [number('to', 0, 100, 40, { integer: true })],
+  { id: 'turn_end', group: 'Voice', needs: ['speak'], ops: ['turn.end'], shows: [], label: 'End my turn', fields: [], run: async ({ lamp }) => { await lamp.endTurn(); return 'lamp.endTurn()'; } },
+  { id: 'volume_to', group: 'Voice', needs: ['speak'], ops: ['volume'], shows: ['volume.changed'], label: 'Volume to', fields: [number('to', 0, 100, 40, { integer: true })],
     run: async ({ lamp }, a) => answered(`lamp.volume({ to: ${a.to} })`, await lamp.volume({ to: a.to })) },
-  { id: 'volume_step', group: 'Voice', ops: ['volume'], shows: ['volume.changed'], label: 'Volume step', fields: [select('step', ['up', 'down'])],
+  { id: 'volume_step', group: 'Voice', needs: ['speak'], ops: ['volume'], shows: ['volume.changed'], label: 'Volume step', fields: [select('step', ['up', 'down'])],
     run: async ({ lamp }, a) => answered(`lamp.volume({ step: ${q(a.step)} })`, await lamp.volume({ step: a.step })) },
-  { id: 'volume_mute', group: 'Voice', ops: ['volume'], shows: ['volume.changed'], label: 'Mute', fields: [select('mute', ['on', 'off'], 'off')],
+  { id: 'volume_mute', group: 'Voice', needs: ['speak'], ops: ['volume'], shows: ['volume.changed'], label: 'Mute', fields: [select('mute', ['on', 'off'], 'off')],
     run: async ({ lamp }, a) => answered(`lamp.volume({ mute: ${a.mute === 'on'} })`, await lamp.volume({ mute: a.mute === 'on' })) },
   // The person's own volume, so this row puts it back: it reads the level, takes the one step (or the mute), then
   // restores the level and the mute it found, even when the step is refused. Nothing is left changed.
-  { id: 'volume', group: 'Voice', ops: ['volume', 'get'], shows: ['volume.changed'], label: 'Volume (then back)',
+  { id: 'volume', group: 'Voice', needs: ['speak'], ops: ['volume', 'get'], shows: ['volume.changed'], label: 'Volume (then back)',
     hint: 'steps the volume once and puts it back (level and mute)', fields: [select('how', ['step down', 'step up', 'mute'], 'step down')],
     run: async ({ lamp }, a) => {
       const before = (await lamp.get('volume')).volume;
@@ -229,17 +229,17 @@ export const CONTROLS = [
       return `lamp.volume(${q(arg)}) -> ${q(after)}; put back: ${q(back)} (was ${q({ level: before.level, muted: Boolean(before.muted) })})`;
     } },
   // Mute this computer's hearing and give it back: `false` holds the lamp's mute, `true` lifts it. Needs the hear grant.
-  { id: 'listen', group: 'Voice', ops: ['listen.set'], shows: [], label: 'Listening',
+  { id: 'listen', group: 'Voice', needs: ['hear'], ops: ['listen.set'], shows: [], label: 'Listening',
     hint: "the virtual lamp has no listening control: on is taken, off is refused here (a real lamp's off holds its mute until you press on)",
     hintReal: "off holds the real lamp's mute: it stays deaf to the room until you press on", fields: [select('listen', ['on', 'off'], 'on')],
     run: async ({ lamp }, a) => `lamp.setListening(${a.listen === 'on'}) -> ${q(await lamp.setListening(a.listen === 'on'))}` },
   // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
-  { id: 'sound', group: 'Voice', ops: ['sound'], shows: [], label: 'Sound (hum)', fields: [],
+  { id: 'sound', group: 'Voice', needs: ['speak'], ops: ['sound'], shows: [], label: 'Sound (hum)', fields: [],
     hint: "a stand-in for the lamp's hum: this page plays its own quiet hum (the lamp's real hum is made by its voice)", hintReal: "a real lamp plays its own hum through its own speaker",
     run: async ({ lamp, audio }) => { await lamp.sound('hum'); return `lamp.sound('hum')${heard(audio?.('hum', humWav()), "a stand-in for the lamp's hum")}`; } },
   // Clips (grant `speak`): this computer's own, kept on the lamp. The rows touch ONLY this run's scratch clip: upload makes it,
   // the list shows this computer's clips (a read), remove takes away the one this run made and nothing else.
-  { id: 'sound_upload', group: 'Voice', ops: ['sound.upload'], shows: [], label: 'Keep a quiet clip', fields: [number('ms', 100, 2000, 300, { integer: true })],
+  { id: 'sound_upload', group: 'Voice', needs: ['speak'], ops: ['sound.upload'], shows: [], label: 'Keep a quiet clip', fields: [number('ms', 100, 2000, 300, { integer: true })],
     hint: 'this page plays the clip it keeps, its own audio', hintReal: 'a real lamp plays its clips through its own speaker',
     run: async ({ lamp, audio }, a) => {
       const clip = quietTone(a.ms);
@@ -247,12 +247,12 @@ export const CONTROLS = [
       clipKept = true;
       return `lamp.uploadSound(${q(SCRATCH_CLIP)}, a ${a.ms} ms quiet tone) -> ${q(kept)}${heard(audio?.('clip', clip), 'the clip saved on the lamp')}`;
     } },
-  { id: 'sound_list', group: 'Voice', ops: ['sound.list'], shows: [], label: 'List my clips', fields: [],
+  { id: 'sound_list', group: 'Voice', needs: ['speak'], ops: ['sound.list'], shows: [], label: 'List my clips', fields: [],
     hint: 'clips named try-... are this app\'s test clips; remove them from the list',
     run: async ({ lamp }) => `lamp.sounds() -> ${q((await lamp.sounds()).map((c) => `${c.name} ${c.ms} ms${c.name === SCRATCH_CLIP ? ' (this run\'s)' : TRY_CLIP.test(c.name) ? ' (an earlier run\'s test clip)' : ''}`))}` },
   // Removes this run's clip, or one of this app's own earlier test clips named in `name` (`try-` and six hex digits): any
   // other name (`hum`, a clip of the person's) is refused here, before the lamp is asked.
-  { id: 'sound_remove', group: 'Voice', ops: ['sound.remove'], shows: [], label: 'Remove a test clip', fields: [text('name', 64, '', { optional: true })],
+  { id: 'sound_remove', group: 'Voice', needs: ['speak'], ops: ['sound.remove'], shows: [], label: 'Remove a test clip', fields: [text('name', 64, '', { optional: true })],
     hint: 'with no name, this run\'s clip; or a try-xxxxxx test clip from the list',
     run: async ({ lamp }, a) => {
       const name = a.name ?? SCRATCH_CLIP;
@@ -265,13 +265,13 @@ export const CONTROLS = [
   // The camera and the microphone (their grants; one press, one use, nothing kept). The lamp's own rules hold: never while
   // it is private, the ring shows the mark, and the microphone only with one person in view (its refusal in its words).
   // A picture goes to the page that pressed, under the row, and is not logged; sound is only counted, never played or kept.
-  { id: 'camera_snapshot', group: 'Camera and microphone', needs: 'camera', ops: ['camera.snapshot'], shows: [], label: 'Camera: one picture', fields: [],
+  { id: 'camera_snapshot', group: 'Camera and microphone', needs: ['camera'], ops: ['camera.snapshot'], shows: [], label: 'Camera: one picture', fields: [],
     run: async ({ lamp, show }) => {
       const jpeg = await lamp.cameraSnapshot();
       show?.(jpeg);
       return `lamp.cameraSnapshot() -> a JPEG of ${jpeg.length} bytes, on this page only`;
     } },
-  { id: 'camera_stream', group: 'Camera and microphone', needs: 'camera', ops: ['camera.stream'], shows: [], label: 'Camera: a short stream', fields: [number('seconds', 1, 10, 2, { integer: true }), number('fps', 1, 30, 2, { integer: true }), select('size', ['', '640x480', '1280x720'], '', { optional: true })],
+  { id: 'camera_stream', group: 'Camera and microphone', needs: ['camera'], ops: ['camera.stream'], shows: [], label: 'Camera: a short stream', fields: [number('seconds', 1, 10, 2, { integer: true }), number('fps', 1, 30, 2, { integer: true }), select('size', ['', '640x480', '1280x720'], '', { optional: true })],
     hint: "fps 1 to 30 (the lamp's limit). The virtual lamp's host camera gives about 6 pictures a second; size changes nothing here. seconds: how long this row keeps the stream on (at most 10)",
     hintReal: "fps 1 to 30 (the lamp's limit; its fast stream gives about 21 to 25). size: the fast stream's picture size. seconds: how long this row keeps the stream on (at most 10)",
     run: async ({ lamp, show }, a) => {
@@ -293,7 +293,7 @@ export const CONTROLS = [
       if (last) show?.(last);
       return `lamp.cameraStream(true, ${a.fps}${a.size ? `, ${q(a.size)}` : ''}) for ${a.seconds} s -> ${frames} frames${ended ? `, ended: ${ended}` : ''}; the last is on this page only`;
     } },
-  { id: 'microphone_stream', group: 'Camera and microphone', needs: 'microphone', ops: ['microphone.stream'], shows: [], label: 'Microphone: count the sound', fields: [number('seconds', 1, 10, 2, { integer: true })],
+  { id: 'microphone_stream', group: 'Camera and microphone', needs: ['microphone'], ops: ['microphone.stream'], shows: [], label: 'Microphone: count the sound', fields: [number('seconds', 1, 10, 2, { integer: true })],
     run: async ({ lamp }, a) => {
       let blocks = 0;
       let bytes = 0;
@@ -316,7 +316,7 @@ export const CONTROLS = [
   // The speaker (grant `speaker`, off unless the owner ticked it and the lamp serves it): a second of 440 Hz at -20 dBFS
   // through a speaker stream, in real time; the log shows its `speaker.stats` and `speaker.ended` events. Without the
   // grant, or while the lamp is private or muted, the lamp's refusal comes back in its words.
-  { id: 'speaker_tone', group: 'Voice', ops: ['speaker.stream'], shows: [], label: 'Speaker tone (1 s of 440 Hz)', fields: [],
+  { id: 'speaker_tone', group: 'Voice', needs: ['speaker'], ops: ['speaker.stream'], shows: [], label: 'Speaker tone (1 s of 440 Hz)', fields: [],
     run: async ({ lamp }) => {
       const stream = await lamp.speakerStream(16000);
       try {
@@ -331,32 +331,33 @@ export const CONTROLS = [
         await stream.stop();
       }
     } },
-  { id: 'skill_push', group: 'Skills', ops: ['skill.push'], shows: [], label: 'Push the try-wave skill', fields: [],
+  { id: 'skill_push', group: 'Skills', needs: ['skills'], ops: ['skill.push'], shows: [], label: 'Push the try-wave skill', fields: [],
     run: async ({ lamp }) => {
       const skill = await lamp.pushSkill(TRY_SKILL);
       return `lamp.pushSkill('skills/try-wave')  // ${skill.held ? `held: ${skill.held}` : skill.on ? 'on' : 'off'}`;
     } },
-  { id: 'skills', group: 'Skills', ops: ['skill.list'], shows: [], label: 'List my skills', fields: [],
+  { id: 'skills', group: 'Skills', needs: ['skills'], ops: ['skill.list'], shows: [], label: 'List my skills', fields: [],
     run: async ({ lamp }) => {
       const kept = await lamp.skills();
       return `lamp.skills()  // ${kept.map((k) => `${k.name} ${k.version}${k.on ? '' : ' (off)'}`).join(', ') || 'none'}`;
     } },
-  { id: 'play', group: 'Skills', ops: ['play', 'lease.take', 'lease.release'], shows: [], label: 'Play a recorded move', fields: [select('name', ['small-nod'])],
+  { id: 'play', group: 'Skills', needs: ['body'], ops: ['play', 'lease.take', 'lease.release'], shows: [], label: 'Play a recorded move', fields: [select('name', ['small-nod'])],
+    hint: 'plays small-nod from the try-wave skill: push that skill first (the push needs the skills grant; the play needs the body alone)',
     run: async ({ lamp, release }, a) => {
       // `play` needs the body lease at the door, as a look does.
       await release();
       await lamp.withLease(['body'], () => lamp.play(a.name, { wait: true }));
       return `lamp.withLease(['body'], () => lamp.play(${q(a.name)}, { wait: true }))`;
     } },
-  { id: 'skill_remove', group: 'Skills', ops: ['skill.remove'], shows: [], label: 'Remove the try-wave skill', fields: [],
+  { id: 'skill_remove', group: 'Skills', needs: ['skills'], ops: ['skill.remove'], shows: [], label: 'Remove the try-wave skill', fields: [],
     run: async ({ lamp }) => { await lamp.removeSkill('try-wave'); return "lamp.removeSkill('try-wave')"; } },
   // What the lamp says of itself, by name (`lamp.get`), and the three named reads (the `air`, `device` and `body`
   // states): the answer is in the log; a `known: false` is the lamp having nothing to say yet.
-  { id: 'get', group: 'Reads', ops: ['get'], shows: [], label: 'Read a state', fields: [select('state', [...schema.states], 'presence')],
+  { id: 'get', group: 'Reads', ops: ['get'], shows: [], label: 'Read a state', fields: [select('state', [...schema.states], 'lamp')],
     run: async ({ lamp }, a) => answered(`lamp.get(${q(a.state)})`, await lamp.get(a.state)) },
-  { id: 'air', group: 'Reads', ops: ['get'], shows: [], label: 'Air', fields: [], run: async ({ lamp }) => answered('lamp.air()', await lamp.air()) },
-  { id: 'device', group: 'Reads', ops: ['get'], shows: [], label: 'Device', fields: [], run: async ({ lamp }) => answered('lamp.device()', await lamp.device()) },
-  { id: 'body_info', group: 'Reads', ops: ['get'], shows: [], label: 'Body', fields: [], run: async ({ lamp }) => answered('lamp.bodyInfo()', await lamp.bodyInfo()) },
+  { id: 'air', group: 'Reads', needs: ['air'], ops: ['get'], shows: [], label: 'Air', fields: [], run: async ({ lamp }) => answered('lamp.air()', await lamp.air()) },
+  { id: 'device', group: 'Reads', needs: ['device'], ops: ['get'], shows: [], label: 'Device', fields: [], run: async ({ lamp }) => answered('lamp.device()', await lamp.device()) },
+  { id: 'body_info', group: 'Reads', needs: ['body'], ops: ['get'], shows: [], label: 'Body', fields: [], run: async ({ lamp }) => answered('lamp.bodyInfo()', await lamp.bodyInfo()) },
 ];
 
 // The world, not the SDK: `lamp-sim <verb> ... DIR` writes what the lamp's stand-ins read. `argv` is an array,
@@ -375,13 +376,21 @@ export const STIMULI = [
 ];
 
 // What the page needs to draw the buttons: the entries without their code.
-export const describe = (mode = 'lamp-sim') => {
-  const hinted = ({ hint, hintReal }) => ((mode === 'real' && hintReal) || hint ? { hint: (mode === 'real' && hintReal) || hint } : {});
-  return {
-    controls: CONTROLS.map((entry) => ({ id: entry.id, group: entry.group, label: entry.label, fields: entry.fields, ...(entry.needs ? { needs: entry.needs } : {}), ...hinted(entry) })),
-    stimuli: STIMULI.map((entry) => ({ id: entry.id, group: entry.group, label: entry.label, fields: entry.fields, ...hinted(entry) })),
+// `grants` (the lamp's, from hello) make a row's `disabled`: the grant it needs that the lamp did not give. Without `grants`
+// the table is static. A stimulus is a lamp-sim verb and needs no grant.
+export function describe(mode = 'lamp-sim', { grants } = {}) {
+  const why = (entry) => {
+    const missing = grants ? (entry.needs ?? []).filter((g) => !grants.includes(g)) : [];
+    return missing.length ? `the lamp did not grant ${missing.join(', ')}` : undefined;
   };
-};
+  const shown = (entry) => {
+    const { id, group, label, fields, hint, hintReal, needs } = entry;
+    const text = (mode === 'real' && hintReal) || hint;
+    const disabled = why(entry);
+    return { id, group, label, fields, ...(needs?.length ? { needs } : {}), ...(text ? { hint: text } : {}), ...(disabled ? { disabled } : {}) };
+  };
+  return { controls: CONTROLS.map(shown), stimuli: STIMULI.map(shown) };
+}
 
 // Whether the event log shows this event now: every line the lamp says (lamp.said) is shown, however fast they come
 // (a dropped line would be a line the page never saw); the others are thinned to one in 200 ms per event name.

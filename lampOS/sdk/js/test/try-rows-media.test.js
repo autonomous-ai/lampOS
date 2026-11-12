@@ -18,11 +18,11 @@ async function lampWith(t, grants) {
   return { fake, lamp, run, shown };
 }
 
-test('the camera rows are named for the camera grant, the microphone row for the microphone, and describe() says so', () => {
+test('the camera rows need the camera grant, the microphone row the microphone grant, and describe() says so', () => {
   const table = describe().controls;
-  const needs = Object.fromEntries(table.filter((c) => c.needs).map((c) => [c.id, c.needs]));
-  assert.deepEqual(needs, { camera_snapshot: 'camera', camera_stream: 'camera', microphone_stream: 'microphone' });
-  assert.equal('needs' in table.find((c) => c.id === 'gesture'), false);
+  const needs = (id) => table.find((c) => c.id === id).needs;
+  assert.deepEqual([needs('camera_snapshot'), needs('camera_stream'), needs('microphone_stream')], [['camera'], ['camera'], ['microphone']]);
+  assert.equal('needs' in table.find((c) => c.id === 'stop'), false, 'a row that needs no grant carries none');
 });
 
 test('one camera snapshot is one picture handed to show(), and the answer says its size and keeps the bytes out of the log', async (t) => {

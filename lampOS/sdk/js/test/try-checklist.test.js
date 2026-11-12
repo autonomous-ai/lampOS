@@ -2,7 +2,7 @@
 // export that carries only the rows and the marks. Its own file, so a row PR never appends to try.test.js.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { exportChecklist, keyFor, openChecklist, rowsOf, visible } from '../examples/twin/checklist.js';
+import { exportChecklist, keyFor, openChecklist, rowsOf, tickable } from '../examples/twin/checklist.js';
 import { describe } from '../examples/twin/controls.js';
 
 const memory = () => { const data = new Map(); return { data, getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, String(v)) }; };
@@ -23,27 +23,23 @@ test('the key is the lamp and the mode, so two lamps and two modes never share t
   assert.deepEqual(again.get('call:gesture'), { result: 'pass', note: 'nodded', at: at() }, 'the same lamp keeps them across a reload');
 });
 
-test('a row that needs a grant the lamp lacks is not a row of the checklist: not counted, not exported', () => {
+test('a row the lamp or the run cannot do is drawn, n/a with its reason, not tickable, and not counted', () => {
   const table = {
-    controls: [{ id: 'gesture', label: 'Gesture', group: 'Body' }, { id: 'camera_snapshot', label: 'Camera', group: 'C', needs: 'camera' }, { id: 'microphone_stream', label: 'Mic', group: 'C', needs: 'microphone' }],
+    controls: [{ id: 'gesture', label: 'Gesture', group: 'Body' }, { id: 'camera_snapshot', label: 'Camera', group: 'C', disabled: 'the lamp did not grant camera' }, { id: 'microphone_stream', label: 'Mic', group: 'C', disabled: 'start the run with --microphone' }],
     stimuli: [{ id: 'arrive', label: 'Arrives', group: 'People' }],
-    camera: true, microphone: false,
   };
-  assert.deepEqual(rowsOf(table).map((r) => r.id), ['call:gesture', 'call:camera_snapshot', 'stim:arrive']);
-  assert.deepEqual(rowsOf({ ...table, camera: false }).map((r) => r.id), ['call:gesture', 'stim:arrive']);
-  assert.deepEqual(rowsOf({ ...table, camera: undefined, microphone: undefined }).map((r) => r.id), ['call:gesture', 'stim:arrive'], 'a flag that is not true hides it');
-  // The page's drawing and the checklist's counting are the one test.
-  for (const entry of [...table.controls, ...table.stimuli]) {
-    assert.equal(visible(table, entry), rowsOf(table).some((r) => r.id.endsWith(`:${entry.id}`)), entry.id);
-  }
   const shown = rowsOf(table);
-  const list = openChecklist({ storage: memory(), key: 'k', rowIds: shown.map((r) => r.id), now: at });
-  list.set('call:camera_snapshot', { result: 'pass' });
-  assert.deepEqual(list.count(), { ticked: 1, of: 3 });
-  assert.throws(() => list.set('call:microphone_stream', { result: 'pass' }), /no row/);
+  assert.deepEqual(shown.map((r) => r.id), ['call:gesture', 'call:camera_snapshot', 'call:microphone_stream', 'stim:arrive'], 'every row is a row of the page');
+  assert.deepEqual(tickable(shown), ['call:gesture', 'stim:arrive']);
+  const list = openChecklist({ storage: memory(), key: 'k', rowIds: tickable(shown), now: at });
+  list.set('call:gesture', { result: 'pass' });
+  assert.deepEqual(list.count(), { ticked: 1, of: 2 }, 'N counts the enabled rows');
+  assert.throws(() => list.set('call:camera_snapshot', { result: 'pass' }), /no row/, 'a disabled row cannot be ticked');
   const out = exportChecklist({ lamp: { id: 'l', name: 'L' }, mode: 'real', rows: shown, marks: list.marks(), now: at });
-  assert.equal(out.json.includes('microphone_stream'), false);
-  assert.equal(out.markdown.includes('microphone_stream'), false);
+  const json = JSON.parse(out.json);
+  assert.deepEqual(json.rows.find((r) => r.row === 'call:camera_snapshot'), { row: 'call:camera_snapshot', label: 'Camera', group: 'C', kind: 'call', result: 'n/a', note: 'the lamp did not grant camera', time: '' });
+  assert.match(out.markdown, /\| call:microphone_stream \| n\/a \| start the run with --microphone \| {2}\|/);
+  assert.match(out.markdown, /1 of 2 ticked, 2 n\/a/);
 });
 
 test('n of N counts rows with a result; a note alone is not a tick; a result pressed again clears', () => {
@@ -95,7 +91,7 @@ test('the export is JSON and a markdown table of the rows and marks, and holds n
   assert.equal(json.rows.find((r) => r.row === 'stim:arrive').result, 'not run');
   assert.match(out.markdown, /^# Try-it checklist: Lamp 75c9 \(lamp-75c9, real\)/);
   assert.match(out.markdown, /\| call:gesture \| pass \| nodded \\\| twice \| 2026-11-12T01:00:00\.000Z \|/);
-  assert.match(out.markdown, /2 of \d+ ticked/);
+  assert.match(out.markdown, /2 of \d+ ticked, 0 n\/a/);
   assert.equal(out.markdown.split('\n').filter((l) => l.startsWith('| call:')).length, ids.filter((r) => r.kind === 'call').length);
 });
 
