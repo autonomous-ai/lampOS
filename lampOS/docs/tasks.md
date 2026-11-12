@@ -2881,8 +2881,12 @@ gone. The engine's `HOME` is its own `/var/lib/lampos-agents/<engine>`.
 An engine counts as present only when `lampos`'s login shell finds the
 wrapper first (not its own program in `~/.local/bin`). With lamp-update's
 own `LAMP_AGENT_NS=on` (and `LAMP_APP_ENGINES=on`), each round writes it
-for every engine Harness says is installed except Hermes and OpenClaw.
-Skill runs still go to Hermes alone (`HarnessRunner`, above).
+for every engine Harness says is installed except Hermes and OpenClaw, and
+takes out a wrapper it wrote (exactly its own text, nothing else) once
+Harness no longer says that engine is installed or no program of the
+engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
+line that stays true round after round is logged once. Skill runs still go
+to Hermes alone (`HarnessRunner`, above).
 
 ## Devin (#1854)
 

@@ -1082,6 +1082,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // only for a round that acts; Harness's record looked at often only
     // with its switch on.
     // Held in a cell: the round's phase and target both tell it (#5473).
+    // What the agent namespace's rounds last said, so a line that stays
+    // true is said once (#6510).
+    let mut agent_ns_said = lamp_update::agent_ns::rounds::Said::default();
     let telling = std::cell::RefCell::new(config.apply.then(|| {
         lamp_update::status::Telling::start(
             &bus_root,
@@ -1214,8 +1217,10 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     &config.root,
                     &look,
                     *shown,
+                    &mut agent_ns_said,
                     &mut lamp_update::agent_ns::rounds::lampos_ids,
                     &mut lamp_update::agent_ns::wrapper::login_finds,
+                    &mut lamp_update::agent_ns::wrapper::login_programs,
                     &mut say,
                 );
             }
