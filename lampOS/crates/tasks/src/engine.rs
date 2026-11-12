@@ -39,6 +39,14 @@ pub const CLOSE_TRIES: u8 = 3;
 /// How long the lamp's own agent is left open with its answer kept but not
 /// yet told ([`closes_untold`], #6530): room for a follow-up, then closed.
 pub const UNTOLD_CLOSE_MS: u64 = 60_000;
+/// How long a task handed to the lamp's own OpenClaw may read idle with
+/// nothing asked, no answer and no tool used before it is taken as never
+/// begun (#6577, [`never_began`]): its `--message` never reached the TUI,
+/// as when the Gateway answered the look before `new` and then did not
+/// serve it. UNMEASURED: the slowest real first prompt on a lamp with
+/// Harness 0.6.41, times two, from lamp-tasks' journal, replaces it before
+/// this trains.
+pub const OPENCLAW_BEGIN_WITHIN_MS: u64 = 180_000;
 /// How often a task handed over is looked at on its own (unless `serve --no-watch`):
 /// every half minute for its first ten minutes, then every two, until the
 /// agent has finished or asks something, and for at most a day. After that
@@ -659,6 +667,59 @@ fn settled(value: &Observation) -> bool {
         _ => false,
     }
 }
+/// What `show` reads of an agent that has not begun: idle, nothing asked,
+/// no answer and no tool used.
+fn unbegun(value: &Observation) -> bool {
+    value.state == "idle"
+        && value.ask.is_none()
+        && value.answer.trim().is_empty()
+        && value.tools == 0
+}
+
+/// `observation` of `task` read at `now`, as a failure when the lamp's own
+/// OpenClaw has never begun it (#6577): handed over and accepted
+/// [`OPENCLAW_BEGIN_WITHIN_MS`] ago or more in this boot, and every read
+/// since, this one too, [`unbegun`]. It is then settled, told plainly that
+/// it stopped without finishing, never tried again or moved to another
+/// engine (the lead's rule), and its empty harness closed ([`close_due`]).
+/// Anything asked, answered or used, an earlier boot, the person's own
+/// session or another engine leaves it as it was read.
+fn never_began(task: &Task, observation: Observation, now: &Clock) -> Observation {
+    let waited = task.dispatch.finished.as_ref().is_some_and(|accepted| {
+        accepted.boot_id == now.boot_id
+            && now.monotonic_ms.saturating_sub(accepted.monotonic_ms) >= OPENCLAW_BEGIN_WITHIN_MS
+    });
+    if task.target_alias != crate::runtime::LAMP_TARGET
+        || task.launch.target.engine != EngineKind::Openclaw
+        || task.dispatch.state != DispatchState::Accepted
+        || task.dispatch.joined.is_some()
+        || task.dispatch.joined_on.is_some()
+        || !waited
+        || !unbegun(&observation)
+        || !task.observations.iter().all(|kept| unbegun(&kept.data))
+    {
+        return observation;
+    }
+    eprintln!(
+        "tasks: task {}: OpenClaw on the lamp still idle with nothing asked {} s after it was handed over: never begun, told as stopped and closed",
+        task.id,
+        OPENCLAW_BEGIN_WITHIN_MS / 1000
+    );
+    Observation {
+        state: "failed".into(),
+        ..observation
+    }
+}
+
+/// A never-begun task's kept reading ([`never_began`]): failed, with nothing
+/// asked, answered or used.
+fn never_began_kept(value: &Observation) -> bool {
+    value.state == "failed"
+        && value.ask.is_none()
+        && value.answer.trim().is_empty()
+        && value.tools == 0
+}
+
 /// Whether this lamp should close the harness it started for `task` now
 /// (#1390): a task this version made, whose newest answer was kept from an
 /// agent `idle` with an answer, and told: its claimed telling played, or
@@ -697,8 +758,8 @@ fn close_due(task: &Task, now: &Clock) -> bool {
     // as its first kept answer. A newer one asked by the person at the
     // computer ("Now make it longer.") is theirs, kept and told or not.
     newest.data.ask == first.data.ask
-        && newest.data.state == "idle"
-        && settled(&newest.data)
+        && ((newest.data.state == "idle" && settled(&newest.data))
+            || (task.target_alias == crate::runtime::LAMP_TARGET && never_began_kept(&newest.data)))
         && (closes_untold(task, now)
             || match &newest.speech {
                 // A playout under way is not told yet.
@@ -2606,6 +2667,7 @@ impl<P: Persistence> Engine<P> {
             return self.observation_failed(job, "invalid_reply", now);
         }
         let index = find(&self.state, job.task_id)?;
+        let observation = never_began(&self.state.tasks[index], observation, now);
         let observed_digest = digest(&observation);
         // The watch keeps only what the person would want to hear about:
         // an agent still at work is looked at again later, and an idle
@@ -3553,6 +3615,132 @@ mod tests {
                 .unwrap_err()
                 .code,
             "stale_job"
+        );
+    }
+
+    /// #6577: a task handed to the lamp's own `engine`, accepted at `at`.
+    fn lamp_accepted(engine_kind: EngineKind, at: u64) -> (Engine<Memory>, u64) {
+        let targets = BTreeMap::from([(
+            crate::runtime::LAMP_TARGET.to_owned(),
+            Target {
+                machine_id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+                project: "lamp-project".into(),
+                engine: engine_kind,
+            },
+        )]);
+        let mut engine =
+            Engine::open(Memory::default(), targets, STORE, SESSION, &clock(0)).unwrap();
+        engine.close_told(true);
+        let request = Request::Prepare {
+            guard: guard(&engine, "prepare"),
+            text: "List five fruits that are good when you're sick.".into(),
+            target: crate::runtime::LAMP_TARGET.into(),
+            session: None,
+        };
+        let id = engine.handle(&request, &clock(at), false).unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        engine
+            .handle(&confirmation(&engine, id), &clock(at), true)
+            .unwrap();
+        assert_eq!(
+            engine.begin_launch(&clock(at)).unwrap().unwrap().task_id,
+            id
+        );
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Created {
+                    agent_id: AGENT.into(),
+                },
+                &clock(at),
+            )
+            .unwrap();
+        (engine, id)
+    }
+
+    /// What `show` reads of a harness that has not begun its task.
+    fn not_begun() -> Observation {
+        Observation {
+            tools: 0,
+            ..data("")
+        }
+    }
+
+    /// The newest kept reading's state after a read of `seen` at `at`.
+    fn read_as(engine: &mut Engine<Memory>, id: u64, seen: Observation, at: u64) -> String {
+        let job = request_read(engine, id, at);
+        engine.finish_observation(&job, seen, &clock(at)).unwrap();
+        let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+        task.observations.last().unwrap().data.state.clone()
+    }
+
+    /// #6577: the lamp's OpenClaw still idle with nothing asked, answered
+    /// or used past the bound is a failure, told and then closed once with
+    /// the reading it really gave; before the bound it is as it was read.
+    #[test]
+    fn a_lamp_openclaw_task_never_begun_past_the_bound_is_failed_and_closed() {
+        let (mut engine, id) = lamp_accepted(EngineKind::Openclaw, 1_000);
+        assert_eq!(read_as(&mut engine, id, not_begun(), 31_000), "idle");
+        assert_eq!(
+            read_as(
+                &mut engine,
+                id,
+                not_begun(),
+                1_000 + OPENCLAW_BEGIN_WITHIN_MS - 1
+            ),
+            "idle"
+        );
+        let at = 1_000 + OPENCLAW_BEGIN_WITHIN_MS;
+        assert_eq!(read_as(&mut engine, id, not_begun(), at), "failed");
+        let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+        assert!(settled(&task.observations.last().unwrap().data));
+        // Not told yet: left open until the lamp's own untold bound.
+        assert!(engine.begin_close(&clock(at + 1)).unwrap().is_none());
+        let job = engine
+            .begin_close(&clock(at + UNTOLD_CLOSE_MS))
+            .unwrap()
+            .expect("the empty harness is closed");
+        assert_eq!(job.answer, "");
+        assert_eq!(job.asked, None);
+    }
+
+    /// #6577: a slow first prompt that shows up just before the bound, or a
+    /// tool used, is a task begun: never failed after it.
+    #[test]
+    fn a_slow_real_first_prompt_is_never_taken_as_never_begun() {
+        let (mut engine, id) = lamp_accepted(EngineKind::Openclaw, 0);
+        let asked = Observation {
+            ask: Some("List five fruits that are good when you're sick.".into()),
+            state: "working".into(),
+            ..not_begun()
+        };
+        assert_eq!(
+            read_as(&mut engine, id, asked, OPENCLAW_BEGIN_WITHIN_MS - 1),
+            "working"
+        );
+        assert_eq!(
+            read_as(&mut engine, id, not_begun(), OPENCLAW_BEGIN_WITHIN_MS + 1),
+            "idle"
+        );
+        let (mut engine, id) = lamp_accepted(EngineKind::Openclaw, 0);
+        let used = Observation {
+            tools: 1,
+            ..not_begun()
+        };
+        assert_eq!(
+            read_as(&mut engine, id, used, OPENCLAW_BEGIN_WITHIN_MS + 1),
+            "idle"
+        );
+    }
+
+    /// #6577: the lamp's Hermes never begun is as before, however long.
+    #[test]
+    fn hermes_never_begun_is_left_as_read() {
+        let (mut engine, id) = lamp_accepted(EngineKind::Hermes, 0);
+        assert_eq!(
+            read_as(&mut engine, id, not_begun(), 10 * OPENCLAW_BEGIN_WITHIN_MS),
+            "idle"
         );
     }
 
