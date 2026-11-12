@@ -26,7 +26,7 @@ Group=lampos
 Slice=lampos-parts.slice
 Nice=10
 # A skill's task (#6305, #6432, docs/control.md): the owner's yes kept in --state-dir's task-yes.json, and a
-# run's service.read and service.write sent to lamp-services; only while LAMP_CONTROL is on.
+# run's service.read and service.write sent to lamp-services; only on the run socket, with the door on or off ((b)).
 Environment=LAMP_SKILL_TASKS=on
 # The run socket (/run/lampos-control/control.sock) for lamp-tasks' skill runs as `lampos` (#6071 PR 1,
 # docs/control.md "The control socket, lamp-control's side"). With LAMP_CONTROL off, lamp-control serves only it and
