@@ -276,6 +276,50 @@ pub fn ranges_from(spec: Option<&str>) -> Result<[(u16, u16); 5], String> {
     Ok(ranges)
 }
 
+/// The counts of one lamp's body: where its servos are found folded, and what `lamp-body` is
+/// told of its home, folded arm and stand (`--home`, `--folded-arm`, `--stand`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Counts {
+    /// Found folded, in the servos' order: base yaw, shoulder, elbow, head roll, head pitch.
+    pub found: [u16; 5],
+    /// The head's home: pitch, roll, yaw.
+    pub home: [u16; 3],
+    /// The folded arm: shoulder, elbow.
+    pub folded_arm: [u16; 2],
+    /// The stand: pitch, roll, yaw, shoulder, elbow.
+    pub stand: [u16; 5],
+}
+
+/// lamp-fc4b's, the default (its measured home).
+pub const FC4B: Counts = Counts {
+    found: [2028, 2048, 1946, 2085, 1817],
+    home: [1817, 2085, 2028],
+    folded_arm: [2048, 1946],
+    stand: [1772, 2085, 2028, 2621, 2558],
+};
+
+/// lamp-75c9's. Sources: the arm (shoulder 2076, elbow 2045 folded; 2639 and 2570 at the stand) and the head's folded pitch
+/// 1791 are `get body` read on 10 Nov (the same numbers are in `docs/lamp.model.json`, "measured"). The head's roll, yaw and
+/// stand pose are the real lamp-body's own journal reads of lamp-75c9 on 11 Nov, as [pitch, roll, yaw]: standing at 17:35
+/// [1780, 2057, 2026]; folded at 17:42 [1756-1760, 2057, 2000] (pitch read mid-move, not used); folded at 18:05
+/// [1785, 2057, 1999]. So roll is 2057 and yaw 2000 folded (1999-2000 in both folded reads), the stand's head pose is the 17:35
+/// read, and the folded pitch stays the 10 Nov `get body` 1791 (the 18:05 journal read is 1785, 6 counts or half a degree under it).
+pub const L75C9: Counts = Counts {
+    found: [2000, 2076, 2045, 2057, 1791],
+    home: [1791, 2057, 2000],
+    folded_arm: [2076, 2045],
+    stand: [1780, 2057, 2026, 2639, 2570],
+};
+
+/// The body counts asked of lamp-sim (`LAMP_SIM_ARM`): none or `fc4b`, [`FC4B`]; `75c9`, [`L75C9`].
+pub fn counts_from(spec: Option<&str>) -> Result<Counts, String> {
+    match spec.map(str::trim).unwrap_or("") {
+        "" | "fc4b" => Ok(FC4B),
+        "75c9" => Ok(L75C9),
+        other => Err(format!("LAMP_SIM_ARM: {other:?} is fc4b or 75c9")),
+    }
+}
+
 impl Bus {
     /// A bus of servos 1 to 5, found at `found` counts, free inside `limits`.
     pub fn new(found: [u16; 5], limits: [(u16, u16); 5]) -> Self {
@@ -616,5 +660,24 @@ mod tests {
         ] {
             assert!(ranges_from(Some(bad)).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn the_body_counts_default_to_fc4b_and_75c9_is_a_preset() {
+        assert_eq!(counts_from(None).unwrap(), FC4B);
+        assert_eq!(counts_from(Some("fc4b")).unwrap(), FC4B);
+        assert_eq!(counts_from(Some("75c9")).unwrap(), L75C9);
+        assert!(counts_from(Some("fc4c")).is_err());
+        // Found folded at the folded arm and the head's home, in the servos' order.
+        for lamp in [FC4B, L75C9] {
+            assert_eq!(lamp.found[1..3], lamp.folded_arm);
+            assert_eq!([lamp.found[4], lamp.found[3], lamp.found[0]], lamp.home);
+        }
+        assert_eq!(
+            L75C9.stand,
+            [1780, 2057, 2026, 2639, 2570],
+            "the journal's standing read and get body's arm"
+        );
+        assert_eq!(L75C9.home, [1791, 2057, 2000]);
     }
 }

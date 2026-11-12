@@ -121,17 +121,32 @@ fn servo(dir: &Path) -> std::io::Result<()> {
         link.display(),
         port.slave.display()
     );
-    port.serve(&mut found_bus()?, &link, || false)
+    port.serve(&mut found_bus(&body_counts()?)?, &link, || false)
 }
 
-/// Servos found folded at the counts of lamp-fc4b's measured home: base yaw,
-/// shoulder, elbow, head roll, head pitch.
-fn found_bus() -> std::io::Result<Bus> {
+/// Servos found folded at the body counts' home (lamp-fc4b's, or lamp-75c9's): base
+/// yaw, shoulder, elbow, head roll, head pitch.
+fn found_bus(counts: &lamp_sim::servo::Counts) -> std::io::Result<Bus> {
     // The limits the servos store: all 0..=4095 unless `LAMP_SIM_SERVO_RANGES` says (README).
     let ranges =
         lamp_sim::servo::ranges_from(std::env::var("LAMP_SIM_SERVO_RANGES").ok().as_deref())
             .map_err(std::io::Error::other)?;
-    Ok(Bus::new([2028, 2048, 1946, 2085, 1817], ranges))
+    Ok(Bus::new(counts.found, ranges))
+}
+
+/// The body's counts: lamp-fc4b's unless `LAMP_SIM_ARM=75c9` (README).
+fn body_counts() -> std::io::Result<lamp_sim::servo::Counts> {
+    lamp_sim::servo::counts_from(std::env::var("LAMP_SIM_ARM").ok().as_deref())
+        .map_err(std::io::Error::other)
+}
+
+/// `1,2,3` for `--home` and the like.
+fn counts_arg(counts: &[u16]) -> String {
+    counts
+        .iter()
+        .map(u16::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 /// Why `lamp-body` would refuse an ancestor of its lock folder, the rule of
@@ -207,7 +222,8 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     let link = dir.join("servo");
     let _ = std::fs::remove_file(&link);
     symlink(&port.slave, &link)?;
-    let mut servo_bus = found_bus()?;
+    let counts = body_counts()?;
+    let mut servo_bus = found_bus(&counts)?;
     let servo_pose = servo_bus.pose();
     let mut threads = vec![spawn_named("servo bus", move || {
         let _ = port.serve(&mut servo_bus, &link, || false);
@@ -439,6 +455,7 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
 /// The real `lamp-body` on the simulated servo bus; its exit reports go to
 /// `DIR/body.log`, one after another.
 fn body_command(bin: &Path, dir: &Path, bus_root: &Path) -> std::io::Result<Command> {
+    let counts = body_counts()?;
     let d = |name: &str| dir.join(name).display().to_string();
     let mut command = watched(bin.join("lamp-body"));
     command
@@ -482,10 +499,15 @@ fn body_command(bin: &Path, dir: &Path, bus_root: &Path) -> std::io::Result<Comm
             "--force-limit",
             "600",
         ])
-        .args(["--home", "1817,2085,2028", "--folded-arm", "2048,1946"])
+        .args([
+            "--home",
+            &counts_arg(&counts.home),
+            "--folded-arm",
+            &counts_arg(&counts.folded_arm),
+        ])
         .args([
             "--stand",
-            "1772,2085,2028,2621,2558",
+            &counts_arg(&counts.stand),
             "--pitch-window",
             "1740,2030",
             "--torque",
