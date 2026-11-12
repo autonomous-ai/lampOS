@@ -242,8 +242,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   lần đang chạy được trả lời `busy` ngay, và tối đa 4 kết nối được đọc hay
   trả lời cùng lúc, kết nối thứ năm cũng là `busy`. Nhật ký chỉ giữ mã kết
   quả, không bao giờ giữ dòng, lời của việc hay token. lamp-skills chỉ tới
-  socket bằng `--tasks-socket` hoặc `LAMP_SKILLS_TASKS_SOCKET` (#6346);
-  chưa unit nào truyền nó.
+  socket bằng `--tasks-socket` hoặc `LAMP_SKILLS_TASKS_SOCKET` (#6346); unit
+  lamp-skills của sản phẩm truyền `/run/lampos-tasks/skill-task.sock`.
 - **Không mạng nào khác: hai đường ra** (thiết kế của người xây dựng đầu
   tiên trên #6443). Lần chạy được khởi động với `LAMP_NS_NET=run`
   (`NET_ENV`), cách chọn duy nhất, và nó chỉ lấy bớt quyền truy cập: với
@@ -285,11 +285,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 
 **Chưa có (nói rõ để không hiểu code là nhiều hơn):** `ControlTokens` nói
 theo socket quản trị của lamp-control (#6408, đã gộp), nhưng lamp-control
-chưa giữ lời đồng ý nào của kỹ năng, nên hiện mọi lần xin token ở đó đều bị
-từ chối.
-Các unit sản phẩm đặt `LAMP_SKILL_TASKS=on` cho lamp-tasks và lamp-update
-(12/11), nhưng chưa unit nào truyền socket cho lamp-skills, nên trên đèn
-chưa có việc của kỹ năng nào chạy. hermes-ns cũng chỉ cho lần chạy thấy
+chưa giữ lời đồng ý nào của kỹ năng (#6509 thêm nó), nên hiện mọi lần xin
+token ở đó đều bị từ chối, và khi `LAMP_CONTROL` tắt thì lamp-control không
+mở socket chạy nào cho đến (b) (#6304).
+Các unit sản phẩm đặt `LAMP_SKILL_TASKS=on` và truyền socket cho lamp-skills
+(`LAMP_SKILLS_TASKS_SOCKET=/run/lampos-tasks/skill-task.sock`, 12/11), nên
+việc của kỹ năng được giao đi, và bị từ chối ở lần xin token cho đến khi hai
+phần đó vào. hermes-ns cũng chỉ cho lần chạy thấy
 `control.sock` của lamp-control khi có `LAMP_SKILL_TASKS=on` trong unit của
 chính lamp-update; network namespace riêng của lần chạy cũng vậy. Kết quả của
 lần chạy chưa thành Task news, và thư mục của kỹ năng được

@@ -1472,8 +1472,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   `--state-dir`; an unreadable ledger or one with a run after now counts as
   full).
 - **The hand-over** (#6306's to build): one line on lamp-tasks' socket
-  (`--tasks-socket`, or `LAMP_SKILLS_TASKS_SOCKET`; no unit passes either
-  yet, so a run says "no lamp-tasks hand-over on this lamp yet"):
+  (`--tasks-socket`, or `LAMP_SKILLS_TASKS_SOCKET`, which the product's
+  lamp-skills unit passes, `/run/lampos-tasks/skill-task.sock`; with
+  neither, a run says "no lamp-tasks hand-over on this lamp yet"):
   `{"op": "skill_task", "skill", "task", "run", "folder", "sha256",
   "grants"}`. lamp-tasks answers `{"ok": true, "id"?}` when the run ends, or
   `{"ok": false, "error", "message"}`, waited for at most 15 minutes; the

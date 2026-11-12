@@ -1875,7 +1875,8 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   lại, không hỏi được lamp-control thì không giao gì; một tác vụ một lúc mỗi
   kỹ năng, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng trong 24 giờ.
 - **Giao cho lamp-tasks** (#6306 xây): một dòng `{"op": "skill_task", ...}`
-  trên `--tasks-socket`; chưa unit nào truyền socket này. Token một lần
+  trên `--tasks-socket` (hoặc `LAMP_SKILLS_TASKS_SOCKET`; unit lamp-skills
+  của sản phẩm truyền `/run/lampos-tasks/skill-task.sock`). Token một lần
   (#6304, lamp-control đúc từ cái "có" nó giữ,
   `lamp_control::task_yes::yes_for_token`) và kết quả qua Task news là của
   #6304 và #6306.
