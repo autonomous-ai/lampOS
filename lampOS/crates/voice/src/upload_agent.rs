@@ -18,16 +18,17 @@
 //!   (its namespace, a fresh home per run, no `admin.sock`, the run's own
 //!   one-run token for its grants), told to follow the file.
 //! - **Its grants are read from what the file asks for** ([`grants_read`]),
-//!   conservatively: `camera`, `light`, `speak`, `sound`, and `net` when it
+//!   conservatively: `camera`, `light`, `speak` (its voice and the sounds
+//!   it plays), `sound` (hearing kinds of sound), and `net` when it
 //!   names a web API, a URL or HTTP (with `LAMP_TASK_NET` on; off, such a
 //!   file is refused, [`NO_NET`]). Each is said back when it goes on.
 //! - **On at once, or a spoken yes once** (the first builder's 19:14 line):
 //!   it goes on as an uploaded skill does today (#5977, said aloud). With
-//!   grants only of [`AT_ONCE`] (light, sound, body, speak) its task's yes
-//!   is recorded by lamp-control as it goes on ([`went_on`]); with the
-//!   camera, the microphone, a send or `net` ([`asks_yes`]) its first run
-//!   asks the spoken yes through the task-yes path ([`first_run`],
-//!   `crate::skill_task_yes`), once.
+//!   grants only of [`AT_ONCE`] (light, speak, body) its task's yes is
+//!   recorded by lamp-control as it goes on ([`went_on`]); with anything
+//!   else, `sound` (hearing kinds of sound), the microphone, the camera, a
+//!   send or `net` ([`asks_yes`]), its first run asks the spoken yes through
+//!   the task-yes path ([`first_run`], `crate::skill_task_yes`), once.
 //! - **No secret is the lamp's** (the first builder's 19:44 ruling): a key
 //!   or token is never said aloud, asked by voice or kept in the skill's
 //!   folder. Its way in (the app, into root's store as a service's tokens,
@@ -50,8 +51,12 @@ pub const MOST_BYTES: usize = 64 * 1_024;
 pub const MARK: &str = "agent: file";
 /// Where the file is kept in the skill's folder, the task's `run`.
 pub const INSTRUCTIONS: &str = "scripts/SKILL.md";
-/// The grants that go on at once, with no spoken yes.
-pub const AT_ONCE: [&str; 4] = ["light", "sound", "body", "speak"];
+/// The grants that go on at once, with no spoken yes (the first builder's
+/// 19:44 and 20:16 lines): the same set as #6659's
+/// `made_skill::CODE_AT_ONCE_GRANTS`, mirrored here until that lands.
+/// `sound` is hearing kinds of sound (lamp-control's `Grant::Sound`), so it
+/// keeps its yes; playing a sound is `speak`.
+pub const AT_ONCE: [&str; 3] = ["light", "speak", "body"];
 /// Where the script is said to come from in the say-back.
 pub const FROM: &str = "a file added in the app";
 /// What a file that names a web API is told with `LAMP_TASK_NET` off.
@@ -130,12 +135,15 @@ pub fn grants_read(text: &str) -> Vec<String> {
     ]) {
         grants.push("light");
     }
+    // Its voice and the sounds it plays are `speak`, lamp-control's.
     if any(&[
-        "say", "says", "saying", "speak", "speaks", "aloud", "announce",
+        "say", "says", "saying", "speak", "speaks", "aloud", "announce", "sound", "sounds", "beep",
+        "chime",
     ]) {
         grants.push("speak");
     }
-    if any(&["sound", "sounds", "beep", "chime"]) {
+    // Hearing kinds of sound (`sound`): only a clap or a knock named.
+    if any(&["clap", "claps", "clapping", "knock", "knocks", "knocking"]) {
         grants.push("sound");
     }
     if any(&[
