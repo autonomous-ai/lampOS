@@ -2398,11 +2398,37 @@ skill's task is handed over, and is refused at its mint until those two land. he
 `LAMP_SKILL_TASKS=on` in lamp-update's own unit too; its own network
 namespace is the same. The run's result is not yet Task news, and the
 skill's folder is named in the run's words, not in the work folder's
-`AGENTS.md`. The caps on
-lamp-tasks.service (`MemoryHigh`, `CPUQuota`) wait for measurements of
-Hermes's RAM and CPU running a task on lamp-52e6 (a 6 GB lamp: every
-RAM cap is sized to one) against Hermes's install floor (≥1,350 MB available), with the voice answering a line during the
-run. Tests: `skill_task::tests` (the switch, the token's life, a failed
+`AGENTS.md`.
+
+**The caps on lamp-tasks.service** (#6306; the first builder's 09:32 on
+#6306, 12 Nov). A skill's run is started by lamp-tasks itself, and
+Hermes's wrapper only unshares namespaces, so the run stays in
+lamp-tasks.service's cgroup, beside the part's Harness children (one
+`harness wait` and up to four `harness watch`es, Node, about 130 MB each on
+lamp-75c9). Harness's own panes run under harnessd's user unit, not here.
+A skill task may run beside a spoken one, so the cgroup is sized for two
+task deltas at once (`skill_task::TASKS_AT_ONCE`): the memory and tasks
+caps are **rest + 2 × delta × 1.5**, rounded up
+(`skill_task::two_tasks_cap`), and the CPU cap is two tasks' CPU and half
+again, held to three cores. The measures are Fourteen's of a real Hermes
+voice task (a packing list, 80 s) on lamp-9adf, a 6 GB lamp on build 12255,
+read from lamp-tasks.service's cgroup with `systemctl show`; the CPU came
+through the first builder (13:14 on #6059). The peaks were sampled every
+2 s, so they are a floor; the half again covers what fell between samples.
+After the task closed, the cgroup held 727 MiB and 89 tasks.
+
+| Measure (`skill_task::`) | Measured | Source | Cap in the product unit |
+|---|---|---|---|
+| Cgroup memory, `MemoryCurrent` (`MEASURED_REST_MEMORY_MB`, `MEASURED_PEAK_MEMORY_MB`) | 632 MiB at rest, 1120 MiB peak (+488; a floor: 2 s samples) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | `MemoryHigh=2100M` (`MEMORY_HIGH`): 632 + 2 × 488 × 1.5 = 2096, rounded up to 100 MB. Past it the kernel throttles and reclaims the part's own memory, never kills it: no `MemoryMax` |
+| Cgroup tasks, `TasksCurrent`, processes with threads (`MEASURED_REST_TASKS`, `MEASURED_TASKS`) | 91 at rest, 126 peak (+35; a floor: 2 s samples) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | `TasksMax=200` (`TASKS_MAX`): 91 + 2 × 53 = 197, rounded up to 10. Past it a fork fails, nothing is killed |
+| CPU (`MEASURED_PEAK_CPU_PERCENT`) | about 1.2 cores for 80 s (120%) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059); the first builder, 13:14 | `CPUQuota=300%` (`CPU_QUOTA`): 2 × 120 × 1.5 = 360%, held to 300% (`CPU_QUOTA_MOST_PERCENT`), since 360% would leave the voice 0.4 of a core while both tasks are busy; 300% keeps one of a 4-core lamp's cores for the voice and still holds both tasks' 240% |
+| Least MemAvailable (`MEASURED_MIN_AVAILABLE_MB`) | 3208 MB (3,285,476 kB) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | none; a test holds it, less a second task's 488 MB (2720 MB), at or over Hermes's install floor (`HERMES_FLOOR_MB`, ≥1,350 MB) |
+| Run time, `new` to close (`MEASURED_RUN_SECS`) | 75 s | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | none; a test holds it, and half again, within a run's life (`RUN_LIFETIME`, 14 minutes) |
+| Work folder's size (`MEASURED_WORK_FOLDER_MB`) | 1 MB, rounded up (36K before, 40K after) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | none; recorded only |
+
+Each `MEASURED_*` and its cap must agree, in the unit too: the tests fail
+when a measure changes without its cap.
+Tests: `skill_task::tests` (the switch, the token's life, a failed
 run, no token, every refused line; the socket answering a line, a second
 run refused `busy`, the switch off binding nothing, a caller not
 lamp-skills given no answer; a run killed at its deadline, its exit status,
@@ -2411,8 +2437,11 @@ setting `LAMP_NS_NET=run`) and `net_bridge::tests` (a call piped TCP to
 unix to TCP and its answer back, byte for byte, through a stand-in
 forwarder on an ephemeral port; a connection past the most closed at once
 and the bound let go; an idle pipe ended; nothing piped ever said; the
-relay's arguments; the switch off binding nothing), on any computer, with
-no Hermes.
+relay's arguments; the switch off binding nothing), and the caps
+(`skill_task::tests`: each in the product unit's `[Service]` once, no hard
+memory line, each cap holding two tasks with half again, the least
+MemAvailable less a second task's delta at or over Hermes's floor, the run time and half again within a run's
+life), on any computer, with no Hermes.
 
 **The lamp row (not yet run):** on a lamp with Hermes installed,
 lamp-control serving and `LAMP_SKILL_TASKS=on` in both units, a skill's run

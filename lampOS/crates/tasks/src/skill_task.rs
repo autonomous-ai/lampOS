@@ -77,6 +77,94 @@ pub const ADMIN_WAIT: Duration = Duration::from_secs(5);
 /// answer (`RUN_MOST`, #6346), so a run never holds the one place after
 /// nobody waits for it.
 pub const RUN_LIFETIME: Duration = Duration::from_secs(14 * 60);
+
+// lamp-tasks.service's caps (#6306; the first builder's 09:32 on #6306,
+// 12 Nov: `MemoryHigh` and `CPUQuota` on the product unit, from measured
+// numbers, never below Hermes's install floor). A skill's run is started by
+// lamp-tasks itself ([`HermesRunner`]), and Hermes's wrapper only unshares
+// namespaces, so the run stays in lamp-tasks.service's cgroup beside the
+// part's Harness children (`harness wait` and up to
+// `crate::follow::MOST_FOLLOWED` `harness watch`es). Harness's own panes
+// run under harnessd's user unit, not here. The caps are written in
+// `deploy/product/lamp-tasks.service` as [`MEMORY_HIGH`], [`CPU_QUOTA`]
+// and [`TASKS_MAX`]; a test holds the unit to these constants.
+//
+// The measures are Fourteen's of a real Hermes voice task (a packing list,
+// 80 s) on lamp-9adf (a 6 GB lamp, build 12255), read from
+// lamp-tasks.service's cgroup with `systemctl show` (12 Nov, #6059; the
+// CPU through the first builder, 13:14 on #6059). A skill task may run
+// beside a spoken one (the first builder, 13:14), so the memory and tasks
+// caps are the cgroup at rest plus two task deltas, each delta with half
+// again: `rest + 2 × delta × 1.5`, rounded up ([`two_tasks_cap`]). The
+// peaks were sampled every 2 s, so they are a floor; the half again covers
+// what fell between samples. After the task closed, the cgroup held
+// 727 MiB and 89 tasks.
+
+/// How many tasks the cgroup is sized to hold at once: a skill task beside
+/// a spoken one (the first builder, 13:14 on #6059).
+pub const TASKS_AT_ONCE: u64 = 2;
+/// lamp-tasks.service's cgroup `MemoryCurrent` at rest, in MB (MiB as
+/// `systemctl show` gives it): 632 on lamp-9adf (#6059).
+pub const MEASURED_REST_MEMORY_MB: u64 = 632;
+/// The cgroup's peak `MemoryCurrent` through one Hermes task, in MB: 1120
+/// on lamp-9adf (#6059), +488 over rest, sampled every 2 s, so a floor.
+pub const MEASURED_PEAK_MEMORY_MB: u64 = 1120;
+/// The cgroup's `TasksCurrent` (processes and their threads) at rest: 91
+/// on lamp-9adf (#6059).
+pub const MEASURED_REST_TASKS: u64 = 91;
+/// The cgroup's peak `TasksCurrent` through the task: 126 on lamp-9adf
+/// (#6059), +35 over rest, sampled every 2 s, so a floor.
+pub const MEASURED_TASKS: u64 = 126;
+/// The task's CPU, in percent of one core: about 1.2 cores for 80 s on
+/// lamp-9adf (Fourteen through the first builder, 13:14 on #6059).
+pub const MEASURED_PEAK_CPU_PERCENT: u64 = 120;
+/// The least MemAvailable on the lamp through the task, in MB: 3,285,476
+/// kB on lamp-9adf (#6059).
+pub const MEASURED_MIN_AVAILABLE_MB: u64 = 3208;
+/// The task's run time, `new` to close, in seconds, on lamp-9adf (#6059).
+pub const MEASURED_RUN_SECS: u64 = 75;
+/// The lamp's work folder's size after the task, in MB, rounded up: 36K
+/// before and 40K after on lamp-9adf (#6059). Recorded only: no cap is set
+/// on the folder.
+pub const MEASURED_WORK_FOLDER_MB: u64 = 1;
+
+/// Hermes's install floor: at least this much available through a task
+/// (#6306's body; the first builder on #6226, 11 Nov).
+pub const HERMES_FLOOR_MB: u64 = 1350;
+/// A measure and half again, rounded up to `step`.
+pub const fn half_again(measured: u64, step: u64) -> u64 {
+    (measured * 3).div_ceil(2).div_ceil(step) * step
+}
+/// A cap for [`TASKS_AT_ONCE`] tasks in one cgroup: `rest` plus each task's
+/// delta (`peak - rest`) and half again, rounded up to `step`.
+pub const fn two_tasks_cap(rest: u64, peak: u64, step: u64) -> u64 {
+    let delta = (peak - rest) * 3;
+    (rest + TASKS_AT_ONCE * delta.div_ceil(2)).div_ceil(step) * step
+}
+/// `MemoryHigh`, in MB: [`MEASURED_REST_MEMORY_MB`] plus two deltas to
+/// [`MEASURED_PEAK_MEMORY_MB`], each with half again, rounded up to 100 MB:
+/// 632 + 2 × 732 = 2096, so 2100. Past it the kernel throttles and reclaims
+/// the part's own memory, never kills it (no `MemoryMax`), so the voice's
+/// hand-overs never lose lamp-tasks to the cap.
+pub const MEMORY_HIGH_MB: u64 = 2100;
+/// [`MEMORY_HIGH_MB`] as the unit's line.
+pub const MEMORY_HIGH: &str = "MemoryHigh=2100M";
+/// The most `CPUQuota` this part is given, in percent of one core: three of
+/// a 4-core lamp's cores, so one whole core is always left to the voice.
+pub const CPU_QUOTA_MOST_PERCENT: u64 = 300;
+/// `CPUQuota`, in percent of one core: two tasks' [`MEASURED_PEAK_CPU_PERCENT`]
+/// and half again (2 × 120 × 1.5 = 360%), held to [`CPU_QUOTA_MOST_PERCENT`]:
+/// 360% would leave the voice 0.4 of a core while both tasks are busy, and
+/// 300% still holds both tasks' measured 240% with a quarter to spare.
+pub const CPU_QUOTA_PERCENT: u64 = 300;
+/// [`CPU_QUOTA_PERCENT`] as the unit's line.
+pub const CPU_QUOTA: &str = "CPUQuota=300%";
+/// `TasksMax`: [`MEASURED_REST_TASKS`] plus two deltas to [`MEASURED_TASKS`],
+/// each with half again, rounded up to 10: 91 + 2 × 53 = 197, so 200. Past
+/// it a fork or a new thread in the part fails; nothing running is killed.
+pub const TASKS_MAX: u64 = 200;
+/// [`TASKS_MAX`] as the unit's line.
+pub const TASKS_MAX_LINE: &str = "TasksMax=200";
 /// The folder a skill's script is in (#6305, `lamp_skills::task::SCRIPTS`).
 pub const SCRIPTS: &str = "scripts";
 /// The most bytes of a task's words (#6305, `MOST_TASK_BYTES`).
@@ -1740,5 +1828,95 @@ mod tests {
             "{shown}"
         );
         assert!(shown.contains(CONTROL_SOCKET), "{shown}");
+    }
+
+    /// The product unit's `[Service]` lines.
+    fn product_service_lines() -> Vec<&'static str> {
+        let unit = include_str!("../../../deploy/product/lamp-tasks.service");
+        let start = unit.find("\n[Service]\n").expect("a [Service] section");
+        let service = &unit[start + "\n[Service]\n".len()..];
+        let end = service.find("\n[").unwrap_or(service.len());
+        service[..end].lines().collect()
+    }
+
+    /// #6306: the product's lamp-tasks.service carries every cap, once
+    /// each, in its `[Service]` section, as these constants say them.
+    #[test]
+    fn the_product_unit_carries_the_caps() {
+        let lines = product_service_lines();
+        for (name, cap) in [
+            ("MemoryHigh=", MEMORY_HIGH),
+            ("CPUQuota=", CPU_QUOTA),
+            ("TasksMax=", TASKS_MAX_LINE),
+        ] {
+            let found: Vec<_> = lines.iter().filter(|line| line.starts_with(name)).collect();
+            assert_eq!(found, [&cap], "{name} once in [Service]");
+        }
+        assert_eq!(MEMORY_HIGH, format!("MemoryHigh={MEMORY_HIGH_MB}M"));
+        assert_eq!(CPU_QUOTA, format!("CPUQuota={CPU_QUOTA_PERCENT}%"));
+        assert_eq!(TASKS_MAX_LINE, format!("TasksMax={TASKS_MAX}"));
+    }
+
+    /// #6306: past the memory cap lamp-tasks is throttled, never killed:
+    /// no hard memory line, so the voice's hand-overs never lose the part.
+    #[test]
+    fn the_memory_cap_throttles_and_never_kills() {
+        let lines = product_service_lines();
+        for hard in [
+            "MemoryMax=",
+            "MemorySwapMax=",
+            "MemoryLimit=",
+            "OOMPolicy=kill",
+        ] {
+            assert!(
+                !lines.iter().any(|line| line.starts_with(hard)),
+                "{hard} in lamp-tasks.service"
+            );
+        }
+    }
+
+    /// #6306: the memory and tasks caps are rest plus two task deltas,
+    /// each with half again (`rest + 2 × delta × 1.5`, rounded up), and
+    /// CPU two tasks' measure and half again, held to three cores, so
+    /// changing a measure (#6059) without its cap fails.
+    #[test]
+    fn each_cap_holds_two_tasks_with_half_again() {
+        assert_eq!(TASKS_AT_ONCE, 2);
+        assert_eq!(two_tasks_cap(632, 1120, 100), 2100);
+        assert_eq!(two_tasks_cap(91, 126, 10), 200);
+        assert_eq!(
+            MEMORY_HIGH_MB,
+            two_tasks_cap(MEASURED_REST_MEMORY_MB, MEASURED_PEAK_MEMORY_MB, 100)
+        );
+        assert_eq!(
+            TASKS_MAX,
+            two_tasks_cap(MEASURED_REST_TASKS, MEASURED_TASKS, 10)
+        );
+        assert_eq!(half_again(2 * 120, 10), 360);
+        assert_eq!(
+            CPU_QUOTA_PERCENT,
+            half_again(TASKS_AT_ONCE * MEASURED_PEAK_CPU_PERCENT, 10).min(CPU_QUOTA_MOST_PERCENT)
+        );
+        // The first builder's bound: at or under 2200M.
+        const { assert!(MEMORY_HIGH_MB <= 2200) };
+        // Both tasks' measured CPU still fits under the quota.
+        const { assert!(CPU_QUOTA_PERCENT >= TASKS_AT_ONCE * MEASURED_PEAK_CPU_PERCENT) };
+    }
+
+    /// #6306: with a second task's delta on top of the measured least
+    /// MemAvailable, the lamp stays at or over Hermes's install floor, and
+    /// the measured run fits its life with half again to spare.
+    #[test]
+    fn the_measured_task_keeps_the_floor_and_fits_its_life() {
+        const {
+            assert!(
+                MEASURED_MIN_AVAILABLE_MB - (MEASURED_PEAK_MEMORY_MB - MEASURED_REST_MEMORY_MB)
+                    >= HERMES_FLOOR_MB
+            )
+        };
+        assert!(half_again(MEASURED_RUN_SECS, 1) <= RUN_LIFETIME.as_secs());
+        // Under a 4-core lamp's whole CPU, so the voice keeps a core.
+        const { assert!(CPU_QUOTA_MOST_PERCENT < 4 * 100) };
+        const { assert!(CPU_QUOTA_MOST_PERCENT <= (4 - 1) * 100) };
     }
 }
