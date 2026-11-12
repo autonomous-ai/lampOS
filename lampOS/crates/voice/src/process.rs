@@ -1334,6 +1334,14 @@ fn worker_command(
             role,
             var(crate::made_skill::CODE_AT_ONCE_ENVIRONMENT).as_deref(),
         ))
+        .envs(upload_agent_worker_environment(
+            role,
+            var(crate::upload_agent::ENVIRONMENT).as_deref(),
+        ))
+        .envs(task_net_worker_environment(
+            role,
+            var(crate::skill_task_yes::NET_ENVIRONMENT).as_deref(),
+        ))
         .envs(skill_loose_worker_environment(
             role,
             var(crate::made_skill::LOOSE_ENVIRONMENT).as_deref(),
@@ -1464,6 +1472,27 @@ fn skill_tasks_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::skill_task_yes::ENVIRONMENT, "on"))
+}
+
+// An agent skill added from a file (`upload_agent::on`), passed the same
+// narrow way: the exact `on`, to the two routes whose tool call asks its
+// first run's yes and whose `make_skill` takes it.
+fn upload_agent_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::upload_agent::ENVIRONMENT, "on"))
+}
+
+// A task's `net` grant (`skill_task_yes::net_on`), passed the same narrow
+// way: the exact `on`, to the two routes that say a task's grants back.
+fn task_net_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::skill_task_yes::NET_ENVIRONMENT, "on"))
 }
 
 // A made skill loosened (#6059, `made_skill::loose_on`), passed the same
@@ -2698,6 +2727,14 @@ mod tests {
             ),
             (
                 crate::made_skill::CODE_AT_ONCE_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::upload_agent::ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::skill_task_yes::NET_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
             (
