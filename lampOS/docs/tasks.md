@@ -2726,10 +2726,12 @@ for each run, and is answered once the run ends
     folder in its Harness project (never a link), a token file in
     `/run/lampos-tasks/runs/`, or a session on the lamp's machine named
     `skill-<run-id>` (`harness ps --json`). Each session is closed
-    `--now` (within `CLOSE_BUDGET`), then the folder and the token file
-    are removed, even when a close failed. One journal line per run says
-    what was closed and removed ("a run an earlier start left,
-    skill-<id>: closed …, folder removed, token file removed"). The sweep
+    `--now` (within `CLOSE_BUDGET`), after its token is ended with
+    lamp-control (the run holds the token in memory, so removing its file
+    revokes nothing), then the folder and the token file are removed, even
+    when a close failed. One journal line per run says what was ended,
+    closed and removed ("a run an earlier start left, skill-<id>: token
+    ended, closed …, folder removed, token file removed"). The sweep
     runs on a thread of its own before the skill runs' Harness is set, so
     a skill's run is refused ("Harness isn't set up on this lamp yet")
     until it is done, no run of this start is ever swept, and spoken tasks
