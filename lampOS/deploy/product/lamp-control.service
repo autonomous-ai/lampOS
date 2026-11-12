@@ -25,6 +25,13 @@ User=lampos
 Group=lampos
 Slice=lampos-parts.slice
 Nice=10
+# A skill's task (#6305, #6432, docs/control.md): the owner's yes kept in --state-dir's task-yes.json, and a
+# run's service.read and service.write sent to lamp-services; only while LAMP_CONTROL is on.
+Environment=LAMP_SKILL_TASKS=on
+# The run socket (/run/lampos-control/control.sock) for lamp-tasks' skill runs as `lampos` (#6071 PR 1,
+# docs/control.md "The control socket, lamp-control's side"). With LAMP_CONTROL off, lamp-control serves only it and
+# admin.sock (no TLS door), once the first builder's (b) of 12 Nov 08:15 lands.
+Environment=LAMP_CONTROL_RUN_SOCKET_USER=lampos
 # Its certificate and paired computers in --state-dir, the owner's side on --admin-socket (0600),
 # the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`),
 # root's skills manage helper (skill push) and the ring's light requests on the bus.

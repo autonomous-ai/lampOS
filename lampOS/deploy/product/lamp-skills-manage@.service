@@ -30,6 +30,9 @@ Environment=LAMP_SKILL_READS=on
 # A made skill's write (#6066, #6142): a made skill with one fixed write step loads as it is put on; it sends
 # only after the owner's yes to its content, at most three a day, never a public post. On in the product (owner, 11 Nov).
 Environment=LAMP_SKILL_WRITES=on
+# A Store or pushed skill's `do.task` (#6305): its task and grants read for the voice's say-back (task_asks).
+# The same line in lamp-skills, lamp-voice, lamp-control, lamp-services, lamp-tasks and lamp-update.
+Environment=LAMP_SKILL_TASKS=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills' [present] values, as lamp-skills
 # loads them, so the app's on and off act on the skills as they run. The same line in lamp-skills.service and lamp-cloud.service.
 Environment=LAMP_NUDGES_PRESENT=on

@@ -339,13 +339,13 @@ door for one named user the owner turned on; a skill's script never gets it. The
 without a token, and a token carries only the grants the owner said yes to for that skill and that folder's bytes: a
 changed script asks again.
 
-### A skill run's linked services (`LAMP_SKILL_TASKS`, #6432, off)
+### A skill run's linked services (`LAMP_SKILL_TASKS`, #6432, on in the product)
 
 A run's token may also name a linked service: `<code>-read` or `<code>-write` (`protocol::SERVICE_CODES`, the codes of lamp-services' catalog, `gmail-app` granted as `gmail` and `figma-api` as `figma`; e.g. `gmail-read`, `google_calendar-write`). Such a grant is a skill run's alone: `code` and `set_grants` on the admin socket refuse one ("a linked service is a skill run's alone"), and one in `clients.json` is never held.
 
 - **The ops.** `{"id":N,"op":"service.read","service":"gmail","args":{...}}` needs `<service>-read`; `{"id":N,"op":"service.write","service":"gmail","args":{...}}` needs `<service>-write`. `args` are what lamp-services' `service_read` and `service_write` take, without `service`. A service with no grant, `service` inside `args`, or a write with `send_id` or `said` is a `bad_request`: a run only prepares a write, which the lamp reads back and the person's spoken yes sends.
 - **Where they go.** Only from a connection that came by the run socket and whose run still goes (else `no_grant`, "a linked service is a skill run's alone"), as one line to lamp-services' tools socket (`/run/lampos-services/tools/call.sock`, or `--services-socket`), naming the run's skill; the reply waits off the door's lock (at most 20 s) and is `{"result": ...}` or lamp-services' refusal as `refused`. The journal names the service and the `what` or `action` only.
-- **Off** unless `LAMP_SKILL_TASKS=on` in lamp-control's environment: both ops are `off`, "a skill's linked services are off on this lamp (LAMP_SKILL_TASKS)". lamp-services takes lamp-control's cgroup only with the same switch on its side. The rest is in [services.md](services.md), "A skill's run on the lamp's Hermes". In `control.schema.json` (`service.read`, `service.write`, `service_grant`, `service_code`) and the SDKs (`serviceRead` / `service_read`, `serviceWrite` / `service_write`); their debug logs redact `args` and `result`.
+- **Off** unless `LAMP_SKILL_TASKS=on` in lamp-control's environment (the product's unit sets it, 12 Nov): both ops are `off`, "a skill's linked services are off on this lamp (LAMP_SKILL_TASKS)". lamp-services takes lamp-control's cgroup only with the same switch on its side. The rest is in [services.md](services.md), "A skill's run on the lamp's Hermes". In `control.schema.json` (`service.read`, `service.write`, `service_grant`, `service_code`) and the SDKs (`serviceRead` / `service_read`, `serviceWrite` / `service_write`); their debug logs redact `args` and `result`.
 
 ## The wire
 

@@ -1725,7 +1725,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    - **lamp-control's socket for a skill's run, behind `LAMP_SKILL_TASKS`**
      (#6306; in `lamp-update.service`'s environment, the same name
      lamp-tasks reads to serve a skill's task, so one name turns skill
-     tasks on; on only when `on` exactly, on any lamp; no product unit
+     tasks on; on only when `on` exactly, on any lamp; the product's unit
      sets it). A skill's run under Hermes is told
      `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`
      (`lamp_tasks::skill_task::CONTROL_SOCKET`), which the empty `/run`

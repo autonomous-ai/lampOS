@@ -55,6 +55,9 @@ Environment=LAMP_UPDATE_MODELS=on
 # The lamp's agents for the app (#6240): `engines` in update.status and engines.install for a missing Hermes,
 # on in the product by the owner's rule of 11 Nov; `off` here takes it away.
 Environment=LAMP_APP_ENGINES=on
+# A skill's run under the lamp's Hermes (#6306, docs/install.md): hermes-ns shows lamp-control's control.sock
+# alone, read-only, and gives a run started with LAMP_NS_NET=run a network of only lo. lamp-tasks reads the same name.
+Environment=LAMP_SKILL_TASKS=on
 
 [Install]
 WantedBy=multi-user.target
