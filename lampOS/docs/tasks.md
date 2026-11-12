@@ -1851,7 +1851,11 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `harness reply` comes only if the second is lost too: it needs the
     person's own `programs-reply` switch, so a product lamp gets
     `reply_off` there. A second `new` that fails is uncertain,
-    `openclaw_new_again_failed`. Nothing starts a third time.
+    `openclaw_new_again_failed`. Nothing starts a third time. The second
+    `new` comes only once the first is closed: a close refused or failed
+    is uncertain, `openclaw_not_closed`, with nothing more started, so the
+    task never runs twice. A first `new` that made its folder
+    (`--new <name>`) is asked again in that folder.
   - **The voice** (`agent_tasks`, `task_news`): reads the lamp's target's
     engine from `{"op":"targets"}` and names it, so a hand-over naming no
     machine is said as "OpenClaw on the lamp" and the tool descriptions
