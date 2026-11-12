@@ -27,6 +27,14 @@
 //! Connection policy: one live connection per role; the same permitted
 //! consumer may reconnect after any closure except its own protocol
 //! violation; `close_all` is terminal for the producer.
+//!
+//! Peer policy: the socket's mode and directory let in only this user, and
+//! the hello's boots name a consumer. A producer whose consumers are
+//! another unit running as the same user also checks each connection's
+//! peer as the kernel names it ([`FrameServer::with_peer_check`]), before a
+//! byte of it is read: anything it refuses is closed and counted as
+//! [`CloseReason::PeerRefused`]. A producer whose consumers are its own
+//! process's workers sets none.
 use crate::{DriverTimestamp, FrameObservation, TimestampDomain, TimestampPoint};
 use lamp_turn_owner::{BootId, CameraGrant};
 use serde::{Deserialize, Serialize};
@@ -217,6 +225,9 @@ pub enum CloseReason {
     HelloTimeout,
     /// More simultaneous unidentified connections than allowed.
     TooManyConnections,
+    /// The peer, as the kernel named it, is not one the producer's check
+    /// lets in ([`FrameServer::with_peer_check`]).
+    PeerRefused,
     /// A socket error other than would-block.
     Io,
 }
@@ -321,6 +332,10 @@ impl Slot {
     }
 }
 
+/// Whether a connection's peer may go on to its hello, from the kernel's
+/// naming of it (`SO_PEERCRED` and its cgroup), never its word.
+pub type PeerCheck = Box<dyn Fn(&UnixStream) -> bool + Send + Sync>;
+
 /// The camera worker's end. Every method is nonblocking and bounded.
 pub struct FrameServer {
     listener: UnixListener,
@@ -337,6 +352,8 @@ pub struct FrameServer {
     counts: LinkCounts,
     events: VecDeque<LinkEvent>,
     closed: bool,
+    /// Who may connect, by the kernel's naming; `None` checks no peer.
+    peer: Option<PeerCheck>,
 }
 
 impl FrameServer {
@@ -377,7 +394,16 @@ impl FrameServer {
             counts: LinkCounts::default(),
             events: VecDeque::with_capacity(MAX_EVENTS),
             closed: false,
+            peer: None,
         })
+    }
+
+    /// Check each connection's peer with `check` as it is accepted, before
+    /// a byte of it is read; one refused is closed and counted
+    /// ([`CloseReason::PeerRefused`]).
+    pub fn with_peer_check(mut self, check: PeerCheck) -> Self {
+        self.peer = Some(check);
+        self
     }
 
     pub fn path(&self) -> &Path {
@@ -476,6 +502,17 @@ impl FrameServer {
         for _ in 0..MAX_PENDING_CONNECTIONS {
             match self.listener.accept() {
                 Ok((stream, _)) => {
+                    if self.peer.as_ref().is_some_and(|check| !check(&stream)) {
+                        bump(&mut self.counts.rejected);
+                        let _ = stream.shutdown(std::net::Shutdown::Both);
+                        self.event(LinkEvent::Closed {
+                            role: None,
+                            reason: CloseReason::PeerRefused,
+                            partial_frame_discarded: false,
+                            at_us: now_us,
+                        });
+                        continue;
+                    }
                     if self.pending.len() >= MAX_PENDING_CONNECTIONS
                         || stream.set_nonblocking(true).is_err()
                     {

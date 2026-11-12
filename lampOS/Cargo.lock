@@ -2126,6 +2126,7 @@ dependencies = [
  "lamp-turn-owner",
  "libc",
  "ort",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
