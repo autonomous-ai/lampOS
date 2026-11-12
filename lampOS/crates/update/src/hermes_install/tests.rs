@@ -2003,9 +2003,11 @@ fn the_skills_text_is_the_namespace_script_with_only_the_skills_socket_added() {
 }
 
 /// The tasks switch (#6306) is lamp-tasks' own name, off unless `on`
-/// exactly on any lamp, and no product unit names it.
+/// exactly on any lamp. The product turns it on (#6071, #6305, #6306,
+/// #6432): lamp-update's unit and lamp-tasks' each set it `on`, and no
+/// product file sets it to anything else.
 #[test]
-fn the_tasks_switch_is_lamp_tasks_own_and_off_unless_on() {
+fn the_tasks_switch_is_lamp_tasks_own_and_on_in_the_product() {
     assert_eq!(TASKS_SWITCH, "LAMP_SKILL_TASKS");
     for product in [true, false] {
         assert!(!wanted(None, product, false), "unset");
@@ -2014,11 +2016,21 @@ fn the_tasks_switch_is_lamp_tasks_own_and_off_unless_on() {
         }
         assert!(wanted(Some("on"), product, false));
     }
+    let update = include_str!("../../../../deploy/product/lamp-update.service");
+    let tasks = include_str!("../../../../deploy/product/lamp-tasks.service");
+    let switch = format!("Environment={TASKS_SWITCH}=on");
+    let setting = format!("{TASKS_SWITCH}=");
+    for (unit, text) in [("lamp-update", update), ("lamp-tasks", tasks)] {
+        let lines = text.lines().filter(|line| *line == switch).count();
+        assert_eq!(lines, 1, "{unit}");
+    }
     let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
     for entry in fs::read_dir(&product).unwrap() {
         let path = entry.unwrap().path();
         if let Ok(text) = fs::read_to_string(&path) {
-            assert!(!text.contains(TASKS_SWITCH), "{}", path.display());
+            for line in text.lines().filter(|line| line.contains(&setting)) {
+                assert_eq!(line, switch, "{}", path.display());
+            }
         }
     }
 }

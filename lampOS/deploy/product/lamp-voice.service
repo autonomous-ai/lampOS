@@ -427,6 +427,9 @@ Environment=LAMP_SKILL_READS=on
 # owner's later yes approves its content (the say-back's own echo held), passed to both routes; a send needs that
 # yes, at most three a day, never a public post, and is told at the next heard line. On in the product (owner, 11 Nov).
 Environment=LAMP_SKILL_WRITES=on
+# A Store or pushed skill's `do.task` (#6305, docs/skills.md "A skill's task"): its task and each grant said back,
+# and the person's yes recorded by lamp-control (task_yes_record); passed to the provider and second routes.
+Environment=LAMP_SKILL_TASKS=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill

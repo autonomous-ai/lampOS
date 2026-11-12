@@ -154,7 +154,7 @@ chạy thật gửi thêm (ghi chú của bộ nhớ, các dòng của skill, c�
 web, tên vừa nghe thấy) không có trong probe. D giúp việc giao việc không còn
 phụ thuộc vào những thứ đó. Chưa được phát thử trên đèn.
 
-## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`)
+## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`, bật trong sản phẩm)
 
 Bước `do.task` của một kỹ năng (#6305, docs/skills.md, "A skill's task")
 giao phần chậm hơn cho Hermes của chính đèn. lamp-skills gửi một dòng cho mỗi
@@ -287,13 +287,11 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 theo socket quản trị của lamp-control (#6408, đã gộp), nhưng lamp-control
 chưa giữ lời đồng ý nào của kỹ năng, nên hiện mọi lần xin token ở đó đều bị
 từ chối.
-Chưa unit sản phẩm nào đặt `LAMP_SKILL_TASKS=on` cho lamp-tasks, và chưa
-unit nào truyền socket cho lamp-skills, nên trên đèn chưa có việc của kỹ
-năng nào chạy. hermes-ns cũng chỉ cho lần chạy thấy `control.sock` của
-lamp-control khi có `LAMP_SKILL_TASKS=on` trong unit của chính lamp-update,
-và cũng chưa unit sản phẩm nào đặt nó; network namespace riêng của lần chạy
-cũng vậy. `LAMP_SKILL_TASKS` vẫn tắt cho tới khi các quyền của lamp-control
-tới được thư, lịch và phần còn lại qua `control.sock` (#6436). Kết quả của
+Các unit sản phẩm đặt `LAMP_SKILL_TASKS=on` cho lamp-tasks và lamp-update
+(12/11), nhưng chưa unit nào truyền socket cho lamp-skills, nên trên đèn
+chưa có việc của kỹ năng nào chạy. hermes-ns cũng chỉ cho lần chạy thấy
+`control.sock` của lamp-control khi có `LAMP_SKILL_TASKS=on` trong unit của
+chính lamp-update; network namespace riêng của lần chạy cũng vậy. Kết quả của
 lần chạy chưa thành Task news, và thư mục của kỹ năng được
 nêu trong lời của lần chạy, chưa nằm trong `AGENTS.md` của thư mục làm việc.
 Giới hạn
