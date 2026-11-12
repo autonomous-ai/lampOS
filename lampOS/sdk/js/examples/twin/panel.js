@@ -3,6 +3,16 @@
 // lamp's own events. Nothing here is written per feature: a new SDK call is a new entry in controls.js.
 const send = (message) => window.twinSend?.(message);
 let counter = 0;
+let movesAllowed = false;
+// On a real lamp, the one yes to "this moves the real lamp" per page load (a row that moves the body, or a joint slider); the
+// server holds every move until it has been told.
+const movesOk = () => {
+  if (table.mode !== 'real' || movesAllowed) return true;
+  if (!window.confirm('This moves the real lamp. Go on?')) return false;
+  movesAllowed = true;
+  send({ type: 'moves_ok' });
+  return true;
+};
 // The row each press came from, for a picture it asks to show (answered to this page only, under that row).
 const rowOf = new Map();
 const el = (tag, props = {}, ...children) => {
@@ -24,6 +34,12 @@ document.head.append(el('style', { textContent: `
   #panel .world button { border-style: dashed; }
   #panel .why { flex-basis: 100%; font-size: 11px; color: #b26a00; margin: -2px 0 2px 2px; }
   #panel button:disabled { opacity: .5; cursor: not-allowed; }
+  /* The page is a grid (the view, the side): the banner takes a row of its own across both. */
+  body.real { grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+  @media (max-width: 720px) { body.real { grid-template-rows: auto 55vh auto; overflow: auto; } }
+  #realbanner { grid-column: 1 / -1; position: sticky; top: 0; z-index: 10; background: #b71c1c; color: #fff; padding: 6px 10px; font: 600 13px system-ui, sans-serif; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  #realbanner small { font-weight: 400; flex-basis: 100%; }
+  #realbanner button { background: #fff; color: #b71c1c; border: 0; border-radius: 4px; padding: 4px 12px; font-weight: 700; cursor: pointer; }
   #panel .hint { flex-basis: 100%; font-size: 11px; color: var(--soft); margin: -2px 0 2px 2px; }
   #panel img.shot { flex-basis: 100%; max-width: 320px; border-radius: 6px; border: 1px solid var(--line); }
   #events { height: 220px; overflow: auto; font: 12px/1.35 ui-monospace, monospace; border: 1px solid var(--line); border-radius: 6px; padding: 6px; white-space: pre-wrap; }
@@ -97,6 +113,8 @@ function row(entry, kind) {
     textContent: entry.label,
     disabled: Boolean(entry.disabled),
     onclick: () => {
+      // A row that moves the body asks once per page load on a real lamp.
+      if (entry.moves && !movesOk()) return;
       rowOf.set(counter + 1, node);
       send({ type: kind, id: ++counter, name: entry.id, args: values() });
     },
@@ -129,6 +147,15 @@ const say = (cls, text) => {
   while (events.childElementCount > 200) events.lastElementChild.remove();
 };
 
+// On a real lamp a strip that stays on every load: whose lamp this is, what it granted, and a STOP that is always there.
+if (table.mode === 'real') {
+  document.body.classList.add('real');
+  document.body.prepend(el('div', { id: 'realbanner' },
+    `REAL LAMP: ${table.lamp.name || table.lamp.id} (${table.lamp.id}) at ${table.host}`,
+    el('button', { id: 'realstop', textContent: 'STOP', onclick: () => send({ type: 'call', id: ++counter, name: 'stop', args: {} }) }),
+    el('small', { textContent: `granted: ${(table.grants ?? []).join(', ') || 'nothing'}` })));
+}
+
 const panel = el('section', { id: 'panel' },
   el('h2', { textContent: 'The lamp, through the SDK' }),
   el('p', { className: 'sub', textContent: `Checklist for ${table.lamp.name || table.lamp.id} (${table.mode}): PASS or FAIL each row, add a note, then export. Ticks stay in this browser for this lamp; the export is the record.` }),
@@ -150,6 +177,16 @@ const fold = el('details', {}, el('summary', { textContent: 'Joints (drag a slid
 joints.before(panel);
 panel.after(fold);
 fold.append(joints);
+// A slider drag asks the same yes first on a real lamp (in the capture phase, before the slider's own handler sends it): a
+// refused drag puts the slider back, an accepted one is sent by the drag that follows.
+for (const type of ['input', 'change']) {
+  joints.addEventListener(type, (event) => {
+    if (table.mode !== 'real' || movesAllowed) return;
+    event.stopPropagation();
+    // Only the `input` asks; the `change` that ends the same drag finds the slider already put back.
+    if (event.type === 'input' && !movesOk() && event.target instanceof HTMLInputElement) event.target.value = event.target.defaultValue;
+  }, true);
+}
 
 // A picture the lamp gave for a press: under its row, replacing the last, in memory only (a blob URL), never logged.
 function showPicture({ id, jpeg }) {

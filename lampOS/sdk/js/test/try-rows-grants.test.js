@@ -26,6 +26,7 @@ async function scenario(mode, granted) {
   const lamp = await fake.connect();
   try {
     const table = describe(mode, { grants: lamp.grants });
+    const removed = ALL.filter((g) => !granted.includes(g));
     const silent = [];
     const stricter = [];
     const answered = [];
@@ -37,11 +38,16 @@ async function scenario(mode, granted) {
         // lamp would take (`play` needs the body alone at the door) may not be off here: no row is stricter than the lamp.
         // (A row that asks the lamp nothing with its defaults cannot show it: `sound_remove` with no clip kept answers by itself.)
         if (ASKS_NOTHING.includes(row.id)) continue;
+        // A row off for a reason that is not a grant (a mode, a run's flag) is not this leg's: only a row drawn off for a grant is
+        // asked of the lamp.
+        if (!/^the lamp did not grant /.test(row.disabled)) continue;
         try {
           await control.run({ lamp, release: async () => { await lamp.following?.stop().catch(() => {}); }, show: () => {}, mode }, checked(control.fields, {}));
           stricter.push(`${row.id}: drawn off (${row.disabled}) but the lamp took it`);
         } catch (error) {
-          if (!(error.code === 'no_grant' || /not granted/.test(error.message))) stricter.push(`${row.id}: drawn off (${row.disabled}) but the lamp refused it for another reason: ${error.message}`);
+          // The lamp's refusal must name the grant that was removed, not another one.
+          const named = (error.code === 'no_grant' || /not granted/.test(error.message)) && removed.some((g) => new RegExp(`\\b${g}\\b`).test(error.message));
+          if (!named) stricter.push(`${row.id}: drawn off (${row.disabled}) but the lamp refused it for another reason, or for a grant that was not removed: ${error.message}`);
         }
         continue;
       }
