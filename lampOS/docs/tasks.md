@@ -4136,7 +4136,9 @@ finish?" for any recent piece of work.
   over, not looked at yet", …), `since` ("7 minutes ago"), `quiet_for` when
   a working agent was last active 3 or more minutes ago, `last_step` as
   `{"untrusted": "…"}` (at most 160 characters, quoted), and, for settled
-  work, `told`. `not_listed` counts what the record left out. No task
+  work, `told`: its news **began** to be told, heard whole or not (#6530,
+  the first builder's 23:14 on #6059); whether it was heard whole decides
+  only a retell (`LAMP_TASK_NEWS_RETELL`). `not_listed` counts what the record left out. No task
   number, store or machine id. Every word of `asked` and `last_step` that
   looks like a path (it holds `/` or `\`, or starts with `~`) is given as
   "a file", so a folder or a username never reaches the model
