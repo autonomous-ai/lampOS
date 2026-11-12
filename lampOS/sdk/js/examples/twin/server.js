@@ -54,25 +54,46 @@ const tell = (message) => {
   for (const page of pages) page.send(text);
 };
 let last = null;
-// `--ring-file PATH`: the virtual desktop lamp's ring pixels (lamp-sim's DIR/ring.json, 32 `#rrggbb`),
-// put in the light's `shows.pixels` until a lamp says them itself: the twin then draws the ring pixel
-// by pixel. It reads a file beside the lamp, not the lamp's door; it goes with the field it stands in for.
+// `--ring-file PATH`: the virtual desktop lamp's ring (lamp-sim's DIR/ring.json: `on`, `colour`, `level`, 32 `#rrggbb` pixels as drawn
+// at that moment, and the `pattern` while one moves), put in the light's `shows` for what the lamp does not say itself: the twin then
+// draws the ring pixel by pixel, moving. It reads a file beside the lamp, not the lamp's door; it goes with the field it stands in
+// for. lamp-sim rewrites the file as the pattern steps (about 25 times a second); a change is read within 100 ms and pushed to the
+// pages as a state of its own, so the picture moves between the lamp's own states.
 const ringFile = options['ring-file'];
+const ringShows = () => {
+  try {
+    const ring = JSON.parse(readFileSync(ringFile, 'utf8'));
+    if (!Array.isArray(ring.pixels)) return null;
+    return { pixels: ring.pixels, ...(typeof ring.on === 'boolean' ? { on: ring.on } : {}), ...(typeof ring.colour === 'string' ? { colour: ring.colour } : {}), ...(Number.isInteger(ring.level) ? { level: ring.level } : {}), ...(typeof ring.pattern === 'string' ? { pattern: ring.pattern } : {}) };
+  } catch { return null; /* no ring file yet, or half written: the one colour shows */ }
+};
 const withRing = (state) => {
   if (!ringFile) return state;
-  try {
-    const { pixels } = JSON.parse(readFileSync(ringFile, 'utf8'));
-    if (Array.isArray(pixels) && !state.lamp?.light?.shows?.pixels) {
-      return { ...state, lamp: { ...state.lamp, light: { ...state.lamp?.light, shows: { ...state.lamp?.light?.shows, pixels } } } };
-    }
-  } catch { /* no ring file yet, or half written: the one colour shows */ }
-  return state;
+  const ring = ringShows();
+  if (!ring) return state;
+  const shows = state.lamp?.light?.shows ?? {};
+  // What the lamp says itself stays; the ring's file fills only what is missing.
+  return { ...state, lamp: { ...state.lamp, light: { ...state.lamp?.light, shows: { ...ring, ...shows } } } };
 };
+let lastRaw = null;
 await lamp.on('body.state', (raw) => {
+  lastRaw = raw;
   const state = withRing(raw);
   last = state;
   tell({ type: 'state', state });
 });
+if (ringFile) {
+  let before = '';
+  setInterval(() => {
+    let text = '';
+    try { text = readFileSync(ringFile, 'utf8'); } catch { return; }
+    if (text === before) return;
+    before = text;
+    if (!lastRaw) return;
+    last = withRing(lastRaw);
+    tell({ type: 'state', state: last });
+  }, 100).unref();
+}
 console.log(`body.state subscribed on ${options.fake ? 'a simulated body' : 'the paired lamp'}`);
 
 // One lease at a time, taken at the first drag and given back 3 s after the last.

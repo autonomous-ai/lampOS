@@ -55,3 +55,26 @@ test('a lamp\'s own shows.pixels beats the ring file', async (t) => {
   await until(() => shown()?.[0] === '#ff0000');
   assert.equal(shown()[31], '#0000ff', 'the lamp\'s own pixels, not the file\'s');
 });
+
+test('a change of the ring file is pushed to the page as a state of its own: the moving pixels and the pattern name', async (t) => {
+  const { port, token, folder } = await started(t);
+  const write = (pixels, extra = {}) => writeFileSync(join(folder, 'ring.json'), JSON.stringify({ on: true, colour: 'orange', level: 4, pixels, ...extra }));
+  write(Array(32).fill('#503000'));
+  const socket = new WebSocket(`ws://127.0.0.1:${port}/live?t=${token}`, { headers: { origin: `http://127.0.0.1:${port}` } });
+  const states = [];
+  socket.on('message', (data) => { const m = JSON.parse(data); if (m.type === 'state') states.push(m.state); });
+  await new Promise((resolve, reject) => { socket.on('open', resolve); socket.on('error', reject); });
+  t.after(() => socket.close());
+  const shows = () => states.at(-1)?.lamp?.light?.shows;
+  await until(() => shows()?.pixels?.[0] === '#503000');
+  assert.deepEqual([shows().on, shows().colour, shows().level, shows().pattern], [true, 'orange', 4, undefined]);
+  // Nothing from the lamp in between: only the file changes, and the page is told within about 100 ms of the poll.
+  const before = states.length;
+  write(Array(32).fill('#402400'), { pattern: 'candle' });
+  await until(() => shows()?.pixels?.[0] === '#402400');
+  assert.equal(shows().pattern, 'candle');
+  assert.ok(states.length > before, 'a state was pushed for the file alone');
+  write(Array(32).fill('#503000'));
+  await until(() => shows()?.pixels?.[0] === '#503000');
+  assert.equal(shows().pattern, undefined, 'the pattern ends with the light: the key is gone');
+});
