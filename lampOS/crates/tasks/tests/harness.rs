@@ -6843,3 +6843,23 @@ fn a_skill_run_is_refused_with_no_harness_or_an_old_wrapper() {
     old.held_by = Some(wrapper);
     refused(old, &rig, skill_task::NOT_FOUND_BY_FOLDER);
 }
+
+/// #6691: lamp-tasks' start reads each session's id and name from one `ps`
+/// of the lamp's machine; a row with no name or no agent id is left out.
+#[test]
+fn issue_6691_named_reads_each_sessions_id_and_name_from_one_ps() {
+    let rig = Rig::new();
+    rig.plan(json!({"ps":step(json!({"ok":true,"harnesses":[
+        {"id":AGENT,"name":"skill-run-a","state":"idle"},
+        {"id":"22222222-2222-4222-8222-222222222222","state":"idle"},
+        {"id":"not-an-agent","name":"skill-run-b","state":"idle"},
+    ]}))}));
+    assert_eq!(
+        rig.cli().named(MACHINE).unwrap(),
+        [(AGENT.to_owned(), "skill-run-a".to_owned())]
+    );
+    let calls = rig.calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0]["args"], json!(["ps", "--machine", MACHINE, "--json"]));
+    assert_eq!(rig.cli().named("not a machine"), Err("invalid_machine".into()));
+}

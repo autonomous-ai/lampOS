@@ -2831,6 +2831,15 @@ impl Cli {
         parse_ps(&reply.stdout).map_err(str::to_string)
     }
 
+    /// Each harness on one machine as `(agent id, name)`, from one `ps`
+    /// (#6691: lamp-tasks' start finds the skill runs an earlier start
+    /// left by their `skill-<run-id>` names). A read only; a row with no
+    /// name is left out.
+    pub fn named(&self, machine: &str) -> Result<Vec<(String, String)>, String> {
+        let _ = machine;
+        Ok(Vec::new())
+    }
+
     /// Whether Harness is signed in to the person's account (`harness auth
     /// status --json`, `serve --set-up-later`). A read only: it signs
     /// nothing in or out.

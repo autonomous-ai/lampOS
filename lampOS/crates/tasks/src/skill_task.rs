@@ -1487,6 +1487,38 @@ fn write_answer(mut stream: &UnixStream, answer: &Value) {
     }
 }
 
+/// One run an earlier lamp-tasks left behind (#6691): its id, and the
+/// Harness sessions on the lamp's machine named for it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Leftover {
+    pub run: String,
+    pub agents: Vec<String>,
+}
+
+/// The runs an earlier lamp-tasks left behind (#6691), by any one trace:
+/// a `skill-<id>` folder in `project` (a real folder, never a link), a
+/// token file `<runs>/<id>`, or a session `named` `skill-<id>` (each row
+/// `(agent id, name)`, from `harness ps`). Read at start, before a run
+/// can begin, so each is one this process never started.
+pub fn leftovers(project: &Path, runs: &Path, named: &[(String, String)]) -> Vec<Leftover> {
+    let _ = (project, runs, named);
+    Vec::new()
+}
+
+/// Each `leftover` undone, as a run's own guard does (#6691): its sessions
+/// closed with `close` (`harness close --now`), then its folder in
+/// `project` and its token file in `runs` removed, even when a close
+/// failed. One journal line a run, which names what was closed and removed.
+pub fn sweep(
+    project: &Path,
+    runs: &Path,
+    leftovers: &[Leftover],
+    close: &dyn Fn(&str) -> Result<(), String>,
+) -> Vec<String> {
+    let _ = (project, runs, leftovers, close);
+    Vec::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2509,5 +2541,92 @@ mod tests {
         // The quota leaves the voice at least one of the lamp's cores.
         assert_eq!(LAMP_CORES, 8);
         const { assert!(CPU_QUOTA_PERCENT < (LAMP_CORES - 1) * 100) };
+    }
+
+    /// #6691: a run left by an earlier start is found by any one trace (its
+    /// folder, its token file, or a session named for it), each run once;
+    /// anything else in those places is left alone.
+    #[test]
+    fn issue_6691_leftovers_are_found_by_folder_token_file_or_session_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lamp-tasks");
+        let runs = dir.path().join("runs");
+        std::fs::create_dir_all(project.join("skill-run-a")).unwrap();
+        std::fs::create_dir_all(project.join("skill-run-b")).unwrap();
+        std::fs::create_dir_all(project.join("someone-else")).unwrap();
+        std::fs::create_dir_all(project.join("skill-Bad_Id")).unwrap();
+        std::fs::write(project.join("skill-a-file"), "").unwrap();
+        std::os::unix::fs::symlink(dir.path(), project.join("skill-a-link")).unwrap();
+        std::fs::create_dir_all(&runs).unwrap();
+        std::fs::write(runs.join("run-b"), "").unwrap();
+        std::fs::write(runs.join("run-c"), "").unwrap();
+        let named = [
+            ("agent-1".to_owned(), "skill-run-a".to_owned()),
+            ("agent-2".to_owned(), "skill-run-d".to_owned()),
+            ("agent-3".to_owned(), "lamp-task-001".to_owned()),
+            ("agent-4".to_owned(), "skill-run-a".to_owned()),
+        ];
+        let found = leftovers(&project, &runs, &named);
+        let leftover = |run: &str, agents: &[&str]| Leftover {
+            run: run.into(),
+            agents: agents.iter().map(|agent| (*agent).to_owned()).collect(),
+        };
+        assert_eq!(
+            found,
+            [
+                leftover("run-a", &["agent-1", "agent-4"]),
+                leftover("run-b", &[]),
+                leftover("run-c", &[]),
+                leftover("run-d", &["agent-2"]),
+            ]
+        );
+        // Nothing there at all, as on a lamp's first start: none.
+        let none = dir.path().join("none");
+        assert!(leftovers(&none.join("p"), &none.join("r"), &[]).is_empty());
+    }
+
+    /// #6691: the sweep closes each session first, then removes the folder
+    /// and the token file, even when a close failed (the hung `close --now`
+    /// Thirteen's P3 on #6684 left open); its journal line names each part.
+    #[test]
+    fn issue_6691_the_sweep_closes_then_removes_and_says_what_it_did() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = dir.path().join("lamp-tasks");
+        let runs = dir.path().join("runs");
+        std::fs::create_dir_all(project.join("skill-run-a/deep")).unwrap();
+        std::fs::create_dir_all(project.join("skill-run-b")).unwrap();
+        std::fs::create_dir_all(&runs).unwrap();
+        std::fs::write(runs.join("run-a"), "").unwrap();
+        std::fs::write(project.join("keep.txt"), "").unwrap();
+        let found = leftovers(
+            &project,
+            &runs,
+            &[
+                ("agent-1".into(), "skill-run-a".into()),
+                ("agent-2".into(), "skill-run-b".into()),
+            ],
+        );
+        assert_eq!(found.len(), 2);
+        let closed = RefCell::new(Vec::new());
+        let close = |agent: &str| {
+            closed.borrow_mut().push(agent.to_owned());
+            if agent == "agent-2" {
+                Err("timeout".to_owned())
+            } else {
+                Ok(())
+            }
+        };
+        let lines = sweep(&project, &runs, &found, &close);
+        assert_eq!(*closed.borrow(), ["agent-1", "agent-2"]);
+        assert!(!project.join("skill-run-a").exists());
+        assert!(!project.join("skill-run-b").exists(), "removed though its close failed");
+        assert!(!runs.join("run-a").exists());
+        assert!(project.join("keep.txt").exists());
+        assert_eq!(lines.len(), 2);
+        assert!(lines[0].contains("skill-run-a") && lines[0].contains("closed agent-1"), "{lines:?}");
+        assert!(lines[0].contains("folder removed") && lines[0].contains("token file removed"), "{lines:?}");
+        assert!(lines[1].contains("agent-2 not closed (timeout)"), "{lines:?}");
+        // Swept again, nothing is left to find.
+        assert!(leftovers(&project, &runs, &[]).is_empty());
     }
 }
