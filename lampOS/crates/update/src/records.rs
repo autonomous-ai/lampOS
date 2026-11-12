@@ -654,6 +654,29 @@ impl Records {
         );
     }
 
+    /// The newest `lines` entry the log holds, newest file first: its event
+    /// and lines. A line cut short or broken is passed over (#6266 5b).
+    pub fn last_lines(&self) -> Option<(String, Vec<String>)> {
+        for name in ["log.jsonl", "log.jsonl.1"] {
+            let Ok(bytes) = fs::read(self.folder.join(name)) else {
+                continue;
+            };
+            let found = bytes.rsplit(|byte| *byte == b'\n').find_map(|line| {
+                let entry: serde_json::Value = serde_json::from_slice(line).ok()?;
+                let lines = entry["lines"]
+                    .as_array()?
+                    .iter()
+                    .map(|one| one.as_str().map(str::to_owned))
+                    .collect::<Option<Vec<_>>>()?;
+                Some((entry["event"].as_str()?.to_owned(), lines))
+            });
+            if found.is_some() {
+                return found;
+            }
+        }
+        None
+    }
+
     /// A round's end in the log, marked as one and with the build it was
     /// about: what `update/status` says as the last result, read back when
     /// lamp-update starts again (#2194, `crate::status`).

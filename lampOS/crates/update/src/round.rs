@@ -810,6 +810,17 @@ impl Run<'_, '_> {
                 | Outcome::Failed(_)
         ) && !self.lines.is_empty()
         {
+            // A failure that comes every round the same way (15 minutes
+            // apart) is kept once: the lines only when they differ from the
+            // last kept ones. Its end is still written each round.
+            if matches!(outcome, Outcome::Failed(_))
+                && self
+                    .records
+                    .last_lines()
+                    .is_some_and(|(event, lines)| event == outcome.kind() && lines == self.lines)
+            {
+                return;
+            }
             self.records.log_lines(outcome.kind(), &self.lines);
         }
     }
