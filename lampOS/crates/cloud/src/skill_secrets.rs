@@ -160,6 +160,15 @@ mod tests {
             Err(lamp_services::skill_secrets::NOT_NEEDED.to_owned())
         );
         served.join().unwrap();
+        // The app polls `skills.secrets` after an upload and reads this one
+        // as not there yet: its words reach it exactly.
+        let (_dir, socket, served) =
+            admin(json!({"ok": false, "error": lamp_services::skill_secrets::NO_SKILL}));
+        assert_eq!(
+            answer(&socket, "skills.secrets", &json!({"skill": "photo-booth"})),
+            Err("no skill of that name is on this lamp".to_owned())
+        );
+        served.join().unwrap();
         assert_eq!(
             line("skills.secrets", &json!(["photo-booth"])),
             Err(lamp_services::skill_secrets::BAD_FIELDS.to_owned())
