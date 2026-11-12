@@ -25,6 +25,7 @@ import sys
 import socket
 import time
 import unicodedata
+import wave
 from pathlib import Path
 from typing import Any, Literal
 
@@ -85,6 +86,9 @@ EVENT_NEEDS = {
     "sound.heard": "sound",
     "air.changed": "air",
 }
+# The longest clip `lamp_play_audio` plays, in seconds: MCP cannot stream, so
+# the tool plays in real time and returns when done.
+PLAY_AUDIO_MAX_S = 60
 # Which `limits` kind each op counts against (docs/control.md, "Limits").
 LIMIT_KIND = {
     "gesture": "motion",
@@ -805,6 +809,40 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             the lamp is private or its camera is closed."""
             reply = await act("camera.snapshot")
             return Image(data=base64.b64decode(reply["jpeg"]), format="jpeg")
+
+    if allowed("speaker"):
+        # Needs the `speaker` grant (protocol.rs `Op::SpeakerStream` needs
+        # Grant::Speaker), never pre-ticked: the owner ticks it at pairing.
+
+        @server.tool()
+        async def lamp_play_audio(wav_path: str) -> str:
+            """Play the WAV file at `wav_path` on this computer through the lamp's speaker, in real time,
+            and return when it has played: 16-bit mono PCM at 16 kHz or 24 kHz, at most 60 s. It is
+            any sound, so it can sound like a person: the lamp shows its ring's mark while it plays,
+            never plays while the lamp is private or muted, and stops the moment the lamp or the
+            person speaks or a hand touches it (the tool's error says why). Only one stream plays on
+            the lamp: this one replaces another computer's."""
+            try:
+                with wave.open(str(Path(wav_path).expanduser()), "rb") as clip:
+                    rate, frames = clip.getframerate(), clip.getnframes()
+                    kind = (clip.getnchannels(), clip.getsampwidth(), clip.getcomptype())
+            except (OSError, EOFError, wave.Error) as error:
+                raise ToolError(f"bad_request: {wav_path} is not a WAV that can be read: {error}") from error
+            if kind != (1, 2, "NONE"):
+                raise ToolError("bad_request: a WAV of 16-bit mono PCM is needed")
+            if rate not in (16_000, 24_000):
+                raise ToolError(f"bad_request: {rate} Hz; the speaker takes 16000 or 24000")
+            if frames / rate > PLAY_AUDIO_MAX_S:
+                raise ToolError(f"bad_request: {frames / rate:.0f} s; at most {PLAY_AUDIO_MAX_S} s a call")
+            try:
+                async with lamp.speaker_stream(rate) as out:
+                    await out.play_wav(Path(wav_path).expanduser())
+                    ended = out.ended
+            except LampError as error:
+                raise refused(error) from error
+            if ended is not None:
+                raise ToolError(f"refused: the lamp ended the sound: {ended}")
+            return f"played {frames / rate:.1f} s"
 
     if allowed("skills"):
 

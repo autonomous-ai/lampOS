@@ -177,6 +177,24 @@ The answer is `{"stream": "on", "sample_rate": 16000, "channels": 1,
   makes a gap; `set_private()` / `setPrivate()` and `set_in_view(2)` /
   `setInView(2)` end it.
 
+## The speaker
+
+| what | Python | JavaScript | MCP | grant |
+|---|---|---|---|---|
+| play sound of your own | `async with lamp.speaker_stream(16000) as out:` then `await out.speaker_write(pcm)` or `await out.play_wav(path)` (the plain call: `await lamp.speaker_stream_request(True, 16000)`) | `const out = await lamp.speakerStream(16000)`, `await out.speakerWrite(pcm)`, `await out.playWav(path)` | `lamp_play_audio` (a WAV, real time, at most 60 s) | speaker |
+| stop it | leave the `async with`, or `speaker_stream_request(False)` | `await out.stop()` | — | none |
+
+`pcm` is mono signed 16-bit little-endian samples at the stream's rate (16000 by default, or 24000), sent as binary messages of 10 to 100 ms (at most 9,600 bytes). The answer is `{stream, sample_rate, format, frame_ms, buffer_ms, source: "speaker", turn}`. Then, unasked:
+
+| event | fields | fires when |
+|---|---|---|
+| `speaker.stats` (speaker) | `buffered_ms`, `lost`, `underruns`, `limited`, `stray` | every 2 s while a stream runs, so a sender can pace itself |
+| `speaker.ended` (speaker) | `why`, `turn` | the lamp turned private or was muted, another computer's stream replaced it (`replaced`), no sound for 2 s (`idle`), 10 minutes (`limit`), or the ring did not show its mark; a `speaker.ended` of another `turn` is not this stream's end |
+
+- **It is a grant of its own, never ticked for you,** because it lets a program sound like a person; the app does not offer it. **Off unless the owner switched it on** (`--speaker on`). **Never while the lamp is private or muted. Only on the lamp's own network.** The lamp is speaking or in a conversation: `busy`.
+- Listen with `lamp.on("speaker.stats", h)` and `lamp.on("speaker.ended", h)`: no subscription, they come with the stream you asked for. Command line: `lamp speaker FILE.wav`.
+- The fake lamp plays nothing and keeps what was sent (`played_samples()` / `played()`); `end_speaker(why)` / `endSpeaker(why)` and `set_private()` / `setPrivate()` end it.
+
 ## Skills of your own
 
 | what | Python | JavaScript | command line |

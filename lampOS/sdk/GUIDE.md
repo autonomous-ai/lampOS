@@ -343,6 +343,12 @@ computer on the lamp's own network.
 |---|---|---|---|---|---|---|---|---|
 | `await lamp.microphone_stream(True)` | `lamp.microphoneStream(true)` | — | Op `microphone.stream`: the room's sound as `microphone.audio` blocks (20 ms, 16 kHz, mono, signed 16-bit) until `on: false`, `stop`, or a `microphone.ended`; never while the lamp is private, local network only | `microphone` | off unless the owner switches it on; never with someone else in view or when the room isn't seen; the ring shows its mark first ("The microphones") | `{stream: "on", sample_rate, channels, format, block_ms, source}`, then the blocks | `refused` "the microphone stream is off on this lamp"; "someone else is here"; "the room isn't seen"; `private`; `no_grant` | in development: merged, off by default (10 Nov 2026), seen on a test lamp with both switches on, not on the customer build |
 
+### Speaker
+
+| Python | JavaScript | MCP tool | What it does | Grant | Limits | Answer | Refusals | Status |
+|---|---|---|---|---|---|---|---|---|
+| `async with lamp.speaker_stream(16000) as out:` then `await out.speaker_write(pcm)` (and `await out.play_wav(path)`); the plain call is `await lamp.speaker_stream_request(True, 16000)` | `const out = await lamp.speakerStream(16000)`, then `await out.speakerWrite(pcm)` (and `out.playWav(path)`); the plain call is `lamp.request('speaker.stream', {on: true, sample_rate: 16000})` | `lamp_play_audio` (a WAV file, real time, at most 60 s; offered only with the grant) | Op `speaker.stream`: a computer's own sound through the lamp's speaker, as binary messages (a 4-byte header length, a JSON header `{"ev":"speaker.audio","sequence":N}`, mono signed 16-bit samples, 10 to 100 ms, at most 9,600 bytes) until `on: false`, `stop`, or a `speaker.ended`; the voice plays it through its own path, so its gates and the echo canceller see it | `speaker` | off unless the owner switches it on (`--speaker on`); local network only; one stream on the lamp (another computer's `on` replaces it, the old one is told `replaced`); the ring shows its mark and sound goes only once the ring drew it; at most 10 minutes, ends after 2 s with no frame; 20 blocks queue and past that sound is dropped and counted | `{stream: "on", sample_rate, format: "s16le", frame_ms, buffer_ms, source: "speaker", turn}`, then `speaker.stats` every 2 s (`buffered_ms`, `lost`, `underruns`, `limited`, `stray`) and, at the end, `speaker.ended` with `why` and `turn` | `private` "the lamp is private", "the lamp is muted", `busy` (the lamp is speaking or in a conversation), `no_grant`, "the speaker stream is off on this lamp", "the ring is not showing the speaker's mark" | in development (11 Nov 2026): the door is open as #6483, off by default (`--speaker on`), not on any lamp or customer build; the SDK and fakes are tested against the fake lamp only |
+
 What a program hears today goes through events: its own phrases (`phrase.heard`), the
 lamp's name (`name.heard`), sound classes (`sound.heard`), and how a turn ended. No audio
 and no transcript leave the lamp.
@@ -703,6 +709,23 @@ The room's sound for a program is merged and off by default, with the owner's co
 | **Limits** | off unless the lamp's owner switches it on (`--microphone on`); local network only (one hop on the lamp's own wire, never a VPN or tunnel the owner didn't set up); the ring shows a small red mark before any sound goes; never while the lamp is private; never with someone else in view; never when the room isn't seen (no fresh word from the camera in 2 s); a stream with no sound for 2 s ends |
 | **Refusals and ends, in the lamp's words** | "the microphone stream is off on this lamp (LAMP_CONTROL_MICROPHONE)"; "the lamp's microphone isn't shared here"; "someone else is here"; "the room isn't seen"; "the ring is not showing the microphone's mark"; `private` while the lamp is private; `no_grant` without the grant |
 | **STATUS** | in development: merged, off by default (10 Nov 2026), with the owner's consent; seen on a test lamp with both switches on, not on a customer build: the pairing carries `microphone` (a code made on the lamp: the app offers no such tick) and the owner switches the stream on (`lamp-control --microphone on`, and the ears sharing their sound, `LAMP_BUS_AUDIO=on`). Not on the customer build: there neither switch is on, the `microphone` grant exists but no sound is routed, and product lamps share only the second microphone with the lamp's bus today, so a stream would end at once with "the lamp's microphone isn't shared here" until the owner's switch is settled. On a test lamp (lamp-75c9) with both switches on (a lamp-built `lamp-control` of the patch merged as #5839, Python SDK from a paired laptop with the grants `light`, `camera` and `microphone`): the answer came in 3 ms; 47 to 52 blocks a second (50 expected), 2 lost in the first second and none after; the level followed the room (about −47 dBFS quiet, −42 dBFS while a line was said near the lamp); with the lamp's camera stopped for 6 s the stream ended at 21.9 s with `microphone.ended` "the room isn't seen" and a new stream was refused with the same words; a camera stream before it gave 11 frames each time and none after each `off`. Numbers only: no sound was kept. |
+
+### The speaker
+
+A program can play sound of its own through the lamp's speaker, not only the lamp's voice. It is the one grant that lets a program sound like a person, so it is a grant of its own, never ticked for you:
+
+| | |
+|---|---|
+| **Python** | `async with lamp.speaker_stream(16000) as out:` … `await out.speaker_write(pcm)`, `await out.play_wav("clip.wav")`; `lamp.on("speaker.stats", h)`, `lamp.on("speaker.ended", h)`; the command line `lamp speaker FILE.wav` |
+| **JavaScript** | `const out = await lamp.speakerStream(16000)` … `await out.speakerWrite(pcm)`, `await out.playWav('clip.wav')`, `await out.stop()`; `lamp.on('speaker.stats', h)`, `lamp.on('speaker.ended', h)`; `lamp speaker FILE.wav` |
+| **MCP** | `lamp_play_audio` (a WAV file of 16-bit mono PCM at 16000 or 24000 Hz, at most 60 s, returns when done) |
+| **Grant** | `speaker` |
+| **Op** | `speaker.stream` with `on` and an optional `sample_rate` (16000 by default, or 24000) |
+| **Returns** | the stream's `sample_rate`, `format` `s16le`, `frame_ms`, `buffer_ms`, `source` `speaker` and a `turn`; a `speaker.ended` of another `turn` is not this stream's end |
+| **Limits** | off unless the lamp's owner switches it on (`--speaker on`); local network only; never while the lamp is private or muted; one stream on the lamp; the ring's mark; 10 minutes at most and 2 s with no frame; the lamp buffers 300 ms and drops what a slow sender queues past 20 blocks (`lost`) |
+| **Refusals and ends, in the lamp's words** | "the lamp is private"; "the lamp is muted"; `busy`; "the speaker stream is off on this lamp"; "the ring is not showing the speaker's mark"; `no_grant` |
+| **Test it** | `lamp fake --everything` or the SDKs' fake lamp: it plays nothing, and keeps what was sent (`played_samples()` in Python, `played()` in JS); it has no 10-minute limit and no ring mark |
+| **STATUS** | in development (11 Nov 2026): the door is open as #6483, off by default (`--speaker on`), not on any lamp or customer build; the SDK and fakes are tested against the fake lamp only |
 
 ### The camera
 

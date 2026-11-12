@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { Keyring, Lamp, LampError, model, schema } from 'lampos';
+import { Keyring, Lamp, LampError, SPEAKER_EVENTS, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
 import { checked, describe, findControl, findStimulus, logIt } from './controls.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
@@ -167,7 +167,7 @@ async function listenFor(phrase) {
 }
 if (stimDir) {
   listenFor('good night lamp').catch((error) => console.log(`not listening for a phrase: ${error.message}`));
-  for (const event of [...schema.events.filter((e) => e !== 'body.state' && e !== 'time' && e !== 'phrase.heard'), 'lease', 'done']) {
+  for (const event of [...schema.events.filter((e) => e !== 'body.state' && e !== 'time' && e !== 'phrase.heard'), 'lease', 'done', ...SPEAKER_EVENTS]) {
     lamp.on(event, (frame) => {
       if (!logIt(event, Date.now(), quiet)) return;
       const { ev: _ev, at: _at, ...rest } = frame ?? {};
@@ -333,7 +333,7 @@ function parse(args) {
 // that eases each joint to where it was last sent, said 25 times a second
 // as lamp-control's `body.state` says it.
 async function fakeBody() {
-  const fakeLamp = await FakeLamp.start({ name: 'Fake lamp (twin)', grants: ['body', 'light', 'speak', 'look', 'notes', 'camera', 'skills'] });
+  const fakeLamp = await FakeLamp.start({ name: 'Fake lamp (twin)', grants: ['body', 'light', 'speak', 'look', 'notes', 'camera', 'skills', 'speaker'] });
   // A keyring of its own, so the fake's pairing never sits beside a real lamp's.
   const folder = mkdtempSync(join(tmpdir(), 'lampos-twin-'));
   process.on('exit', () => rmSync(folder, { recursive: true, force: true }));

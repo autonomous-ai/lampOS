@@ -134,6 +134,12 @@ dozens of events a second (a JPEG, or 50 audio blocks of 20 ms), which a model c
 fill the events window of the last 200 in seconds; and the microphone's is off by default and the owner's to switch on.
 Use `lamp_camera_snapshot` for a picture; a program that wants the streams uses the SDKs (`camera_stream`, `microphone_stream`).
 
+With the `speaker` grant (never pre-ticked; the owner ticks it at pairing, and the lamp
+must serve it: `--speaker on`), `lamp_play_audio(wav_path)` plays a 16-bit mono WAV at 16 or 24 kHz,
+at most 60 s, through the lamp's speaker in real time and returns when it has played (MCP cannot
+stream, so there is no streaming tool; programs use the SDKs' `speaker_stream`). It stops, with the
+lamp's why as the tool's error, when the lamp is private or muted or someone talks to it.
+
 `lamp_joints` aims named joints once; it is not a 20 Hz stream. `play` needs a
 skill package; `sound` plays `hum` or a clip the computer uploaded. With the
 `camera` grant, `lamp_camera_snapshot` returns the newest picture (on stable

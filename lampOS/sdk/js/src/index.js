@@ -1,5 +1,5 @@
 // lampos: program a lampOS lamp from your own computer (docs/control.md).
-export { Following, Lamp, Lease } from './client.js';
+export { Following, Lamp, Lease, SPEAKER_EVENTS, SpeakerStream } from './client.js';
 export { LampError, NotPaired, WrongLamp, WHAT_TO_DO, byCode, fromReply } from './errors.js';
 export { Keyring } from './keys.js';
 export { find } from './discovery.js';
