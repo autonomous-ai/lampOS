@@ -2329,24 +2329,26 @@ fn a_lamp_with_no_computer_hands_work_to_its_own_hermes() {
     );
 }
 
-/// #6226, the owner's default: with both of the lamp's engines on and
-/// installed, the lamp's target is OpenClaw and a hand-over to `lamp`
-/// starts OpenClaw on the lamp's own machine, its guidance in the lamp's
-/// folder; `LAMP_LAMP_ENGINE=hermes` picks Hermes; with only one installed
-/// that one is the lamp's, whichever is chosen.
+/// #6498, the lead's default (back from #6226's OpenClaw): with both of
+/// the lamp's engines on and installed, the lamp's target is Hermes and a
+/// hand-over to `lamp` starts Hermes on the lamp's own machine, its
+/// guidance in the lamp's folder; `LAMP_LAMP_ENGINE=openclaw` picks
+/// OpenClaw; with only one installed that one is the lamp's, whichever is
+/// chosen (unset with only OpenClaw: OpenClaw).
 #[test]
-fn the_lamps_engine_is_openclaw_by_default_hermes_when_chosen_or_the_one_installed() {
+fn the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_installed() {
     use EngineKind::{Hermes, Openclaw};
     let both = vec![
         row("hermes", Some(true), None),
         row("openclaw", Some(true), None),
     ];
     let only_openclaw = vec![row("openclaw", Some(true), None)];
+    let only_hermes = vec![row("hermes", Some(true), None)];
     for (chosen, rows, want) in [
-        (None, both.clone(), Openclaw),
-        (Some("hermes"), both.clone(), Hermes),
-        (None, vec![row("hermes", Some(true), None)], Hermes),
-        (Some("hermes"), only_openclaw.clone(), Openclaw),
+        (None, both.clone(), Hermes),
+        (Some("openclaw"), both.clone(), Openclaw),
+        (None, only_openclaw, Openclaw),
+        (Some("openclaw"), only_hermes, Hermes),
     ] {
         let home = tempfile::tempdir().unwrap();
         let side = lamp_side(Some("on"), Some("on"), chosen, Some(home.path().to_owned()));
@@ -2398,7 +2400,7 @@ const COMPUTER: &str = "9d14f36b-e73a-4acb-9922-0bbb39cbc22e";
 /// `harness machines`, which needs the sign-in. Now, signed out, the lamp
 /// is its own target while its engine is installed here (on Harness's
 /// `PATH`) and switched on, the one `LAMP_LAMP_ENGINE` puts first
-/// (OpenClaw unless set, #6226) among those installed: `lamp`, under this
+/// (Hermes unless set, #6498) among those installed: `lamp`, under this
 /// computer's own id, which Harness starts work on with no `--machine`.
 /// Harness's daemon is started at boot signed out too, the machines are
 /// never asked, and the health line says only the computers need the
@@ -2409,8 +2411,15 @@ fn a_lamp_never_signed_in_hands_work_to_its_own_engine() {
     let bin = tempfile::tempdir().unwrap();
     let (mut s, path) = engines_running(true);
     s.config.sign_in_by_code = true;
-    // Both of the lamp's engines on, neither chosen: OpenClaw first.
-    let mut side = lamp_side(Some("on"), Some("on"), None, Some(home.path().to_owned())).unwrap();
+    // Both of the lamp's engines on, OpenClaw chosen first (unset is
+    // Hermes first, #6498): each installed in turn becomes the target.
+    let mut side = lamp_side(
+        Some("on"),
+        Some("on"),
+        Some("openclaw"),
+        Some(home.path().to_owned()),
+    )
+    .unwrap();
     side.bin = bin.path().to_owned();
     s.config.set_up_later.as_mut().unwrap().lamp = Some(side);
     s.counts.signed_out.store(true, Ordering::SeqCst);
