@@ -15,7 +15,14 @@
 //!   skills where they are, read-only, never copied into `HERMES_HOME`;
 //!   the dirs a person added there are kept;
 //! - `.env`'s [`TOKEN_ENV`] line: the forwarder's local token, never the
-//!   relay's key.
+//!   relay's key;
+//! - with [`AGENT_SERVICES_SWITCH`] on, `mcp_servers.lamp-services`
+//!   ([`mcp_entry`]): the lamp's agent's connectors, `lamp-services mcp`,
+//!   given a skill run's `LAMP_CONTROL_SOCKET` and one-run token
+//!   `LAMP_CONTROL_TOKEN` by Hermes's own `${VAR}` interpolation, so it
+//!   reaches the linked services only through lamp-control under the run's
+//!   grants; with it off, that one entry is taken out (a person's other
+//!   servers are kept).
 //!
 //! Every other line is kept as it was, Harness's `hooks:` block above all
 //! (openharness `engines/hermes/contract.ts`). The workspace has no YAML
@@ -58,6 +65,41 @@ pub const APPROVALS: &str = "manual";
 /// The lamp's own skills, the folder lamp-skills reads (`lamp-skills
 /// --dir`), given to Hermes in place through `skills.external_dirs`.
 pub const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
+
+/// The lamp's agent's connectors' switch, `on` exactly; off unless set
+/// (`lamp_services::AGENT_SERVICES_ENVIRONMENT`), in lamp-tasks' own unit.
+pub const AGENT_SERVICES_SWITCH: &str = "LAMP_AGENT_SERVICES";
+/// The lamp's own entry in `mcp_servers`.
+pub const MCP_NAME: &str = "lamp-services";
+/// What it runs (`lamp_services::mcp_server::COMMAND`), with `mcp`.
+pub const MCP_COMMAND: &str = "/opt/lampOS/services/current/lamp-services";
+
+/// Whether [`AGENT_SERVICES_SWITCH`] is on in this process.
+pub fn agent_services_on() -> bool {
+    std::env::var(AGENT_SERVICES_SWITCH).ok().as_deref() == Some("on")
+}
+
+/// The lamp's `mcp_servers` entry, its `lamp-services:` line first: the
+/// run's socket and token are Hermes's to fill in from the run's own
+/// environment (`${VAR}`), never written here; outside a skill's run they
+/// stay unfilled and the server reaches nothing.
+pub fn mcp_entry() -> Vec<String> {
+    vec![
+        format!("{MCP_NAME}:"),
+        format!("  command: {}", quoted(MCP_COMMAND)),
+        "  args:".to_owned(),
+        format!("  - {}", quoted("mcp")),
+        "  env:".to_owned(),
+        format!(
+            "    LAMP_CONTROL_SOCKET: {}",
+            quoted("${LAMP_CONTROL_SOCKET}")
+        ),
+        format!(
+            "    LAMP_CONTROL_TOKEN: {}",
+            quoted("${LAMP_CONTROL_TOKEN}")
+        ),
+    ]
+}
 
 /// The forwarder's base for Hermes, on `port`.
 pub fn base_url(port: u16) -> String {
@@ -469,8 +511,16 @@ fn quoted(value: &str) -> String {
 }
 
 /// `config.yaml`'s text with the lamp's lines merged in, on the forwarder's
-/// `port`. The same text given twice gives the same text back.
+/// `port`, with the lamp's agent's connectors off. The same text given
+/// twice gives the same text back.
 pub fn merge_config(text: &str, port: u16) -> Result<String, Refused> {
+    merge_config_for(text, port, false)
+}
+
+/// [`merge_config`] with [`AGENT_SERVICES_SWITCH`] as `agent_services`:
+/// on, the lamp's `mcp_servers` entry ([`mcp_entry`]) set; off, that entry
+/// taken out, and `mcp_servers` with it when nothing else is left there.
+pub fn merge_config_for(text: &str, port: u16, agent_services: bool) -> Result<String, Refused> {
     let mut parts = parts(text)?;
     let one = |key: &str, value: &str| vec![format!("{key}: {}", quoted(value))];
     set_child(
@@ -501,6 +551,25 @@ pub fn merge_config(text: &str, port: u16) -> Result<String, Refused> {
         Some(&one("mode", APPROVALS)),
     )?;
     add_to_list(&mut parts, "skills", "external_dirs", SKILLS_DIR)?;
+    let entry = mcp_entry();
+    let had_servers = parts
+        .iter()
+        .any(|part| part.key.as_deref() == Some("mcp_servers"));
+    set_child(
+        &mut parts,
+        "mcp_servers",
+        MCP_NAME,
+        agent_services.then_some(&entry[..]),
+    )?;
+    if had_servers && !agent_services {
+        parts.retain(|part| {
+            part.key.as_deref() != Some("mcp_servers")
+                || part.lines[1..]
+                    .iter()
+                    .any(|line| !is_blank_or_comment(line))
+                || !inline_value(&part.lines[0]).is_empty()
+        });
+    }
     let mut out = String::new();
     for part in &parts {
         for line in &part.lines {
@@ -602,11 +671,22 @@ pub(crate) fn replace(path: &Path, text: &str) -> io::Result<()> {
 /// its local `token`; a file already right is not written. Nothing is
 /// written when `config.yaml` can't be merged or the token isn't plain.
 pub fn write(hermes_home: &Path, port: u16, token: &str) -> io::Result<Written> {
+    write_for(hermes_home, port, token, agent_services_on())
+}
+
+/// [`write`] with the lamp's agent's connectors as `agent_services`.
+pub fn write_for(
+    hermes_home: &Path,
+    port: u16,
+    token: &str,
+    agent_services: bool,
+) -> io::Result<Written> {
     let config_path = hermes_home.join("config.yaml");
     let env_path = hermes_home.join(".env");
     let config = read_or_empty(&config_path)?;
     let env = read_or_empty(&env_path)?;
-    let merged_config = merge_config(&config, port).map_err(io::Error::other)?;
+    let merged_config =
+        merge_config_for(&config, port, agent_services).map_err(io::Error::other)?;
     let merged_env = merge_env(&env, token)
         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "the token is not plain"))?;
     fs::create_dir_all(hermes_home)?;
@@ -747,6 +827,74 @@ custom_providers:
             })
             .unwrap_or(rest.len());
         rest[..end].to_owned()
+    }
+
+    const SERVERS: &str = "mcp_servers:\n  lamp-services:\n    command: \"/opt/lampOS/services/current/lamp-services\"\n    args:\n    - \"mcp\"\n    env:\n      LAMP_CONTROL_SOCKET: \"${LAMP_CONTROL_SOCKET}\"\n      LAMP_CONTROL_TOKEN: \"${LAMP_CONTROL_TOKEN}\"\n";
+
+    /// LAMP_AGENT_SERVICES: on, the lamp's MCP server is added, once, with
+    /// the run's socket and token left to Hermes's interpolation; off, the
+    /// lamp's entry alone is taken out, a person's server kept, and an
+    /// emptied `mcp_servers` goes.
+    #[test]
+    fn the_lamps_mcp_server_is_added_on_and_removed_off() {
+        let on = merge_config_for(HARNESS, 7741, true).unwrap();
+        assert!(on.ends_with(SERVERS), "{on}");
+        assert_eq!(merge_config_for(&on, 7741, true).unwrap(), on);
+        assert!(!on.contains("LAMP_CONTROL_TOKEN="));
+        let off = merge_config_for(&on, 7741, false).unwrap();
+        assert!(
+            !off.contains("mcp_servers") && !off.contains(MCP_NAME),
+            "{off}"
+        );
+        assert_eq!(off, merge_config(HARNESS, 7741).unwrap());
+        // A person's own server beside it: kept both ways.
+        let theirs = "mcp_servers:\n  notes:\n    command: /home/me/notes-mcp\n";
+        let both = merge_config_for(theirs, 7741, true).unwrap();
+        assert!(
+            both.contains("  notes:\n    command: /home/me/notes-mcp\n  lamp-services:\n"),
+            "{both}"
+        );
+        let kept = merge_config_for(&both, 7741, false).unwrap();
+        assert!(
+            kept.contains("mcp_servers:\n  notes:\n    command: /home/me/notes-mcp\n"),
+            "{kept}"
+        );
+        assert!(!kept.contains(MCP_NAME));
+        // What a reset leaves (`mcp_servers` cut), merged on again.
+        let reset = merge_config_for("updates:\n  check: false\n", 7741, true).unwrap();
+        assert!(reset.ends_with(SERVERS), "{reset}");
+    }
+
+    /// A skill's run sees the server with its own token: the entry names
+    /// exactly the two variables lamp-tasks gives the run
+    /// (`skill_task::SkillRun`'s environment), for Hermes to fill in.
+    #[test]
+    fn the_lamps_mcp_server_takes_the_runs_socket_and_token() {
+        let entry = mcp_entry().join("\n");
+        for name in [crate::skill_task::SOCKET_ENV, crate::skill_task::TOKEN_ENV] {
+            assert!(
+                entry.contains(&format!("{name}: \"${{{name}}}\"")),
+                "{entry}"
+            );
+        }
+        assert!(entry.contains(&format!("command: \"{MCP_COMMAND}\"")));
+    }
+
+    /// The file is written with the entry on, and without it off.
+    #[test]
+    fn the_settings_written_follow_the_switch() {
+        let dir = tempfile::tempdir().unwrap();
+        let token = "a".repeat(43);
+        write_for(dir.path(), 7741, &token, true).unwrap();
+        let config = fs::read_to_string(dir.path().join("config.yaml")).unwrap();
+        assert!(config.contains(SERVERS), "{config}");
+        assert!(
+            write_for(dir.path(), 7741, &token, false)
+                .unwrap()
+                .config_changed
+        );
+        let config = fs::read_to_string(dir.path().join("config.yaml")).unwrap();
+        assert!(!config.contains(MCP_NAME), "{config}");
     }
 
     #[test]
