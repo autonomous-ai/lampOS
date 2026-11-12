@@ -51,6 +51,13 @@ export function toneBlock(sequence, hz = 440, level = 1000) {
   return samples;
 }
 
+// The fake's speaker stream, as lamp-control's speaker.rs: one on the lamp, 10 to 100 ms frames of at most 9,600 bytes,
+// the voice's 300 ms buffer, `speaker.stats` every 2 s and an end after 2 s with no frame.
+export const SPEAKER_FRAME_MAX = 9600;
+export const SPEAKER_BUFFER_MS = 300;
+export const SPEAKER_PRIVATE = 'the lamp is private';
+export const SPEAKER_MUTED = 'the lamp is muted';
+
 export const FEELING_MOVES = { glad: 'glad-lift', lively: 'perk', low: 'low-droop' };
 
 // `look`'s targets lamp-control doesn't route, in parts.rs's words: `name`
@@ -411,7 +418,7 @@ export const DEVICE = Object.freeze({ cpu_load: 0.25, memory_used: 0.4, disk_fre
 // What the lamp says for a missing grant (lamp-control's `not_granted`): for `camera` and `microphone` it says the way out.
 const notGranted = (missing) => {
   const said = `not granted: ${missing.join(', ')}`;
-  return missing.some((g) => g === 'camera' || g === 'microphone') ? `${said} (the app does not grant it yet: only a pairing code made on the lamp itself carries it)` : said;
+  return missing.some((g) => g === 'camera' || g === 'microphone' || g === 'speaker') ? `${said} (the app does not grant it yet: only a pairing code made on the lamp itself carries it)` : said;
 };
 
 export class FakeLamp {
@@ -499,6 +506,17 @@ export class FakeLamp {
     // made-up ears' next block's `sequence`.
     this.listening = new Map();
     this.audioSequence = 0;
+    // The lamp's one speaker stream (`speaker.stream`, any connection's): { ws, client, turn, rate, ... } or null, the
+    // turns given so far, what every stream played (`played()`, `playedFrames`), and binary messages that were no
+    // stream's own (`speakerStray`). A test may set `speakerIdleMs` and `speakerStatsMs` (2000 as lamp-control's)
+    // and `speakerBusy` (a refusal as the voice's "the lamp is speaking", code `busy`).
+    this.speaker = null;
+    this.speakerTurns = 0;
+    this.playedFrames = [];
+    this.speakerStray = 0;
+    this.speakerIdleMs = 2000;
+    this.speakerStatsMs = 2000;
+    this.speakerBusy = null;
   }
 
   async listen() {
@@ -570,6 +588,7 @@ export class FakeLamp {
       for (const lamp of this.connected ?? []) await lamp.close().catch(() => {});
       this.connected = [];
       for (const ws of [...this.listening.keys()]) this.stopListening(ws);
+      this.clearSpeaker();
       for (const ws of this.wss.clients) ws.terminate();
       await new Promise((resolve) => this.wss.close(resolve));
       this.https.closeAllConnections();
@@ -636,6 +655,7 @@ export class FakeLamp {
     const before = this.state.volume;
     this.state.volume = now;
     if (before.level !== now.level || before.muted !== now.muted) this.emit('volume.changed', now);
+    if (now.muted) this.endSpeaker(SPEAKER_MUTED);
   }
 
   // `get`'s light, as lamp-control answers it (Nine's light/drawn): the
@@ -683,7 +703,10 @@ export class FakeLamp {
   // `microphone.ended`, as lamp-control's do, and a new one is refused.
   setPrivate(isPrivate = true) {
     this.state.lamp.private = isPrivate;
-    if (isPrivate) this.endListening('the lamp is private');
+    if (isPrivate) {
+      this.endListening('the lamp is private');
+      this.endSpeaker(SPEAKER_PRIVATE);
+    }
   }
 
   // How many people are in view (`presence`'s `count`): above one, every
@@ -705,6 +728,101 @@ export class FakeLamp {
   stopListening(ws) {
     clearInterval(this.listening.get(ws));
     this.listening.delete(ws);
+  }
+
+  // What every speaker stream played, the samples in the order they came (a Buffer).
+  played() { return Buffer.concat(this.playedFrames.map((f) => f.data)); }
+
+  // Forget what was played and the stray count (between two parts of a test).
+  clearPlayed() { this.playedFrames = []; this.speakerStray = 0; }
+
+  // The speaker stream ends by itself, as lamp-control's does: its connection hears `speaker.ended` with `why` and
+  // its `turn`; nothing is told when none runs.
+  endSpeaker(why = 'the voice ended it') {
+    const stream = this.speaker;
+    if (!stream) return;
+    this.clearSpeaker();
+    if (stream.ws.readyState === 1) stream.ws.send(JSON.stringify({ ev: 'speaker.ended', why, turn: stream.turn }));
+  }
+
+  // Say a `speaker.ended` of any `turn` to the stream's connection without ending it: an old stream's end, which
+  // the SDK must not take for the current one's.
+  sayStaleSpeakerEnded(turn, why = 'replaced') {
+    if (this.speaker?.ws.readyState === 1) this.speaker.ws.send(JSON.stringify({ ev: 'speaker.ended', why, turn }));
+  }
+
+  // Drop the stream and its timers, saying nothing.
+  clearSpeaker() {
+    const stream = this.speaker;
+    if (!stream) return;
+    clearInterval(stream.statsTimer);
+    clearTimeout(stream.idleTimer);
+    this.speaker = null;
+  }
+
+  // The owner takes `grant` from `client` (as a changed pairing does): a speaker stream of that computer ends.
+  dropGrant(client, grant) {
+    const held = this.clients.get(client);
+    if (!held) return;
+    held.grants = held.grants.filter((g) => g !== grant);
+    if (grant === 'speaker' && this.speaker?.client === client) this.endSpeaker('the grant was taken');
+  }
+
+  // `speaker.stream`'s on: one stream on the lamp; on again, from any connection, replaces it (its connection is told
+  // `replaced`); refused private, muted, or busy (`speakerBusy`) before the old one goes.
+  speakerOn(ws, client, id, request) {
+    if (this.state.lamp.private) return this.refuse(ws, id, 'private', SPEAKER_PRIVATE);
+    if (this.state.volume.muted) return this.refuse(ws, id, 'refused', SPEAKER_MUTED);
+    if (this.speakerBusy) return this.refuse(ws, id, 'busy', this.speakerBusy);
+    const rate = request.sample_rate ?? 16000;
+    if (![16000, 24000].includes(rate)) return this.refuse(ws, id, 'bad_request', 'sample_rate: 16000 or 24000');
+    this.endSpeaker('replaced');
+    this.speakerTurns += 1;
+    const stream = { ws, client, turn: this.speakerTurns, rate, sequence: null, lost: 0, underruns: 0, limited: 0, stray: 0, playUntil: 0 };
+    this.speaker = stream;
+    stream.statsTimer = setInterval(() => {
+      if (stream.ws.readyState !== 1) return;
+      const buffered = Math.max(Math.round(stream.playUntil - Date.now()), 0);
+      stream.ws.send(JSON.stringify({ ev: 'speaker.stats', turn: stream.turn, buffered_ms: Math.min(buffered, SPEAKER_BUFFER_MS), lost: stream.lost, underruns: stream.underruns, limited: stream.limited, stray: stream.stray }));
+    }, this.speakerStatsMs);
+    stream.statsTimer.unref();
+    this.speakerIdle(stream);
+    return this.ok(ws, id, { stream: 'on', sample_rate: rate, channels: 1, format: 's16le', frame_ms: [10, 100], buffer_ms: SPEAKER_BUFFER_MS, source: 'speaker', turn: stream.turn });
+  }
+
+  speakerIdle(stream) {
+    clearTimeout(stream.idleTimer);
+    stream.idleTimer = setTimeout(() => { if (this.speaker === stream) this.endSpeaker('idle'); }, this.speakerIdleMs);
+    stream.idleTimer.unref();
+  }
+
+  // A binary message, `speaker.audio`: the header's length (4 bytes, big-endian), the header, the samples. Only the
+  // stream's own connection's whole frame of 1 to 9,600 bytes (whole samples) counts, plays and keeps the stream
+  // idle-free; anything else is dropped with no answer and counted `stray`.
+  speakerFrame(ws, data) {
+    const stream = this.speaker;
+    let header = null;
+    let samples = null;
+    try {
+      const length = data.readUInt32BE(0);
+      header = JSON.parse(data.subarray(4, 4 + length).toString());
+      samples = data.subarray(4 + length);
+    } catch { /* not a frame */ }
+    const whole = header?.ev === 'speaker.audio' && samples.length > 0 && samples.length <= SPEAKER_FRAME_MAX && samples.length % 2 === 0;
+    if (!stream || stream.ws !== ws || !whole) {
+      this.speakerStray += 1;
+      if (stream) stream.stray += 1;
+      return;
+    }
+    // A gap in the sequence is sound lost on the way.
+    if (stream.sequence !== null && Number.isInteger(header.sequence) && header.sequence > stream.sequence + 1) stream.lost += header.sequence - stream.sequence - 1;
+    stream.sequence = Number.isInteger(header.sequence) ? header.sequence : (stream.sequence ?? -1) + 1;
+    const ms = (samples.length / 2 / stream.rate) * 1000;
+    const now = Date.now();
+    if (stream.playUntil < now) stream.playUntil = now;
+    stream.playUntil += ms;
+    this.playedFrames.push({ turn: stream.turn, sequence: header.sequence, rate: stream.rate, data: Buffer.from(samples) });
+    this.speakerIdle(stream);
   }
 
   // One block every 20 ms of a quiet 440 Hz tone, as binary frames: the
@@ -792,9 +910,13 @@ export class FakeLamp {
       this.clientOf.delete(ws);
       if (gone && ![...this.clientOf.values()].includes(gone)) this.mutes.delete(gone);
       this.stopListening(ws);
+      // Its speaker stream ends with its connection, told to nobody.
+      if (this.speaker?.ws === ws) this.clearSpeaker();
       for (const [lease, held] of this.leases) if (held.ws === ws) this.leases.delete(lease);
     });
-    ws.on('message', (data) => {
+    ws.on('message', (data, isBinary) => {
+      // A speaker stream's frame: binary, never a request.
+      if (isBinary) return this.speakerFrame(ws, data);
       let request;
       try { request = JSON.parse(data.toString()); } catch { return this.refuse(ws, null, 'bad_request', 'not JSON'); }
       this.received.push(request);
@@ -956,13 +1078,14 @@ export class FakeLamp {
     return {
       express: ['body', 'light'], light: ['light'],
       'camera.snapshot': ['camera'], 'camera.stream': ['camera'],
-      'microphone.stream': ['microphone'],
+      'microphone.stream': ['microphone'], 'speaker.stream': ['speaker'],
       'turn.start': ['speak', 'hear'], 'listen.set': ['hear'],
     }[op] ?? [];
   }
 
   // The owner lets `client` go, as lamp-control's revoke: its key, its clips and its notes are gone.
   revoke(client) {
+    if (this.speaker?.client === client) this.endSpeaker('the grant was taken');
     this.clients.delete(client);
     this.clips.delete(client);
     this.notes.delete(client);
@@ -1141,6 +1264,14 @@ export class FakeLamp {
         this.ok(ws, id, { stream: 'on', sample_rate: AUDIO_RATE, channels: 1, format: 's16le', block_ms: AUDIO_EVERY_MS, source: 'mic1' });
         this.listenFor(ws);
         return undefined;
+      case 'speaker.stream':
+        // As lamp-control's speaker.rs: `on` is a boolean; off ends this connection's own stream with no event.
+        if (typeof request.on !== 'boolean') return this.refuse(ws, id, 'bad_request', 'on: true or false');
+        if (!request.on) {
+          if (this.speaker?.ws === ws) this.clearSpeaker();
+          return this.ok(ws, id, { stream: 'off' });
+        }
+        return this.speakerOn(ws, client, id, request);
       case 'stop':
         // The holder's stop ends its following, as any of its actions, and
         // its microphone stream, with no event.

@@ -263,6 +263,9 @@
         },
         {
           "$ref": "#/$defs/service.write"
+        },
+        {
+          "$ref": "#/$defs/speaker.stream"
         }
       ]
     },
@@ -1700,7 +1703,16 @@
               "type": "integer"
             },
             "turn": {
-              "const": "ended"
+              "description": "turn.end's: \"ended\"; speaker.stream's: this stream's number (a speaker.ended with another turn is not this stream's end).",
+              "oneOf": [
+                {
+                  "const": "ended"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              ]
             },
             "started": {
               "description": "turn.end's: the id of the turn.start it ended.",
@@ -1733,8 +1745,26 @@
               "minimum": 1
             },
             "source": {
-              "description": "microphone.stream: which of the lamp's microphones: mic1, the room microphone the ears read.",
-              "const": "mic1"
+              "description": "microphone.stream: which of the lamp's microphones: mic1, the room microphone the ears read. speaker.stream: speaker.",
+              "enum": [
+                "mic1",
+                "speaker"
+              ]
+            },
+            "frame_ms": {
+              "description": "speaker.stream: how long one frame it takes may be, from 10 to 100 ms.",
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "buffer_ms": {
+              "description": "speaker.stream: how much sound the voice buffers, in ms.",
+              "type": "integer",
+              "minimum": 0
             }
           },
           "required": [
@@ -2218,7 +2248,9 @@
                 "camera.frame",
                 "camera.ended",
                 "microphone.audio",
-                "microphone.ended"
+                "microphone.ended",
+                "speaker.stats",
+                "speaker.ended"
               ]
             }
           ]
@@ -2942,6 +2974,77 @@
               "why"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "speaker.stats"
+              }
+            }
+          },
+          "then": {
+            "description": "Every 2 s while a speaker.stream runs: how much sound the voice holds, and what was lost: blocks the lamp had no room for or held back for the ring's mark, underruns the voice played as silence, blocks it limited to the clips' loudness cap, and binary messages dropped because they were another connection's, too big or not whole samples.",
+            "properties": {
+              "turn": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "buffered_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lost": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "underruns": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "limited": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "stray": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "turn",
+              "buffered_ms",
+              "lost",
+              "underruns",
+              "limited",
+              "stray"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "speaker.ended"
+              }
+            }
+          },
+          "then": {
+            "description": "The speaker.stream ended by itself, with why: the lamp turned private or muted, the ring's mark is not shown, the voice ended it (the lamp or the person speaks, a hand on the head, stop), no frame came for 2 s (idle), 10 minutes (limit), or another connection replaced it (replaced).",
+            "properties": {
+              "turn": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "why": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "turn",
+              "why"
+            ]
+          }
         }
       ]
     },
@@ -3434,6 +3537,34 @@
         "id",
         "op",
         "service"
+      ],
+      "additionalProperties": false
+    },
+    "speaker.stream": {
+      "description": "Sound for the lamp's speaker: after on: true the connection sends binary WebSocket messages, the header's length (4 bytes, big-endian), the header (JSON: ev speaker.audio, sequence), then 10 to 100 ms of mono S16LE samples at sample_rate (16000, the default, or 24000), at most 9600 bytes of samples. The lamp plays them through the voice's own speaker path, so the person's volume, privacy and the speaking order hold: it starts only when the lamp is not speaking, and ends at once (speaker.ended, with why) when the lamp or the person speaks, the lamp turns private or muted, the ring's mark is not shown, no frame comes for 2 s, 10 minutes pass, or a second connection opens one. One stream on the lamp, bound to the connection that opened it. Needs the speaker grant; local network only.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "speaker.stream"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "sample_rate": {
+          "description": "The sample rate of the frames this stream sends: 16000 (the default) or 24000.",
+          "enum": [
+            16000,
+            24000
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "on"
       ],
       "additionalProperties": false
     }

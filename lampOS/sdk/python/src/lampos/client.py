@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
 import hashlib
 import inspect
 import json
@@ -23,7 +24,9 @@ import socket
 import ssl
 import stat
 import sys
+import time
 import unicodedata
+import wave
 import warnings
 from collections import defaultdict
 from pathlib import Path
@@ -234,7 +237,7 @@ def _no_event(name: str, *, on: bool = False) -> LampError:
     else:
         if on:
             # What `on` takes: the schema's, the streams' and the two that come unasked.
-            names = sorted({*schema.events(), *CAMERA_EVENTS, *MICROPHONE_EVENTS})
+            names = sorted({*schema.events(), *CAMERA_EVENTS, *MICROPHONE_EVENTS, *SPEAKER_EVENTS})
             hint = f"one of {', '.join(names)}, or 'lease' or 'done'"
         else:
             hint = f"one of {', '.join(sorted(schema.events()))}"
@@ -255,6 +258,16 @@ def binary_frame(message: bytes) -> dict:
 # and a microphone stream's.
 CAMERA_EVENTS = ("camera.frame", "camera.ended")
 MICROPHONE_EVENTS = ("microphone.audio", "microphone.ended")
+# A speaker stream's, also never subscribed to: its stats every 2 s and its end.
+SPEAKER_EVENTS = ("speaker.stats", "speaker.ended")
+
+# What the lamp takes of a speaker stream (docs/control.md, "The speaker"):
+# mono S16LE at 16 kHz (the default) or 24 kHz, in binary messages of at most
+# 9,600 bytes of samples; this client sends 100 ms at most, the frame length
+# the lamp announces (`frame_ms`).
+SPEAKER_RATES = (16_000, 24_000)
+SPEAKER_FRAME_MAX_BYTES = 9_600
+SPEAKER_FRAME_MS = 100
 
 # `keep_connected`'s pauses before connecting again, in seconds: the first
 # after a closed connection, then longer while the lamp can't be reached (a
@@ -441,6 +454,122 @@ class Following:
 
     async def __aexit__(self, *_exc) -> None:
         await self.stop()
+
+
+class SpeakerStream:
+    """A running `speaker.stream` (see `Lamp.speaker_stream`): write mono
+    S16LE sound with `speaker_write`, or play a WAV with `play_wav`. `info`
+    is the lamp's answer (`sample_rate`, `format`, `frame_ms`, `buffer_ms`,
+    `source`, `turn`); `stats` is the newest `speaker.stats` (every 2 s);
+    `ended` is the lamp's why once it ended the stream (`speaker.ended` of
+    this stream's `turn`), None while it runs."""
+
+    def __init__(self, lamp: "Lamp", info: dict):
+        self.lamp = lamp
+        self.info = info
+        self.sample_rate: int = info.get("sample_rate", 16_000)
+        self.turn = info.get("turn")
+        self.stats: dict | None = None
+        self.ended: str | None = None
+        self.sequence = 0
+        # An odd last byte of a write waits for the next one's first (a sample is two bytes).
+        self._rest = b""
+        # When the sound written so far has played, on the monotonic clock.
+        self._plays_until = 0.0
+        self._early: list[dict] = []
+
+    def _event(self, event: dict) -> None:
+        # Another stream's end (an old one this computer replaced, whose
+        # `turn` is not ours) is not this stream's. Until the answer gives
+        # our turn, events are kept and judged then.
+        if self.turn is None:
+            self._early.append(event)
+            return
+        if event.get("turn", self.turn) != self.turn:
+            return
+        if event["ev"] == "speaker.ended":
+            self.ended = str(event.get("why", "ended"))
+        else:
+            self.stats = event
+
+    @property
+    def frame_bytes(self) -> int:
+        return self.sample_rate * 2 * SPEAKER_FRAME_MS // 1000
+
+    async def speaker_write(self, pcm: bytes) -> None:
+        """Send `pcm` (mono signed 16-bit little-endian samples at this
+        stream's rate) in binary frames of 100 ms at most, each with its
+        `sequence`. It paces nothing: the lamp buffers 300 ms and drops what
+        a slow computer's queue can't hold, so a caller sending a clip waits
+        between writes (`drain`, or `play_wav`). Raises `closed` once the lamp
+        ended the stream (see `ended`)."""
+        data = self._rest + bytes(pcm)
+        whole = len(data) - len(data) % 2
+        data, self._rest = data[:whole], data[whole:]
+        for at in range(0, len(data), self.frame_bytes):
+            await self._send(data[at : at + self.frame_bytes])
+
+    write = speaker_write
+
+    async def _send(self, samples: bytes) -> None:
+        if self.ended is not None:
+            raise LampError(f"the speaker stream ended: {self.ended}", code="closed")
+        header = json.dumps({"ev": "speaker.audio", "sequence": self.sequence}, separators=(",", ":")).encode()
+        try:
+            await self.lamp._ws.send(len(header).to_bytes(4, "big") + header + samples)
+        except ConnectionClosed as error:
+            raise LampError("the connection to the lamp closed", code="closed") from error
+        self.sequence += 1
+        now = time.monotonic()
+        self._plays_until = max(self._plays_until, now) + len(samples) / (self.sample_rate * 2)
+
+    async def drain(self) -> None:
+        """Wait until the sound written so far has played, in real time (the
+        stream's own count of it, not the lamp's), so the next write or the
+        end of the stream doesn't cut it."""
+        wait = self._plays_until - time.monotonic()
+        if wait > 0:
+            await asyncio.sleep(wait)
+
+    async def play_wav(self, path: str | os.PathLike) -> None:
+        """Play a WAV file of 16-bit mono PCM at this stream's rate, written
+        in real time, in 20 ms frames; returns when it has been played
+        (the lamp's own buffer too). Any other WAV is a `bad_request`."""
+        try:
+            clip = wave.open(str(path), "rb")
+        except (OSError, EOFError, wave.Error) as error:
+            raise LampError(f"{path}: not a WAV that can be read: {error}", code="bad_request") from error
+        with clip:
+            if clip.getnchannels() != 1 or clip.getsampwidth() != 2 or clip.getcomptype() != "NONE":
+                raise LampError(f"{path}: a WAV of 16-bit mono PCM is needed", code="bad_request")
+            rate = clip.getframerate()
+            if rate not in SPEAKER_RATES:
+                raise LampError(f"{path}: {rate} Hz; a speaker stream takes 16000 or 24000", code="bad_request")
+            if rate != self.sample_rate:
+                raise LampError(
+                    f"{path}: {rate} Hz, but this stream takes {self.sample_rate}: "
+                    f"open it with speaker_stream(sample_rate={rate})",
+                    code="bad_request",
+                )
+            pcm = clip.readframes(clip.getnframes())
+        await self.play_pcm(pcm)
+
+    async def play_pcm(self, pcm: bytes) -> None:
+        """`pcm` written in real time as `play_wav` does, in 20 ms frames,
+        returning when it has been played."""
+        start = time.monotonic()
+        step = self.sample_rate * 2 * 20 // 1000
+        sent = 0
+        for at in range(0, len(pcm), step):
+            # A frame goes at its own time, so a slow send is caught up, not added to.
+            wait = start + sent / (self.sample_rate * 2) - time.monotonic()
+            if wait > 0:
+                await asyncio.sleep(wait)
+            piece = pcm[at : at + step]
+            await self.speaker_write(piece)
+            sent += len(piece)
+        await self.drain()
+        await asyncio.sleep(self.info.get("buffer_ms", 0) / 1000)
 
 
 class Notes:
@@ -874,7 +1003,7 @@ class Lamp:
         `await lamp.on(...)` raises the lamp's refusal (`NoGrantError` without
         the event's grant). Not awaited, a refusal is raised by
         `wait_closed` instead, never lost."""
-        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS):
+        if event not in schema.events() and event not in ("lease", "done", *CAMERA_EVENTS, *MICROPHONE_EVENTS, *SPEAKER_EVENTS):
             raise _no_event(event, on=True)
         _short_phrase(phrases)
         # A handler given `phrases` hears only those; with none it hears every `phrase.heard`.
@@ -1155,6 +1284,64 @@ class Lamp:
         into view, the room went unseen, the ring didn't show its mark, or no sound came for 2 s
         (the lamp doesn't share its microphone, `LAMP_BUS_AUDIO`)."""
         return await self.request("microphone.stream", on=on)
+
+    # The speaker (the `speaker` grant, never given by default): any sound
+    # through the lamp's speaker, never while the lamp is private or muted,
+    # only on the lamp's own network.
+
+    async def speaker_stream_request(self, on: bool = True, sample_rate: int | None = None) -> dict:
+        """The plain `speaker.stream` request, as `microphone_stream` is:
+        `on` True opens it (replacing any stream of this lamp, whose
+        connection is told `speaker.ended` `replaced`), False ends it.
+        `sample_rate` is 16000 (the lamp's default) or 24000. Answers
+        `sample_rate`, `format` (`s16le`), `frame_ms`, `buffer_ms`, `source`
+        and `turn`. Prefer `speaker_stream`, which also sends the sound."""
+        fields: dict[str, Any] = {"on": on}
+        if sample_rate is not None:
+            fields["sample_rate"] = sample_rate
+        return await self.request("speaker.stream", **fields)
+
+    @contextlib.asynccontextmanager
+    async def speaker_stream(self, sample_rate: int = 16_000):
+        """Play sound of your own through the lamp's speaker:
+
+            async with lamp.speaker_stream() as out:
+                await out.speaker_write(pcm)   # mono S16LE, 16 kHz
+                await out.play_wav("clip.wav")
+
+        Needs the `speaker` grant, which the owner ticks at pairing and is
+        never pre-ticked: it lets a program sound like a person, so the
+        pairing screen says so. The lamp plays it through its own speaker
+        path (the person's volume; never while private or muted; words the
+        lamp speaks and a stream don't mix), shows the ring's mark, and ends
+        the stream after 2 s with no frame, 10 minutes, or when the lamp or
+        the person speaks: `out.ended` says why. `sample_rate` is 16000
+        (the default) or 24000. Leaving the block ends the stream."""
+        if sample_rate not in SPEAKER_RATES:
+            raise LampError(f"sample_rate: 16000 or 24000, not {sample_rate!r}", code="bad_request")
+        # Heard from before the request, so an end that comes with or right
+        # after the answer is not missed; its turn is known at the answer.
+        out = SpeakerStream(self, {})
+        for event in SPEAKER_EVENTS:
+            self._handlers[event].append(out._event)
+        try:
+            info = await self.speaker_stream_request(True, sample_rate)
+            out.info, out.sample_rate, out.turn = info, info.get("sample_rate", sample_rate), info.get("turn", 0)
+            early, out._early = out._early, []
+            for event in early:
+                out._event(event)
+            yield out
+        finally:
+            for event in SPEAKER_EVENTS:
+                handlers = self._handlers.get(event, [])
+                if out._event in handlers:
+                    handlers.remove(out._event)
+                if not handlers:
+                    self._handlers.pop(event, None)
+            # An end the lamp told is already over; and a closed connection has nothing to end.
+            if out.ended is None and out.turn is not None:
+                with contextlib.suppress(LampError):
+                    await self.speaker_stream_request(False)
 
     async def sound(self, name: str) -> dict:
         """Play `hum`, the lamp's own, or one of this computer's clips by

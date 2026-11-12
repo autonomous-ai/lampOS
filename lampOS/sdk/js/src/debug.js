@@ -59,6 +59,8 @@ export const SHOWN = new Set([
   // A microphone stream's shape and a block's count (never the sound, which
   // comes binary and is never logged).
   'block_ms', 'channels', 'format', 'lost', 'sample_rate', 'sequence', 'source',
+  // A speaker stream's shape and its counters (never the sound, which goes binary and is never logged).
+  'buffer_ms', 'buffered_ms', 'frame_ms', 'limited', 'stray', 'underruns',
   'asleep', 'at', 'clamped', 'class', 'client', 'code', 'colour', 'confidence', 'count', 'elbow', 'error', 'ev', 'events',
   'express', 'facing', 'from', 'feeling', 'for_ms', 'frames', 'got', 'grants', 'hold_max_ms', 'how', 'id', 'lease_max_ms', 'say_max_bytes',
   'joints', 'kind', 'lamp', 'lamp_state', 'lease', 'level', 'light', 'limits', 'manage', 'mood',

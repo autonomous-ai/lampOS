@@ -237,6 +237,7 @@ Python names first, JavaScript where it differs.
 | Open a conversation turn, or end its own | `turn.start`, `turn.end` | `start_turn`, `end_turn` / `startTurn`, `endTurn` | `lamp_start_turn`, `lamp_end_turn` | done | Nine | 75c9 3–4 Nov, combined builds: turn answered, same computer continuing, own end cutting a story (by ear) |
 | A computer's own mute | `listen.set` | `set_listening` / `setListening` | `lamp_set_listening` | done | Nine | not yet |
 | The microphone's audio, local only | `microphone.stream`, `microphone.audio` (binary 20 ms blocks), `microphone.ended`; off unless `--microphone on` | `microphone_stream` / `microphoneStream`, `on("microphone.audio")` | — (a stream is for a program, as the camera's) | missing (local, waits for the owner's privacy yes) | banana | not yet |
+| A computer's own sound through the speaker, local only | `speaker.stream`, `speaker.stats`, `speaker.ended`; binary 10–100 ms frames in; off unless `--speaker on` | `speaker_stream` / `speakerStream`, `on("speaker.ended")`, `lamp speaker FILE.wav` | `lamp_play_audio` | in review (door #6483; the voice's half, the ring's mark and the app's grant come after) | eighth | not yet |
 
 ### Eyes and camera
 
