@@ -57,7 +57,14 @@ pub(crate) const LAST_WORDS: &str = "last_words";
 /// A say cut by its own asker's cancel on the say socket (a paired
 /// computer's `stop`): the cut revokes the speaker as a hand's Stop does.
 pub(crate) const ASKER_STOPPED: &str = crate::say::ASKER_STOPPED;
-pub(crate) const LOCAL_CANCELS: [&str; 10] = [
+/// A computer's stream replaced by a later one, and one ended because a
+/// timer, alarm or reminder fell due (`end_stream_for`): the cut revokes the
+/// speaker first, as a hand's Stop does, so the queued sound it drops is
+/// expected (lamp-75c9, 13 Nov: a replaced stream's queued audio came as a
+/// cancelled tail and ended the voice).
+pub(crate) const STREAM_REPLACED: &str = "stream_replaced";
+pub(crate) const STREAM_REMINDER_DUE: &str = "stream_reminder_due";
+pub(crate) const LOCAL_CANCELS: [&str; 12] = [
     LAST_WORDS,
     HEAD_SLEEP,
     SOFTWARE_MUTED,
@@ -68,6 +75,8 @@ pub(crate) const LOCAL_CANCELS: [&str; 10] = [
     BODY_PUSHED,
     CONTROL_ENDED,
     ASKER_STOPPED,
+    STREAM_REPLACED,
+    STREAM_REMINDER_DUE,
 ];
 
 impl ReceiptHistory {

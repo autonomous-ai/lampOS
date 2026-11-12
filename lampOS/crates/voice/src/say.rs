@@ -262,6 +262,9 @@ pub enum Answer {
         at_us: u64,
         id: u64,
     },
+    /// A stream was admitted: the sound's feed, which its client thread
+    /// fills ([`crate::speaker_stream`]); never written to the client.
+    Stream(Arc<crate::speaker_stream::Feed>),
     Done(Outcome),
 }
 
@@ -274,6 +277,8 @@ impl Answer {
             Self::BegunTurn { at_us, id } => {
                 format!(r#"{{"event":"begun","at_us":{at_us},"id":{id}}}"#)
             }
+            // Not for the client: the stream's thread takes the feed.
+            Self::Stream(_) => String::new(),
             Self::Done(outcome) => outcome.line(),
         }
     }
@@ -1421,9 +1426,6 @@ pub struct Says {
     order: u64,
     /// When the last skill's sound was played.
     last_sound_us: Option<u64>,
-    /// The computer's stream the voice has admitted, answered when it ends
-    /// ([`Self::admit_stream`]).
-    stream: Option<Ticket>,
 
     /// Kept so that the socket goes with the voice.
     _socket: Option<Bound>,
@@ -1457,7 +1459,6 @@ impl Drop for Says {
             waiting: Vec::new(),
             order: self.order,
             last_sound_us: self.last_sound_us,
-            stream: None,
             _socket: self._socket.take(),
             parks: true,
         };
@@ -1637,7 +1638,6 @@ impl Says {
             waiting: Vec::new(),
             order: 0,
             last_sound_us: None,
-            stream: None,
             _socket: Some(bound),
             parks: false,
         })
@@ -1881,7 +1881,6 @@ impl Says {
                 waiting: Vec::new(),
                 order: 0,
                 last_sound_us: None,
-                stream: None,
                 _socket: None,
                 parks: false,
             },
@@ -2112,24 +2111,16 @@ impl Says {
             .is_some()
     }
 
-    /// Admit or refuse the next waiting stream, and end the one held when its
-    /// computer has closed the connection (its asker's cancel, set by the
-    /// client's thread). The speaker's gate is the exact line's
-    /// ([`may_play_exact`]): at rest, or refused in words, never queued
-    /// behind a conversation (the stream's sound would be stale). One stream
-    /// at a time: an admitted stream replaces the one that runs (the door
-    /// asks the voice before it drops the old one, so a refusal leaves the old
-    /// one be). Opened, the client is told `begun` and the ticket is held
-    /// until it ends. None when nothing waited.
+    /// Admit or refuse the next waiting stream. The speaker's gate is the
+    /// exact line's ([`may_play_exact`]): at rest, or refused in words, never
+    /// queued behind a conversation (the stream's sound would be stale). One
+    /// stream at a time: the voice owns it, so an admitted stream replaces the
+    /// one that plays (the coordinator ends that one, `dropped`, and the caller
+    /// gates with the speaker's busy not counting that stream's own playing),
+    /// and a refused one leaves the old be. Opened, the client is told `begun`
+    /// and handed the sound's feed, and the ticket and feed go to the voice to
+    /// play ([`Admitted::Opened`]). None when nothing waited.
     pub fn admit_stream(&mut self, now: &SoundNow, at_us: u64) -> Option<Admitted> {
-        if self
-            .stream
-            .as_ref()
-            .is_some_and(|ticket| ticket.cancel.load(Ordering::Acquire))
-            && let Some(ticket) = self.stream.take()
-        {
-            ticket.answer(Outcome::Dropped(STREAM_CLOSED.into()));
-        }
         if !self.stream_waiting(at_us) {
             return None;
         }
@@ -2149,26 +2140,21 @@ impl Says {
             said: None,
         };
         let why = match may_play_exact(now) {
-            ExactNow::Play => None,
-            ExactNow::Wait(why) => Some(format!("the speaker is busy: {why}")),
-            ExactNow::Refuse(why) => Some(why.to_owned()),
+            ExactNow::Play => return Some(self.open_stream(by, ticket, at_us)),
+            ExactNow::Wait(why) => format!("the speaker is busy: {why}"),
+            ExactNow::Refuse(why) => why.to_owned(),
         };
-        Some(match why {
-            // Refused: the stream that runs, if one does, is left be.
-            Some(why) => {
-                ticket.answer(Outcome::Refused(why.clone()));
-                Admitted::Refused { by, why }
-            }
-            // Admitted: it replaces the one that runs, which is told.
-            None => {
-                if let Some(old) = self.stream.take() {
-                    old.answer(Outcome::Dropped(STREAM_REPLACED.into()));
-                }
-                ticket.begun(at_us);
-                self.stream = Some(ticket);
-                Admitted::Opened { by }
-            }
-        })
+        ticket.answer(Outcome::Refused(why.clone()));
+        Some(Admitted::Refused { by, why })
+    }
+
+    fn open_stream(&mut self, by: String, ticket: Ticket, at_us: u64) -> Admitted {
+        let feed = crate::speaker_stream::Feed::new();
+        ticket.begun(at_us);
+        if let Some(answer) = ticket.answer.as_ref() {
+            let _ = answer.send(Answer::Stream(Arc::clone(&feed)));
+        }
+        Admitted::Opened { by, ticket, feed }
     }
 
     /// Whether an exact line waits to be said, without taking it.
@@ -2613,6 +2599,8 @@ fn serve_client(
                                 // Begun, it has left the queue: no more watching.
                                 gone = None;
                             }
+                            // Only a stream's thread takes its feed.
+                            Ok(Answer::Stream(_)) => {}
                             Ok(Answer::Done(outcome)) => break outcome,
                             Err(mpsc::RecvTimeoutError::Timeout) => {
                                 if let Some(gone) = gone.as_ref()
@@ -3214,18 +3202,19 @@ pub fn may_play_sound_with(now: &SoundNow, every_sound: bool) -> Result<(), &'st
 }
 
 /// What became of a stream asked for ([`Says::admit_stream`]).
-#[derive(Debug, PartialEq, Eq)]
 pub enum Admitted {
-    /// The speaker is its computer's now.
-    Opened { by: String },
+    /// The speaker is its computer's now: its ticket, answered when the
+    /// sound has played or was cut, and the feed its sound comes through.
+    Opened {
+        by: String,
+        ticket: Ticket,
+        feed: Arc<crate::speaker_stream::Feed>,
+    },
     /// Refused, with why, in the words its computer is told.
     Refused { by: String, why: String },
 }
 
-/// Why a stream the voice held ends when its computer closed the connection.
-pub const STREAM_CLOSED: &str = "the computer closed the stream";
-
-/// Why a stream the voice held ends when a later one is admitted.
+/// Why a stream the voice plays ends when a later one is admitted.
 pub const STREAM_REPLACED: &str = "replaced by a later stream";
 
 /// What becomes of a paired computer's exact line now ([`may_play_exact`]).
@@ -6093,17 +6082,13 @@ mod tests {
     }
 
     /// The voice's pass over its says until `done` says so, or three seconds.
-    fn pass_until(
-        says: &mut Says,
-        now: &SoundNow,
-        mut done: impl FnMut(Option<Admitted>, bool) -> bool,
-    ) {
+    fn pass_until(says: &mut Says, now: &SoundNow, mut done: impl FnMut(Option<Admitted>) -> bool) {
         let started = Instant::now();
         while started.elapsed() < Duration::from_secs(3) {
             let at_us = lamp_ipc::monotonic_us();
             says.poll(at_us);
             let admitted = says.admit_stream(now, at_us);
-            if done(admitted, says.stream.is_some()) {
+            if done(admitted) {
                 return;
             }
             thread::sleep(Duration::from_millis(5));
@@ -6112,7 +6097,7 @@ mod tests {
     }
 
     #[test]
-    fn a_stream_is_opened_at_rest_replaced_by_a_later_one_and_ended_by_its_close() {
+    fn a_stream_is_opened_at_rest_fed_from_the_bus_and_played_out_when_its_computer_closes() {
         let _turn = crate::speaker_stream::ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -6120,74 +6105,97 @@ mod tests {
             let dir = socket_dir("stream-bus");
             (lamp_bus::Bus::new(dir.join("bus")).unwrap(), dir)
         };
+        let mut computers = bus
+            .publisher_declared(
+                lamp_msgs::Audio::SPEAKER_TOPIC,
+                &lamp_msgs::Audio::declaration(),
+                "control",
+            )
+            .unwrap();
         *crate::speaker_stream::TEST_BUS.lock().unwrap() = Some(bus);
         crate::speaker_stream::set(true);
         let (path, mut says, _mutes) = listening("stream-open");
         let (client, mut first) = streaming(&path);
         let rest = at_rest();
         let mut admitted = None;
-        pass_until(&mut says, &rest, |now, _| {
+        pass_until(&mut says, &rest, |now| {
             admitted = now;
             admitted.is_some()
         });
-        assert_eq!(admitted, Some(Admitted::Opened { by: "desk".into() }));
-        let open = said(&mut first);
-        assert_eq!(open["event"], "stream");
-        assert_eq!(open["state"], "open");
-        // A second stream the voice refuses leaves the first be (the door asks
-        // the voice before it drops the old one): the first hears nothing.
-        let (_busy, mut refused) = streaming(&path);
-        let not_at_rest = SoundNow {
-            conversing: true,
-            ..at_rest()
+        let Some(Admitted::Opened { by, ticket, feed }) = admitted else {
+            panic!("the stream was not opened");
         };
-        let mut told = None;
-        pass_until(&mut says, &not_at_rest, |taken, _| {
-            told = taken;
-            told.is_some()
-        });
-        assert!(matches!(told, Some(Admitted::Refused { .. })));
-        assert_eq!(said(&mut refused)["outcome"], "refused");
-        first
-            .get_ref()
-            .set_read_timeout(Some(Duration::from_millis(300)))
-            .unwrap();
-        let mut nothing = String::new();
-        assert!(
-            first.read_line(&mut nothing).is_err() || nothing.is_empty(),
-            "the running stream was told something: {nothing:?}"
+        assert_eq!(by, "desk");
+        let open = said(&mut first);
+        assert_eq!(
+            (open["event"].as_str(), open["state"].as_str()),
+            (Some("stream"), Some("open"))
         );
-        first
-            .get_ref()
-            .set_read_timeout(Some(Duration::from_secs(3)))
-            .unwrap();
-        // A second the voice admits replaces the first: the first is told
-        // `dropped`, replaced; the second is opened.
-        let (replacing, mut second) = streaming(&path);
-        let mut replaced = None;
-        pass_until(&mut says, &rest, |taken, _| {
-            replaced = taken;
-            replaced.is_some()
+        // A second stream is the voice's to place: it passes the same gate and
+        // opens as its own ticket and feed (the coordinator replaces the one
+        // that plays, as `play_stream` does).
+        let (_other, mut second) = streaming(&path);
+        let mut later = None;
+        pass_until(&mut says, &rest, |now| {
+            later = now;
+            later.is_some()
         });
-        assert_eq!(replaced, Some(Admitted::Opened { by: "desk".into() }));
+        let Some(Admitted::Opened {
+            feed: second_feed, ..
+        }) = later
+        else {
+            panic!("the second stream was not opened");
+        };
+        assert!(!Arc::ptr_eq(&feed, &second_feed));
         assert_eq!(said(&mut second)["state"], "open");
-        let mut told_first = serde_json::Value::Null;
-        for _ in 0..10 {
-            told_first = said(&mut first);
-            if told_first["outcome"].is_string() {
-                break;
+        // The computer's blocks arrive in the feed, the first chunk only after
+        // the prefill, each chunk 240 samples.
+        assert!(!feed.ready(), "nothing is held yet");
+        for sequence in 1..=3 {
+            let block = lamp_msgs::Audio {
+                sample_rate: 24_000,
+                channels: 1,
+                sample_format: lamp_msgs::Audio::S16LE.to_owned(),
+                sequence,
+            }
+            .block(&vec![7u8; 2_400])
+            .unwrap();
+            computers
+                .publish_bytes(lamp_ipc::monotonic_us(), lamp_msgs::Audio::ENCODING, &block)
+                .unwrap();
+        }
+        let started = Instant::now();
+        while !feed.ready() {
+            assert!(
+                started.elapsed() < Duration::from_secs(3),
+                "the sound did not arrive"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        let (chunk, last) = feed.take().unwrap();
+        assert_eq!((chunk.len(), last), (240, false));
+        assert_eq!(chunk[0], i16::from_le_bytes([7, 7]));
+        // Its computer closes the connection: what is held plays out, the last
+        // chunk faded to nothing, and the voice's answer ends the stream.
+        client.shutdown(std::net::Shutdown::Write).unwrap();
+        let started = Instant::now();
+        let mut ended_at = None;
+        while ended_at.is_none() {
+            assert!(
+                started.elapsed() < Duration::from_secs(3),
+                "the close was not seen"
+            );
+            if let Some((chunk, last)) = feed.take() {
+                if last {
+                    ended_at = Some(chunk);
+                }
+            } else {
+                thread::sleep(Duration::from_millis(5));
             }
         }
-        assert_eq!(
-            told_first,
-            serde_json::json!({"outcome": "dropped", "why": STREAM_REPLACED})
-        );
-        drop(client);
-        let client = replacing;
-        let mut first = second;
-        // Its computer closes the connection: the voice ends it, `dropped`.
-        client.shutdown(std::net::Shutdown::Write).unwrap();
-        pass_until(&mut says, &rest, |_, held| !held);
+        assert!(feed.finished());
+        assert_eq!(ended_at.unwrap()[239], 0, "the last chunk ends in silence");
+        ticket.answer(Outcome::Spoken);
         let mut last = serde_json::Value::Null;
         for _ in 0..10 {
             last = said(&mut first);
@@ -6195,10 +6203,7 @@ mod tests {
                 break;
             }
         }
-        assert_eq!(
-            last,
-            serde_json::json!({"outcome": "dropped", "why": STREAM_CLOSED})
-        );
+        assert_eq!(last, serde_json::json!({"outcome": "spoken"}));
         crate::speaker_stream::set(false);
         *crate::speaker_stream::TEST_BUS.lock().unwrap() = None;
         drop(says);
@@ -6244,17 +6249,14 @@ mod tests {
         ] {
             let (_client, mut said_to) = streaming(&path);
             let mut admitted = None;
-            pass_until(&mut says, &now, |taken, _| {
+            pass_until(&mut says, &now, |taken| {
                 admitted = taken;
                 admitted.is_some()
             });
-            assert_eq!(
-                admitted,
-                Some(Admitted::Refused {
-                    by: "desk".into(),
-                    why: why.into()
-                })
-            );
+            let Some(Admitted::Refused { by, why: told }) = admitted else {
+                panic!("the stream was not refused");
+            };
+            assert_eq!((by.as_str(), told.as_str()), ("desk", why));
             assert_eq!(
                 said(&mut said_to),
                 serde_json::json!({"outcome": "refused", "why": why})
