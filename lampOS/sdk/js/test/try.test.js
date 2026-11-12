@@ -107,7 +107,7 @@ test('a stimulus runs lamp-sim with an argument array and the lamp folder last; 
   assert.equal(by[6].ok, false);
   assert.match(by[6].answer, /^bad_request: name: one of nod/);
   assert.match(by[7].call, /^lamp\.withLease\(\['body'\], \(\) => lamp\.movePoses\(/);
-  assert.equal(by[8].call, "lamp.sound('hum')");
+  assert.equal(by[8].call, "lamp.sound('hum')  // no sound sent: turn on 'Hear the lamp in this page'");
   assert.deepEqual([by[9].ok, by[9].call], [true, 'lamp.language // "en"']);
 });
 
