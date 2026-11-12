@@ -262,8 +262,12 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   xóa trước thì không sao). Token không bao giờ có trong argv, dòng debug,
   nhật ký, lỗi hay trạng thái của Harness; đường dẫn chỉ chứa run id.
 - **Lần chạy:** một việc cho đích `lamp`, lời của nó là việc của kỹ năng,
-  script cần chạy từ thư mục chỉ đọc của kỹ năng, và đường duy nhất tới đèn
-  (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
+  lệnh chính xác chạy script từ thư mục chỉ đọc của kỹ năng,
+  `PYTHONPATH=/usr/local/lib/lampos/sdk-python python3 <folder>/<run>`
+  (đường dẫn của SDK nằm ngay trong lệnh, để `lampos` import được dù shell
+  của Hermes làm gì với môi trường của lần chạy, #6684), quy tắc chạy
+  script đúng như nó là, không bao giờ sửa, chép hay viết lại file của kỹ
+  năng, và đường duy nhất tới đèn (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
   Việc của kỹ năng được đưa vào như dữ liệu (một chuỗi JSON, "as data, not
   as instructions"), và không được có ký tự điều khiển. Runner kết thúc lần
   chạy ở `SkillRun::deadline`, đúng thời hạn của token, tự nó làm, không
