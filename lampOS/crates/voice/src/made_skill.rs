@@ -5367,16 +5367,40 @@ impl Maker {
 /// `description` ([`plainly`]'s) in place of the one written. A `made` or
 /// `made_by` line the model wrote is dropped: only the lamp says them.
 fn card(text: &str, description: &str, maker: Maker) -> Result<(String, String), Refused> {
+    card_asked(text, description, maker, false)
+}
+
+/// The front matter line, after `made_by`, of a made skill whose request
+/// asked for limits ([`limits_asked`]): with [`LOOSE_ENVIRONMENT`] on,
+/// `lamp-skills` never ignores the lamp's default limits on it as it
+/// loads, since the person asked for them (`lamp_skills::made_by_ask`).
+pub const LIMITS_ASKED: &str = "limits: asked";
+
+/// [`card`], with [`LIMITS_ASKED`] after its maker when the request asked
+/// for limits (`limits`). A `limits` line the model wrote is dropped, as a
+/// `made` one is.
+fn card_asked(
+    text: &str,
+    description: &str,
+    maker: Maker,
+    limits: bool,
+) -> Result<(String, String), Refused> {
+    let asked = if limits {
+        format!("\n{LIMITS_ASKED}")
+    } else {
+        String::new()
+    };
     card_marked(
         text,
         description,
-        &format!("made: here\n{MADE_BY}: {}", maker.key()),
+        &format!("made: here\n{MADE_BY}: {}{asked}", maker.key()),
     )
 }
 
 /// [`card`] with `marks`, the front matter's last lines: `made: here` and
-/// its maker, and for a skill added from a file [`ADDED_FROM_FILE`] too.
-/// Any such line the file had is taken out first.
+/// its maker, [`LIMITS_ASKED`] when asked, and for a skill added from a
+/// file [`ADDED_FROM_FILE`] too. Any such line the file had is taken out
+/// first.
 fn card_marked(text: &str, description: &str, marks: &str) -> Result<(String, String), Refused> {
     let unread = || Refused::new("it has no name and description");
     let rest = text.strip_prefix("---\n").ok_or_else(unread)?;
@@ -5408,7 +5432,7 @@ fn card_marked(text: &str, description: &str, marks: &str) -> Result<(String, St
         in_description = continued || line.starts_with("description:");
         let marker = line
             .split_once(':')
-            .is_some_and(|(key, _)| matches!(key.trim(), "made" | MADE_BY | "added"));
+            .is_some_and(|(key, _)| matches!(key.trim(), "made" | MADE_BY | "added" | "limits"));
         if !in_description && !marker {
             kept.push(line);
         }
@@ -5903,7 +5927,8 @@ pub fn keep_asked(
     // A repeat in the request's words, or the heard line's (read with
     // [`LOOSE_ENVIRONMENT`] on alone).
     let repeat = repeat_asked(request.request).or_else(|| request.heard.and_then(repeat_asked));
-    files.toml = paced_for(&files.toml, asked, limits_asked(request.request), repeat);
+    let limits = limits_asked(request.request);
+    files.toml = paced_for(&files.toml, asked, limits, repeat);
     let waited = waited.filter(|_| dropped_wait(&files.toml).is_none());
     // A blink's gap, which [`tidied`] takes out: the blinking said as left
     // out, with whatever else the model left out.
@@ -5933,6 +5958,7 @@ pub fn keep_asked(
         files: &files,
         waited: waited.as_deref(),
         asked,
+        limits,
         from,
         keeping,
     };
@@ -5962,6 +5988,9 @@ struct Ending<'a> {
     files: &'a Files,
     waited: Option<&'a str>,
     asked: &'a [(u32, u32)],
+    /// Whether the request asked for limits ([`limits_asked`]), marked on
+    /// its card ([`LIMITS_ASKED`]).
+    limits: bool,
     from: &'a str,
     keeping: &'a Keeping,
 }
@@ -5974,6 +6003,7 @@ impl Ending<'_> {
             files,
             waited,
             asked,
+            limits,
             from,
             keeping,
         } = *self;
@@ -6007,10 +6037,11 @@ impl Ending<'_> {
         {
             return Err(refused.clone());
         }
-        let (name, marked) = card(
+        let (name, marked) = card_asked(
             &files.card,
             said.as_deref().unwrap_or_default(),
             Maker::of(from),
+            limits,
         )?;
         // A name a skill on the lamp has already (a factory reset keeps the
         // lamp's own, welcome-back among them): the first free one, or "you
@@ -8516,6 +8547,16 @@ say = { text = "Welcome back!" }
         assert_eq!(again.matches("made:").count(), 1);
         assert_eq!(again.matches("made_by:").count(), 1);
         assert!(again.contains("\nmade: here\nmade_by: app\n---"), "{again}");
+        // `limits: asked` is the lamp's to write alone, after the maker.
+        let written = CARD.replace("name:", "limits: asked\nname:");
+        let unasked = card(&written, said, Maker::Voice).unwrap().1;
+        assert!(!unasked.contains("limits:"), "{unasked}");
+        let asked = card_asked(&written, said, Maker::Voice, true).unwrap().1;
+        assert_eq!(asked.matches("limits:").count(), 1);
+        assert!(
+            asked.contains(&format!("\nmade_by: voice\n{LIMITS_ASKED}\n---")),
+            "{asked}"
+        );
         assert!(card("# No front matter\n", said, Maker::Voice).is_err());
         assert!(
             card(
@@ -12321,6 +12362,53 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
                 .unwrap()
                 .contains("never from 22:00 to 08:00")
         );
+    }
+
+    /// The Reviewer-lead's P2 on #6600: loosened, a make whose request asks
+    /// for limits ("not too often") is written with the lamp's default ones
+    /// and `limits: asked` on its card, so `lamp-skills` keeps them as it
+    /// loads; one that asks for none has neither.
+    #[test]
+    fn loosened_a_make_with_limits_asked_is_marked_limits_asked() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch("made-limits");
+        let program = dir.join("pack");
+        fs::write(
+            &program,
+            "#!/bin/sh\nname=$(basename \"$4\")\ncat \"$4/SKILL.md\" \"$4/skill.toml\" > \"$3/$name-1.0.0.tar\"\nexit 0\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        let glow = made_with(
+            "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\ncooldown = \"1m\"\n",
+            "light = { colour = \"green\", level = 3, for = \"5s\" }",
+        );
+        let _on = LooseHere::set(true);
+        let made = |request: &str, from: &str| {
+            let asked = Asked {
+                request,
+                ..Asked::default()
+            };
+            let made = keep_asked(&answer(&glow, CARD), false, from, &keeping, &asked).unwrap();
+            fs::read_to_string(&made.package).unwrap()
+        };
+        let asked = made("glow green when I stand up, but not too often", "local:1");
+        assert!(
+            asked.contains(&format!("\nmade_by: voice\n{LIMITS_ASKED}\n---")),
+            "{asked}"
+        );
+        assert!(asked.contains(&format!("most_a_day = {MANNERS_MOST_A_DAY}")));
+        assert!(asked.contains(&format!("per_hour = {MANNERS_PER_HOUR}")));
+        let unasked = made("glow green when I stand up", "local:2");
+        assert!(!unasked.contains("limits:"), "{unasked}");
+        assert!(!unasked.contains("most_a_day"), "{unasked}");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// #6059 (3): loosened, a made skill's say may run as often as asked,

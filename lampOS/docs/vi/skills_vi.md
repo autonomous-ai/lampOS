@@ -1438,16 +1438,29 @@ thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguy
    trong thư mục kỹ năng, không phải được đẩy lên, front matter của
    `SKILL.md` có `made: here` (dòng của chính đèn, nằm trong gói mà SHA-256
    ràng buộc; dòng mô hình viết bị bỏ, và kỹ năng được chia sẻ bị gỡ dòng
-   này) và không có `added: file` hay `written: app`, và `.package.json`
-   không phải của Store. Kỹ năng core, Store, add-on, được đẩy, thêm từ tệp
-   hay đặt từ thư mục giữ mọi giới hạn. Mỗi kỹ năng một dòng, một lần mỗi
-   lần chạy: `lamp-skills: light-off: made here, LAMP_MADE_SKILL_LOOSE=on:
-   the lamp's old [budget] group "wellbeing" per_hour = 1 and most_a_day =
-   3 ignored, its files as they are`. Giới hạn người dùng yêu cầu đúng bằng
-   các giá trị đó (nói "at most three times a day", tạo trước công tắc)
-   cũng bị bỏ: tệp không phân biệt được với giá trị của đèn. Tắt thì không
-   bỏ gì. Test:
-   `tests::loosened_a_made_skill_sheds_the_lamps_old_limits_as_it_loads`.
+   này) và không có `added: file`, `written: app` hay `limits: asked`, và
+   `.package.json` không phải của Store. Kỹ năng core, Store, add-on, được
+   đẩy, thêm từ tệp hay đặt từ thư mục giữ mọi giới hạn. Mỗi kỹ năng một
+   dòng, một lần mỗi lần chạy: `lamp-skills: light-off: made here,
+   LAMP_MADE_SKILL_LOOSE=on: the lamp's old [budget] group "wellbeing"
+   per_hour = 1 and most_a_day = 3 ignored, its files as they are`.
+
+   Lần tạo mà yêu cầu có xin giới hạn (`made_skill::limits_asked`, "not
+   too often", "at most three times a day") được ghi, dù công tắc bật hay
+   tắt, với dòng `limits: asked` sau `made_by` trên thẻ
+   (`made_skill::LIMITS_ASKED`, P2 của Reviewer-lead trên #6600); dòng
+   `limits` do mô hình viết bị bỏ, như dòng `made`. Khi công tắc bật, giới
+   hạn của nó là giá trị mặc định của đèn nếu yêu cầu không nêu số, nên
+   `lamp-skills` giữ tất cả khi nạp: kỹ năng tạo với "not too often" vẫn
+   chạy tối đa một lần mỗi giờ và 3 lần mỗi ngày. Việc chia sẻ của
+   `lamp-cloud` giữ dòng này: trên đèn khác kỹ năng không có `made: here`
+   nên không bỏ gì. Giới hạn xin đúng bằng các giá trị đó của kỹ năng tạo
+   trước khi có dòng này cũng bị bỏ: tệp không phân biệt được với giá trị
+   của đèn. Tắt thì không bỏ gì. Test:
+   `tests::loosened_a_made_skill_sheds_the_lamps_old_limits_as_it_loads`
+   (lamp-skills) và
+   `made_skill::tests::loosened_a_make_with_limits_asked_is_marked_limits_asked`
+   (lamp-voice).
 
 Không đổi khi bật: lời đọc lại của một lần ghi và lời đồng ý nói ra cho
 SHA-256 nội dung của nó; việc gửi, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng

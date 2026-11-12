@@ -3828,16 +3828,29 @@ today's checks.
    the skills folder, never pushed, its `SKILL.md` front matter says
    `made: here` (the lamp's own line, inside the package its SHA-256
    binds; one the model wrote is dropped, and a shared skill has it taken
-   out) and neither `added: file` nor `written: app`, and its
-   `.package.json` is not the Store's. A core, Store, add-on, pushed,
-   file-added or folder-put skill keeps every limit. One line a skill,
-   once a run: `lamp-skills: light-off: made here,
+   out) and neither `added: file`, `written: app` nor `limits: asked`,
+   and its `.package.json` is not the Store's. A core, Store, add-on,
+   pushed, file-added or folder-put skill keeps every limit. One line a
+   skill, once a run: `lamp-skills: light-off: made here,
    LAMP_MADE_SKILL_LOOSE=on: the lamp's old [budget] group "wellbeing"
-   per_hour = 1 and most_a_day = 3 ignored, its files as they are`. A
-   limit the person asked for at exactly those values (asked "at most
-   three times a day", made before the switch) is shed too: the file
-   can't tell it from the lamp's. Off, nothing is shed. Test:
-   `tests::loosened_a_made_skill_sheds_the_lamps_old_limits_as_it_loads`.
+   per_hour = 1 and most_a_day = 3 ignored, its files as they are`.
+
+   A make whose request asks for limits (`made_skill::limits_asked`, "not
+   too often", "at most three times a day") is written, with the switch on
+   or off, with `limits: asked` after `made_by` on its card
+   (`made_skill::LIMITS_ASKED`, the Reviewer-lead's P2 on #6600); a
+   `limits` line the model wrote is dropped, as a `made` one is. With the
+   switch on, its limits are the lamp's defaults where the request named
+   no number, so `lamp-skills` keeps them all as it loads: a skill made
+   with "not too often" still runs at most once an hour and 3 times a
+   day. `lamp-cloud`'s share leaves the line in: on another lamp the skill
+   has no `made: here` and sheds nothing. A limit asked for at exactly
+   those values by a skill made before this line was written is shed too:
+   the file can't tell it from the lamp's. Off, nothing is shed. Tests:
+   `tests::loosened_a_made_skill_sheds_the_lamps_old_limits_as_it_loads`
+   (lamp-skills) and
+   `made_skill::tests::loosened_a_make_with_limits_asked_is_marked_limits_asked`
+   (lamp-voice).
 
 Unchanged with it on: a write's read-back and the spoken yes on its
 content's SHA-256; the sends, at most 3 a skill and 10 across all skills
