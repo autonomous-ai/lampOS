@@ -6268,7 +6268,7 @@ mod tests {
                 sample_format: lamp_msgs::Audio::S16LE.to_owned(),
                 sequence,
             }
-            .block(&vec![7u8; 2_400])
+            .block(&vec![3u8; 2_400])
             .unwrap();
             computers
                 .publish_bytes(lamp_ipc::monotonic_us(), lamp_msgs::Audio::ENCODING, &block)
@@ -6284,7 +6284,7 @@ mod tests {
         }
         let (chunk, last) = feed.take().unwrap();
         assert_eq!((chunk.len(), last), (240, false));
-        assert_eq!(chunk[0], i16::from_le_bytes([7, 7]));
+        assert_eq!(chunk[0], i16::from_le_bytes([3, 3]));
         // Its computer closes the connection: what is held plays out, the last
         // chunk faded to nothing, and the voice's answer ends the stream.
         client.shutdown(std::net::Shutdown::Write).unwrap();
