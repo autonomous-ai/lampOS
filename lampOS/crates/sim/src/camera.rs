@@ -14,7 +14,7 @@ use std::{
     io::Read,
     os::unix::process::CommandExt,
     path::{Path, PathBuf},
-    process::{Child, ChildStdout, Command, Stdio},
+    process::{Child, ChildStdout, Stdio},
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -108,7 +108,7 @@ impl Camera {
              -vf fps=6,scale=320:-1 -q:v 5 -f mjpeg - & F=$!; \
              while kill -0 \"$OWNER\" 2>/dev/null && kill -0 $F 2>/dev/null; do sleep 1; done; \
              kill $F 2>/dev/null; rm -f \"$SIGHT\"";
-        let mut child = match Command::new("sh")
+        let mut child = match crate::keys::command("sh")
             .args(["-c", script])
             .env("FORMAT", format)
             .env("DEVICE", &device)

@@ -57,7 +57,7 @@ impl Folders {
 
 /// The helper's command: the real `lamp-skills asked` on `folders`.
 fn helper(bin: &Path, folders: &Folders) -> Command {
-    let mut command = Command::new(bin);
+    let mut command = crate::keys::command(bin);
     command
         .args(["asked", "--dir"])
         .arg(&folders.skills)

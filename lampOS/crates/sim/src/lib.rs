@@ -14,6 +14,7 @@ pub mod mic;
 pub mod people;
 pub mod pose;
 pub mod pty;
+pub mod real_voice;
 pub mod ring;
 pub mod servo;
 pub mod stimuli;
