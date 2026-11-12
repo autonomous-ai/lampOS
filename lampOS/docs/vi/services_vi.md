@@ -333,6 +333,11 @@ giờ của chính lịch, và trên lamp-9adf ngày 5/11 lúc 00:27 một sự 
 trả về là 08:00Z và bị nói thành "8 to 9 AM your time". Khi múi giờ không có
 tên, không hỏi gì, như trước.
 
+Lần đọc một sự kiện mà một lần sửa làm trước khi đọc lại (`writes::event_read`)
+cũng hỏi như vậy, nên một lần dời hay hủy đọc lại giờ của sự kiện là
+22:00 +07:00. Thiếu nó, trên lamp-06c1 ngày 12/11, một lần dời đã đọc lại "now
+from 2026-11-13T15:00:00Z" cho một sự kiện 22:00 +07:00.
+
 Một lệnh gọi có thể gọi tên mã Gmail nào cũng được: `gmail` hay `gmail-app`
 đều đến liên kết Gmail mà đèn đang có, vì mô hình của giọng nói dùng lẫn hai
 tên (trên lamp-9adf ngày 4/11 nó gọi `gmail` ở hai trong bốn lần gửi và đèn

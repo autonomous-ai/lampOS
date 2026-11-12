@@ -269,7 +269,7 @@ pub fn never_read(code: &str) -> Option<&'static str> {
 
 /// The lamp's own zone's IANA name, as the system has it now; nothing when
 /// it names none.
-fn zone_here() -> Option<String> {
+pub(crate) fn zone_here() -> Option<String> {
     lamp_local_time::LocalTime::zone("system").ok()?.name()
 }
 
