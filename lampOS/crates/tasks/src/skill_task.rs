@@ -1541,20 +1541,25 @@ pub fn leftovers(project: &Path, runs: &Path, named: &[(String, String)]) -> Vec
         .collect()
 }
 
-/// Each `leftover` undone, as a run's own guard does (#6691): its sessions
-/// closed with `close` (`harness close --now`), then its folder in
-/// `project` and its token file in `runs` removed, even when a close
-/// failed. One journal line a run, which names what was closed and removed.
+/// Each `leftover` undone in V2's order on #6510, as a run's own guard
+/// does (#6691): its token ended with lamp-control first (`end`, safe for a
+/// run it never minted or already ended), since the run holds the token in
+/// memory and its file's removal revokes nothing; then its sessions closed
+/// with `close` (`harness close --now`); then its folder in `project` and
+/// its token file in `runs` removed, even when a close failed. One journal
+/// line a run, which names what was ended, closed and removed.
 pub fn sweep(
     project: &Path,
     runs: &Path,
     leftovers: &[Leftover],
+    end: &dyn Fn(&str),
     close: &dyn Fn(&str) -> Result<(), String>,
 ) -> Vec<String> {
     leftovers
         .iter()
         .map(|leftover| {
-            let mut said = Vec::new();
+            end(&leftover.run);
+            let mut said = vec!["token ended".to_owned()];
             for agent in &leftover.agents {
                 said.push(match close(agent) {
                     Ok(()) => format!("closed {agent}"),
@@ -1626,7 +1631,9 @@ pub fn sweep_at_start(harness: SkillHarness, home: &Path, slot: SkillHarnessSlot
             .map(|_| ()),
         _ => Err("Harness can't be asked".into()),
     };
-    for line in sweep(&runner.project, &runner.runs, &found, &close) {
+    let tokens = ControlTokens::default();
+    let end = |run: &str| tokens.end(run);
+    for line in sweep(&runner.project, &runner.runs, &found, &end, &close) {
         eprintln!("{line}");
     }
     let _ = slot.set(harness);
@@ -2721,6 +2728,8 @@ mod tests {
         );
         assert_eq!(found.len(), 2);
         let closed = RefCell::new(Vec::new());
+        // Each run's token is ended before any of its sessions is closed.
+        let end = |run: &str| closed.borrow_mut().push(format!("end {run}"));
         let close = |agent: &str| {
             closed.borrow_mut().push(agent.to_owned());
             if agent == "agent-2" {
@@ -2729,8 +2738,11 @@ mod tests {
                 Ok(())
             }
         };
-        let lines = sweep(&project, &runs, &found, &close);
-        assert_eq!(*closed.borrow(), ["agent-1", "agent-2"]);
+        let lines = sweep(&project, &runs, &found, &end, &close);
+        assert_eq!(
+            *closed.borrow(),
+            ["end run-a", "agent-1", "end run-b", "agent-2"]
+        );
         assert!(!project.join("skill-run-a").exists());
         assert!(
             !project.join("skill-run-b").exists(),
@@ -2740,7 +2752,7 @@ mod tests {
         assert!(project.join("keep.txt").exists());
         assert_eq!(lines.len(), 2);
         assert!(
-            lines[0].contains("skill-run-a") && lines[0].contains("closed agent-1"),
+            lines[0].contains("skill-run-a") && lines[0].contains("token ended, closed agent-1"),
             "{lines:?}"
         );
         assert!(
