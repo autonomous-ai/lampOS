@@ -25,12 +25,12 @@
 //!
 //! The connection's thread is the client's, never the voice's: nothing here
 //! waits on the voice's loop or the voice on it.
-use crate::say::{Answer, Cancel, Outcome, asker_went};
+use crate::say::{Answer, Cancel, Outcome, is_cancel};
 use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::Audio;
 use std::{
     collections::VecDeque,
-    io::{self, Write},
+    io::{self, Read, Write},
     os::unix::net::UnixStream,
     sync::{
         Arc, Mutex,
@@ -238,6 +238,7 @@ pub(crate) fn hold_with(
     let mut sound: Option<Sound> = None;
     let mut last_said = Instant::now();
     let mut closed = false;
+    let mut said_so_far: Vec<u8> = Vec::new();
     let outcome = loop {
         match answered.recv_timeout(LOOK) {
             Ok(Answer::Begun(_)) => {
@@ -285,10 +286,24 @@ pub(crate) fn hold_with(
         // the feed is closed with no cancel, so what is held plays out, its
         // last chunk faded, and the voice answers `spoken` (a cancel would
         // cut the turn at once, the held sound dropped).
-        if !closed && asker_went(&stream) {
-            closed = true;
-            if let Some(feed) = feed.as_ref() {
-                feed.close();
+        if !closed {
+            match asked(&stream, &mut said_so_far) {
+                Asked::Nothing => {}
+                Asked::Closed => {
+                    closed = true;
+                    if let Some(feed) = feed.as_ref() {
+                        feed.close();
+                    }
+                }
+                // Its hard stop: the cancel cuts the turn at once and the
+                // voice answers `dropped`, as it does for any say's asker.
+                Asked::Stop => {
+                    closed = true;
+                    cancel.store(true, Ordering::Release);
+                    if let Some(feed) = feed.as_ref() {
+                        feed.close();
+                    }
+                }
             }
         }
         if let Some(sound) = sound.as_mut() {
@@ -318,6 +333,59 @@ pub(crate) fn hold_with(
         sound.map(|sound| sound.counts)
     );
 }
+
+/// What its computer did on the stream's connection since the last look.
+#[derive(Debug, PartialEq, Eq)]
+enum Asked {
+    /// Nothing that ends the stream.
+    Nothing,
+    /// The connection closed: the sound plays out and fades.
+    Closed,
+    /// A `{"cancel":true}` line, its hard stop (the door's `off`, `stop` or a
+    /// revoke): the sound is cut at once, as a say's cancel cuts it.
+    Stop,
+}
+
+/// Reads what its computer wrote without waiting, whole lines kept in `held`.
+/// A line is its stop when it is [`crate::say::CANCEL_LINE`]'s; any other line
+/// is dropped; one past the most a line may be is dropped too.
+fn asked(stream: &UnixStream, held: &mut Vec<u8>) -> Asked {
+    if stream.set_nonblocking(true).is_err() {
+        return Asked::Nothing;
+    }
+    let mut piece = [0u8; 512];
+    let mut found = Asked::Nothing;
+    loop {
+        match (&*stream).read(&mut piece) {
+            Ok(0) => {
+                found = Asked::Closed;
+                break;
+            }
+            Ok(read) => held.extend_from_slice(&piece[..read]),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => {
+                if error.kind() != io::ErrorKind::WouldBlock {
+                    found = Asked::Closed;
+                }
+                break;
+            }
+        }
+    }
+    let _ = stream.set_nonblocking(false);
+    while let Some(end) = held.iter().position(|&byte| byte == b'\n') {
+        let line: Vec<u8> = held.drain(..=end).collect();
+        if is_cancel(&line) {
+            return Asked::Stop;
+        }
+    }
+    if held.len() > MOST_LINE {
+        held.clear();
+    }
+    found
+}
+
+/// The most of a line from its computer that is kept waiting for its newline.
+const MOST_LINE: usize = 4096;
 
 /// `speaker/audio`, read for as long as a stream is open.
 struct Sound {
@@ -533,6 +601,45 @@ mod tests {
         assert!(feed.finished());
         // The voice answers once it has played out; the thread ends.
         answer.send(Answer::Done(Outcome::Spoken)).unwrap();
+        served.join().unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_cancel_line_is_the_computers_hard_stop_and_other_lines_are_not() {
+        let _turn = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (bus, dir) = temp_bus("hard-stop");
+        let (answer, cancel, mut said, mut computer, served) = held(bus);
+        answer.send(Answer::Begun(1)).unwrap();
+        assert_eq!(line(&mut said)["state"], "open");
+        // Lines that are no cancel (and a cancel that is not `true`) are dropped,
+        // the stream runs on.
+        computer
+            .write_all(b"{\"hello\":1}\n{\"cancel\":false}\nnot json\n")
+            .unwrap();
+        thread::sleep(Duration::from_millis(300));
+        assert!(!cancel.load(Ordering::Acquire), "no stop was asked");
+        // The stop arrives in two pieces: still one line, still its stop.
+        computer.write_all(b"{\"can").unwrap();
+        thread::sleep(Duration::from_millis(100));
+        assert!(!cancel.load(Ordering::Acquire));
+        computer.write_all(b"cel\":true}\n").unwrap();
+        let began = Instant::now();
+        while !cancel.load(Ordering::Acquire) {
+            assert!(
+                began.elapsed() < Duration::from_secs(2),
+                "the stop was not seen"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        // The voice cuts the turn and answers; the thread ends.
+        answer
+            .send(Answer::Done(Outcome::Dropped(
+                crate::say::STOPPED_BY_ASKER.into(),
+            )))
+            .unwrap();
         served.join().unwrap();
         std::fs::remove_dir_all(dir).unwrap();
     }
