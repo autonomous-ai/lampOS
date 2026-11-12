@@ -1049,7 +1049,13 @@ spacing and a final punctuation mark (and, in a person's own scope, a leading
 441." kept and "My gym locker code is 441." kept again; and before it the
 "They said: " a line kept as heard leads with: C81, stock 11091, 10 Nov,
 "They said: my gym locker code is 441." is "Gym locker code is 441."; never
-in the room's, where "my" is whoever said it, `days::own_text`), is answered
+in the room's, where "my" is whoever said it, `days::own_text`; and in
+either scope a whole number word from "zero" to "nine" read as its digit,
+with each run of single digits one number, so "four four one" and "4 4 1"
+are "441": C81, stock 12226, 12 Nov, "They said: my gym locker code is four
+four one." kept as heard and "My gym locker code is 441." kept again as a
+new id; "someone" or "tone" stay words, "oh" is never zero, and the kept
+text is never changed, `days::digit_text`), is answered
 `{"ok":true,"id":24,"existing":true}` with that kept thing's id, and no
 entry is written; it gains this conversation's `source_ids`, so forgetting
 it with `LAMP_MEMORY_FORGET_ALL` removes both conversations' exchanges
@@ -2389,7 +2395,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   time called `remember` again with the same text (lamp-06c1, the second
   route, build 4142: kept ids 24 and 25). Now a text the person already
   keeps (the same words, ignoring case, spacing and a final punctuation
-  mark, and in their own scope a leading "They said: ", "my" or "the", C81) is that kept
+  mark, and in their own scope a leading "They said: ", "my" or "the", and
+  "four four one" as "441", C81) is that kept
   thing, no entry is written, it gains this
   conversation's exchanges as sources (so forgetting it with
   `LAMP_MEMORY_FORGET_ALL` removes both conversations'), and the model is told

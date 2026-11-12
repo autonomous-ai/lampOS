@@ -2887,15 +2887,64 @@ fn own_text(same: &str) -> &str {
         .unwrap_or(same)
 }
 
-/// The words `once` compares in `person`'s scope: [`same_text`], and in a
-/// person's own scope [`own_text`] too.
+/// The words `once` compares in `person`'s scope: [`same_text`], in a
+/// person's own scope [`own_text`] too, and in either [`digit_text`].
 fn once_text(person: &Person, text: &str) -> String {
     let same = same_text(text);
     if person.as_str() != Person::EVERYONE {
-        own_text(&same).to_owned()
+        digit_text(own_text(&same))
     } else {
-        same
+        digit_text(&same)
     }
+}
+
+/// The digit a whole word names, "zero" to "nine" or the digit itself, and
+/// with a comma after it ("four, four, one").
+fn single_digit(word: &str) -> Option<char> {
+    let word = word.strip_suffix(',').unwrap_or(word);
+    const WORDS: [&str; 10] = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    ];
+    if let Some(n) = WORDS.iter().position(|w| *w == word) {
+        return char::from_digit(n as u32, 10);
+    }
+    let mut chars = word.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) if c.is_ascii_digit() => Some(c),
+        _ => None,
+    }
+}
+
+/// [`same_text`]'s words with each whole number word from "zero" to "nine"
+/// a digit, and each run of single digits one number: "four four one" and
+/// "4 4 1" are "441" (C81 on lamp-06c1, stock 12226, 12 Nov: "They said:
+/// my gym locker code is four four one." kept as heard and "My gym locker
+/// code is 441." kept again as a new id, never marked said again). Only
+/// whole words are read, so "someone", "often" or "tone" stay as they are,
+/// and "oh" is never a zero. For comparing alone: the kept text is never
+/// changed.
+fn digit_text(same: &str) -> String {
+    let mut out = String::with_capacity(same.len());
+    let mut in_digits = false;
+    for word in same.split(' ') {
+        match single_digit(word) {
+            Some(digit) => {
+                if !in_digits && !out.is_empty() {
+                    out.push(' ');
+                }
+                out.push(digit);
+                in_digits = true;
+            }
+            None => {
+                if !out.is_empty() {
+                    out.push(' ');
+                }
+                out.push_str(word);
+                in_digits = false;
+            }
+        }
+    }
+    out
 }
 
 fn is_punctuation(c: char) -> bool {
@@ -3886,6 +3935,74 @@ mod tests {
             .unwrap();
         let mine = store.remember_once_from(&everyone, now, "My wifi is Kestrel-7", &[], true);
         assert_ne!(mine.unwrap(), (room, true), "the room's my is apart");
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// C81: number words and digits are the same words to `once`, word by
+    /// word: a run of single digits is one number, other words keep theirs.
+    #[test]
+    fn once_text_reads_number_words_as_digits() {
+        let olivia = Person::new("p-b2471d941bf88836").unwrap();
+        let everyone = Person::everyone();
+        for person in [&olivia, &everyone] {
+            let same = |a: &str, b: &str| once_text(person, a) == once_text(person, b);
+            assert!(same(
+                "gym locker code is four four one",
+                "gym locker code is 441"
+            ));
+            assert!(same("gym locker code is 4 4 1.", "Gym locker code is 441"));
+            assert!(same("code is four, four, one", "code is 441"));
+            assert!(!same(
+                "gym locker code is four four one",
+                "gym locker code is 442"
+            ));
+            assert!(!same("code is four forty one", "code is 441"));
+            assert!(same("One more thing", "1 more thing"));
+            assert!(!same("one more thing", "more thing"));
+            assert!(!same("one more thing", "two more things"));
+        }
+        assert_eq!(
+            once_text(&olivia, "Someone often hums a tone, oh well"),
+            "someone often hums a tone, oh well"
+        );
+        assert_eq!(once_text(&olivia, "one more thing"), "1 more thing");
+        assert_eq!(
+            once_text(&olivia, "Room 12 is on floor 3 4"),
+            "room 12 is on floor 34"
+        );
+    }
+
+    /// C81 on stock 12226 (lamp-06c1, 12 Nov, run-1447 req 34/37): "They
+    /// said: my gym locker code is four four one." kept as heard, then "My
+    /// gym locker code is 441." kept again as a second id. `once` finds it
+    /// now, and a correction in those words restates it; 442 is another.
+    #[test]
+    fn a_remember_once_finds_number_words_said_as_digits() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-once-num-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let options = Options {
+            dir: dir.clone(),
+            keep_days: 30,
+            local: LocalTime::Offset(0),
+        };
+        let mut store = Days::open(options, now).unwrap();
+        let olivia = Person::new("p-b2471d941bf88836").unwrap();
+        let heard = "They said: my gym locker code is four four one.";
+        let (gym, existing) = store
+            .remember_once_from(&olivia, now, heard, &[], true)
+            .unwrap();
+        assert!(!existing);
+        let again = store.remember_once_from(&olivia, now, "My gym locker code is 441.", &[], true);
+        assert_eq!(again.unwrap(), (gym, true), "the same kept thing");
+        let restated = store.restates(&olivia, now, "Gym locker code is 441.", gym, &[gym]);
+        assert!(restated.unwrap(), "a correction in its words says it again");
+        let other = store
+            .remember_once_from(&olivia, now, "My gym locker code is 442.", &[], true)
+            .unwrap();
+        assert!(!other.1, "another number is another thing");
+        assert_eq!(store.record(&olivia, gym).unwrap().unwrap().text, heard);
         drop(store);
         fs::remove_dir_all(dir).unwrap();
     }
