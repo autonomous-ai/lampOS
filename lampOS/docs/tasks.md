@@ -1550,9 +1550,17 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     one shell that timed out doesn't move a target to another engine. A
     reading more than 15 minutes old is unknown.
   - **Targets from what is there:** a target written from the machines
-    gets `ENGINE` where it is known installed on that computer, else the
-    first known installed of claude, codex and opencode, else `ENGINE` as
-    before. A file someone else wrote is still never written over.
+    gets, of the engines known installed on that computer, one that can
+    run (#6657, the first builder's (b), no switch): known signed in
+    first, then sign-in unknown, then known signed out, and within each
+    `ENGINE` first, then claude, codex and opencode
+    (`readiness::Known::chosen`). So a known signed-out engine, which the
+    hand-over would then refuse (`engine_not_signed_in`), never wins over
+    one that can run: on a laptop with claude installed and signed out and
+    codex signed in, the target is codex, and moves back at the first look
+    after claude signs in. None known installed: `ENGINE` as before. A
+    file someone else wrote is still never written over. Test:
+    `the_engine_chosen_is_one_that_can_run`.
   - **Its own file,** `targets.engines.json` beside the targets:
     `{"version":1,"computers":{ALIAS:{"status":{"value":WORD,"read_ms":MS},
     "engines":{ENGINE:{"installed":{"value":BOOL,"read_ms":MS},
