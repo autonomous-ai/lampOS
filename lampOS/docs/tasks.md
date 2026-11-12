@@ -1880,6 +1880,18 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `--message` and types the task once the pane is ready); a lamp gets it
     with the Harness pin move (#5957). (#6504's close-and-start-again
     stopgap is gone.)
+  - **Never begun, told and closed** (#6577): the lamp's own OpenClaw
+    task, handed over in this boot, still read idle with nothing asked,
+    no answer and no tool used `OPENCLAW_BEGIN_WITHIN_MS` (180 s,
+    unmeasured until the slowest real first prompt on a lamp with Harness
+    0.6.41, times two, replaces it) after it was accepted, and so at every
+    read since, is kept as `failed` (`engine::never_began`, one journal
+    line). The voice then tells it as any failed task, in one plain
+    sentence that it stopped without finishing, and its empty harness is
+    closed as a told lamp task's is (`close_due`). It is not tried again
+    and not moved to Hermes (the lead's rule). Anything asked, answered or
+    used before the bound, a task from an earlier boot, the person's own
+    session, Hermes and the computer's agents are as before.
   - **The voice** (`agent_tasks`, `task_news`): reads the lamp's target's
     engine from `{"op":"targets"}` and names it, so a hand-over naming no
     machine is said as "OpenClaw on the lamp" and the tool descriptions
