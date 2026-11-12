@@ -146,18 +146,52 @@ pub fn service_words(name: &str) -> Option<String> {
     })
 }
 
-/// `name`'s plain words, for a grant of [`GRANTS`].
+/// The switch for a task's network grant ([`NET`]), in lamp-tasks,
+/// lamp-skills and its manage helper, lamp-control and the voice. `on`
+/// only; off, `net` is no grant and every run stays off the network
+/// (`LAMP_NS_NET=run`).
+pub const NET_ENVIRONMENT: &str = "LAMP_TASK_NET";
+
+/// The task grant that keeps the run on the lamp's network (with
+/// [`NET_ENVIRONMENT`] on): never one of lamp-control's own, so it is never
+/// in a one-run token; lamp-tasks reads it from the hand-over.
+pub const NET: (&str, &str) = ("net", "reaches the internet");
+
+thread_local! {
+    /// The network grant's switch as a test of this thread sets it (other
+    /// crates' tests too, so not only under `cfg(test)`).
+    static NET_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a task's network grant is on in this process.
+pub fn net_on() -> bool {
+    if let Some(on) = NET_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(NET_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The network grant's switch for this test's thread alone: tests only.
+#[doc(hidden)]
+pub fn set_net_here(on: Option<bool>) {
+    NET_HERE.with(|here| here.set(on));
+}
+
+/// [`GRANTS`], and [`NET`] while [`net_on`].
+fn known() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
+    GRANTS.iter().chain(net_on().then_some(&NET))
+}
+
+/// `name`'s plain words, for a grant of [`GRANTS`] (or [`NET`], on).
 pub fn grant_words(name: &str) -> Option<&'static str> {
-    GRANTS
-        .iter()
+    known()
         .find(|(grant, _)| *grant == name)
         .map(|(_, words)| *words)
 }
 
-/// `name` as [`GRANTS`] has it, for a grant of it.
+/// `name` as [`GRANTS`] has it, for a grant of it (or [`NET`], on).
 pub fn grant_named(name: &str) -> Option<&'static str> {
-    GRANTS
-        .iter()
+    known()
         .find(|(grant, _)| *grant == name)
         .map(|(grant, _)| *grant)
 }
@@ -225,6 +259,13 @@ impl TaskAsks {
             from: text("from")?,
             approved: false,
         })
+    }
+
+    /// What an agent skill's yes is recorded for as it goes on, with no
+    /// spoken yes (`crate::upload_agent::went_on`): its grants only of the
+    /// ones that go on at once.
+    pub fn at_once(&self) -> Asks {
+        self.asks()
     }
 
     /// What the yes is asked of: what must be said whole, then kept.
@@ -808,6 +849,13 @@ pub fn forget_by(control: &Path, name: &str) -> Result<(), String> {
     }
 }
 
+/// Whether the skill `name`, as the manage helper at `manage` reads it, is
+/// an agent skill added from a file ([`crate::upload_agent::FROM`]).
+fn read_from_file(manage: &Path, name: &str) -> bool {
+    read_by(manage, name)
+        .is_ok_and(|asks| asks.is_some_and(|asks| asks.from == crate::upload_agent::FROM))
+}
+
 /// The person's yes to `asks` recorded by lamp-control at `control`
 /// (`{"task_yes_record": {"name", "sha256", "grants"}}`), only while the
 /// skill on the lamp, read again by the manage helper at `manage`, still
@@ -828,6 +876,11 @@ pub fn approve_by(manage: &Path, control: &Path, asks: &Asks) -> Result<Value, S
         answer.get("recorded").and_then(Value::as_bool),
         answer.get("error").and_then(Value::as_str),
     ) {
+        // An agent skill added from a file (`LAMP_UPLOAD_TO_AGENT`): its
+        // first run asked this yes, so it runs now, as the person asked.
+        (Some(true), _) if crate::upload_agent::on() && read_from_file(manage, &asks.skill) => {
+            Ok(json!({ "approved": 1, "call": asks.skill.replace('-', "_") }))
+        }
         (Some(true), _) => Ok(json!({ "approved": 1 })),
         (_, Some(why)) => Err(why.to_owned()),
         _ => Err("lamp-control said nothing".to_owned()),
