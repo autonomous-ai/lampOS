@@ -3515,7 +3515,9 @@ corrected ask, read back again, and started only on a yes:
   could still start it. Now, on the second route, a heard line that is a
   plain no (`services::plain_no`, the list the voice already reads a no to a
   skill's write with: "No.", "No thanks.", "Never mind.", "Don't.", "Cancel
-  that.", "Không, thôi.") while a task waits, from a request that could have
+  that.", "Không, thôi.", and "No, don't start it.": "start", "begin", "do"
+  and "run" count, as "send" does, only after "don't", found on lamp-c0a4
+  at 12431 where "No, don't start it." was not a no) while a task waits, from a request that could have
   said yes to it (`may_confirm`), drops it (`agent_tasks::declined`, hooked
   as the engine's `declining_a_task_waiting`): `PENDING` is cleared, so no
   later yes in the window starts it; the tasks part is sent its `cancel`,
