@@ -586,6 +586,13 @@ pub trait Tokens {
     fn mint(&self, skill: &str, run: &str) -> Result<Minted, String>;
     /// The run ended: its token is refused from now on.
     fn end(&self, run: &str);
+    /// Whether lamp-control's recorded yes for `skill` is for exactly the
+    /// folder hashed `sha256` and `grants`, [`NET_GRANT`] among them: what
+    /// a run granted `net` must have before it keeps the network, since
+    /// the token can't carry `net`. None asked: never.
+    fn net_agreed(&self, _skill: &str, _sha256: &str, _grants: &[String]) -> bool {
+        false
+    }
 }
 
 /// No lamp-control token: every run is refused.
@@ -680,6 +687,21 @@ impl Tokens for ControlTokens {
                 Err("lamp-control's token answer is not one this lamp-tasks reads".into())
             }
         }
+    }
+
+    /// `{"task_yes_check": {"name", "sha256", "grants"}}` on lamp-control's
+    /// admin socket, answered `{"agreed": true}` only for a yes of exactly
+    /// that folder and those grants. The mint already held the yes to the
+    /// folder lamp-control hashed itself and the grants it declares, and a
+    /// skill has one yes, so an agreed check for the line's SHA-256 and
+    /// grants is the owner's yes to `net` for the folder as it is.
+    fn net_agreed(&self, skill: &str, sha256: &str, grants: &[String]) -> bool {
+        grants.iter().any(|grant| grant == NET_GRANT)
+            && self
+                .ask(
+                    &json!({"task_yes_check": {"name": skill, "sha256": sha256, "grants": grants}}),
+                )
+                .is_ok_and(|answer| answer["agreed"] == true)
     }
 
     fn end(&self, run: &str) {
@@ -1006,6 +1028,16 @@ pub fn answer_for(
         .cloned()
         .collect();
     run_on_token(&hand.skill, &asked, false, tokens, runner, |run, token| {
+        // `net` keeps the network only with lamp-control's yes naming it for
+        // this folder as it is (the token can't carry it): never on the
+        // line's word alone.
+        if keeps_net && !tokens.net_agreed(&hand.skill, &hand.sha256, &hand.grants) {
+            return Err(refusal(
+                "no_token",
+                "the owner's yes for this skill's folder as it is doesn't name net, so its run \
+                 doesn't keep the network",
+            ));
+        }
         let mut made = SkillRun::of(
             &hand.skill,
             SkillRun::prompt(&hand),
@@ -3107,9 +3139,15 @@ mod tests {
         /// (run id, token) of each live run.
         live: RefCell<Vec<(String, String)>>,
         ended: RefCell<Vec<String>>,
+        /// Whether lamp-control's yes names `net` for the folder.
+        net_yes: bool,
     }
 
     impl Tokens for FakeTokens {
+        fn net_agreed(&self, _: &str, _: &str, grants: &[String]) -> bool {
+            self.net_yes && grants.iter().any(|grant| grant == NET_GRANT)
+        }
+
         fn mint(&self, skill: &str, run: &str) -> Result<Minted, String> {
             if self.refuse {
                 return Err("the owner hasn't said yes to this skill's task".into());
@@ -3680,6 +3718,23 @@ mod tests {
             wait: Duration::from_secs(5),
         };
         (dir, tokens, served)
+    }
+
+    #[test]
+    fn control_tokens_ask_lamp_control_whether_its_yes_names_net() {
+        let (_dir, tokens, served) = admin(
+            |asked| json!({"agreed": asked["task_yes_check"]["sha256"] == SHA}),
+            2,
+        );
+        let grants = vec!["camera".to_owned(), NET_GRANT.to_owned()];
+        assert!(tokens.net_agreed("photo-booth", SHA, &grants));
+        assert!(!tokens.net_agreed("photo-booth", &"0".repeat(64), &grants));
+        // No `net` in the grants: never asked, never agreed.
+        assert!(!tokens.net_agreed("photo-booth", SHA, &["camera".to_owned()]));
+        assert_eq!(
+            served.join().unwrap()[0],
+            json!({"task_yes_check": {"name": "photo-booth", "sha256": SHA, "grants": ["camera", "net"]}})
+        );
     }
 
     #[test]
@@ -5216,7 +5271,23 @@ mod tests {
     fn the_net_grant_keeps_the_network_and_no_grant_holds_it() {
         assert!(net_on(Some("on")) && !net_on(Some("yes")) && !net_on(None));
         let with_net = line(|value| value["grants"] = json!(["camera", "light", NET_GRANT]));
-        let tokens = FakeTokens::default();
+        // lamp-control's yes doesn't name `net`: refused, nothing run, the
+        // token ended.
+        let no_net_yes = FakeTokens::default();
+        let (held, open) = (where_runner(), where_runner());
+        let agent = Agent {
+            net: Some(&open),
+            work: None,
+        };
+        let told = answer_agent(&with_net, true, skills(), &no_net_yes, &held, &agent);
+        assert_eq!(told["error"], "no_token", "{told}");
+        assert!(open.started.borrow().is_empty() && held.started.borrow().is_empty());
+        assert_eq!(no_net_yes.ended.borrow().len(), 1);
+        assert!(no_net_yes.live.borrow().is_empty());
+        let tokens = FakeTokens {
+            net_yes: true,
+            ..FakeTokens::default()
+        };
         let (held, open) = (where_runner(), where_runner());
         let agent = Agent {
             net: Some(&open),
