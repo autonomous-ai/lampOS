@@ -305,8 +305,14 @@ impl Speaker {
             })
         };
         if let Some(old) = old {
-            // Its thread sees its slot gone and ends, telling why.
-            events(&old.client, ended_event(REPLACED, old.turn));
+            // Told from a thread of its own, never from this one: this runs
+            // under the door's lock (`door.handle`), and the event's journal
+            // line takes that lock again, so told here the door answered
+            // nothing again (lamp-75c9, 13 Nov: a second stream of a client
+            // whose first one played hung lamp-control for 8 minutes). Its
+            // own stream thread sees its slot gone and ends, telling why.
+            let told = events.clone();
+            std::thread::spawn(move || told(&old.client, ended_event(REPLACED, old.turn)));
         }
         let run = Run {
             open: self.open.clone(),
@@ -1227,6 +1233,8 @@ mod tests {
         let rig = rig();
         rig.on(1, "c_1", Some(24_000)).unwrap();
         rig.on(2, "c_2", Some(24_000)).unwrap();
+        // Told from a thread of its own (never under the door's lock).
+        assert!(wait(|| !rig.told_ev("speaker.ended").is_empty()));
         let ended = rig.told_ev("speaker.ended");
         assert_eq!(ended.len(), 1);
         assert_eq!(ended[0]["why"], REPLACED);
