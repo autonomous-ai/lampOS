@@ -763,12 +763,17 @@ pub fn approve(
             json!({ "approved": true, "on": true, "task": task, "next": next })
         }
         // A skill's task (#6305): its grants and folder kept, as said.
-        Ok(_) if waiting.asks.grants.is_some() => {
+        Ok(result) if waiting.asks.grants.is_some() => {
             agreed_in(&waiting.asks.skill, request, now);
             eprintln!(
                 "lamp-voice: request {request}: a skill's task approved on the person's yes (#6305)"
             );
-            json!({ "approved": true, "next": crate::skill_task_yes::APPROVED_NEXT })
+            // An agent skill's first run asked it: run now, as asked.
+            let next = match result["call"].as_str() {
+                Some(tool) => crate::upload_agent::approved_next(tool),
+                None => crate::skill_task_yes::APPROVED_NEXT.to_owned(),
+            };
+            json!({ "approved": true, "next": next })
         }
         Ok(result) => {
             eprintln!(
