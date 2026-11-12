@@ -1971,21 +1971,29 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     read back and the yes started the old task. Now the note reads the
     line's own words: a line that is no plain yes (`plain_yes`), no plain no
     (`services::plain_no`) and holds at least `WHOLE_ASK_FEWEST` (4) ask
-    words (`ask_words`, as #6527's) is a new ask. Its note says a
-    `start_agent_task` with it replaces the task waiting, which will not
-    start, and the task waiting is marked replaced (`SUPERSEDED`; journal
-    `lamp-voice: tasks: request N: a new ask while task <id> waits: …`).
-    With or without `LAMP_TASKS_CORRECT`, the new ask's `start_agent_task`
-    then replaces it and cancels it with the tasks part's `cancel` op, as
-    the correction does, and a yes starts only the new one. A
-    `confirm_agent_task` after the new ask with no new task prepared
-    cancels the old one too and starts nothing (journal `…: a yes after a
-    new ask: task <id> is cancelled, not started`). A yes, a no or a short
-    line ("What was that?") keeps the note as before. Any such line counts,
-    a question that is no work at all too ("What's the weather in Paris
-    tomorrow?"): after it, no yes starts the task that waited. Tests:
+    words (`ask_words`, as #6527's) beside the words of consent
+    (`CONSENT_WORDS`: yes, yeah, yep, yup, sure, ok, okay, go, ahead, do,
+    it, start, begin, send, hand, over, sounds, good, great, fine, please,
+    now, right, away) is a new ask. "Yes, go ahead and start it now.",
+    "Yeah sure, go ahead and do it.", "Yes, sounds good, start it.",
+    "Okay, yes, please start that." and "Yes please, hand it over." are
+    none: each starts the task waiting, with `LAMP_TASKS_ONE_YES` on or off
+    (Heron's P2 on #6572). A new ask's note says a `start_agent_task` with
+    it replaces the task waiting, which will not start. Nothing is marked
+    while the note is built, before the model reads the line: only a
+    `start_agent_task` in the new ask's own request replaces the task
+    waiting, with or without `LAMP_TASKS_CORRECT`, and cancels it then
+    with the tasks part's `cancel` op, as the correction does (journal
+    `lamp-voice: tasks: request N: a corrected or new ask replaces task
+    <id>, which this voice no longer confirms`); a yes after it starts only
+    the new one. Until one does, the task waiting keeps its yes: a question
+    that is no work ("What's the weather going to be like in Hanoi
+    today?"), answered with no call, and then "yes" start it (Heron's P3 on
+    #6572). A yes, a no or a short line ("What was that?") keeps the note
+    as before. Tests:
     `agent_tasks::tests::a_new_ask_while_a_task_waits_replaces_it_and_the_yes_starts_the_new_one`,
-    `agent_tasks::tests::a_yes_after_a_new_ask_never_starts_the_old_task`.
+    `agent_tasks::tests::a_question_while_a_task_waits_leaves_its_yes`,
+    `agent_tasks::tests::a_yes_said_at_length_starts_the_waiting_task`.
   - **No computer in `where` without a pairing (#6547 (1c)).** With no
     computer paired (no staff: the test the description already uses),
     `where`'s `enum` is `["lamp"]` alone and its description never names
