@@ -224,8 +224,11 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             }
         }));
         let act = act.clone();
+        let actions_bus = bus.clone();
         threads.push(spawn_named("volume socket", move || {
-            let _ = voice::serve_actions(&act);
+            if let Err(error) = voice::serve_actions(&act, &actions_bus) {
+                eprintln!("lamp-sim: the volume socket ended: {error}");
+            }
         }));
     }
     // Skill push: the real `lamp-skills asked` on a socket of ours, as systemd's
