@@ -2346,3 +2346,24 @@ cancelled run's done event, first and repeated calls. Measured locally:
 freshness window is separate from reaction time. Tests using authored bus
 events cannot establish acoustic or motor latency; no device run has been
 performed for this carry.
+
+## V1's perception encryption in Rust (#6543)
+
+`lamp-seen` ([seen.md](seen.md)) keeps V1's encryption for the perception
+service so the server is unchanged: RSA-OAEP (SHA-256, MGF1-SHA-256, no
+label) for a random AES-256-GCM session key, a random 12-byte nonce per
+message, tag after the ciphertext, standard Base64, V1's JSON envelopes.
+`ring` cannot RSA-encrypt, so two RustCrypto crates are added:
+
+| Crate | Licence | Why | Failure behaviour |
+|---|---|---|---|
+| `rsa` =0.9.8 (with `num-bigint-dig`, `pkcs1`, `pem-rfc7468`, `rand` 0.8) | MIT OR Apache-2.0 | OAEP encryption of the session key under the server's public key; PEM in SPKI or PKCS#1 form | A key that does not parse, or no randomness, is an error: no session, nothing sent. RUSTSEC-2023-0071 (Marvin, a timing leak in private-key decryption) does not apply: the lamp only encrypts with a public key. |
+| `aes-gcm` =0.10.3 (with `aead`, `ghash`, `polyval`, `ctr`) | Apache-2.0 OR MIT | Each message, AES-256-GCM, its key schedule wiped on drop (`zeroize`) | A tag that does not verify, a nonce not 12 bytes or a misshapen envelope is an error; nothing is passed through as plaintext. |
+
+Proof: tests against vectors made with Python's `cryptography` as V1 uses it
+(the session key opened with OAEP-SHA-256, and the same key and nonce giving
+V1's bytes exactly), round trips through the same test key, and on
+12 November a one-off check that Python opened the key and messages this
+crate sent. Memory: one session key and one cipher per connection; no
+buffer grows with use. Platform: pure Rust, no C; built and tested on the
+Mac, the ARM64 build is the pull request's ARM64 run.
