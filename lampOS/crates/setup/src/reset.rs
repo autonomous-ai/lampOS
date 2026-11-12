@@ -912,7 +912,9 @@ impl Kept<'_> {
 /// ([`harness_hooks`]). Everything else, a
 /// person's `mcp_servers`, `skills.external_dirs`, personality and the
 /// rest, goes; lamp-tasks merges the lamp's provider back in at its next
-/// start. The workspace has no YAML crate, so it is read line by line, as
+/// start, and with `LAMP_AGENT_SERVICES=on` the lamp's own
+/// `mcp_servers.lamp-services` entry too (cut here with the person's, so
+/// nothing a person wrote beside it or into it survives). The workspace has no YAML crate, so it is read line by line, as
 /// lamp-tasks's `hermes_config` reads it, over the block style Hermes and
 /// Harness write. A file it can't read so (not UTF-8, a tab, a document
 /// marker, a top-level line that is not a key, `hooks` twice) is `None`,
