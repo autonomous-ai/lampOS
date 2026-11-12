@@ -4690,6 +4690,250 @@ fn forget_which_id() -> Value {
     })
 }
 
+/// How long a named forget the lamp asked about on a one-face line waits
+/// for the person's yes (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, the PM's cost
+/// ruling on #5627): past it, a yes runs nothing and the thing stays.
+pub const ONE_FACE_FORGET_YES_FOR: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// What the model is told when the forget their yes agreed to finds the
+/// line no longer theirs (another face or voice came in since): nothing was
+/// forgotten, and it is kept (Thirteen's P3 on #6673).
+pub const AGREED_FORGET_NOT_NOW: &str = "Nothing was forgotten: someone else is here now, so I can't forget it just now, and it is still kept. Tell them so in a few words; they can ask again when it is just them.";
+
+/// What a one-face named forget asks to remove, for [`one_kept_of`]: the id
+/// recall gave, or what it is about.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ForgetWant {
+    Id(u64),
+    About(String),
+}
+
+/// The one kept thing of `person`'s that a named `forget` on a line theirs
+/// only by their face alone in view asks to remove, by its id, and the
+/// subject the lamp asks about, in the person's own words (the PM's cost
+/// ruling on #5627): the id recall gave, or what the heard line names
+/// ([`one_face_pick`]). Never the kept text: the speaker was not seen, so
+/// the question must not read out what was kept (the Reviewer-lead's P2 on
+/// #6673). `None`, and the forget is refused as before, for a bare or
+/// unclear forget, a keep-or-deny clause, no days memory, a listing that
+/// fails or may be cut, or anything but exactly one match. The id is
+/// marked shown in their scope, so the forget by id their yes runs is
+/// theirs to forget and never the last kept thing.
+pub fn one_face_forget_target(
+    call: &ToolCall,
+    said: &str,
+    person: &str,
+    lease: &crate::memory_scope::ScopeLease,
+) -> Option<(u64, String)> {
+    // Their yes runs a forget by id, which only a memory taking ids runs
+    // as one: anywhere else it would be the last kept thing.
+    if call.name != FORGET || !forget_all_on() {
+        return None;
+    }
+    let (want, _) = forget_want(call, said)?;
+    let client = DAYS
+        .get()?
+        .as_ref()
+        .filter(|client| client.forget_all.load(Ordering::Acquire))?;
+    let entries = client.kept_listing(person, &want, lease)?;
+    let (id, subject) = one_face_pick(call, said, &entries)?;
+    let line = client.context.lock().ok()?.include(Some(person), &[id]);
+    say(line);
+    Some((id, subject))
+}
+
+/// What a one-face named forget asks to remove, and the subject to ask
+/// about in the person's own words: the heard subject, the model's `about`
+/// when heard, or for an id recall gave the subject the line names. `None`
+/// when the line names nothing.
+fn forget_want(call: &ToolCall, said: &str) -> Option<(ForgetWant, String)> {
+    match pick_forget(call, Some(said), &Recent::default()) {
+        ForgetPick::AsCalled => match call.args.get("source_id").and_then(Value::as_u64) {
+            Some(id) => Some((ForgetWant::Id(id), named_subject(said)?)),
+            None => {
+                let about = call.args.get("about")?.as_str()?.trim().to_owned();
+                Some((ForgetWant::About(about.clone()), about))
+            }
+        },
+        ForgetPick::Named(subject) => Some((ForgetWant::About(subject.clone()), subject)),
+        _ => None,
+    }
+}
+
+/// [`one_face_forget_target`]'s pick from `entries`, `person`'s listing
+/// (id, kept text): the one entry the forget names ([`one_kept_of`]), by
+/// its id, with the subject in their words ([`forget_want`]). The kept text
+/// is only matched, never given back.
+pub fn one_face_pick(
+    call: &ToolCall,
+    said: &str,
+    entries: &[(u64, String)],
+) -> Option<(u64, String)> {
+    let (want, subject) = forget_want(call, said)?;
+    let (id, _) = one_kept_of(entries, &want)?;
+    Some((id, subject))
+}
+
+impl DaysClient {
+    /// `person`'s kept things, by id and text, for [`one_face_pick`]: `None`
+    /// for a failed listing, or one that may be cut when `want` matches by
+    /// what it is about.
+    fn kept_listing(
+        &self,
+        person: &str,
+        want: &ForgetWant,
+        lease: &crate::memory_scope::ScopeLease,
+    ) -> Option<Vec<(u64, String)>> {
+        let list = for_person(
+            json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
+            Some(person),
+        );
+        let answer = exchange_within(
+            &self.socket,
+            &list,
+            crate::tools::ASK_DEADLINE,
+            Some(lease),
+            ABOUT_ANSWER_BYTES,
+        )?;
+        let entries: Vec<(u64, String)> = answer["entries"]
+            .as_array()
+            .filter(|_| answer["ok"] == true)?
+            .iter()
+            .map(|entry| {
+                Some((
+                    entry["id"]
+                        .as_u64()
+                        .filter(|id| *id > 0 && *id <= i64::MAX as u64)?,
+                    entry["text"].as_str()?.to_owned(),
+                ))
+            })
+            .collect::<Option<_>>()?;
+        // A listing that may be cut may miss a second match: by what it is
+        // about, only a whole one picks.
+        let listed: usize = entries.iter().map(|(_, text)| text.len()).sum();
+        if matches!(want, ForgetWant::About(_))
+            && listed.saturating_add(KEPT_TEXT_BYTES) > ABOUT_BYTES
+        {
+            return None;
+        }
+        Some(entries)
+    }
+}
+
+/// The one entry of `entries` (id, text) that `want` names: by id, or the
+/// one whose words have every word of one of its subjects, as a forget
+/// about matches ([`DaysClient::about_matching`]). `None` for none or more
+/// than one.
+pub fn one_kept_of(entries: &[(u64, String)], want: &ForgetWant) -> Option<(u64, String)> {
+    let mut found = entries.iter().filter(|(id, text)| match want {
+        ForgetWant::Id(want) => id == want,
+        ForgetWant::About(about) => {
+            let has = kept_words(text);
+            about_subjects(about).iter().any(|(_, words)| {
+                !words.is_empty()
+                    && words
+                        .iter()
+                        .all(|word| has.iter().any(|kept| about_same(word, kept)))
+            })
+        }
+    });
+    let one = found.next()?;
+    found.next().is_none().then(|| one.clone())
+}
+
+#[cfg(test)]
+mod one_kept_tests {
+    use super::*;
+
+    /// #5627: the question names exactly the kept thing its yes forgets,
+    /// and only it: by what it is about or by id, one match only; two
+    /// matches, or none, ask nothing.
+    #[test]
+    fn a_one_face_forget_names_one_kept_thing_and_leaves_the_rest() {
+        let kept = vec![
+            (3, "My umbrella is blue.".to_owned()),
+            (4, "My bike lock code is 4512.".to_owned()),
+            (5, "Their coffee is black.".to_owned()),
+        ];
+        let about = |about: &str| ForgetWant::About(about.to_owned());
+        assert_eq!(
+            one_kept_of(&kept, &about("umbrella")),
+            Some((3, "My umbrella is blue.".to_owned()))
+        );
+        assert_eq!(
+            one_kept_of(&kept, &about("umbrellas")),
+            Some((3, "My umbrella is blue.".to_owned()))
+        );
+        assert_eq!(
+            one_kept_of(&kept, &ForgetWant::Id(4)),
+            Some((4, "My bike lock code is 4512.".to_owned()))
+        );
+        assert_eq!(one_kept_of(&kept, &about("scarf")), None, "none");
+        assert_eq!(one_kept_of(&kept, &ForgetWant::Id(9)), None, "not listed");
+        let mut two = kept.clone();
+        two.push((6, "The umbrella in the car is red.".to_owned()));
+        assert_eq!(one_kept_of(&two, &about("umbrella")), None, "two: not one");
+    }
+
+    /// The Reviewer-lead's P2 on #6673: the speaker was not seen, so the
+    /// question names the subject in their words and never the kept text.
+    /// "Forget my bike lock code" with "My bike lock code is 4512." kept
+    /// picks that entry's id, and neither the subject nor the held note
+    /// has 4512.
+    #[test]
+    fn the_one_face_question_names_the_subject_never_the_kept_text() {
+        let kept = vec![
+            (3, "My umbrella is blue.".to_owned()),
+            (4, "My bike lock code is 4512.".to_owned()),
+        ];
+        let forget = |args: Value| ToolCall {
+            id: String::new(),
+            name: FORGET.to_owned(),
+            args,
+        };
+        for call in [
+            forget(json!({"about": "bike lock code"})),
+            forget(json!({"source_id": null})),
+        ] {
+            let (id, subject) =
+                one_face_pick(&call, "Lamp, forget my bike lock code.", &kept).unwrap();
+            assert_eq!(id, 4, "{call:?}");
+            assert!(subject.contains("bike lock"), "{subject}");
+            let told = one_face_forget_asks(&subject);
+            assert_eq!(told["forgotten"], false);
+            let held = told["held"].as_str().unwrap();
+            assert!(
+                !held.contains("4512"),
+                "the kept value is never told: {held}"
+            );
+            assert!(!held.contains("My bike lock code is"), "{held}");
+            assert!(held.contains(&format!("about {subject}")), "{held}");
+            assert!(held.contains("30 seconds"), "{held}");
+        }
+        let long = "word ".repeat(200);
+        let held = one_face_forget_asks(&long)["held"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(held.contains('\u{2026}'), "cut");
+    }
+}
+
+/// What the model is told of a named forget on a one-face line held for the
+/// person's yes ([`ONE_FACE_FORGET_YES_FOR`], #5627): ask once about
+/// `subject`, their own words for it, in their language, and stop. Never
+/// the kept text: the speaker was not seen (the Reviewer-lead's P2 on
+/// #6673).
+pub fn one_face_forget_asks(subject: &str) -> Value {
+    json!({
+        "forgotten": false,
+        "held": format!(
+            "Not done yet: I couldn't see who was asking, so this waits for their yes. Ask them once, in a few words and in the language they spoke, whether you should forget what you kept about {} (for example \"Shall I forget what you kept about your bike lock code?\" or \"Mình có nên quên điều đã giữ về mã khóa xe của bạn không?\"), and then stop. Do not say what was kept, its details, or anything you know about it. Only their yes within 30 seconds runs it; a no or nothing keeps it. Do not call forget again for their yes, and do not say it is forgotten.",
+            cut_at_a_word(subject, WHAT_WENT_BYTES)
+        )
+    })
+}
+
 /// A one-face forget by `shown`: an id shown in one scope only goes to that
 /// scope, one shown in both forgets nothing and asks which, and anything
 /// else is [`theirs_then_rooms`].
