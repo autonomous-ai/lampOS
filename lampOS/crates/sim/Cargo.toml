@@ -20,6 +20,8 @@ lamp-ipc = { path = "../ipc" }
 lamp-msgs = { path = "../msgs" }
 serde.workspace = true
 serde_json.workspace = true
+# The developer's voice keys file (keys.rs): the workspace's own toml line, as control, skills and voice have it.
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 # The eyes' own JPEG decoder and encoder: the warped camera picture.
 zune-jpeg = "=0.4.21"
 jpeg-encoder = "=0.7.1"
