@@ -320,6 +320,16 @@ chạy của một kỹ năng có script chạy `curl https://example.com` thì 
 cùng lần chạy được trả lời và lệnh gọi `control.sock` của nó chạy được với
 token.
 
+**Wrapper của mọi engine (#6510 phần 1, bước 1, chưa dùng):** khi lần
+chạy của một kỹ năng đi qua Harness, wrapper chung của lamp-update cho mọi
+engine (docs/install.md, "One agent namespace for every engine") là nơi
+nhận token của lần chạy: khi có `LAMP_RUN_ID` (tên tạm thời), nó đọc
+`/run/lampos-tasks/runs/<run-id>` một lần, xoá tệp, và đưa token cho
+engine dưới dạng `LAMP_CONTROL_TOKEN` chỉ trong môi trường, kèm
+`LAMP_NS_NET=run`; `HOME` của engine là thư mục riêng
+`/var/lib/lampos-agents/<engine>`. Runner của Hermes ở trên giữ nguyên cho
+đến bước 2.
+
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
 Trước đây giọng nói không nói được Harness của đèn đã đăng nhập chưa, hay giao
