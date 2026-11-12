@@ -99,3 +99,42 @@ fn a_round_that_put_a_build_back_keeps_what_it_said_and_a_refusal_said_again_doe
         "a refusal said again keeps no lines"
     );
 }
+
+/// A lamp that fails the same way every round (15 minutes apart) keeps its
+/// lines once, not each round: its end is still written each time. A failure
+/// that says something else keeps its lines again.
+#[test]
+fn a_failure_that_repeats_the_same_lines_keeps_them_once() {
+    use lamp_update::install;
+    let mut lamp = Lamp::new();
+    std::fs::create_dir_all(lamp.root.join(install::SECOND_PATH.trim_start_matches('/'))).unwrap();
+    let second = format!(
+        "{}Environment=LAMP_VOICE_ROUTE=second\nEnvironment=LAMP_VOICE_SECOND_CONFIG={}\n",
+        voice_unit(&"0".repeat(64)),
+        install::SECOND_PATH
+    );
+    lamp.publish(
+        2,
+        &[
+            ("lamp-voice", "voice 2"),
+            ("lamp-turn-end", "turn-end 2"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[("lamp-voice.service", &second)],
+    );
+    for _ in 0..3 {
+        assert!(matches!(lamp.round(), Outcome::Failed(_)));
+    }
+    let kept = kept_lines(&lamp);
+    let failed: Vec<_> = kept.iter().filter(|(event, _)| event == "failed").collect();
+    // The first round installs files and says so; the next two say the same
+    // thing, kept once.
+    assert_eq!(failed.len(), 2, "{kept:?}");
+    assert!(failed[0].1.len() > failed[1].1.len(), "{kept:?}");
+    let ends = log(&lamp)
+        .iter()
+        .filter(|entry| entry["round"] == true && entry["event"] == "failed")
+        .count();
+    assert_eq!(ends, 3, "each round's end is written");
+}
