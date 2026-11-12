@@ -454,6 +454,7 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         rollback_order: None,
         held: None,
         apply_failed: false,
+        lines: Vec::new(),
     };
     if !config.apply {
         // A dry round: the state is only looked at, never kept.
@@ -546,6 +547,8 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     }
     // Before setup, a channel out of reach is a plain line, not a round's
     // end that `update/status` reads back at a restart (#6284).
+    // What the round said, before its end (which `update/status` reads back).
+    run.keep_lines(&outcome);
     if crate::first_update::kept(crate::first_update::before_setup(config), &outcome) {
         run.records
             .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
@@ -589,7 +592,14 @@ struct Run<'r, 'w> {
     /// This round's `apply` of the build's settings failed: a writer not yet
     /// proved is put back after the apply's own undo (crate::writer_swap).
     apply_failed: bool,
+    /// What this round said, kept for [`Self::keep_lines`] (#6266 5b): at most
+    /// [`MOST_LINES`] lines of [`MOST_LINE`] characters.
+    lines: Vec<String>,
 }
+
+/// The most lines of a round kept in the log, and the most characters of each.
+const MOST_LINES: usize = 200;
+const MOST_LINE: usize = 400;
 
 /// A unit as it is to be put back.
 struct Back {
@@ -754,7 +764,41 @@ impl Run<'_, '_> {
     }
 
     fn say(&mut self, line: &str) {
+        if self.lines.len() < MOST_LINES {
+            self.lines.push(line.chars().take(MOST_LINE).collect());
+        }
         (self.world.say)(line);
+    }
+
+    /// Says `line`, and keeps `kept` in its place for [`Self::keep_lines`]:
+    /// for a line that holds text the log must not (a unit's own words).
+    fn say_apart(&mut self, line: &str, kept: &str) {
+        if self.lines.len() < MOST_LINES {
+            self.lines.push(kept.chars().take(MOST_LINE).collect());
+        }
+        (self.world.say)(line);
+    }
+
+    /// What this round said, kept in `log.jsonl` (#6266 5b) for a round that
+    /// changed something or failed, so what lamp-update decided and did is
+    /// there after the journal is gone: the journal is RAM on the product
+    /// lamp and holds about the last 40 minutes, and is empty after a reboot.
+    /// A round that did nothing (up to date, unreachable, nothing published,
+    /// not quiet, a refusal said again) keeps only its end, as before: they
+    /// come every round and say the same.
+    fn keep_lines(&self, outcome: &Outcome) {
+        if matches!(
+            outcome,
+            Outcome::Switched(_)
+                | Outcome::Held { .. }
+                | Outcome::SelfSwitched { .. }
+                | Outcome::Climbs { .. }
+                | Outcome::RolledBack { .. }
+                | Outcome::Failed(_)
+        ) && !self.lines.is_empty()
+        {
+            self.records.log_lines(outcome.kind(), &self.lines);
+        }
     }
 
     fn acting(&mut self) -> Outcome {
@@ -2975,10 +3019,12 @@ impl Run<'_, '_> {
         told: String,
         cut_short: bool,
     ) -> Outcome {
-        self.say(&format!(
-            "putting build {} back: {why}{told}",
-            build.sequence
-        ));
+        // `told` carries a unit's own last journal line: it is said, never
+        // kept in the log (the log keeps `why` alone, as the refusal does).
+        self.say_apart(
+            &format!("putting build {} back: {why}{told}", build.sequence),
+            &format!("putting build {} back: {why}", build.sequence),
+        );
         // A fault of the build is written into the journal before anything
         // is put back, so a start after a cut in the put-back, or before the
         // state below is written, refuses the build as this one would have,
