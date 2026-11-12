@@ -14,8 +14,8 @@ rather than copying them:
 **Status words** used throughout:
 
 - **works today:** on customer lamps, shown on a test lamp running a customer
-  build (10824, 11048, 11091, 11308, 11372, or 11450, the customer build since 10 Nov 2026), with the date;
-- **in today's build, lamp run pending:** in the customer build's code (11091, 11308, 11372 or 11450),
+  build (the stable build: among them 10824, 11048, 11091, 11308, 11372, 11450 since 10 Nov 2026, 12226 since 11:06 on 12 Nov and 12337 since 17:09 on 12 Nov, as the first builder said on #6059, 18:45), with the date;
+- **in today's build, lamp run pending:** in the customer build's code (the stable build today, 12337),
   not yet shown on a lamp;
 - **next build:** built and merged (or in review, with its pull request); comes
   with the next update;
@@ -211,9 +211,9 @@ refusals in the lamp's own words, and its status.
   fails with `code: why`. The words shown are copied from the lamp's code. `…` marks a part
   the lamp fills in, such as a number or a name.
 - **Status** has five words. *Works today* means shown on a test lamp on a customer
-  build (stable 10824, 11048, 11091, 11308, 11372, or 11450, stable since 10 Nov 2026), with the date. *In today's build, lamp run pending* means the code is
-  on customer lamps (11091, 11308, 11372 or 11450) but no run shows it yet. *Next build* means it is on the
-  development branch, not in 11450. *In development* means the lamp refuses it today and says
+  build (the stable build: among them 10824, 11048, 11091, 11308, 11372, 11450 since 10 Nov 2026, 12226 since 11:06 on 12 Nov and 12337 since 17:09 on 12 Nov, as the first builder said on #6059, 18:45), with the date. *In today's build, lamp run pending* means the code is
+  on customer lamps (the stable build today, 12337) but no run shows it yet. *Next build* means it is on the
+  development branch, not in the stable build (12337 today). *In development* means the lamp refuses it today and says
   so. *Planned* means it is named in the protocol but nothing serves it yet.
 - **Every op but `pair` and `hello`** needs `hello` first on the connection (`no_hello`,
   "say hello first"). A missing grant is always `no_grant`, "not granted: …" with the grant's
