@@ -2604,8 +2604,12 @@ const NUMBER_WORDS: [(&str, &str); 24] = [
 /// and the close forms, each matched as a whole run of words, so "open"
 /// in "open the file" stays while "open claw" goes). `compared` is a
 /// number word's digits ([`NUMBER_WORDS`]) or the word's [`stem`]; `said`
-/// is the word as it came, to name it back.
-fn ask_words(text: &str) -> Vec<(String, String)> {
+/// is the word as it came. With `after_name`, only the words after the last
+/// agent's name (or "agent") count: what came before it is often an aside
+/// ("ugh, rough day, anyway have Claude fix the login bug"), and the
+/// refusal must never push the model to send an aside to an agent (#6537,
+/// the Reviewer-lead's privacy read).
+fn ask_words(text: &str, after_name: bool) -> Vec<(String, String)> {
     let words: Vec<String> = text
         .split(|c: char| !c.is_alphanumeric())
         .filter(|word| !word.is_empty())
@@ -2633,10 +2637,17 @@ fn ask_words(text: &str) -> Vec<(String, String)> {
     while at < words.len() {
         if let Some(form) = names.iter().find(|form| words[at..].starts_with(form)) {
             at += form.len();
+            if after_name {
+                found.clear();
+            }
             continue;
         }
         let word = &words[at];
         at += 1;
+        if after_name && matches!(word.as_str(), "agent" | "agents") {
+            found.clear();
+            continue;
+        }
         if NOT_ASK.contains(&word.as_str()) || WHOLE_ASK_PLACES.contains(&word.as_str()) {
             continue;
         }
@@ -2651,8 +2662,8 @@ fn ask_words(text: &str) -> Vec<(String, String)> {
     found
 }
 
-/// The heard request's content words its `task` left out, as they were
-/// said, when the task keeps under [`WHOLE_ASK_SHARE`] of them and the
+/// The heard request's content words (those after the last agent's name,
+/// [`ask_words`]) its `task` left out, when the task keeps under [`WHOLE_ASK_SHARE`] of them and the
 /// request has at least [`WHOLE_ASK_FEWEST`] (#6527); `None` when the task
 /// keeps enough. A plain yes ("yeah sure, go ahead") is never checked: the
 /// task then comes from the read-back before it, not from these words. Nor
@@ -2662,13 +2673,13 @@ fn dropped_from_ask(heard: &str, task: &str) -> Option<Vec<String>> {
     if plain_yes(heard) {
         return None;
     }
-    let asked = ask_words(heard);
+    let asked = ask_words(heard, true);
     if asked.len() < WHOLE_ASK_FEWEST
         || asked.iter().filter(|(_, said)| !said.is_ascii()).count() * 4 > asked.len()
     {
         return None;
     }
-    let kept = ask_words(task);
+    let kept = ask_words(task, false);
     let dropped: Vec<String> = asked
         .iter()
         .filter(|(compared, _)| !kept.iter().any(|(word, _)| word == compared))
@@ -2687,8 +2698,11 @@ static WHOLE_ASK_REFUSED: Mutex<Vec<u64>> = Mutex::new(Vec::new());
 const WHOLE_ASK_KEPT: usize = 8;
 
 /// What `start_agent_task` answers instead of preparing `task` when it
-/// dropped most of the person's ask (#6527): the dropped words named, and
-/// to call again with the whole ask in their words. `heard` is the
+/// dropped most of the person's ask (#6527): that the task looks shorter
+/// than the ask, and to say the whole task again only if part of it was
+/// left out. The dropped words are never named back, and nothing asks for
+/// "every topic they said": the model must not be steered into sending an
+/// aside, or another person's words, to an agent (#6537, privacy read). `heard` is the
 /// request's words as heard; `None` (a typed text, or nothing heard)
 /// checks nothing. Once per request: a second call in the same request is
 /// let through, whatever it keeps.
@@ -2709,14 +2723,15 @@ fn whole_ask(request: u64, heard: Option<&str>, task: &str) -> Option<Value> {
     );
     Some(json!({
         "error": format!(
-            "Nothing was prepared: the task dropped part of what the person asked ({}). Call {START} again now with the whole ask in their own words: what to do, and every count, list, topic, file name or place they said.",
-            dropped.join(", ")
+            "Nothing was prepared: the task looks shorter than what the person asked of the agent. If part of the task was left out (a count, a list or a file name), call {START} again now with the whole task; leave out anything said that is not part of it."
         )
     }))
 }
 
 /// The words heard in `request` for [`whole_ask`]: none for a request
 /// nobody said (the lamp's own, or a typed text, `crate::messages`).
+/// Only the request's own line counts, never the newest words heard, which
+/// may be another utterance's (`thread::heard_in_own_line`, #6537).
 /// Tests set them per test thread ([`HEARD_IN_TEST`]), never from the
 /// process's shared thread, which other tests fill.
 fn heard_ask(request: u64, heard: bool) -> Option<String> {
@@ -2732,7 +2747,7 @@ fn heard_ask(request: u64, heard: bool) -> Option<String> {
         crate::thread::THREAD
             .lock()
             .ok()?
-            .heard_for(request, Instant::now())
+            .heard_in_own_line(request)
     }
 }
 
@@ -5375,8 +5390,9 @@ pub(crate) mod tests {
         )
         .expect("the cut task is refused");
         let error = told["error"].as_str().unwrap();
-        for dropped in ["list", "five", "good", "sick", "write"] {
-            assert!(error.contains(dropped), "{error}");
+        // The dropped words are never named back (#6537, privacy read).
+        for dropped in ["five", "good", "sick", "write", "fruits"] {
+            assert!(!error.contains(dropped), "{error}");
         }
         assert!(error.contains(START), "{error}");
         let whole = "List five fruits that are good when you're sick and write them to fruits.md";
@@ -5424,19 +5440,28 @@ pub(crate) mod tests {
         assert!(
             told["error"]
                 .as_str()
-                .is_some_and(|error| error.contains("dropped part of what the person asked")),
+                .is_some_and(|error| error.contains("looks shorter than what the person asked")),
             "{told}"
         );
         // The second call in the same request goes on to the tasks part.
         let (told, _) = start(6_527_010, true);
-        assert!(!told.to_string().contains("dropped part of what"), "{told}");
+        assert!(
+            !told.to_string().contains("looks shorter than what"),
+            "{told}"
+        );
         // A line the lamp wrote itself is never checked.
         let (told, _) = start(6_527_011, false);
-        assert!(!told.to_string().contains("dropped part of what"), "{told}");
+        assert!(
+            !told.to_string().contains("looks shorter than what"),
+            "{told}"
+        );
         HEARD_IN_TEST.with(|words| *words.borrow_mut() = None);
         // Nothing heard: nothing checked.
         let (told, _) = start(6_527_012, true);
-        assert!(!told.to_string().contains("dropped part of what"), "{told}");
+        assert!(
+            !told.to_string().contains("looks shorter than what"),
+            "{told}"
+        );
     }
 
     /// #6527: a task in other words that keeps the ask's content passes.
@@ -5454,6 +5479,32 @@ pub(crate) mod tests {
                 "Fix the failing login tests in the web app"
             ),
             None
+        );
+    }
+
+    /// #6537, the Reviewer-lead's privacy read: an aside before the agent's
+    /// name is not part of the ask, so a task without it is never refused
+    /// and the model is never asked to send it on.
+    #[test]
+    fn an_aside_before_the_agent_is_not_part_of_the_ask() {
+        for heard in [
+            "ugh, work was rough today, anyway have Claude fix the login bug",
+            "my sister is visiting tomorrow and I'm tired, so ask Codex to fix the tests",
+            "the weather is awful and the train was late again, okay agent, fix the build",
+        ] {
+            assert_eq!(
+                whole_ask(6_537_001, Some(heard), "Fix the login bug"),
+                None,
+                "{heard}"
+            );
+        }
+        // The words after the name still count: a cut task is still refused.
+        assert!(
+            dropped_from_ask(
+                "ugh, long day; anyway have Hermes list five fruits that are good when you're sick and write them to fruits dot md",
+                "Create a file called fruits.md"
+            )
+            .is_some()
         );
     }
 
@@ -5486,7 +5537,7 @@ pub(crate) mod tests {
     #[test]
     fn number_words_and_spoken_file_names_match() {
         let words = |text: &str| -> Vec<String> {
-            ask_words(text)
+            ask_words(text, true)
                 .into_iter()
                 .map(|(compared, _)| compared)
                 .collect()

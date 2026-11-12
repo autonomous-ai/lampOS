@@ -3466,9 +3466,10 @@ file held no fruit. The `task` words above now ask for every part of the
 ask, and `start_agent_task` checks it in code (`agent_tasks::whole_ask`),
 with or without any switch, before the tasks part is asked anything:
 
-- **The heard words.** The request's words as the thread holds them
-  (`thread::heard_for`: the line held at the Live route's first call, or the
-  second route's line). A typed text (`messages::is_text`), a line the lamp
+- **The heard words.** The request's own line only
+  (`thread::heard_in_own_line`: the line held for it, or its exchange's),
+  never the newest words heard since the last answer, which may be another
+  utterance's (#6537). A typed text (`messages::is_text`), a line the lamp
   wrote itself, or a request with nothing heard is not checked. Neither is a
   plain yes (the task then comes from the read-back), nor a line where more
   than a quarter of the content words are not plain ASCII (a Vietnamese ask
@@ -3481,19 +3482,26 @@ with or without any switch, before the tasks part is asked anything:
   knows (`KINDS`), matched as a whole run so "open" in "open the file"
   stays. A number word is its digits ("five" is "5", `NUMBER_WORDS`), so
   "fruits dot md" and "fruits.md" are the same words; others compare by
-  stem.
+  stem. Only the words after the last agent's name (or "agent") count:
+  what comes before it is often an aside ("ugh, work was rough today,
+  anyway have Claude fix the login bug"), and an aside must never be pushed
+  into a task that leaves the lamp (#6537, the privacy read).
 - **The rule.** With at least `WHOLE_ASK_FEWEST` (4) content words heard, a
   task that keeps under `WHOLE_ASK_SHARE` (half) of them is refused:
-  "Nothing was prepared: the task dropped part of what the person asked
-  (list, five, good, sick, write). Call start_agent_task again now with the
-  whole ask in their own words: …". Once per request: a second call in the
+  "Nothing was prepared: the task looks shorter than what the person asked
+  of the agent. If part of the task was left out (a count, a list or a file
+  name), call start_agent_task again now with the whole task; leave out
+  anything said that is not part of it." The dropped words are never named
+  back. Once per request: a second call in the
   same request goes through whatever it keeps, so a person is never stuck.
 
 Tests: `a_task_that_drops_most_of_the_ask_is_refused_then_the_whole_ask_goes`,
 `start_refuses_a_cut_task_before_preparing_it`,
 `a_paraphrase_that_keeps_the_ask_passes`,
 `a_short_heard_ask_is_never_refused`, `no_heard_text_is_never_checked`,
-`number_words_and_spoken_file_names_match`. Not yet played: row-6361c's ask
+`number_words_and_spoken_file_names_match`,
+`an_aside_before_the_agent_is_not_part_of_the_ask`,
+`heard_in_own_line_never_takes_another_utterance`. Not yet played: row-6361c's ask
 on 52e6 reaching Hermes whole, and a voice-eval of 10 spoken asks with a
 list, a count or a file name.
 
