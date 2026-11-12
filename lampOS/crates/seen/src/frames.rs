@@ -18,6 +18,11 @@
 //! Each copy is handed to a [`Sink`]: the one place a frame would go to
 //! the server. In phase 1 that is [`Discard`], and the copy is wiped right
 //! after. Nothing is kept, on disk or in memory, past the step it came in.
+//!
+//! The sink is asked before each request ([`Sink::ready`]) and told when
+//! sending stops ([`Sink::stopped`]): the ring's mark
+//! ([`crate::mark::Marked`]) wraps the sink there, so no frame is asked for
+//! or passed, to `Discard` too, unless the ring said it drew the mark.
 use crate::gate::Closed;
 use lamp_camera::frames::{FrameClient, FrameMeta};
 use lamp_turn_owner::CameraGrant;
@@ -69,7 +74,23 @@ impl Source for FrameClient {
 /// Where a copied frame goes. Its bytes are lent for the call only and
 /// wiped after it.
 pub trait Sink {
-    fn frame(&mut self, meta: &FrameMeta, jpeg: &[u8]);
+    /// Whether a frame may be asked for at `now_us`: what must come first
+    /// (the ring's mark) is in place. Asked each step a request is due; no
+    /// means no request this step.
+    fn ready(&mut self, _now_us: u64) -> bool {
+        true
+    }
+    /// The oldest a frame asked for at `now_us` may be when the camera
+    /// copies it, once [`Sink::ready`] said yes: [`MAX_AGE_US`] at most,
+    /// and at least 1.
+    fn max_age_us(&mut self, _now_us: u64) -> u32 {
+        MAX_AGE_US
+    }
+    /// A frame copied at `now_us`, lent for the call only.
+    fn frame(&mut self, now_us: u64, meta: &FrameMeta, jpeg: &[u8]);
+    /// Sending stopped: the gate closed, the link was lost, the grant
+    /// changed or the process stops. Called again harmlessly.
+    fn stopped(&mut self) {}
 }
 
 /// Phase 1's sink: the frame goes nowhere. Phase 2's sender (encrypted,
@@ -78,7 +99,7 @@ pub trait Sink {
 pub struct Discard;
 
 impl Sink for Discard {
-    fn frame(&mut self, _: &FrameMeta, _: &[u8]) {}
+    fn frame(&mut self, _: u64, _: &FrameMeta, _: &[u8]) {}
 }
 
 /// What one step did.
@@ -89,6 +110,9 @@ pub enum Step {
     Idle,
     /// The gate closed: everything held was dropped.
     Dropped(Closed),
+    /// A frame was due, but the sink is not ready for one (the ring's mark
+    /// not drawn yet): none asked for.
+    NotReady,
     /// A frame was asked for.
     Requested,
     /// A frame was copied and handed to the sink, then wiped.
@@ -154,6 +178,7 @@ impl<S: Source> Taker<S> {
     /// One step at `now_us` under the gate's word for this step.
     pub fn step(&mut self, gate: Result<(), Closed>, now_us: u64, sink: &mut impl Sink) -> Step {
         if let Err(closed) = gate {
+            sink.stopped();
             if !self.holds_anything() {
                 return Step::Idle;
             }
@@ -165,6 +190,7 @@ impl<S: Source> Taker<S> {
             Ok(step) => step,
             Err(_) => {
                 self.drop_everything();
+                sink.stopped();
                 self.counts.lost = self.counts.lost.saturating_add(1);
                 Step::Lost
             }
@@ -179,18 +205,23 @@ impl<S: Source> Taker<S> {
         if let Some(meta) = self.source.poll(&mut self.jpeg)? {
             if self.grant.is_some_and(|kept| kept != meta.grant) {
                 self.drop_everything();
+                sink.stopped();
                 self.counts.grant_changed = self.counts.grant_changed.saturating_add(1);
                 return Ok(Step::GrantChanged);
             }
             self.grant = Some(meta.grant);
-            sink.frame(&meta, &self.jpeg);
+            sink.frame(now_us, &meta, &self.jpeg);
             self.jpeg.zeroize();
             self.next_request_us = now_us.saturating_add(EVERY_US);
             self.counts.handed = self.counts.handed.saturating_add(1);
             return Ok(Step::Handed);
         }
         if self.source.outstanding().is_none() && now_us >= self.next_request_us {
-            self.source.request(MAX_AGE_US)?;
+            if !sink.ready(now_us) {
+                return Ok(Step::NotReady);
+            }
+            let max_age_us = sink.max_age_us(now_us).clamp(1, MAX_AGE_US);
+            self.source.request(max_age_us)?;
             self.counts.requested = self.counts.requested.saturating_add(1);
             return Ok(Step::Requested);
         }
@@ -199,4 +230,4 @@ impl<S: Source> Taker<S> {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

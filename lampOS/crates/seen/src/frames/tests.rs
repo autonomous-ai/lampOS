@@ -13,7 +13,7 @@ fn boot(n: u8) -> BootId {
 
 /// Grants of one controller: `generation` 1 is the first open, each later
 /// one another close and open of the privacy.
-fn grant(generation: u64) -> CameraGrant {
+pub(crate) fn grant(generation: u64) -> CameraGrant {
     let mut controller = Controller::new(boot(1), MonoTime::from_micros(0));
     let mut grant = None;
     for step in 0..generation {
@@ -64,7 +64,7 @@ fn observation(sequence: u64, grant: CameraGrant) -> FrameObservation {
     }
 }
 
-fn meta(grant: CameraGrant) -> FrameMeta {
+pub(crate) fn meta(grant: CameraGrant) -> FrameMeta {
     FrameMeta::new(&observation(1, grant), 1, 1_000)
 }
 
@@ -84,6 +84,7 @@ struct Fake {
     requests: u64,
     frames: VecDeque<io::Result<FrameMeta>>,
     disconnects: u64,
+    max_ages: Vec<u32>,
 }
 
 impl Source for Fake {
@@ -97,9 +98,10 @@ impl Source for Fake {
     fn outstanding(&self) -> Option<u64> {
         self.outstanding
     }
-    fn request(&mut self, _: u32) -> io::Result<u64> {
+    fn request(&mut self, max_age_us: u32) -> io::Result<u64> {
         assert!(self.outstanding.is_none(), "one request at a time");
         assert!(self.connected);
+        self.max_ages.push(max_age_us);
         self.requests += 1;
         self.outstanding = Some(self.requests);
         Ok(self.requests)
@@ -136,7 +138,7 @@ struct Count {
 }
 
 impl Sink for Count {
-    fn frame(&mut self, _: &FrameMeta, jpeg: &[u8]) {
+    fn frame(&mut self, _: u64, _: &FrameMeta, jpeg: &[u8]) {
         self.frames += 1;
         self.bytes += jpeg.len();
     }
@@ -292,4 +294,144 @@ fn through_the_cameras_frame_link() {
     assert_eq!(sink.frames, 1);
     drop(server);
     let _ = std::fs::remove_dir_all(dir);
+}
+
+/// The ring's mark at the sink's boundary (phase 1b): what the frames do
+/// with a [`crate::mark::Marked`] sink around phase 1's [`Discard`]'s place.
+mod marked {
+    use super::*;
+    use crate::mark::{
+        FRESH_US, Marked, WAIT_US,
+        tests::{FakeRing, Inner},
+    };
+
+    /// A frame the camera captured at `at_us`.
+    fn captured(at_us: u64) -> FrameMeta {
+        let mut meta = meta(grant(1));
+        meta.dequeue_completed_at_us = at_us;
+        meta
+    }
+
+    fn taker() -> (Taker<Fake>, Marked<FakeRing, Inner>) {
+        (
+            Taker::new(Fake::default()),
+            Marked::new(FakeRing::default(), Inner::default()),
+        )
+    }
+
+    #[test]
+    fn no_word_from_the_ring_means_no_frame() {
+        let (mut taker, mut sink) = taker();
+        let mut now = 0;
+        while now < 10 * WAIT_US {
+            assert_eq!(taker.step(Ok(()), now, &mut sink), Step::NotReady);
+            now += 100_000;
+        }
+        assert_eq!(taker.source.requests, 0, "nothing asked of the camera");
+        assert!(sink.counts().asked >= 10, "the mark asked again");
+        assert_eq!(sink.counts().passed, 0);
+    }
+
+    #[test]
+    fn the_ring_drawing_the_mark_lets_a_frame_through() {
+        let (mut taker, mut sink) = taker();
+        assert_eq!(taker.step(Ok(()), 0, &mut sink), Step::NotReady);
+        // The ring draws it and says so.
+        ring_of(&mut sink).draws(50_000);
+        assert_eq!(taker.step(Ok(()), 100_000, &mut sink), Step::Requested);
+        assert_eq!(
+            taker.source.max_ages,
+            [50_000],
+            "no frame from before the draw"
+        );
+        taker.source.frames.push_back(Ok(captured(150_000)));
+        assert_eq!(taker.step(Ok(()), 200_000, &mut sink), Step::Handed);
+        assert_eq!(sink.counts().passed, 1);
+        // The next frame waits for its own mark.
+        let next = 200_000 + EVERY_US;
+        assert_eq!(taker.step(Ok(()), next, &mut sink), Step::NotReady);
+        assert_eq!(taker.source.requests, 1);
+    }
+
+    /// The camera's newest frame may be up to `MAX_AGE_US` old when it is
+    /// asked for: one captured before the dot lit is dropped, and the next
+    /// request's, captured inside the blink, passes.
+    #[test]
+    fn a_frame_captured_before_the_mark_lit_is_dropped() {
+        let (mut taker, mut sink) = taker();
+        taker.step(Ok(()), 1_000_000, &mut sink);
+        ring_of(&mut sink).draws(1_020_000);
+        // Not until a frame's time after the draw.
+        assert_eq!(taker.step(Ok(()), 1_030_000, &mut sink), Step::NotReady);
+        assert_eq!(taker.step(Ok(()), 1_100_000, &mut sink), Step::Requested);
+        // The camera is asked for none older than the time since the draw.
+        assert_eq!(taker.source.max_ages, [80_000]);
+        // Were one from 0.4 s before the draw to come all the same: dropped.
+        taker
+            .source
+            .frames
+            .push_back(Ok(captured(1_020_000 - 400_000)));
+        assert_eq!(taker.step(Ok(()), 1_110_000, &mut sink), Step::Handed);
+        assert_eq!(sink.counts().refused, 1);
+        assert_eq!(sink.counts().passed, 0);
+        assert!(taker.jpeg.is_empty(), "wiped all the same");
+    }
+
+    #[test]
+    fn a_frame_whose_mark_went_stale_is_dropped() {
+        let (mut taker, mut sink) = taker();
+        taker.step(Ok(()), 0, &mut sink);
+        ring_of(&mut sink).draws(10);
+        assert_eq!(
+            taker.step(Ok(()), 10 + FRESH_US, &mut sink),
+            Step::Requested
+        );
+        taker.source.frames.push_back(Ok(meta(grant(1))));
+        // The frame comes over a second after the ring last drew the mark.
+        assert_eq!(taker.step(Ok(()), 1_100_000, &mut sink), Step::Handed);
+        assert_eq!(sink.counts().passed, 0);
+        assert_eq!(sink.counts().refused, 1);
+        assert!(taker.jpeg.is_empty(), "wiped all the same");
+    }
+
+    #[test]
+    fn the_mark_is_let_go_when_the_gate_closes_or_the_link_is_lost() {
+        let (mut taker, mut sink) = taker();
+        taker.step(Ok(()), 0, &mut sink);
+        ring_of(&mut sink).draws(10);
+        assert_eq!(
+            taker.step(Ok(()), 10 + FRESH_US, &mut sink),
+            Step::Requested
+        );
+        assert!(sink.holds_mark());
+        assert_eq!(
+            taker.step(Err(Closed::Stranger), 10 + FRESH_US + 10, &mut sink),
+            Step::Dropped(Closed::Stranger)
+        );
+        assert!(!sink.holds_mark(), "let go on the gate's close");
+        assert!(!taker.holds_anything());
+        // Open again: the old word is not the new ask's.
+        let reopened = 10 + FRESH_US + 20;
+        assert_eq!(taker.step(Ok(()), reopened, &mut sink), Step::NotReady);
+        assert_eq!(taker.step(Ok(()), reopened + 10, &mut sink), Step::NotReady);
+        ring_of(&mut sink).draws(reopened + 5);
+        assert_eq!(
+            taker.step(Ok(()), reopened + 5 + FRESH_US, &mut sink),
+            Step::Requested
+        );
+        taker.source.frames.push_back(Err(io::Error::new(
+            io::ErrorKind::UnexpectedEof,
+            "camera closed the frame link",
+        )));
+        assert_eq!(
+            taker.step(Ok(()), reopened + 10 + FRESH_US, &mut sink),
+            Step::Lost
+        );
+        assert!(!sink.holds_mark(), "let go on a lost link");
+        assert_eq!(sink.counts().passed, 0);
+    }
+
+    fn ring_of(sink: &mut Marked<FakeRing, Inner>) -> &mut FakeRing {
+        sink.ring_mut()
+    }
 }
