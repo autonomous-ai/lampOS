@@ -1679,7 +1679,18 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `DONE_ALREADY_TOLD`): on 10538 the yes after a done forget was answered
     with a `recall`, never a `forget`, so the call's check never saw it. A
     done keep or change then backs that turn's "Kept." as a held keep's
-    does; a done forget does not (tests:
+    does; a done forget does not. A yes on a one-face line
+    (`LAMP_PERSON_SCOPE_ONE_FACE`, "told and read as the room's, its keep
+    theirs") looks for the done write in the scope its keep goes to, that
+    person's, when the room's has none (`remember::done_for_yes_in`): on
+    build 10824 (9 Nov, S1 req 390-391) the scarf was kept as theirs and
+    its yes, read as the room's, found none, 5 times in 11. Their keep
+    admitted as theirs (seen speaking) is the same done write for them, so
+    their one-face yes after it is told too. Only a keep or
+    change of theirs, never their forget: it is a note, and a one-face line
+    still forgets and retires nothing (tests:
+    `a_one_face_yes_is_told_its_one_face_keep_is_done_already`,
+    `a_one_face_yes_through_done_already_finds_its_keep`,
     `a_done_write_outlives_a_new_session_for_the_same_scope`,
     `a_yes_after_a_done_write_is_told_it_is_done_before_it_answers`,
     `a_done_write_two_turns_back_is_not_the_yes_last_turn`). The `on` check and the REPLACES journal line use the same words.

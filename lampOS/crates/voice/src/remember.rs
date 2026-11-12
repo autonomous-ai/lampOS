@@ -7203,6 +7203,38 @@ pub(crate) fn done_last_in(lease: Option<&crate::memory_scope::ScopeLease>) -> O
         .done_last_for(person.as_deref())
 }
 
+/// [`done_last_in`] for a yes alone's done-already note
+/// ([`heard::done_already`]). A line that keeps for someone by the
+/// one-face rule (`LAMP_PERSON_SCOPE_ONE_FACE`, "told and read as the
+/// room's, its keep theirs") is narrowed to the room, but its keep is
+/// theirs ([`crate::memory_scope::ScopeLease::reached_by_one_face`]): its
+/// yes looks for their done keep or change, the scope the keep went to, so
+/// the two agree (lamp-06c1, build 10824, 9 Nov, S1 req 390-391: the
+/// scarf kept as theirs, its yes read as the room's, no note). Only when
+/// the line's own scope has none, and never their forget: it is only a
+/// note, and nothing is forgotten or retired by it.
+pub(crate) fn done_for_yes_in(
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<DoneWrite> {
+    let Some(lease) = lease else {
+        return done_last_in(None);
+    };
+    let days = DAYS.get().and_then(Option::as_ref)?;
+    done_for_yes(&*days.context.lock().ok()?, lease)
+}
+
+/// [`done_for_yes_in`] on `context`: the line's own scope's done write, else
+/// its one-face keep's person's keep or change.
+fn done_for_yes(
+    context: &DaysContext,
+    lease: &crate::memory_scope::ScopeLease,
+) -> Option<DoneWrite> {
+    done_last(context, lease.scope()?.person()).or_else(|| {
+        let person = lease.reached_by_one_face(REMEMBER)?;
+        done_last(context, Some(&person)).filter(|(done, _)| *done != MemoryDone::Forgotten)
+    })
+}
+
 impl DaysClient {
     /// [`done_last`] on this client's context.
     fn done_last_for(&self, person: Option<&str>) -> Option<DoneWrite> {
@@ -15087,6 +15119,211 @@ mod tests {
             Some(4),
         ));
         assert_eq!(done_last(&context, Some(MINH)), None);
+    }
+
+    /// lamp-06c1, build 10824, 9 Nov, S1 req 390-391: "My scarf is green."
+    /// kept as theirs by the one-face rule (`LAMP_PERSON_SCOPE_ONE_FACE`),
+    /// then "Yes. Please keep that." on the next turn, a one-face line too,
+    /// read as the room's: the yes looked for the room's done write and was
+    /// never told it is done already. It is told now, by the scope the keep
+    /// went to, so the turn's "Kept." is backed (`kept_now`). Another known
+    /// person's line, a room's line, a one-face line another voice narrowed
+    /// after, and their forget get no note.
+    #[test]
+    fn a_one_face_yes_is_told_its_one_face_keep_is_done_already() {
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let p = person_id("Done One Face P");
+        let key = |request| RequestKey {
+            worker: lamp_turn_owner::BootId::new([53; 16]).unwrap(),
+            session: 1,
+            request,
+        };
+        let now = Instant::now();
+        let mut thread = crate::thread::Thread::new();
+        thread.person("Lamp. My scarf is green.", true, now);
+        thread.lamp(1, "Keeping it — your scarf is green.", now);
+        thread.person("Yes. Please keep that.", true, now);
+        // Req 390: the keep, done for P (as `run_at_guarded` records it).
+        let mut context = DaysContext {
+            last_done: Some((MemoryDone::Kept, Some(p.clone()), Instant::now(), Some(1))),
+            ..DaysContext::default()
+        };
+        // Requests no other test names.
+        let request = |n: u64| u64::MAX - 560_700 - n;
+        // Req 391: the yes, P's by the one-face rule, read as the room's.
+        let yes = RequestScope::new(key(request(1)), ScopeSnapshot::of("Done One Face P"));
+        let lease = yes.lease();
+        assert!(lease.take_by_one_face());
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
+        assert_eq!(lease.kept_by_one_face(), Some(p.clone()), "its keep P's");
+        assert_eq!(
+            done_last(&context, None),
+            None,
+            "the room's: none, as on 06c1"
+        );
+        let done = done_for_yes(&context, &lease);
+        assert_eq!(done, Some((MemoryDone::Kept, Some(1))));
+        let (note, told) = heard::done_already_in(&thread, (2, None, now), done).unwrap();
+        assert!(note.contains(heard::DONE_ALREADY_KEPT), "{note}");
+        assert!(crate::second_provider::done_already_backs_keep(Some(&(
+            note, told
+        ))));
+        // A change done for P is told too.
+        context.last_done = Some((
+            MemoryDone::Changed,
+            Some(p.clone()),
+            Instant::now(),
+            Some(1),
+        ));
+        assert_eq!(
+            done_for_yes(&context, &lease),
+            Some((MemoryDone::Changed, Some(1)))
+        );
+        // Their forget never is: a one-face line's mouth was not seen.
+        context.last_done = Some((
+            MemoryDone::Forgotten,
+            Some(p.clone()),
+            Instant::now(),
+            Some(1),
+        ));
+        assert_eq!(done_for_yes(&context, &lease), None);
+        context.last_done = Some((MemoryDone::Kept, Some(p.clone()), Instant::now(), Some(1)));
+        // Another known person's one-face yes: not P's keep.
+        let other = RequestScope::new(key(request(2)), ScopeSnapshot::of("Done One Face Q"));
+        assert!(other.lease().take_by_one_face());
+        assert_eq!(done_for_yes(&context, &other.lease()), None);
+        // Another known person's yes, admitted as theirs.
+        let seen = RequestScope::new(key(request(3)), ScopeSnapshot::of("Done One Face Q"));
+        assert_eq!(done_for_yes(&context, &seen.lease()), None);
+        // A room's yes, nobody's keep.
+        let room = RequestScope::new(key(request(4)), ScopeSnapshot::room());
+        assert_eq!(done_for_yes(&context, &room.lease()), None);
+        // P's one-face yes another voice narrowed after: the room's.
+        let narrowed = RequestScope::new(key(request(5)), ScopeSnapshot::of("Done One Face P"));
+        assert!(narrowed.lease().take_by_one_face());
+        narrowed.lease().narrow_to_room();
+        assert_eq!(done_for_yes(&context, &narrowed.lease()), None);
+        // Past the held window: none, as before.
+        context.last_done = Some((
+            MemoryDone::Kept,
+            Some(p),
+            Instant::now()
+                .checked_sub(HELD_FORGET_FOR + Duration::from_secs(1))
+                .unwrap(),
+            Some(1),
+        ));
+        assert_eq!(done_for_yes(&context, &lease), None);
+    }
+
+    /// The same 06c1 case (build 10824, S1 req 390-391) through the line's
+    /// own path, [`heard::done_already`], on this process's memory context
+    /// and thread, and the turn's `kept_now` as `second_provider` reads it
+    /// (Thirteen's P2 on #5798): P's keep done, then P's one-face "Yes."
+    /// read as the room's is told it is done already. With the room's
+    /// lookup alone (`done_last_in`) it is told nothing. P's keep admitted
+    /// as theirs, seen speaking, is the same done write for P and is told
+    /// the same way; another known person's one-face yes is not.
+    #[test]
+    fn a_one_face_yes_through_done_already_finds_its_keep() {
+        const CHILD: &str = "LAMP_MEMORY_ONE_FACE_DONE_ALREADY_TEST_CHILD";
+        if std::env::var(CHILD).ok().as_deref() != Some("1") {
+            // The memory context and the thread are this process's; a child
+            // keeps them from every other test.
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "remember::tests::a_one_face_yes_through_done_already_finds_its_keep",
+                    "--nocapture",
+                ])
+                .env(CHILD, "1")
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+            return;
+        }
+        use crate::memory_scope::{RequestKey, RequestScope, ScopeSnapshot};
+        let p = person_id("Done Through P");
+        let key = |request| RequestKey {
+            worker: lamp_turn_owner::BootId::new([54; 16]).unwrap(),
+            session: 1,
+            request,
+        };
+        heard::set_on_for_test(true);
+        // Never reached: the client only holds the done write here.
+        let socket =
+            std::env::temp_dir().join(format!("lv-done-through-{}.sock", std::process::id()));
+        assert!(DAYS.set(Some(DaysClient::new(socket).unwrap())).is_ok());
+        let done_for = |done: MemoryDone, person: &str| {
+            DAYS.get()
+                .and_then(Option::as_ref)
+                .unwrap()
+                .context
+                .lock()
+                .unwrap()
+                .last_done = Some((done, Some(person.to_owned()), Instant::now(), Some(1)));
+        };
+        {
+            let now = Instant::now();
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            *thread = crate::thread::Thread::new();
+            thread.person("Lamp. My scarf is green.", true, now);
+            thread.lamp(1, "Keeping it — your scarf is green.", now);
+            thread.person("Yes. Please keep that.", true, now);
+        }
+        // Req 390: P's keep, done (as `run_at_guarded` records it); req
+        // 391: P's yes, theirs by the one-face rule, read as the room's.
+        done_for(MemoryDone::Kept, &p);
+        let yes = RequestScope::new(key(2), ScopeSnapshot::of("Done Through P"));
+        let lease = yes.lease();
+        assert!(lease.take_by_one_face());
+        assert_eq!(lease.scope(), Some(&ScopeSnapshot::room()));
+        assert_eq!(done_last_in(Some(&lease)), None, "the room's: none");
+        let told = heard::done_already(2, Some(&lease));
+        let (note, done) = told.as_ref().expect("P's one-face yes is told");
+        assert!(note.contains(heard::DONE_ALREADY_KEPT), "{note}");
+        assert_eq!(*done, MemoryDone::Kept);
+        assert!(crate::second_provider::done_already_backs_keep(
+            told.as_ref()
+        ));
+        // P's keep admitted as theirs, seen speaking: the same done write
+        // for P, so P's one-face yes is told it too.
+        let seen = RequestScope::new(key(1), ScopeSnapshot::of("Done Through P"));
+        assert_eq!(
+            seen.lease().scope().and_then(ScopeSnapshot::person),
+            Some(p.as_str())
+        );
+        done_for(MemoryDone::Kept, &p);
+        let told = heard::done_already(2, Some(&lease));
+        assert!(crate::second_provider::done_already_backs_keep(
+            told.as_ref()
+        ));
+        // A change of P's backs "Kept." as well; P's forget is never told.
+        done_for(MemoryDone::Changed, &p);
+        let told = heard::done_already(2, Some(&lease));
+        assert!(
+            told.as_ref()
+                .is_some_and(|(note, _)| note.contains(heard::DONE_ALREADY_CHANGED))
+        );
+        assert!(crate::second_provider::done_already_backs_keep(
+            told.as_ref()
+        ));
+        done_for(MemoryDone::Forgotten, &p);
+        let told = heard::done_already(2, Some(&lease));
+        assert_eq!(told, None);
+        assert!(!crate::second_provider::done_already_backs_keep(
+            told.as_ref()
+        ));
+        // Another known person's one-face yes: not P's keep.
+        done_for(MemoryDone::Kept, &p);
+        let other = RequestScope::new(key(3), ScopeSnapshot::of("Done Through Q"));
+        assert!(other.lease().take_by_one_face());
+        assert_eq!(heard::done_already(2, Some(&other.lease())), None);
     }
 
     /// lamp-06c1, build 10538, 6 Nov (S1 req 271, S6 311, S13 339): a keep,

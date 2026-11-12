@@ -14138,6 +14138,15 @@ async fn said_not_done(
         .await
 }
 
+/// Whether a yes's done-already note ([`crate::remember::heard::done_already`])
+/// backs its turn's "Kept." (`kept_now`), as a held keep's does: a done keep
+/// or change does, a done forget does not.
+pub(crate) fn done_already_backs_keep(
+    done_already: Option<&(String, crate::remember::MemoryDone)>,
+) -> bool {
+    done_already.is_some_and(|(_, done)| *done != crate::remember::MemoryDone::Forgotten)
+}
+
 /// Chat, speech and the turn's last events, for the person's `said`, with
 /// the picture of a look (`looking`). The picture goes in this request only,
 /// never into the thread or a later turn's history.
@@ -14842,10 +14851,7 @@ async fn answer(
         if let Some((note, _)) = &done_already {
             messages.push(Message::system(note.clone()));
         }
-        let mut kept_now = held_keep_ran
-            || done_already
-                .as_ref()
-                .is_some_and(|(_, done)| *done != crate::remember::MemoryDone::Forgotten);
+        let mut kept_now = held_keep_ran || done_already_backs_keep(done_already.as_ref());
         // A forget invalidates earlier memory-keep evidence, while completed
         // non-memory actions may still have their content-free confirmation.
         let mut confirmed_other_call = false;

@@ -422,7 +422,8 @@ pub(crate) fn done_already(
         return None;
     }
     // Read before the thread is locked, as [`yes_alone`] does.
-    let done = super::done_last_in(lease)?;
+    // A one-face line's yes, the scope its keep went to (#5607 on 06c1).
+    let done = super::done_for_yes_in(lease)?;
     let thread = crate::thread::THREAD.lock().ok()?;
     done_already_in(
         &thread,
