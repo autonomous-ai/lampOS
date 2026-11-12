@@ -10122,9 +10122,8 @@ async fn spoken(
         .chain(linked)
         // A made skill's sends since the last told (#6066), once each.
         .chain(crate::skill_writes_told::note_for(request))
-        // A made skill with code of its own said back from the app's make,
-        // waiting for its yes (#6307): its id, as no call of this route's
-        // told it.
+        // A skill said back and waiting for its yes (#6066, #6305, #6307):
+        // its id, as this route's history keeps no call's answer.
         .chain(crate::skill_write_yes::waiting_note(
             request,
             Instant::now(),
