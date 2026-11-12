@@ -63,6 +63,8 @@ mod product_carrier;
 mod product_companions;
 #[path = "round/recover_start.rs"]
 mod recover_start;
+#[path = "round/reset_hold.rs"]
+mod reset_hold;
 #[path = "round/restart_order.rs"]
 mod restart_order;
 #[path = "round/restart_quiet.rs"]

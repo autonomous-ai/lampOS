@@ -799,6 +799,25 @@ each under the quiet rule. A round
    `Wants=`, `Requires=` and `PartOf=` do not themselves establish order.
    This orders restart calls, not service readiness or health (step 9).
 
+   **A reset under way, or the lamp just booted (#6266, `reset_hold.rs`):**
+   no switch while lamp-setup's reset journal (`/var/lib/lampos-setup/reset.json`)
+   is there **and the setup marker (`/var/lib/lampos-setup/done`) is not**, or the
+   journal is under 60 s old: setup writes the journal first, removes it only when
+   the wipe is done, and removes the marker right after writing it, so in a real
+   reset the two sit together for milliseconds. A journal beside the marker that
+   is not new is no reset (a failed unlink of the marker, which `reset` reports
+   and leaves the lamp running, or a restore; `lamp-setup serve`, which would
+   remove it, never runs on a lamp whose marker is there): the round says so and
+   goes on, so it can never hold a lamp for good. A journal dated ahead (a clock
+   that jumped) has no age and is not new. The round also does not switch in the
+   first 180 s after the boot (`/proc/uptime`; one that can't be read holds
+   nothing; and not for the first update after setup, #6284, which is wanted
+   right after the boot's setup and would be lost, so only the journal holds it),
+   when setup's recovery of a cut reset may still be running.
+   The round ends `not switched: …` (status 4, `not-quiet`), nothing is refused,
+   and the next round looks again. Looked at before the fetch and again after
+   the quiet wait, before anything is written.
+
    **The setup walk under way (#3689, `walk.rs`):** a build with changes
    is not fetched while the person is being walked through onboarding.
    Under way means setup is done (`/var/lib/lampos-setup/done`) and the
@@ -1361,7 +1380,7 @@ only a self-switch or a climb goes to the journal's form, before its `exec`.
 | `up to date: build N` | `up-to-date` | nothing to do |
 | `nothing changed: …` | `unreachable`, `nothing-published` | the channel couldn't be read, or has no build |
 | `refused, nothing switched: …` | `refused` | the build isn't taken. `…: build N needs updater M or newer, and this is updater K; …` (`TooOld::why`) means **no climb**: `LAMP_UPDATE_SELF` off, the build not newer, its updater put back before, or its updater not this channel's (each ends `…; waiting for a newer updater`); or the build carries none (`…; it carries no lamp-update, so waiting for a build that does`) |
-| `not switched: …` | `not-quiet` | tried again next round: `no quiet moment in S s: …`, `the setup walk is under way: held, round R of 8`, or `another lamp-update is at work` |
+| `not switched: …` | `not-quiet` | tried again next round: `no quiet moment in S s: …`, `the setup walk is under way: held, round R of 8`, `a reset of the lamp may be under way …`, `the lamp booted N s ago: no switch in its first 180 s …`, or `another lamp-update is at work` |
 | `switched to build N; every part is well` | `switched` | the parts switched and the watch passed |
 | `switched to build N and kept; held: <unit> held, nothing moves: <why>` | `held` | the parts switched and the watch passed, one unit held as it was before the switch (#6113, step 9): the build is kept, the hold needs a person (unplug.md); the cloud alert tells it as `done` |
 | `build N runs; lamp-update switches from its build A to B, which must confirm itself` | `self-switched` | a new updater, after the parts switched and their watch passed (or with none to change). That round writes this end instead of `switched to build N; every part is well`. It does so whenever the build carries a lamp-update other than the running one, as 8999 → 9063 did (lamp-9adf, 30 Oct): lamp-update's own code was unchanged, but it embeds the product's units, and `lamp-voice.service` changed. Builds are reproducible, so between builds whose lamp-update is the same (9101 to 9118) the end is `switched …`. A promote spans many builds, so it mostly ends this way: 9 of the 10 stable promotes since 8327 changed lamp-update, and 8545 kept 8525's |
@@ -1415,6 +1434,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `the journal cannot be marked with why build N is put back: …` | a put-back for a fault of the build left the journal, and its reason couldn't be written into it: the next start would take it for a cut-short |
 | **What the build brings** | |
 | `build … was put back while a part was held by a passing local state; after … it is tried once more` | a build refused as `held` (a kept unplug request, #6266) after 24 hours or on another boot than it was refused on: its refusal is dropped and the round goes on; one more try, a refusal of it again is final |
+| `/var/lib/lampos-setup/reset.json is beside the setup marker and is not new: a failed unlink or a restore left it, not a reset, so it holds nothing` | a reset journal over 60 s old with the setup marker there (#6266): said, and the round goes on |
 | `lamp-update.service is not carried by rounds; its installed unit is kept` | a new product build is planned and the installed updater unit is a regular file; policy only, since the manifest has no candidate text for it |
 | `… is kept: only comments, blank lines or trailing whitespace differ` | a carried unit has such text differences and the plan leaves it unchanged; never for a unit being rewritten with a binary or setting change |
 | `installed … beside …` | each new folder, a self-switch's or a climb's updater too |
