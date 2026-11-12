@@ -948,8 +948,8 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     let openclaw = {
         use lamp_update::{harness_install::product, openclaw_install as openclaw};
         let acts = config.apply && command == "serve";
-        // On by this build's default on a product lamp (PRODUCT_DEFAULT true: the lamp's
-        // default engine under Harness); LAMP_OPENCLAW_ON_LAMP=off turns it off, and
+        // On by this build's default on a product lamp (PRODUCT_DEFAULT true: beside Hermes,
+        // the default engine, under Harness, #6498); LAMP_OPENCLAW_ON_LAMP=off turns it off, and
         // another lamp needs `on`. Its skills switch is read the same way.
         let product = acts && product::product_lamp(&config.root, &config.on(&config.units));
         let wanted = openclaw::wanted(
