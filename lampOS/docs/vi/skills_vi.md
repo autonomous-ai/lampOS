@@ -529,7 +529,19 @@ sau:
      đồng ý gắn với package đã cài), nội dung chính xác các lần ghi của nó,
      giữ cạnh nó trong index (`made_skill::writes_of`), chờ trong bộ nhớ
      120 s với một `approve_id` được đưa cho mô hình, không bao giờ chính
-     việc đồng ý. Nếu lời tiếp theo của người dùng đồng ý, bằng bất kỳ lời
+     việc đồng ý. Lịch sử của route thứ hai không giữ câu trả lời của lời
+     gọi nào, nên mỗi dòng nghe được sau đó được báo id ấy trong một ghi
+     chú khi nó còn chờ (`skill_write_yes::waiting_note`, mọi lần chờ: của
+     một lần tạo bằng giọng nói, một lần đọc lại, một task và code của một
+     lần tạo từ app như nhau; hàng 4 của #6223 trên 9adf thấy lời đồng ý
+     "found nothing waiting" khi thiếu nó). Lời đồng ý của mọi lần chờ chỉ
+     là của chủ nhân, như lần gửi của một lần chạy kỹ năng: ngoài phòng
+     riêng, chủ nhân được thấy nói ra hoặc bằng giọng của chủ nhân ở mức
+     `same_voice::SERVICES_SAME_FROM` (`services::owners_yes_now`); của bất
+     kỳ ai khác là `services::OTHER_VOICE`, lần chờ bị bỏ và không có gì
+     được duyệt (`make_skill_local::not_owners_yes_refused`, P1 của Heron
+     trên #6558). Khi bật `LAMP_PRIVATE_ROOM` (sản phẩm), mọi dòng nghe
+     được là của chủ nhân, nên ở đó mọi lời đồng ý nghe được đều tính. Nếu lời tiếp theo của người dùng đồng ý, bằng bất kỳ lời
      nào (mô hình phán đoán, như #6009 để mô hình phán đoán lệnh gửi một
      thư đang chờ), mô hình gọi `make_skill` chỉ với id đó; khi đó chính
      giọng nói gọi `skill_write_approve` (`services::skill_write_approve`,
@@ -707,7 +719,7 @@ sau:
      thấy nói ra hoặc bằng giọng của chủ nhân ở mức
      `same_voice::SERVICES_SAME_FROM` (`services::owners_yes`); của bất kỳ
      ai khác là `services::OTHER_VOICE`, cơ chế chờ bị bỏ và kỹ năng vẫn
-     tắt (`make_skill_local::app_code_yes_refused`). Khi bật, mọi dòng
+     tắt (`make_skill_local::not_owners_yes_refused`). Khi bật, mọi dòng
      nghe được là của chủ nhân, như trước.
      Bằng giọng nói, lần tạo chờ lời đồng ý qua đúng cơ chế chờ của lần ghi
      (`crate::skill_write_yes`, `Asks::code`), với mọi chốt chặn của nó:

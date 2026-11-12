@@ -2893,7 +2893,18 @@ gone ([switches.md](switches.md)). What happens:
      approval binds the installed package), its writes' exact contents,
      kept beside it in the index (`made_skill::writes_of`), wait in memory
      for 120 s with an `approve_id` the model is given, never the
-     approval itself. If the person's next words agree, in any words (the
+     approval itself. The second route's history keeps no call's answer,
+     so each later heard line is told that id in a note while it waits
+     (`skill_write_yes::waiting_note`, every wait: a voice make's, a
+     read-back's, a task's and an app make's code alike; #6223's row 4 on
+     9adf found the yes "found nothing waiting" without it). Every wait's
+     yes is the owner's only, as a skill run's write's send is: outside
+     the private room the owner seen saying it or in the owner's voice at
+     `same_voice::SERVICES_SAME_FROM` (`services::owners_yes_now`); anyone
+     else's is `services::OTHER_VOICE`, the wait is dropped and nothing is
+     approved (`make_skill_local::not_owners_yes_refused`, Heron's P1 on
+     #6558). With `LAMP_PRIVATE_ROOM` on (the product) any heard line is
+     the owner's, so any heard yes counts there. If the person's next words agree, in any words (the
      model judges, as #6009 has a waiting mail's send judged), the model
      calls `make_skill` with only that id; the voice itself then calls
      `skill_write_approve` (`services::skill_write_approve`, the one place
@@ -3066,7 +3077,7 @@ gone ([switches.md](switches.md)). What happens:
      in the owner's voice at `same_voice::SERVICES_SAME_FROM`
      (`services::owners_yes`); anyone else's is
      `services::OTHER_VOICE`, its wait is dropped and the skill stays off
-     (`make_skill_local::app_code_yes_refused`). On, any heard line is
+     (`make_skill_local::not_owners_yes_refused`). On, any heard line is
      the owner's, as before.
      By voice, the make waits for the yes through the write's very wait
      (`crate::skill_write_yes`, `Asks::code`), with every guard of it: said

@@ -91,9 +91,10 @@ pub struct Waiting {
     /// The lamp's words in each request from the make's on, and whether
     /// that answer was cut.
     pub said: VecDeque<(u64, String, bool)>,
-    /// Its id is told in a note to each later heard line
-    /// ([`waiting_note`]): a wait the voice's model began with no call of
-    /// its own (an app's make with code, #6307, [`wait_for_yes_noted`]).
+    /// A wait the voice's model began with no call of its own (an app's
+    /// make with code, #6307, [`wait_for_yes_noted`]). Every wait's id is
+    /// told in [`waiting_note`] alike, and every wait's yes is the owner's
+    /// only (`make_skill_local::not_owners_yes_refused`).
     pub noted: bool,
 }
 
@@ -179,48 +180,52 @@ fn rand_u32(skill: &str, request: u64, now: Instant) -> u32 {
     hasher.finish() as u32
 }
 
-/// The note a later heard line `request` is told at `now` of a wait begun
-/// by [`wait_for_yes_noted`]: the skill said back waits for the person's
-/// yes, and how to take it ([`then_wait`]'s words). None for any other
-/// wait, none waiting, or past [`YES_WITHIN`].
+/// The note a later heard line `request` is told at `now` of the wait:
+/// the skill said back waits for the person's yes, and how to take it
+/// ([`then_wait`]'s words). Every wait, as the second route's history keeps
+/// no call's answer, so the id a make or a read-back told is gone by the
+/// next line (#6223's row 4 on 9adf, 12 Nov: "a made skill's yes found
+/// nothing waiting" three times). None in the wait's own request, none
+/// waiting, or past [`YES_WITHIN`]; the yes keeps every guard of
+/// [`approve`].
 pub fn waiting_note(request: u64, now: Instant) -> Option<String> {
     kept::waiting(|waiting| {
         let waiting = waiting.as_ref().filter(|waiting| {
-            waiting.noted
-                && request > waiting.request
-                && now.saturating_duration_since(waiting.at) <= YES_WITHIN
+            request > waiting.request && now.saturating_duration_since(waiting.at) <= YES_WITHIN
         })?;
+        let before = if waiting.asks.code {
+            "before it runs any code"
+        } else if waiting.asks.grants.is_some() {
+            "before its task runs"
+        } else {
+            "before it sends anything"
+        };
         Some(format!(
             "(For you to know, not to answer: the skill {} that the lamp just said back waits \
-             for their yes before it runs any code, approve_id \"{}\". If they agree, in any \
-             words, call make_skill with only that approve_id. If they decline, wait or change \
-             it, don't call it: it stays off.)",
+             for their yes {before}, approve_id \"{}\". If they agree, in any words, call \
+             make_skill with only that approve_id. If they decline, wait or change it, don't \
+             call it: it stays off.)",
             crate::made_skill::spoken_name(&waiting.asks.skill),
             waiting.id
         ))
     })
 }
 
-/// Whether the wait `id` is one begun by [`wait_for_yes_noted`].
-pub fn noted(id: &str) -> bool {
-    kept::waiting(|waiting| {
-        waiting
-            .as_ref()
-            .is_some_and(|waiting| waiting.noted && waiting.id == id)
-    })
+/// Whether the wait `id` is the one waiting: a voice make's, a read-back's,
+/// a task's or an app make's code alike.
+pub fn waits(id: &str) -> bool {
+    kept::waiting(|waiting| waiting.as_ref().is_some_and(|waiting| waiting.id == id))
 }
 
-/// The wait `id`, begun by [`wait_for_yes_noted`], dropped: its yes was
-/// not the owner's (#6307). Whether one was.
-pub fn drop_noted(id: &str) -> bool {
+/// The wait `id` dropped: its yes was not the owner's (Heron's P1 on
+/// #6558, as #6307's for the app's code make). Whether one was.
+pub fn drop_wait(id: &str) -> bool {
     kept::waiting(|waiting| {
-        let noted = waiting
-            .as_ref()
-            .is_some_and(|waiting| waiting.noted && waiting.id == id);
-        if noted {
+        let waits = waiting.as_ref().is_some_and(|waiting| waiting.id == id);
+        if waits {
             *waiting = None;
         }
-        noted
+        waits
     })
 }
 
@@ -558,6 +563,50 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .contains("anyone can see what it posts in acme/site")
+        );
+    }
+
+    /// #6223's row 4 on 9adf (12 Nov): a voice make's wait, whose id only
+    /// the make's call answer told, is noted on each later heard line, so
+    /// the next line's yes can name it; a task's and code's say which.
+    #[test]
+    fn every_wait_is_noted_on_the_lines_after_it() {
+        let now = Instant::now();
+        let id = said_back("leaving-mail", &[mail()], 4, now);
+        assert!(waiting_note(4, now).is_none());
+        let next = waiting_note(5, now).unwrap();
+        assert!(next.contains(&format!("approve_id \"{id}\"")), "{next}");
+        assert!(next.contains("before it sends anything"), "{next}");
+        let told = approve(&id, 5, true, true, now, |_| {
+            Ok(json!({"approved": 1, "public": []}))
+        });
+        assert_eq!(told["approved"], true, "{told}");
+        assert!(waiting_note(6, now).is_none());
+        // Past YES_WITHIN: no note.
+        let id = said_back("leaving-mail", &[mail()], 7, now);
+        assert!(waiting_note(8, now + YES_WITHIN + Duration::from_secs(1)).is_none());
+        assert!(waiting_note(8, now).unwrap().contains(&id));
+        let task = Asks {
+            grants: Some(vec!["camera".to_owned()]),
+            writes: Vec::new(),
+            ..asks("desk-watch", &[])
+        };
+        wait_for_yes(task, 9, now);
+        assert!(
+            waiting_note(10, now)
+                .unwrap()
+                .contains("before its task runs")
+        );
+        let code = Asks {
+            code: true,
+            writes: Vec::new(),
+            ..asks("desk-watch", &[])
+        };
+        wait_for_yes(code, 11, now);
+        assert!(
+            waiting_note(12, now)
+                .unwrap()
+                .contains("before it runs any code")
         );
     }
 
