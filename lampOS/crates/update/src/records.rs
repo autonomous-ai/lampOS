@@ -61,6 +61,14 @@ pub struct Refusal {
     /// it from `why`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
+    /// The boot it was refused on, when the kernel said one: a `held`
+    /// refusal gets one more try on another boot (#6266, [`State::lapse_held`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boot_id: Option<String>,
+    /// This refusal is of a build already tried once more after a `held` one:
+    /// final.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub retried: bool,
 }
 
 impl Refusal {
@@ -125,6 +133,11 @@ pub struct State {
     /// different build starts it again. Absent from a state written before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cut_short: Option<CutShort>,
+    /// Builds whose `held` refusal was lapsed and tried once more (#6266): a
+    /// refusal of one of them is final, so a passing local state that comes
+    /// back is not retried for ever. Absent from a state written before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub held_retried: Vec<u64>,
     /// Fields a later build wrote that this one does not know: kept as
     /// they were across a save, for that build to read again (#1505).
     #[serde(flatten)]
@@ -132,6 +145,43 @@ pub struct State {
 }
 
 impl State {
+    /// How long a `held` refusal stands before its one more try.
+    pub const HELD_RETRY_AFTER_MS: u64 = 24 * 60 * 60 * 1000;
+
+    /// A refusal because a part was held by a passing local state (a kept
+    /// unplug request, `held`) is no fault of the build: it gets one more try
+    /// after 24 hours or on another boot than the one it was made on
+    /// (#6266). Its refusal is dropped and said as `Some(why it is lapsed)`;
+    /// the build is noted in `held_retried`, so a refusal of it again is
+    /// final. A real fault (`part_unwell`, `cut_short`, `other`), a refusal
+    /// already tried once more, one made now on this boot, and a boot not
+    /// known never lapse.
+    pub fn lapse_held(
+        &mut self,
+        sequence: u64,
+        now_ms: u64,
+        boot: Option<&str>,
+    ) -> Option<&'static str> {
+        let refusal = self.refusal(sequence)?;
+        if refusal.reason() != "held" || refusal.retried || self.held_retried.contains(&sequence) {
+            return None;
+        }
+        let day = now_ms.saturating_sub(refusal.at_unix_ms) >= Self::HELD_RETRY_AFTER_MS;
+        let reboot = matches!((&refusal.boot_id, boot), (Some(then), Some(now)) if then != now);
+        let after = if reboot {
+            "a reboot"
+        } else if day {
+            "24 hours"
+        } else {
+            return None;
+        };
+        self.refused.retain(|refusal| refusal.sequence != sequence);
+        self.held_retried.push(sequence);
+        let extra = self.held_retried.len().saturating_sub(MOST_REFUSED);
+        self.held_retried.drain(..extra);
+        Some(after)
+    }
+
     /// The owner's retry (#6266): the refusal of `sequence` dropped, so the next
     /// round takes the build again. Whether there was one.
     pub fn forget_refusal(&mut self, sequence: u64) -> bool {
@@ -164,17 +214,24 @@ impl State {
     }
 
     pub fn refuse(&mut self, build: &Build, why: &str) {
-        self.refuse_as(build, why, None);
+        self.refuse_as(build, why, None, None);
     }
 
-    /// [`Self::refuse`] with the fixed name for the app ([`Refusal::reason`]).
-    pub fn refuse_as(&mut self, build: &Build, why: &str, kind: Option<&str>) {
+    /// [`Self::refuse`] with the fixed name for the app ([`Refusal::reason`])
+    /// and the boot it happened on. A build's earlier refusal is replaced, and
+    /// one of a build whose `held` refusal was already given its one more try
+    /// is final ([`State::lapse_held`]).
+    pub fn refuse_as(&mut self, build: &Build, why: &str, kind: Option<&str>, boot: Option<&str>) {
+        self.refused
+            .retain(|refusal| refusal.sequence != build.sequence);
         self.refused.push(Refusal {
             sequence: build.sequence,
             commit: build.commit.clone(),
             why: why.to_owned(),
             at_unix_ms: unix_ms(),
             kind: kind.map(str::to_owned),
+            boot_id: boot.map(str::to_owned),
+            retried: self.held_retried.contains(&build.sequence),
         });
         let extra = self.refused.len().saturating_sub(MOST_REFUSED);
         self.refused.drain(..extra);
@@ -745,8 +802,14 @@ mod tests {
             installed: Some(build.clone()),
             ..State::default()
         };
-        for _ in 0..40 {
-            state.refuse(&build, "why");
+        for sequence in 0..40 {
+            state.refuse(
+                &Build {
+                    sequence,
+                    commit: "c".repeat(40),
+                },
+                "why",
+            );
         }
         assert_eq!(state.refused.len(), MOST_REFUSED);
         records.save_state(&state).unwrap();
@@ -890,6 +953,8 @@ mod tests {
             }),
             refused: vec![Refusal {
                 kind: None,
+                boot_id: None,
+                retried: false,
                 sequence: 4573,
                 commit: "c902a95cf".into(),
                 why: "lamp-voice.service was not well within a minute".into(),
@@ -910,6 +975,7 @@ mod tests {
             )]
             .into(),
             cut_short: None,
+            held_retried: Vec::new(),
             later: Default::default(),
         };
         let journal = Journal {

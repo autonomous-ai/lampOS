@@ -456,8 +456,9 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         apply_failed: false,
     };
     if !config.apply {
-        let state = run.records.peek_state();
-        return match run.look(&state) {
+        // A dry round: the state is only looked at, never kept.
+        let mut state = run.records.peek_state();
+        return match run.look(&mut state) {
             Ok((manifest, changes, placing))
                 if changes.is_empty()
                     && run.placings.is_empty()
@@ -786,7 +787,7 @@ impl Run<'_, '_> {
             Ok(state) => state,
             Err(error) => return Outcome::Failed(format!("the state cannot be read: {error}")),
         };
-        let (manifest, mut changes, placing) = match self.look(&state) {
+        let (manifest, mut changes, placing) = match self.look(&mut state) {
             Ok(found) => found,
             Err(outcome) => return outcome,
         };
@@ -939,7 +940,10 @@ impl Run<'_, '_> {
 
     /// Steps 2 to 5: what the newest build would change here, or why
     /// nothing will.
-    fn look(&mut self, state: &State) -> Result<(Manifest, Vec<Change>, Option<Placing>), Outcome> {
+    fn look(
+        &mut self,
+        state: &mut State,
+    ) -> Result<(Manifest, Vec<Change>, Option<Placing>), Outcome> {
         let url = format!("{}{}", self.config.channel_url, manifest::ENVELOPE);
         let mut envelope = Vec::new();
         match self
@@ -975,6 +979,17 @@ impl Run<'_, '_> {
                     manifest.sequence, installed.sequence
                 )));
             }
+        }
+        // A build put back while a part was held by a passing local state is no
+        // fault of its own: one more try after 24 hours or a reboot (#6266).
+        let boot = crate::own::boot_id(&self.config.root);
+        if let Some(after) =
+            state.lapse_held(manifest.sequence, records::unix_ms(), boot.as_deref())
+        {
+            self.say(&format!(
+                "build {} was put back while a part was held by a passing local state; after {after} it is tried once more",
+                manifest.sequence
+            ));
         }
         if let Some(refusal) = state.refusal(manifest.sequence) {
             return Err(Outcome::Refused(format!(
@@ -2970,7 +2985,12 @@ impl Run<'_, '_> {
         }
         if !cut_short {
             let kind = refusal_kind(&why, failed);
-            state.refuse_as(build, &why, Some(kind));
+            state.refuse_as(
+                build,
+                &why,
+                Some(kind),
+                crate::own::boot_id(&self.config.root).as_deref(),
+            );
         } else {
             let times = state.count_cut_short(build);
             if times >= CUT_SHORTS_REFUSE {
@@ -2979,6 +2999,7 @@ impl Run<'_, '_> {
                     build,
                     &format!("{why}, {times} times in a row"),
                     Some("cut_short"),
+                    crate::own::boot_id(&self.config.root).as_deref(),
                 );
             } else {
                 self.say(&format!(
