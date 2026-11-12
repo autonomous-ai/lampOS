@@ -1454,6 +1454,10 @@ pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
 /// for the person's yes (`crate::agent_tasks::pending_note`): with its
 /// request, to the note or nothing.
 pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
+/// A heard line's plain no to a task this voice prepared and read back
+/// (`crate::agent_tasks::declined`, #6582): with its request and words, the
+/// task dropped and the note it gets, or nothing.
+pub type TaskDeclined = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// The note a spoken line gets from its own words: at setup, a line that
 /// spells the person's name is told the read-back to say, the name as a
 /// word (`crate::onboarding::spelled_name_note_now`, #5580 row 2).
@@ -1801,6 +1805,8 @@ struct Shared {
     name_fired: Option<NameFired>,
     /// With the tasks part: the note that a prepared task waits for a yes.
     task_waiting: Option<TaskNote>,
+    /// With the tasks part: a heard plain no drops the task waiting (#6582).
+    task_declined: Option<TaskDeclined>,
     /// With the setup walk: a line that spells the person's name, told how
     /// to say it back ([`Engine::noting_a_spelled_name`]).
     spelled_name: Option<WordsNote>,
@@ -4515,6 +4521,7 @@ impl Engine {
                 name_sounded: None,
                 name_fired: None,
                 task_waiting: None,
+                task_declined: None,
                 spelled_name: None,
                 air: None,
                 seems: None,
@@ -6276,6 +6283,17 @@ impl Engine {
     pub fn noting_a_task_waiting(mut self, note: TaskNote) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_waiting = Some(note);
+        }
+        self
+    }
+
+    /// A heard line that says a plain no to a task this voice prepared and
+    /// read back drops it at once (`declined`, with the tasks part, #6582):
+    /// no later yes starts it, and the line is told so in place of
+    /// [`Engine::noting_a_task_waiting`]'s note. Before any turn only.
+    pub fn declining_a_task_waiting(mut self, declined: TaskDeclined) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.task_declined = Some(declined);
         }
         self
     }
@@ -10007,10 +10025,12 @@ async fn spoken(
     // yes is taken as a new hand-over (#1712).
     // And a write read back and waiting for its "send", with what it holds
     // (#5962): never asked for again.
+    // A plain no to a task read back drops it at once (#6582).
     let waiting = shared
-        .task_waiting
+        .task_declined
         .as_ref()
-        .and_then(|note| note(request))
+        .and_then(|declined| declined(request, &text))
+        .or_else(|| shared.task_waiting.as_ref().and_then(|note| note(request)))
         // A plain no to a skill run's write read back drops it at once
         // (#6432).
         .or_else(|| crate::services::run_declined(request, &text))
