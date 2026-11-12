@@ -1177,6 +1177,54 @@ mỗi người đã biết được gửi qua relay tới mô hình một lần 
 những gì qua được kiểm tra, từng mục một. Không nói hay hiện gì; nhật ký chỉ
 có số đếm.
 
+## Chương tuần (B2, `LAMP_MEMORY_WEEKLY_CHAPTERS`, C109)
+
+Kế hoạch trích xuất của người phụ trách trí nhớ, B2, sau lượt ban đêm B: mỗi
+tuần một lần, một chương ngắn về tuần địa phương (thứ Hai đến Chủ nhật) của
+một người đã biết, do cùng luồng ban đêm viết từ những gì lượt B đã kiểm tra
+và giữ trong tuần đó. Chương không bao giờ đọc một lượt trao đổi; nó dẫn các
+mục nó dựa vào (`crates/memory/src/chapters.rs`, `nightly.rs` của voice).
+
+- **Khi nào:** `LAMP_MEMORY_WEEKLY_CHAPTERS=on` của voice, cùng với
+  `LAMP_MEMORY_NIGHTLY=on` (tắt nếu không đặt). Mỗi người đã biết được nghe
+  trong một tuần được xếp hàng cho tuần đó (chỉ trong bộ nhớ, như các ngày);
+  sau khi các ngày của đêm đó xong, một tuần đã qua được một lần gọi, trong
+  cùng giờ, yên lặng, công tắc riêng tư và ngân sách đêm như một ngày. Tuần
+  được bỏ sau lần gọi, hoặc 7 ngày sau Chủ nhật của nó.
+- **`weekly_prepare`** `{"person","week"}` (`week` là một thứ Hai,
+  `YYYY-MM-DD`, của một tuần đã qua; nếu không thì `bad_day`): các tập,
+  sự kiện, việc sắp tới, khuôn mẫu và cảm xúc hiện hành của người đó có ngày
+  trong tuần, theo thứ tự ngày, tối đa 48 mục và 24 KiB; ít hơn 2 là
+  `"reason":"nothing"`. Tuần đã có chương là `done`. Việc chỉ giữ id
+  (`nightly_weeks`), không bao giờ giữ chữ, và mất sau một ngày.
+- **`weekly_apply`** `{"person","job","proposal"}`: `{"chapter":{"text",
+  "cites"}}` của đề xuất được kiểm tra: `shape` (trống, quá 600 byte, ký tự
+  điều khiển, dẫn rỗng, quá 16, lặp), `unknown_source` (dẫn ngoài việc),
+  `forgotten` (một mục việc đã đưa, được dẫn hay không, đã mất từ lúc chuẩn
+  bị), `grounded` (dưới một
+  phần ba từ nội dung có trong các mục được dẫn: mô hình tóm tắt, không thêm
+  gì), `private_kind` (kiểm tra từ sức khoẻ và tiền bạc của lượt ban đêm,
+  trừ khi mọi mục được dẫn dựa trên một điều được giữ), `full`, `done`.
+- **Lưu** như một quan sát `entries` (`category='chapter'`, ngày là Chủ nhật
+  của tuần) với dòng `nightly_items` (`kind='chapter'`, hết hạn 90 ngày sau
+  Chủ nhật) và các cạnh `sources` tới mọi mục việc đã đưa, được dẫn hay
+  không (mô hình đã đọc hết, nên chữ của nó có thể kể một mục nó không dẫn).
+  Không phai, không nhường chỗ, và một mục bên dưới hết hạn thì không kéo nó
+  theo: nó đóng vào ngày của nó, hoặc khi bị quên. Một tập nằm dưới một
+  chương còn hiệu lực không phai khi chương còn sống, nên một nguồn có thể
+  sống quá hạn phai của chính nó tối đa bằng tuổi của chương.
+- **`chapters`** `{"person","day_from","day_to"}`: các chương của người đó
+  có tuần chạm khoảng ngày, mới nhất trước, tối đa 2 và 1.200 byte. Voice
+  chỉ hỏi khi một người đã biết tự hỏi lại về một ngày hay một khoảng ngày,
+  và đưa các chương lên đầu như bản tóm tắt của chính họ. Chương không bao
+  giờ vào ghi chú phiên, nên không lượt nào có lời nhắc dài thêm.
+- **Riêng tư:** chỉ phạm vi riêng của một người đã biết: phòng chung, phạm vi
+  quy tắc và người lạ là `bad_person` ở cả ba lệnh. Quên bất cứ thứ gì chương
+  đã được đưa, dù chương có dẫn hay không, sẽ xoá chương; `forget_all` và `forget_person` xoá mọi chương và
+  việc tuần của người đó. Không nói hay hiện gì; nhật ký voice chỉ có số đếm.
+- **Tắt:** không gửi lệnh tuần hay `chapters`; không có dòng chương nào, mọi
+  câu trả lời giữ nguyên từng byte. lamp-memory cũ trả lời `unknown_op`.
+
 ## Đầu dò của bộ đo (#4748)
 
 Bộ đo bộ nhớ (`docs/memory-bench.md`) chạy một tháng qua chính client Days của

@@ -5,6 +5,7 @@
 //! [`store`] is the files, [`protocol`] is what is asked of them and
 //! answered, one JSON line each way, and [`server`] is the socket the lines
 //! travel on.
+pub mod chapters;
 pub mod days;
 pub mod days_protocol;
 pub mod forgot;
