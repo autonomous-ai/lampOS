@@ -120,6 +120,28 @@ coord_red_checks_jq='[(.statusCheckRollup // [])[]
      c: (if .__typename == "StatusContext" then .state else .conclusion end)}
   | select(.s == "COMPLETED" and .c != "SUCCESS" and .c != "SKIPPED" and .c != "NEUTRAL")]
   | if length == 0 then "ok" else "red " + (map(.n) | join(", ")) end'
+# coord_arm64_green_jq: over the same JSON, "ok" when the PR's own ARM64 run is there and all green: its (build) and
+# (release) jobs and every shard (k/N), one N, at least one shard, each COMPLETED with SUCCESS; else "waiting <what>".
+# 12 Nov (#6556, train 841): #6572's head had no ARM64 pull_request run at the cut, and its release job went red after.
+coord_arm64_green_jq='[(.statusCheckRollup // [])[] | select((.name // "") | startswith("lampOS — build and test on Linux ARM64 ("))
+  | {j: (.name | capture("\\((?<j>[^()]*)\\)$").j), ok: (.status == "COMPLETED" and .conclusion == "SUCCESS")}] as $a
+  | [$a[] | .j | select(test("^[0-9]+/[0-9]+$"))] as $sh
+  | ([$sh[] | split("/")[1]] | unique) as $n
+  | [ (if any($a[]; .j == "build") then empty else "no (build)" end),
+      (if any($a[]; .j == "release") then empty else "no (release)" end),
+      (if ($n | length) == 1 and ($sh | unique | length) == ($n[0] | tonumber) then empty else "shards " + ($sh | join(",") | if . == "" then "none" else . end) end),
+      ($a[] | select(.ok | not) | "(\(.j)) not green") ]
+  | if length == 0 then "ok" else "waiting " + join(", ") end'
+# coord_arm_takes COMMIT [LAMP_VOICE]: true when the ARM64 run takes a file COMMIT changes from its merge base with
+# LAMP_VOICE (default origin/lamp-voice), by lampos-arm64.yml's pull_request paths at COMMIT, as merge-when-green.sh
+# reads them. Fails closed (true) when the files or the paths can't be read. Leaves the caller's coord_*_pats alone.
+coord_arm_takes() {
+  local b files f; local -a coord_arm_pats coord_sdk_pats
+  b=$(git merge-base ${2:-origin/lamp-voice} $1 2>/dev/null) && files=$(git diff --no-renames --name-only $b $1 2>/dev/null) && [[ -n $files ]] || return 0
+  coord_inputs_init $1; (( ${#coord_arm_pats} )) || return 0
+  for f in ${(f)files}; do coord_takes $f coord_arm_pats && return 0; done
+  return 1
+}
 
 # coord_head PR: prints the PR's head sha, or fails when it can't be read or its head is in another repository
 # (a fork's PR is never carried, whatever its markers say).
