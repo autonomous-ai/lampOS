@@ -1255,7 +1255,15 @@ fn serve(
         sample_clock(&mut engine, &runner, clock::now_us());
         while let Ok(event) = done.try_recv() {
             let skill = event.skill.clone();
+            let unwritten = lamp_skills::service_write::waiting(&event.why);
             publish(&mut out, event);
+            // A write waiting for the owner's yes made nothing: what its
+            // start spent is given back (#6066, lamp-9adf 12 Nov).
+            if unwritten && engine.unwritten(&skill) {
+                eprintln!(
+                    "lamp-skills: {skill} sent nothing: its group's hour, cooldown, day's count and rest are given back"
+                );
+            }
             // A trigger's run that said nothing gives its place in its
             // group's hour back, where the group says so (#5207).
             if runs.unsaid(&skill)
