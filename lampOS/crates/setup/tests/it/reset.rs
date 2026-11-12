@@ -3079,6 +3079,18 @@ fn a_reset_cuts_the_agents_kept_settings_to_the_lamps_keys() {
             .unwrap()
             .ends_with("hooks:\n  on_session_start:\n  - command: \"harness hook hermes session-start\"\n    timeout: 10\n")
     );
+    // LAMP_AGENT_SERVICES: a person's MCP server goes, and so does the lamp's
+    // own `lamp-services` entry beside it, with every token-shaped value in
+    // either; lamp-tasks merges the lamp's back at its next start with the
+    // switch on (`hermes_config::merge_config_for`), before any Hermes runs.
+    let servers = b"mcp_servers:\n  mine:\n    command: /home/me/mcp\n    env:\n      KEY: T0K3N\n  lamp-services:\n    command: \"/opt/lampOS/services/current/lamp-services\"\n    args:\n    - \"mcp\"\n    env:\n      LAMP_CONTROL_SOCKET: \"${LAMP_CONTROL_SOCKET}\"\n      LAMP_CONTROL_TOKEN: \"${LAMP_CONTROL_TOKEN}\"\n";
+    let cut = reset::cut_hermes_config(servers).unwrap();
+    assert_eq!(cut, only_lamp);
+    let cut = String::from_utf8(cut).unwrap();
+    assert!(
+        !cut.contains("mcp_servers") && !cut.contains("T0K3N"),
+        "{cut}"
+    );
     // Without hooks, only the lamp's settings; a file not read is removed.
     assert_eq!(
         reset::cut_hermes_config(b"personality: pirate\n").unwrap(),
