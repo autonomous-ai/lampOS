@@ -2286,8 +2286,15 @@ for each run, and is answered once the run ends
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; that folder not there
   is `run_failed` with nothing started. Its environment is only `PATH`,
   `HOME`, `HERMES_HOME` and `SHELL` (as lamp-tasks.service gives them),
-  `LAMP_NS_NET=run` (below), and the run's `LAMP_CONTROL_SOCKET` and `LAMP_CONTROL_TOKEN`; nothing else of
-  lamp-tasks' own. The token is never an argument, and the run's output
+  `LAMP_NS_NET=run` (below), `PYTHONPATH=/usr/local/lib/lampos/sdk-python`
+  (#6507), and the run's `LAMP_CONTROL_SOCKET` and `LAMP_CONTROL_TOKEN`; nothing else of
+  lamp-tasks' own. `PYTHONPATH` is where lamp-update puts the build's own
+  Python SDK (docs/install.md, "Hermes on the lamp"), so a made skill's
+  script can `from lampos import Lamp` and `await Lamp.local(token)` with
+  `LAMP_CONTROL_TOKEN` over `LAMP_CONTROL_SOCKET`. The SDK needs
+  `websockets` and `cryptography`: Hermes's own Python has both (its bin
+  folder comes first on the run's `PATH`); the lamp's `/usr/bin/python3` has
+  `cryptography` only. The token is never an argument, and the run's output
   goes nowhere, not into the journal. The run is its own process group,
   killed whole at its deadline (14 minutes); exit status 0 is
   `{"ok":true,"id":0}` (the status: there is no Harness task number), any

@@ -223,8 +223,15 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; thư mục đó không có thì
   là `run_failed` và không khởi động gì. Môi trường chỉ có `PATH`, `HOME`,
   `HERMES_HOME` và `SHELL` (như lamp-tasks.service cho), `LAMP_NS_NET=run`
-  (bên dưới), cùng `LAMP_CONTROL_SOCKET` và `LAMP_CONTROL_TOKEN` của lần chạy; không gì khác
-  của chính lamp-tasks. Token không bao giờ là đối số, và đầu ra của lần
+  (bên dưới), `PYTHONPATH=/usr/local/lib/lampos/sdk-python` (#6507), cùng
+  `LAMP_CONTROL_SOCKET` và `LAMP_CONTROL_TOKEN` của lần chạy; không gì khác
+  của chính lamp-tasks. `PYTHONPATH` là nơi lamp-update đặt SDK Python của
+  chính bản build (docs/install.md, "Hermes on the lamp"), nên script của
+  một kỹ năng tự làm có thể `from lampos import Lamp` và
+  `await Lamp.local(token)` với `LAMP_CONTROL_TOKEN` qua
+  `LAMP_CONTROL_SOCKET`. SDK cần `websockets` và `cryptography`: Python
+  riêng của Hermes có cả hai (thư mục bin của nó đứng đầu `PATH` của lần
+  chạy); `/usr/bin/python3` của đèn chỉ có `cryptography`. Token không bao giờ là đối số, và đầu ra của lần
   chạy không đi đâu cả, không vào nhật ký. Lần chạy là một nhóm tiến trình
   riêng, bị kill cả nhóm ở hạn chót (14 phút); mã thoát 0 là
   `{"ok":true,"id":0}` (chính mã thoát: không có số việc của Harness), mã

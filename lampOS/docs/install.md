@@ -1671,7 +1671,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      lamp's programs (`/usr`, `/opt/lampOS`); no lamp service's `/run` or
      `/var/lib` folder (no socket, no state, no credential), no
      `/etc/lampOS`, no camera, mic, serial, I2C, SPI or GPIO device and no
-     lamp process. A test (`no_lampos_service_folder_is_visible_to_hermes`)
+     lamp process. `/usr` is left as it is, so a run sees it read-only.
+     **The SDK beside them** (#6507): lamp-update carries the build's own
+     Python SDK (`lampos`, with `Lamp.local`) inside its binary and, on
+     every round and install, writes it to
+     `/usr/local/lib/lampos/sdk-python/lampos/` (root-owned, folders 0755,
+     files 0644, each written whole, only when changed). No network fetch;
+     one copy for any agent engine. A skill's run finds it through
+     `PYTHONPATH` (docs/tasks.md, "The lamp's runner"). A test (`no_lampos_service_folder_is_visible_to_hermes`)
      reads every `RuntimeDirectory=`, `StateDirectory=` and
      `ReadWritePaths=` under `/run` or `/var/lib` of the product units run
      as `lampos`, and the tmpfiles folders made `lampos`'s, and fails if

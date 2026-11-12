@@ -330,7 +330,9 @@ A skill that carries code (a `do.task` run, lamp-tasks) reaches the lamp's hardw
 A skill's script on the lamp connects with the SDK, not by hand. `Lamp.local(token)` (Python `await Lamp.local(token)`,
 JS `await Lamp.local(token)`) connects to `LAMP_CONTROL_SOCKET` (default `/run/lampos-control/control.sock`) with the
 token (default `LAMP_CONTROL_TOKEN`, which lamp-tasks puts in the run's environment); `lamp.run` is the run's id and
-`lamp.skill` its skill. No pairing, no certificate pin: the socket's owner check and the token are the trust. The fake
+`lamp.skill` its skill. On the lamp the Python SDK is the build's own: lamp-update writes it to
+`/usr/local/lib/lampos/sdk-python/lampos/` and a skill's run gets `PYTHONPATH=/usr/local/lib/lampos/sdk-python`
+(#6507; docs/tasks.md, "The lamp's runner"), so the script needs no install. No pairing, no certificate pin: the socket's owner check and the token are the trust. The fake
 lamps serve it too (`FakeLamp(local=True)` and `mint_token`/`mintToken`, `end_run`/`endRun`), with the refusals above
 (a missing or ended token `no_grant`; `pair`, a token on the TLS door, and a real client id or signature beside the token `bad_request`).
 
