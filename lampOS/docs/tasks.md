@@ -462,8 +462,12 @@ refusal), and nothing is started new in any case:
     this computer's own id, which Harness starts work under while signed
     out (`session_index::forget_machines`). Signed in or offline, it keeps
     every one.
+  - Unpaired: each read of the account's machines (`Cli::machines`) lets
+    the sessions of a machine no longer listed go, since it was unpaired
+    in the app. The listed machines and this computer's own id stay.
   - Tests: `tests/harness.rs`
-    `signed_out_the_account_machines_sessions_are_let_go`;
+    `signed_out_the_account_machines_sessions_are_let_go`,
+    `an_unpaired_machines_sessions_are_let_go`;
     `tests/session_index.rs` `forgetting_machines_keeps_only_those_kept`;
     `tests/harness.rs`
     `an_older_session_not_listed_is_found_by_its_name_through_the_index`,

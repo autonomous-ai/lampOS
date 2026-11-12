@@ -1174,8 +1174,13 @@ của giọng nói và `lamp-tasks --reply-named`):
     riêng của máy này, là id Harness dùng để chạy việc khi chưa đăng nhập
     (`session_index::forget_machines`). Khi đã đăng nhập hoặc offline, index
     giữ hết.
+  - Khi gỡ ghép đôi: mỗi lần đọc danh sách máy của tài khoản
+    (`Cli::machines`), index bỏ các session của máy không còn trong danh sách,
+    vì máy đó đã bị gỡ ghép đôi trong app. Các máy còn trong danh sách và id
+    riêng của máy này vẫn được giữ.
   - Test: `tests/harness.rs`
-    `signed_out_the_account_machines_sessions_are_let_go`;
+    `signed_out_the_account_machines_sessions_are_let_go`,
+    `an_unpaired_machines_sessions_are_let_go`;
     `tests/session_index.rs` `forgetting_machines_keeps_only_those_kept`;
     `tests/harness.rs`
     `an_older_session_not_listed_is_found_by_its_name_through_the_index`,
