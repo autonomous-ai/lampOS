@@ -875,7 +875,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_TASK_NEWS_RETELL` | If you talk over the lamp telling you a task finished, it tells you once more when the room is quiet. |
 | `LAMP_TASKS_NOW` | You can ask how any of your agents' recent work is going, or if one finished, and hear it at once. |
 | `LAMP_TASKS_HARNESS_STATUS` | You can ask if the lamp's Harness is signed in, and which of your computers and agents it can hand work to. |
-| `LAMP_TASKS_ONE_YES` | The lamp prepares a task for your computer before it reads it back. One yes to a read-back is enough with it off too. |
+| `LAMP_TASKS_ONE_YES` | The lamp prepares a task for your computer before it reads it back. |
 | `LAMP_TASKS_REPLY_NAMED` | Name or describe earlier work on your computer ("the survey one") to open it, check it or add to it. |
 | `LAMP_UNPLUG` | You can ask the lamp to fold up for unplugging; it says when it's done, and "never mind" undoes it. |
 | `LAMP_PEEK` | A developer can open the lamp's live status page, by a one-time link, from a browser on the same Wi-Fi. |
