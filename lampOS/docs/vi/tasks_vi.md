@@ -944,6 +944,23 @@ tạo (`do.write`, docs/skills.md) như một lượt chạy
   `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
   `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
 
+### Lần chạy của kỹ năng agent và quyền `net` (`LAMP_UPLOAD_TO_AGENT`, `LAMP_TASK_NET`, tắt)
+
+Người xây dựng đầu tiên đồng ý lúc 19:44 (12/11), cả hai công tắc tắt và
+không đặt trong unit nào; xây trên đường `skill_make` của #6643, để chuyển
+sang runner chung của #6510 bước 2 mà không cần luật mới.
+
+- **`net`** (`skill_task::NET_SWITCH`): một quyền của lần chạy, không phải
+  của lamp-control. Lần chạy có `net` đi qua runner của lần tạo, giữ mạng
+  (`skill_make::lamp_runner(home, false)`); lần khác vẫn `LAMP_NS_NET=run`.
+  lamp-control giữ `net` trong lời đồng ý nhưng không bao giờ đặt nó vào
+  token. Tắt: `net` bị từ chối trước khi có token.
+- **Lần chạy của kỹ năng agent** (`run` = `scripts/SKILL.md`): Hermes được
+  bảo đọc tệp đó và làm theo, chỉ chạm tới đèn qua `control.sock` với token
+  của lần chạy, không bao giờ hỏi khóa hay token bằng giọng nói. Nó bắt đầu
+  trong một thư mục mới `agent-<run id>` (0700), bị xóa khi kết thúc. Môi
+  trường chỉ có socket, token và đường dẫn SDK: không có khóa.
+
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
 Trước đây giọng nói không nói được Harness của đèn đã đăng nhập chưa, hay giao

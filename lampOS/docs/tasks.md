@@ -3344,6 +3344,36 @@ docs/skills.md) as a run (`skill_task::WriteHandOver`, `answer_with`):
   `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
   `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
 
+### An agent skill's run and the `net` grant (`LAMP_UPLOAD_TO_AGENT`, `LAMP_TASK_NET`, off)
+
+The first builder's yes at 19:44 (12 Nov), both switches off and set in no
+unit. Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
+one runner (a fresh home per run, the token as a file) with no new rules:
+
+- **`net`** (`skill_task::NET_SWITCH`, `LAMP_TASK_NET=on` in lamp-tasks,
+  lamp-skills and its manage helper, lamp-control and lamp-voice): a task
+  grant beside lamp-control's own (`NET_GRANT`). A hand-over whose grants
+  name it runs through the make's runner with its network kept
+  (`skill_make::lamp_runner(home, false)`: Hermes's namespace, no
+  `LAMP_NS_NET`); any other stays `LAMP_NS_NET=run`. lamp-control keeps
+  `net` in the owner's yes and checks it with the folder's declared
+  grants, but never names it in the token (`task_yes::KeptYes`), so the
+  minted grants are matched against the line's without it. Off, `net` is
+  refused as an unknown grant (`bad_request`) before any token.
+- **An agent skill's run** (`run` = `scripts/SKILL.md`,
+  `AGENT_INSTRUCTIONS`): Hermes is told to read that file in the skill's
+  read-only folder and do what it says, as data, reaching the lamp only
+  through `control.sock` with the run's own token, never asking anyone for
+  a key or token by voice nor saying one aloud. It starts in a fresh
+  folder of its own, `agent-<run id>` in the work folder, 0700, removed
+  however the run ends (`skill_make::fresh_folder`, a make's folder's
+  rule). Its environment is lamp-tasks' cleared one, the control socket,
+  the token and the SDK's path: no key. `admin.sock` is never shown in
+  Hermes's namespace.
+
+Tests: `skill_task::tests::the_net_grant_keeps_the_network_and_no_grant_holds_it`,
+`an_agent_run_follows_its_file_in_a_fresh_folder_with_no_key`.
+
 ## Devin (#1854)
 
 `devin` is Devin's own terminal program on the person's computer, which
