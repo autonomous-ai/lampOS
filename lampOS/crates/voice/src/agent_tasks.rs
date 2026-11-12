@@ -5423,6 +5423,19 @@ pub(crate) mod tests {
         assert_eq!(whole_ask(6_527_002, Some(FRUITS_HEARD), whole), None);
     }
 
+    /// #6527, the owner's bound: a request is refused at most once. A second
+    /// call in it goes through even if it is still cut short, so a person is
+    /// never stuck; another request is checked afresh.
+    #[test]
+    fn a_second_call_in_the_same_request_is_never_refused() {
+        let request = 6_527_101;
+        let cut = "Create a file called fruits.md";
+        assert!(whole_ask(request, Some(FRUITS_HEARD), cut).is_some());
+        assert_eq!(whole_ask(request, Some(FRUITS_HEARD), cut), None);
+        assert_eq!(whole_ask(request, Some(FRUITS_HEARD), cut), None);
+        assert!(whole_ask(6_527_102, Some(FRUITS_HEARD), cut).is_some());
+    }
+
     /// #6527: the refusal comes from `start_agent_task` itself, before the
     /// tasks part is asked anything, and only for a heard request.
     #[test]
