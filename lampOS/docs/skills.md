@@ -979,7 +979,7 @@ when to call it and when not. A skill's is `SKILL.md`'s `when` front-matter
 line; a `[stop]` function's is the `[stop]` `when` of the skill whose
 `about` is told (the first in order); `stay_plugged_in`'s is
 `unplug::STAY_WHEN`. Each is at most 200 bytes (`WHEN_MOST_BYTES`), and a
-longer one refuses the skill at load. It says when to call and when not,
+longer one is left out with a journal line (the skill loads as without one, so the switch off changes nothing). It says when to call and when not,
 and any rule on what the lamp says or doesn't say as it makes the call,
 since a realtime model often speaks in the turn it calls (the first
 builder's ruling); nothing else. The voice lists it in place of the

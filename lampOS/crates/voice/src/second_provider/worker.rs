@@ -12558,7 +12558,13 @@ pub(crate) fn texts_ends(
         // the Reviewer-lead's P3 on #4629).
         let offered = crate::tools::skill_tools(&told);
         let mut skills = if told.use_skill {
-            crate::use_skill::section(&offered, &crate::tools::core_skills(&told))
+            // `when` lines as on a spoken turn, so a skill is told whole
+            // once, in its answer (Twelve's P3 on #6521).
+            crate::use_skill::section_told(
+                &offered,
+                &crate::tools::core_skills(&told),
+                &crate::tools::skill_whens(&told),
+            )
         } else {
             String::new()
         };

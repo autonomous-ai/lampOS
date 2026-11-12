@@ -45,7 +45,7 @@ One more is read when there: `when`, one line of at most 200 bytes saying
 only when the model calls the skill's tool and when not, and any rule on
 what the lamp says as it calls. With `LAMP_USE_SKILL_SUMMARY=on` the voice
 lists it in place of the description (#6218, skills.md, "Tools for the
-model"); a longer one is refused.
+model"); a longer one is left out with a journal line, and the skill loads as without it.
 
 Other front-matter lines and the body are for people.
 

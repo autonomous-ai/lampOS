@@ -15501,10 +15501,12 @@ fn every_when_in_the_repo_is_within_its_bound() {
     assert!(stops.iter().all(Option::is_some));
 }
 
-/// A `when` over [`lamp_skills::WHEN_MOST_BYTES`] is refused at load, in
-/// `SKILL.md` or in `[stop]`; one at the bound loads.
+/// A `when` over [`lamp_skills::WHEN_MOST_BYTES`] is left out at load, in
+/// `SKILL.md` or in `[stop]`, and the skill loads as without one (Twelve's
+/// P3 on #6521: never a refusal, so the switch off changes nothing); one
+/// at the bound is kept.
 #[test]
-fn a_when_over_its_bound_is_refused() {
+fn a_when_over_its_bound_is_left_out() {
     let most = lamp_skills::WHEN_MOST_BYTES;
     let dir = tempfile::tempdir().unwrap();
     let skill = skill_with(
@@ -15524,11 +15526,7 @@ fn a_when_over_its_bound_is_refused() {
         front(&"w".repeat(most)).unwrap().when,
         Some("w".repeat(most))
     );
-    let refused = front(&"w".repeat(most + 1)).unwrap_err();
-    assert!(
-        refused.contains("SKILL.md's when is at most 200 bytes"),
-        "{refused}"
-    );
+    assert_eq!(front(&"w".repeat(most + 1)).unwrap().when, None);
 
     let folder = dir.path().join("comfort-break");
     copy(&skills_root().join("comfort-break"), &folder);
@@ -15543,9 +15541,7 @@ fn a_when_over_its_bound_is_refused() {
         toml.replace(&from, &format!("when = \"{}\"", "w".repeat(most + 1))),
     )
     .unwrap();
-    let refused = load(&folder).unwrap_err();
-    assert!(
-        refused.contains("[stop] when is at most 200 bytes"),
-        "{refused}"
-    );
+    let stop = load(&folder).unwrap().stop.unwrap();
+    assert_eq!(stop.tool, "wellbeing_nudges");
+    assert_eq!(stop.when, None);
 }
