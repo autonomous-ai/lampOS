@@ -175,14 +175,14 @@ export const CONTROLS = [
   { id: 'stop', group: 'Body', ops: ['stop'], shows: [], label: 'Stop', fields: [], run: async ({ lamp }) => { await lamp.stop(); return 'lamp.stop()'; } },
   // The owner's language the lamp said in hello: a read, so the log says the code it got.
   { id: 'language', group: 'Voice', ops: [], shows: [], label: 'Language', fields: [], run: async ({ lamp }) => `lamp.language // ${q(lamp.language)}` },
-  { id: 'light', group: 'Light', needs: ['light'], ops: ['light'], shows: ['lamp.changed'], label: 'Light',
+  { id: 'light', group: 'Light', needs: ['light'], ops: ['light'], shows: [], label: 'Light',
     fields: [select('colour', COLOURS, 'warm'), number('level', 1, 5, 3, { integer: true }), select('pattern', ['', ...PATTERNS], '', { optional: true }), number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => {
       await lamp.light(a.colour, a.level, a.for_ms, a.pattern);
       return `lamp.light(${q(a.colour)}, ${a.level}, ${a.for_ms}${a.pattern ? `, ${q(a.pattern)}` : ''})`;
     } },
   // A computer's own colours on the ring, one per pixel: a few presets (the SDK takes any 32 `#rrggbb`).
-  { id: 'light_pixels', group: 'Light', needs: ['light'], ops: ['light'], shows: ['lamp.changed'], label: 'Light pixels',
+  { id: 'light_pixels', group: 'Light', needs: ['light'], ops: ['light'], shows: [], label: 'Light pixels',
     fields: [select('preset', Object.keys(PIXEL_PRESETS), 'rainbow'), number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => {
       const count = lamp.ringPixels ?? 32;
@@ -190,7 +190,7 @@ export const CONTROLS = [
       await lamp.ring(pixels, { forMs: a.for_ms });
       return `lamp.ring(${q(a.preset)} // ${count} pixels, { forMs: ${a.for_ms} })`;
     } },
-  { id: 'light_off', group: 'Light', needs: ['light'], ops: ['light'], shows: ['lamp.changed'], label: 'Light off', fields: [number('for_ms', 1, 30_000, 10_000, { integer: true })],
+  { id: 'light_off', group: 'Light', needs: ['light'], ops: ['light'], shows: [], label: 'Light off', fields: [number('for_ms', 1, 30_000, 10_000, { integer: true })],
     run: async ({ lamp }, a) => { await lamp.lightOff({ forMs: a.for_ms }); return `lamp.lightOff({ forMs: ${a.for_ms} })`; } },
   // Notes: this computer's own small notes kept on the lamp (grant `notes`, no lease). The refusals (a bad key, a value over
   // 16 KiB, a second write at once) come back in the lamp's words.
@@ -213,7 +213,7 @@ export const CONTROLS = [
     } },
   // A light kept on past the 30 s one ask lasts: asked again at half the lamp's hold limit until stopped. One hold at a
   // time here (a new one ends the last); a later refusal ends it and is said on the server's log.
-  { id: 'hold_light', group: 'Light', needs: ['light'], ops: ['light'], shows: ['lamp.changed'], label: 'Hold a light',
+  { id: 'hold_light', group: 'Light', needs: ['light'], ops: ['light'], shows: [], label: 'Hold a light',
     fields: [select('colour', COLOURS, 'warm'), number('level', 1, 5, 2, { integer: true }), select('pattern', ['', ...PATTERNS], '', { optional: true })],
     run: async ({ lamp }, a) => {
       held?.stop();
@@ -393,10 +393,10 @@ export const CONTROLS = [
 // The world, not the SDK: `lamp-sim <verb> ... DIR` writes what the lamp's stand-ins read. `argv` is an array,
 // never a shell string; the lamp's folder is added last.
 export const STIMULI = [
-  { id: 'arrive', group: 'People', shows: ['person.arrived'], label: 'Someone arrives', fields: [], argv: () => ['people', '1'] },
+  { id: 'arrive', group: 'People', shows: ['person.arrived', 'person.facing'], label: 'Someone arrives', fields: [], argv: () => ['people', '1'] },
   { id: 'leave', group: 'People', shows: ['person.left'], label: 'Everyone leaves', fields: [], argv: () => ['people', '0'] },
-  { id: 'people', group: 'People', shows: ['person.arrived', 'person.left'], label: 'Set people', fields: [number('n', 0, 5, 1, { integer: true })], argv: (a) => ['people', String(a.n)] },
-  { id: 'hear', group: 'Sound', shows: ['phrase.heard'], label: 'Hear it', fields: [text('text', 120, 'good night lamp')], argv: (a) => ['hear', a.text], listensFor: (a) => a.text },
+  { id: 'people', group: 'People', shows: ['person.arrived'], label: 'Set people', fields: [number('n', 0, 5, 1, { integer: true })], argv: (a) => ['people', String(a.n)] },
+  { id: 'hear', group: 'Sound', needs: ['hear'], shows: ['phrase.heard'], label: 'Hear it', fields: [text('text', 120, 'good night lamp')], argv: (a) => ['hear', a.text], listensFor: (a) => a.text },
   { id: 'sound', group: 'Sound', shows: ['sound.heard'], label: 'Make the sound', fields: [select('kind', ['music', 'laughter', 'door', 'footsteps'])], argv: (a) => ['sound', a.kind] },
   // A held hand is ONE pet (a real lamp tells one per stroke): a touch within `gapMs` of the last is the same stroke.
   { id: 'touch', group: 'Touch', shows: ['touch'], label: 'Touch', fields: [select('kind', ['tap', 'pet'])], argv: (a) => ['touch', a.kind], gapMs: 800 },
@@ -418,12 +418,12 @@ export function describe(mode = 'lamp-sim', { grants, flags } = {}) {
     return off.length ? `start the run with ${off.map((g) => `--${g}`).join(' and ')}` : undefined;
   };
   const shown = (entry) => {
-    const { id, group, label, fields, hint, hintReal, needs, moves, changes } = entry;
+    const { id, group, label, fields, hint, hintReal, needs, moves, changes, shows } = entry;
     const text = (mode === 'real' && hintReal) || hint;
     const disabled = why(entry);
     // A field that says another default for a real lamp (`defaultReal`) shows that one there, and nothing of it otherwise.
     const shownFields = fields.map(({ defaultReal, ...field }) => (mode === 'real' && defaultReal !== undefined ? { ...field, default: defaultReal } : field));
-    return { id, group, label, fields: shownFields, ...(needs?.length ? { needs } : {}), ...(moves ? { moves: true } : {}), ...(changes ? { changes } : {}), ...(text ? { hint: text } : {}), ...(disabled ? { disabled } : {}) };
+    return { id, group, label, fields: shownFields, ...(needs?.length ? { needs } : {}), ...(moves ? { moves: true } : {}), ...(changes ? { changes } : {}), ...(shows?.length ? { shows } : {}), ...(text ? { hint: text } : {}), ...(disabled ? { disabled } : {}) };
   };
   return { controls: CONTROLS.map(shown), stimuli: mode === 'real' ? [] : STIMULI.map(shown) };
 }

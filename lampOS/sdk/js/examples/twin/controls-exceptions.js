@@ -12,9 +12,9 @@ export const COVERAGE_EXCEPTIONS = [
   { kind: 'op', name: 'service.read', reason: 'the virtual lamp has no service to read (needs a <service>-read grant and lamp-services)' },
   { kind: 'op', name: 'service.write', reason: 'the virtual lamp has no service to write (needs a <service>-write grant and lamp-services)' },
   { kind: 'event', name: 'person.stood_up', reason: 'lamp-sim has no verb for a person standing up yet' },
-  { kind: 'event', name: 'person.facing', reason: 'lamp-sim has no verb for a person facing the lamp yet' },
   { kind: 'event', name: 'name.heard', reason: 'lamp-sim has no name.heard verb yet (L1 plans a canned one)' },
   { kind: 'event', name: 'button', reason: 'lamp-sim has no button verb' },
+  { kind: 'event', name: 'lamp.changed', reason: "comes with the lamp's own life (talking, paused, private, asleep, lease), not reliably with any one button: seen on 75c9 with a turn start once, not the next time" },
   { kind: 'event', name: 'body.state', reason: 'drawn by the twin itself, not logged (twelve a second)' },
   { kind: 'event', name: 'time', reason: 'noise: not logged, and nothing a button makes' },
 ];

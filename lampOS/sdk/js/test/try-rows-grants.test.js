@@ -88,10 +88,10 @@ for (const mode of ['lamp-sim']) {
   });
 }
 
-test('without grants the table is static, and the stimuli are never disabled', () => {
+test('without grants the table is static, and a stimulus is off only for a grant it needs', () => {
   assert.equal(describe('lamp-sim').controls.some((c) => c.disabled), false, 'without grants no row is off');
   const table = describe('lamp-sim', { grants: ['body'] });
-  assert.ok(table.stimuli.length > 0 && table.stimuli.every((c) => c.disabled === undefined));
+  assert.ok(table.stimuli.length > 0 && table.stimuli.filter((c) => !c.needs).every((c) => c.disabled === undefined), 'a stimulus is off only for the grant it says it needs');
   assert.equal(table.controls.find((c) => c.id === 'say').disabled, 'the lamp did not grant speak');
 });
 
