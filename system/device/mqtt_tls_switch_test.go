@@ -2,7 +2,6 @@ package device
 
 import (
 	"testing"
-	"time"
 
 	"go.autonomous.ai/os/system/beclient"
 	"go.autonomous.ai/os/system/server/config"
@@ -19,13 +18,13 @@ func reply(port string, tls *bool) *beclient.MQTTConfig {
 func TestPingTLSSwitchOn(t *testing.T) {
 	on := true
 	c := plainDevice()
-	if !applyPingMQTT(reply("8883", &on), c, time.Now()) {
+	if !applyPingMQTT(reply("8883", &on), c) {
 		t.Fatal("TLS switch should apply")
 	}
-	if !c.MQTTTLS || c.MQTTPort != 8883 || c.MQTTPlainPort != 1883 {
-		t.Fatalf("got tls=%v port=%d plain=%d", c.MQTTTLS, c.MQTTPort, c.MQTTPlainPort)
+	if !c.MQTTTLS || c.MQTTPort != 8883 {
+		t.Fatalf("got tls=%v port=%d", c.MQTTTLS, c.MQTTPort)
 	}
-	if applyPingMQTT(reply("8883", &on), c, time.Now()) {
+	if applyPingMQTT(reply("8883", &on), c) {
 		t.Fatal("same reply again must not reconnect")
 	}
 }
@@ -33,38 +32,19 @@ func TestPingTLSSwitchOn(t *testing.T) {
 func TestPingTLSSwitchOff(t *testing.T) {
 	off := false
 	c := plainDevice()
-	c.MQTTTLS, c.MQTTPort, c.MQTTPlainPort = true, 8883, 1883
-	if !applyPingMQTT(reply("1883", &off), c, time.Now()) {
+	c.MQTTTLS, c.MQTTPort = true, 8883
+	if !applyPingMQTT(reply("1883", &off), c) {
 		t.Fatal("TLS off should apply")
 	}
-	if c.MQTTTLS || c.MQTTPort != 1883 || c.MQTTPlainPort != 0 {
-		t.Fatalf("got tls=%v port=%d plain=%d", c.MQTTTLS, c.MQTTPort, c.MQTTPlainPort)
+	if c.MQTTTLS || c.MQTTPort != 1883 {
+		t.Fatalf("got tls=%v port=%d", c.MQTTTLS, c.MQTTPort)
 	}
 }
 
 func TestPingWithoutTLSFieldKeepsSetting(t *testing.T) {
 	c := plainDevice()
 	c.MQTTTLS, c.MQTTPort = true, 8883
-	if applyPingMQTT(reply("8883", nil), c, time.Now()) || !c.MQTTTLS {
+	if applyPingMQTT(reply("8883", nil), c) || !c.MQTTTLS {
 		t.Fatal("a reply without the TLS field must leave TLS alone")
-	}
-}
-
-func TestPingTLSSwitchSkippedWhileWaiting(t *testing.T) {
-	on := true
-	now := time.Now()
-	c := plainDevice()
-	c.MQTTTLSRetryAfter = now.Add(time.Hour).Unix()
-	if applyPingMQTT(reply("8883", &on), c, now) {
-		t.Fatal("no change expected while waiting")
-	}
-	if c.MQTTTLS || c.MQTTPort != 1883 {
-		t.Fatalf("must stay plain on 1883, got tls=%v port=%d", c.MQTTTLS, c.MQTTPort)
-	}
-	// A new broker still applies, on the current plain port.
-	r := reply("8883", &on)
-	r.Endpoint = "c.example"
-	if !applyPingMQTT(r, c, now) || c.MQTTEndpoint != "c.example" || c.MQTTPort != 1883 || c.MQTTTLS {
-		t.Fatalf("got endpoint=%s port=%d tls=%v", c.MQTTEndpoint, c.MQTTPort, c.MQTTTLS)
 	}
 }

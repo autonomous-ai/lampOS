@@ -197,9 +197,13 @@ type PingPayload struct {
 	Skills []domain.SkillSummary `json:"skills,omitempty"`
 	// MQTTTLS is true only when the device connects to the broker over TLS.
 	MQTTTLS bool `json:"mqtt_tls,omitempty"`
-	// MQTTTLSSwitch is true when the device accepts a TLS switch in the ping
-	// reply (MQTTConfig.TLS). False while it waits after a failed TLS attempt.
+	// MQTTTLSSwitch is true when the device acts on a TLS switch in the ping
+	// reply (MQTTConfig.TLS). Older firmware never sends it.
 	MQTTTLSSwitch bool `json:"mqtt_tls_switch,omitempty"`
+	// MQTTTLSFailing is true when TLS is on but no TLS connection to the
+	// broker has come up for a while. The device keeps retrying over TLS; only
+	// a reply with mqtt_tls false turns TLS off.
+	MQTTTLSFailing bool `json:"mqtt_tls_failing,omitempty"`
 }
 
 // MQTTConfig holds MQTT broker configuration from the backend.

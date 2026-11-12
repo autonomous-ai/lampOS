@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/url"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/eclipse/paho.golang/autopaho"
@@ -32,12 +31,7 @@ type MQTT struct {
 	// subscriptions are re-applied on each connection up
 	subscriptions map[string]subEntry
 	handlers      map[string]MessageHandler
-	// connectedAt is the unix time of the last successful connection (0 = never).
-	connectedAt atomic.Int64
 }
-
-// Connected reports whether this client has ever connected to the broker.
-func (c *MQTT) Connected() bool { return c.connectedAt.Load() != 0 }
 
 type subEntry struct {
 	topic string
@@ -72,6 +66,7 @@ func defaultClientID() string {
 
 // Connect starts auto-reconnect and returns once the initial handshake completes or ctx expires.
 func (c *MQTT) Connect(ctx context.Context) error {
+	markStart(c.opts.TLS, time.Now())
 	c.mu.Lock()
 	if c.conn != nil {
 		c.mu.Unlock()
@@ -101,7 +96,7 @@ func (c *MQTT) Connect(ctx context.Context) error {
 		ReconnectBackoff:              autopaho.DefaultExponentialBackoff(),
 		Queue:                         memory.New(),
 		OnConnectionUp: func(cm *autopaho.ConnectionManager, _ *paho.Connack) {
-			c.connectedAt.Store(time.Now().Unix())
+			markConnected(c.opts.TLS, time.Now())
 			c.mu.Lock()
 			subs := c.copySubscriptions()
 			c.mu.Unlock()
