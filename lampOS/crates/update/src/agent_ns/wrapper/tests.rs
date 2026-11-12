@@ -46,8 +46,8 @@ fn engine_names_are_refused_unless_plain() {
     }
     let too_long = "a".repeat(ENGINE_MAX + 1);
     for engine in [
-        "", "Hermes", "a/b", "../x", "..", "a b", "a;b", "a\nb", "$(id)", "a_b", "é", "a.b",
-        &too_long,
+        "", "-", "-x", "--help", "Hermes", "a/b", "../x", "..", "a b", "a;b", "a\nb", "$(id)",
+        "a_b", "é", "a.b", &too_long,
     ] {
         assert!(!engine_ok(engine), "{engine:?}");
         assert!(wrapper_text(engine).is_err(), "{engine:?}");
@@ -55,7 +55,7 @@ fn engine_names_are_refused_unless_plain() {
         assert!(home_of(engine).is_err(), "{engine:?}");
         let root = tempfile::tempdir().unwrap();
         assert!(write_engine(root.path(), engine, (0, 0), SHOWN[0]).is_err());
-        assert!(!present(root.path(), engine, SHOWN[0]));
+        assert!(!present(root.path(), engine, SHOWN[0], None));
     }
 }
 
@@ -320,6 +320,19 @@ fn only_wrappers_on_path_run_nothing() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("no eng on PATH"));
 }
 
+/// (Reviewer-lead's P3) A run whose wrapper finds no engine program still
+/// has its token file deleted: the run-id block comes first.
+#[test]
+fn a_run_with_no_engine_program_leaves_no_token_file() {
+    let lamp = lamp("eng");
+    let file = lamp.token_file("run-2");
+    let path = format!("{}:/usr/bin:/bin", lamp.top.join("bin1").display());
+    let out = lamp.run(&[(RUN_ID_ENV, "run-2")], &path);
+    assert!(!out.status.success());
+    assert!(lamp.read("argv").is_none());
+    assert!(!file.exists());
+}
+
 /// The namespace script is Hermes's with the engine made data: every edit
 /// found once for every switch, no engine named, `HOME` the engine's own.
 #[test]
@@ -377,11 +390,13 @@ fn write_engine_writes_the_entry_points_and_a_0700_home() {
     let root = root();
     let shown = SHOWN[3];
     for engine in ["eng", "other"] {
-        assert!(!present(root.path(), engine, shown));
+        let found = wrapper_path(engine).unwrap();
+        let found = Some(found.as_str());
+        assert!(!present(root.path(), engine, shown, found));
         write_engine(root.path(), engine, me(), shown).unwrap();
-        assert!(present(root.path(), engine, shown));
+        assert!(present(root.path(), engine, shown, found));
         assert!(
-            !present(root.path(), engine, SHOWN[0]),
+            !present(root.path(), engine, SHOWN[0], found),
             "another switch: written again"
         );
         let home = on(root.path(), &home_of(engine).unwrap());
@@ -397,7 +412,53 @@ fn write_engine_writes_the_entry_points_and_a_0700_home() {
     // A changed wrapper is the engine missing.
     let wrapper = on(root.path(), "/usr/local/bin/eng");
     fs::write(&wrapper, format!("#!/bin/sh\n# {MARK}\n")).unwrap();
-    assert!(!present(root.path(), "eng", shown));
+    assert!(!present(
+        root.path(),
+        "eng",
+        shown,
+        Some("/usr/local/bin/eng")
+    ));
+}
+
+/// (Heron's read) The wrapper written but the engine's own program found
+/// first by `lampos`'s login shell (`~/.local/bin/<engine>`, earlier on
+/// Harness's `PATH`), or nothing found: not present, so not offered.
+#[test]
+fn an_engine_found_before_the_wrapper_is_not_present() {
+    let root = root();
+    let shown = SHOWN[3];
+    write_engine(root.path(), "eng", me(), shown).unwrap();
+    assert!(present(
+        root.path(),
+        "eng",
+        shown,
+        Some("/usr/local/bin/eng")
+    ));
+    for found in [
+        Some("/home/lampos/.local/bin/eng"),
+        Some("/var/lib/lampos/.local/bin/eng"),
+        Some("/usr/bin/eng"),
+        Some("/usr/local/bin/eng2"),
+        Some(""),
+        None,
+    ] {
+        assert!(!present(root.path(), "eng", shown, found), "{found:?}");
+        assert!(!found_first("eng", found), "{found:?}");
+    }
+    assert!(found_first("eng", Some("/usr/local/bin/eng")));
+}
+
+/// Harness's lookup: `lampos`'s login shell, the engine one plain word.
+#[test]
+fn the_login_lookup_is_lamposs_login_shell_and_refuses_unplain_names() {
+    assert_eq!(
+        login_lookup_argv("claude").unwrap(),
+        ["runuser", "-l", "lampos", "-c", "command -v claude"]
+    );
+    for engine in ["-l", "a;b", "$(id)", "a b", ""] {
+        assert!(login_lookup_argv(engine).is_err(), "{engine:?}");
+        assert!(login_finds(engine).is_none(), "{engine:?}");
+    }
 }
 
 /// The engine's own program (or anyone's file) at the wrapper's place is
