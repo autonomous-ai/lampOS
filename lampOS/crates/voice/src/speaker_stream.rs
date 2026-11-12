@@ -4,27 +4,32 @@
 //! lamp-control opens a stream on the say socket (`{"skill":"control",
 //! "stream":{"by":COMPUTER},"expires_in_ms":N}`) and publishes the computer's
 //! sound on `speaker/audio` ([`Audio::SPEAKER_TOPIC`], 24 kHz mono S16LE,
-//! source `control`). The voice answers one line, `{"event":"stream",
-//! "state":"open","buffer_ms":N}` or a refusal in words; while the stream is
-//! open it says `{"event":"stats",...}` once a second; the computer's door
-//! ends the stream by closing the connection.
+//! source `control`). The stream is a say the voice admits like an exact line
+//! ([`crate::say::Says::admit_stream`]): at rest it is `begun` and the
+//! computer is told `{"event":"stream","state":"open","buffer_ms":N}`; in a
+//! conversation, speaking, muted or paused it is refused in words, never
+//! queued; a second is refused. While open the voice says
+//! `{"event":"stats",...}` once a second; the computer's door ends the
+//! stream by closing the connection, which the voice answers `dropped`.
 //!
-//! This is the voice's half in two steps. This one reads the sound and counts
-//! it (`blocks`, `lost`, `stray` in the stats line) and plays nothing: playing
-//! is the speaker worker's, by the voice's own path, in the steps after. So it
-//! is off unless `LAMP_SPEAKER_STREAM=on`; off, a stream is refused with the
-//! words a voice from before it gives, "this lamp's voice does not take a
-//! stream". One stream at a time, since the speaker is one device.
+//! This step reads the sound and counts it (`blocks`, `lost`, `stray` in the
+//! stats line) and plays nothing: playing is the speaker worker's, by the
+//! voice's own path, in the step after. So it is off unless
+//! `LAMP_SPEAKER_STREAM=on`; off, a stream is refused with the words a voice
+//! from before it gives, "this lamp's voice does not take a stream".
 //!
-//! Like a held mute ([`crate::control_mute`]) it lives on the client's thread
-//! and is never a turn: nothing here waits on the voice or the voice on it.
-use crate::say::Outcome;
+//! The connection's thread is the client's, never the voice's: nothing here
+//! waits on the voice's loop or the voice on it.
+use crate::say::{Answer, Cancel, Outcome, asker_went};
 use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::Audio;
 use std::{
-    io::{self, Read, Write},
+    io::{self, Write},
     os::unix::net::UnixStream,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        mpsc,
+    },
     time::{Duration, Instant},
 };
 
@@ -34,7 +39,7 @@ pub const ENVIRONMENT: &str = "LAMP_SPEAKER_STREAM";
 /// voice from before the request, so a computer sees one thing).
 pub const NOT_TAKEN: &str = "this lamp's voice does not take a stream";
 /// Why a second stream is refused.
-const BUSY: &str = "another computer's stream is playing";
+pub const BUSY: &str = "another computer's stream is playing";
 /// What this reader is called to the bus.
 const NAME: &str = "voice_speaker_stream";
 /// The only publisher whose sound is taken: the paired computers' door.
@@ -43,13 +48,25 @@ const SOURCE: &str = "control";
 const BUFFER_MS: u32 = 300;
 /// How often the stream's counts are said.
 pub const STATS_EVERY: Duration = Duration::from_secs(1);
-/// How long one look at the connection waits, which paces the loop.
+/// How long one look at the voice's answer waits, which paces the loop.
 const LOOK: Duration = Duration::from_millis(20);
 /// A computer that stops reading never holds this thread in a write.
 const WRITE_WITHIN: Duration = Duration::from_millis(200);
 
+/// Whether [`ENVIRONMENT`] was `on` when the service started.
+static ON: AtomicBool = AtomicBool::new(false);
 /// Whether a stream is open on this lamp.
 static OPEN: AtomicBool = AtomicBool::new(false);
+
+/// The service started with the switch `on` or not.
+pub fn set(on: bool) {
+    ON.store(on, Ordering::Relaxed);
+}
+
+/// Whether the voice takes streams.
+pub fn on() -> bool {
+    ON.load(Ordering::Relaxed)
+}
 
 /// What a stream has taken in so far.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -62,104 +79,125 @@ pub struct Counts {
     pub stray: u64,
 }
 
-/// Serve `by`'s stream on `stream`, the switch and bus as the process has
-/// them.
-pub fn serve(stream: UnixStream, by: &str, kept: Vec<u8>) {
-    let on = std::env::var(ENVIRONMENT).is_ok_and(|value| value == "on");
-    serve_with(stream, by, kept, on, Bus::from_environment, STATS_EVERY);
+/// Holds `stream` for its computer while the voice decides and then for as
+/// long as the stream is open: the voice's answers come on `answered`
+/// (`begun` opens it, a final outcome ends it), and a closed connection sets
+/// `cancel`, which the voice reads as the end.
+pub(crate) fn hold(
+    stream: UnixStream,
+    answered: mpsc::Receiver<Answer>,
+    cancel: Cancel,
+    claim: Open,
+) {
+    hold_with(stream, answered, cancel, claim, bus, STATS_EVERY);
 }
 
-/// [`serve`], with the switch and the way to the bus given, and how often the
-/// counts are said.
-pub fn serve_with(
+/// The lamp's bus; a test's own, when it has one.
+fn bus() -> io::Result<Bus> {
+    #[cfg(test)]
+    if let Some(bus) = TEST_BUS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+    {
+        return Ok(bus);
+    }
+    Bus::from_environment()
+}
+
+/// A test's bus for [`bus`], and the lock that gives the one stream the lamp
+/// takes to one test at a time.
+#[cfg(test)]
+pub(crate) static TEST_BUS: std::sync::Mutex<Option<Bus>> = std::sync::Mutex::new(None);
+#[cfg(test)]
+pub(crate) static ONE_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// [`hold`], with the way to the bus given and how often the counts are said.
+pub(crate) fn hold_with(
     mut stream: UnixStream,
-    by: &str,
-    _kept: Vec<u8>,
-    on: bool,
+    answered: mpsc::Receiver<Answer>,
+    cancel: Cancel,
+    claim: Open,
     bus: impl FnOnce() -> io::Result<Bus>,
     stats_every: Duration,
 ) {
-    let refuse = |stream: &mut UnixStream, why: &str| {
-        let _ = writeln!(stream, "{}", Outcome::Refused(why.into()).line());
-    };
-    if !on {
-        return refuse(&mut stream, NOT_TAKEN);
-    }
-    let Some(_open) = Open::claim() else {
-        return refuse(&mut stream, BUSY);
-    };
-    let mut sound = match bus().and_then(|bus| Sound::on(&bus)) {
-        Ok(sound) => sound,
-        Err(error) => {
-            return refuse(
-                &mut stream,
-                &format!("the voice could not read the sound: {error}"),
-            );
-        }
-    };
     let _ = stream.set_write_timeout(Some(WRITE_WITHIN));
-    if stream.set_read_timeout(Some(LOOK)).is_err()
-        || writeln!(
-            stream,
-            r#"{{"event":"stream","state":"open","buffer_ms":{BUFFER_MS}}}"#
-        )
-        .is_err()
-    {
-        return;
-    }
-    eprintln!("[voice] speaker stream of {by:?} open");
+    let mut bus = Some(bus);
+    let mut sound: Option<Sound> = None;
     let mut last_said = Instant::now();
-    let mut scrap = [0u8; 256];
-    loop {
-        // Gone: the stream goes with it, as its claim drops.
-        match stream.read(&mut scrap) {
-            Ok(0) => break,
-            Ok(_) => {}
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    io::ErrorKind::WouldBlock
-                        | io::ErrorKind::TimedOut
-                        | io::ErrorKind::Interrupted
-                ) => {}
-            Err(_) => break,
-        }
-        if sound.take_in().is_err() {
-            let _ = writeln!(
-                stream,
-                "{}",
-                Outcome::Dropped("the voice lost the sound's bus".into()).line()
-            );
-            break;
-        }
-        if last_said.elapsed() >= stats_every {
-            last_said = Instant::now();
-            let counts = sound.counts;
-            if writeln!(
-                stream,
-                r#"{{"event":"stats","buffered_ms":0,"underruns":0,"limited":0,"blocks":{},"lost":{},"stray":{}}}"#,
-                counts.blocks, counts.lost, counts.stray
-            )
-            .is_err()
-            {
-                break;
+    let outcome = loop {
+        match answered.recv_timeout(LOOK) {
+            Ok(Answer::Begun(_)) => {
+                let opened = bus
+                    .take()
+                    .map(|bus| bus().and_then(|bus| Sound::on(&bus)))
+                    .unwrap_or_else(|| Err(io::Error::other("opened twice")));
+                match opened {
+                    Ok(taken) => {
+                        sound = Some(taken);
+                        last_said = Instant::now();
+                        if writeln!(
+                            stream,
+                            r#"{{"event":"stream","state":"open","buffer_ms":{BUFFER_MS}}}"#
+                        )
+                        .is_err()
+                        {
+                            cancel.store(true, Ordering::Release);
+                        }
+                        eprintln!("[voice] speaker stream of {:?} open", claim.by);
+                    }
+                    // The voice has the speaker's turn; it ends at once.
+                    Err(error) => {
+                        eprintln!("[voice] speaker stream: no bus for the sound: {error}");
+                        cancel.store(true, Ordering::Release);
+                    }
+                }
+            }
+            Ok(Answer::Done(outcome)) => break outcome,
+            Ok(_) | Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                break Outcome::Dropped("the voice has gone".into());
             }
         }
-    }
+        if !cancel.load(Ordering::Acquire) && asker_went(&stream) {
+            cancel.store(true, Ordering::Release);
+        }
+        if let Some(sound) = sound.as_mut() {
+            if sound.take_in().is_err() {
+                cancel.store(true, Ordering::Release);
+            } else if last_said.elapsed() >= stats_every {
+                last_said = Instant::now();
+                let counts = sound.counts;
+                if writeln!(
+                    stream,
+                    r#"{{"event":"stats","buffered_ms":0,"underruns":0,"limited":0,"blocks":{},"lost":{},"stray":{}}}"#,
+                    counts.blocks, counts.lost, counts.stray
+                )
+                .is_err()
+                {
+                    cancel.store(true, Ordering::Release);
+                }
+            }
+        }
+    };
+    let _ = writeln!(stream, "{}", outcome.line());
     eprintln!(
-        "[voice] speaker stream of {by:?} closed: {:?}",
-        sound.counts
+        "[voice] speaker stream of {:?} closed: {:?}",
+        claim.by,
+        sound.map(|sound| sound.counts)
     );
 }
 
 /// The one open stream, released when it is dropped.
-struct Open;
+pub(crate) struct Open {
+    by: String,
+}
 
 impl Open {
-    fn claim() -> Option<Self> {
+    pub(crate) fn claim(by: &str) -> Option<Self> {
         OPEN.compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .ok()
-            .map(|_| Self)
+            .map(|_| Self { by: by.to_owned() })
     }
 }
 
@@ -208,11 +246,7 @@ impl Sound {
 mod tests {
     use super::*;
     use std::io::{BufRead, BufReader};
-    use std::sync::Mutex;
     use std::thread;
-
-    /// One stream at a time is the lamp's, so these share it by turns.
-    static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
     fn block(rate: u32, sequence: u64) -> Vec<u8> {
         Audio {
@@ -223,27 +257,6 @@ mod tests {
         }
         .block(&[0u8; 480])
         .unwrap()
-    }
-
-    /// A voice serving one stream on one end of a pair, the other end handed
-    /// back as a reader and the connection itself.
-    fn serving(
-        on: bool,
-        bus: impl FnOnce() -> io::Result<Bus> + Send + 'static,
-    ) -> (BufReader<UnixStream>, UnixStream, thread::JoinHandle<()>) {
-        let (voice, computer) = UnixStream::pair().unwrap();
-        let served = thread::spawn(move || {
-            serve_with(
-                voice,
-                "desk",
-                Vec::new(),
-                on,
-                bus,
-                Duration::from_millis(50),
-            );
-        });
-        let line_reader = BufReader::new(computer.try_clone().unwrap());
-        (line_reader, computer, served)
     }
 
     fn line(reader: &mut BufReader<UnixStream>) -> serde_json::Value {
@@ -262,24 +275,42 @@ mod tests {
         (Bus::new(&dir).unwrap(), dir)
     }
 
-    #[test]
-    fn a_stream_is_refused_as_a_voice_without_it_does_while_the_switch_is_off() {
-        let _turn = ONE_AT_A_TIME
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let (mut said, _computer, served) = serving(false, || panic!("the bus is not even opened"));
-        assert_eq!(
-            line(&mut said),
-            serde_json::json!({"outcome": "refused", "why": NOT_TAKEN})
-        );
-        served.join().unwrap();
+    /// The voice's side of one stream, held on one end of a pair: its answers
+    /// go in through the sender, the other end comes back as a reader.
+    #[allow(clippy::type_complexity)]
+    fn held(
+        bus: Bus,
+        claim: Open,
+    ) -> (
+        mpsc::Sender<Answer>,
+        Cancel,
+        BufReader<UnixStream>,
+        UnixStream,
+        thread::JoinHandle<()>,
+    ) {
+        let (voice, computer) = UnixStream::pair().unwrap();
+        let (answer, answered) = mpsc::channel();
+        let cancel = Cancel::default();
+        let held_cancel = Cancel::clone(&cancel);
+        let served = thread::spawn(move || {
+            hold_with(
+                voice,
+                answered,
+                held_cancel,
+                claim,
+                move || Ok(bus),
+                Duration::from_millis(50),
+            );
+        });
+        let reader = BufReader::new(computer.try_clone().unwrap());
+        (answer, cancel, reader, computer, served)
     }
 
     #[test]
     fn an_open_stream_counts_the_computers_blocks_and_the_rest_as_stray() {
         let _turn = ONE_AT_A_TIME
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         let (bus, dir) = temp_bus("counts");
         let mut computers = bus
             .publisher_declared(Audio::SPEAKER_TOPIC, &Audio::declaration(), SOURCE)
@@ -287,8 +318,9 @@ mod tests {
         let mut other = bus
             .publisher_declared(Audio::SPEAKER_TOPIC, &Audio::declaration(), "someone")
             .unwrap();
-        let served_bus = bus.clone();
-        let (mut said, computer, served) = serving(true, move || Ok(served_bus));
+        let (answer, _cancel, mut said, computer, served) = held(bus, Open::claim("desk").unwrap());
+        // Nothing is said until the voice has begun it.
+        answer.send(Answer::Begun(1)).unwrap();
         assert_eq!(
             line(&mut said),
             serde_json::json!({"event": "stream", "state": "open", "buffer_ms": 300})
@@ -322,36 +354,63 @@ mod tests {
             (Some(3), Some(2))
         );
         assert_eq!(stats["buffered_ms"], 0, "nothing is played yet");
-        drop((said, computer));
+        answer
+            .send(Answer::Done(Outcome::Dropped(
+                "the lamp has something to say".into(),
+            )))
+            .unwrap();
+        let mut ended = serde_json::Value::Null;
+        for _ in 0..40 {
+            ended = line(&mut said);
+            if ended["outcome"].is_string() {
+                break;
+            }
+        }
+        assert_eq!(
+            ended,
+            serde_json::json!({"outcome": "dropped", "why": "the lamp has something to say"})
+        );
         served.join().unwrap();
+        drop(computer);
         std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
-    fn a_second_stream_is_refused_until_the_first_is_closed() {
+    fn a_closed_connection_is_the_computers_cancel_and_the_voice_ends_it() {
         let _turn = ONE_AT_A_TIME
             .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let (bus, dir) = temp_bus("one");
-        let open_bus = |bus: &Bus| {
-            let bus = bus.clone();
-            move || Ok(bus)
-        };
-        let (mut first, first_computer, first_served) = serving(true, open_bus(&bus));
-        assert_eq!(line(&mut first)["state"], "open");
-        let (mut second, _second_computer, second_served) = serving(true, open_bus(&bus));
-        assert_eq!(
-            line(&mut second),
-            serde_json::json!({"outcome": "refused", "why": BUSY})
-        );
-        second_served.join().unwrap();
-        // Closing the connection ends the stream, and the speaker is free.
-        drop((first, first_computer));
-        first_served.join().unwrap();
-        let (mut third, _third_computer, third_served) = serving(true, open_bus(&bus));
-        assert_eq!(line(&mut third)["state"], "open");
-        drop((third, _third_computer));
-        third_served.join().unwrap();
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (bus, dir) = temp_bus("close");
+        let (answer, cancel, mut said, computer, served) = held(bus, Open::claim("desk").unwrap());
+        answer.send(Answer::Begun(1)).unwrap();
+        assert_eq!(line(&mut said)["state"], "open");
+        drop((said, computer));
+        let began = Instant::now();
+        while !cancel.load(Ordering::Acquire) {
+            assert!(
+                began.elapsed() < Duration::from_secs(2),
+                "the close was not seen"
+            );
+            thread::sleep(Duration::from_millis(5));
+        }
+        // The voice reads the cancel and answers; the thread ends.
+        answer
+            .send(Answer::Done(Outcome::Dropped("closed".into())))
+            .unwrap();
+        served.join().unwrap();
+        // The speaker is free again once the hold is gone.
+        assert!(Open::claim("laptop").is_some());
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_second_claim_is_refused_until_the_first_is_dropped() {
+        let _turn = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let first = Open::claim("desk").unwrap();
+        assert!(Open::claim("laptop").is_none());
+        drop(first);
+        assert!(Open::claim("laptop").is_some());
     }
 }

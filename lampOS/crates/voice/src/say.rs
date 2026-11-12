@@ -245,7 +245,7 @@ pub const STOPPED_BY_ASKER: &str = "stopped by its asker";
 /// The trace outcome of a turn cut by its asker's cancel.
 pub const ASKER_STOPPED: &str = "asker_stopped";
 /// An ask's cancel, set by its own client's thread alone.
-type Cancel = Arc<std::sync::atomic::AtomicBool>;
+pub(crate) type Cancel = Arc<std::sync::atomic::AtomicBool>;
 /// Told the model before a text, so that it says the words as they are.
 pub const AS_WRITTEN: &str = "Say exactly these words, in your own voice, and nothing else:";
 
@@ -1421,6 +1421,9 @@ pub struct Says {
     order: u64,
     /// When the last skill's sound was played.
     last_sound_us: Option<u64>,
+    /// The computer's stream the voice has admitted, answered when it ends
+    /// ([`Self::admit_stream`]).
+    stream: Option<Ticket>,
 
     /// Kept so that the socket goes with the voice.
     _socket: Option<Bound>,
@@ -1454,6 +1457,7 @@ impl Drop for Says {
             waiting: Vec::new(),
             order: self.order,
             last_sound_us: self.last_sound_us,
+            stream: None,
             _socket: self._socket.take(),
             parks: true,
         };
@@ -1522,6 +1526,12 @@ impl Says {
         ADDON_SAY.store(
             std::env::var(ADDON_SAY_ENVIRONMENT).ok().as_deref() == Some("on"),
             std::sync::atomic::Ordering::Relaxed,
+        );
+        crate::speaker_stream::set(
+            std::env::var(crate::speaker_stream::ENVIRONMENT)
+                .ok()
+                .as_deref()
+                == Some("on"),
         );
         let every_sound = std::env::var(EVERY_SOUND_ENVIRONMENT).ok().as_deref() == Some("on");
         if every_sound {
@@ -1627,6 +1637,7 @@ impl Says {
             waiting: Vec::new(),
             order: 0,
             last_sound_us: None,
+            stream: None,
             _socket: Some(bound),
             parks: false,
         })
@@ -1870,6 +1881,7 @@ impl Says {
                 waiting: Vec::new(),
                 order: 0,
                 last_sound_us: None,
+                stream: None,
                 _socket: None,
                 parks: false,
             },
@@ -2091,6 +2103,69 @@ impl Says {
     /// A skill's sound was played at `at_us`.
     pub fn sound_played(&mut self, at_us: u64) {
         self.last_sound_us = Some(at_us);
+    }
+
+    /// A stream waits to be admitted, not yet expired at `now_us`.
+    fn stream_waiting(&mut self, now_us: u64) -> bool {
+        self.expire(now_us);
+        self.next_of(|request| matches!(request.words, Words::Stream { .. }))
+            .is_some()
+    }
+
+    /// Admit or refuse the next waiting stream, and end the one held when its
+    /// computer has closed the connection (its asker's cancel, set by the
+    /// client's thread). The speaker's gate is the exact line's
+    /// ([`may_play_exact`]): at rest, or refused in words, never queued
+    /// behind a conversation (the stream's sound would be stale). One stream
+    /// at a time. Opened, the client is told `begun` and the ticket is held
+    /// until it ends. None when nothing waited.
+    pub fn admit_stream(&mut self, now: &SoundNow, at_us: u64) -> Option<Admitted> {
+        if self
+            .stream
+            .as_ref()
+            .is_some_and(|ticket| ticket.cancel.load(Ordering::Acquire))
+            && let Some(ticket) = self.stream.take()
+        {
+            ticket.answer(Outcome::Dropped(STREAM_CLOSED.into()));
+        }
+        if !self.stream_waiting(at_us) {
+            return None;
+        }
+        let index = self.next_of(|request| matches!(request.words, Words::Stream { .. }))?;
+        let waiting = self.waiting.remove(index);
+        let Words::Stream { by } = waiting.request.words else {
+            unreachable!("next_of chose a stream");
+        };
+        let ticket = Ticket {
+            skill: waiting.request.skill,
+            answer: Some(waiting.answer),
+            guard: waiting.guard,
+            cancel: waiting.cancel,
+            who: false,
+            question: false,
+            line: Default::default(),
+            said: None,
+        };
+        let why = if self.stream.is_some() {
+            Some(crate::speaker_stream::BUSY.to_owned())
+        } else {
+            match may_play_exact(now) {
+                ExactNow::Play => None,
+                ExactNow::Wait(why) => Some(format!("the speaker is busy: {why}")),
+                ExactNow::Refuse(why) => Some(why.to_owned()),
+            }
+        };
+        Some(match why {
+            Some(why) => {
+                ticket.answer(Outcome::Refused(why.clone()));
+                Admitted::Refused { by, why }
+            }
+            None => {
+                ticket.begun(at_us);
+                self.stream = Some(ticket);
+                Admitted::Opened { by }
+            }
+        })
     }
 
     /// Whether an exact line waits to be said, without taking it.
@@ -2449,10 +2524,13 @@ fn serve_client(
                 words: Words::Listen(on),
                 ..
             }) => return serve_listen(stream, on, caller, kept, mutes),
+            // A stream the voice does not take: off, as a voice without it.
             Ok(Request {
-                words: Words::Stream { by },
+                words: Words::Stream { .. },
                 ..
-            }) => return crate::speaker_stream::serve(stream, &by, kept),
+            }) if !crate::speaker_stream::on() => {
+                Outcome::Refused(crate::speaker_stream::NOT_TAKEN.into())
+            }
             Ok(request) => {
                 let read_at_us = lamp_ipc::monotonic_us();
                 let expires_at_us = request.expires_at_us(read_at_us);
@@ -2470,6 +2548,22 @@ fn serve_client(
                     let _ = stream.set_write_timeout(Some(Duration::from_millis(50)));
                 }
                 let (answer, answered) = mpsc::channel();
+                // One stream at a time on the lamp: claimed before it is
+                // asked, so a second is refused at once.
+                let stream_claim = match &request.words {
+                    Words::Stream { by } => match crate::speaker_stream::Open::claim(by) {
+                        Some(claim) => Some(claim),
+                        None => {
+                            let _ = writeln!(
+                                stream,
+                                "{}",
+                                Outcome::Refused(crate::speaker_stream::BUSY.into()).line()
+                            );
+                            return;
+                        }
+                    },
+                    _ => None,
+                };
                 // A turn start watches its connection while it waits: closed
                 // (its computer went or was revoked, and lamp-control shut
                 // it), the voice drops it at its next pass ([`ASKER_GONE`]).
@@ -2479,7 +2573,10 @@ fn serve_client(
                 // once is never missed. A turn is ended by `turn: "end"`,
                 // never by a cancel: its connection is not watched.
                 let cancel = Cancel::default();
-                if !matches!(request.words, Words::TurnStart { .. } | Words::TurnEnd(_)) {
+                if !matches!(
+                    request.words,
+                    Words::TurnStart { .. } | Words::TurnEnd(_) | Words::Stream { .. }
+                ) {
                     watch =
                         watch_for_cancel(&stream, std::mem::take(&mut kept), Arc::clone(&cancel));
                 }
@@ -2497,6 +2594,11 @@ fn serve_client(
                 {
                     Outcome::Refused("the voice has gone".into())
                 } else {
+                    // A stream holds the connection for its sound and counts
+                    // ([`crate::speaker_stream`]), answered as any ask.
+                    if let Some(claim) = stream_claim {
+                        return crate::speaker_stream::hold(stream, answered, cancel, claim);
+                    }
                     // The voice answers an ask not begun in time itself;
                     // begun, the turn may run on past its expiry, so the
                     // answer is waited for until it comes or the voice goes.
@@ -2689,7 +2791,7 @@ fn read_some(stream: &UnixStream, within: Duration, kept: &mut Vec<u8>) -> Resul
 /// lamp-control shut it), looked at without waiting. Bytes after the ask
 /// line are not the protocol's on a turn start: read and let go, at most
 /// one piece a look, so they never hide the close for long.
-fn asker_went(stream: &UnixStream) -> bool {
+pub(crate) fn asker_went(stream: &UnixStream) -> bool {
     if stream.set_nonblocking(true).is_err() {
         return false;
     }
@@ -3118,6 +3220,18 @@ pub fn may_play_sound_with(now: &SoundNow, every_sound: bool) -> Result<(), &'st
         Ok(())
     }
 }
+
+/// What became of a stream asked for ([`Says::admit_stream`]).
+#[derive(Debug, PartialEq, Eq)]
+pub enum Admitted {
+    /// The speaker is its computer's now.
+    Opened { by: String },
+    /// Refused, with why, in the words its computer is told.
+    Refused { by: String, why: String },
+}
+
+/// Why a stream the voice held ends when its computer closed the connection.
+pub const STREAM_CLOSED: &str = "the computer closed the stream";
 
 /// What becomes of a paired computer's exact line now ([`may_play_exact`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -5946,6 +6060,174 @@ mod tests {
         ] {
             assert_eq!(parse(line), Err("not a say request".into()), "{line}");
         }
+    }
+
+    /// A lamp at rest: nothing in the way of a stream.
+    fn at_rest() -> SoundNow {
+        SoundNow {
+            paused: false,
+            muted: false,
+            speaking: false,
+            listening: false,
+            reply_owed: false,
+            reminder_waiting: false,
+            since_turn_us: u64::MAX,
+            since_sound_us: None,
+            playing: false,
+            conversing: false,
+        }
+    }
+
+    const STREAM_LINE: &str = r#"{"skill":"control","stream":{"by":"desk"},"expires_in_ms":30000}"#;
+
+    /// A client that asked a stream, and what the voice says line by line.
+    fn streaming(path: &Path) -> (UnixStream, BufReader<UnixStream>) {
+        let mut client = UnixStream::connect(path).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(3)))
+            .unwrap();
+        let said = BufReader::new(client.try_clone().unwrap());
+        writeln!(client, "{STREAM_LINE}").unwrap();
+        (client, said)
+    }
+
+    fn said(reader: &mut BufReader<UnixStream>) -> serde_json::Value {
+        let mut text = String::new();
+        reader.read_line(&mut text).unwrap();
+        serde_json::from_str(&text).unwrap_or_else(|_| panic!("a json line, got {text:?}"))
+    }
+
+    /// The voice's pass over its says until `done` says so, or three seconds.
+    fn pass_until(
+        says: &mut Says,
+        now: &SoundNow,
+        mut done: impl FnMut(Option<Admitted>, bool) -> bool,
+    ) {
+        let started = Instant::now();
+        while started.elapsed() < Duration::from_secs(3) {
+            let at_us = lamp_ipc::monotonic_us();
+            says.poll(at_us);
+            let admitted = says.admit_stream(now, at_us);
+            if done(admitted, says.stream.is_some()) {
+                return;
+            }
+            thread::sleep(Duration::from_millis(5));
+        }
+        panic!("the voice did not come to it in time");
+    }
+
+    #[test]
+    fn a_stream_is_opened_at_rest_one_at_a_time_and_ended_by_its_close() {
+        let _turn = crate::speaker_stream::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (bus, bus_dir) = {
+            let dir = socket_dir("stream-bus");
+            (lamp_bus::Bus::new(dir.join("bus")).unwrap(), dir)
+        };
+        *crate::speaker_stream::TEST_BUS.lock().unwrap() = Some(bus);
+        crate::speaker_stream::set(true);
+        let (path, mut says, _mutes) = listening("stream-open");
+        let (client, mut first) = streaming(&path);
+        let rest = at_rest();
+        let mut admitted = None;
+        pass_until(&mut says, &rest, |now, _| {
+            admitted = now;
+            admitted.is_some()
+        });
+        assert_eq!(admitted, Some(Admitted::Opened { by: "desk".into() }));
+        let open = said(&mut first);
+        assert_eq!(open["event"], "stream");
+        assert_eq!(open["state"], "open");
+        // A second stream is refused at once, without the voice's look.
+        let (_other, mut second) = streaming(&path);
+        assert_eq!(
+            said(&mut second),
+            serde_json::json!({"outcome": "refused", "why": crate::speaker_stream::BUSY})
+        );
+        // Its computer closes the connection: the voice ends it, `dropped`.
+        client.shutdown(std::net::Shutdown::Write).unwrap();
+        pass_until(&mut says, &rest, |_, held| !held);
+        let mut last = serde_json::Value::Null;
+        for _ in 0..10 {
+            last = said(&mut first);
+            if last["outcome"].is_string() {
+                break;
+            }
+        }
+        assert_eq!(
+            last,
+            serde_json::json!({"outcome": "dropped", "why": STREAM_CLOSED})
+        );
+        crate::speaker_stream::set(false);
+        *crate::speaker_stream::TEST_BUS.lock().unwrap() = None;
+        drop(says);
+        let _ = fs::remove_dir_all(bus_dir);
+    }
+
+    #[test]
+    fn a_stream_is_refused_in_words_while_the_lamp_is_not_at_rest_and_off_it_is_not_taken() {
+        let _turn = crate::speaker_stream::ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        crate::speaker_stream::set(true);
+        let (path, mut says, _mutes) = listening("stream-refused");
+        for (now, why) in [
+            (
+                SoundNow {
+                    conversing: true,
+                    ..at_rest()
+                },
+                "the speaker is busy: someone is talking with the lamp",
+            ),
+            (
+                SoundNow {
+                    playing: true,
+                    ..at_rest()
+                },
+                "the speaker is busy: the lamp is speaking",
+            ),
+            (
+                SoundNow {
+                    muted: true,
+                    ..at_rest()
+                },
+                "the lamp is muted",
+            ),
+            (
+                SoundNow {
+                    paused: true,
+                    ..at_rest()
+                },
+                "the lamp is paused",
+            ),
+        ] {
+            let (_client, mut said_to) = streaming(&path);
+            let mut admitted = None;
+            pass_until(&mut says, &now, |taken, _| {
+                admitted = taken;
+                admitted.is_some()
+            });
+            assert_eq!(
+                admitted,
+                Some(Admitted::Refused {
+                    by: "desk".into(),
+                    why: why.into()
+                })
+            );
+            assert_eq!(
+                said(&mut said_to),
+                serde_json::json!({"outcome": "refused", "why": why})
+            );
+        }
+        // Switched off, a stream is not taken at all, as by a voice without it.
+        crate::speaker_stream::set(false);
+        let (_client, mut off) = streaming(&path);
+        assert_eq!(
+            said(&mut off),
+            serde_json::json!({"outcome": "refused", "why": crate::speaker_stream::NOT_TAKEN})
+        );
+        drop(says);
     }
 
     /// A say service whose computers' mutes are this test's own, served as
