@@ -258,7 +258,15 @@ fn a_directory_others_can_enter_is_refused_with_the_reason_and_exit_code_two() {
 fn a_killed_process_leaves_a_store_the_next_one_loads_and_a_socket_it_replaces() {
     let scratch = Scratch::new("killed");
     let socket = scratch.0.join("m.sock");
-    let at = 1_791_892_800_000u64;
+    // A current stamp: a fixed date ages out of the default 30 days the day the test is rerun later, and the
+    // recall below would then lose its exchange to the calendar, not to the kill (12 Nov 2026, on 13 Oct).
+    let at = u64::try_from(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis(),
+    )
+    .unwrap();
     let first = Process::start(&scratch, "made/store", "m.sock", "log1");
     let added = ask(
         &socket,
