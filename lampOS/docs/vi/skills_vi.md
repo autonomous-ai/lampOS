@@ -750,14 +750,16 @@ sau:
      không có trong unit sản phẩm nào; trong `lamp-voice` được truyền cho
      cả hai route, chỉ được đọc khi `LAMP_MADE_SCRIPTS=on`,
      `made_skill::code_on_at_once`). Phán quyết của first builder trên
-     #6059 (19:14, và dòng 19:44 của anh ấy: "sound" là âm thanh và giọng
+     #6059 (19:14, và dòng 19:44 của builder đầu tiên: "sound" là âm thanh và giọng
      nói của chính đèn) vạch ranh giới (`made_skill::code_goes_on_at_once`):
      mã chỉ có các quyền ánh sáng của đèn, giọng nói và âm thanh của nó
      hoặc đầu và tay của nó (`made_skill::CODE_AT_ONCE_GRANTS`: `light`,
      `speak`, `body`; hẹn giờ là một trigger và không cần quyền) được bật
      ngay; mã có bất kỳ quyền nào khác, trước hết là camera, micro và
      `sound`, là quyền nghe các loại âm thanh chứ không phải phát chúng
-     (`made_skill::CODE_YES_GRANTS`), hoặc bất kỳ lần gửi nào (một lần ghi,
+     (`made_skill::CODE_YES_GRANTS`), mã biết ai đang ở bên đèn (`who`,
+     `known_faces`: danh tính là quyền riêng tư của camera, first builder
+     lúc 20:16; lamp-control không có quyền nào cho nó), hoặc bất kỳ lần gửi nào (một lần ghi,
      tin nhắn tới điện thoại) vẫn giữ lời đồng ý bằng giọng nói đúng như khi
      công tắc tắt. Một lần tạo như vậy, bằng giọng nói hay từ MAKE IT của
      ứng dụng (`app_make::put_on_line`), được bật ngay khi tạo xong, qua đúng đường của lời đồng ý
@@ -785,6 +787,7 @@ sau:
      `with_the_switch_a_code_make_not_made_or_not_on_says_so_plainly`,
      `with_the_switch_a_send_still_waits_for_its_yes`,
      `with_the_switch_a_voice_code_make_with_the_camera_still_waits_for_its_yes`,
+     `with_the_switch_a_voice_code_make_knowing_who_is_there_still_waits_for_its_yes`,
      `the_grants_that_go_on_at_once_never_hold_the_camera_or_the_microphone`,
      `app_make::tests::with_the_switch_an_app_make_with_code_goes_on_at_once`,
      `app_make::tests::with_the_switch_an_app_make_with_the_camera_still_waits_for_its_yes`,
