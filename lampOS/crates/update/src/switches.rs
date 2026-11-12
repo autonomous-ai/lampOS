@@ -236,6 +236,21 @@ pub fn said(what: &str, how: &str) -> String {
     format!("{what} {how}; the product sets it on")
 }
 
+/// One of lamp-update's own switches (#6607), as `LAMP_APP_ENGINES` and
+/// `LAMP_SKILL_TASKS` are read: set in its environment (`env`), `on`
+/// exactly and any other value off, so the environment always wins; not set
+/// there at all, the switch file every build carries
+/// (`manifest::UPDATE_ENV`, `/etc/lampOS/update.env`) under `root`, read by
+/// `crate::models::file_says_on`'s rule; missing or garbled, off. No round
+/// rewrites lamp-update's own unit, so a switch only in that unit never
+/// reaches a lamp already in a home: every lamp-update switch is read here.
+pub fn update_switch(root: &std::path::Path, switch: &str, env: Option<&std::ffi::OsStr>) -> bool {
+    match env {
+        Some(value) => value == "on",
+        None => crate::models::lamp_file_says_on(root, crate::manifest::UPDATE_ENV, switch),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,5 +437,49 @@ mod tests {
         assert_eq!(found.get("LAMP_CLOUD"), Some("off"));
         assert_eq!(found.get("LAMP_Y"), Some("on"));
         assert_eq!(found.get("LAMP_X"), None);
+    }
+
+    /// #6607: a lamp whose lamp-update unit lacks `LAMP_APP_ENGINES` and
+    /// `LAMP_SKILL_TASKS` (c0a4's, dated 5 Nov) takes both from the carried
+    /// file the product ships; the environment set wins; no file is off.
+    #[test]
+    fn lamp_updates_switches_come_from_the_carried_file_the_environment_winning() {
+        use std::ffi::OsStr;
+        let product = include_bytes!("../../../deploy/product/settings/update.env");
+        let engines = crate::engines::SWITCH;
+        let tasks = crate::hermes_install::TASKS_SWITCH;
+        assert!(crate::models::file_says_on(product, engines));
+        assert!(crate::models::file_says_on(product, tasks));
+
+        let root = tempfile::tempdir().unwrap();
+        // No file, nothing set: off.
+        assert!(!update_switch(root.path(), engines, None));
+        assert!(!update_switch(root.path(), tasks, None));
+        // Set in the environment, it decides with no file.
+        assert!(update_switch(root.path(), engines, Some(OsStr::new("on"))));
+
+        let at = root
+            .path()
+            .join(crate::manifest::UPDATE_ENV.trim_start_matches('/'));
+        std::fs::create_dir_all(at.parent().unwrap()).unwrap();
+        std::fs::write(&at, product).unwrap();
+        // The unit lacks the lines: the carried file turns both on.
+        assert!(update_switch(root.path(), engines, None));
+        assert!(update_switch(root.path(), tasks, None));
+        // The environment set always wins over the file.
+        assert!(!update_switch(
+            root.path(),
+            engines,
+            Some(OsStr::new("off"))
+        ));
+        assert!(!update_switch(root.path(), tasks, Some(OsStr::new(""))));
+        // A switch the file doesn't name stays off.
+        assert!(!update_switch(root.path(), "LAMP_NOT_A_SWITCH", None));
+        // The file saying off, or garbled: off.
+        std::fs::write(&at, b"LAMP_APP_ENGINES=off\nLAMP_SKILL_TASKS=on\n").unwrap();
+        assert!(!update_switch(root.path(), engines, None));
+        assert!(update_switch(root.path(), tasks, None));
+        std::fs::write(&at, b"LAMP_APP_ENGINES=on\ngarbage\n").unwrap();
+        assert!(!update_switch(root.path(), engines, None));
     }
 }
