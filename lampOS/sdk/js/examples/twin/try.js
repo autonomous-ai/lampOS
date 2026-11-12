@@ -8,6 +8,9 @@
 // --lan-address IP  the one network address the page is served on (default: the first real Ethernet or Wi-Fi address,
 //                  never a Docker, VM or VPN one; the others are listed). It must be one of this computer's own.
 //
+// A REAL lamp instead: `node examples/twin/try.js --real --host H` (code and pin in LAMP_TRY_CODE / LAMP_TRY_PIN or a prompt)
+// or `--real --keyring DIR`; see real.js. No lamp-sim, no stimuli; every row says if the lamp or the run cannot do it.
+//
 // --lamp-sim PATH  the lamp-sim binary (default: `lamp-sim` on the PATH; lamp-body and lamp-control beside it)
 // The lamp lives in a private folder of its own (~/.lampsim-try-PID, 0700) that Ctrl-C removes, and listens on
 // 127.0.0.1 only: only this program reaches it. The page is the one thing on the network, and it answers only
@@ -32,7 +35,11 @@ const freePort = () => new Promise((resolve, reject) => {
   probe.listen(0, '127.0.0.1', () => { const { port } = probe.address(); probe.close(() => resolve(port)); });
 });
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.slice(2).includes('--real')) {
+  // A real lamp (real.js): no lamp-sim, no stimuli; the code and pin from the environment or a hidden prompt.
+  const { runReal } = await import('./real.js');
+  await runReal(process.argv.slice(2));
+} else if (process.argv[1] === fileURLToPath(import.meta.url)) {
   let options;
   try { options = parseArguments(process.argv.slice(2)); } catch (error) { console.error(`${error.message}\nusage: see the top of this file`); process.exit(2); }
   const dir = join(homedir(), `.lampsim-try-${process.pid}`);
