@@ -95,7 +95,7 @@ export async function pairOrOpen(options, env = process.env, ask = promptHidden)
 }
 
 // Runs the twin on that keyring and says its URL; the page is on the network like try.js's.
-export async function startReal(options, keyring, folderOrKeyringPath, log = console.log) {
+export async function startReal(options, folderOrKeyringPath) {
   const twinPort = options['twin-port'] ?? String((await portFree(8737)) ? 8737 : 0);
   const args = [fileURLToPath(new URL('server.js', import.meta.url)), '--real', '--lan', '--port', twinPort === '0' ? String(await freePort()) : twinPort,
     ...(options.glb ? ['--glb', options.glb] : []), ...(options['lan-address'] ? ['--lan-address', options['lan-address']] : []),
@@ -115,8 +115,6 @@ export async function startReal(options, keyring, folderOrKeyringPath, log = con
     });
     twin.on('close', (code) => reject(new Error(`the twin ended (${code})`)));
   });
-  void keyring;
-  void log;
   return { twin, urls };
 }
 
@@ -152,7 +150,7 @@ export async function runReal(argv, { exit = (code) => process.exit(code), log =
   process.on('SIGINT', () => end(0));
   process.on('SIGTERM', () => end(0));
   try {
-    const started = await startReal(options, made.keyring, keyringAt, log);
+    const started = await startReal(options, keyringAt);
     twin = started.twin;
     const on = [options.flags.has('camera') && 'CAMERA', options.flags.has('microphone') && 'MICROPHONE'].filter(Boolean).join(' and ');
     log(`\n  A REAL LAMP. Open this on any device on your network:\n\n    ${started.urls.network ?? started.urls.local}\n\n  (the token in it is the key; Ctrl-C stops the page and takes this run's test clips and notes off the lamp)`);
