@@ -50,6 +50,8 @@ install lampOS on a blank lamp (docs/install.md): the newest build's binary of e
         product part, in its folder with its current link; the product units, tmpfiles,
         users and zone; enables the lamp and starts nothing. Run again, it changes
         nothing. As root, on the lamp itself.
+region  the name and time servers for the region lamp-cloud keeps (docs/install.md, #6256):
+        China's only on a lamp placed in China. As root; lamp-region.service runs it.
 harness-off undoes install's Harness at boot, and only that: as lampos, the Harness CLI's
         `harness service uninstall` and `harness stop`, then `loginctl disable-linger
         lampos`, then install's record of it. Harness itself, its sign-in and the
@@ -163,6 +165,7 @@ fn main() -> ExitCode {
         }
         "check" | "once" | "serve" => return on_the_lamp(command, &options),
         "install" => install(&options),
+        "region" => region(&options),
         "harness-off" => harness_off(&options),
         "harness-on" => harness_on(&options),
         "harness-install" => harness_install(&options),
@@ -414,6 +417,17 @@ fn install(options: &BTreeMap<String, String>) -> Result<(), String> {
             done.sequence,
             done.changed.len()
         );
+    }
+    Ok(())
+}
+
+fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let mut say = |line: &str| eprintln!("lamp-update: {line}");
+    let mut changed = Vec::new();
+    install::region_servers(Path::new("/"), &mut System, &mut changed, &mut say)?;
+    for line in &changed {
+        println!("{line}");
     }
     Ok(())
 }

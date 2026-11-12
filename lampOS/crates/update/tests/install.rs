@@ -7738,87 +7738,97 @@ fn the_product_carries_guard_modes_texts_alone_and_its_off_first_words() {
 }
 
 /// Debian's openresolv file as the V2 image leaves it
-/// (`scripts/imager/build-orangepi-v2.sh` before #6256): `name_servers=`,
-/// which openresolv puts before the router's.
+/// (`scripts/imager/build-orangepi-v2.sh`): `name_servers=`, which
+/// openresolv puts before the router's.
 const RESOLVCONF_V2_IMAGE: &str = include_str!("fixtures/resolvconf-v2-image.conf");
 
+/// The region file lamp-cloud keeps, which `lamp-update region` reads.
+const REGION: &str = install::REGION_FILE;
+
 #[test]
-fn name_servers_follow_the_routers_and_answer_in_china() {
-    // #6256: absent, the V2 image's, and already fixed.
-    let absent = install::resolvconf_fixed(None);
+fn the_region_file_is_the_one_the_voice_reads() {
+    assert_eq!(REGION, lamp_voice::second_provider::REGION_FILE);
+}
+
+fn asked(lamp: &Lamp, argv: &str) -> usize {
+    let call = format!("refresh {argv}");
+    lamp.host.calls.iter().filter(|done| **done == call).count()
+}
+
+#[test]
+fn the_name_servers_line_is_replaced_in_place_and_every_other_line_kept() {
+    // #6256: absent, the V2 image's, already fixed, and back again.
+    let absent = install::resolvconf_fixed(None, install::NAME_SERVERS);
     assert_eq!(absent, format!("{}\n", install::NAME_SERVERS));
-    let image = install::resolvconf_fixed(Some(RESOLVCONF_V2_IMAGE));
+    let china = install::resolvconf_fixed(Some(RESOLVCONF_V2_IMAGE), install::NAME_SERVERS);
     assert_eq!(
-        image,
-        RESOLVCONF_V2_IMAGE.replace(
-            "name_servers=\"1.1.1.1 8.8.8.8\"",
-            r#"name_servers_append="223.5.5.5 119.29.29.29 1.1.1.1 8.8.8.8""#
-        )
+        china,
+        RESOLVCONF_V2_IMAGE.replace(install::NAME_SERVERS_IMAGE, install::NAME_SERVERS)
     );
     assert!(
-        image.contains("#name_servers=127.0.0.1\n"),
+        china.contains("#name_servers=127.0.0.1\n"),
         "a comment is kept"
     );
-    for fixed in [&absent, &image] {
-        assert_eq!(&install::resolvconf_fixed(Some(fixed)), fixed);
+    for fixed in [&absent, &china] {
+        assert_eq!(
+            &install::resolvconf_fixed(Some(fixed), install::NAME_SERVERS),
+            fixed
+        );
     }
+    assert_eq!(
+        install::resolvconf_fixed(Some(&china), install::NAME_SERVERS_IMAGE),
+        RESOLVCONF_V2_IMAGE,
+        "back to the image's file byte for byte"
+    );
     // A second `name_servers*` line goes; the first one's place is kept.
     assert_eq!(
-        install::resolvconf_fixed(Some("a=1\nname_servers=x\nb=2\n  name_servers_append=y\n")),
+        install::resolvconf_fixed(
+            Some("a=1\nname_servers=x\nb=2\n  name_servers_append=y\n"),
+            install::NAME_SERVERS
+        ),
         format!("a=1\n{}\nb=2\n", install::NAME_SERVERS)
     );
 }
 
 #[test]
-fn the_v2_image_writes_the_same_name_servers_as_install() {
+fn the_v2_image_keeps_cloudflare_and_google_and_never_names_chinas_servers() {
+    // The Reviewer-lead's HOLD on #6386: China's resolvers only on a lamp
+    // placed in China, never from the image.
     let imager = include_str!("../../../../scripts/imager/build-orangepi-v2.sh");
-    assert!(imager.contains(install::NAME_SERVERS), "the imager's line");
     assert!(
-        !imager
-            .lines()
-            .any(|line| !line.trim_start().starts_with('#') && line.contains("name_servers=")),
-        "no name_servers= before the router's"
+        imager.contains(install::NAME_SERVERS_IMAGE),
+        "the image's line"
     );
+    assert!(RESOLVCONF_V2_IMAGE.contains(install::NAME_SERVERS_IMAGE));
+    for chinese in ["223.5.5.5", "119.29.29.29", "aliyun", "tencent"] {
+        assert!(!imager.contains(chinese), "{chinese}");
+    }
 }
 
 #[test]
-fn install_fixes_the_name_servers_and_asks_resolvconf_once() {
+fn a_lamp_placed_in_china_lists_chinas_name_and_time_servers_after_the_routers() {
     let mut lamp = Lamp::new(188, &[]);
     fs::create_dir_all(lamp.on("/etc")).unwrap();
     fs::write(lamp.on(install::RESOLVCONF_PATH), RESOLVCONF_V2_IMAGE).unwrap();
+    fs::create_dir_all(lamp.on(REGION).parent().unwrap()).unwrap();
+    fs::write(lamp.on(REGION), "CN\n").unwrap();
     let done = lamp.install().unwrap();
-    assert!(
-        done.changed
-            .contains(&format!("wrote {}", install::RESOLVCONF_PATH))
+    for path in [install::RESOLVCONF_PATH, install::TIMESYNCD_PATH] {
+        assert!(done.changed.contains(&format!("wrote {path}")), "{path}");
+    }
+    let text = fs::read_to_string(lamp.on(install::RESOLVCONF_PATH)).unwrap();
+    let servers: Vec<&str> = text
+        .lines()
+        .filter(|line| line.starts_with("name_servers"))
+        .collect();
+    assert_eq!(servers, [install::NAME_SERVERS]);
+    let (ali, cloudflare) = (
+        text.find("223.5.5.5").unwrap(),
+        text.find("1.1.1.1").unwrap(),
     );
-    assert_eq!(
-        fs::read_to_string(lamp.on(install::RESOLVCONF_PATH)).unwrap(),
-        install::resolvconf_fixed(Some(RESOLVCONF_V2_IMAGE))
-    );
-    let refreshed = |lamp: &Lamp| {
-        lamp.host
-            .calls
-            .iter()
-            .filter(|call| *call == "refresh resolvconf -u")
-            .count()
-    };
-    assert_eq!(refreshed(&lamp), 1, "{:?}", lamp.host.calls);
-    lamp.install().unwrap();
-    assert_eq!(refreshed(&lamp), 1, "already fixed: nothing asked");
-}
-
-#[test]
-fn the_clock_falls_back_to_time_servers_that_answer_in_china() {
-    // #6256: Debian's pool first, then Alibaba's, Tencent's and the CN pool,
-    // as fallbacks only, so a server the network gives still wins.
-    let mut lamp = Lamp::new(188, &[]);
-    let done = lamp.install().unwrap();
-    assert!(
-        done.changed
-            .contains(&format!("wrote {}", install::TIMESYNCD_PATH))
-    );
-    let text = fs::read_to_string(lamp.on(install::TIMESYNCD_PATH)).unwrap();
-    let lines: Vec<&str> = text.lines().filter(|line| !line.starts_with('#')).collect();
+    assert!(text.find("119.29.29.29").unwrap() < cloudflare && ali < cloudflare);
+    let time = fs::read_to_string(lamp.on(install::TIMESYNCD_PATH)).unwrap();
+    let lines: Vec<&str> = time.lines().filter(|line| !line.starts_with('#')).collect();
     assert_eq!(
         lines,
         [
@@ -7826,15 +7836,109 @@ fn the_clock_falls_back_to_time_servers_that_answer_in_china() {
             "FallbackNTP=0.debian.pool.ntp.org 1.debian.pool.ntp.org ntp.aliyun.com ntp.tencent.com cn.pool.ntp.org",
         ]
     );
-    let restarted = |lamp: &Lamp| {
-        lamp.host
-            .calls
-            .iter()
-            .filter(|call| *call == "refresh systemctl try-restart systemd-timesyncd")
-            .count()
-    };
-    assert_eq!(restarted(&lamp), 1, "{:?}", lamp.host.calls);
+    assert_eq!(asked(&lamp, "resolvconf -u"), 1, "{:?}", lamp.host.calls);
+    let restart = "systemctl try-restart systemd-timesyncd";
+    assert_eq!(asked(&lamp, restart), 1);
     let again = lamp.install().unwrap();
     assert_eq!(again.changed, Vec::<String>::new());
-    assert_eq!(restarted(&lamp), 1, "written once: nothing asked again");
+    assert_eq!(
+        asked(&lamp, "resolvconf -u"),
+        1,
+        "already so: nothing asked"
+    );
+    assert_eq!(asked(&lamp, restart), 1);
+}
+
+#[test]
+fn any_other_lamp_keeps_its_fallback_and_gets_no_time_drop_in() {
+    // "" from the backend, no region file, and one that cannot be read.
+    for region in [Some(""), None, Some("unreadable")] {
+        let mut lamp = Lamp::new(188, &[]);
+        fs::create_dir_all(lamp.on("/etc")).unwrap();
+        fs::write(lamp.on(install::RESOLVCONF_PATH), RESOLVCONF_V2_IMAGE).unwrap();
+        match region {
+            Some("unreadable") => fs::create_dir_all(lamp.on(REGION)).unwrap(),
+            Some(text) => {
+                fs::create_dir_all(lamp.on(REGION).parent().unwrap()).unwrap();
+                fs::write(lamp.on(REGION), text).unwrap();
+            }
+            None => {}
+        }
+        lamp.install().unwrap();
+        assert_eq!(
+            fs::read_to_string(lamp.on(install::RESOLVCONF_PATH)).unwrap(),
+            RESOLVCONF_V2_IMAGE,
+            "{region:?}"
+        );
+        assert!(!lamp.on(install::TIMESYNCD_PATH).exists(), "{region:?}");
+        assert!(
+            !lamp
+                .host
+                .calls
+                .iter()
+                .any(|call| call.starts_with("refresh")),
+            "{region:?}: {:?}",
+            lamp.host.calls
+        );
+    }
+}
+
+#[test]
+fn a_lamp_no_longer_placed_in_china_gets_the_images_fallback_back() {
+    let mut lamp = Lamp::new(188, &[]);
+    fs::create_dir_all(lamp.on("/etc")).unwrap();
+    fs::write(lamp.on(install::RESOLVCONF_PATH), RESOLVCONF_V2_IMAGE).unwrap();
+    fs::create_dir_all(lamp.on(REGION).parent().unwrap()).unwrap();
+    fs::write(lamp.on(REGION), "CN\n").unwrap();
+    lamp.install().unwrap();
+    // lamp-cloud writes "" and lamp-region.path runs `lamp-update region`.
+    fs::write(lamp.on(REGION), "\n").unwrap();
+    let mut changed = Vec::new();
+    let mut said = Vec::new();
+    install::region_servers(
+        &lamp.root,
+        &mut lamp.host,
+        &mut changed,
+        &mut |line: &str| said.push(line.to_owned()),
+    )
+    .unwrap();
+    assert_eq!(
+        changed,
+        [
+            format!("wrote {}", install::RESOLVCONF_PATH),
+            format!("removed {}", install::TIMESYNCD_PATH),
+        ]
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.on(install::RESOLVCONF_PATH)).unwrap(),
+        RESOLVCONF_V2_IMAGE
+    );
+    assert!(!lamp.on(install::TIMESYNCD_PATH).exists());
+    assert_eq!(asked(&lamp, "resolvconf -u"), 2);
+    assert_eq!(asked(&lamp, "systemctl try-restart systemd-timesyncd"), 2);
+    assert_eq!(said, Vec::<String>::new());
+}
+
+#[test]
+fn the_region_units_run_lamp_update_region_as_root_at_boot_and_on_a_change() {
+    let unit = |name: &str| {
+        install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == name)
+            .unwrap_or_else(|| panic!("{name} not in the product"))
+            .1
+    };
+    let path = unit("lamp-region.path");
+    assert!(path.contains(&format!("PathChanged={REGION}\n")));
+    assert!(path.contains("Unit=lamp-region.service\n"));
+    let service = unit("lamp-region.service");
+    for line in [
+        "User=root",
+        "Type=oneshot",
+        "ExecStart=/opt/lampOS/update/current/lamp-update region",
+        "ReadWritePaths=/etc -/run/resolvconf",
+        "WantedBy=multi-user.target",
+    ] {
+        assert!(service.lines().any(|kept| kept == line), "{line}");
+    }
 }

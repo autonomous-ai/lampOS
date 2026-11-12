@@ -3859,12 +3859,14 @@ fn installed_units(config: &Config) -> io::Result<Vec<Installed>> {
         // A linked unit lives somewhere else, which is not this program's
         // to change. Neither is a unit of lamp-update's own: its service, and
         // the writer's one-shot (crate::writer_unit) and Harness's
-        // (crate::harness_install), which start `update/current` too and
-        // must never move that link as a part's.
+        // (crate::harness_install), and the region's (crate::install::REGION_UNIT),
+        // which start `update/current` too and must never move that link as a
+        // part's.
         if !manifest::is_unit_name(&name)
             || name == OWN_UNIT
             || name == crate::writer_unit::UNIT
             || name == crate::harness_install::UNIT
+            || name == crate::install::REGION_UNIT
             || !entry.file_type()?.is_file()
         {
             continue;
