@@ -2984,7 +2984,7 @@
             }
           },
           "then": {
-            "description": "Every 2 s while a speaker.stream runs: how much sound the voice holds, and what was lost: blocks the lamp had no room for or held back for the ring's mark, underruns the voice played as silence, blocks it limited to the clips' loudness cap, and binary messages dropped because they were another connection's, too big or not whole samples.",
+            "description": "Every 2 s while a speaker.stream runs: how much sound the voice held when it wrote the line (`buffered_ms`, in ms at the speaker's 24 kHz; the line reaches the computer about a second old, and no line carries the stream's final totals), and what was lost: blocks the lamp had no room for or held back for the ring's mark, underruns (gaps the speaker itself reported in the stream's sound, its own queue ran dry; the stream running dry because the computer stopped sending counts as one when the speaker reports it), the 10 ms windows of sound the voice lowered or clipped to the clips' loudness cap (`limited`), and binary messages dropped because they were another connection's, too big or not whole samples.",
             "properties": {
               "turn": {
                 "type": "integer",
