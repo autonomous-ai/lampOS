@@ -310,21 +310,28 @@ fn said_whole_before(waiting: &Waiting, request: u64) -> bool {
     })
 }
 
-/// The first word of `say_back` that `said` does not hold in order, as
-/// [`crate::services::read_back_said`] checks it; none when it holds all.
-fn first_missing(say_back: &str, said: &str) -> Option<String> {
+/// Where `said` first falls short of `say_back`, as
+/// [`crate::services::read_back_said`] checks it: the 1-based place of the
+/// first say-back word it does not hold in order, and the say-back's word
+/// count; none when it holds all. Places only, never a word: the say-back
+/// is the write's own content, the person's.
+fn first_missing(say_back: &str, said: &str) -> Option<(usize, usize)> {
     let mut said = crate::services::check_words(said).into_iter();
-    crate::services::check_words(say_back)
-        .into_iter()
-        .find(|word| !said.any(|got| &got == word))
+    let wanted = crate::services::check_words(say_back);
+    wanted
+        .iter()
+        .position(|word| !said.any(|got| &got == word))
+        .map(|at| (at + 1, wanted.len()))
 }
 
 /// The journal's line of a yes in `request` not taken because the
 /// say-back was not heard whole (#6715): each of the lamp's answers kept
 /// toward it, by request, cut or not and its word count, and the first
 /// say-back word missing from the best of them (the one before `request`
-/// that holds the most of it in order, an uncut one on a tie). One word of the
-/// say-back at most, never the rest of it, nor what the lamp said.
+/// that holds the most of it in order, an uncut one on a tie). Counts and
+/// places only, never a word of the say-back nor of what the lamp said: a
+/// say-back is the person's content, and the journal holds counts and
+/// outcomes only (`LAMP_SKILL_WRITES`).
 fn not_said_whole_line(waiting: &Waiting, request: u64) -> String {
     let kept: Vec<String> = waiting
         .said
@@ -352,7 +359,7 @@ fn not_said_whole_line(waiting: &Waiting, request: u64) -> String {
     let missing = match best {
         None => "no answer kept".to_owned(),
         Some((id, said, cut)) => match first_missing(&waiting.asks.say_back, said) {
-            Some(word) => format!("first missing word in r{id} \"{word}\""),
+            Some((at, of)) => format!("first missing word in r{id}: {at} of {of}"),
             None if *cut => format!("r{id} held it all but was cut"),
             None => format!("r{id} held it all"),
         },
@@ -751,9 +758,15 @@ mod tests {
         let line = not_said_whole_line(&waiting(), 3);
         assert_eq!(
             line,
-            "lamp-voice: request 3: a made skill's yes not taken: its say-back was not heard whole (kept: r1 cut=false 10 words; r2 cut=true 9 words; first missing word in r1 \"saying\")"
+            "lamp-voice: request 3: a made skill's yes not taken: its say-back was not heard whole (kept: r1 cut=false 10 words; r2 cut=true 9 words; first missing word in r1: 10 of 14)"
         );
-        assert!(!line.contains("leaving now"), "{line}");
+        // No word of the say-back reaches the journal: places and counts only.
+        let line_words = crate::services::check_words(&line);
+        for word in crate::services::check_words(SAY_BACK) {
+            if word.len() > 2 {
+                assert!(!line_words.contains(&word), "{word} in {line}");
+            }
+        }
         // Held whole but cut: said so.
         lamp_said(3, SAY_BACK);
         lamp_cut(3);
