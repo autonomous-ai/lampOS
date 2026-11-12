@@ -5,10 +5,15 @@
 //! voice's) or `--enable`: off, it opens no socket and exits at once, so its
 //! unit stays inactive. `lamp-services --pdf-text` is the service's own
 //! child for one PDF's text (`mail::pdf`), never started by hand.
+//! `lamp-services mcp` is the lamp's agent's MCP server over stdio
+//! (`mcp_server`, `LAMP_AGENT_SERVICES`), started by Hermes in a skill's
+//! run: it holds no service token and reaches the services only through
+//! lamp-control's control socket with the run's one-run token.
 use lamp_services::{
     CALENDAR_EDITS_ENVIRONMENT, DRAFT_EDITS_ENVIRONMENT, ENVIRONMENT, LINKED_TOOLS_ENVIRONMENT,
     SKILL_READS_ENVIRONMENT, SKILL_TASKS_ENVIRONMENT, WRITE_ENVIRONMENT,
     mail::{self, Gmail},
+    mcp_server,
     net::Https,
     on,
     refresh::Backend,
@@ -47,6 +52,23 @@ fn main() -> ExitCode {
     // nothing else of the service is started.
     if std::env::args().nth(1).as_deref() == Some(mail::pdf::CHILD_ARG) {
         return mail::pdf::child();
+    }
+    // The lamp's agent's MCP server, on standard input and output.
+    if std::env::args().nth(1).as_deref() == Some(mcp_server::ARG) {
+        if std::env::args().nth(2).is_some() {
+            say(
+                "usage: lamp-services mcp (LAMP_CONTROL_SOCKET and LAMP_CONTROL_TOKEN, a skill run's)",
+            );
+            return ExitCode::from(2);
+        }
+        let link = mcp_server::Link::from_environment();
+        return match mcp_server::serve(&link, io::stdin().lock(), io::stdout().lock()) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                say(&format!("mcp: {}", error.kind()));
+                ExitCode::FAILURE
+            }
+        };
     }
     let mut enable = on(std::env::var(ENVIRONMENT).ok().as_deref());
     let mut store = PathBuf::from(store::DIR);

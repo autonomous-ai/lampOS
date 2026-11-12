@@ -2404,6 +2404,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "flate2",
+ "futures-util",
  "lamp-local-time",
  "pdf-extract",
  "reqwest",
@@ -2415,6 +2416,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-rustls",
+ "tokio-tungstenite",
  "unicode-normalization",
  "webpki-roots 1.0.9",
 ]
