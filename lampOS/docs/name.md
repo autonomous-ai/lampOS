@@ -273,7 +273,10 @@ start window, even when only a woken grid's score a second later reached
 the bar (lamp-52e6, #6078: the first grid gave 0.27–0.79 at the start, and
 the 0.89–0.94 that came 2.0–2.7 s in were of that same "Lamp"). A late score
 of sound inside the hold-off after a hearing is passed over, so one call is
-still one hearing. `check` dates its lines the same way.
+still one hearing. The hold-off counts from the sound that ended the
+hearing, not from when its scores came (#6114): in a woken grid's batch, a
+stray hearing early in the batch no longer passes over a call 1.5 s later
+in the same batch. `check` dates its lines the same way.
 
 The later grids run on a thread of their own (`hear::Woken`), so the first
 grid's steps, and its own hearing, never wait for them: a wake's catch-up
@@ -480,7 +483,13 @@ looks at whether the lamp speaks, and as the message arrives). With
 `voice/state` and passes over a hearing that began while it said
 `speaking`, or within 0.6 s after (a score reaches the bar a little after
 its sound, and the room rings on). Its first sign and its final word are
-judged once, together. A voice unheard for 2.5 s, or gone, is not speaking.
+judged once, together. With `--near`, a name hearing is judged from the
+call's first sound: the near bar's hearing going on, when it began up to
+0.5 s before the name's (`not_self::call_began`, `CALL_LEAD`, #6114). On
+lamp-52e6 on 12 Nov a "Lamp" called as the lamp began to speak went out on
+`name/near` at 0.972, its near hearing begun before the speech, while the
+name's own hearing, begun a step later inside it, was passed over, and no
+request opened. Now the two are judged as one call. A voice unheard for 2.5 s, or gone, is not speaking.
 Each one passed over is a journal line ("passed over a hearing that began
 while the lamp spoke", with its score), no sound, and the minute line counts
 them (`passed_over_in_all`). Any hearing that began within 3 s after the

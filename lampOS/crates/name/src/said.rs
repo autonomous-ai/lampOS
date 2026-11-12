@@ -56,9 +56,22 @@ impl Hearings {
         })
     }
 
+    /// When the hearing going on began, if one is.
+    pub fn began(&self) -> Option<Instant> {
+        self.open.map(|(began, _)| began)
+    }
+
     fn close(&mut self, now: Instant) -> Option<NameHeard> {
+        self.close_at(now, now)
+    }
+
+    /// [`Self::close`], the hold-off counted from `heard`, the time of the
+    /// sound that ended the hearing (#6114): a woken grid's batch holds off
+    /// only the second after the call, never one counted from when the
+    /// batch came, which would pass over a later call in the same batch.
+    fn close_at(&mut self, now: Instant, heard: Instant) -> Option<NameHeard> {
         let (began, score) = self.open.take()?;
-        self.quiet_until = Some(now + HOLD_OFF);
+        self.quiet_until = Some(heard.min(now) + HOLD_OFF);
         Some(NameHeard {
             score,
             ago_ms: u32::try_from(now.saturating_duration_since(began).as_millis())
@@ -87,10 +100,10 @@ impl Hearings {
                 *highest = highest.max(score.min(1.0));
                 *began = (*began).min(at.min(now));
                 (now.saturating_duration_since(*began) >= LONGEST)
-                    .then(|| self.close(now))
+                    .then(|| self.close_at(now, at))
                     .flatten()
             }
-            (Some(_), false) => self.close(now),
+            (Some(_), false) => self.close_at(now, at),
             (None, true) => {
                 self.open = Some((at.min(now), score.min(1.0)));
                 self.rising_said = false;
@@ -149,13 +162,14 @@ impl Stops {
 mod tests {
     use super::*;
 
-    /// #6114, cause 1 (hold-off): one call whose score dips under the
-    /// name's bar and rises again inside [`HOLD_OFF`] is said as near at its
-    /// best (0.972, 52e6 on 12391 at 18:23:08) while the name tracker, held
-    /// off after the dip, never sees that best. A hearing the near bar says
-    /// at the name's bar is the name's too, at the same score.
+    /// #6114, cause 1 ruled out: a score that dips under the name's bar
+    /// inside one call ends the name's hearing at its first peak, and the
+    /// higher peak after the dip is held off. The name is still heard
+    /// once, at the bar or over it: the dip lowers the score said, it never
+    /// loses the call. Fifth's 52e6 clue (a near at 0.972 and no request)
+    /// is cause 2 in `not_self`.
     #[test]
-    fn issue_6114_a_near_hearing_at_the_names_bar_is_a_name_hearing_too() {
+    fn issue_6114_a_dip_inside_a_call_still_says_the_name_once() {
         let start = Instant::now();
         let (mut name, mut nears) = (Hearings::new(0.9), Hearings::new(0.5));
         let (mut heard, mut near) = (Vec::new(), Vec::new());
@@ -167,10 +181,9 @@ mod tests {
             heard.extend(name.score(score, at));
             near.extend(nears.score(score, at));
         }
-        let near_best = near.iter().map(|n| n.score).fold(0.0f32, f32::max);
-        let name_best = heard.iter().map(|n| n.score).fold(0.0f32, f32::max);
-        assert!(near_best >= 0.9, "{near:?}");
-        assert_eq!(name_best, near_best, "name {heard:?}, near {near:?}");
+        assert_eq!(heard.len(), 1, "{heard:?}");
+        assert!(heard[0].score >= 0.9, "{heard:?}");
+        assert_eq!(near.len(), 1, "{near:?}");
     }
 
     /// #6114, cause 3 (late scores held off by when they came): a woken

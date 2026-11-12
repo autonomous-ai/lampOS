@@ -685,8 +685,12 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         // Whether a hearing said now, begun `ago_ms` before, goes out:
         // never one begun while the lamp spoke, and one begun while the body
         // moved only at `--moving-least`.
-        let mut lets_through = |name: &NameHeard| {
-            let ago = Duration::from_millis(u64::from(name.ago_ms));
+        // `call`: when the call began, if earlier than the hearing's own
+        // start ([`not_self::call_began`], #6114).
+        let mut lets_through = |name: &NameHeard, call: Option<Instant>| {
+            let ago = call.map_or(Duration::from_millis(u64::from(name.ago_ms)), |call| {
+                now.saturating_duration_since(call)
+            });
             if !(voice.is_none() || speaking.lets_through(ago, now)) {
                 return false;
             }
@@ -794,7 +798,13 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                                     rescued_in_hearing = true;
                                 }
                                 if let Some(first) = hearings.rising(now)
-                                    && lets_through(&first)
+                                    && lets_through(
+                                        &first,
+                                        Some(lamp_name::not_self::call_began(
+                                            began_of(&first, now),
+                                            nears.as_ref().and_then(Hearings::began),
+                                        )),
+                                    )
                                 {
                                     let _ = rising.publish_json(at_us(now), &first);
                                 }
@@ -828,10 +838,15 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         }
         // A hearing that reached the lower bar, said as it is over: never
         // one begun while the lamp spoke, as for the name.
-        if let (Some(near), Some(publisher)) = (
-            near_said.or_else(|| nears.as_mut().and_then(|nears| nears.tick(now))),
-            near_heard.as_mut(),
-        ) && lets_through(&near)
+        let near_said = near_said.or_else(|| nears.as_mut().and_then(|nears| nears.tick(now)));
+        // When this pass's near hearing began, said now or still going on:
+        // the name's call is judged from it ([`not_self::call_began`]).
+        let near_began = near_said
+            .as_ref()
+            .map(|near| began_of(near, now))
+            .or_else(|| nears.as_ref().and_then(Hearings::began));
+        if let (Some(near), Some(publisher)) = (near_said, near_heard.as_mut())
+            && lets_through(&near, None)
         {
             let _ = publisher.publish_json(at_us(now), &near);
             log(&format!(
@@ -840,11 +855,15 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             ));
         }
         if let Some(name) = name_said
-            && !lets_through(&name)
+            && !lets_through(
+                &name,
+                Some(lamp_name::not_self::call_began(
+                    began_of(&name, now),
+                    near_began,
+                )),
+            )
         {
-            let began = now
-                .checked_sub(Duration::from_millis(u64::from(name.ago_ms)))
-                .unwrap_or(now);
+            let began = lamp_name::not_self::call_began(began_of(&name, now), near_began);
             if voice.is_some() && speaking.covers(began, now) {
                 log(&format!(
                     "passed over a hearing that began while the lamp spoke: score={:.3} began_ms_ago={}{}",
@@ -1265,6 +1284,12 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// When a hearing said at `now` began.
+fn began_of(heard: &NameHeard, now: Instant) -> Instant {
+    now.checked_sub(Duration::from_millis(u64::from(heard.ago_ms)))
+        .unwrap_or(now)
 }
 
 #[cfg(test)]
