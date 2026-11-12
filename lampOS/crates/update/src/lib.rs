@@ -35,6 +35,7 @@ pub mod publish;
 pub mod quiet;
 pub mod records;
 pub mod round;
+pub mod sdk_tree;
 mod setup_lifecycle;
 pub mod status;
 pub mod switches;

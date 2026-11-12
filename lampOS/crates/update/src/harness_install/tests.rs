@@ -2831,3 +2831,22 @@ fn a_move_with_the_lock_held_stays_installing_for_its_holder() {
     assert!(log.borrow().is_empty());
     assert_eq!(lamp.said().unwrap().install, "installing");
 }
+
+/// The one-shot makes `/usr/local/lib/lampos` itself, before its sandbox (#6507): a lamp that took lamp-update from
+/// the channel never ran the installer that makes it, and the `-` of `ReadWritePaths` skips a missing folder, so the
+/// namespace scripts and the SDK could not be written on read-only `/usr`.
+#[test]
+fn the_one_shot_makes_the_folder_of_its_entry_points_before_its_sandbox() {
+    let make = TEXT
+        .lines()
+        .position(|line| {
+            line == "ExecStartPre=+/usr/bin/install -d -m 0755 -o root -g root /usr/local/lib/lampos"
+        })
+        .expect("the folder is made by a `+` line");
+    let start = TEXT
+        .lines()
+        .position(|line| line.starts_with("ExecStart="))
+        .unwrap();
+    assert!(make < start);
+    assert!(TEXT.contains("ReadWritePaths=/usr/local/bin -/usr/local/lib/lampos"));
+}

@@ -1590,7 +1590,16 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (checked by its SHA-256 in the checkout's `pm/lock.json`) and a
      uv-managed Python, and its package manager installs the dependencies
      from the checkout's hash-locked `uv.lock`. `hermes` is published at
-     `/var/lib/lampos-hermes/.local/bin/hermes`, on no `PATH`. No unit, no
+     `/var/lib/lampos-hermes/.local/bin/hermes`, on no `PATH`.
+     The build's own **lampos SDK** is written beside it, once for every
+     agent (#6507): `sdk_tree` embeds `sdk/python/src/lampos` and the
+     pure-Python `websockets` (`deploy/sdk-runtime/`, 15.0.1) in
+     lamp-update, and the same one-shot that writes Hermes's entry points
+     writes them to `/usr/local/lib/lampos/sdk-python` (root's, files 0644:
+     the namespace leaves `/usr` as it is, so a run reads it and cannot change
+     it). The folder holding anything but exactly this build's files counts
+     as Hermes missing, so a newer build has it written again; a skill's run
+     has it on `PYTHONPATH` (`docs/tasks.md`). No fetch at run time. No unit, no
      service, no gateway, nothing at boot: Harness starts `hermes` in a
      pane only when a task is sent to it.
    - **In a namespace that shows Hermes only its own folders.** Hermes
