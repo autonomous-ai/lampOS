@@ -1004,7 +1004,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     if let Some(engines) = &engines {
         // Every other engine the lamp's Harness has (the lead's rule of 12
         // Nov: the list is Harness's, never a fixed two), looked at on a
-        // thread of its own once a minute, only by a `serve` that acts.
+        // thread of its own every five minutes (`HARNESS_LOOK_EVERY`), only by a `serve` that acts.
         if config.apply && command == "serve" {
             engines.look_at_harness_every(
                 lamp_update::engines::HARNESS_LOOK_EVERY,
