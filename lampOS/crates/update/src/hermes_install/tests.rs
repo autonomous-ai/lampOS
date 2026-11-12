@@ -2016,15 +2016,23 @@ fn the_tasks_switch_is_lamp_tasks_own_and_on_in_the_product() {
         }
         assert!(wanted(Some("on"), product, false));
     }
-    let update = include_str!("../../../../deploy/product/lamp-update.service");
-    let tasks = include_str!("../../../../deploy/product/lamp-tasks.service");
     let switch = format!("Environment={TASKS_SWITCH}=on");
     let setting = format!("{TASKS_SWITCH}=");
-    for (unit, text) in [("lamp-update", update), ("lamp-tasks", tasks)] {
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    // One name turns a skill's tasks on: every unit whose part reads it.
+    for unit in [
+        "lamp-control",
+        "lamp-services",
+        "lamp-skills",
+        "lamp-skills-manage@",
+        "lamp-tasks",
+        "lamp-update",
+        "lamp-voice",
+    ] {
+        let text = fs::read_to_string(product.join(format!("{unit}.service"))).unwrap();
         let lines = text.lines().filter(|line| *line == switch).count();
         assert_eq!(lines, 1, "{unit}");
     }
-    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
     for entry in fs::read_dir(&product).unwrap() {
         let path = entry.unwrap().path();
         if let Ok(text) = fs::read_to_string(&path) {
