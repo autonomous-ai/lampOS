@@ -6,7 +6,8 @@ speaks in that voice and takes those words into its character. Off unless
 `LAMP_CHOSEN_VOICE=on` on both `lamp-cloud` (beside `LAMP_CLOUD=on` and
 `LAMP_SETTINGS_CHANGE=on`) and `lamp-voice`. With it off, neither kind is in
 `system.info`'s `can`, both are answered "not on this lamp", and the voice
-reads neither file: it speaks and answers exactly as before.
+reads neither file: it speaks and answers exactly as before. The product's
+units set it in both since 12 November (#6590).
 
 ## The messages
 
