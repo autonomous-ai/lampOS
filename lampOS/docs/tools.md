@@ -890,6 +890,34 @@ expected (`as_expected`), how many of those spoke before the call
     LAMP_TASKS_ASKED=on lamp-voice provider-check /etc/lampOS/voice/provider.json --hand-overs 5
     LAMP_TASKS_ASKED=on LAMP_TOOL_LEAD_IN=on lamp-voice provider-check /etc/lampOS/voice/provider.json --hand-overs 5
 
+**The route, not only the start (#6547).** `--hand-overs` also asks 30
+requests labelled `route_`, each with the route it should take
+(`tool_turns::Route`): the lamp's own answer (4: the weather, a fact, a joke,
+a poem said aloud), one of its own functions (9: a timer, two reminders such
+as "remind me to email Bob a summary", warmer, dimmer, off, blue, the time
+in English and in Vietnamese), a skill (5: two light scenes, "check my
+homework", which also sounds like work, look for my phone, dance), or
+`start_agent_task` (12): on the lamp (a file such as fruits.md, research, a
+website, a spreadsheet, "do it yourself on the lamp", a file asked in
+Vietnamese, "Hermes, look up the weather" by Hermes) or on a computer ("ask
+Claude Code to fix my repo", the same garbled as "cloud code", Codex named,
+"on my computer, make a doc", "on the Mac"). A skill counts through
+`use_skill` or by its own function; a hand-over's place and engine are read
+as the voice maps them (`agent_tasks::route_of`): no machine named is the
+lamp's own engine, `where` `computer` or an agent named on a computer is
+that agent, else the paired computer's. For these the session is declared
+as the lamp's own is, from its environment (its actions, skills, clock,
+`use_skill`; `agent_tasks::tools_on_the_lamp`), with its own target, and
+no computer paired unless `LAMP_HAND_OVERS_COMPUTER=ENGINE` (`claude`,
+`codex`) pairs one; so run it on the lamp, with the environment of its
+`lamp-voice.service`. The earlier requests, declared the same way now, are
+scored as before. Each line says `class`, `route` and `route_ok`, the
+summary counts `route_ok` per request and by class (`by_class`), and a
+table follows: a line a request, then the totals by class.
+
+    env $(systemctl show lamp-voice -p Environment --value) lamp-voice provider-check /etc/lampOS/voice/provider.json --hand-overs 2
+    env $(systemctl show lamp-voice -p Environment --value) LAMP_HAND_OVERS_COMPUTER=claude lamp-voice provider-check /etc/lampOS/voice/provider.json --hand-overs 2
+
 `provider-check` declares the functions with one of the staff (`who`
 off), so the length that left lamp-4ace's sessions without functions does
 not arise there; the test above covers it.
