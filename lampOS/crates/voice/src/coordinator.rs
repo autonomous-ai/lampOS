@@ -1522,12 +1522,15 @@ impl Reply {
         };
         // A skill's sound or a computer's exact line is `spoken` when it was
         // played whole, with no gap in its playback.
-        let sound = matches!(
+        // A computer's stream is `spoken` when its last chunk played out;
+        // a gap in a stream's sound is its computer's, not a cut.
+        let sound = (matches!(
             self.notice.origin(),
             SpeechOrigin::SkillSound | SpeechOrigin::ExactLine
-        ) && self.settled(speaker_pending)
-            && self.notice.retired()
-            && self.playback_gaps == 0;
+        ) && self.playback_gaps == 0
+            || self.notice.origin() == SpeechOrigin::ComputerStream)
+            && self.settled(speaker_pending)
+            && self.notice.retired();
         // A reminder that played through gaps and counts as said
         // (#5258) is spoken on the same proof.
         let played_whole = sound
@@ -12716,6 +12719,35 @@ fn conversation_with_gate_inner(
         if !overdue_may_begin {
             reminder_held = None;
         }
+        // A timer, alarm or reminder that falls due ends a computer's stream
+        // that plays, as a turn of the person's would: it is not made to wait
+        // behind sound that can go on for ten minutes.
+        // Only when the reminder can be said at all: with unasked speech
+        // paused or the cloud away it never begins, and the stream would die
+        // on every pass for nothing.
+        if overdue_may_begin
+            && reminders
+                .as_ref()
+                .is_some_and(|reminders| reminders.offer(reminder_now_us).is_some())
+            && unasked_session(&cloud, unasked_paused).is_some()
+            && end_stream_for(
+                owner,
+                reply,
+                trace,
+                "a reminder is due",
+                crate::receipt_history::STREAM_REMINDER_DUE,
+                |state| rig.publish(state),
+            )?
+        {
+            // As every loop-level cancel: the speaker was revoked first (the
+            // ownerless authority is published), and nothing of the ended
+            // turn stays queued or pending, so the reminder's own gates see
+            // the new authority this pass.
+            provider_queue.clear();
+            speaker_pending = None;
+            snapshot = owner.snapshot(now())?;
+            last_publish = monotonic_us();
+        }
         if let Some(reminders) = reminders.as_mut()
             && reply.is_none()
             && provider_queue.is_empty()
@@ -13095,22 +13127,25 @@ fn conversation_with_gate_inner(
                 },
                 says,
             );
-            // A computer's stream for the speaker: opened at rest or refused
-            // in words, as an exact line's gate says, and a held one ended
-            // when its computer closed the connection. It plays nothing yet.
-            if let Some(admitted) = says.admit_stream(&now_is, at_us) {
-                let (by, opened, why) = match &admitted {
-                    crate::say::Admitted::Opened { by } => (by, true, None),
-                    crate::say::Admitted::Refused { by, why } => (by, false, Some(why)),
-                };
-                record(
-                    trace,
-                    json!({"kind":"speaker_stream","at_us":at_us,"by":by,"opened":opened,"why":why}),
-                )?;
-            }
             // A paired computer's exact line first: it waits while the
             // person talks, where a skill's sound is refused.
-            if let Some(now_state) = play_exact_line(
+            if let Some(now_state) = play_stream(
+                says,
+                &now_is,
+                at_us,
+                owner,
+                reply,
+                rig.playout_start_now(),
+                trace,
+                |state| rig.publish(state),
+            )? {
+                // A stream that replaced another leaves nothing of it
+                // pending (at rest both were empty already).
+                provider_queue.clear();
+                speaker_pending = None;
+                snapshot = now_state;
+                last_publish = monotonic_us();
+            } else if let Some(now_state) = play_exact_line(
                 says,
                 &now_is,
                 at_us,
@@ -14637,6 +14672,136 @@ fn tell_voice_of_turn(
             .filter(|_| !origin.is_some_and(SpeechOrigin::unshown)),
         at_us,
     );
+}
+
+/// A computer's stream for the speaker, if one waits (`speaker.stream`,
+/// [`crate::speaker_stream`]): opened as a turn of the lamp's own at rest,
+/// whose sound comes as the computer sends it, or refused now in words
+/// ([`crate::say::Says::admit_stream`]). A turn of the person's or the
+/// lamp's own admitted after it revokes its speech as it does any, and the
+/// ticket is answered `dropped` with why. The authority's new snapshot when
+/// it opens.
+#[allow(clippy::too_many_arguments)]
+fn play_stream(
+    says: &mut crate::say::Says,
+    now_is: &crate::say::SoundNow,
+    at_us: u64,
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    playout_start: PlayoutStart,
+    trace: &mut SessionState,
+    publish: impl FnMut(Snapshot) -> io::Result<()>,
+) -> Result<Option<Snapshot>> {
+    // A stream that plays is the voice's own and a later stream replaces it:
+    // its own playing is not the speaker's busy for the gate. Everything else
+    // (a conversation, a mute, a pause) still refuses it, leaving the old one.
+    let replacing = reply
+        .as_ref()
+        .is_some_and(|current| current.notice.origin() == SpeechOrigin::ComputerStream);
+    let gate = crate::say::SoundNow {
+        playing: now_is.playing && !replacing,
+        speaking: now_is.speaking && !replacing,
+        ..*now_is
+    };
+    let Some(admitted) = says.admit_stream(&gate, at_us) else {
+        return Ok(None);
+    };
+    let (by, ticket, feed) = match admitted {
+        crate::say::Admitted::Refused { by, why } => {
+            record(
+                trace,
+                json!({"kind":"speaker_stream","at_us":at_us,"by":by,"opened":false,"why":why}),
+            )?;
+            return Ok(None);
+        }
+        crate::say::Admitted::Opened { by, ticket, feed } => (by, ticket, feed),
+    };
+    record(
+        trace,
+        json!({"kind":"speaker_stream","at_us":at_us,"by":by,"opened":true,"replaced":replacing}),
+    )?;
+    let snapshot = open_stream_turn(
+        owner,
+        reply,
+        ticket,
+        feed,
+        replacing,
+        playout_start,
+        trace,
+        publish,
+    )?;
+    Ok(Some(snapshot))
+}
+
+/// Ends the stream that plays, if one does: its ticket is told `dropped`
+/// with `told`, and its turn is cancelled for `reason` (a local cancel, see
+/// [`crate::receipt_history::LOCAL_CANCELS`]). The cut revokes the speaker
+/// itself: the ownerless authority is published before anything is admitted
+/// after it, so the speaker drops the queued sound as an expected discard,
+/// as it does for a hand's Stop. Admitted first, the next turn's authority
+/// kept that sound as a cancelled tail only a person's interruption may have,
+/// and the voice ended (lamp-75c9, 13 Nov). True when one was ended.
+fn end_stream_for(
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    trace: &mut SessionState,
+    told: &str,
+    reason: &'static str,
+    publish: impl FnOnce(Snapshot) -> io::Result<()>,
+) -> Result<bool> {
+    let playing = reply
+        .as_ref()
+        .is_some_and(|current| current.notice.origin() == SpeechOrigin::ComputerStream);
+    if !playing {
+        return Ok(false);
+    }
+    if let Some(old) = reply.as_mut().and_then(|current| current.say.take()) {
+        old.answer(crate::say::Outcome::Dropped(told.into()));
+    }
+    cancel_reply(owner, reply, trace, reason)?;
+    publish(owner.snapshot(now())?)?;
+    Ok(true)
+}
+
+/// A stream admitted opens its own turn. One that plays is told why it
+/// ends, `dropped` ("replaced by a later stream"), and its turn is cancelled,
+/// before the new turn is committed and takes the speaker.
+#[allow(clippy::too_many_arguments)]
+fn open_stream_turn(
+    owner: &mut Controller,
+    reply: &mut Option<Reply>,
+    ticket: crate::say::Ticket,
+    feed: std::sync::Arc<crate::speaker_stream::Feed>,
+    replacing: bool,
+    playout_start: PlayoutStart,
+    trace: &mut SessionState,
+    mut publish: impl FnMut(Snapshot) -> io::Result<()>,
+) -> Result<Snapshot> {
+    if replacing {
+        end_stream_for(
+            owner,
+            reply,
+            trace,
+            crate::say::STREAM_REPLACED,
+            crate::receipt_history::STREAM_REPLACED,
+            &mut publish,
+        )?;
+    }
+    let (snapshot, _) = speaker_tone::commit_sound_turn(
+        owner,
+        reply,
+        NoticeDelivery::stream(feed),
+        "computer_stream",
+        "a computer's stream: nothing heard, nothing sent to the provider",
+        0,
+        playout_start,
+        trace,
+        publish,
+    )?;
+    if let Some(current) = reply.as_mut() {
+        current.say = Some(ticket);
+    }
+    Ok(snapshot)
 }
 
 /// A paired computer's exact line, if one waits (`exact`, docs/control.md,
@@ -21073,6 +21238,10 @@ mod tests {
 #[cfg(test)]
 #[path = "coordinator/ring_trace_tests.rs"]
 mod ring_trace_tests;
+
+#[cfg(test)]
+#[path = "coordinator/stream_turn_tests.rs"]
+mod stream_turn_tests;
 
 #[cfg(test)]
 #[path = "coordinator/optional_ring_tests.rs"]
