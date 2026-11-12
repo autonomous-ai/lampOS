@@ -3,6 +3,7 @@ use super::*;
 
 mod action_claim;
 mod after_forget;
+mod agent_tasks_named;
 mod chat_second_try;
 mod checking_line;
 mod cut_to_a_person;

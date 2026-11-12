@@ -1797,8 +1797,8 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     show, wait, watch, task news and the status and progress tool. Its
     session shows in Harness Desktop like any other.
   - **The voice:** the `lamp` target is never one of the staff.
-    `start_agent_task` gets `where` (`"lamp"`, `"computer"`) while the
-    tasks part has it; the description says long work is handed over, an
+    `start_agent_task` gets `where` (`"lamp"`, and `"computer"` only with a
+    computer paired, #6547) while the tasks part has it; the description says long work is handed over, an
     earlier session of theirs first (the lamp's first), else a new one on
     the lamp unless they name their computer. The read-back and the yes
     are as before (one yes for a named session too): "Hermes on the lamp".
@@ -1864,11 +1864,51 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     model's args. Each override logs one line with what was set and what
     the model sent, never the words. The read-back says where it runs, as
     before ("OpenClaw on the lamp", "Claude Code on the office computer").
-    A turn where the model calls no `start_agent_task` is not changed.
+    A turn where the model calls no `start_agent_task` is caught on the
+    second route (next point).
     Tests: `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
     `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
     `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
     `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
+  - **Named, nothing handed over: asked again once (#6547 (1b)).** On the
+    second route, with the tasks part, a spoken line whose own words name
+    an agent for the work, read exactly as above (the doer only, from the
+    lamp's engines while the lamp has its target and the staff, Claude Code
+    when none is read; a mention such as "What is Hermes?" names nothing),
+    has its round 1 words held to the round's end
+    (`agent_tasks::named_for_work`, `Engine::catching_named_agents`). If
+    round 1 answers in words alone, with no call, those words are not said:
+    the turn is asked once more with a system note naming the agent ("the
+    person asked Hermes to do this … Call start_agent_task now to hand the
+    work to Hermes; never do it yourself"), and the journal says
+    `request N: named agent, no start_agent_task: asked again`, then what
+    came of it (`…: asked again: start_agent_task called`, `…: still no
+    call, said as it came`, or `…: called <names>, not start_agent_task`).
+    Once a request (`agent_tasks::AskedAgain`, the last 8 requests kept):
+    the second answer is said as it came, and a request asked again before
+    is said with `…: asked again before, said as it came`; it never loops.
+    A round 1 that calls anything (`start_agent_task`, `not_for_me`, a
+    skill) goes on as before, its words said at the round's end; a line
+    naming no agent is untouched and streams as before. The Live route is
+    not caught. Tests: `second_provider::tests::agent_tasks_named`
+    (`named_with_no_start_is_asked_again_once`,
+    `named_with_no_start_twice_is_said_the_second_time`,
+    `named_with_start_is_untouched`,
+    `not_named_and_a_question_about_an_agent_are_untouched`,
+    `a_request_asked_again_before_is_not_asked_again`),
+    `agent_tasks::tests::a_named_agent_is_the_doer_and_asked_again_once_a_request`.
+  - **No computer in `where` without a pairing (#6547 (1c)).** With no
+    computer paired (no staff: the test the description already uses),
+    `where`'s `enum` is `["lamp"]` alone and its description never names
+    the computer; with one paired, `["lamp", "computer"]` as before. A
+    `where` `"computer"` that still comes in that state (or one the heard
+    words set from "on my computer") goes to the lamp while the lamp has
+    its target, never to a computer that isn't there; with the switch
+    `LAMP_TASKS_WHO` off, where the staff are never read, it goes to the
+    configured target as before. Tests:
+    `agent_tasks::tests::where_offers_no_computer_without_a_pairing`,
+    `agent_tasks::tests::no_computer_paired_a_computer_named_goes_to_the_lamp`,
+    `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
   - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
     `runtime::tests::hermes_settings_are_written_at_start_only_with_a_token`,
