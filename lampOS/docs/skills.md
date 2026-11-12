@@ -3726,7 +3726,7 @@ Tests:
 ##### A linked service as a task for the lamp's agent (`LAMP_AGENT_SERVICES=on`, off)
 
 The owner's ask, 12 Nov. With `LAMP_AGENT_SERVICES=on` in `lamp-voice`
-(set alike in lamp-tasks and lamp-skills-manage@,
+(set alike in lamp-tasks, lamp-skills, lamp-skills-manage@ and lamp-control,
 [services.md](services.md), "The lamp's agent's connectors"; `on` exactly; `made_skill::AGENT_SERVICES_ENVIRONMENT`,
 `made_skill::agent_services_on`), and `LAMP_MADE_SCRIPTS=on` beside it (a
 made `task` step is held to that cap and loads only with it), a voice make
