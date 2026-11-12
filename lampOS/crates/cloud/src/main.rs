@@ -204,6 +204,14 @@ fn main() -> ExitCode {
             .flatten()
             .map(|dir| PathBuf::from(dir).join(lamp_cloud::onboarding_done::FILE)),
     );
+    // The app told when an update starts and ends (#6284):
+    // LAMP_APP_UPDATE_EVENTS=on with a state folder, where what is owed is kept.
+    lamp_cloud::update_events::switch(
+        lamp_cloud::update_events::on()
+            .then(|| std::env::var_os("STATE_DIRECTORY"))
+            .flatten()
+            .map(|dir| PathBuf::from(dir).join(lamp_cloud::update_events::FILE)),
+    );
     let mut login = watches_login(
         telling_on,
         lamp_cloud::services::on_from_environment(),

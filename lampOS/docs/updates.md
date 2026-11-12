@@ -833,7 +833,11 @@ each under the quiet rule. A round
    update comes within the hour of their setup, while their first voice
    leads the walk. The quiet gate (step 7) keeps a switch off a sentence,
    but a walk waiting silently for the person reads as resting. A climb
-   (lamp-update's own switch) is not held: it restarts only lamp-update.
+   (lamp-update's own switch) is not held: it restarts only lamp-update. With
+   `LAMP_FIRST_UPDATE=on`, no round is held while the first update after
+   setup is owed (`/var/lib/lampos-setup/first-update`, below): the walk
+   has not begun, and the round says `the setup walk has not begun: the
+   first update after setup is owed, so the round is not held`.
 5. **Room.** The disk `/opt/lampOS` is on must hold every file of every
    new folder, counted whole as if nothing could be linked, plus
    `--keep-free-mb` (256). Otherwise refused, before anything is written:
@@ -1434,6 +1438,7 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `switching to build N` | the parts' switch begins |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
 | `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
+| `the first update after setup: setup is done; its phone grace period is not restarted` | the first update after setup, before the walk: setup is done and its new unit still skips once done, so it isn't restarted though its unit differs from this build's (#6284) |
 | `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
 | `lamp-setup-recover.service could not be started (…); it starts at the next boot` | that start failed: said only, the round stays switched |
 | `started <unit>, added by build N` | the watch passed and the build is kept; a long-running part of `lampos.target` the switch added, enabled and inactive, was started with `--no-block` ("A part added over the air") |
@@ -1475,6 +1480,86 @@ voice covers that one transition itself: as it starts, with
 `LAMP_VOICE_ROUTE=second` at the product's path and no file there, it
 places the same bytes (`second_config::place_product_if_missing`), and a
 later install takes them as its own.
+
+### The first update after setup (#6284, `LAMP_FIRST_UPDATE`)
+
+On by this build's default on a product lamp (`first_update::PRODUCT_DEFAULT`,
+read as Hermes's switch is: lamp-update run from the product's unit, with
+`--apply on`): lamp-update's own unit is never carried by a round
+(`own_unit_line_tests`), so a switch in it would never reach a lamp in a
+home. `LAMP_FIRST_UPDATE=off` turns it off; another lamp needs `on`. The
+product units of setup and the voice set `LAMP_FIRST_UPDATE=on`, after runs
+on lamp-e82d on 11 Nov.
+
+1. With its done marker, setup writes `/var/lib/lampos-setup/first-update`,
+   `{"at_unix_ms": <ms>}` (`lamp_msgs::FIRST_UPDATE_FILE`). It is owed for
+   20 minutes from `at_unix_ms` (`lamp_msgs::FirstUpdate::owed`), and the
+   voice holds the walk's beginning while it is there.
+2. A `serve` with `--apply on` looks for the file at each second of its
+   wait between rounds (`first_update.rs`, the same looks as the app's
+   Check for update), and once as each round begins. Owed, a round starts
+   at once instead of after `--every-s` (900): `the first update after
+   setup is owed: a round now, round N of 3`. One such round per file and
+   process: a round never follows it back to back.
+3. That round is a round like any other: the lock, the signature checks,
+   the watch and the put-back all stay. Two things differ while the file is
+   owed: the setup walk's hold (step 4) is skipped, and the update is
+   forced: no quiet moment (step 7) is waited for, and someone heard as the
+   switch begins does not stop it (`Run::forced`; the product's call on
+   #6284, 12 Nov: the walk has not begun, and the lamp has said only its
+   update line). On lamp-e82d, the 45 s rule held a first update 3 min
+   while the owner talked to the lamp (11 Nov), and a 5 s wait ended
+   `not-quiet` on office noise ("heard 0 words"), so the walk ran on the
+   old build (12 Nov).
+   Forced and not held only while the walk has not begun
+   (`first_update::before_walk`: no step kept in its progress file). A
+   first update still owed once the walk has begun, after a self-switch or
+   a walk begun at the switch's wait, is held and waits for its quiet
+   moment as any round, so the lamp is never switched mid-walk (V2's P2 on
+   #6299).
+   It runs inside setup's phone grace period, so setup is still active: a
+   setup done whose new unit still skips once setup is done
+   (`ConditionPathExists=!/var/lib/lampos-setup/done`) is not restarted,
+   forward or in a put-back, even when its unit differs between the lamp's
+   build and the newest (`setup_lifecycle::first_update_leaves`; the
+   ordinary exception needs this build's exact unit): `the first update
+   after setup: setup is done; its phone grace period is not restarted`.
+   On lamp-e82d on 12 Nov the restart stopped setup, its condition skipped
+   the start, and 12226 was put back as `lamp-setup.service stopped`.
+4. Any end of that round is kept in the records first, as every round of the
+   file spent (`first-update-rounds`, `<at_unix_ms> 3`), so the file is owed
+   no more whether or not it can be removed; then the file is removed: up to date, switched, refused,
+   failed, put back, not quiet, unreachable. The journal says `the first
+   update after setup: its round ended <kind>, its file removed`, with the
+   round's kind from "Reading a round from the journal". A failed or put
+   back build is tried again by the 15-minute rounds, as before.
+5. Not after `self-switched` or `climbs` (lamp-update switching itself):
+   the new lamp-update starts with a round of its own, finds the file
+   still owed and takes it then (`… kept for the new lamp-update's round`).
+   At most 3 rounds per file, counted in `first-update-rounds` in the
+   records (`<at_unix_ms> <rounds>`); the third removes the file whatever
+   its end, and a file found with its 3 spent is removed
+   (`… every round of it spent, its file removed`).
+6. A file past its 20 minutes is removed at the next look (`… past its 20
+   minutes, its file removed`). One that can't be read is left as it is;
+   no reader counts it as owed. A file that can't be removed is said once.
+7. A lamp in a home runs lamp-update in the 7071 image's sandbox
+   (`ProtectSystem=strict`, no `/var/lib/lampos-setup` among its
+   `ReadWritePaths`, and no round widens it), where the removal fails and is
+   said once. Nothing waits on it: lamp-update owes the file no more by its
+   records (step 4), and the voice begins the walk on the round's end as
+   `update/status` says it ([onboarding.md](onboarding.md), "Held for the
+   first update").
+8. Before setup is done (no `/var/lib/lampos-setup/done`, with the switch
+   on), a round that couldn't reach the channel is not kept as the last
+   round's end: `update/status` stays as it was, so the app never shows
+   "Couldn't check" for the round a new lamp runs at boot on its setup
+   hotspot, with no internet (seen on #6284). It is a plain line in the
+   records' log, not a round's end read back at a restart, and the next
+   round is asked in 30 s (`BEFORE_SETUP_AGAIN`), not after `--every-s`:
+   `setup is not done: the channel is out of reach, not told, asked again
+   in 30 s`. Rounds are never stopped before setup: a lamp online without
+   the marker updates as before, and every other end is kept as before.
 
 ### lamp-update's own build on a product lamp
 

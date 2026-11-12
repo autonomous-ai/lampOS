@@ -880,6 +880,10 @@ impl Lamp for Real {
         self.latest(lamp_msgs::UpdateStatus::TOPIC)
     }
 
+    fn update_events(&self) -> Option<PathBuf> {
+        crate::update_events::kept_in()
+    }
+
     fn check_update(&mut self, now: Instant, retry: Option<u64>) -> Result<(), String> {
         self.update_checks.ask(self.bus.as_ref(), now, retry)
     }

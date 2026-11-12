@@ -263,6 +263,19 @@ pub trait Lamp {
         None
     }
 
+    /// The file the app's `update.started` and `update.ended` are kept in
+    /// (#6284, `crate::update_events`): there only with
+    /// `LAMP_APP_UPDATE_EVENTS=on` and a state folder.
+    fn update_events(&self) -> Option<std::path::PathBuf> {
+        None
+    }
+
+    /// `update/status` as those events read it: fresh, and one lamp-update
+    /// could have said.
+    fn update_now(&self) -> Option<lamp_msgs::UpdateStatus> {
+        crate::update_events::read(self.update_status())
+    }
+
     /// Asks `lamp-update serve` for its next round now (`update.check`,
     /// #4153, `crate::update::Checks`), at `now`: at most once a minute, and
     /// only when a running lamp-update reads it. Only with
@@ -534,6 +547,12 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
                 info["onboarding_page_supported"] = json!(true);
                 // Which page contract (#6366): 2 is per-tap Add and `done`.
                 info["onboarding_page_version"] = json!(crate::onboarding_page::VERSION);
+            }
+            // `update_events_supported` (#6284): this lamp sends
+            // `update.started` and `update.ended`, so the app may show
+            // "Updating". Only with its switch on (and a state folder).
+            if lamp.update_events().is_some() {
+                info["update_events_supported"] = json!(true);
             }
             some(info)
         }
@@ -962,6 +981,10 @@ pub mod tests {
         pub onboarding_done: Option<std::path::PathBuf>,
         /// What `onboarding_steps` says (#5979).
         pub onboarding_steps: Option<(u64, Vec<lamp_msgs::OnboardingStepEnded>)>,
+        /// The switch's file for the update's events (#6284), and the
+        /// `update/status` they read in place of the bus's.
+        pub update_events: Option<std::path::PathBuf>,
+        pub update_now: Option<lamp_msgs::UpdateStatus>,
     }
 
     impl Lamp for Fake {
@@ -1089,6 +1112,14 @@ pub mod tests {
         }
         fn consent(&self) -> Option<crate::consent::Place> {
             self.consent.clone()
+        }
+        fn update_events(&self) -> Option<std::path::PathBuf> {
+            self.update_events.clone()
+        }
+        fn update_now(&self) -> Option<lamp_msgs::UpdateStatus> {
+            self.update_now
+                .clone()
+                .or_else(|| crate::update_events::read(self.update_status()))
         }
         fn update_status(&self) -> Option<lamp_bus::Message> {
             self.update_bus
@@ -1362,6 +1393,17 @@ pub mod tests {
         // #6366: the page contract's version beside it, same switch.
         assert_eq!(told["onboarding_page_version"], 2);
         assert!(info.get("onboarding_page_version").is_none(), "{info}");
+        // #6284: `update_events_supported` only with its own switch.
+        assert!(info.get("update_events_supported").is_none(), "{info}");
+        assert!(told.get("update_events_supported").is_none(), "{told}");
+        let mut updating = Fake {
+            update_events: Some("/nonexistent/update-events".into()),
+            ..Fake::default()
+        };
+        let updated = answer(&mut updating, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(updated["update_events_supported"], true);
         assert!(answer(&mut will, "onboarding.page", &json!({"page": "create"})).is_ok());
         assert!(
             answer(

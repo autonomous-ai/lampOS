@@ -727,6 +727,10 @@ pub trait Save {
     /// just before the marker: best effort, it never fails setup. Nothing
     /// by default: only [`Files`] sets it, and [`NetworkOnly`] never does.
     fn first_volume(&mut self) {}
+    /// The first update after this setup (#6284, `LAMP_FIRST_UPDATE=on`),
+    /// just before the marker: best effort, it never fails setup. Nothing
+    /// by default: only [`Files`] writes it, and [`NetworkOnly`] never does.
+    fn first_update(&mut self) {}
     /// Just after the marker: the parts `lampos.target` wants and does not
     /// run, started ([`crate::parts`]), so a part skipped at boot before the
     /// marker was there does not wait for the next reboot. Best effort, it
@@ -1036,6 +1040,21 @@ impl Save for Files<'_> {
             });
         }
     }
+    fn first_update(&mut self) {
+        use crate::first_update;
+        if first_update::on(std::env::var(first_update::ENVIRONMENT).ok().as_deref()) {
+            let path = first_update::beside(&self.0.marker);
+            match first_update::write(&path, SystemTime::now()) {
+                Ok(()) => eprintln!(
+                    "lamp-setup: the first update is owed: {} written",
+                    path.display()
+                ),
+                Err(error) => eprintln!(
+                    "lamp-setup: the first update's file was not written ({error}): the lamp starts without it"
+                ),
+            }
+        }
+    }
     fn start_parts(&mut self) {
         crate::parts::start(
             crate::reset::query::read,
@@ -1225,6 +1244,7 @@ pub fn run(
             // The volume before the marker, which starts the voice, so its
             // first line is already at it (#5551).
             .map(|()| save.first_volume())
+            .map(|()| save.first_update())
             .and_then(|()| save.marker())
             // Just after the marker: what lampos.target wants and does not
             // run, started, since the path's start of a target already

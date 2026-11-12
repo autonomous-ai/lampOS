@@ -119,6 +119,87 @@ pub const ONBOARDING_STEPS: [&str; 9] = [
     "preferences",
 ];
 
+/// The first update after a setup (#6284, `LAMP_FIRST_UPDATE`): setup writes
+/// this file with its marker, as `{"at_unix_ms": <ms>}`; lamp-update starts a
+/// round at once while it is there and removes it when that round ends; the
+/// voice holds the walk's beginning while it is there.
+pub const FIRST_UPDATE_FILE: &str = "/var/lib/lampos-setup/first-update";
+
+/// How long a first update may hold the walk, from the file's `at_unix_ms`
+/// (the product's call on #6284: 10 minutes, raised to 20 on 11 Nov after
+/// lamp-e82d fetched at 0.17 MB/s on the office's network). Past it the file
+/// counts as gone for every reader, whoever failed to remove it.
+pub const FIRST_UPDATE_WITHIN_MS: u64 = 1_200_000;
+
+/// The file's body.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FirstUpdate {
+    pub at_unix_ms: u64,
+    /// The boot's own clock when it was written. A new lamp joins Wi-Fi on
+    /// its last saved wall clock, often hours behind, and timesyncd sets it
+    /// a minute later; within the same boot the bound is measured on this
+    /// clock instead, so that jump neither ends the 20 minutes at once nor
+    /// stretches them. Absent from a file written without it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boot: Option<BootClock>,
+}
+
+/// One boot's id and its time since boot, suspend included, in ms
+/// (`/proc/sys/kernel/random/boot_id` and `/proc/uptime`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BootClock {
+    pub id: String,
+    pub ms: u64,
+}
+
+impl BootClock {
+    /// This boot's clock now; `None` off Linux or if either can't be read.
+    pub fn now() -> Option<Self> {
+        let id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id").ok()?;
+        let uptime = std::fs::read_to_string("/proc/uptime").ok()?;
+        let seconds: f64 = uptime.split_whitespace().next()?.parse().ok()?;
+        let id = id.trim();
+        (!id.is_empty() && seconds.is_finite() && seconds >= 0.0).then(|| Self {
+            id: id.to_owned(),
+            ms: (seconds * 1000.0) as u64,
+        })
+    }
+}
+
+impl FirstUpdate {
+    /// Whether a first update is still owed at `now_unix_ms` and this
+    /// boot's clock now: see [`FirstUpdate::owed_at`].
+    pub fn owed(&self, now_unix_ms: u64) -> bool {
+        self.owed_at(now_unix_ms, BootClock::now().as_ref())
+    }
+
+    /// Whether a first update is still owed. Within the boot that wrote it,
+    /// by the boot's clock: under the bound since it was written. Otherwise
+    /// by the wall clock: within the bound, and not from the future by more
+    /// than a minute (a clock set after setup counts it as owed only within
+    /// the bound from now).
+    pub fn owed_at(&self, now_unix_ms: u64, boot: Option<&BootClock>) -> bool {
+        if let (Some(then), Some(now)) = (&self.boot, boot)
+            && then.id == now.id
+        {
+            return now.ms >= then.ms && now.ms - then.ms < FIRST_UPDATE_WITHIN_MS;
+        }
+        now_unix_ms.saturating_add(60_000) >= self.at_unix_ms
+            && now_unix_ms.saturating_sub(self.at_unix_ms) < FIRST_UPDATE_WITHIN_MS
+    }
+
+    /// The file at `path`, if it is there and reads as one.
+    pub fn read(path: &std::path::Path) -> Option<Self> {
+        let bytes = std::fs::read(path).ok()?;
+        if bytes.len() > 256 {
+            return None;
+        }
+        serde_json::from_slice(&bytes).ok()
+    }
+}
+
 pub fn onboarding_topics() -> Vec<(&'static str, Declaration)> {
     vec![(OnboardingPending::TOPIC, OnboardingPending::declaration())]
 }
@@ -192,6 +273,33 @@ mod tests {
         let old: OnboardingPending =
             serde_json::from_str(r#"{"invitations":[],"walk":true}"#).unwrap();
         assert_eq!(old.done_at_unix_ms, None);
+    }
+
+    /// A clock synced after the file was written, hours forward, does not
+    /// end the first update within the boot that wrote it; the boot's own
+    /// clock bounds it. Another boot, or no boot clock, falls back to the
+    /// wall clock.
+    #[test]
+    fn a_first_update_is_bounded_by_its_boots_clock_through_a_clock_sync() {
+        let stale = 1_794_000_000_000;
+        let synced = stale + 6 * 3_600_000;
+        let boot = |id: &str, ms: u64| BootClock { id: id.into(), ms };
+        let file = FirstUpdate {
+            at_unix_ms: stale,
+            boot: Some(boot("a", 40_000)),
+        };
+        let text = serde_json::to_string(&file).unwrap();
+        assert_eq!(serde_json::from_str::<FirstUpdate>(&text).unwrap(), file);
+        assert!(file.owed_at(synced, Some(&boot("a", 100_000))));
+        assert!(file.owed_at(synced, Some(&boot("a", 40_000 + 1_199_999))));
+        assert!(!file.owed_at(stale, Some(&boot("a", 40_000 + 1_200_000))));
+        assert!(!file.owed_at(synced, Some(&boot("a", 39_000))));
+        assert!(!file.owed_at(synced, Some(&boot("b", 100_000))));
+        assert!(!file.owed_at(synced, None));
+        assert!(file.owed_at(stale + 1_000, None));
+        let old: FirstUpdate = serde_json::from_str(r#"{"at_unix_ms":5}"#).unwrap();
+        assert_eq!(old.boot, None);
+        assert!(!serde_json::to_string(&old).unwrap().contains("boot"));
     }
 
     /// The walk's id and its ended steps round-trip, are left out while
