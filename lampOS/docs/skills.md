@@ -3513,6 +3513,29 @@ gone ([switches.md](switches.md)). What happens:
     the first builder on #6174), a wordless cut of a later line is never
     answered "Um, excuse me, did anyone say something?"
     (`Shared::quiet_for_a_make`, second-voice.md).
+11. **One ask makes one skill** (lamp-9adf, 12 Nov 15:13: "make me a
+    skill: when I come back to my desk, blink the light green twice" was
+    cut while it was made, its words were carried into the next line, and
+    the model called `make_skill` again there, so `green-blink-on-return`
+    and `blink-green-twice` went on with one trigger and the same steps,
+    each outranking the other's light). A voice `make_skill` call is held
+    to the asks before it in the same folder (`make_skill_local::OneAsk`):
+    its heard line or its request is the same ask as an earlier one when
+    their words (lower case, letters and digits) are the same, or the one
+    of at least 5 words is held whole, in order, in the other (the carried
+    line with the lamp's name or an earlier piece before it, or without
+    them). While the earlier make is under way, the call makes nothing and
+    is told it is being made (`"making": true`), its line still said by
+    the earlier make. Once that make is kept and on (or waits for its yes),
+    for 3 minutes (`make_skill_local::ONE_ASK_WITHIN`) and while the skill
+    is still kept, the call makes nothing and is told the earlier answer
+    marked `"already_made": true`: "You already have that skill: <name>.
+    It's on." (`made_skill::already_have_line`), or, for one that waits for
+    the person's yes, its say-back and `approve_id` again, so the yes the
+    cut turn never asked for can still be asked. A make refused or not put
+    on holds nothing, so asking again tries again. The app's MAKE IT is
+    not held. Tests: `a_cut_ask_carried_into_the_next_line_makes_one_skill`,
+    `only_the_same_ask_is_held_as_made`.
 
 A made line said with no make behind it is never said
 (`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): a reply that

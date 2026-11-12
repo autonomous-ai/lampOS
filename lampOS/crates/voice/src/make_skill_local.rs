@@ -780,6 +780,17 @@ fn make_with_by(
     linked: impl FnOnce() -> Option<Vec<String>>,
     agent: Option<&crate::make_skill_agent::Agent>,
 ) -> Value {
+    // One ask makes one skill: a call for an ask made or being made a
+    // moment ago, carried into the next line after its turn was cut, makes
+    // nothing again ([`OneAsk`]). By voice only: `made_in` 0 is no
+    // request of the voice's.
+    let asked = match made_in {
+        0 => None,
+        _ => match OneAsk::begin(&keeping.directory, heard, request, now_unix_ms) {
+            Ok(asked) => Some(asked),
+            Err(told) => return told,
+        },
+    };
     let brief = match made_skill::brief(request) {
         Ok(brief) => brief,
         Err(why) => {
@@ -820,7 +831,7 @@ fn make_with_by(
     // A skill that sends or writes, once on (its yes binds the installed
     // package): its writes wait for the person's yes, in a later heard
     // line (#6066, `crate::skill_write_yes`).
-    match (&made, &on) {
+    let told = match (&made, &on) {
         (Ok(made), Ok(())) if made.uses.code => {
             let id = crate::skill_write_yes::wait_for_yes(
                 code_asks(made),
@@ -835,15 +846,180 @@ fn make_with_by(
             }
             told
         }
-        (Ok(made), Ok(())) => {
-            let Some(asks) = asks_of(&keeping.directory, made) else {
-                return told;
-            };
-            let id = crate::skill_write_yes::wait_for_yes(asks, made_in, std::time::Instant::now());
-            waits_for_yes(told, &made_skill::on_line(made), &id)
-        }
+        (Ok(made), Ok(())) => match asks_of(&keeping.directory, made) {
+            Some(asks) => {
+                let id =
+                    crate::skill_write_yes::wait_for_yes(asks, made_in, std::time::Instant::now());
+                waits_for_yes(told, &made_skill::on_line(made), &id)
+            }
+            None => told,
+        },
         _ => told,
+    };
+    // Made and on (or waiting for its yes): held for the same ask asked
+    // again; anything else is let go, so asking again tries again.
+    if let (Some(asked), Ok(made), Ok(())) = (asked, &made, &on) {
+        asked.made(&made.name, &told, now_unix_ms);
     }
+    told
+}
+
+/// How long a voice make's ask is held once its skill is made and on
+/// ([`OneAsk`]): longer than a cut turn's carried line takes to be heard
+/// and answered again, shorter than a person deciding to ask once more.
+pub const ONE_ASK_WITHIN: Duration = Duration::from_secs(180);
+
+/// The fewest words a line holds for another line holding it whole to be
+/// the same ask ([`same_ask`]): "make me a skill" alone is no ask of its
+/// own.
+const ONE_ASK_FEWEST_WORDS: usize = 5;
+
+/// A voice make's ask, held in [`ASKS`]: its keeping folder, the words
+/// heard and the model's request (each [`ask_words`]), and, once made and
+/// on, its skill's name, what its turn was told and when.
+struct HeldAsk {
+    id: u64,
+    directory: std::path::PathBuf,
+    heard: Vec<String>,
+    request: Vec<String>,
+    made: Option<(String, Value, u64)>,
+}
+
+/// The voice's asks under way or made within [`ONE_ASK_WITHIN`].
+static ASKS: std::sync::Mutex<Vec<HeldAsk>> = std::sync::Mutex::new(Vec::new());
+static ASK_IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// A line's words for [`same_ask`]: lower case, each run of letters and
+/// digits one word.
+fn ask_words(line: &str) -> Vec<String> {
+    line.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// Whether two lines' words are one ask: the same words, or the one of at
+/// least [`ONE_ASK_FEWEST_WORDS`] held whole, in order, in the other (a
+/// line carried into the next with the lamp's name or an earlier piece
+/// before it, or without them).
+fn same_ask(one: &[String], other: &[String]) -> bool {
+    if one.is_empty() || other.is_empty() {
+        return false;
+    }
+    if one == other {
+        return true;
+    }
+    let (short, long) = if one.len() <= other.len() {
+        (one, other)
+    } else {
+        (other, one)
+    };
+    short.len() >= ONE_ASK_FEWEST_WORDS && long.windows(short.len()).any(|words| words == short)
+}
+
+/// One voice make's ask (lamp-9adf, 12 Nov 15:13: "make me a skill: when
+/// I come back to my desk, blink the light green twice" was cut while it
+/// was made, carried into the next line, and `make_skill` called again
+/// there: two skills of one trigger and the same steps, each outranking
+/// the other's light). A call whose heard line or request is the same ask
+/// ([`same_ask`]) as one under way in the same folder, or made and on
+/// within [`ONE_ASK_WITHIN`] and still kept, makes nothing: it is told the
+/// one under way, or the one made ("You already have that skill: NAME.
+/// It's on.", or its say-back and yes again for one that waits for one).
+/// Dropped before [`Self::made`], the ask is let go.
+struct OneAsk(u64);
+
+impl OneAsk {
+    fn begin(
+        directory: &std::path::Path,
+        heard: Option<&str>,
+        request: &str,
+        now_unix_ms: u64,
+    ) -> Result<Self, Value> {
+        let heard = ask_words(heard.unwrap_or_default());
+        let request = ask_words(request);
+        let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        let kept = made_skill::kept_names(directory);
+        asks.retain(|ask| match &ask.made {
+            Some((name, _, at)) => {
+                now_unix_ms.saturating_sub(*at) <= ONE_ASK_WITHIN.as_millis() as u64
+                    && (ask.directory != directory || kept.contains(name))
+            }
+            None => true,
+        });
+        let earlier = asks.iter().find(|ask| {
+            ask.directory == directory
+                && (same_ask(&ask.heard, &heard) || same_ask(&ask.request, &request))
+        });
+        match earlier.map(|ask| &ask.made) {
+            Some(Some((name, told, _))) => {
+                eprintln!(
+                    "lamp-voice: a skill wasn't made again: the same ask made {name} a moment ago, and it is still on the lamp"
+                );
+                Err(already_made(name, told))
+            }
+            Some(None) => {
+                eprintln!(
+                    "lamp-voice: a skill wasn't made again: the same ask is being made already"
+                );
+                Err(json!({
+                    "making": true,
+                    "next": format!(
+                        "{}It is being made already, for this same ask, and nothing new is \
+                         made. Tell the person in a few words, in the language of the \
+                         conversation, that it is being made and they'll hear when it's on.",
+                        made_skill::ALREADY_DONE
+                    )
+                }))
+            }
+            None => {
+                let id = ASK_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                asks.push(HeldAsk {
+                    id,
+                    directory: directory.to_path_buf(),
+                    heard,
+                    request,
+                    made: None,
+                });
+                Ok(Self(id))
+            }
+        }
+    }
+
+    /// The ask's skill `name` made and on, its turn told `told`.
+    fn made(self, name: &str, told: &Value, now_unix_ms: u64) {
+        let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(ask) = asks.iter_mut().find(|ask| ask.id == self.0) {
+            ask.made = Some((name.to_owned(), told.clone(), now_unix_ms));
+        }
+        std::mem::forget(self);
+    }
+}
+
+impl Drop for OneAsk {
+    fn drop(&mut self) {
+        let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        asks.retain(|ask| ask.id != self.0);
+    }
+}
+
+/// What a call for an ask made a moment ago is told: the earlier `told`,
+/// marked `already_made`. One that waits for the person's yes keeps its
+/// say-back and `approve_id`, so the yes the cut turn never asked for can
+/// still be asked; any other is said as had already
+/// ([`made_skill::already_have_line`]).
+fn already_made(name: &str, told: &Value) -> Value {
+    let mut told = told.clone();
+    told["already_made"] = json!(true);
+    if told.get(crate::skill_write_yes::APPROVE_ID).is_none() {
+        told["next"] = json!(format!(
+            "{}Nothing new was made: this same ask made it a moment ago. Tell the person \
+             this, in the language of the conversation, and add nothing else: \"{}\"",
+            made_skill::ALREADY_DONE,
+            made_skill::already_have_line(name)
+        ));
+    }
+    told
 }
 
 /// What the person's yes to the kept skill `made` would approve: its
@@ -2488,6 +2664,117 @@ light = { dim = 1 }
             assert!(!second_brief.contains(earlier), "{earlier}: {second_brief}");
         }
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Lamp-9adf, 12 Nov 15:13: request 3's turn was cut while its
+    /// `make_skill` ran, its words were carried into request 4 (heard with
+    /// no words of its own), and the model called `make_skill` again with
+    /// its own wording: one skill is made and put on, and the second call
+    /// is told it is had already, nothing asked of the model or the manage
+    /// helper again.
+    #[test]
+    fn a_cut_ask_carried_into_the_next_line_makes_one_skill() {
+        let (root, keeping) = keeping("one-ask");
+        let (url, served) = service(vec![(200, good())]);
+        let url_gone = url.clone();
+        let asked = manage_helper(&keeping.manage);
+        let heard = "make me a skill: when I come back to my desk, blink the light green twice.";
+        let first = make_with(
+            3,
+            Some(heard),
+            "blink the light green twice when I come back to my desk",
+            &keeping,
+            chat_at(url.clone()),
+            NOW,
+            || None,
+        );
+        assert_eq!(first["made"], "evening-dim", "{first}");
+        assert_eq!(first["on"], true, "{first}");
+        let _ = take_said_line();
+        asked.join().unwrap();
+        // Request 4: the carried line, its lamp's name before it, and the
+        // model's request in other words.
+        let carried = format!("Hey Lamp, {heard}");
+        let second = make_with(
+            4,
+            Some(&carried),
+            "when I return to my desk, blink green two times",
+            &keeping,
+            chat_at(url),
+            NOW + 9_000,
+            || None,
+        );
+        assert_eq!(second["already_made"], true, "{second}");
+        assert_eq!(second["made"], "evening-dim", "{second}");
+        assert!(
+            second["next"]
+                .as_str()
+                .unwrap()
+                .contains("You already have that skill: evening dim. It's on."),
+            "{second}"
+        );
+        assert_eq!(take_said_line(), None, "nothing new to say for a cut turn");
+        assert_eq!(served.join().unwrap(), 1, "the model was asked once");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        // Past the window, the same ask is asked of the model again (gone
+        // here, so not made).
+        let later = make_with(
+            5,
+            Some(heard),
+            "blink the light green twice when I come back to my desk",
+            &keeping,
+            chat_at(url_gone),
+            NOW + ONE_ASK_WITHIN.as_millis() as u64 + 1,
+            || None,
+        );
+        assert!(later.get("already_made").is_none(), "{later}");
+        assert!(later["error"].is_string(), "{later}");
+        let _ = take_said_line();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Only the same ask is held: another ask, a few words alone, or the
+    /// same ask in another folder, let go unmade or no longer kept is made.
+    #[test]
+    fn only_the_same_ask_is_held_as_made() {
+        let words = |line: &str| ask_words(line);
+        let ask = words("make me a skill: when I come back, glow green");
+        assert!(same_ask(
+            &ask,
+            &words("Hey Lamp, make me a skill: when I come back, glow green.")
+        ));
+        assert!(same_ask(
+            &ask,
+            &words("Make me a skill, when I come back glow green")
+        ));
+        assert!(!same_ask(
+            &ask,
+            &words("make me a skill: when I come back, glow blue")
+        ));
+        assert!(!same_ask(
+            &words("make me a skill"),
+            &words("make me a skill that nods")
+        ));
+        assert!(!same_ask(&[], &[]));
+        let directory = std::env::temp_dir().join(format!("one-ask-held-{}", std::process::id()));
+        let other = directory.join("other");
+        let held =
+            OneAsk::begin(&directory, Some("glow green when I come back"), "glow", NOW).unwrap();
+        // Under way: the same ask is told so, another folder's is not held.
+        let told = OneAsk::begin(&directory, Some("glow green when I come back"), "x", NOW)
+            .err()
+            .unwrap();
+        assert_eq!(told["making"], true, "{told}");
+        assert!(OneAsk::begin(&other, Some("glow green when I come back"), "x", NOW).is_ok());
+        // Let go unmade: asked again, it is made.
+        drop(held);
+        let again = OneAsk::begin(&directory, Some("glow green when I come back"), "x", NOW);
+        assert!(again.is_ok());
+        // Made, but no longer kept here: made again.
+        again
+            .unwrap()
+            .made("glow-on-return", &json!({"made": "glow-on-return"}), NOW);
+        assert!(OneAsk::begin(&directory, Some("glow green when I come back"), "x", NOW).is_ok());
     }
 
     /// A made skill that mails mai when the person gets up (#6066).
