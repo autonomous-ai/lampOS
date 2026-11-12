@@ -2937,8 +2937,9 @@ mod tests {
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
         // The skill's day's sends used up: the next is not sent.
         let ledger = skill_writes::Ledger::new(&services.store.0);
-        ledger.take("mail-count", crate::now_secs()).unwrap();
-        ledger.take("mail-count", crate::now_secs()).unwrap();
+        for _ in 1..skill_writes::PER_SKILL {
+            ledger.take("mail-count", crate::now_secs()).unwrap();
+        }
         run(services.run_tool(&run_line(tools::WRITE, draft)));
         let id = services.run_held.lock().unwrap().clone().unwrap();
         let refused = run(services.tool(&send(&id.0)));
@@ -2946,7 +2947,7 @@ mod tests {
             refused["error"]
                 .as_str()
                 .unwrap()
-                .contains("at most 3 times a day"),
+                .contains(&format!("at most {} times a day", skill_writes::PER_SKILL)),
             "{refused}"
         );
         assert_eq!(services.mail.sent.lock().unwrap().len(), 1);
@@ -4052,16 +4053,19 @@ mod tests {
             skill_writes::WAITING
         );
         assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
-        // Over its bound: three a day, then refused.
-        for _ in 0..2 {
+        // Over its bound: PER_SKILL a day, then refused.
+        for _ in 1..skill_writes::PER_SKILL {
             assert_eq!(run(on.skill_tool(&line))["result"]["sent"], true);
         }
         let over = run(on.skill_tool(&line));
         assert!(
-            over["error"].as_str().unwrap().contains("at most 3"),
+            over["error"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("at most {} times", skill_writes::PER_SKILL)),
             "{over}"
         );
-        assert_eq!(on.mail.sent.lock().unwrap().len(), 3);
+        assert_eq!(on.mail.sent.lock().unwrap().len(), skill_writes::PER_SKILL);
         let store = dir.path().join("s");
         for file in [skill_writes::LEDGER_FILE, skill_writes::APPROVED_FILE] {
             let kept = std::fs::read_to_string(store.join(file)).unwrap();
@@ -4070,7 +4074,7 @@ mod tests {
         // The owner's sent-log: who, never what.
         let log = run(on.tool(r#"{"op":"call","name":"skill_writes_sent"}"#));
         let sent = log["result"]["sent"].as_array().unwrap();
-        assert_eq!(sent.len(), 3, "{log}");
+        assert_eq!(sent.len(), skill_writes::PER_SKILL, "{log}");
         assert_eq!(sent[0]["skill"], "arrive-mail");
         assert_eq!(sent[0]["to"], "boss");
         assert!(!log.to_string().contains("desk"));

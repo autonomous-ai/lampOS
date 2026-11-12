@@ -178,7 +178,7 @@ pub(crate) fn set_writes_here(on: Option<bool>) {
 /// - a step [`plainly`] can't say is said in general words, never a send,
 ///   the camera or the microphone ([`named_exactly`]).
 ///
-/// A write's read-back and yes, the sends (3 a skill, 10 across all skills
+/// A write's read-back and yes, the sends (10 a skill, 30 across all skills
 /// a day, in `lamp-services`), privacy refusals and the code grants stay
 /// as they are.
 pub const LOOSE_ENVIRONMENT: &str = "LAMP_MADE_SKILL_LOOSE";
