@@ -1353,18 +1353,27 @@ thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguy
    không bao giờ một giờ: `"1h"` trên "when I come back to my desk, blink
    the light green twice" đến từ mô hình, vốn chép ví dụ trong system prompt
    (`for = "5s"`, `cooldown = "1h"`, `rearm = "ends"`), không phải từ
-   `paced`. `paced` đặt `"1m"` khi thiếu hay ngắn hơn, và đặt cooldown dài
-   hơn về `"1m"` khi trigger chạy một lần mỗi lần nó đúng (`rearm`,
-   `when = "appears"`, một khuôn mặt, một lần đứng dậy) và lời yêu cầu
-   không nói tới giới hạn (`limits_asked`, có cả "once an hour"); trigger
-   không có `rearm` giữ cooldown đã viết, nếu không nó sẽ chạy mỗi phút
-   người còn ngồi. Không khí ngột ngạt giữ một giờ, và giờ trong ngày, vốn
-   chạy một lần đúng phút đó, không đổi. Lặp lại mà lời yêu cầu tự nói
-   (`made_skill::repeat_asked`: "every five minutes", "every 2 hours",
-   "every minute", "every half hour", "mỗi 10 phút") chạy trong lúc trigger
-   còn đúng: bỏ `rearm` và `cooldown` là khoảng được yêu cầu, ít nhất một
-   phút (không khí: một giờ); không bao giờ với giờ trong ngày hay khuôn mặt
-   xuất hiện, vốn chạy một lần mỗi lần. `rearm = "ends"` được giữ trên kỹ
+   `paced`. `paced` đặt `"1m"` khi thiếu hay ngắn hơn, và không bao giờ hạ
+   cooldown dài hơn mà mô hình đã viết ("the first time I come in each
+   morning, glow green" giữ `"12h"`). Không khí ngột ngạt giữ một giờ, giờ
+   trong ngày, vốn chạy một lần đúng phút đó, không đổi, và chạm vào đèn
+   (mọi topic `controls/…`, cả xoa đầu) cũng vậy, vì mỗi lần chạm có chủ ý
+   đều được đáp lại. Trạng thái kéo dài không có `rearm` và không có lặp
+   lại được yêu cầu ("glow green when I'm at my desk", `room/presence`
+   someone true) được thêm `rearm = "ends"`, để chạy một lần mỗi lần trạng
+   thái đúng, không bao giờ theo từng tin nhắn hiện diện hay mỗi phút người
+   còn ngồi (phán quyết của người xây dựng đầu tiên cho "when I'm present");
+   không bao giờ với giờ trong ngày, khuôn mặt, đứng dậy hay không khí. Lặp
+   lại mà lời yêu cầu tự nói (`made_skill::repeat_asked`: "every five
+   minutes", "every 2 hours", "every minute", "every half hour", "mỗi 10
+   phút", "once an hour while I'm at my desk") chạy trong lúc trigger còn
+   đúng: bỏ `rearm` và `cooldown` là khoảng được yêu cầu, ít nhất một phút
+   (không khí: một giờ); không bao giờ với giờ trong ngày hay khuôn mặt xuất
+   hiện, vốn chạy một lần mỗi lần. Đơn vị chỉ được đọc sau một số hay chữ
+   số, hoặc đứng một mình ở cuối cụm hay trước "while" hoặc "when": "every
+   second time", "every other time", "every second" đứng một mình, "every
+   few minutes" và "once an hour" không có "while" hay "when" (một giới
+   hạn) không phải lặp lại. `rearm = "ends"` được giữ trên kỹ
    năng "when I come back", `[rest] after_ignored = 2` được giữ trên mọi kỹ
    năng tự tạo, cả khi lặp lại, và `[quiet]` được giữ cho kỹ năng có nói.
    Lời thuật lại nói cooldown như trước ("at most once every 5 minutes").
@@ -1376,10 +1385,12 @@ quyền mã và lời đồng ý của #6071.
 
 Test: `made_skill::tests::loosened_*` (bốn thay đổi, bật và tắt,
 `loosened_never_takes_a_triggers_key_or_a_camera_steps_key_alone`, và ba
-lần tạo trên lamp-9adf: `loosened_a_silent_made_skill_is_never_held_to_an_hour`,
+lần tạo trên lamp-9adf: `loosened_a_silent_made_skill_keeps_the_cooldown_it_wrote`,
 `loosened_an_asked_repeat_runs_while_its_trigger_holds`,
 `loosened_a_moving_made_skill_keeps_its_minute_and_rest`, cùng
-`a_repeat_is_read_from_the_requests_words`), và với
+`a_repeat_is_read_from_the_requests_words`,
+`loosened_a_held_state_with_no_rearm_runs_once_each_time_it_holds` và
+`loosened_a_silent_touch_skill_has_no_minute_floor`), và với
 `lamp-skills` thật `made::loosened_a_key_the_check_refuses_is_left_out_and_told`,
 `made::loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused`
 và `made::loosened_a_trigger_the_check_refuses_is_never_loosened`.
