@@ -4720,6 +4720,12 @@ after a take-over, but now for every turn:
       `asked_which=true`, never its note, and the fresh chat tells the
       model to ask which and not call forget again in this turn (C134,
       `after_forget::tests::a_forget_that_asked_which_stays_asked_past_the_reset`).
+      A plain "Yes." to that which-question, with `forget {}`, names
+      nothing and is marked bare, so the lamp asks which again and never
+      takes their newest keep (`forget_last`), nor, with a `source_id`,
+      the model's own pick by id; a held forget run on that
+      yes goes through the same guard (the Reviewer-lead's P2 on #6575,
+      [memory.md](memory.md)).
       The same-turn reset also
       discards a pending rename note already composed before the face call.
       Tests are in `second_provider/tests/after_forget.rs`
