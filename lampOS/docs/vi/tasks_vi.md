@@ -327,8 +327,9 @@ nhận token của lần chạy: khi có `LAMP_RUN_ID` (tên tạm thời), nó 
 `/run/lampos-tasks/runs/<run-id>` một lần, xoá tệp, và đưa token cho
 engine dưới dạng `LAMP_CONTROL_TOKEN` chỉ trong môi trường, kèm
 `LAMP_NS_NET=run`; `HOME` của engine là thư mục riêng
-`/var/lib/lampos-agents/<engine>`. Runner của Hermes ở trên giữ nguyên cho
-đến bước 2.
+`/var/lib/lampos-agents/<engine>`. Một engine chỉ được coi là có khi login
+shell của `lampos` tìm thấy wrapper trước (không phải chương trình của chính
+nó trong `~/.local/bin`). Runner của Hermes ở trên giữ nguyên cho đến bước 2.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
