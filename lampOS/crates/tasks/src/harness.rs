@@ -1337,7 +1337,19 @@ impl Cli {
             // `programs-reply` switch, off on every product lamp.
             Ok(reply) if reply.success && launch.target.engine == EngineKind::Openclaw => {
                 let outcome = parse_launch(&reply.stdout, launch);
-                self.openclaw_first_prompt(launch, &args, outcome, until, seen)
+                // A `new` that made its folder (`--new <name>`) is asked
+                // again in that folder, as the folder-is-there branch above
+                // does: `--new` again is refused, the project being there
+                // (Thirteen's P3 on #6504).
+                let mut again = args.clone();
+                if let Some(at) = again.iter().position(|arg| arg == "--new") {
+                    let plain = folder.as_ref().map_or_else(
+                        || launch.target.project.clone(),
+                        |folder| folder.sent.clone(),
+                    );
+                    again.splice(at..at + 2, [plain.into()]);
+                }
+                self.openclaw_first_prompt(launch, &again, outcome, until, seen)
             }
             Ok(reply) if reply.success => parse_launch(&reply.stdout, launch),
             Ok(reply) if self.config.folder_missing && folder_missing(&reply.stdout) => {
@@ -2388,7 +2400,8 @@ impl Cli {
     /// asked once more with the same words, in what is left of the
     /// launch's bound; the first TUI on a lamp is the one that pairs with
     /// the Gateway (12139, lamp-52e6), so the second one is given its
-    /// prompt. Lost again, it is typed in once, as before (#6226): that
+    /// prompt. A close refused or failed ends it uncertain,
+    /// `openclaw_not_closed`, with nothing more started. Lost again, it is typed in once, as before (#6226): that
     /// needs the person's `programs-reply`, and is refused (`reply_off`)
     /// without it. Nothing is ever started a third time.
     fn openclaw_first_prompt(
@@ -2424,17 +2437,29 @@ impl Cli {
             left,
         );
         seen.took(&closed);
-        let closed = match &closed {
+        // Started once more only once the first is closed: idle with no ask
+        // may still be a TUI pairing, and one left running could take its
+        // prompt later beside the second, the task done twice (Heron's P2
+        // on #6504). Not closed: uncertain, nothing more started.
+        let not_closed = match &closed {
             Ok(reply) => match self::closed(reply.code) {
-                Ok(Closed::Closed) => "is closed".to_owned(),
-                Ok(Closed::Refused) => "was refused a close".to_owned(),
-                Ok(Closed::Gone | Closed::Left) => "is gone".to_owned(),
-                Err(code) => format!("wasn't closed ({code})"),
+                Ok(Closed::Closed | Closed::Gone) => None,
+                Ok(Closed::Refused | Closed::Left) => Some("refused".to_owned()),
+                Err(code) => Some(code),
             },
-            Err(error) => format!("wasn't closed ({})", error.code),
+            Err(error) => Some(error.code.to_owned()),
         };
+        if let Some(why) = not_closed {
+            eprintln!(
+                "tasks: {}: OpenClaw's harness started idle with no ask, and the empty harness wasn't closed ({why}), so nothing more is started",
+                launch.name
+            );
+            return LaunchOutcome::Uncertain {
+                code: "openclaw_not_closed".into(),
+            };
+        }
         eprintln!(
-            "tasks: {}: OpenClaw's harness started idle with no ask, so its first prompt was lost: the empty harness {closed}, and it is started once more",
+            "tasks: {}: OpenClaw's harness started idle with no ask, so its first prompt was lost: the empty harness is closed, and it is started once more",
             launch.name
         );
         let left = until.saturating_duration_since(Instant::now());

@@ -383,7 +383,11 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   thứ hai cũng mất mới dùng `harness reply`: lệnh này cần switch
   `programs-reply` của chính người dùng, nên đèn sản phẩm nhận `reply_off` ở
   bước đó. `new` lần hai thất bại thì kết quả là uncertain,
-  `openclaw_new_again_failed`. Không bao giờ khởi động lần thứ ba.
+  `openclaw_new_again_failed`. Không bao giờ khởi động lần thứ ba. `new` lần
+  hai chỉ chạy khi harness đầu đã đóng: đóng bị từ chối hoặc lỗi thì kết quả
+  là uncertain, `openclaw_not_closed`, và không khởi động thêm gì, để việc
+  không bao giờ chạy hai lần. `new` đầu đã tạo thư mục (`--new <name>`) thì
+  lần hai gọi thẳng thư mục đó.
 - **Voice** (`agent_tasks`, `task_news`): đọc engine của target của đèn từ
   `{"op":"targets"}` và gọi đúng tên, nên một việc giao không nêu máy nào được
   nói là "OpenClaw on the lamp" và mô tả công cụ nói "OpenClaw here on the
