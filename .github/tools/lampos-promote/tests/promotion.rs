@@ -538,6 +538,42 @@ fn source_provenance_must_match_original_successful_attempt() {
         assert_eq!(fake.writes, 0);
     }
 }
+/// lamp-voice's push that published the train pull request's tested build
+/// (#6556) skipped its ARM64 jobs; its successful reuse job stands for them,
+/// and only then may an ARM64 job be skipped.
+#[test]
+fn a_reused_build_promotes_only_with_its_reuse_job() {
+    let reuse = |fake: &mut Fake, conclusion: &str| {
+        for job in fake.jobs.iter_mut().filter(|j| j.name.contains("ARM64")) {
+            job.conclusion = Some("skipped".into());
+        }
+        let mut job = fake.jobs[1].clone();
+        job.name = "lampOS — reuse the train's tested ARM64 build".into();
+        job.conclusion = Some(conclusion.into());
+        fake.jobs.push(job);
+    };
+    let mut fake = Fake::new(Some(9));
+    reuse(&mut fake, "success");
+    promote(&mut fake, &context(10)).unwrap();
+    for change in 0..3 {
+        let mut fake = Fake::new(Some(9));
+        match change {
+            0 => reuse(&mut fake, "failure"),
+            1 => {
+                reuse(&mut fake, "success");
+                fake.jobs[0].conclusion = Some("failure".into());
+            }
+            2 => {
+                for job in fake.jobs.iter_mut().filter(|j| j.name.contains("ARM64")) {
+                    job.conclusion = Some("skipped".into());
+                }
+            }
+            _ => unreachable!(),
+        }
+        assert!(promote(&mut fake, &context(10)).is_err(), "case {change}");
+        assert_eq!(fake.writes, 0);
+    }
+}
 #[test]
 fn signed_identity_must_match_source_and_fixed_url() {
     for change in 0..3 {
