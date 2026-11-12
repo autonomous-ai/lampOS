@@ -4744,7 +4744,7 @@ fn spawn_rig(
         diagnostic_directory: diagnostic_directory.map(|p| p.join("render-audio")),
         ..AudioWorkerOptions::default()
     }
-    .child_arguments("plug:device_speaker", false)?;
+    .child_arguments(options.speaker_device(), false)?;
     let capture_arguments: Vec<&str> = capture_arguments.iter().map(String::as_str).collect();
     let speaker_arguments: Vec<&str> = speaker_arguments.iter().map(String::as_str).collect();
     let mut capture = Worker::spawn_with_tick(
