@@ -188,6 +188,8 @@ pub struct Counts {
     pub lost: u64,
     /// Blocks of another source or not mono 24 kHz S16LE, dropped.
     pub stray: u64,
+    /// The 10 ms windows of sound the loudness limit lowered or clipped.
+    pub limited: u64,
 }
 
 /// Holds `stream` for its computer while the voice decides and then for as
@@ -324,8 +326,8 @@ pub(crate) fn hold_with(
                 let counts = sound.counts;
                 if writeln!(
                     stream,
-                    r#"{{"event":"stats","buffered_ms":0,"underruns":0,"limited":0,"blocks":{},"lost":{},"stray":{}}}"#,
-                    counts.blocks, counts.lost, counts.stray
+                    r#"{{"event":"stats","buffered_ms":0,"underruns":0,"limited":{},"blocks":{},"lost":{},"stray":{}}}"#,
+                    counts.limited, counts.blocks, counts.lost, counts.stray
                 )
                 .is_err()
                 {
@@ -427,10 +429,76 @@ const MOST_READS: usize = 64;
 /// The most of a line from its computer that is kept waiting for its newline.
 const MOST_LINE: usize = 4096;
 
+/// The loudness a computer's stream is held to, the same bound a skill's
+/// sound has ([`crate::say::SOUND_PEAK_DBFS`], [`crate::say::SOUND_LOUDEST_DBFS`]):
+/// no sample past the first and no 10 ms louder than the second as RMS. A
+/// clip past it is refused; a stream, which cannot be read ahead, is lowered.
+const LIMIT_WINDOW: usize = 240;
+
+/// A stream's limiter: per 10 ms window (240 samples, one speaker chunk) the
+/// gain that brings its RMS to the cap, taken at once when it must go down
+/// and let up across the window when it can go back, then no sample past the
+/// peak cap. Nothing is gathered ahead: each window is limited as it comes.
+#[derive(Debug)]
+struct Limiter {
+    /// The gain the last window ended on.
+    gain: f64,
+}
+
+impl Default for Limiter {
+    fn default() -> Self {
+        Self { gain: 1.0 }
+    }
+}
+
+impl Limiter {
+    /// Limits `block` in place; how many of its 10 ms windows were lowered
+    /// or clipped. A window shorter than 240 (the end of a block) is its own.
+    fn limit(&mut self, block: &mut [i16]) -> u64 {
+        let full = 32_767.0;
+        let peak = (full * 10f64.powf(crate::say::SOUND_PEAK_DBFS / 20.0)).floor();
+        let loudest = full * 10f64.powf(crate::say::SOUND_LOUDEST_DBFS / 20.0);
+        let mut limited = 0;
+        for window in block.chunks_mut(LIMIT_WINDOW) {
+            let power = window.iter().map(|&s| f64::from(s).powi(2)).sum::<f64>();
+            let rms = (power / window.len() as f64).sqrt();
+            let target = if rms > loudest { loudest / rms } else { 1.0 };
+            let start = if target < self.gain {
+                target
+            } else {
+                self.gain
+            };
+            let count = window.len() as f64;
+            // Lowered now, or still coming back up from an earlier window.
+            let mut touched = target < 1.0 || self.gain < 1.0;
+            for (at, sample) in window.iter_mut().enumerate() {
+                // Down at once; back up across the window.
+                let gain = if target < self.gain {
+                    target
+                } else {
+                    start + (target - start) * (at as f64 + 1.0) / count
+                };
+                let mut value = f64::from(*sample) * gain;
+                if value.abs() > peak {
+                    value = value.signum() * peak;
+                    touched = true;
+                }
+                *sample = value.round() as i16;
+            }
+            self.gain = target;
+            if touched {
+                limited += 1;
+            }
+        }
+        limited
+    }
+}
+
 /// `speaker/audio`, read for as long as a stream is open.
 struct Sound {
     blocks: Subscriber,
     counts: Counts,
+    limiter: Limiter,
 }
 
 impl Sound {
@@ -438,6 +506,7 @@ impl Sound {
         Ok(Self {
             blocks: bus.subscribe_typed(Audio::SPEAKER_TOPIC, NAME, Audio::TYPE)?,
             counts: Counts::default(),
+            limiter: Limiter::default(),
         })
     }
 
@@ -455,10 +524,14 @@ impl Sound {
                 self.counts.blocks += 1;
                 self.counts.lost += message.gap;
                 if let (Some(feed), Ok((_, bytes))) = (feed, Audio::split(&message.payload)) {
-                    let samples: Vec<i16> = bytes
+                    let mut samples: Vec<i16> = bytes
                         .chunks_exact(2)
                         .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
                         .collect();
+                    // A computer's sound is held to the loudness a skill's
+                    // sound is (a clip past it is refused; a live stream is
+                    // lowered, and counted).
+                    self.counts.limited += self.limiter.limit(&mut samples);
                     feed.push(&samples);
                 }
             } else {
@@ -612,6 +685,126 @@ mod tests {
             ended,
             serde_json::json!({"outcome": "dropped", "why": "the lamp has something to say"})
         );
+        served.join().unwrap();
+        drop(computer);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A sine of `amplitude`, `count` samples.
+    fn sine(amplitude: f64, count: usize) -> Vec<i16> {
+        (0..count)
+            .map(|at| (amplitude * (at as f64 * 0.21).sin()).round() as i16)
+            .collect()
+    }
+
+    /// The loudest 10 ms (240 samples, aligned) of `samples` as RMS, and its peak.
+    fn loudest(samples: &[i16]) -> (f64, f64) {
+        let rms = samples
+            .chunks(240)
+            .map(|window| {
+                let power: f64 = window.iter().map(|&s| f64::from(s).powi(2)).sum();
+                (power / window.len() as f64).sqrt()
+            })
+            .fold(0.0, f64::max);
+        let peak = samples
+            .iter()
+            .map(|&s| f64::from(s).abs())
+            .fold(0.0, f64::max);
+        (rms, peak)
+    }
+
+    #[test]
+    fn a_quiet_sound_passes_the_limit_untouched() {
+        let mut limiter = Limiter::default();
+        let quiet = sine(1_000.0, 4_800);
+        let mut block = quiet.clone();
+        assert_eq!(limiter.limit(&mut block), 0);
+        assert_eq!(block, quiet);
+    }
+
+    #[test]
+    fn a_loud_sound_is_held_to_the_skill_sound_cap_window_by_window_and_counted() {
+        let cap_rms = 32_767.0 * 10f64.powf(crate::say::SOUND_LOUDEST_DBFS / 20.0);
+        let cap_peak = 32_767.0 * 10f64.powf(crate::say::SOUND_PEAK_DBFS / 20.0);
+        // Whole windows, and blocks that end inside one.
+        for size in [240, 2_400, 100, 777] {
+            let mut limiter = Limiter::default();
+            let mut played = Vec::new();
+            let mut limited = 0;
+            let loud = sine(20_000.0, 24_000);
+            for part in loud.chunks(size) {
+                let mut block = part.to_vec();
+                limited += limiter.limit(&mut block);
+                played.extend(block);
+            }
+            let (rms, peak) = loudest(&played);
+            assert!(rms <= cap_rms * 1.01, "size {size}: {rms} past {cap_rms}");
+            assert!(peak <= cap_peak, "size {size}: peak {peak} past {cap_peak}");
+            assert!(limited >= 100, "size {size}: {limited} windows counted");
+            assert_eq!(played.len(), loud.len());
+        }
+    }
+
+    #[test]
+    fn the_limit_lets_go_when_the_sound_is_quiet_again() {
+        let mut limiter = Limiter::default();
+        let mut loud = sine(20_000.0, 2_400);
+        assert!(limiter.limit(&mut loud) > 0);
+        // The gain comes back across one window; after it a quiet sound is
+        // untouched and not counted.
+        let mut quiet = sine(500.0, 2_400);
+        let before = quiet.clone();
+        let counted = limiter.limit(&mut quiet);
+        assert!(counted <= 1, "{counted} windows counted while letting go");
+        assert_eq!(quiet[240..], before[240..]);
+    }
+
+    #[test]
+    fn an_open_stream_holds_a_loud_computer_to_the_cap_and_says_how_many_windows_it_lowered() {
+        let _turn = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (bus, dir) = temp_bus("limited");
+        let mut computers = bus
+            .publisher_declared(Audio::SPEAKER_TOPIC, &Audio::declaration(), SOURCE)
+            .unwrap();
+        let (answer, _cancel, mut said, computer, served) = held(bus);
+        let feed = Feed::new();
+        answer.send(Answer::Begun(1)).unwrap();
+        answer.send(Answer::Stream(Arc::clone(&feed))).unwrap();
+        assert_eq!(line(&mut said)["state"], "open");
+        // 120 ms of a loud tone, as 24 kHz S16LE blocks of 10 ms and 100 ms.
+        let loud: Vec<i16> = sine(20_000.0, 2_880);
+        let bytes: Vec<u8> = loud.iter().flat_map(|s| s.to_le_bytes()).collect();
+        let header = Audio {
+            sample_rate: 24_000,
+            channels: 1,
+            sample_format: Audio::S16LE.to_owned(),
+            sequence: 1,
+        };
+        computers
+            .publish_bytes(
+                lamp_ipc::monotonic_us(),
+                Audio::ENCODING,
+                &header.block(&bytes).unwrap(),
+            )
+            .unwrap();
+        let mut stats = serde_json::Value::Null;
+        for _ in 0..40 {
+            stats = line(&mut said);
+            if stats["limited"].as_u64().is_some_and(|limited| limited > 0) {
+                break;
+            }
+        }
+        assert_eq!(stats["limited"], 12, "12 windows of 10 ms: {stats}");
+        // What reached the feed is held to the cap.
+        let (chunk, _) = feed.take().expect("the prefill is held");
+        let (rms, peak) = loudest(&chunk);
+        assert!(rms <= 32_767.0 * 0.0316 * 1.01, "{rms}");
+        assert!(peak <= 8_232.0, "{peak}");
+        answer
+            .send(Answer::Done(Outcome::Dropped("done".into())))
+            .unwrap();
         served.join().unwrap();
         drop(computer);
         std::fs::remove_dir_all(dir).unwrap();
