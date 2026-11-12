@@ -2918,6 +2918,8 @@ pub fn serve(
             crate::services::Linked::new(folder)
         });
     let has_tasks = tools.tasks.is_some();
+    // The tasks part, for a heard plain no to a task read back (#6582).
+    let tasks_declined = tools.tasks.clone();
     // Whom a line's words ask by name, with `LAMP_TASKS_NAMED_ASK=on`: its
     // forced call goes to that one, and the journal says so (#1722).
     let named_ask = tools
@@ -3639,6 +3641,13 @@ pub fn serve(
     if has_tasks {
         engine = engine.noting_a_task_waiting(Arc::new(move |request| {
             crate::agent_tasks::pending_note(request, Instant::now())
+        }));
+    }
+    // A heard plain no to a task read back drops it, in the tasks part too
+    // (#6582).
+    if let Some(place) = tasks_declined {
+        engine = engine.declining_a_task_waiting(Arc::new(move |request, words: &str| {
+            crate::agent_tasks::declined(&place, request, words)
         }));
     }
     // A look reads the eyes' look file with the Live route's bounds: a full

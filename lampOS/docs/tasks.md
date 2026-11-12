@@ -3301,6 +3301,29 @@ corrected ask, read back again, and started only on a yes:
   plain no, call nothing; "Only their yes starts it": the same work asked
   again, in the same words or others, is not a yes, so `start_agent_task`
   again and read it back, never `confirm_agent_task`.
+- **A plain no drops the task in code (#6582, with or without the switch).**
+  Before, a plain no called nothing and the task stayed waiting, here and
+  in the tasks part, for the whole `CONFIRM_WITHIN` (120 s), so a later yes
+  could still start it. Now, on the second route, a heard line that is a
+  plain no (`services::plain_no`, the list the voice already reads a no to a
+  skill's write with: "No.", "No thanks.", "Never mind.", "Don't.", "Cancel
+  that.", "Không, thôi.") while a task waits, from a request that could have
+  said yes to it (`may_confirm`), drops it (`agent_tasks::declined`, hooked
+  as the engine's `declining_a_task_waiting`): `PENDING` is cleared, so no
+  later yes in the window starts it; the tasks part is sent its `cancel`,
+  the same op a corrected ask sends, after a `status` for its guard, on a
+  thread of its own bounded by `DEADLINE` (3.5 s), so a cancel refused or
+  never answered never holds the voice (journalled `could not be
+  cancelled; this voice no longer confirms it, and it lapses in the tasks
+  part`); the journal says `lamp-voice: tasks: request N: task <id>
+  dropped: the person said no to its read-back`; and the line is told, in
+  place of the note above, "they said no to the task you read back. It is
+  dropped and nothing was started. Say only … that you won't start it. Call
+  nothing." A no with more in it ("no, write a poem about tea instead",
+  "no, I said tea", "no, ask Codex") is not plain and stays a correction,
+  as above. A no with nothing waiting, in the request that prepared the
+  task, or past the 120 s, does nothing. The Live route has no such hook
+  yet: there a plain no still calls nothing.
 - a `start_agent_task` that prepares while another task still waits for its
   yes replaces it, but only from a request that could say yes to it
   (`may_confirm`): a later request than the one that prepared it, heard (or
@@ -3325,7 +3348,10 @@ corrected ask, read back again, and started only on a yes:
 Without the switch the note, `next` and the lines sent are byte-for-byte
 as before (a second prepare already replaced the one waiting, unsaid).
 Tests: `a_corrected_ask_replaces_the_one_waiting_and_only_it_starts`,
-`a_plain_no_starts_nothing_and_a_failed_cancel_keeps_the_correction`,
+`a_plain_no_drops_the_task_and_a_failed_cancel_keeps_the_correction`,
+`a_plain_no_then_a_yes_within_the_window_starts_nothing`,
+`a_correction_after_the_read_back_is_not_a_plain_no`,
+`a_plain_no_with_nothing_pending_does_nothing`,
 `two_starts_in_one_request_or_a_written_one_replace_nothing`,
 `without_the_correct_switch_the_note_and_next_are_as_before`,
 `with_the_correct_switch_a_repeat_of_the_waiting_ask_is_not_a_yes`,
@@ -3340,12 +3366,14 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
 "Lamp"; #2838):
 - **Passed:**
   - a correction then yes (task 24 replaced, only 25 reached the computer);
-  - a plain no (nothing called);
+  - a plain no (nothing called; since #6582 the voice drops the task
+    itself);
   - two corrections in a row then yes (31 and 32 replaced, only 33 sent).
 - **Found:**
   - a reworded repeat was taken as the yes (before the words above);
   - within the 120 s after a plain no, new asks were answered in words, as
-    the declined task's note still stood beside them;
+    the declined task's note still stood beside them (since #6582 the no
+    clears it, so the note goes with it);
   - "yes, and also …" isn't shown cleanly yet.
 
 ### One yes for a read-back said in words (#5169, off unless `LAMP_TASKS_ONE_YES=on`)

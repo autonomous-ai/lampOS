@@ -154,6 +154,40 @@ chạy thật gửi thêm (ghi chú của bộ nhớ, các dòng của skill, c�
 web, tên vừa nghe thấy) không có trong probe. D giúp việc giao việc không còn
 phụ thuộc vào những thứ đó. Chưa được phát thử trên đèn.
 
+### Một tiếng "không" cho lời đọc lại bỏ việc đã chuẩn bị (#6582)
+
+Trước đây (#2838), sau khi đèn đọc lại một việc, một tiếng "không" đơn thuần
+không gọi gì cả: việc đã chuẩn bị vẫn chờ, trong giọng nói (`PENDING`) và trong
+phần tasks, suốt `CONFIRM_WITHIN` (120 s), nên một tiếng "có" sau đó vẫn bắt
+đầu được nó. Nay, trên tuyến thứ hai, một câu nghe được là một tiếng không đơn
+thuần (`services::plain_no`, danh sách giọng nói đã dùng cho tiếng không với
+một lần ghi của kỹ năng: "No.", "No thanks.", "Never mind.", "Don't.",
+"Cancel that.", "Không, thôi.") trong lúc một việc đang chờ, từ một yêu cầu
+có thể nói có với nó (`may_confirm`), bỏ việc đó (`agent_tasks::declined`,
+gắn vào engine bằng `declining_a_task_waiting`):
+
+- `PENDING` được xoá, nên không tiếng "có" nào sau đó trong 120 s bắt đầu nó;
+- phần tasks được gửi lệnh `cancel` cho việc đó, cùng lệnh mà một lời sửa gửi,
+  sau một `status` để lấy guard, trên một luồng riêng giới hạn bởi `DEADLINE`
+  (3,5 s): một lệnh huỷ bị từ chối hoặc không được trả lời không bao giờ giữ
+  giọng nói lại (nhật ký ghi `could not be cancelled; this voice no longer
+  confirms it, and it lapses in the tasks part`);
+- nhật ký ghi `lamp-voice: tasks: request N: task <id> dropped: the person
+  said no to its read-back`;
+- câu đó được báo, thay cho ghi chú việc đang chờ, rằng người ta đã nói không,
+  việc đã bị bỏ và chưa có gì bắt đầu: chỉ nói là sẽ không bắt đầu nó, không
+  gọi gì.
+
+Một tiếng không có thêm nội dung ("no, write a poem about tea instead", "no,
+I said tea", "no, ask Codex") không phải tiếng không đơn thuần: nó vẫn là một
+lời sửa như trước (#2838). Một tiếng không khi không có việc nào chờ, trong
+chính yêu cầu đã chuẩn bị việc, hoặc sau 120 s, không làm gì. Tuyến Live chưa
+có chỗ gắn này: ở đó một tiếng không vẫn không gọi gì. Test:
+`a_plain_no_drops_the_task_and_a_failed_cancel_keeps_the_correction`,
+`a_plain_no_then_a_yes_within_the_window_starts_nothing`,
+`a_correction_after_the_read_back_is_not_a_plain_no`,
+`a_plain_no_with_nothing_pending_does_nothing`.
+
 ## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`, bật trong sản phẩm)
 
 Bước `do.task` của một kỹ năng (#6305, docs/skills.md, "A skill's task")
