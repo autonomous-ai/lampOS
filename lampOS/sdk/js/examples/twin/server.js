@@ -26,7 +26,8 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, SPEAKER_EVENTS, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
-import { checked, cleanScratch, cleanScratchNotes, describe, findControl, findStimulus, logIt } from './controls.js';
+import { checked, cleanScratch, cleanScratchNotes, cleanScratchSkill, describe, findControl, findStimulus, logIt } from './controls.js';
+import { endHandler, watchParent } from './twin-end.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
@@ -44,6 +45,11 @@ const stimDir = options['stim-dir'];
 const real = Boolean(options.real);
 const tryPanel = Boolean(stimDir || real);
 const mode = real ? 'real' : options.fake ? 'fake' : 'lamp-sim';
+// Only try.js gives it; started alone, this would fall to the SDK's default keyring (the person's own pairings): refused.
+if (real && !process.env.LAMP_TRY_KEYRING) {
+  console.error('try: a real run takes its keyring from try.js --real (LAMP_TRY_KEYRING): start it with try.js --real');
+  process.exit(2);
+}
 const realKeyring = real ? new Keyring(process.env.LAMP_TRY_KEYRING) : undefined;
 delete process.env.LAMP_TRY_KEYRING;
 const lampSimBin = options['lamp-sim'] ?? 'lamp-sim';
@@ -360,29 +366,26 @@ wss.on('connection', (page) => {
 // The end of a real run: this run's scratch clip and notes come off the lamp (nothing else is touched), then the connection
 // closes. try.js sends SIGTERM; a second signal ends it at once.
 if (real) {
-  let signals = 0;
-  let ending = false;
-  const bounded = (work) => Promise.race([work.catch((error) => console.error(`try: could not clean up on the lamp: ${error?.message ?? error}`)), new Promise((resolve) => setTimeout(resolve, 3000))]);
-  const end = async () => {
-    signals += 1;
-    // A repeat signal (a second Ctrl-C, a parent's SIGTERM after a terminal's SIGINT) must not cut the cleanup short: only a
-    // third one ends at once, and the cleanup itself is bounded (about 12 s).
-    if (signals >= 3) process.exit(1);
-    if (ending) return;
-    ending = true;
-    setTimeout(() => process.exit(1), 15_000).unref();
-    await bounded(release());
-    await bounded(cleanScratch(lamp));
-    await bounded(cleanScratchNotes(lamp));
-    await bounded(lamp.close());
-    process.exit(0);
-  };
+  // Five steps, each bounded at 3 s, are 15 s at worst; the limit is that plus 5 s, so a lamp that hangs on every step still ends 0.
+  const STEP_MS = 3000;
+  const STEPS = 5;
+  const bounded = (work) => Promise.race([work.catch((error) => console.error(`try: could not clean up on the lamp: ${error?.message ?? error}`)), new Promise((resolve) => setTimeout(resolve, STEP_MS))]);
+  const end = endHandler({
+    mostMs: STEPS * STEP_MS + 5000,
+    exit: (code) => process.exit(code),
+    cleanup: async () => {
+      await bounded(release());
+      await bounded(cleanScratch(lamp));
+      await bounded(cleanScratchNotes(lamp));
+      await bounded(cleanScratchSkill(lamp));
+      await bounded(lamp.close());
+    },
+  });
   process.on('SIGTERM', end);
   process.on('SIGINT', end);
   // try.js started this process in a group of its own, so a terminal's Ctrl-C reaches try.js alone; if try.js dies without a
   // word (SIGKILL), this one cleans up and ends too, rather than keeping the lamp connected.
-  const parent = process.ppid;
-  setInterval(() => { if (process.ppid !== parent) end(); }, 2000).unref();
+  watchParent({ parent: process.ppid, end });
 }
 // Always on 127.0.0.1. With --lan also on the one address it prints (a second server that hands its requests and
 // upgrades to the first), never on every interface: a second network card or a VPN address does not get the twin.

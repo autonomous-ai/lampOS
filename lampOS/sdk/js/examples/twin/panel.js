@@ -282,7 +282,8 @@ const hearing = (() => {
 })();
 // Above the log it controls (the page has one column here).
 events.before(hearing.node);
-window.addEventListener('twin-open', () => hearing.off());
+// A new connection is a new page to the server, which has not been told yes: the panel asks again (it was refusing silently).
+window.addEventListener('twin-open', () => { movesAllowed = false; hearing.off(); });
 
 window.addEventListener('twin-message', ({ detail }) => {
   if (detail.type === 'picture') showPicture(detail);
