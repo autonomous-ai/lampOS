@@ -70,6 +70,11 @@ pub struct Computer {
     pub status: Option<Reading<String>>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub engines: BTreeMap<String, EngineKnown>,
+    /// The engines in the order the last look gave them (Harness's order,
+    /// #6492): the lamp's own engines are offered in it after the default.
+    /// Kept in memory only, never in the engines file.
+    #[serde(skip)]
+    pub order: Vec<String>,
 }
 
 impl EngineKnown {
@@ -117,7 +122,32 @@ impl Computer {
         Self {
             status: self.status.clone().filter(|r| fresh(r.read_ms)),
             engines,
+            order: self.order.clone(),
         }
+    }
+
+    /// The engines known installed here now, by Harness's name, in
+    /// Harness's order (#6492): the order its last look gave, then any
+    /// other known installed, by name.
+    pub fn installed_in_order(&self) -> Vec<String> {
+        let installed = |name: &String| {
+            self.engines
+                .get(name)
+                .and_then(|known| known.installed.as_ref())
+                .is_some_and(|r| r.value)
+        };
+        let mut names: Vec<String> = self
+            .order
+            .iter()
+            .filter(|n| installed(n))
+            .cloned()
+            .collect();
+        for name in self.engines.keys() {
+            if installed(name) && !names.contains(name) {
+                names.push(name.clone());
+            }
+        }
+        names
     }
 
     fn installed(&self, engine: EngineKind) -> Option<bool> {
@@ -244,6 +274,7 @@ impl Known {
             }
         }
         computer.engines.retain(|_, known| !known.is_empty());
+        computer.order = rows.iter().map(|row| row.engine.clone()).collect();
     }
 
     /// What is known of `machine`, fresh at `now_ms`.
@@ -294,6 +325,18 @@ impl Known {
 }
 
 impl Known {
+    /// The engines the lamp's own machine (the one Harness marks
+    /// `current`) is known to have installed now, in Harness's order
+    /// ([`Computer::installed_in_order`], #6492). None when that machine
+    /// is not listed or no fresh look at its engines is known.
+    pub fn lamp_installed(&self, machines: &[AccountMachine], now_ms: u64) -> Option<Vec<String>> {
+        let lamp = machines.iter().find(|m| m.current)?;
+        let computer = self
+            .computer(&lamp.machine_id, now_ms)
+            .filter(|computer| !computer.engines.is_empty())?;
+        Some(computer.installed_in_order())
+    }
+
     /// `LAMP_OPENCLAW_ON_LAMP` and `LAMP_HERMES_ON_LAMP` (#5978, #6226):
     /// the lamp's own machine, the one Harness marks `current`, with the
     /// first engine of `order` (the lamp's engines switched on, the chosen
@@ -754,10 +797,11 @@ mod tests {
         assert_eq!(mode, 0o600);
         let read = read_engines(&path).unwrap();
         assert_eq!(read.keys().collect::<Vec<_>>(), ["office"]);
-        assert_eq!(
-            read["office"],
-            known.computer(&"a".repeat(32), NOW).unwrap()
-        );
+        // Harness's order is kept in memory only (#6492).
+        let mut computer = known.computer(&"a".repeat(32), NOW).unwrap();
+        assert_eq!(computer.order, ["claude"]);
+        computer.order.clear();
+        assert_eq!(read["office"], computer);
         assert_eq!(
             serde_json::from_slice::<serde_json::Value>(&fs::read(&path).unwrap()).unwrap(),
             serde_json::json!({"version":1,"computers":{"office":{
@@ -858,6 +902,46 @@ mod tests {
 
     /// #5978: the lamp's own machine is the lamp only where its look said
     /// Hermes is installed; never a choice for a computer's target.
+    /// #6492: the lamp's own machine's engines known installed, in the
+    /// order Harness's look gave them, not by name; a computer's never.
+    #[test]
+    fn the_lamps_installed_engines_keep_harness_s_order() {
+        let lamp = AccountMachine {
+            current: true,
+            ..machine('a', Some("running"))
+        };
+        let listed = [lamp.clone(), machine('b', Some("running"))];
+        let mut known = Known::default();
+        known.listed(&listed, NOW);
+        assert_eq!(known.lamp_installed(&listed, NOW), None, "not looked at");
+        known.probed(
+            &lamp.machine_id,
+            &[
+                row("openclaw", Some(true), None),
+                not_found("codex"),
+                row("hermes", Some(true), None),
+                row("claude", Some(true), None),
+            ],
+            NOW,
+        );
+        assert_eq!(
+            known.lamp_installed(&listed, NOW).unwrap(),
+            ["openclaw", "hermes", "claude"]
+        );
+        known.probed(&"b".repeat(32), &[row("pi", Some(true), None)], NOW);
+        assert!(
+            !known
+                .lamp_installed(&listed, NOW)
+                .unwrap()
+                .contains(&"pi".to_owned())
+        );
+        assert_eq!(
+            known.lamp_installed(&listed, NOW + STALE_AFTER_MS + 1),
+            None,
+            "stale"
+        );
+    }
+
     #[test]
     fn the_lamp_is_kept_only_where_hermes_is_known_installed() {
         let lamp = AccountMachine {

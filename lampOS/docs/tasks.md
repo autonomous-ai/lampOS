@@ -1807,19 +1807,32 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     set up, never sent to a computer. A finished task's news adds that it was
     done here on the lamp ("I did it here on the lamp"); a session joined
     on a computer is told as that computer's.
-  - **A named engine (#6492).** While the tasks part has the `lamp` target,
-    `start_agent_task` also takes `engine` (`"hermes"`, `"openclaw"`),
-    filled only when the person names Hermes or OpenClaw for work on the
-    lamp. A hand-over to the lamp naming one, by `engine` or by `who`
-    (any case, "the " left off), sends `"engine"` with the `prepare` and
-    says that engine as who does it ("OpenClaw on the lamp"); naming none
-    sends no `engine` and says the lamp's default. An `engine` for a
-    computer is ignored. A refusal `engine_not_here` is said "OpenClaw
-    isn't set up on me, so I didn't start that." (`engine_unknown`: "I
-    don't know OpenClaw here, so I didn't start that."), and is never
-    retried on the other engine. Tests:
+  - **A named engine (#6492).** The voice keeps the lamp's engines from
+    the `targets` answer: the `lamp` target's `engine` (its default) first,
+    then its `engines`, each once (`[engine]` alone from an older tasks
+    part). They are whatever Harness reports on the lamp; the voice keeps no
+    list of engines. While the tasks part has the `lamp` target,
+    `start_agent_task` also takes `engine`, its `enum` the lamp's engines as
+    last read (none before they are read), filled only when the person
+    names one of them for work on the lamp. A hand-over to the lamp naming
+    one, by `engine` or by `who` (its id or the name it is called, any case,
+    spaces and "the " left off), sends `"engine"` with the `prepare` and
+    says that engine as who does it ("Pi on the lamp"); naming none, or a
+    name not among the lamp's engines, sends no `engine` and says the
+    lamp's default. A `who` naming one of the lamp's engines goes to the
+    lamp with that engine even when a computer has an agent of that name
+    ("Claude Code"); only `where` `"computer"` sends it to the computer. An
+    `engine` for a computer is ignored. Names are said from a small table
+    (Hermes, OpenClaw, Claude Code, Codex, OpenCode, Devin), else the id
+    with a capital ("Pi"); the table only names, it gates nothing. A
+    refusal `engine_not_here` is said "<Name> isn't set up on me, so I
+    didn't start that." (`engine_unknown`: "I don't know <Name> here, so I
+    didn't start that."), and is never retried on another engine. Tests:
     `agent_tasks::tests::a_named_lamp_engine_goes_with_the_prepare_and_is_said`,
-    `agent_tasks::tests::the_lamp_engine_is_declared_only_with_the_lamp`.
+    `agent_tasks::tests::the_lamp_engine_is_declared_only_with_the_lamp`,
+    `agent_tasks::tests::the_lamp_engines_are_read_from_the_targets_answer`,
+    `agent_tasks::tests::an_engine_is_said_by_its_name_or_its_id_with_a_capital`,
+    `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
   - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
     `runtime::tests::hermes_settings_are_written_at_start_only_with_a_token`,
@@ -1875,34 +1888,65 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
   - **Which engine:** `LAMP_LAMP_ENGINE` is `openclaw` or `hermes`, unset
     `hermes`, the default (#6498; #6226 had `openclaw`). The lamp's target is still `lamp`, with that engine; when
     the one chosen is not installed but the other is, the other.
-  - **Named or not, and the app's choice (#6492):** a `prepare` for the
-    `lamp` target may carry `"engine":"hermes"` or `"engine":"openclaw"`
-    (absent: not written; another target ignores it). Named, the work runs
-    on exactly that engine while it is in the lamp's order now
-    (`lamp_order`: switched on, OpenClaw left out under a Harness older
-    than 0.6.11, and not known missing on the lamp); otherwise the prepare
-    is refused with `engine_not_here`, and nothing is launched: never
-    moved to the other engine. Any other value is refused with
-    `engine_unknown`. Named none, the work runs on the lamp's default: the
-    owner's choice in the app when set and in the order, else
-    `LAMP_LAMP_ENGINE`'s, else the build's. The app sets it on the app's
-    route (`--app-socket`) with `{"op":"app_engine_default","engine":"hermes"}`
-    (refused `engine_unknown`, or `engine_not_installed` when that engine is
-    not switched on here; `engine_default_unsaved` when the file can't be
-    written), kept in `engine-default.json` in the tasks folder (`--dir`) as
-    `{"version":1,"engine":"hermes"}`, written beside and renamed over. It
-    is used at once, without a restart: the lamp's order puts it first, the
-    `targets` answer says it as the `lamp` target's engine (so the voice
-    names it), and the lamp's target is written again at the next look.
-    `{"op":"app_engine_default_state"}` reads it. Both answer
-    `{"ok":true,"default":"hermes","chosen_in_app":true}` (`default` null
-    when the lamp has no engine; `chosen_in_app` true only while the app's
-    choice is the default). The file is read at start; missing or not
-    valid is no choice. The lamp's reset wipes it with the tasks folder.
-    Shown in tests: `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
+  - **The lamp's engines, named or not, and the app's choice (#6492).**
+    Nothing on the lamp is built per engine: Harness has many, and Hermes
+    and OpenClaw are two of them. The lamp's engines are the engines
+    Harness's engines look (`harness machines engines <id> --json`, read
+    with the computers' looks, bounded and refreshed as they are) reports
+    installed on the lamp's own machine (the one `harness machines` marks
+    `current`), in Harness's order, of those Harness starts with a task:
+    an engine lamp-tasks has no name for is one Harness launches with no
+    first prompt (`PROMPT_UNSUPPORTED`), so it is never offered, and Devin
+    Cloud works in Devin's cloud, never on the lamp. `LAMP_HERMES_ON_LAMP`
+    and `LAMP_OPENCLAW_ON_LAMP` are off-switches only: an engine whose
+    switch is off is not offered (OpenClaw also not under a Harness older
+    than 0.6.11); every other engine has no switch. Before a look has
+    reported (or signed out, #6407), the lamp's engines are the ones
+    switched on, as before. The default comes first, then every other in
+    Harness's order (`lamp_order`): the owner's choice in the app when it is
+    among them, else `LAMP_LAMP_ENGINE`'s (any engine's name), else the
+    build's (`lamp_engines`' first switched on), else the first of them.
+    The `targets` answer's `lamp` entry says the default as its `engine`
+    and lists them all, default first:
+    `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
+    (no `engines` when there are none). A `prepare` for the `lamp` target
+    may carry `"engine"` with any engine's name (absent: not written;
+    another target ignores it). Named, the work runs on exactly that engine
+    while it is among the lamp's engines and not known missing there, passed
+    to Harness by its name (`harness new <engine>` in the lamp's folder, as
+    Harness starts that engine: no per-engine runner here; OpenClaw's
+    Gateway wait and lost-first-prompt check, #6226, stay keyed by its
+    name as Harness's documented behaviour); otherwise the prepare is
+    refused with `engine_not_here` and nothing is launched: never moved to
+    another engine. An empty or blank name is refused with
+    `engine_unknown`. Named none, the work runs on the default. The lamp's
+    folder gets Hermes's or OpenClaw's guidance only for those two; any
+    other engine reads its own settings, as Harness starts it. The app
+    sets the default on the app's route (`--app-socket`) with
+    `{"op":"app_engine_default","engine":"claude"}`: among the lamp's
+    engines, kept and used at once; blank, `engine_unknown`; not among
+    them, `engine_not_installed`; `engine_default_unsaved` when the file
+    can't be written. It is kept in `engine-default.json` in the tasks
+    folder (`--dir`) as `{"version":1,"engine":"claude"}`, written beside
+    and renamed over, and used at once, without a restart: the lamp's
+    order puts it first, the `targets` answer says it as the `lamp`
+    target's engine (so the voice names it), and the lamp's target is
+    written again at the next look. `{"op":"app_engine_default_state"}`
+    reads it. Both answer `{"ok":true,"default":"claude","chosen_in_app":true}`
+    (`default` null when the lamp has no engine; `chosen_in_app` true only
+    while the app's choice is the default). The file is read at start;
+    missing, not valid, or naming an engine Harness starts with no task is
+    no choice. A choice no longer among the lamp's engines (Harness no
+    longer reports it, or its switch is off) is passed over, not wiped.
+    The lamp's reset wipes it with the tasks folder. Shown in tests:
+    `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
     `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
     `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
+    `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default`,
     `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
+    `runtime::tests::the_lamps_engines_are_harness_s_the_default_first_then_harness_s_order`,
+    `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
+    `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
     `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
   - **Started** as Harness starts OpenClaw:
     `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
