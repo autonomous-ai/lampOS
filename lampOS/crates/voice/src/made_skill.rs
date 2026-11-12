@@ -5783,6 +5783,23 @@ pub fn forget_named(directory: &Path, name: &str) {
     }
 }
 
+/// The made skill `sha256`, kept and not on, dropped from the index, its
+/// package with it unless another entry names it (`crate::made_clash`'s
+/// cancel, or a clash never answered): never told as made and off.
+pub fn forget_unput(directory: &Path, sha256: &str) {
+    let (gone, entries): (Vec<Value>, Vec<Value>) = index(directory)
+        .into_iter()
+        .partition(|entry| entry["sha256"] == sha256 && entry["on"] != true);
+    if gone.is_empty() {
+        return;
+    }
+    if let Err(error) = write_index(directory, &entries) {
+        eprintln!("lamp-voice: a made skill not put on wasn't dropped from the index: {error}");
+        return;
+    }
+    drop_packages(directory, gone, &entries);
+}
+
 /// Drop from the index every kept skill called `name` but the one from
 /// `from`, their packages with them.
 fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
@@ -5793,6 +5810,13 @@ fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
         return Ok(());
     }
     write_index(directory, &entries)?;
+    drop_packages(directory, gone, &entries);
+    Ok(())
+}
+
+/// The packages of the index entries `gone`, each unless one of `entries`,
+/// still kept, names it.
+fn drop_packages(directory: &Path, gone: Vec<Value>, entries: &[Value]) {
     for entry in gone {
         // The same words make the same package: kept while one still names it.
         if let Some(package) = entry["package"].as_str().filter(|package| {
@@ -5804,7 +5828,6 @@ fn forget_others(directory: &Path, name: &str, from: &str) -> io::Result<()> {
             let _ = fs::remove_file(directory.join(package));
         }
     }
-    Ok(())
 }
 
 /// Where made skills are kept, the program that checks them, and the

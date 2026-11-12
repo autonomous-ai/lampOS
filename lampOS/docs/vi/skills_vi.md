@@ -1192,30 +1192,53 @@ sau:
     `body`). Trigger khác, hoặc cùng trigger mà không chung đầu ra, thì
     không xung đột. Khi xung đột, không bật gì: mô hình được báo tên nói
     của kỹ năng kia (`clashes_with`), thứ cả hai dùng (`shares`), một
-    `clash_id`, và được dặn nói xung đột trong vài từ rồi hỏi: thay nó, giữ
-    cả hai (cái mới thắng), hay hủy. Lượt bị cắt trước đó thì nói "I made
-    NAME, but didn't put it on: OTHER starts at the same moment and uses
-    the light. Ask me again to replace it or to keep both."
-    (`made_clash::cut_line`). Câu trả lời quay lại là `make_skill` chỉ với
-    `clash_id` và `choice` (`replace`, `keep` hoặc `cancel`), nên
-    `request` không còn bắt buộc (`made_clash::chosen`): chỉ một câu nghe
-    được sau câu tạo, trong 5 phút (`made_clash::CLASH_WITHIN`), và chỉ
-    của chủ đèn, kiểm như một lời "có" (`services::owners_yes_now`: với
-    `LAMP_PRIVATE_ROOM` bật, bất kỳ câu nghe được nào). **Thay** nhờ manage
-    helper bằng chính `{"remove": NAME}` của nó, như nút gỡ của ứng dụng
-    (kỹ năng lõi bị từ chối ở đó, và khi ấy không bật gì), bỏ kỹ năng đã
-    tạo khỏi `made.json`, rồi bật cái mới theo SHA-256
-    (`made_skill::put_on_within`). **Giữ** bật cái mới bên cạnh và nói
-    "When they start together, NEW wins over OTHER." **Hủy** không bật gì;
-    kỹ năng đã tạo vẫn được giữ và tắt. Một lần tạo có mã riêng vẫn chờ
-    lời "có" như trước và không bị so xung đột; MAKE IT của ứng dụng cũng
-    vậy. Còn mở: vòng đèn hiện yêu cầu mới nhất trong cùng mức ưu tiên
-    (`ring_requests`), và lamp-skills chạy các lượt của một sự kiện theo
-    thứ tự tên thư mục, mỗi lượt một luồng riêng, nên chưa có gì bảo đảm
-    yêu cầu của cái mới đến sau cùng; câu của "giữ" là theo phán quyết,
-    chưa được thực thi. Kiểm thử: `a_clash_is_found_and_nothing_is_put_on`,
+    `clash_id`, và được dặn nói nguyên văn "NEW would start at the same
+    moment as OTHER, which is on the lamp, and both use the light. Shall I
+    replace OTHER, keep both (they may take turns), or cancel?". "Giữ"
+    không hứa cái nào thắng (P2 của Heron trên #6614): vòng đèn hiện yêu
+    cầu mới nhất trong cùng mức ưu tiên (`ring_requests`), và lamp-skills
+    chạy các lượt của một sự kiện theo thứ tự tên thư mục, mỗi lượt một
+    luồng riêng, nên không có gì bảo đảm yêu cầu của cái mới đến sau cùng.
+    Lượt bị cắt trước đó thì nói "I made NAME, but didn't put it on: OTHER
+    starts at the same moment and uses the light. Ask me again to replace
+    it or to keep both." (`made_clash::cut_line`). Câu trả lời quay lại là
+    `make_skill` chỉ với `clash_id` và `choice` (`replace`, `keep` hoặc
+    `cancel`), nên `request` không còn bắt buộc (`made_clash::chosen`);
+    một lần tạo không có `request`, hoặc một `choice` không có
+    `clash_id`, không tạo gì và được báo "nothing was made: a new skill
+    needs request, what it should do and when"
+    (`make_skill_local::NO_REQUEST`). Lựa chọn chỉ được nhận trong một câu
+    nghe được sau câu tạo, trong 5 phút (`made_clash::CLASH_WITHIN`), và
+    chỉ của chủ đèn, kiểm như một lời "có" (`services::owners_yes_now`:
+    với `LAMP_PRIVATE_ROOM` bật, bất kỳ câu nghe được nào). "Thay" gỡ một
+    kỹ năng, nên lựa chọn được canh như lời "có" của kỹ năng đã tạo (P2
+    của Heron trên #6614): khi một xung đột đang chờ
+    (`made_clash::awaited`) thì bật giữ tiếng vọng, nên một câu chỉ gồm lời
+    của chính đèn trong đuôi tiếng vọng bị giữ lại, kể cả trong phòng riêng,
+    và không lựa chọn nào trong đó được nhận (`made_clash::echo_held`);
+    "thay" hay "giữ" chỉ đến trên đường có bộ xét tiếng vọng
+    (`services::sends_here`), và chỉ sau khi một câu trả lời của đèn, như
+    đã phát và không bị cắt (`made_clash::lamp_said`,
+    `made_clash::lamp_cut`), chứa trọn câu hỏi; trước đó mô hình được dặn
+    hỏi lại trọn câu và xung đột tiếp tục chờ. **Thay** bật cái mới trước
+    theo SHA-256 (`made_skill::put_on_within`), rồi nhờ manage helper bằng
+    chính `{"remove": NAME}` của nó, như nút gỡ của ứng dụng, và bỏ kỹ
+    năng đã tạo khỏi `made.json`. Nếu bật thất bại thì không gỡ gì ("OTHER
+    stays as it was"); nếu gỡ thất bại (kỹ năng lõi bị từ chối ở đó) thì
+    cả hai đều bật và đèn nói "NEW is on, but OTHER wasn't removed: … Both
+    are on." **Giữ** bật cái mới bên cạnh và nói "Both are on." **Hủy**
+    không bật gì, và kỹ năng đã tạo bị bỏ khỏi `made.json` cùng gói của nó
+    (`made_skill::forget_unput`), cũng như một kỹ năng mà xung đột không
+    nhận được lựa chọn trong 5 phút (bỏ ở câu nghe được kế tiếp) hoặc bị
+    một xung đột mới hơn thay chỗ. Một lần tạo có mã riêng vẫn chờ lời
+    "có" như trước và không bị so xung đột; MAKE IT của ứng dụng cũng vậy.
+    Kiểm thử: `a_clash_is_found_and_nothing_is_put_on`,
     `no_clash_on_another_trigger_or_no_shared_output`,
-    `replace_keep_and_cancel_each_do_what_they_say`.
+    `replace_keep_and_cancel_each_do_what_they_say`,
+    `an_echoed_unsaid_or_live_replace_is_refused`,
+    `replace_never_leaves_both_off`,
+    `cancel_and_expiry_forget_the_made_one`,
+    `a_make_with_no_request_is_refused_plainly`.
 
 Một câu "đã tạo" mà không có lần tạo nào đứng sau thì không bao giờ được nói
 (`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): câu trả lời mở đầu

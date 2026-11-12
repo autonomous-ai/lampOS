@@ -558,7 +558,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
         "enum": crate::made_clash::CHOICES,
-        "description": "With clash_id only: replace the other skill, keep both (the new one wins), or cancel, as the person chose in any words."
+        "description": "With clash_id only: replace the other skill, keep both (they may take turns), or cancel, as the person chose in any words."
     });
     if writes || tasks || code {
         parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
@@ -2217,6 +2217,12 @@ fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Val
 pub const NOT_ASKED_ALOUD: &str =
     "a skill is made only when the person asks for one out loud, or with MAKE IT in the app";
 
+/// What a `make_skill` call with no `request` and no other argument it
+/// takes is told (Heron's P3 on #6614: `request` is not required, so a
+/// clash's choice can come alone): nothing is made.
+pub const NO_REQUEST: &str =
+    "nothing was made: a new skill needs request, what it should do and when";
+
 pub fn answer(
     call: &lamp_gemini::ToolCall,
     request: u64,
@@ -2227,10 +2233,13 @@ pub fn answer(
     // lamp (#6593): only the owner's own later line, as for a yes.
     if let Some(id) = call.args[crate::made_clash::CLASH_ID].as_str() {
         return crate::made_clash::chosen(
-            id,
-            call.args[crate::made_clash::CHOICE].as_str(),
-            request,
-            heard,
+            crate::made_clash::Answer {
+                id,
+                choice: call.args[crate::made_clash::CHOICE].as_str(),
+                request,
+                heard,
+                here: crate::services::sends_here(),
+            },
             || crate::services::owners_yes_now(request, heard, lease),
             std::time::Instant::now(),
             &crate::made_clash::helper_hands(),
@@ -2335,6 +2344,19 @@ pub fn answer(
             "lamp-voice: a skill wasn't made: no one asked for it aloud in this turn (#5985)"
         );
         return serde_json::json!({ "error": NOT_ASKED_ALOUD });
+    }
+    // `request` is not required, so a clash's choice can come alone
+    // (#6593): a make with none, or a choice with no clash_id, makes
+    // nothing and is told so plainly (Heron's P3 on #6614).
+    if call.args["request"]
+        .as_str()
+        .is_none_or(|request| request.trim().is_empty())
+    {
+        eprintln!("lamp-voice: request {request}: a skill wasn't made: the call had no request");
+        return serde_json::json!({
+            "error": NO_REQUEST,
+            "next": "Ask them, in a few words, what the skill should do and when. Call nothing now."
+        });
     }
     let now_unix_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -2532,6 +2554,27 @@ pub(crate) mod tests {
             answer(&call, 1, false, None),
             serde_json::json!({"error": NOT_ASKED_ALOUD})
         );
+    }
+
+    /// Heron's P3 on #6614: with a clash's choice `request` is no longer
+    /// required, so a plain make with none, or a choice with no clash_id,
+    /// is refused with a plain line, and nothing is made.
+    #[test]
+    fn a_make_with_no_request_is_refused_plainly() {
+        for args in [
+            serde_json::json!({}),
+            serde_json::json!({"request": "  "}),
+            serde_json::json!({"choice": "keep"}),
+        ] {
+            let call = lamp_gemini::ToolCall {
+                id: "c1".to_owned(),
+                name: crate::made_skill::MAKE.to_owned(),
+                args,
+            };
+            let told = answer(&call, 2, true, None);
+            assert_eq!(told["error"], NO_REQUEST, "{told}");
+            assert!(told["next"].is_string(), "{told}");
+        }
     }
 
     const TOML: &str = r#"kind = "installable"
