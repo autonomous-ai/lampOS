@@ -53,11 +53,12 @@ pub enum Request {
         /// new one ([`crate::harness::Launch::session`]). Absent, as before.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         session: Option<String>,
-        /// The engine the person named for the work (#6492), `hermes` or
-        /// `openclaw`, read only for the lamp's own target
-        /// ([`crate::runtime::LAMP_TARGET`]): the work runs on exactly that
-        /// one while it is in the lamp's order, else the prepare is refused
-        /// (`engine_not_here`, `engine_unknown`), never moved to the other.
+        /// The engine the person named for the work (#6492), by any name
+        /// Harness gives an engine (`hermes`, `openclaw`, `claude`, …), read
+        /// only for the lamp's own target ([`crate::runtime::LAMP_TARGET`]):
+        /// the work runs on exactly that one while it is among the lamp's
+        /// engines, else the prepare is refused (`engine_not_here`,
+        /// `engine_unknown`), never moved to another.
         /// Another target ignores it. Absent: the lamp's default.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         engine: Option<String>,
@@ -171,7 +172,8 @@ pub enum Request {
         delivered: bool,
     },
     /// The owner's choice in the app of the lamp's default engine (#6492),
-    /// `hermes` or `openclaw`, on the app's route only: kept in
+    /// by any engine's name among the lamp's engines, on the app's route
+    /// only: kept in
     /// [`crate::runtime::ENGINE_DEFAULT_FILE`] and used at once.
     AppEngineDefault {
         engine: String,
