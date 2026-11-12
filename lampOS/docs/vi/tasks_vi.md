@@ -246,6 +246,19 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   trong môi trường tiến trình của wrapper ngoài cùng (`/proc/<pid>/environ`),
   các tiến trình khác cùng uid với lamp-tasks đọc được; điều này được chấp
   nhận cho một token chỉ dùng một lần chạy và sống tối đa 14 phút.
+- **File token của lần chạy** (#6510 Part 1, chưa dùng): `harness new`
+  không nhận môi trường, nên khi các lần chạy đi qua Harness (#6510 Part 1
+  bước 2), token được giao bằng một file thay cho `LAMP_CONTROL_TOKEN`:
+  `/run/lampos-tasks/runs/<run-id>` (`run_token_file::RUNS_DIR`, tmpfs),
+  run id phải là id thuần (`a-z`, `0-9`, `-`, 1 đến 64 ký tự), nếu không
+  thì bị từ chối trước khi tạo gì. `RunTokenFile::write` tạo thư mục 0700
+  khi chưa có và từ chối thư mục là link, không thuộc user của lamp-tasks
+  hoặc mở cho người khác; file được tạo 0600, độc quyền (file có sẵn hay
+  link ở đó bị từ chối, không bao giờ đi theo hay ghi đè), ghi đủ rồi sync.
+  Wrapper của engine (lamp-update) đọc nó một lần rồi xóa; lamp-tasks cũng
+  xóa nó khi lần chạy kết thúc dù kết thúc thế nào (drop của guard; đã bị
+  xóa trước thì không sao). Token không bao giờ có trong argv, dòng debug,
+  nhật ký, lỗi hay trạng thái của Harness; đường dẫn chỉ chứa run id.
 - **Lần chạy:** một việc cho đích `lamp`, lời của nó là việc của kỹ năng,
   script cần chạy từ thư mục chỉ đọc của kỹ năng, và đường duy nhất tới đèn
   (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
