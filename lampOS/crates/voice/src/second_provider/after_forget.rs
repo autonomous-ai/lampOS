@@ -45,6 +45,10 @@ pub(super) fn status(name: &str, result: &Value) -> Value {
             outcome.insert(field.to_owned(), json!(value));
         }
     }
+    // A refusal that asked which (C134): its flag, never its note's words.
+    if is_memory_forget(name) && result[crate::remember::ASK_WHICH] == true {
+        outcome.insert("asked_which".into(), json!(true));
+    }
     if result["scope"] == "room" {
         outcome.insert("scope".into(), json!("room"));
     }
@@ -183,7 +187,7 @@ pub(super) fn context(
     vec![
         Message::system(instruction),
         Message::system(format!(
-            "A {kind} forget call has run in this turn. The earlier conversation, recalled memory, pictures and tool payloads have been discarded. Answer only the person's current words and these content-free call outcomes: {}. Do not repeat any of these calls or reconstruct what was forgotten. Only confirm deletion when the outcome confirms it; an error or missing confirmation means the result is uncertain, not success. forgotten reports memory items only; false means none were removed. face_forgotten is independent and true confirms the face was forgotten, not that memory or every related record was removed. primary_memory_result=forgotten confirms primary memory only; uncertain means it could not be confirmed. old_face_records_kept_apart means old face records remain, and face_cleanup_uncertain means another face cleanup warning could not be interpreted. Neither is complete deletion. setup_name_result, place_result and reminders_result report those steps: forgotten/cancelled confirms that step, kept means it could not be cleared, uncertain means it was not confirmed. room_memory_result, sound_consent_result and face_expression_consent_result report cleanup of the room lines and the two household consents: cleared confirms that step, kept means it was refused, uncertain means completion was not confirmed. A missing step is unreported, never a confirmation. everything=false, all=false, some_subjects_not_found or some_items_left means do not claim complete deletion; distinguish a known kept part from an uncertain outcome. scope=room means only what this room remembers, never a person's private memory. Say briefly if a face, old face records, setup name, place, reminders, room lines or household consents could not be cleared. {left} later calls from the old round were not run; if the current words still ask for other work, plan it afresh without the discarded context. Never invent a fact or a reason that the status does not give.",
+            "A {kind} forget call has run in this turn. The earlier conversation, recalled memory, pictures and tool payloads have been discarded. Answer only the person's current words and these content-free call outcomes: {}. Do not repeat any of these calls or reconstruct what was forgotten. Only confirm deletion when the outcome confirms it; an error or missing confirmation means the result is uncertain, not success. forgotten reports memory items only; false means none were removed. face_forgotten is independent and true confirms the face was forgotten, not that memory or every related record was removed. primary_memory_result=forgotten confirms primary memory only; uncertain means it could not be confirmed. old_face_records_kept_apart means old face records remain, and face_cleanup_uncertain means another face cleanup warning could not be interpreted. Neither is complete deletion. setup_name_result, place_result and reminders_result report those steps: forgotten/cancelled confirms that step, kept means it could not be cleared, uncertain means it was not confirmed. room_memory_result, sound_consent_result and face_expression_consent_result report cleanup of the room lines and the two household consents: cleared confirms that step, kept means it was refused, uncertain means completion was not confirmed. A missing step is unreported, never a confirmation. everything=false, all=false, some_subjects_not_found or some_items_left means do not claim complete deletion; distinguish a known kept part from an uncertain outcome. scope=room means only what this room remembers, never a person's private memory. asked_which=true means nothing was removed because it was not clear which thing: ask them which in a few words, and do not call forget again in this turn. Say briefly if a face, old face records, setup name, place, reminders, room lines or household consents could not be cleared. {left} later calls from the old round were not run; if the current words still ask for other work, plan it afresh without the discarded context. Never invent a fact or a reason that the status does not give.",
             serde_json::to_string(calls).expect("JSON values serialize"),
         )),
         question.clone(),
@@ -215,6 +219,55 @@ mod tests {
             kept,
             json!({"tool": crate::known_faces::FORGET, "outcome": {"error": true}})
         );
+    }
+
+    /// C134: a refusal that asked which keeps that flag, never its note,
+    /// past the after-forget chat reset, and the chat says what it means:
+    /// ask which, do not call forget again.
+    #[test]
+    fn a_forget_that_asked_which_stays_asked_past_the_reset() {
+        for refused in [
+            crate::remember::forget_which(true),
+            crate::remember::forget_which(false),
+            crate::remember::forget_nothing_mentioned(),
+        ] {
+            let kept = status(crate::remember::FORGET, &refused);
+            assert_eq!(
+                kept,
+                json!({"tool": crate::remember::FORGET,
+                    "outcome": {"forgotten": false, "asked_which": true}})
+            );
+        }
+        // Not on another tool's answer, nor a plain refusal.
+        assert!(
+            status(crate::remember::REMEMBER, &json!({"ask_which": true}))["outcome"]
+                .get("asked_which")
+                .is_none()
+        );
+        assert!(
+            status(crate::remember::FORGET, &json!({"forgotten": false}))["outcome"]
+                .get("asked_which")
+                .is_none()
+        );
+        let question = Message::user("Lamp, forget that.");
+        let chat = context(
+            "instructions",
+            &question,
+            &[status(
+                crate::remember::FORGET,
+                &crate::remember::forget_which(true),
+            )],
+            0,
+        );
+        let said = chat[1].content.as_ref().and_then(Value::as_str).unwrap();
+        assert!(said.contains(r#""asked_which":true"#), "{said}");
+        assert!(
+            said.contains("asked_which=true means nothing was removed")
+                && said.contains("do not call forget again in this turn"),
+            "{said}"
+        );
+        // The refusal's words never pass the reset.
+        assert!(!said.contains("graduation date"), "{said}");
     }
 
     #[test]

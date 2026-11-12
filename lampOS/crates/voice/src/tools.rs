@@ -1799,7 +1799,14 @@ fn run_call_with_scope(
                         .heard_for(request, std::time::Instant::now())
                 })
                 .flatten();
-            let named = crate::remember::named_forget(call, said.as_deref(), lease);
+            // A spoken forget whose line is no longer held (an earlier
+            // forget in this request let the thread go) is never the
+            // model's call unchecked: it asks which (C134).
+            let unheard = heard
+                && said.is_none()
+                && !lease.is_some_and(|lease| lease.undoes_own_keep(&call.args));
+            let named = crate::remember::forget_unheard(call, unheard)
+                .or_else(|| crate::remember::named_forget(call, said.as_deref(), lease));
             let call = named.as_ref().unwrap_or(call);
             // With `LAMP_MEMORY_KEEP_HEARD`, a `remember` whose sentence has
             // words the line did not keeps that line instead (#2176).

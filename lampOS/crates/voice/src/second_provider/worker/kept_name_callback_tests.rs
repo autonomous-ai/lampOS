@@ -303,6 +303,9 @@ fn keep(memory: &Memory, scope: &RequestScope, text: &str) -> Value {
         ))
 }
 
+/// A forget that reaches the store (`forget_last`): not a spoken one, whose
+/// line no test here holds, and which with no line held asks which instead
+/// of taking the newest keep (C134).
 fn forget(memory: &Memory, scope: &RequestScope) -> Value {
     let runner = super::scoped_tool_runner(memory.settings(), None, None, false);
     let lease = scope.lease();
@@ -312,7 +315,7 @@ fn forget(memory: &Memory, scope: &RequestScope) -> Value {
         .unwrap()
         .block_on(runner(
             lease.key().request,
-            true,
+            false,
             crate::remember::FORGET.into(),
             json!({}),
             lease,

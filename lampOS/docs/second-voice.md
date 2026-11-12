@@ -4655,7 +4655,12 @@ after a take-over, but now for every turn:
       `face_cleanup_uncertain`. The three fixed cleanup states survive, but
       this inner path never introduces `everything: true` because it does
       not perform the outer setup-name, place, voice-print, journal or
-      reminder cleanup ([memory.md](memory.md)). The same-turn reset also
+      reminder cleanup ([memory.md](memory.md)). A memory forget refused
+      to ask which (`ask_which`) keeps that fixed flag as
+      `asked_which=true`, never its note, and the fresh chat tells the
+      model to ask which and not call forget again in this turn (C134,
+      `after_forget::tests::a_forget_that_asked_which_stays_asked_past_the_reset`).
+      The same-turn reset also
       discards a pending rename note already composed before the face call.
       Tests are in `second_provider/tests/after_forget.rs`
       and `held_forget.rs`, with the prior acting-answer case in

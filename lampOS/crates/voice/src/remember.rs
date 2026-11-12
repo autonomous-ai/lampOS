@@ -3323,6 +3323,13 @@ pub const HEARD_BARE: &str = "heard_bare";
 /// Lamp, forget it." just after the tea keep is not the tea).
 pub const ABOUT_DROPPED: &str = "about_dropped";
 
+/// A refused forget's fixed flag, never words: nothing was removed because
+/// it was not clear which thing, so the lamp asks which. It is the one part
+/// of the refusal kept past the after-forget chat reset
+/// (`second_provider::after_forget`), so the model asks rather than calling
+/// forget again in the same turn (C134).
+pub const ASK_WHICH: &str = "ask_which";
+
 /// What the model is told of a bare forget's guessed `source_id`
 /// ([`HEARD_BARE`]) while more than one thing this session was shown could
 /// be "that": nothing is forgotten, and it asks once which one. On
@@ -3338,6 +3345,7 @@ pub fn forget_which(theirs: bool) -> Value {
     };
     json!({
         "forgotten": false,
+        ASK_WHICH: true,
         "note": format!("Nothing was forgotten yet: their words name nothing, and more than one thing could be meant. {ask}, and forget only the one they then name. Never say there was nothing to forget or remove.")
     })
 }
@@ -3353,6 +3361,7 @@ pub const BARE_NOTHING_JUST_GIVEN_NONE_SHOWN: &str = "lamp-voice provider: a bar
 pub fn forget_nothing_mentioned() -> Value {
     json!({
         "forgotten": false,
+        ASK_WHICH: true,
         "note": "Nothing was forgotten: nothing was just kept or mentioned for \"that\" to be. Ask them once what they want forgotten, without naming or listing anything you keep, and forget only what they then name."
     })
 }
@@ -4249,6 +4258,31 @@ pub const HEARD_UNCLEAR: &str = "heard_unclear";
 /// What the model is told of an unclear forget: nothing removed, ask once.
 pub const FORGET_UNCLEAR: &str = "Nothing was forgotten: I couldn't tell which thing they meant to forget. Ask them once, in a few words, which thing, and forget it only when they name it.";
 
+/// C134 (lamp-06c1, 12 Nov, build 12226): a spoken `forget` whose heard
+/// line is no longer held (`unheard`: an earlier forget in the same
+/// request let the thread go, or no line was held) is marked, never run as
+/// the model made it: with no `source_id` and no `about` it is a bare
+/// forget ([`HEARD_BARE`]), so the memory asks which rather than taking
+/// their newest keep (`forget_last`); with either it is unclear
+/// ([`HEARD_UNCLEAR`]), so nothing is removed on the model's guess. `None`
+/// for any other call, or one whose line is held.
+pub fn forget_unheard(call: &ToolCall, unheard: bool) -> Option<ToolCall> {
+    if !unheard || call.name != FORGET {
+        return None;
+    }
+    let given = |key: &str| call.args.get(key).is_some_and(|value| !value.is_null());
+    let args = if given("source_id") || given("about") {
+        json!({ HEARD_UNCLEAR: true })
+    } else {
+        json!({ HEARD_BARE: true })
+    };
+    Some(ToolCall {
+        id: call.id.clone(),
+        name: call.name.clone(),
+        args,
+    })
+}
+
 /// The lamp's guard on a `forget` ([`pick_forget`]) in `person`'s scope,
 /// with `carry` what was named just before: a named pick is the call as it
 /// runs, `about` the subject, of the asker's own scope alone; a `remember`
@@ -4812,7 +4846,10 @@ fn run_for_guarded(
         eprintln!(
             "lamp-voice provider: a forget whose line names something unread is not run: asked which"
         );
-        return (json!({"forgotten": false, "note": FORGET_UNCLEAR}), true);
+        return (
+            json!({"forgotten": false, ASK_WHICH: true, "note": FORGET_UNCLEAR}),
+            true,
+        );
     }
     // With `LAMP_MEMORY_PERSONAL_NEEDS_FACE`, nothing about a person is kept
     // while nobody is known, on either memory client.
@@ -10172,10 +10209,9 @@ impl DaysClient {
         if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) && told["forgotten"] == true {
             said = self.forgotten(&mut context);
             // The keep that was "that" is gone: a second "forget that" is
-            // not it again (C88).
-            if just_kept_id.is_some() {
-                context.last_given = None;
-            }
+            // not it again (C88), nor the next newest kept thing, of theirs
+            // or the room's (C134).
+            context.last_given = None;
         }
         // A write done, for a yes alone soon after it (Bug C, 5 Nov).
         let done = match call.name.as_str() {
@@ -14479,6 +14515,222 @@ mod tests {
             emptied
         );
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// C134: a spoken forget whose line is no longer held is marked, never
+    /// the model's call as made: bare when it gives nothing, unclear when it
+    /// gives an id or an `about`; any other call, or a held line, is not.
+    #[test]
+    fn a_forget_whose_line_is_let_go_is_marked_bare_or_unclear() {
+        let marked = |args: Value| forget_unheard(&call(FORGET, args), true).map(|call| call.args);
+        assert_eq!(marked(json!({})), Some(json!({HEARD_BARE: true})));
+        assert_eq!(
+            marked(json!({"source_id": null, "about": null})),
+            Some(json!({HEARD_BARE: true}))
+        );
+        for args in [
+            json!({"source_id": 5}),
+            json!({"about": "umbrella"}),
+            json!({"source_id": 5, "about": "umbrella"}),
+        ] {
+            assert_eq!(marked(args), Some(json!({HEARD_UNCLEAR: true})));
+        }
+        // A held line, or not a forget: as before.
+        assert!(forget_unheard(&call(FORGET, json!({})), false).is_none());
+        assert!(forget_unheard(&call(REMEMBER, json!({"text": "x"})), true).is_none());
+        assert!(forget_unheard(&call(FORGET_EVERYTHING, json!({})), true).is_none());
+        // The marks the memory checks: bare asks which, unclear runs
+        // nothing (`run_for_guarded`).
+        assert_eq!(forget_which(true)[ASK_WHICH], true);
+        assert_eq!(forget_nothing_mentioned()[ASK_WHICH], true);
+    }
+
+    const FORGET_TWICE_CHILD: &str = "LAMP_MEMORY_FORGET_TWICE_TOOLS_TEST_CHILD";
+
+    /// What a two-forget request did ([`forget_twice_through_the_tools`]):
+    /// the two answers and the memory ops it read.
+    struct ForgetTwice {
+        told: [Value; 2],
+        ops: Vec<Value>,
+    }
+
+    /// C134 (lamp-06c1, 12 Nov, build 12226, req 34): "Lamp, forget that."
+    /// held as the request's line, then `forget {}` called twice in that
+    /// one request through the tools (`tools::run_call_scoped`), the second
+    /// as the after-forget chat's retry. The first forget clears the thread,
+    /// its line with it. `person` is the asker's name (`None`: the room's
+    /// line); `given` is the one id given just before in that scope, if
+    /// any; three things were shown. The Days client and its switches are
+    /// the process's, so `name` runs in a child.
+    fn forget_twice_through_the_tools(
+        name: &str,
+        person: Option<&str>,
+        given: Option<u64>,
+    ) -> Option<ForgetTwice> {
+        if std::env::var(FORGET_TWICE_CHILD).ok().as_deref() != Some(name) {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", name, "--nocapture"])
+                .env(FORGET_TWICE_CHILD, name)
+                .output()
+                .unwrap();
+            let said = format!(
+                "{}\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(output.status.success(), "{said}");
+            assert!(said.contains("1 passed"), "the child ran no test: {said}");
+            return None;
+        }
+        const REQUEST: u64 = 13_401_034;
+        let dir = std::env::temp_dir().join(format!("forget-twice-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let memory = dir.join("memory.sock");
+        let listener = UnixListener::bind(&memory).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let done = Arc::new(AtomicBool::new(false));
+        let served = {
+            let done = done.clone();
+            std::thread::spawn(move || {
+                let until = Instant::now() + Duration::from_secs(10);
+                let mut read = Vec::new();
+                while !done.load(Ordering::Acquire) && Instant::now() < until {
+                    let stream = match listener.accept() {
+                        Ok((stream, _)) => stream,
+                        Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                            std::thread::sleep(Duration::from_millis(5));
+                            continue;
+                        }
+                        Err(error) => panic!("{error}"),
+                    };
+                    stream.set_nonblocking(false).unwrap();
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(2)))
+                        .unwrap();
+                    let mut line = String::new();
+                    if BufReader::new(&stream).read_line(&mut line).is_err() {
+                        continue;
+                    }
+                    let Ok(request) = serde_json::from_str::<Value>(&line) else {
+                        continue;
+                    };
+                    let answer = match request["op"].as_str() {
+                        Some("forget") => json!({"ok":true,"removed":1}),
+                        Some("forget_last") => {
+                            json!({"ok":true,"removed":{"kind":"kept","id":9,"at_unix_ms":NOW}})
+                        }
+                        _ => json!({"ok": true, "entries": []}),
+                    };
+                    let _ = (&stream).write_all(format!("{answer}\n").as_bytes());
+                    read.push(request);
+                }
+                read
+            })
+        };
+        DAYS_MODE.set(true).unwrap();
+        let client = DaysClient::new(memory.clone()).unwrap();
+        client.forget_just_kept.store(true, Ordering::Release);
+        let whose = person.map(person_id);
+        {
+            let mut context = client.context.lock().unwrap();
+            assert!(context.include(whose.as_deref(), &[5, 6, 7]).is_none());
+            if let Some(id) = given {
+                context.last_given = Some((vec![(whose.clone(), id)], Instant::now()));
+                context.given_text = Some("my umbrella is in the car".to_owned());
+            }
+        }
+        assert!(DAYS.set(Some(client)).is_ok());
+        let route = crate::tools::Route::Memory(memory.clone(), None, None, None);
+        let scope = scoped_request(person, REQUEST);
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .line_of(REQUEST, "Lamp, forget that.");
+        let forget = call(FORGET, json!({}));
+        let mut told = [Value::Null, Value::Null];
+        for answer in &mut told {
+            let (_, (said, answered)) =
+                crate::tools::run_call_scoped(&route, &forget, REQUEST, true, &scope.lease());
+            assert!(answered, "{said}");
+            *answer = said;
+        }
+        done.store(true, Ordering::Release);
+        let ops = served
+            .join()
+            .unwrap()
+            .into_iter()
+            .filter(|read| {
+                matches!(
+                    read["op"].as_str(),
+                    Some("forget" | "forget_last" | "forget_about" | "forget_all")
+                )
+            })
+            .collect();
+        std::fs::remove_dir_all(&dir).unwrap();
+        Some(ForgetTwice { told, ops })
+    }
+
+    /// C134: with nothing given just before, the first bare forget asks
+    /// which; the second, its line let go by the first, asks too, never
+    /// taking their newest keep (`forget_last`) unasked.
+    #[test]
+    fn a_second_bare_forget_after_a_refused_one_asks_never_takes_their_newest_keep() {
+        let Some(twice) = forget_twice_through_the_tools(
+            "remember::tests::a_second_bare_forget_after_a_refused_one_asks_never_takes_their_newest_keep",
+            Some("Olivia"),
+            None,
+        ) else {
+            return;
+        };
+        assert_eq!(twice.told[0], forget_which(true));
+        assert_eq!(twice.told[1], forget_which(true));
+        assert!(twice.ops.is_empty(), "{:?}", twice.ops);
+    }
+
+    /// C134 after C88: "that" right after their keep forgets that keep by
+    /// its id; a second forget in the same request removes nothing else.
+    #[test]
+    fn a_second_bare_forget_after_their_keep_went_removes_nothing_else() {
+        let Some(twice) = forget_twice_through_the_tools(
+            "remember::tests::a_second_bare_forget_after_their_keep_went_removes_nothing_else",
+            Some("Olivia"),
+            Some(5),
+        ) else {
+            return;
+        };
+        assert_eq!(twice.told[0]["forgotten"], true, "{}", twice.told[0]);
+        assert_eq!(twice.told[1], forget_which(true));
+        assert_eq!(
+            twice.ops,
+            [json!({"op":"forget","id":5,"person":person_id("Olivia"),"selective":true})]
+        );
+    }
+
+    /// C134, the room's line (nobody known): an unknown voice's "forget
+    /// that" twice takes at most the one thing given just before, never the
+    /// room's next newest keep.
+    #[test]
+    fn a_second_bare_forget_on_the_rooms_line_never_takes_the_rooms_next_keep() {
+        let Some(twice) = forget_twice_through_the_tools(
+            "remember::tests::a_second_bare_forget_on_the_rooms_line_never_takes_the_rooms_next_keep",
+            None,
+            Some(5),
+        ) else {
+            return;
+        };
+        assert_eq!(twice.told[1]["forgotten"], false, "{}", twice.told[1]);
+        assert!(
+            twice
+                .ops
+                .iter()
+                .filter(|op| op["op"] == "forget_last")
+                .count()
+                <= 1,
+            "{:?}",
+            twice.ops
+        );
+        assert_eq!(twice.ops.len(), 1, "{:?}", twice.ops);
     }
 
     const FACE_TOOLS_CHILD: &str = "LAMP_MEMORY_FORGET_FACE_TOOLS_TEST_CHILD";
