@@ -2102,6 +2102,78 @@ Kiểm thử: `made_skill::tests::a_written_skill_*`,
 của lamp-skills, và `make_skill::tests::a_written_skill_is_handed_to_the_voice_as_written`
 cùng `written_fields_are_held_as_lamp_voice_holds_them` của `lamp-cloud`.
 
+## Bắt đầu khi được nói với đèn (`LAMP_MADE_SKILL_SAID=on`, tắt)
+
+Tắt nếu không đặt `LAMP_MADE_SKILL_SAID=on`, và không có trong unit sản phẩm
+nào (#6526, thiết kế của người xây dựng đầu tiên). Một kỹ năng tạo tại đây,
+bằng giọng nói hay trong ứng dụng (`made_skill::keep_asked`), có thể bắt đầu
+khi người dùng nói một yêu cầu với đèn, không bao giờ theo chuyện trong
+phòng: "khi tôi đang làm việc hay họp, tôi nói với đèn là tôi bận, và nó
+chuyển sang đỏ". `lamp-voice` đọc nó (và chuyển đúng `on` cho worker
+`provider` và `second`, nơi tạo kỹ năng), và trình quản lý của `lamp-skills`
+đọc nó qua `made_skill::written_capped` khi bật kỹ năng: hãy đặt nó giống
+nhau trong `lamp-voice` và `lamp-skills-manage@`, nếu không kỹ năng bị từ
+chối khi cài.
+
+1. **Nói cho mô hình tạo kỹ năng** (`make_skill_local`,
+   `made_skill::SAID_RULES`). Thay cho `[trigger]` là bảng `[said]`: `told`,
+   điều người dùng sẽ nói với đèn, theo cách nói lại với họ ("you're busy",
+   tối đa 60 ký tự, một dòng), và `when`, khi nào dùng nó, bằng lời của họ
+   ("when they say they're busy or in a meeting", giữ như `when` của kỹ năng
+   viết trong ứng dụng, một dòng tối đa 200 byte; thiếu "when " thì được
+   thêm vào trước); và một bước `[[do]]`, `light = { colour }`, một màu của
+   đèn, với `level` từ 1 đến 5 chỉ khi được yêu cầu. Không bước nào khác,
+   không `[trigger]` và không `[ask]`. Mô hình được biết kỹ năng chưa thể
+   nghe những gì nói trong phòng, và bản brief ghi "one [trigger] as listed
+   or [said] as above" ở chỗ vốn nêu sự có mặt ở bàn (lời nhắc hệ thống cũng
+   nêu điều đó), nên brief dài nhất vẫn trong 1.160 byte. Bất cứ gì khác
+   cạnh `[said]` bị từ chối kèm các dòng cho một lần sửa
+   (`made_skill::said_asked`), và người dùng nghe "I couldn't make that
+   one." nếu đã hết lượt sửa.
+2. **Gói do đèn tự viết** (`made_skill::Said::toml`): hàm của kỹ năng viết
+   trong ứng dụng (`tool = "written_<tên, _ thay cho ->"`, tên tối đa 40
+   byte), không có trigger và không `[ask]`, nên không điều gì nói trong
+   phòng làm nó bắt đầu; `[permissions]` chỉ có `speak` và `light`; một ghi
+   chú `say` trả lại cho mô hình làm câu trả lời của lời gọi (khung cố định,
+   rồi `When they use it: WHEN`); và màu là bước thứ hai với `keep = true`,
+   ánh sáng của người dùng, như của Light scenes: lamp-skills đặt nó khi lời
+   gọi chạy và không bao giờ trả lại. `SKILL.md` giữ tên của mô hình, được
+   đánh dấu `made: here` cùng người tạo, với mô tả "Use it WHEN, a request
+   said to you, never talk in the room: it turns the light COLOUR.", dòng
+   `when` đứng đầu, nên dòng ngắn của `use_skill` vẫn giữ nó. Tên mà một kỹ
+   năng trên đèn đã có thì lấy tên trống đầu tiên, như kỹ năng viết.
+3. **Đưa cho giọng nói** như một lựa chọn của `use_skill` (`LAMP_USE_SKILL=on`)
+   qua dòng đó: mô hình giọng nói chọn nó theo một yêu cầu nó đã nghe sau
+   tên đèn, cũng như nó chọn các kỹ năng của sản phẩm. Không nghe thêm gì,
+   không giữ bản ghi lời nói, không so khớp cụm từ trên âm thanh trong phòng.
+4. **Nói lại đúng điều nó làm** (`Said::said_back`): "When you tell me
+   you're busy, I'll turn red." (thêm " at level N" trước dấu chấm khi có
+   yêu cầu mức sáng), rồi nó được bật ngay như một kỹ năng tự tạo, với
+   "I made NAME, and it's on: when you tell me you're busy, I'll turn red,
+   using its voice and its light."
+5. **Chưa làm: sự im lặng.** Bước thứ hai của thiết kế, chế độ không làm
+   phiền của đèn (không nhắc nhở bằng lời, không đọc to lời nhắc, hẹn giờ
+   vẫn reo) cho đến khi người dùng nói "I'm free" hoặc hết giới hạn 2 giờ họ
+   có thể đổi, hôm nay chưa có chế độ nào để đặt: quy tắc `[quiet]` của người
+   dùng (`LAMP_MEMORY_RULES`) chỉ mô hình đặt, không có giới hạn và không giữ
+   lời nhắc nào. Nó sẽ gắn vào ở `TODO(#6526)` trên `Said::toml` khi người
+   xây dựng đầu tiên quyết định chế độ đó nằm ở đâu; đến lúc đó kỹ năng chỉ
+   đặt ánh sáng và lời nói lại không hứa gì thêm.
+
+Khi tắt, đúng như trước: mô hình tạo kỹ năng được biết kỹ năng không thể
+nghe những gì được nói, một `[said]` trong câu trả lời không được giữ, giới
+hạn khi bật từ chối dạng này, và một trigger trên `voice/heard` hay
+`name/heard` là "I can't do that yet: starting on words it hears"
+(`topic_cant_yet`), không bao giờ được sửa, và vẫn vậy khi bật.
+
+Kiểm thử: `made_skill::tests::with_its_switch_off_a_said_start_is_refused_as_before`,
+`with_its_switch_on_a_said_start_is_made_and_said_back_as_it_does`,
+`a_said_start_is_offered_through_use_skill_with_its_when_line` và
+`nothing_starts_a_said_start_without_a_request_to_the_lamp`;
+`make_skill_local::tests::a_said_start_is_told_to_the_maker_only_with_its_switch`;
+và `made::a_said_start_passes_the_real_checker_and_loads_as_a_function_with_its_when_line`
+của lamp-skills.
+
 ## Gửi kỹ năng tự tạo lên Skills Store (fourteen-P13, `LAMP_SKILLS_SHARE`, bật trong sản phẩm từ 2/11, #4948)
 
 Tắt nếu không đặt `LAMP_SKILLS_SHARE=on` trong unit của `lamp-cloud` (cùng

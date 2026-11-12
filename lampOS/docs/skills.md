@@ -5027,6 +5027,84 @@ function with no trigger), and `lamp-cloud`'s
 `make_skill::tests::a_written_skill_is_handed_to_the_voice_as_written` and
 `written_fields_are_held_as_lamp_voice_holds_them`.
 
+#### A start said to the lamp (`LAMP_MADE_SKILL_SAID=on`, off)
+
+Off unless `LAMP_MADE_SKILL_SAID=on`, and in no product unit (#6526, the
+first builder's design). A skill made here, by voice or in the app
+(`made_skill::keep_asked`), may start on a request said to the lamp, never
+on room talk: "when I'm working or in a meeting, I tell the lamp I'm busy,
+and it turns red". `lamp-voice` reads it (and gives the exact `on` to its
+`provider` and `second` workers, which make the skill), and `lamp-skills`'
+manage helper reads it through `made_skill::written_capped` as it puts the
+skill on: set it alike in `lamp-voice` and `lamp-skills-manage@`, or the
+made skill is refused at install.
+
+1. **Told to the making model** (`make_skill_local`, `made_skill::SAID_RULES`).
+   In place of `[trigger]`, a `[said]` table: `told`, what the person will
+   tell the lamp, as said back to them ("you're busy", at most 60
+   characters, one line), and `when`, when to use it, in their words
+   ("when they say they're busy or in a meeting", held as a written
+   skill's `when`, one line of at most 200 bytes; "when " is put before it
+   if it lacks one); and one `[[do]]` step, `light = { colour }`, a colour
+   of the light's own, with `level` 1 to 5 only if asked. No other step,
+   no `[trigger]` and no `[ask]`. The model is told a skill can't yet hear
+   what is said in the room, and the brief says "one [trigger] as listed or
+   [said] as above" where it otherwise names the desk's presence (the
+   system prompt names it too), so the longest brief stays within 1,160
+   bytes. Anything else beside `[said]` is refused with lines for a repair
+   (`made_skill::said_asked`), and the person hears "I couldn't make that
+   one." if the repairs are used up.
+2. **The package, written by the lamp** (`made_skill::Said::toml`): a
+   written skill's function (`tool = "written_<name with _ for ->"`, the
+   name at most 40 bytes), with no trigger and no `[ask]`, so nothing the
+   room says starts it; `[permissions]` `speak` and `light` alone; a `say`
+   note given back to the model as the call's answer ("The person who owns
+   this lamp asked for this skill, to start when they tell you so. This
+   call has set its light as they asked: say in a few words that it's
+   done.", then `When they use it: WHEN`); and the colour as a second step
+   with `keep = true`, the person's light, as Light scenes' are: set by
+   lamp-skills as the call runs and never given back. `SKILL.md` keeps the
+   model's name and is marked `made: here` and its maker, with the
+   description "Use it WHEN, a request said to you, never talk in the
+   room: it turns the light COLOUR.", the `when` line first, so a short
+   `use_skill` line keeps it. A name a skill on the lamp has gets the
+   first free one, as a written skill's.
+3. **Offered to the voice** as a `use_skill` choice ([tools.md](tools.md),
+   `LAMP_USE_SKILL=on`) by that line: the voice's model picks it on a
+   request it already hears after the name, the same way it picks the
+   product skills. No new listening, no transcript kept, no phrase matched
+   on room sound.
+4. **Said back exactly as it does** (`Said::said_back`): "When you tell me
+   you're busy, I'll turn red." (", at level N" before the stop when a
+   level was asked), and it goes on at once, as a made skill does, with
+   "I made NAME, and it's on: when you tell me you're busy, I'll turn red,
+   using its voice and its light."
+5. **Not built yet: the quiet.** The design's second step, the lamp's
+   do-not-disturb hold (no spoken nudges or reminders said aloud, a timer
+   still ringing) until the person says "I'm free" or a 2 h cap they can
+   change, has no hold to set today: the person's `[quiet]` rule
+   (`LAMP_MEMORY_RULES`) is set by the model alone, has no cap and holds
+   no reminder. It plugs in at the `TODO(#6526)` on `Said::toml` once the
+   first builder says where the hold lives; until then the skill sets the
+   light alone and its say-back promises nothing more.
+
+Off, exactly as before: the making model is told a skill can't hear what is
+said, a `[said]` in its answer is not kept, the put-on cap refuses the
+shape, and a trigger on `voice/heard` or `name/heard` is "I can't do that
+yet: starting on words it hears" (`topic_cant_yet`), never repaired, as it
+stays with the switch on.
+
+Tests: `made_skill::tests::with_its_switch_off_a_said_start_is_refused_as_before`,
+`with_its_switch_on_a_said_start_is_made_and_said_back_as_it_does`,
+`a_said_start_is_offered_through_use_skill_with_its_when_line` and
+`nothing_starts_a_said_start_without_a_request_to_the_lamp`;
+`make_skill_local::tests::a_said_start_is_told_to_the_maker_only_with_its_switch`;
+and lamp-skills'
+`made::a_said_start_passes_the_real_checker_and_loads_as_a_function_with_its_when_line`
+(the real checker packs it; the helper refuses it with the switch off; on,
+it loads as a function with no trigger, its light and voice alone, its
+description beginning with the `when` line).
+
 ## V1's moves and emotions: what we take
 
 The owner, 08:00: "evaluate carefully to pick the good stuff from V1, not
