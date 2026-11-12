@@ -3756,19 +3756,27 @@ today's checks.
    come back to my desk, blink the light green twice" came from the
    model, which copies its system prompt's example (`for = "5s"`,
    `cooldown = "1h"`, `rearm = "ends"`), not from `paced`. `paced` sets
-   `"1m"` when it is missing or shorter, and sets a longer one to `"1m"`
-   when its trigger runs once each time it holds (`rearm`,
-   `when = "appears"`, a face, a getting up) and the request asked for no
-   limits (`limits_asked`, "once an hour" among its words); a trigger
-   without `rearm` keeps the cooldown it wrote, or it would run each
-   minute someone stays. Stuffy air keeps its hour, and a time of day,
-   which runs once at its minute, is unchanged. A repeat the request asks
-   for in its own words (`made_skill::repeat_asked`: "every five
-   minutes", "every 2 hours", "every minute", "every half hour", "mỗi 10
-   phút") runs while its trigger holds: its `rearm` is taken out and its
-   `cooldown` is the asked interval, at least a minute (the air's an
-   hour); never on a time of day or a face coming into view, which run
-   once each time. `rearm = "ends"` stays on "when I come back" skills,
+   `"1m"` when it is missing or shorter, and never lowers a longer one
+   the model wrote ("the first time I come in each morning, glow green"
+   keeps its `"12h"`). Stuffy air keeps its hour, a time of day, which
+   runs once at its minute, is unchanged, and so is a touch on the lamp
+   (any `controls/…` topic, a pat on the head too), which answers each
+   deliberate touch. A held state with no `rearm` and no repeat asked
+   ("glow green when I'm at my desk", `room/presence` someone true) gains
+   `rearm = "ends"`, so it runs once each time it holds, never on each
+   presence message or each minute someone stays (the first builder's
+   ruling for "when I'm present"); never on a time of day, a face, a
+   getting up or the air. A repeat the request asks for in its own words
+   (`made_skill::repeat_asked`: "every five minutes", "every 2 hours",
+   "every minute", "every half hour", "mỗi 10 phút", "once an hour while
+   I'm at my desk") runs while its trigger holds: its `rearm` is taken
+   out and its `cooldown` is the asked interval, at least a minute (the
+   air's an hour); never on a time of day or a face coming into view,
+   which run once each time. A unit is read only after a number or a
+   number word, or alone at a phrase's end or before "while" or "when":
+   "every second time", "every other time", "every second" alone, "every
+   few minutes" and "once an hour" without "while" or "when" (a limit)
+   are no repeat. `rearm = "ends"` stays on "when I come back" skills,
    `[rest] after_ignored = 2` stays on every made skill, a repeat too, and
    `[quiet]` stays on one that speaks. The say-back says the cooldown as
    it always has ("at most once every 5 minutes").
@@ -3780,10 +3788,12 @@ refusals; #6071's code grants and yes.
 
 Tests: `made_skill::tests::loosened_*` (the four, on and off,
 `loosened_never_takes_a_triggers_key_or_a_camera_steps_key_alone`, and
-the three lamp-9adf makes: `loosened_a_silent_made_skill_is_never_held_to_an_hour`,
+the three lamp-9adf makes: `loosened_a_silent_made_skill_keeps_the_cooldown_it_wrote`,
 `loosened_an_asked_repeat_runs_while_its_trigger_holds`,
 `loosened_a_moving_made_skill_keeps_its_minute_and_rest`, with
-`a_repeat_is_read_from_the_requests_words`), and
+`a_repeat_is_read_from_the_requests_words`,
+`loosened_a_held_state_with_no_rearm_runs_once_each_time_it_holds` and
+`loosened_a_silent_touch_skill_has_no_minute_floor`), and
 with the real `lamp-skills` `made::loosened_a_key_the_check_refuses_is_left_out_and_told`,
 `made::loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused`
 and `made::loosened_a_trigger_the_check_refuses_is_never_loosened`.
