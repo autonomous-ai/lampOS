@@ -161,7 +161,13 @@ locker code is 441.» đã giữ và «My gym locker code is 441.» bị giữ l
 và trước đó cả «They said: » mà một câu giữ theo lời nghe được mở đầu: C81,
 bản 11091, 10/11, «They said: my gym locker code is 441.» là «Gym locker code
 is 441.»; không bao giờ trong phạm vi căn phòng, nơi «my» là của bất kỳ ai nói,
-`days::own_text`), là chính điều đã giữ đó, không ghi
+`days::own_text`; và trong cả hai phạm vi, một chữ số đọc thành chữ trọn
+từ «zero» đến «nine» là chữ số của nó, mỗi chuỗi chữ số đơn liền nhau là
+một số, nên «four four one» và «4 4 1» là «441»: C81, bản 12226, 12/11,
+«They said: my gym locker code is four four one.» giữ theo lời nghe được
+và «My gym locker code is 441.» bị giữ lại thành id mới; «someone» hay
+«tone» vẫn là chữ, «oh» không bao giờ là số không, và câu đã giữ không bao
+giờ bị đổi, `days::digit_text`), là chính điều đã giữ đó, không ghi
 thêm dòng nào. Một lời sửa có `once` mà nêu đúng điều đã giữ bằng cùng chữ như
 vậy (`Days::restates`) cũng là điều đó được nói lại: không có bản mới, và nó
 mang thời điểm được nói lại («last said»). Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
