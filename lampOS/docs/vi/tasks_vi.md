@@ -589,6 +589,18 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   Harness khởi động OpenClaw không kèm `--message` và gõ task vào khi pane
   đã sẵn sàng); đèn có bản sửa này khi pin Harness được dời lên (#5957). (Cách
   tạm thời của #6504, đóng rồi khởi động lại, đã bỏ.)
+- **Chưa bao giờ bắt đầu: báo và đóng** (#6577): một việc giao cho OpenClaw
+  của chính đèn, trong lần khởi động này, mà sau khi được nhận
+  `OPENCLAW_BEGIN_WITHIN_MS` (180 s, chưa đo; sẽ thay bằng lần câu hỏi đầu
+  chậm nhất thật trên một đèn có Harness 0.6.41, nhân hai) vẫn đọc là rảnh,
+  chưa được hỏi, chưa có câu trả lời và chưa dùng công cụ nào, và mọi lần đọc
+  từ đó cũng vậy, thì được giữ là `failed` (`engine::never_began`, một dòng
+  journal). Giọng nói báo nó như mọi việc lỗi, một câu ngắn rằng việc đã dừng
+  khi chưa xong, và harness trống được đóng như một việc của đèn đã báo
+  (`close_due`). Không thử lại, không chuyển sang Hermes (quy tắc của lead).
+  Việc đã được hỏi, đã trả lời hoặc đã dùng công cụ trước giới hạn, việc từ
+  lần khởi động trước, phiên của chính người dùng, Hermes và các agent trên
+  máy tính đều như trước.
 - **Voice** (`agent_tasks`, `task_news`): đọc engine của target của đèn từ
   `{"op":"targets"}` và gọi đúng tên, nên một việc giao không nêu máy nào được
   nói là "OpenClaw on the lamp" và mô tả công cụ nói "OpenClaw here on the
