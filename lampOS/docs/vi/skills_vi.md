@@ -2162,6 +2162,26 @@ Kiểm thử: `upload_skill::tests`, `upload::tests`,
 `online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`
 và `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
 
+### Chạy bởi agent của đèn (`LAMP_UPLOAD_TO_AGENT=on`, tắt)
+
+Yêu cầu của chủ (12/11): một `SKILL.md` tải lên từ app chạy qua agent của
+đèn, như V1; người xây dựng đầu tiên đồng ý lúc 19:44, cả hai công tắc tắt
+và không đặt trong unit nào. Khi bật (trong `lamp-voice`, `lamp-cloud`,
+`lamp-skills` và manage helper), một `SKILL.md` trần tối đa 64 KiB thành một
+kỹ năng agent thay vì kỹ năng viết (tắt: như trước, ghi chú tối đa 900 byte):
+tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công cụ giọng nói
+(`tool = name`) mà ghi chú là mô tả và các câu kích hoạt của tệp; một bước
+`do.task` giao tệp cho Hermes của đèn (lamp-tasks, namespace của Hermes, một
+thư mục mới mỗi lần chạy, token riêng của lần chạy). Quyền được đọc thận
+trọng từ tệp: `camera`, `light`, `speak`, `sound`, và `net` khi tệp nhắc một
+API web, URL hay HTTP (cần `LAMP_TASK_NET=on`). Đèn nói lại các quyền khi bật.
+Chỉ đèn, âm thanh, thân và giọng thì bật ngay (giọng nói ghi lời đồng ý với
+lamp-control); camera, micro, gửi đi hoặc `net` thì hỏi lời đồng ý bằng
+giọng nói một lần, ở lần chạy đầu. Khóa hay token không bao giờ được nói ra,
+hỏi bằng giọng nói hay giữ trong thư mục kỹ năng: tệp chứa giá trị giống
+khóa hay token bị từ chối (đưa bí mật qua app là việc tiếp theo).
+`lamp_voice::upload_agent`; xem bản tiếng Anh, "Run by the lamp's agent".
+
 ## Trigger theo ngày trong tuần (`trigger.days`, #6066)
 
 | Khóa | Bắt buộc | Ý nghĩa |
