@@ -158,6 +158,14 @@ impl Computer {
             .map(|r| r.value)
     }
 
+    fn signed_in(&self, engine: EngineKind) -> Option<bool> {
+        self.engines
+            .get(engine.argument())?
+            .signed_in
+            .as_ref()
+            .map(|r| r.value)
+    }
+
     /// Why a hand-over of `engine`'s work to this computer is refused now,
     /// from what is known: the code and its words. Only a known `offline`,
     /// an engine not found there ([`EngineKnown::not_found`]) or a known
@@ -285,21 +293,32 @@ impl Known {
             .filter(|computer| !computer.is_empty())
     }
 
-    /// The engine a target written from the machines gives `machine`:
-    /// `wanted` (the person's, `--targets-from-machines ENGINE`) where it
-    /// is known installed there, else the first of [`ENGINE_ORDER`] known
-    /// installed, else `wanted`, as before anything was known.
+    /// The engine a target written from the machines gives `machine`, of
+    /// those known installed there, by what can run (#6657, the first
+    /// builder's (b)): one known signed in, then one whose sign-in is
+    /// unknown, then one known signed out; within each, `wanted` (the
+    /// person's, `--targets-from-machines ENGINE`) first, then
+    /// [`ENGINE_ORDER`]. So a known signed-out engine never wins over one
+    /// that can run, which [`Computer::refusal`] would refuse at prepare.
+    /// None known installed: `wanted`, as before anything was known.
     pub fn chosen(&self, machine: &str, wanted: EngineKind, now_ms: u64) -> EngineKind {
         let Some(computer) = self.computer(machine, now_ms) else {
             return wanted;
         };
-        if computer.installed(wanted) == Some(true) {
-            return wanted;
-        }
-        ENGINE_ORDER
-            .into_iter()
-            .find(|engine| computer.installed(*engine) == Some(true))
-            .unwrap_or(wanted)
+        // 0 signed in, 1 unknown, 2 signed out; none when not installed.
+        let can_run = |engine: EngineKind| {
+            (computer.installed(engine) == Some(true)).then(|| match computer.signed_in(engine) {
+                Some(true) => 0,
+                None => 1,
+                Some(false) => 2,
+            })
+        };
+        // `min_by_key` keeps the first of equals: `wanted`, then the order.
+        std::iter::once(wanted)
+            .chain(ENGINE_ORDER)
+            .filter_map(|engine| can_run(engine).map(|rank| (rank, engine)))
+            .min_by_key(|(rank, _)| *rank)
+            .map_or(wanted, |(_, engine)| engine)
     }
 
     /// The engine [`Known::chosen`] gives each machine, by machine id: the
@@ -715,8 +734,91 @@ mod tests {
         assert_eq!(known.computer(&id, NOW), None);
     }
 
+    /// #6657 (the first builder's (b)): of the engines installed, one
+    /// signed in first, then one not known either way, never a known
+    /// signed-out one over either; the person's first among equals.
+    #[test]
+    fn the_engine_chosen_is_one_that_can_run() {
+        let id = "a".repeat(32);
+        // Thirteen's laptop (12 Nov, 12337 and 12391): claude installed
+        // and signed out, codex signed in, opencode installed.
+        let mut known = Known::default();
+        known.probed(
+            &id,
+            &[
+                row("claude", Some(true), Some(false)),
+                row("codex", Some(true), Some(true)),
+                row("opencode", Some(true), None),
+            ],
+            NOW,
+        );
+        for wanted in [EngineKind::Claude, EngineKind::Codex, EngineKind::Opencode] {
+            assert_eq!(
+                known.chosen(&id, wanted, NOW),
+                EngineKind::Codex,
+                "{wanted:?}"
+            );
+        }
+        let computer = known.computer(&id, NOW).unwrap();
+        assert_eq!(computer.refusal(EngineKind::Codex), None);
+        // Codex signs out: the one not known either way, never claude.
+        known.probed(&id, &[row("codex", Some(true), Some(false))], NOW);
+        assert_eq!(
+            known.chosen(&id, EngineKind::Claude, NOW),
+            EngineKind::Opencode
+        );
+        // Claude signs in: the person's again, within the next look.
+        known.probed(&id, &[row("claude", Some(true), Some(true))], NOW + 1);
+        assert_eq!(
+            known.chosen(&id, EngineKind::Claude, NOW + 1),
+            EngineKind::Claude
+        );
+        // Among the signed in, the person's first, then the order.
+        known.probed(&id, &[row("opencode", Some(true), Some(true))], NOW + 2);
+        assert_eq!(
+            known.chosen(&id, EngineKind::Opencode, NOW + 2),
+            EngineKind::Opencode
+        );
+        assert_eq!(
+            known.chosen(&id, EngineKind::Codex, NOW + 2),
+            EngineKind::Claude
+        );
+        // All signed out: the person's where installed, else the order's
+        // first, as before (the hand-over is then refused with its words).
+        let mut out = Known::default();
+        out.probed(
+            &id,
+            &[
+                row("claude", Some(true), Some(false)),
+                row("codex", Some(true), Some(false)),
+            ],
+            NOW,
+        );
+        assert_eq!(out.chosen(&id, EngineKind::Codex, NOW), EngineKind::Codex);
+        assert_eq!(
+            out.chosen(&id, EngineKind::Opencode, NOW),
+            EngineKind::Claude
+        );
+        // Signed in but not known installed is not chosen over the person's.
+        let mut odd = Known::default();
+        odd.probed(&id, &[row("codex", None, Some(true))], NOW);
+        assert_eq!(odd.chosen(&id, EngineKind::Claude, NOW), EngineKind::Claude);
+        // Nothing known: the person's.
+        assert_eq!(
+            Known::default().chosen(&id, EngineKind::Opencode, NOW),
+            EngineKind::Opencode
+        );
+        // A stale reading is unknown: the person's, as before anything
+        // was known.
+        assert_eq!(
+            known.chosen(&id, EngineKind::Codex, NOW + STALE_AFTER_MS + 3),
+            EngineKind::Codex
+        );
+    }
+
     /// The person's engine where it is there, else the first there of
-    /// Claude Code, Codex and OpenCode, else the person's.
+    /// Claude Code, Codex and OpenCode, else the person's: sign-in not
+    /// known for any (signed in first is the test above, #6657).
     #[test]
     fn the_engine_chosen_is_one_the_computer_has() {
         let id = "a".repeat(32);
@@ -730,7 +832,7 @@ mod tests {
             &id,
             &[
                 row("claude", None, None),
-                row("codex", Some(true), Some(true)),
+                row("codex", Some(true), None),
                 row("opencode", Some(true), None),
             ],
             NOW,
