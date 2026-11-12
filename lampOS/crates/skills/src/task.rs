@@ -12,7 +12,11 @@
 //!   of lamp-control's grants (`lamp_voice::skill_task_yes::GRANTS`), once
 //!   each, never `skills` ([`grants_of`]); only beside a `do.task`. What
 //!   the script may reach through lamp-control's `control.sock` with its
-//!   one-run token (#6304), nothing more.
+//!   one-run token (#6304), nothing more. With `LAMP_AGENT_SERVICES=on`, a
+//!   linked service's grant too, `<code>-read` or `<code>-write` (#6432's
+//!   names, `gmail-read`): the run's agent reaches that service only
+//!   through lamp-control under it (`lamp-services mcp`); a Store or made
+//!   skill's alone, never a pushed one's.
 //! - **First kind only** ([`origin_refuses`]): a skill whose script came
 //!   from the Skills Store (backend-reviewed, its `.package.json`'s
 //!   `from_store`) or was pushed by the owner's own paired computer (the
@@ -75,6 +79,33 @@ pub fn on() -> bool {
 #[cfg(test)]
 pub fn set_on_here(on: Option<bool>) {
     ON_HERE.with(|here| here.set(on));
+}
+
+/// The lamp's agent's connectors' switch (`LAMP_AGENT_SERVICES`, `on`
+/// only), here, in the manage helper, in the voice and in lamp-control,
+/// which reads a skill's grants through this crate at each token's mint:
+/// on, a `do.task` may carry a linked service's grant ([`grants_of`]).
+pub const AGENT_SERVICES_ENVIRONMENT: &str = lamp_voice::made_skill::AGENT_SERVICES_ENVIRONMENT;
+
+#[cfg(test)]
+thread_local! {
+    /// [`AGENT_SERVICES_ENVIRONMENT`] as a test of this thread sets it.
+    static AGENT_SERVICES_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether [`AGENT_SERVICES_ENVIRONMENT`] is on in this process.
+pub fn agent_services_on() -> bool {
+    #[cfg(test)]
+    if let Some(on) = AGENT_SERVICES_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(AGENT_SERVICES_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// [`agent_services_on`] for this test's thread alone.
+#[cfg(test)]
+pub fn set_agent_services_here(on: Option<bool>) {
+    AGENT_SERVICES_HERE.with(|here| here.set(on));
 }
 
 /// What a `do.task` is told with the switch off: in the journal.
@@ -183,7 +214,11 @@ pub fn grants_of(grants: &[String]) -> Result<Vec<String>, String> {
                 "grants: \"skills\" is never a script's: it never puts skills on the lamp".into(),
             );
         }
-        if lamp_voice::skill_task_yes::grant_named(grant).is_none() {
+        // A linked service's grant (`gmail-read`), only with
+        // LAMP_AGENT_SERVICES on: the run reaches that service through
+        // lamp-control under it, and only the owner's yes names it.
+        let service = agent_services_on() && lamp_voice::made_skill::service_grant(grant).is_some();
+        if !service && lamp_voice::skill_task_yes::grant_named(grant).is_none() {
             let known: Vec<&str> = lamp_voice::skill_task_yes::GRANTS
                 .iter()
                 .map(|(name, _)| *name)
@@ -726,6 +761,87 @@ mod tests {
             let refused = grants_of(&bad).unwrap_err();
             assert!(refused.contains(why), "{bad:?}: {refused}");
         }
+    }
+
+    /// LAMP_AGENT_SERVICES: a linked service's grant (#6432's names) is a
+    /// grant only with the switch on; an unknown service, a second code or
+    /// another kind never is.
+    #[test]
+    fn service_grants_are_grants_only_with_the_switch_on() {
+        let list = |names: &[&str]| {
+            names
+                .iter()
+                .map(|name| name.to_string())
+                .collect::<Vec<_>>()
+        };
+        let mail = list(&["gmail-read", "google_calendar-write", "light"]);
+        set_agent_services_here(Some(false));
+        assert!(grants_of(&mail).unwrap_err().contains("is not a grant"));
+        set_agent_services_here(Some(true));
+        assert_eq!(grants_of(&mail).unwrap(), mail);
+        for bad in ["myspace-read", "gmail-app-read", "gmail-delete", "gmail"] {
+            assert!(
+                grants_of(&list(&[bad]))
+                    .unwrap_err()
+                    .contains("is not a grant"),
+                "{bad}"
+            );
+        }
+        assert!(
+            grants_of(&list(&["gmail-read", "gmail-read"]))
+                .unwrap_err()
+                .contains("listed twice")
+        );
+        set_agent_services_here(None);
+    }
+
+    /// LAMP_AGENT_SERVICES: a connector skill's task is handed over with
+    /// its service grants in the line, which lamp-tasks holds the token's
+    /// minted grants to, after lamp-control's yes for exactly them.
+    #[test]
+    fn a_connector_skills_task_is_handed_over_with_its_service_grants() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let folder = folder(dir.path());
+        let step = step(&folder, "scripts/main.py").unwrap();
+        let grants = vec!["gmail-read".to_owned(), "gmail-write".to_owned()];
+        let socket = dir.path().join("tasks.sock");
+        let control_socket = dir.path().join("control.sock");
+        let place = Place {
+            state: Some(&state),
+            control: &control_socket,
+            socket: Some(&socket),
+        };
+        let lamp_control = control(&control_socket, vec![serde_json::json!({"agreed": true})]);
+        set_on_here(Some(true));
+        set_agent_services_here(Some(true));
+        let mut sent = None;
+        let said = hand(
+            "morning-mail",
+            &step,
+            &folder,
+            &grants,
+            place,
+            1,
+            |_, line| {
+                sent = Some(line.to_owned());
+                answered("{\"ok\":true,\"id\":9}")
+            },
+        );
+        assert_eq!(said, "do.task: handed to lamp-tasks: its run ended, task 9");
+        let line: serde_json::Value = serde_json::from_str(&sent.unwrap()).unwrap();
+        assert_eq!(
+            line["grants"],
+            serde_json::json!(["gmail-read", "gmail-write"])
+        );
+        let asked = lamp_control.join().unwrap();
+        assert_eq!(
+            asked[0][lamp_voice::skill_task_yes::CHECK]["grants"],
+            serde_json::json!(["gmail-read", "gmail-write"])
+        );
+        set_agent_services_here(None);
+        set_on_here(None);
     }
 
     /// The folder's hash changes with any file, hidden ones too, but the

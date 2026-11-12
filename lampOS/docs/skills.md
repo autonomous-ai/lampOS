@@ -3759,8 +3759,25 @@ task's words given as data. Tests:
 `a_service_skill_made_as_a_task_passes_the_lamps_checks`,
 `a_services_brief_points_to_the_agents_task_only_with_its_switch`,
 `a_service_tasks_grants_are_held_only_with_its_switch_and_said_back`.
-Open: lamp-skills' own grant check (`task::grants_of`) and the voice's
-task yes (`skill_task_yes::GRANTS`) don't take the service grants yet.
+With the same switch in `lamp-skills`, its manage helper, `lamp-voice` and
+`lamp-control` (which reads a skill's grants through lamp-skills at each
+token's mint), a `do.task`'s `grants` may name a linked service's grant
+(`task::grants_of`, `task::agent_services_on`): a skill so made loads, its
+grants are said back ("it reads your Gmail and prepares sends with your
+Gmail, each sent only on your yes", `skill_task_yes::service_words`), the
+owner's yes is kept for exactly them, and the run's token carries them
+(`Grant::Service`). An unknown service, a second code (`gmail-app-read`)
+or another kind (`gmail-delete`) is "not a grant"; a service that is not
+linked is refused at the call by lamp-services ("isn't linked to this
+lamp yet"). A skill pushed from a computer never carries one ("a linked
+service's grant (a skill run's alone), which this computer was not
+granted", lamp-control's `no_grant`). Off, a service grant is "not a
+grant", as before. Tests: lamp-skills'
+`a_connector_skills_task_loads_with_its_service_grants_only_on`,
+`service_grants_are_grants_only_with_the_switch_on` and
+`a_connector_skills_task_is_handed_over_with_its_service_grants`,
+lamp-control's `the_yes_covers_a_skills_service_grants`, the voice's
+`service_grants_are_said_back_plainly_only_on`.
 
 ##### Handed to the lamp's agent when DeepSeek fails (`LAMP_MAKE_SKILL_AGENT=on`, off, proposal on #6059)
 

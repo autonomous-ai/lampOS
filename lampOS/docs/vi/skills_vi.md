@@ -1319,6 +1319,17 @@ gửi thì chỉ `-write`), chỉ được giữ khi bật công tắc; đúng m
 `scripts/main.py` chỉ in một dòng. Tắt (hoặc `LAMP_MADE_SCRIPTS` tắt),
 prompt và brief giữ nguyên như trước. Các skill đã làm với
 `do.read`/`do.write` vẫn tải và chạy như hôm nay, không được chuyển đổi.
+Với cùng công tắc trong `lamp-skills`, trình quản lý của nó, `lamp-voice`
+và `lamp-control` (đọc grants của skill qua lamp-skills mỗi lần tạo token),
+`grants` của một `do.task` được phép nêu quyền của một dịch vụ đã liên kết
+(`task::grants_of`): skill làm như vậy tải được, grants được đọc lại bằng
+lời thường ("it reads your Gmail and prepares sends with your Gmail, each
+sent only on your yes"), lời đồng ý của chủ được giữ cho đúng các quyền đó,
+và token của lượt chạy mang chúng (`Grant::Service`). Dịch vụ không biết,
+mã thứ hai (`gmail-app-read`) hay loại khác (`gmail-delete`) là "not a
+grant"; dịch vụ chưa liên kết bị lamp-services từ chối lúc gọi. Skill đẩy
+từ máy tính không bao giờ mang quyền này. Tắt, quyền dịch vụ là "not a
+grant" như trước.
 
 ### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, tắt, đề xuất trên #6059)
 
