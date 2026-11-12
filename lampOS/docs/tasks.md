@@ -2563,7 +2563,7 @@ A skill task may run beside a spoken one, so the cgroup is sized for two
 task deltas at once (`skill_task::TASKS_AT_ONCE`): the memory and tasks
 caps are **rest + 2 × delta × 1.5**, rounded up
 (`skill_task::two_tasks_cap`), and the CPU cap is two tasks' CPU and half
-again, held to three cores. The measures are Fourteen's of a real Hermes
+again. The measures are Fourteen's of a real Hermes
 voice task (a packing list, 80 s) on lamp-9adf, a 6 GB lamp on build 12255,
 read from lamp-tasks.service's cgroup with `systemctl show`; the CPU came
 through the first builder (13:14 on #6059). The peaks were sampled every
@@ -2572,9 +2572,9 @@ After the task closed, the cgroup held 727 MiB and 89 tasks.
 
 | Measure (`skill_task::`) | Measured | Source | Cap in the product unit |
 |---|---|---|---|
-| Cgroup memory, `MemoryCurrent` (`MEASURED_REST_MEMORY_MB`, `MEASURED_PEAK_MEMORY_MB`) | 632 MiB at rest, 1120 MiB peak (+488; a floor: 2 s samples) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | `MemoryHigh=2100M` (`MEMORY_HIGH`): 632 + 2 × 488 × 1.5 = 2096, rounded up to 100 MB. Past it the kernel throttles and reclaims the part's own memory, never kills it: no `MemoryMax` |
+| Cgroup memory, `MemoryCurrent` (`MEASURED_REST_MEMORY_MB`, `MEASURED_PEAK_MEMORY_MB`) | 632 MiB at rest, 1120 MiB peak (+488; a floor: 2 s samples) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | `MemoryHigh=2100M` (`MEMORY_HIGH`): 632 + 2 × 488 × 1.5 = 2096, rounded up to 100 MB. Past it the kernel throttles and reclaims the part's own memory, never kills it: no `MemoryMax`. The lamp has no swap, so past it every process in lamp-tasks.service, serve included, stalls in reclaim until the cgroup is back under it (inferred, not measured) |
 | Cgroup tasks, `TasksCurrent`, processes with threads (`MEASURED_REST_TASKS`, `MEASURED_TASKS`) | 91 at rest, 126 peak (+35; a floor: 2 s samples) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | `TasksMax=512` (`TASKS_MAX`): 91 + 2 × 53 = 197, rounded up to 10 gives 200, raised to the least of 512 (`TASKS_MAX_LEAST`): a tool-heavy run (Python, Node, a browser's threads) can pass 100 at once. Past it a fork fails, lamp-tasks' own included; nothing is killed |
-| CPU (`MEASURED_PEAK_CPU_PERCENT`) | about 1.2 cores for 80 s (120%) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059); the first builder, 13:14 | `CPUQuota=300%` (`CPU_QUOTA`): 2 × 120 × 1.5 = 360%, held to 300% (`CPU_QUOTA_MOST_PERCENT`), since 360% would leave the voice 0.4 of a core while both tasks are busy; 300% keeps one of a 4-core lamp's cores for the voice and still holds both tasks' 240% |
+| CPU (`MEASURED_CPU_PERCENT`) | about 1.2 cores (120%): an average over the 80 s run from the cgroup's `CPUUsageNSec`, an upper bound, not a peak | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059); the first builder, 13:14 | `CPUQuota=360%` (`CPU_QUOTA`): 2 × 120 × 1.5 = 360%, which leaves over 4 of the lamp's 8 cores (`LAMP_CORES`, the A733) to the voice; a test holds it under 7 cores |
 | Least MemAvailable (`MEASURED_MIN_AVAILABLE_MB`) | 3208 MB (3,285,476 kB) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | none; a test holds it, less a second task's 488 MB (2720 MB), at or over Hermes's install floor (`HERMES_FLOOR_MB`, ≥1,350 MB) |
 | Run time, `new` to close (`MEASURED_RUN_SECS`) | 75 s | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | none; a test holds it, and half again, within a run's life (`RUN_LIFETIME`, 14 minutes) |
 | Work folder's size (`MEASURED_WORK_FOLDER_MB`) | 1 MB, rounded up (36K before, 40K after) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | none; recorded only |

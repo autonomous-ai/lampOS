@@ -74,11 +74,12 @@ NoNewPrivileges=yes
 # lamp's Hermes is started by this part, so it stays in this cgroup beside Harness's `wait` and up to four `watch`es.
 # Sized for a skill task beside a spoken one: rest + 2 x delta x 1.5, rounded up. Measures: lamp-9adf, 12 Nov,
 # lamp-tasks.service cgroup (#6059), a real Hermes task: MemoryCurrent 632 MiB at rest, 1120 peak; TasksCurrent 91 at
-# rest, 126 peak (peaks sampled every 2 s, so a floor); CPU about 1.2 cores. CPUQuota: 2 x 120% x 1.5 = 360%, held to
-# 300% so one of four cores is always left to the voice. MemoryHigh: past it the part is throttled, never killed (no
-# MemoryMax). TasksMax: past it a fork fails.
+# rest, 126 peak (peaks sampled every 2 s, so a floor); CPU about 1.2 cores (an average over the run, an upper bound).
+# CPUQuota: 2 x 120% x 1.5 = 360%, leaving over 4 of the A733's 8 cores to the voice. MemoryHigh: past it the part is
+# throttled, never killed (no MemoryMax); with no swap on the lamp, every process here (serve included) stalls in reclaim
+# until the cgroup is back under it (inferred, not measured). TasksMax: past it a fork fails.
 MemoryHigh=2100M
-CPUQuota=300%
+CPUQuota=360%
 TasksMax=512
 
 [Install]
