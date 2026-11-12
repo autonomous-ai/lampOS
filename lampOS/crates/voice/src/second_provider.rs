@@ -10001,6 +10001,20 @@ async fn spoken(
         .records
         .as_ref()
         .and_then(|records| records(request, &text, scope.as_ref()));
+    // The events the owner's last calendar read found, kept a few minutes
+    // for a move or cancel by id (`LAMP_SERVICE_READ_IDS_KEPT`): beside
+    // the asker's own line alone, no wait.
+    let read_ids = crate::service_read_ids::note_for(
+        crate::services::owner_of(scope.as_ref()).as_deref(),
+        Instant::now(),
+    );
+    if let Some(note) = &read_ids {
+        eprintln!(
+            "lamp-voice second: request {request}: the owner's line is told {} event id(s) a calendar read kept, {} bytes (LAMP_SERVICE_READ_IDS_KEPT)",
+            note.lines().filter(|line| line.starts_with("- ")).count(),
+            note.len()
+        );
+    }
     // What memory holds for these words: the prepared chat's, when it was
     // begun on them (so its round still stands), else asked now, off the
     // runtime's thread (Fourth's P3 on #2229).
@@ -10175,6 +10189,7 @@ async fn spoken(
             Instant::now(),
         ))
         .chain(records)
+        .chain(read_ids)
         .chain(remembered)
         .chain(named)
         .chain(wake)

@@ -1113,6 +1113,8 @@ pub fn run_write_waiting(folder: &Path) -> Option<crate::run_write_yes::RunWrite
 /// with it what [`waiting_note`] tells (Thirteen's P2 on #5968): after it
 /// the next turn is told nothing of the mail, and "send it" finds nothing.
 pub fn forget_waiting() {
+    // So do the events a calendar read kept (`LAMP_SERVICE_READ_IDS_KEPT`).
+    crate::service_read_ids::forget();
     if kept::pending(Option::take).is_some() {
         eprintln!("lamp-voice: a waiting write is dropped: forgotten, or a privacy change");
     }
@@ -1396,6 +1398,11 @@ pub fn gate(
                 crate::service_records::redo::fill(turn.owner.unwrap_or_default(), &mut call.args)
         {
             return Err(json!({ "error": why }));
+        }
+        // An event a calendar read kept for the next request
+        // (`LAMP_SERVICE_READ_IDS_KEPT`): only the asker's own, while kept.
+        if call.name == WRITE {
+            crate::service_read_ids::check_write(turn.owner, &mut call.args, now)?;
         }
         return Ok(call);
     };
@@ -2247,6 +2254,9 @@ pub fn run(
             // Its record from the whole answer, before any brief: the
             // owner's, told only by the owner check (`LAMP_SERVICE_RECORDS`).
             crate::service_records::read(&record_owner, &call.args, &told);
+            // A calendar read's event ids, titles and times, kept for the
+            // asker's next request (`LAMP_SERVICE_READ_IDS_KEPT`).
+            crate::service_read_ids::read_answered(owner.as_deref(), &call.args, &told, now);
         }
         if call.name == READ && told.get("error").is_none() {
             read_answered(request);
@@ -2776,6 +2786,75 @@ mod tests {
         };
         let refused = gate(&mut pending, &send("s1"), 11, &stranger, at(now));
         assert_eq!(refused.unwrap_err()["error"], OWNER_ONLY);
+    }
+
+    /// Tracker row C132 (lamp-06c1, 12 Nov, row X1): with
+    /// `LAMP_SERVICE_READ_IDS_KEPT` on, an event a calendar read found in
+    /// request 10 is cancelled by its id in request 11, prepared with no
+    /// read first; another person's write naming it, or one past the time
+    /// it is kept, is refused before anything is prepared. Off, the gate
+    /// passes it as before.
+    #[test]
+    fn a_kept_read_ids_write_is_prepared_on_the_next_request_only_for_its_asker() {
+        let now = Instant::now();
+        let read = json!({"service":"google_calendar","what":"events"});
+        let told = json!({"quoted":[{"id":"kctlh9nnt7045gm342qucliu0k","summary":"lamp train test 2",
+            "start":{"dateTime":"2026-11-13T21:00:00+07:00"},"end":{"dateTime":"2026-11-13T22:00:00+07:00"}}]});
+        let cancel = call(
+            WRITE,
+            json!({"service":"google_calendar","action":"delete_event","event_id":"kctlh9nnt7045gm342qucliu0k"}),
+        );
+        for on in [false, true] {
+            crate::service_read_ids::on_for_test(on);
+            crate::service_read_ids::forget();
+            crate::service_read_ids::read_answered(Some("ann"), &read, &told, now);
+            let mut pending = None;
+            let prepared = gate(
+                &mut pending,
+                &cancel,
+                11,
+                &heard(),
+                now + Duration::from_secs(15),
+            )
+            .unwrap_or_else(|told| panic!("on {on}: {told}"));
+            assert_eq!(prepared.args["event_id"], "kctlh9nnt7045gm342qucliu0k");
+            assert_eq!(
+                prepared.args.get("calendar").and_then(Value::as_str),
+                on.then_some("primary"),
+                "on {on}"
+            );
+            let bob = Turn {
+                owner: Some("bob"),
+                ..heard()
+            };
+            let theirs = gate(
+                &mut pending,
+                &cancel,
+                12,
+                &bob,
+                now + Duration::from_secs(20),
+            );
+            if on {
+                assert_eq!(
+                    theirs.unwrap_err()["error"],
+                    crate::service_read_ids::NOT_THEIRS
+                );
+            } else {
+                assert!(theirs.is_ok(), "off: as before");
+            }
+            let late = now + crate::service_read_ids::KEPT_FOR + Duration::from_secs(1);
+            let expired = gate(&mut pending, &cancel, 13, &heard(), late);
+            if on {
+                assert_eq!(
+                    expired.unwrap_err()["error"],
+                    crate::service_read_ids::EXPIRED
+                );
+            } else {
+                assert!(expired.is_ok(), "off: as before");
+            }
+            assert_eq!(pending, None, "nothing waits for a send");
+        }
+        crate::service_read_ids::on_for_test(false);
     }
 
     /// The owner with no print is asked once, after a send seen said by

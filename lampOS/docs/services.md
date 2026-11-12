@@ -126,6 +126,7 @@ connected apps.
 | `LAMP_SKILL_WRITES=on` (#6066; on in the product's four units since 11 Nov) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill writes to no service: a skill with a `write` step or a `"write"` permission does not load, `lamp-services` refuses `skill_write` and `skill_write_approve`, and the voice makes none ("I can't do that yet: sending or writing on its own") nor takes a yes ("A made skill's write", below) |
 | `LAMP_SKILL_READS=on` (on in the product's four units) | `lamp-services`, `lamp-skills` (and its `lamp-skills-manage@` helper) and `lamp-voice` | A made skill reaches no service: `lamp-services` refuses `lamp-skills` on its tools socket, a skill's `read` step does nothing at its run ("not made: LAMP_SKILL_READS is not on"), and the making model is told to answer a request for a skill naming a service with `cannot:` ("A made skill's read", below) |
 | `LAMP_SKILL_TASKS=on` (#6432; on in the product units) | `lamp-services`, `lamp-control` (and `lamp-tasks`, which runs the task) and `lamp-voice` | A skill's run reaches no service: lamp-control answers `service.read` and `service.write` `off`, `lamp-services` refuses the `lamp-control.service` cgroup on its tools socket and the voice's `run_write_waiting`, and the voice reads no run's write back ("A skill's run on the lamp's Hermes", below) |
+| `LAMP_SERVICE_READ_IDS_KEPT=on` (tracker row C132; off in every product unit) | `lamp-voice`'s second route, with `LAMP_SERVICES=on` | A calendar read keeps nothing: a move or cancel of an event from an earlier conversation reads in each request and is refused by the after-read rule there ("After a read", below) |
 
 A write, and a read said in full, also need the owner's face seen speaking
 the line, so `LAMP_SECOND_SPEAKING_FACE=on` and `LAMP_EYES_SPEAKING=on` in
@@ -1673,6 +1674,38 @@ it is saved, never sent, whatever words agreed to it.
   read stays in that Live session's own context, which the model keeps for
   the rest of the session; only the thread and what is built from it are
   kept clear of it.
+- **A calendar read's event ids, kept for the next request
+  (`LAMP_SERVICE_READ_IDS_KEPT`, off unless set; off in the product until
+  its lamp check; tracker row C132).** On lamp-06c1 on 12 Nov (row X1) an
+  event made in an earlier conversation could not be cancelled: the model
+  had no `event_id`, so it read first; the rule above refused the write in
+  that request, and the next request read again and was refused again. With
+  the switch on (`crate::service_read_ids`), a Google Calendar `events` read
+  keeps, for the services' owner whose line made it (`services::owner_of`;
+  nobody known, nothing is kept), only each event's id, calendar, title,
+  start and end, of its first 5 events (`KEPT_MOST`): never a description,
+  a place, a guest or any other text the read gave. It is held in RAM,
+  replacing that person's earlier read; a read that found nothing drops it.
+  Their later spoken lines on the second route are told them beside the
+  words, at most 1,400 bytes (`NOTE_BYTES`), titles marked «…» with
+  `DATA_NOTE`, each with its time as the records note says it ("Fri 13 Nov 21:00–22:00") and its `event_id`, "Give calendar <id> with it." for a read of a calendar other than `primary`, and the rule "To move or cancel one they asked for and confirmed, call service_write now with action update_event or delete_event and its event_id; don't read again. It is read back before anything changes." So "cancel my dentist
+  on Friday" reads and the lamp says what it found and asks; "yes, cancel
+  it" in the next request names the event by its id, and the write is
+  prepared (its calendar filled in when the call gave none,
+  `service_read_ids::check_write` in `services::gate`), read back and sent
+  on a yes as every calendar edit is. `lamp-services` takes the id as any
+  Google id (`writes::event_named`: only a record key is refused,
+  `RECORD_KEY_NOT_EVENT`; Google's own read before the read-back decides,
+  `event_read`, `EVENT_NOT_FOUND`). Kept 5 minutes (`KEPT_FOR`) or until
+  the conversation is closed (`Thread::close_conversation`): after that only
+  the ids stay, titles and times dropped, and a write naming one is refused
+  with `EXPIRED`, "Not done: that event_id came from a calendar read that is
+  no longer kept … Call service_read to look for the event again, say what
+  you found, and ask them again." A write naming an event another person's
+  read kept is refused with `NOT_THEIRS`. A forget or a privacy change drops
+  all of it (`services::forget_waiting`). Any other id (a made event's,
+  from its record) goes on as before. This rule is unchanged: a write in the
+  read's own request is still refused with `AFTER_READ`, switch on or off.
 
 One waiting write is shared by both voice routes. A services call is held
 for the Policy's decision as the executive's are, with

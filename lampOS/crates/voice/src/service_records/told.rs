@@ -164,7 +164,7 @@ fn when(at_ms: u64, now_ms: u64, offset: i32) -> String {
 /// An event's time as its write asked it, its own wall clock
 /// (`2026-11-15T19:00:00+07:00`): "Sun 15 Nov 19:00–22:00", the end's day
 /// said when it is another.
-fn event_time(detail: &Value) -> Option<String> {
+pub(crate) fn event_time(detail: &Value) -> Option<String> {
     let parts = |key: &str| {
         let text = detail.get(key)?.as_str()?;
         let day = crate::local_time::day_of(text.get(..10)?)?;
