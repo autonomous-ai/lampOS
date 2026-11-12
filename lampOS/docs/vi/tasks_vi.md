@@ -392,7 +392,7 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   `{"op":"targets"}` và gọi đúng tên, nên một việc giao không nêu máy nào được
   nói là "OpenClaw on the lamp" và mô tả công cụ nói "OpenClaw here on the
   lamp"; nếu là `hermes` thì "Hermes" như trước. Khi chưa đọc targets, voice
-  nói OpenClaw, mặc định. `who`
+  nói Hermes, mặc định (#6498). `who`
   "OpenClaw" hoặc "Hermes", khi đèn có target của mình, là của đèn, không bao
   giờ của máy tính. OpenClaw cũng là một agent mà voice có thể gọi tên trên
   máy tính, nghe được là "OpenClaw", "open claw", "open clause", "open
