@@ -7,6 +7,7 @@
 pub(crate) static FAKE_PROGRAM: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 pub mod camera;
+pub mod keys;
 pub mod manage;
 pub mod mic;
 pub mod people;
