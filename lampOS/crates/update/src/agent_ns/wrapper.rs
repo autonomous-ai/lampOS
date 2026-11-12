@@ -33,8 +33,9 @@
 //!
 //! Hermes and OpenClaw keep their own wrappers and namespace scripts for
 //! now ([`crate::hermes_install`], [`crate::openclaw_install`]); they move
-//! onto this one in step 2. Nothing calls [`write_engine`] from a round
-//! yet: that, for every engine Harness reports, is the next piece.
+//! onto this one in step 2. A round calls [`write_engine`] for every other
+//! engine Harness says is installed, with `LAMP_AGENT_NS=on`
+//! ([`super::rounds`]).
 use crate::{
     hermes_install::{self, Shown, holds, on},
     records::write_whole,
@@ -331,17 +332,29 @@ pub fn write_engine(
         .map_err(|error| format!("{wrapper}: {error}"))
 }
 
+/// The longest `lampos`'s login-shell lookup may take, in seconds; past
+/// it nothing is found, so the engine is not present.
+pub const LOOKUP_SECS: &str = "5";
+
 /// How Harness finds `engine`: `command -v` in `lampos`'s login shell
 /// (`runuser -l`, which reads the same rc files Harness's installer
-/// writes, `~/.local/bin` before `/usr/local/bin`). Refused unless
-/// `engine` is plain, so it is one word in the command.
+/// writes, `~/.local/bin` before `/usr/local/bin`), bounded by
+/// `timeout` ([`LOOKUP_SECS`]) so a slow rc file never holds a round.
+/// Refused unless `engine` is plain, so it is one word in the command.
 pub fn login_lookup_argv(engine: &str) -> Result<Vec<String>, String> {
     plain(engine)?;
-    Ok(["runuser", "-l", crate::install::USER, "-c"]
-        .map(str::to_owned)
-        .into_iter()
-        .chain([format!("command -v {engine}")])
-        .collect())
+    Ok([
+        "timeout",
+        LOOKUP_SECS,
+        "runuser",
+        "-l",
+        crate::install::USER,
+        "-c",
+    ]
+    .map(str::to_owned)
+    .into_iter()
+    .chain([format!("command -v {engine}")])
+    .collect())
 }
 
 /// The program `lampos`'s login shell finds for `engine`

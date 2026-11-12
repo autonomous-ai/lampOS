@@ -1216,8 +1216,10 @@ fn remove_entry_points(root: &Path, say: &mut dyn FnMut(&str)) {
 }
 
 /// Every engine's namespace script: the shared hook stand-in
-/// ([`agent_ns::HOOK_SHIM`]) stays while any of them is there.
-pub(crate) const NS_SCRIPTS: [&str; 2] = [NS, crate::openclaw_install::NS];
+/// ([`agent_ns::HOOK_SHIM`]) stays while any of them is there, the one
+/// every other engine's wrapper runs ([`agent_ns::wrapper::NS`], #6510)
+/// included.
+pub(crate) const NS_SCRIPTS: [&str; 3] = [NS, crate::openclaw_install::NS, agent_ns::wrapper::NS];
 
 /// The install, in order: the installer's bytes checked; `lampos` and its
 /// ids looked up; `git`, `curl`, `bash` and `unshare` looked for as

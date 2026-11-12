@@ -453,7 +453,15 @@ fn an_engine_found_before_the_wrapper_is_not_present() {
 fn the_login_lookup_is_lamposs_login_shell_and_refuses_unplain_names() {
     assert_eq!(
         login_lookup_argv("claude").unwrap(),
-        ["runuser", "-l", "lampos", "-c", "command -v claude"]
+        [
+            "timeout",
+            "5",
+            "runuser",
+            "-l",
+            "lampos",
+            "-c",
+            "command -v claude"
+        ]
     );
     for engine in ["-l", "a;b", "$(id)", "a b", ""] {
         assert!(login_lookup_argv(engine).is_err(), "{engine:?}");
