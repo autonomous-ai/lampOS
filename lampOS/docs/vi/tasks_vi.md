@@ -384,7 +384,13 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   chạy trong cloud của Devin, không bao giờ trên đèn. `LAMP_HERMES_ON_LAMP`
   và `LAMP_OPENCLAW_ON_LAMP` chỉ là công tắc tắt: engine có công tắc tắt
   thì không được đưa ra (OpenClaw cũng không khi Harness cũ hơn 0.6.11);
-  mọi engine khác không có công tắc. Trước khi một lần xem báo về (hoặc khi
+  mọi engine khác không có công tắc. Trên đèn, một engine chỉ được đưa ra
+  khi `/usr/local/bin/<engine>` của nó là wrapper do lamp-update ghi, có dòng
+  `Written by lamp-update.` trong 512 byte đầu (`LAMP_WRAPPER_MARK`, #6506):
+  wrapper chạy engine trong namespace riêng, tách khỏi các dịch vụ của đèn và
+  đồ của người dùng. Chương trình đặt ở đó theo cách khác (một `claude` cài
+  tay) thì không được đưa ra và app không đặt nó làm mặc định được
+  (`engine_not_installed`), dù Harness báo gì. Trước khi một lần xem báo về (hoặc khi
   đăng xuất, #6407), các engine của đèn là những engine đang bật, như
   trước. Engine mặc định đứng đầu, rồi mọi engine khác theo thứ tự của
   Harness (`lamp_order`): lựa chọn của chủ trong app khi nó nằm trong số
@@ -516,7 +522,9 @@ và có `--targets-from-machines`:
 - **Target lấy từ chính đèn.** Mỗi lần đọc sign-in thấy chưa đăng nhập và có id
   của máy này, engine của đèn coi là đã cài khi chương trình của nó nằm ở chỗ
   Harness tìm, `/usr/local/bin/<engine>` (`LAMP_ENGINES_BIN`; `hermes` và
-  `openclaw` là wrapper của lamp-update), chạy được. Khi đó file target được ghi như khi ghi
+  `openclaw` là wrapper của lamp-update), chạy được, và là wrapper do
+  lamp-update ghi: 512 byte đầu có `Written by lamp-update.`
+  (`LAMP_WRAPPER_MARK`, #6506). Khi đó file target được ghi như khi ghi
   từ danh sách máy, không bao giờ đè file mà phần tasks không tự ghi, chỉ có
   đèn: `lamp`, engine đó, `~/harnesses/lamp-tasks/lamp`, dưới id của máy này.
   Target của các máy tính ghi trước đó bị bỏ, vì chưa đăng nhập thì không tới

@@ -1631,7 +1631,9 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
       signed out and names this computer's id, the lamp's engine is
       installed here when its program is where Harness finds it,
       `/usr/local/bin/<engine>` (`LAMP_ENGINES_BIN`; `hermes` and
-      `openclaw` are lamp-update's wrappers), executable. Then the file is written, as
+      `openclaw` are lamp-update's wrappers), executable, and a wrapper
+      lamp-update wrote: its first 512 bytes carry `Written by
+      lamp-update.` (`LAMP_WRAPPER_MARK`, #6506). Then the file is written, as
       from the machines and never over a file the part didn't write, with
       the lamp alone: `lamp`, that engine, `~/harnesses/lamp-tasks/lamp`
       (made, with its guidance), under this computer's id. A computer's
@@ -1900,7 +1902,14 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     Cloud works in Devin's cloud, never on the lamp. `LAMP_HERMES_ON_LAMP`
     and `LAMP_OPENCLAW_ON_LAMP` are off-switches only: an engine whose
     switch is off is not offered (OpenClaw also not under a Harness older
-    than 0.6.11); every other engine has no switch. Before a look has
+    than 0.6.11); every other engine has no switch. On a lamp an engine is
+    offered only while its `/usr/local/bin/<engine>` is a wrapper
+    lamp-update wrote, carrying `Written by lamp-update.` in its first 512
+    bytes (`LAMP_WRAPPER_MARK`, #6506): the wrapper runs it in its own
+    namespace, away from the lamp's services and the person's things. A
+    program put there any other way (a `claude` installed by hand) is not
+    offered and the app can't make it the default (`engine_not_installed`),
+    whatever Harness reports. Before a look has
     reported (or signed out, #6407), the lamp's engines are the ones
     switched on, as before. The default comes first, then every other in
     Harness's order (`lamp_order`): the owner's choice in the app when it is
