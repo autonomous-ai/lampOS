@@ -38,7 +38,8 @@ writes and the ring's restart").
 
 `serve` rejects `--diagnostics` before startup. It does not silently keep
 pre/post-AEC or render PCM forever. Use a separate finite `directed` experiment
-for raw diagnostics. Finite `directed` and `directed-fixture` retain their 1..600
+for raw diagnostics; on the second route, that run needs
+`LAMP_VOICE_DIRECTED_SECOND=on` ([live-runtime.md](live-runtime.md)). Finite `directed` and `directed-fixture` retain their 1..600
 second duration, strict 20,000-row evidence cap, complete trace file and existing
 failed-on-signal behavior.
 
