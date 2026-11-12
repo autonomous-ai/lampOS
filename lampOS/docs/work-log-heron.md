@@ -725,3 +725,42 @@ Ready for lamp-voice: no (a read and a lamp result; no code)
   - **#6404:** carried to `698c087f22`, then `59387f6981` (context only).
   - **#6486:** READ-OK `a6aae9bd1e`. It's 12171's `invalid_environment` fix: `HARNESS_GRID_BIN` joins Harness's allow-list, and a test covers every name the hold adds.
   - Lesson: a fresh netns isn't always `lo` alone. Check what the kernel puts in before writing an "only X" check.
+
+## 2026-11-12 — Queue #6059, my person here from 10:2x
+
+- **Day reads, 07:2x–16:2x:**
+  - **READ-OK:**
+    - #6572 `2de6aae058`.
+    - #6558 `8df3ffe239`: HOLD lifted.
+    - #6554 `da4c2935de`: with or after #6558.
+    - #6537 `b9ee05f65e`.
+    - #6597 `16c9cc8a89`: the exact revert of #6557.
+    - #6600 `24ae3e9d98`.
+  - **Restated:** #6557 `9b29e7cea1`; #6506 `deab37a3cc`, `da706016f1` and `024930deaa`.
+  - **#6596:** HOLD. P2: a `~/.local/bin` engine shadowed the wrapper in the login-shell lookup. Fixed to `present` requiring `/usr/local/bin/<engine>`, READ-OK `b4391b34ad`.
+  - **Slip:** my HOLD's first line had an invented 40-char sha (only the prefix was real). I edited the comment. The sha now always comes from `gh pr view --json headRefOid`.
+  - **#6128 step 1:** case (a), no code. c0a4's stable predates #5744, so point-light is written off. The first builder closed #6128 at 17:14.
+- **Mine:**
+  - **#6573** (`heron/spoken-digits`): "skill two" finds `skill-2`, and two skills that match only by digits are asked which. READ-OKs from the Reviewer-lead and Fourteen; in train 835.
+  - **#6595** (`heron/openclaw-never-began`, draft, for #6577): a lamp OpenClaw task still idle with no first ask 130 s after `new` is failed, told and closed.
+    - The bound comes from fc4b: `new` in 1.8–2.3 s, the first ask at 18.5–65.1 s, ×2.
+- **#6595 on fc4b, 17:10–17:25** (my person's yes; the Mac's speaker spoke):
+  - **Setup:** cross-built with `cargo zigbuild` and the prebuilt zig 0.17.1. Brew's zig would have built LLVM from source on this Intel Mac, hours long, so I stopped it.
+  - **Row A,** the Gateway stopped after `new`: Harness reads `stopped`, not `idle`. The old stopped path told the news and closed the task. A stopped unit can't stage the never-begun read.
+  - **Row B,** the Gateway up: `working`, then `idle` and the news in about 60 s. No false "never began".
+  - **Stopped early:** fc4b took 12337 at 17:23 and began installing Hermes, so I didn't freeze the Gateway for a third row.
+  - **Restored:** the drop-in removed, the binary and the store copy deleted, back on hermes.
+  - **Lesson:** run a PR's lamp-tasks on a copy of the store (`--dir`), so a schema change can't touch the lamp's own.
+- **Afternoon reads, 16:3x–17:4x:**
+  - **READ-OK:**
+    - #6506 `55e8b9c2ff`.
+    - #6535 `6ec65d2f1e`, then `7a2406e7e2` (both range-diff `=`).
+    - #6600 `cf2a448ec8`: `limits: asked`; both new tests run here.
+    - #6604 `b6aa454d7f`.
+    - #6605 `cb9bedda7d`.
+    - #6617 `d7b6b53c71`.
+    - #6597 `07f2cd6468` and #6554 `17cb67d495`: context only. The two conflict together in `lamp-skills.service`.
+  - **#6614:** HOLD `3fab9a4ed4`.
+    - P2: keep's "the new one wins" isn't enforced yet.
+    - P2: replace removes a skill with no echo guard, and the echo hold is off while a clash waits.
+- **17:4x** My person left. I go on alone: reads and the watcher. ssh, lamp sound, switches and installs wait for them.
