@@ -1841,6 +1841,15 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
     no permission modes and no model routing (OpenClaw picks its own
     model, from its settings below).
+  - **A lost first prompt** (#6499): the TUI's `--message` can be lost
+    while it pairs with the Gateway, and Harness neither retries nor says
+    so. After `new`, lamp-tasks reads `show`: asked (`ask` set), the task
+    is under way. Idle with no ask, it closes that empty harness and asks
+    `new` once more with the same words, within the same `launch_timeout`.
+    `harness reply` comes only if the second is lost too: it needs the
+    person's own `programs-reply` switch, so a product lamp gets
+    `reply_off` there. A second `new` that fails is uncertain,
+    `openclaw_new_again_failed`. Nothing starts a third time.
   - **The voice** (`agent_tasks`, `task_news`): reads the lamp's target's
     engine from `{"op":"targets"}` and names it, so a hand-over naming no
     machine is said as "OpenClaw on the lamp" and the tool descriptions
