@@ -66,17 +66,31 @@ pub const NO_NET: &str =
 pub const HAS_SECRET: &str = "it carries what looks like a key or a token; a skill added from a \
                               file can't hold one yet, so add it without the key or token";
 
-/// Whether `text` carries a value that looks like a key or a token: a run
-/// of at least 24 of `A-Z a-z 0-9 _ - . :` with at least four letters and
-/// four digits, outside a link (no `/` in it). Never says which.
+/// Whether `text` carries a value that looks like a key or a token
+/// ([`looks_secret`]): a run outside a link whole, and in a link or a path
+/// (a run with a `/`) each `/`-separated part past its scheme and host,
+/// each split again on `:` (a bot's `bot<id>:<token>`), so a key in a
+/// webhook's or a bot's link is found too. Never says which.
 pub fn carries_secret(text: &str) -> bool {
     text.split(|c: char| !(c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.' | ':' | '/')))
-        .filter(|run| !run.contains('/'))
         .any(|run| {
-            let letters = run.chars().filter(char::is_ascii_alphabetic).count();
-            let digits = run.chars().filter(char::is_ascii_digit).count();
-            run.len() >= 24 && letters >= 4 && digits >= 4
+            if !run.contains('/') {
+                return looks_secret(run);
+            }
+            let path = match run.split_once("://") {
+                Some((_, rest)) => rest.split_once('/').map_or("", |(_, path)| path),
+                None => run,
+            };
+            path.split(['/', ':']).any(looks_secret)
         })
+}
+
+/// One part that looks like a key or a token: at least 24 of
+/// `A-Z a-z 0-9 _ - . :` with at least four letters and four digits.
+fn looks_secret(part: &str) -> bool {
+    let letters = part.chars().filter(char::is_ascii_alphabetic).count();
+    let digits = part.chars().filter(char::is_ascii_digit).count();
+    part.len() >= 24 && letters >= 4 && digits >= 4
 }
 
 /// The most trigger phrases put in the tool's note.
@@ -123,6 +137,36 @@ fn words(text: &str) -> std::collections::BTreeSet<String> {
         .collect()
 }
 
+/// The words that say a web API or URL is reached out to ([`grants_read`]).
+const REACH_WORDS: &[&str] = &[
+    "fetch",
+    "fetches",
+    "fetching",
+    "call",
+    "calls",
+    "calling",
+    "post",
+    "posts",
+    "posting",
+    "request",
+    "requests",
+    "download",
+    "downloads",
+    "upload",
+    "uploads",
+    "query",
+    "queries",
+    "ping",
+    "pings",
+    "send",
+    "sends",
+    "sending",
+    "get",
+    "gets",
+    "look",
+    "lookup",
+];
+
 /// The grants `text` asks for, in [`crate::skill_task_yes::GRANTS`]'s
 /// order and then `net`: only these five, by plain words, never more.
 pub fn grants_read(text: &str) -> Vec<String> {
@@ -151,9 +195,21 @@ pub fn grants_read(text: &str) -> Vec<String> {
     ]) {
         grants.push("camera");
     }
+    // The internet only for a link, a webhook, or a web API or URL the file
+    // says to reach out to: a bare "api" or "url" is not enough.
     if lower.contains("http://")
         || lower.contains("https://")
-        || any(&["api", "apis", "url", "http", "https", "webhook", "endpoint"])
+        || any(&["webhook", "webhooks"])
+        || (any(&[
+            "api",
+            "apis",
+            "url",
+            "urls",
+            "http",
+            "https",
+            "endpoint",
+            "endpoints",
+        ]) && any(REACH_WORDS))
     {
         grants.push(crate::skill_task_yes::NET.0);
     }
