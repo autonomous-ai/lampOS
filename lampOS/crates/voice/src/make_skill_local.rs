@@ -898,16 +898,18 @@ fn ask_words(line: &str) -> Vec<String> {
         .collect()
 }
 
-/// Whether two lines' words are one ask: the same words, or the one of at
-/// least [`ONE_ASK_FEWEST_WORDS`] held whole, in order, in the other (a
-/// line carried into the next with the lamp's name or an earlier piece
-/// before it, or without them).
+/// Whether two lines' words are one ask: the one of at least
+/// [`ONE_ASK_FEWEST_WORDS`] held whole, in order, in the other (the same
+/// words, or a line carried into the next with the lamp's name or an
+/// earlier piece before it, or without them). Two short lines alike, the
+/// same answer to the lamp's question ("green", "yes", "do it") ending two
+/// asks, are no one ask.
 fn same_ask(one: &[String], other: &[String]) -> bool {
     if one.is_empty() || other.is_empty() {
         return false;
     }
     if one == other {
-        return true;
+        return one.len() >= ONE_ASK_FEWEST_WORDS;
     }
     let (short, long) = if one.len() <= other.len() {
         (one, other)
@@ -938,8 +940,9 @@ impl OneAsk {
     ) -> Result<Self, Value> {
         let heard = ask_words(heard.unwrap_or_default());
         let request = ask_words(request);
-        let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        // Read from the folder before the lock, held by every voice make.
         let kept = made_skill::kept_names(directory);
+        let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         asks.retain(|ask| match &ask.made {
             Some((name, _, at)) => {
                 now_unix_ms.saturating_sub(*at) <= ONE_ASK_WITHIN.as_millis() as u64
@@ -2733,6 +2736,66 @@ light = { dim = 1 }
         let _ = std::fs::remove_dir_all(&root);
     }
 
+    /// Reviewer-lead's HOLD on #6604: two makes of other asks, each ending
+    /// on the same short answer to the lamp's question ("which colour?",
+    /// "green"), heard within [`ONE_ASK_WITHIN`]: both are made, the second
+    /// not told it is had already.
+    #[test]
+    fn two_asks_both_answered_green_make_two_skills() {
+        let (root, keeping) = keeping("two-greens");
+        let toml = |topic: &str, when: &str| {
+            format!(
+                "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\n\
+                 topics = [\"{topic}\"]\nlight = true\n\n[trigger]\ntopic = \"{topic}\"\n\
+                 {when}\ncooldown = \"1h\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n\
+                 light = {{ colour = \"green\", level = 3, for = \"20s\" }}\n"
+            )
+        };
+        let back = toml("room/presence", "field = \"someone\"\nequals = true");
+        let leaving = toml("room/stood_up", "field = \"sitting_s\"\nabove = 0");
+        let answer = |toml: &str, name: &str| {
+            format!(
+                "```skill.toml\n{toml}```\n\n```SKILL.md\n---\nname: {name}\n\
+                 description: {name}\n---\n\n# {name}\n```\n"
+            )
+        };
+        let (url, served) = service_sent(vec![
+            (200, answer(&back, "green-on-return")),
+            (200, answer(&leaving, "green-on-leaving")),
+        ]);
+        let helper = manage_helper(&keeping.manage);
+        let first = make_with(
+            7,
+            Some("green"),
+            "glow green when I come back to my desk",
+            &keeping,
+            chat_at(url.clone()),
+            NOW,
+            || None,
+        );
+        assert_eq!(first["made"], "green-on-return", "{first}");
+        let _ = take_said_line();
+        helper.join().unwrap();
+        std::fs::remove_file(&keeping.manage).unwrap();
+        let helper = manage_helper(&keeping.manage);
+        let second = make_with(
+            8,
+            Some("green"),
+            "glow green when I leave my desk",
+            &keeping,
+            chat_at(url),
+            NOW + 60_000,
+            || None,
+        );
+        assert!(second.get("already_made").is_none(), "{second}");
+        assert_eq!(second["made"], "green-on-leaving", "{second}");
+        helper.join().unwrap();
+        let _ = take_said_line();
+        assert_eq!(served.join().unwrap().len(), 2, "the model was asked twice");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     /// Only the same ask is held: another ask, a few words alone, or the
     /// same ask in another folder, let go unmade or no longer kept is made.
     #[test]
@@ -2756,6 +2819,9 @@ light = { dim = 1 }
             &words("make me a skill that nods")
         ));
         assert!(!same_ask(&[], &[]));
+        assert!(!same_ask(&words("green"), &words("Green.")));
+        assert!(!same_ask(&words("do it"), &words("do it")));
+        assert!(same_ask(&ask, &ask));
         let directory = std::env::temp_dir().join(format!("one-ask-held-{}", std::process::id()));
         let other = directory.join("other");
         let held =
