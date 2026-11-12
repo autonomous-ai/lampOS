@@ -99,6 +99,8 @@ struct Held {
     started: bool,
     finished: bool,
     dropped: u64,
+    /// Gaps the speaker reported in this stream's sound.
+    underruns: u64,
 }
 
 /// A feed is its own: two are equal only if they are the same one.
@@ -145,6 +147,12 @@ impl Feed {
         held.closed || held.samples.len() >= if held.started { CHUNK } else { PREFILL }
     }
 
+    /// The speaker reported a gap in this stream's sound: its queue ran dry
+    /// while the stream played (a playback gap that started), counted.
+    pub fn underrun(&self) {
+        self.held().underruns += 1;
+    }
+
     /// The next chunk and whether it is the last: always [`CHUNK`] samples,
     /// padded with silence at the end, and the last faded to nothing.
     pub fn take(&self) -> Option<(Vec<i16>, bool)> {
@@ -176,6 +184,17 @@ impl Feed {
     /// Sound dropped for want of room.
     pub fn dropped(&self) -> u64 {
         self.held().dropped
+    }
+
+    /// Gaps in the sound the speaker reported (its own queue ran dry), counted
+    /// by [`Feed::underrun`].
+    pub fn underruns(&self) -> u64 {
+        self.held().underruns
+    }
+
+    /// The sound held now, in milliseconds of the speaker's 24 kHz.
+    pub fn buffered_ms(&self) -> u64 {
+        self.held().samples.len() as u64 / 24
     }
 }
 
@@ -326,7 +345,9 @@ pub(crate) fn hold_with(
                 let counts = sound.counts;
                 if writeln!(
                     stream,
-                    r#"{{"event":"stats","buffered_ms":0,"underruns":0,"limited":{},"blocks":{},"lost":{},"stray":{}}}"#,
+                    r#"{{"event":"stats","buffered_ms":{},"underruns":{},"limited":{},"blocks":{},"lost":{},"stray":{}}}"#,
+                    feed.as_ref().map_or(0, |feed| feed.buffered_ms()),
+                    feed.as_ref().map_or(0, |feed| feed.underruns()),
                     counts.limited, counts.blocks, counts.lost, counts.stray
                 )
                 .is_err()
@@ -968,6 +989,57 @@ mod tests {
         answer.send(Answer::Done(Outcome::Spoken)).unwrap();
         served.join().unwrap();
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_feed_says_what_it_holds_in_milliseconds_and_counts_the_speakers_gaps() {
+        let feed = Feed::new();
+        assert_eq!((feed.buffered_ms(), feed.underruns()), (0, 0));
+        // 24 samples a millisecond at the speaker's rate.
+        feed.push(&vec![1i16; 4_800]);
+        assert_eq!(feed.buffered_ms(), 200);
+        feed.take().expect("past the prefill");
+        assert_eq!(feed.buffered_ms(), 190, "a chunk of 10 ms went");
+        // The speaker reports its queue ran dry twice.
+        feed.underrun();
+        feed.underrun();
+        assert_eq!(feed.underruns(), 2);
+        assert_eq!(feed.buffered_ms(), 190, "a gap does not take sound");
+    }
+
+    #[test]
+    fn an_open_streams_stats_carry_what_is_held_and_its_underruns() {
+        let _turn = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (bus, dir) = temp_bus("buffered");
+        let (answer, _cancel, mut said, computer, served) = held(bus);
+        let feed = Feed::new();
+        answer.send(Answer::Begun(1)).unwrap();
+        answer.send(Answer::Stream(Arc::clone(&feed))).unwrap();
+        assert_eq!(line(&mut said)["state"], "open");
+        // 120 ms held (nothing taken: the speaker has not come for it) and the
+        // speaker reports one gap: the next stats line says both.
+        feed.push(&vec![1i16; 2_880]);
+        feed.underrun();
+        let mut stats = serde_json::Value::Null;
+        for _ in 0..40 {
+            stats = line(&mut said);
+            if stats["underruns"] == 1 {
+                break;
+            }
+        }
+        assert_eq!(
+            (stats["buffered_ms"].as_u64(), stats["underruns"].as_u64()),
+            (Some(120), Some(1)),
+            "{stats}"
+        );
+        answer
+            .send(Answer::Done(Outcome::Dropped("done".into())))
+            .unwrap();
+        served.join().unwrap();
+        drop(computer);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]
