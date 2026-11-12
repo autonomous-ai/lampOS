@@ -424,6 +424,22 @@ là phần của một coder khác trong #6226; thiết kế:
   home của `lampos`), nơi các khóa skill của đèn trỏ tới và hướng dẫn
   (`AGENTS.md`) được ghi, như với Hermes.
 
+## Hook của Harness bên trong namespace agent của đèn (#6530)
+
+Hook của Harness cho một engine (`harness hook hermes session-start`,
+`harness hook hermes tool`) chạy bên trong namespace agent của đèn, nơi CLI và
+trạng thái của Harness bị ẩn. Phần namespace dùng chung
+(`crates/update/src/agent_ns.rs`, "một namespace cho mọi engine" của #6510,
+hiện được namespace của Hermes và OpenClaw dùng) đặt một `harness` thay thế lên
+đầu `PATH` của namespace: `/usr/local/lib/lampos/ns-bin/harness`, của root,
+0755, do lamp-update ghi. Nó trả lời `harness hook …` bằng không gì cả và mã
+thoát 0, từ chối mọi lệnh khác, và không lộ trạng thái nào của Harness. Mỗi lần
+engine khởi động ghi một dòng journal: "Harness hooks aren't available inside
+the lamp's agent namespace yet (openharness#4194)". Vì vậy, tạm thời Harness
+không theo dõi được phiên của engine chạy trong namespace qua hook. Bản thay
+thế này sẽ được gỡ khi Harness được ghim có chế độ hook cho sandbox
+(openharness#4194) (docs/install.md, "Hermes on the lamp").
+
 ## Đèn chưa đăng nhập vẫn giao việc cho engine của chính nó (#6407)
 
 Một đèn product chưa từng đăng nhập Harness, đã cài Hermes 0.22.2, trả lời
