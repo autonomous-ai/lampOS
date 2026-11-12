@@ -405,14 +405,19 @@ pub fn grants_go_on_at_once(grants: &[String]) -> bool {
 /// Whether the made skill `made`, with code of its own, goes on at once
 /// ([`CODE_AT_ONCE_ENVIRONMENT`]): its grants within
 /// [`CODE_AT_ONCE_GRANTS`] ([`grants_go_on_at_once`]), and no send, no
-/// camera and no microphone in what it uses. Anything else waits for the
-/// spoken yes, exactly as with the switch off.
+/// camera, no microphone and no knowing who is at the lamp (`who`,
+/// `known_faces`: identity is the camera's privacy, the first builder at
+/// 20:16 on #6659) in what it uses. lamp-control has no grant for who is
+/// there (`look` is "never who"), so these are its `uses`. Anything else
+/// waits for the spoken yes, exactly as with the switch off.
 pub fn code_goes_on_at_once(made: &Made) -> bool {
     made.uses.code
         && made.uses.writes.is_empty()
         && !made.uses.messages
         && !made.uses.camera
         && !made.uses.listens()
+        && !made.uses.who
+        && !made.uses.known_faces
         && grants_go_on_at_once(&made.uses.grants)
 }
 
@@ -1372,12 +1377,14 @@ fn grants_plainly(grants: &[String]) -> Option<String> {
 /// taken (`crate::skill_write_yes`). Code that goes on at once
 /// ([`grants_go_on_at_once`]) has no wait, so it ends on what it may use.
 pub fn code_said(grants: &[String]) -> String {
+    code_said_as(grants, grants_go_on_at_once(grants))
+}
+
+/// [`code_said`], `at_once` whether it goes on at once
+/// ([`code_goes_on_at_once`]): then with no [`RUNS_AFTER_YES`].
+pub fn code_said_as(grants: &[String], at_once: bool) -> String {
     let uses = grants_plainly(grants).unwrap_or_else(|| "nothing of the lamp's".to_owned());
-    let waits = if grants_go_on_at_once(grants) {
-        ""
-    } else {
-        RUNS_AFTER_YES
-    };
+    let waits = if at_once { "" } else { RUNS_AFTER_YES };
     format!(" The lamp's model wrote its code, and that code may use {uses}.{waits}")
 }
 
@@ -4139,7 +4146,11 @@ fn said_plainly(table: &toml::Table, reads: bool, general: bool) -> Result<Strin
             .flatten()
             .filter_map(|grant| grant.as_str().map(str::to_owned))
             .collect();
-        said.push_str(&code_said(&grants));
+        // Its wait said unless it goes on at once: grants within
+        // [`CODE_AT_ONCE_GRANTS`] and nothing it reaches beside them
+        // (the camera, the microphone, who is in view, a message).
+        let at_once = grants_go_on_at_once(&grants) && !writes && reaches_plainly(table).is_empty();
+        said.push_str(&code_said_as(&grants, at_once));
     }
     Ok(said)
 }
