@@ -90,7 +90,15 @@ pub enum Note {
 pub trait Stream: Send {
     /// What the voice said since the last call, if anything.
     fn poll(&mut self) -> Option<Note>;
+    /// The computer asked for silence (its own `off`, a `stop`, a revoke):
+    /// tell the voice to cut the sound now instead of playing out what it
+    /// holds, as a plain close does. Best effort; the default says nothing.
+    fn cancel(&mut self) {}
 }
+
+/// The line the voice's say socket takes as its asker's hard stop (the
+/// voice's `say::CANCEL_LINE`): the stream is cut at once, nothing played out.
+pub const CANCEL_LINE: &str = r#"{"cancel":true}"#;
 
 /// Asks the voice for a stream (the say socket's `stream` request): the
 /// voice's refusal comes back in its words, [`NO_VOICE`] from one that does
@@ -186,6 +194,10 @@ struct Slot {
 struct Open {
     slot: Mutex<Option<Slot>>,
     turns: AtomicU64,
+    /// The turn whose computer asked for silence (an `off`, a `stop` or a
+    /// revoke, never a replacement or a closed connection): its thread tells
+    /// the voice to cut the sound when it sees its slot gone.
+    hard: Mutex<Option<u64>>,
 }
 
 /// What stops the speaker, asked before a stream starts and in each look.
@@ -393,10 +405,12 @@ impl Speaker {
     /// `stop`, the connection closing, or a re-pairing without the grant.
     pub fn end_of(&self, conn: u64, client: &str) {
         let mut slot = self.open.slot.lock().expect("slot");
-        if slot
+        if let Some(turn) = slot
             .as_ref()
-            .is_some_and(|slot| slot.conn == conn && slot.client == client)
+            .filter(|slot| slot.conn == conn && slot.client == client)
+            .map(|slot| slot.turn)
         {
+            *self.open.hard.lock().expect("hard") = Some(turn);
             *slot = None;
         }
     }
@@ -414,7 +428,12 @@ impl Speaker {
     /// (a revoke, or a re-pairing without the grant).
     pub fn end_client(&self, client: &str) {
         let mut slot = self.open.slot.lock().expect("slot");
-        if slot.as_ref().is_some_and(|slot| slot.client == client) {
+        if let Some(turn) = slot
+            .as_ref()
+            .filter(|slot| slot.client == client)
+            .map(|slot| slot.turn)
+        {
+            *self.open.hard.lock().expect("hard") = Some(turn);
             *slot = None;
         }
     }
@@ -473,7 +492,10 @@ impl Run {
         let why = loop {
             if !self.mine() {
                 // Replaced or ended by its own off: the replaced computer was
-                // told, the other need not be.
+                // told, the other need not be. An `off`, a `stop` or a revoke
+                // is a stop: the voice is told to cut the sound now, where a
+                // closed connection or a replacement plays out what is held.
+                self.cut_if_stopped(&mut voice);
                 self.unmark();
                 return;
             }
@@ -552,7 +574,10 @@ impl Run {
                     }
                 }
                 Err(RecvTimeoutError::Timeout) => {}
+                // The slot went (its queue with it): ended or replaced meanwhile,
+                // as at the top of the loop.
                 Err(RecvTimeoutError::Disconnected) => {
+                    self.cut_if_stopped(&mut voice);
                     self.unmark();
                     return;
                 }
@@ -575,6 +600,16 @@ impl Run {
             }
         };
         self.finish(&why);
+    }
+
+    /// Whether this stream's computer asked for silence (an `off`, a `stop`, a
+    /// revoke): then the voice is told to cut the sound now.
+    fn cut_if_stopped(&self, voice: &mut Box<dyn Stream>) {
+        let mut hard = self.open.hard.lock().expect("hard");
+        if *hard == Some(self.turn) {
+            *hard = None;
+            voice.cancel();
+        }
     }
 
     /// The stream ended by itself: its slot goes, the mark is let lapse and the
@@ -707,6 +742,13 @@ struct SaySocket {
 }
 
 impl Stream for SaySocket {
+    fn cancel(&mut self) {
+        use std::io::Write;
+        // One short line on a socket with room; a full one is a voice that
+        // already holds our close, which plays out, never a hang here.
+        let _ = writeln!(self.socket, "{CANCEL_LINE}");
+    }
+
     fn poll(&mut self) -> Option<Note> {
         use std::io::Read;
         if self.done {
@@ -804,6 +846,8 @@ mod tests {
     struct Said {
         notes: Mutex<VecDeque<Note>>,
         closed: AtomicBool,
+        /// The stop the door sent before it closed.
+        cancelled: AtomicBool,
         asked: Mutex<Vec<String>>,
         refuse: Mutex<Option<Error>>,
     }
@@ -813,6 +857,9 @@ mod tests {
     impl Stream for FakeStream {
         fn poll(&mut self) -> Option<Note> {
             self.0.notes.lock().unwrap().pop_front()
+        }
+        fn cancel(&mut self) {
+            self.0.cancelled.store(true, Ordering::SeqCst);
         }
     }
 
@@ -1226,6 +1273,39 @@ mod tests {
         rig.speaker.frame(1, &framed(&pcm(480)));
         assert!(rig.blocks.lock().unwrap().is_empty());
         assert!(rig.told.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn an_explicit_off_cuts_the_voices_sound_where_a_replacement_and_a_close_play_it_out() {
+        // Its own off: the voice is told to cut now, before the close.
+        let off = rig();
+        off.on(1, "c_1", Some(24_000)).unwrap();
+        off.speaker.end_of(1, "c_1");
+        assert!(wait(|| off.said.closed.load(Ordering::SeqCst)));
+        assert!(
+            off.said.cancelled.load(Ordering::SeqCst),
+            "an off is a stop"
+        );
+        // A stop and a revoke (end_client) are stops too.
+        let revoke = rig();
+        revoke.on(1, "c_1", Some(24_000)).unwrap();
+        revoke.speaker.end_client("c_1");
+        assert!(wait(|| revoke.said.closed.load(Ordering::SeqCst)));
+        assert!(revoke.said.cancelled.load(Ordering::SeqCst));
+        // A closed connection plays out what is held: no stop line.
+        let closed = rig();
+        closed.on(1, "c_1", Some(24_000)).unwrap();
+        closed.speaker.end_conn(1);
+        assert!(wait(|| closed.said.closed.load(Ordering::SeqCst)));
+        assert!(!closed.said.cancelled.load(Ordering::SeqCst));
+        // So does a replacement: the voice owns it and the old stream is cut
+        // by the voice's own admit, not by this stop line.
+        let replaced = rig();
+        replaced.on(1, "c_1", Some(24_000)).unwrap();
+        let first = replaced.said.clone();
+        replaced.on(2, "c_2", Some(24_000)).unwrap();
+        assert!(wait(|| !replaced.told_ev("speaker.ended").is_empty()));
+        assert!(!first.cancelled.load(Ordering::SeqCst));
     }
 
     #[test]
