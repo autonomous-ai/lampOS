@@ -37,9 +37,12 @@
 //! chat's history: each note has a lineage ([`Note::lineage`]), the same
 //! for every note made from the one before it, and only a job whose note
 //! was kept marks its own exchanges with it
-//! ([`crate::thread::Thread::folded`]). A turn leaves an exchange out only
-//! while its scope's note of that lineage is told to it
-//! ([`told_with_lineage`]); a job dropped, failed, empty or forgotten, a
+//! ([`crate::thread::Thread::folded`]), with the version of the note it
+//! was kept into ([`Note::version`]). A turn leaves an exchange out only
+//! while its scope's note of that lineage, of that version or a later one,
+//! is told to it ([`told_with_lineage`]): a batch folded into a newer
+//! version after the turn read its note is in neither the note it tells nor
+//! out of its history, so it stays told. A job dropped, failed, empty or forgotten, a
 //! note gone at its age or its conversation's end, or one too long for the
 //! room, leaves every exchange told in full, as before.
 use std::{
@@ -93,6 +96,8 @@ pub struct Summaries {
     forgets: u64,
     /// The last lineage given to a note begun from nothing ([`Note::lineage`]).
     lineages: u64,
+    /// The last version given to a kept note ([`Note::version`]).
+    versions: u64,
 }
 
 struct Note {
@@ -103,6 +108,10 @@ struct Note {
     /// exchanges a kept job folded into it carry it
     /// (`LAMP_HISTORY_AFTER_NOTE`, [`crate::thread::Thread::folded`]).
     lineage: u64,
+    /// New at each note kept, whatever its scope or lineage, and only ever
+    /// larger: a note of a lineage holds the exchanges folded into its own
+    /// version and every earlier one of that lineage, never a later one's.
+    version: u64,
 }
 
 impl Summaries {
@@ -111,6 +120,7 @@ impl Summaries {
             notes: Vec::new(),
             forgets: 0,
             lineages: 0,
+            versions: 0,
         }
     }
 
@@ -126,40 +136,60 @@ impl Summaries {
         self.of_lineage(whose, now).map(|(text, _)| text)
     }
 
-    /// [`Self::of`], with the note's lineage ([`Note::lineage`]).
-    fn of_lineage(&mut self, whose: Option<&str>, now: Instant) -> Option<(String, u64)> {
+    /// [`Self::of`], with the note's lineage and version ([`Note::lineage`],
+    /// [`Note::version`]).
+    fn of_lineage(
+        &mut self,
+        whose: Option<&str>,
+        now: Instant,
+    ) -> Option<(String, crate::thread::NoteVersion)> {
         self.notes.retain(|(_, note)| {
             now.saturating_duration_since(note.at) <= crate::thread::REMEMBERED_FOR
         });
         self.notes
             .iter()
             .find(|(scope, _)| scope.as_deref() == whose)
-            .map(|(_, note)| (note.text.clone(), note.lineage))
+            .map(|(_, note)| (note.text.clone(), (note.lineage, note.version)))
     }
 
     /// A note begun from nothing: a lineage of its own.
     #[cfg(any(test, lamp_memory_probe))]
-    fn keep(&mut self, whose: Option<String>, text: String, at: Instant) -> u64 {
+    fn keep(
+        &mut self,
+        whose: Option<String>,
+        text: String,
+        at: Instant,
+    ) -> crate::thread::NoteVersion {
         self.keep_from(whose, text, at, None)
     }
 
     /// The scope's note, made from the note of lineage `from` as its
     /// previous one (it holds what that one held), or from nothing with
-    /// none; its lineage.
+    /// none; its lineage and its own new version.
     fn keep_from(
         &mut self,
         whose: Option<String>,
         text: String,
         at: Instant,
         from: Option<u64>,
-    ) -> u64 {
+    ) -> crate::thread::NoteVersion {
         let lineage = from.unwrap_or_else(|| {
             self.lineages += 1;
             self.lineages
         });
+        self.versions += 1;
+        let version = self.versions;
         self.notes.retain(|(scope, _)| *scope != whose);
-        self.notes.push((whose, Note { text, at, lineage }));
-        lineage
+        self.notes.push((
+            whose,
+            Note {
+                text,
+                at,
+                lineage,
+                version,
+            },
+        ));
+        (lineage, version)
     }
 
     /// The notes of scopes still talking are as new as their talk.
@@ -506,10 +536,17 @@ pub fn told_from(
     told_with_lineage_from(summaries, whose, now, room).0
 }
 
-/// [`told`], with the lineage of the note told ([`Note::lineage`]): none
-/// when no note is told, so no exchange is left out for it
-/// (`LAMP_HISTORY_AFTER_NOTE`, [`crate::thread::Thread::recall_after_note`]).
-pub fn told_with_lineage(whose: Option<&str>, now: Instant, room: usize) -> (String, Option<u64>) {
+/// [`told`], with the lineage and version of the note told
+/// ([`Note::lineage`], [`Note::version`]): none when no note is told, so no
+/// exchange is left out for it (`LAMP_HISTORY_AFTER_NOTE`,
+/// [`crate::thread::Thread::recall_after_note`]). Read before the thread's
+/// lock is taken, never inside it: a forget takes the thread's lock and then
+/// the notes'; the version, not the lock, keeps a batch folded meanwhile told.
+pub fn told_with_lineage(
+    whose: Option<&str>,
+    now: Instant,
+    room: usize,
+) -> (String, Option<crate::thread::NoteVersion>) {
     told_with_lineage_from(&SUMMARIES, whose, now, room)
 }
 
@@ -519,7 +556,7 @@ pub fn told_with_lineage_from(
     whose: Option<&str>,
     now: Instant,
     room: usize,
-) -> (String, Option<u64>) {
+) -> (String, Option<crate::thread::NoteVersion>) {
     let note = summaries
         .lock()
         .ok()
@@ -672,13 +709,13 @@ fn end(
     }
 }
 
-/// A kept note's exchanges marked in `thread` as held by its `lineage`
-/// ([`crate::thread::Thread::folded`]).
+/// A kept note's exchanges marked in `thread` as held by its lineage and
+/// version ([`crate::thread::Thread::folded`]).
 fn fold_into(
     thread: &Mutex<crate::thread::Thread>,
     whose: Option<&str>,
     held: &Exchanges,
-    lineage: u64,
+    lineage: crate::thread::NoteVersion,
 ) {
     match thread.lock() {
         Ok(mut thread) => thread.folded(whose, held, lineage),
@@ -690,7 +727,7 @@ fn fold_into(
 /// answer kept as the scope's note, bounded; a failure keeps the previous.
 /// Only once the note is kept, and with the notes' lock let go (a forget
 /// takes the thread's lock and then theirs), `folded` is given the job's
-/// scope, its exchanges and the kept note's lineage: a job dropped, failed,
+/// scope, its exchanges and the kept note's lineage and version: a job dropped, failed,
 /// empty or forgotten folds nothing. The journal has counts and sizes
 /// only, never the words.
 fn summarize(
@@ -698,7 +735,7 @@ fn summarize(
     summarizer: &(dyn Fn(&str) -> Option<String> + Send + Sync),
     summaries: &Mutex<Summaries>,
     now: impl Fn() -> Instant,
-    folded: impl FnOnce(Option<&str>, &Exchanges, u64),
+    folded: impl FnOnce(Option<&str>, &Exchanges, crate::thread::NoteVersion),
 ) {
     const FORGOTTEN: &str =
         "lamp-voice second: conversation summary: a forget came first; nothing kept";
@@ -714,7 +751,7 @@ fn summarize(
     };
     // The new note holds what the previous held: the same lineage.
     let (previous, from) = match previous {
-        Some((text, lineage)) => (text, Some(lineage)),
+        Some((text, (lineage, _))) => (text, Some(lineage)),
         None => (String::new(), None),
     };
     let started = Instant::now();
