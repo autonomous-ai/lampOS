@@ -4737,7 +4737,9 @@ bytes, as above):
   `light` (light, flash, LED, glow), `speak` (say, speak, aloud, announce,
   and a sound, beep or chime it plays), `sound` (hearing kinds of sound: a
   clap or a knock), `camera` (camera, photo, picture, snapshot,
-  selfie) and `net` (a URL, HTTP, an API, a webhook or an endpoint), never
+  selfie) and `net` (an `http://` or `https://` link, a webhook, or a web
+  API, URL or endpoint the file says to fetch, call, post, send, get or
+  the like: a bare "API" or "URL" is not enough), never
   more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on`;
   off, such a file is refused ("it reaches the internet, which a skill's
   task can't on this lamp").
@@ -4746,7 +4748,9 @@ bytes, as above):
   Its way in (the app, into root's store as a service's tokens, reaching
   the run as an environment file read once) is a follow-up; until then a
   file carrying a value that looks like one (a run of 24 or more letters,
-  digits, `_ - . :` with four letters and four digits, outside a link) is
+  digits, `_ - . :` with four letters and four digits, checked whole
+  outside a link, and in a link each `/` part past its scheme and host and
+  each `:` part of it, so a webhook's or a bot's key is found) is
   refused: "it carries what looks like a key or a token; a skill added
   from a file can't hold one yet, so add it without the key or token". The
   value is never journaled.
