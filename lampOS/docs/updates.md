@@ -293,7 +293,10 @@ These tests do not establish a real stable promotion or lamp acceptance.
   [#6021](https://github.com/autonomous-ai/lampOS/issues/6021), 10 Nov 2026;
   a cold build held every promote about 35 minutes, against about 13
   cached). Only lamp-voice's own runs save that cache; pull requests restore
-  it and never save it.
+  it and never save it. There the build job also compiles through sccache
+  in GitHub's cache service, so a crate the target cache misses is compiled
+  once across runs ([#6556](https://github.com/autonomous-ai/lampOS/issues/6556));
+  not on the Studio, which has no such service, nor on the full run.
 - The nightly full run is the check on that cache: it builds cold. It skips
   cache restore and the step that restores cached source times. A separate
   step first refuses an existing `lampOS/target`, including a dangling

@@ -297,6 +297,21 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
+      # sccache in GitHub's cache service compiles once what the target cache
+      # misses (#6556). GitHub-hosted only: the Studio has no such service. Not
+      # the full run either, which must build cold.
+      - name: sccache
+        if: ${{ runner.environment == 'github-hosted' && !inputs.full }}
+        uses: mozilla-actions/sccache-action@v0.0.11
+      - name: compile through sccache from here on
+        if: ${{ runner.environment == 'github-hosted' && !inputs.full }}
+        # sccache can't cache incremental builds.
+        run: |
+          {
+            echo RUSTC_WRAPPER=sccache
+            echo SCCACHE_GHA_ENABLED=true
+            echo CARGO_INCREMENTAL=0
+          } >> "$GITHUB_ENV"
       - name: build (release, the lamps' binaries)
         working-directory: lampOS
         # Keep Cargo's current-target records outside the restored target cache.
@@ -379,6 +394,10 @@ jobs:
             lampOS/target
           # The cold full run skipped restore, so it has no cache outputs.
           key: ${{ steps.cache.outputs.cache-primary-key || format('lampos-arm64-u2204-{0}-{1}', hashFiles('lampOS/Cargo.lock'), github.sha) }}
+
+      - name: sccache stats
+        if: ${{ always() && runner.environment == 'github-hosted' && !inputs.full }}
+        run: sccache --show-stats || true
 
   # Runs the build job's nextest archive, its share of it on each runner: no compile here.
   arm64-test:
