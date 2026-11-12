@@ -375,19 +375,19 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
   chế độ quyền và không định tuyến model (OpenClaw tự chọn model, theo phần
   cài đặt bên dưới).
-- **Câu hỏi đầu bị mất** (#6499): `--message` của TUI có thể mất khi TUI
-  đang ghép đôi với Gateway, và Harness không thử lại cũng không báo. Sau
-  `new`, lamp-tasks đọc `show`: đã được hỏi (`ask` có giá trị) thì việc đang
-  chạy. Rảnh mà chưa được hỏi thì lamp-tasks đóng harness rỗng đó và gọi
-  `new` thêm một lần với đúng câu đó, trong cùng `launch_timeout`. Chỉ khi lần
-  thứ hai cũng mất mới dùng `harness reply`: lệnh này cần switch
-  `programs-reply` của chính người dùng, nên đèn sản phẩm nhận `reply_off` ở
-  bước đó. `new` lần hai thất bại thì kết quả là uncertain,
-  `openclaw_new_again_failed`. Không bao giờ khởi động lần thứ ba. `new` lần
-  hai chỉ chạy khi harness đầu đã đóng: đóng bị từ chối hoặc lỗi thì kết quả
-  là uncertain, `openclaw_not_closed`, và không khởi động thêm gì, để việc
-  không bao giờ chạy hai lần. `new` đầu đã tạo thư mục (`--new <name>`) thì
-  lần hai gọi thẳng thư mục đó.
+- **Rảnh mà chưa được hỏi vẫn tính là đã giao** (#6499): sau một `new`
+  thành công, lamp-tasks đọc `show` cho đến khi harness được hỏi hoặc rảnh,
+  trong cùng `launch_timeout`. Cả hai trường hợp, việc đều là `Created`, như
+  Harness đã trả lời: trên đèn, `show` của OpenClaw có thể báo rảnh và chưa
+  có `ask` vài giây sau một `new` mà TUI thật ra đã nhận `--message`. Rảnh mà
+  chưa được hỏi chỉ ghi một dòng journal, ngoài ra không làm gì: không đóng
+  harness, không gọi `new` lần nữa, không gõ vào bằng `harness reply`.
+  `show` lỗi thì kết quả là uncertain, kèm mã lỗi. Lỗi mất câu hỏi thật sự,
+  khi OpenClaw bỏ mất `--message` lúc TUI ghép đôi với một Gateway còn
+  nguội, đã được sửa trong Harness 0.6.23 (autonomous-ai/openharness#4172:
+  Harness khởi động OpenClaw không kèm `--message` và gõ task vào khi pane
+  đã sẵn sàng); đèn có bản sửa này khi pin Harness được dời lên (#5957). (Cách
+  tạm thời của #6504, đóng rồi khởi động lại, đã bỏ.)
 - **Voice** (`agent_tasks`, `task_news`): đọc engine của target của đèn từ
   `{"op":"targets"}` và gọi đúng tên, nên một việc giao không nêu máy nào được
   nói là "OpenClaw on the lamp" và mô tả công cụ nói "OpenClaw here on the
