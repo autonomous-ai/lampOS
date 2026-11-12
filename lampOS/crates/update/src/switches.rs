@@ -236,9 +236,54 @@ pub fn said(what: &str, how: &str) -> String {
     format!("{what} {how}; the product sets it on")
 }
 
+/// One of lamp-update's own switches (#6607). A round never rewrites
+/// lamp-update.service (`round::OWN_UNIT`), so a line added there never
+/// reaches a lamp already in a home: each switch also has a default compiled
+/// into the build, which every round carries. Set in lamp-update's
+/// environment: `on` exactly is on, any other value (`off` from a drop-in)
+/// off. Unset: `default` on a lamp installed as the product
+/// (`harness_install::product::product_lamp`), off on any other.
+pub fn update_switch_on(value: Option<&str>, product: bool, default: bool) -> bool {
+    match value {
+        Some(value) => value == "on",
+        None => product && default,
+    }
+}
+
+/// [`update_switch_on`] with the switch read from lamp-update's environment.
+pub fn update_switch(name: &str, product: bool, default: bool) -> bool {
+    update_switch_on(std::env::var(name).ok().as_deref(), product, default)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // #6607: a lamp in a home keeps the unit it was installed with, which
+    // lacks LAMP_APP_ENGINES and LAMP_SKILL_TASKS; both are still on there.
+    #[test]
+    fn a_unit_without_the_lines_still_turns_both_on_on_a_product_lamp() {
+        for default in [
+            crate::engines::PRODUCT_DEFAULT,
+            crate::hermes_install::TASKS_PRODUCT_DEFAULT,
+        ] {
+            assert!(update_switch_on(None, true, default));
+            assert!(!update_switch_on(None, false, default));
+        }
+    }
+
+    #[test]
+    fn an_explicit_off_stays_off() {
+        for default in [
+            crate::engines::PRODUCT_DEFAULT,
+            crate::hermes_install::TASKS_PRODUCT_DEFAULT,
+        ] {
+            for value in ["off", "", "On", "1"] {
+                assert!(!update_switch_on(Some(value), true, default), "{value}");
+            }
+            assert!(update_switch_on(Some("on"), false, default));
+        }
+    }
 
     /// One file read alone: how it leaves each switch off.
     fn turned_off(switches: &[String], found: &Assignments) -> Vec<String> {

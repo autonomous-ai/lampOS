@@ -918,13 +918,14 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             product,
             hermes::SKILLS_PRODUCT_DEFAULT,
         );
-        // A skill's tasks (#6306): LAMP_SKILL_TASKS, the switch lamp-tasks reads,
-        // off unless `on` exactly on any lamp (no product unit sets it); on, Hermes is
-        // shown lamp-control's control socket alone, read-only.
-        let tasks = hermes::wanted(
-            std::env::var(hermes::TASKS_SWITCH).ok().as_deref(),
+        // A skill's tasks (#6306): LAMP_SKILL_TASKS, the switch lamp-tasks reads, on by
+        // this build's default on a product lamp (#6607: lamp-update's own unit never
+        // reaches a lamp in a home); `off` turns it off. On, Hermes is shown
+        // lamp-control's control socket alone, read-only.
+        let tasks = lamp_update::switches::update_switch(
+            hermes::TASKS_SWITCH,
             product,
-            false,
+            hermes::TASKS_PRODUCT_DEFAULT,
         );
         let shown = hermes::Shown { skills, tasks };
         if acts && wanted && harness.is_none() {
@@ -982,11 +983,17 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // reading stops it; one watch for Hermes's and OpenClaw's both (#6226).
     let hermes_watch = (matches!(hermes, Some((true, _))) || matches!(openclaw, Some((true, _))))
         .then(|| lamp_update::hermes_schedule::Watcher::start(&bus_root, &records));
-    // The lamp's agents for the app (#6240): only with lamp-update's own
-    // LAMP_APP_ENGINES=on, read once here. Hermes's state on update/status,
-    // and the app's tap heard beside the app's checks.
-    let engines = lamp_update::engines::on(
-        std::env::var(lamp_update::engines::SWITCH).ok().as_deref(),
+    // The lamp's agents for the app (#6240): LAMP_APP_ENGINES, read once here, on
+    // by this build's default on a product lamp (#6607: lamp-update's own unit
+    // never reaches a lamp in a home); `off` turns it off. Hermes's state on
+    // update/status, and the app's tap heard beside the app's checks.
+    let engines = lamp_update::switches::update_switch(
+        lamp_update::engines::SWITCH,
+        lamp_update::harness_install::product::product_lamp(
+            &config.root,
+            &config.on(&config.units),
+        ),
+        lamp_update::engines::PRODUCT_DEFAULT,
     )
     .then(|| lamp_update::engines::Engines {
         hermes_on: matches!(hermes, Some((true, _))),

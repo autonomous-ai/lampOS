@@ -121,8 +121,13 @@ pub const SKILLS_PRODUCT_DEFAULT: bool = true;
 /// The skill tasks switch (#6306), in lamp-update's own unit: the same
 /// name lamp-tasks reads (`lamp_tasks::skill_task::SWITCH`), so one name
 /// turns a skill's tasks on. `on` exactly shows Hermes [`CONTROL_SOCKET`]
-/// ([`ns_text`]); off unless set so, on any lamp: no product unit sets it.
+/// ([`ns_text`]). Read by `switches::update_switch`: unset, on a product
+/// lamp by [`TASKS_PRODUCT_DEFAULT`] (#6607: a line in lamp-update's own
+/// unit never reaches a lamp in a home); `off` turns it off.
 pub const TASKS_SWITCH: &str = "LAMP_SKILL_TASKS";
+/// Whether a lamp installed as the product shows Hermes lamp-control's
+/// socket with [`TASKS_SWITCH`] unset: on (#6306, #6607).
+pub const TASKS_PRODUCT_DEFAULT: bool = true;
 
 /// What [`NS`] shows Hermes beyond [`ALLOWED`], each by its own switch:
 /// lamp-skills' socket folder ([`SKILLS_SWITCH`]) and lamp-control's

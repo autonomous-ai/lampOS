@@ -242,9 +242,13 @@ pub fn look_at_harness(kept: &Mutex<HarnessLook>, run: &mut HarnessRun) -> Resul
     }
 }
 
-/// The switch, in lamp-update's own unit: `on` exactly, any other value or
-/// none off.
+/// The switch, read by `switches::update_switch`: `on` exactly, any other
+/// value off; unset, [`PRODUCT_DEFAULT`] on a product lamp (#6607: a line
+/// in lamp-update's own unit never reaches a lamp in a home).
 pub const SWITCH: &str = "LAMP_APP_ENGINES";
+/// Whether a lamp installed as the product tells the app its agents with
+/// [`SWITCH`] unset: on (#6240, #6607); `off` turns it off.
+pub const PRODUCT_DEFAULT: bool = true;
 /// Hermes's name among the engines, as the app reads it.
 pub const HERMES: &str = "hermes";
 /// The errors of Hermes's record the app is told by name; any other is
