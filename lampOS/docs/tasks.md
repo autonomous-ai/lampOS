@@ -1807,6 +1807,19 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     set up, never sent to a computer. A finished task's news adds that it was
     done here on the lamp ("I did it here on the lamp"); a session joined
     on a computer is told as that computer's.
+  - **A named engine (#6492).** While the tasks part has the `lamp` target,
+    `start_agent_task` also takes `engine` (`"hermes"`, `"openclaw"`),
+    filled only when the person names Hermes or OpenClaw for work on the
+    lamp. A hand-over to the lamp naming one, by `engine` or by `who`
+    (any case, "the " left off), sends `"engine"` with the `prepare` and
+    says that engine as who does it ("OpenClaw on the lamp"); naming none
+    sends no `engine` and says the lamp's default. An `engine` for a
+    computer is ignored. A refusal `engine_not_here` is said "OpenClaw
+    isn't set up on me, so I didn't start that." (`engine_unknown`: "I
+    don't know OpenClaw here, so I didn't start that."), and is never
+    retried on the other engine. Tests:
+    `agent_tasks::tests::a_named_lamp_engine_goes_with_the_prepare_and_is_said`,
+    `agent_tasks::tests::the_lamp_engine_is_declared_only_with_the_lamp`.
   - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
     `runtime::tests::hermes_settings_are_written_at_start_only_with_a_token`,
@@ -1862,6 +1875,35 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
   - **Which engine:** `LAMP_LAMP_ENGINE` is `openclaw` or `hermes`, unset
     `hermes`, the default (#6498; #6226 had `openclaw`). The lamp's target is still `lamp`, with that engine; when
     the one chosen is not installed but the other is, the other.
+  - **Named or not, and the app's choice (#6492):** a `prepare` for the
+    `lamp` target may carry `"engine":"hermes"` or `"engine":"openclaw"`
+    (absent: not written; another target ignores it). Named, the work runs
+    on exactly that engine while it is in the lamp's order now
+    (`lamp_order`: switched on, OpenClaw left out under a Harness older
+    than 0.6.11, and not known missing on the lamp); otherwise the prepare
+    is refused with `engine_not_here`, and nothing is launched: never
+    moved to the other engine. Any other value is refused with
+    `engine_unknown`. Named none, the work runs on the lamp's default: the
+    owner's choice in the app when set and in the order, else
+    `LAMP_LAMP_ENGINE`'s, else the build's. The app sets it on the app's
+    route (`--app-socket`) with `{"op":"app_engine_default","engine":"hermes"}`
+    (refused `engine_unknown`, or `engine_not_installed` when that engine is
+    not switched on here; `engine_default_unsaved` when the file can't be
+    written), kept in `engine-default.json` in the tasks folder (`--dir`) as
+    `{"version":1,"engine":"hermes"}`, written beside and renamed over. It
+    is used at once, without a restart: the lamp's order puts it first, the
+    `targets` answer says it as the `lamp` target's engine (so the voice
+    names it), and the lamp's target is written again at the next look.
+    `{"op":"app_engine_default_state"}` reads it. Both answer
+    `{"ok":true,"default":"hermes","chosen_in_app":true}` (`default` null
+    when the lamp has no engine; `chosen_in_app` true only while the app's
+    choice is the default). The file is read at start; missing or not
+    valid is no choice. The lamp's reset wipes it with the tasks folder.
+    Shown in tests: `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
+    `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
+    `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
+    `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
+    `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
   - **Started** as Harness starts OpenClaw:
     `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
     no permission modes and no model routing (OpenClaw picks its own

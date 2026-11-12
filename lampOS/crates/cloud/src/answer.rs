@@ -292,6 +292,12 @@ pub trait Lamp {
         Err(not_here("engines.install"))
     }
 
+    /// lamp-tasks' app socket, where the lamp's default agent is chosen
+    /// and read (`engines.default`, #6492, `crate::engine_default`).
+    fn tasks_app_socket(&self) -> std::path::PathBuf {
+        crate::harness_sign_in::SOCKET.into()
+    }
+
     /// Asks setup's change helper to restart the lamp (`system.reboot`, #2193): its
     /// answer, given before the lamp goes down, or why not. Only with
     /// `LAMP_APP_RESTART=on`.
@@ -334,7 +340,7 @@ const ALWAYS: Switch = |_| true;
 
 /// Every kind the app may ask that this lamp can answer, with its switch,
 /// in the order `system.info`'s `can` lists them (#2864).
-pub const KINDS: [(&str, Switch); 68] = [
+pub const KINDS: [(&str, Switch); 69] = [
     ("system.info", ALWAYS),
     ("system.version", ALWAYS),
     ("system.network", ALWAYS),
@@ -396,6 +402,8 @@ pub const KINDS: [(&str, Switch); 68] = [
     ("update.check", |lamp| lamp.update_page()),
     // The lamp's agents (#6240): a missing one installed from the app.
     ("engines.install", |lamp| lamp.engines_page()),
+    // The lamp's default agent, chosen in the app (#6492).
+    (crate::engine_default::KIND, |lamp| lamp.engines_page()),
     ("system.reboot", |lamp| lamp.restarts()),
     ("system.shutdown", |lamp| lamp.shuts_down()),
     // The person's own services (Queue #4710): `services` says
@@ -797,7 +805,13 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
         // The lamp's software update, for the app's Lamp 2 page (#2194):
         // only with `LAMP_APP_UPDATE=on`.
         "update.status" if on(lamp, kind) => {
-            crate::update::status(lamp.update_status(), lamp.engines_page())
+            let mut status = crate::update::status(lamp.update_status(), lamp.engines_page())?;
+            // The default agent beside the agents (#6492), when lamp-tasks
+            // says one; never a failure of the status.
+            if let Some(status) = status.as_mut() {
+                crate::engine_default::add_to(status, &lamp.tasks_app_socket());
+            }
+            Ok(status)
         }
         // The app's Check for update (#4153): `serve`'s next round now, not
         // after its wait. Refused while a round runs and within a minute of
@@ -830,6 +844,11 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             crate::update::installable(&status, engine)?;
             lamp.install_engine(engine, std::time::Instant::now())?;
             some(crate::update::install_started())
+        }
+        // The lamp's default agent chosen in the app (#6492): the name
+        // checked here, the choice lamp-tasks' own.
+        crate::engine_default::KIND if on(lamp, kind) => {
+            crate::engine_default::choose(&lamp.tasks_app_socket(), data).map(Some)
         }
         // A restart from the app (#2193): asked of setup's change helper,
         // never done here; it answers first and refuses under an update.
@@ -911,6 +930,9 @@ pub mod tests {
         pub schedule: Option<lamp_actions::schedule::Adapter>,
         pub guard: Option<std::path::PathBuf>,
         pub harness_sign_in: Option<crate::harness_sign_in::Place>,
+        /// lamp-tasks' app socket for the default agent (#6492); none is a
+        /// path where nothing listens.
+        pub tasks_app: Option<std::path::PathBuf>,
         pub make_skill: Option<std::path::PathBuf>,
         pub make_skill_ready: bool,
         pub write_skill: Option<std::path::PathBuf>,
@@ -1088,6 +1110,11 @@ pub mod tests {
         fn install_engine(&mut self, engine: &str, now: std::time::Instant) -> Result<(), String> {
             self.update_checks
                 .ask_install(self.update_bus.as_ref(), engine, now)
+        }
+        fn tasks_app_socket(&self) -> std::path::PathBuf {
+            self.tasks_app
+                .clone()
+                .unwrap_or_else(|| "/nowhere/app.sock".into())
         }
         fn restarts(&self) -> bool {
             self.restart
@@ -1884,7 +1911,12 @@ pub mod tests {
                     f.update_page = true;
                     f.update_checks = crate::update::Checks::with_engines(true);
                 },
-                &["update.status", "update.check", "engines.install"],
+                &[
+                    "update.status",
+                    "update.check",
+                    "engines.install",
+                    "engines.default",
+                ],
             ),
             (
                 "harness sign-in",
@@ -2206,6 +2238,112 @@ pub mod tests {
             answer(&mut lamp, "engines.install", &hermes),
             Err(not_here("engines.install"))
         );
+    }
+
+    /// #6492: `engines.default` is answered only with both switches; the
+    /// engine goes to lamp-tasks and its answer comes back; an unknown one
+    /// is refused before lamp-tasks is asked; lamp-tasks' refusal passes
+    /// through; `update.status` carries the default lamp-tasks says, and
+    /// leaves it out when lamp-tasks is not reached.
+    #[test]
+    fn the_app_chooses_the_default_agent_through_lamp_tasks() {
+        let dir = crate::harness_sign_in::tests::folder("ead");
+        let asked = crate::harness_sign_in::tests::tasks(
+            &dir,
+            vec![
+                r#"{"ok":true,"default":"openclaw","chosen_in_app":true}"#,
+                r#"{"ok":false,"error":"engine_not_installed"}"#,
+                r#"{"ok":true,"default":"openclaw","chosen_in_app":true}"#,
+            ],
+        );
+        let root = tempfile::tempdir().unwrap();
+        let bus = lamp_bus::Bus::new(root.path()).unwrap();
+        let mut lamp = Fake {
+            update_bus: Some(lamp_bus::Bus::new(root.path()).unwrap()),
+            update_page: true,
+            tasks_app: Some(dir.join("app.sock")),
+            ..lamp()
+        };
+        let openclaw = json!({"engine": "openclaw"});
+        // The agents' switch off: not here, nothing asked.
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &openclaw),
+            Err(not_here("engines.default"))
+        );
+        lamp.update_checks = crate::update::Checks::with_engines(true);
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &openclaw),
+            Ok(Some(json!({"default": "openclaw", "chosen_in_app": true})))
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
+            json!({"op": "app_engine_default", "engine": "openclaw"})
+        );
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &json!({"engine": "gpt"})),
+            Err(crate::engine_default::ENGINE_UNKNOWN.to_owned())
+        );
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &json!({"engine": "hermes"})),
+            Err(crate::engine_default::ENGINE_NOT_INSTALLED.to_owned())
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
+            json!({"op": "app_engine_default", "engine": "hermes"}),
+            "the unknown name was never forwarded"
+        );
+        // update.status: the default beside the agents.
+        let mut says = bus
+            .publisher_declared(
+                lamp_msgs::UpdateStatus::TOPIC,
+                &lamp_msgs::UpdateStatus::declaration(),
+                "update",
+            )
+            .unwrap();
+        says.publish_json(
+            0,
+            &lamp_msgs::UpdateStatus {
+                running: None,
+                now: "idle".into(),
+                last: None,
+                harness: None,
+                round: None,
+                engines: Some(std::collections::BTreeMap::from([(
+                    "hermes".to_owned(),
+                    lamp_msgs::EngineInstall {
+                        state: "installed".into(),
+                        version: Some("1.0.0".into()),
+                        reason: None,
+                        at_unix_ms: Some(3),
+                    },
+                )])),
+            },
+        )
+        .unwrap();
+        let status = answer(&mut lamp, "update.status", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert_eq!(status["engines"]["default"], "openclaw", "{status}");
+        assert_eq!(status["engines"]["default_chosen_in_app"], true);
+        assert_eq!(status["engines"]["hermes"]["state"], "installed");
+        assert_eq!(
+            serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
+            json!({"op": "app_engine_default_state"})
+        );
+        // lamp-tasks not reached: the status still answers, no default.
+        lamp.tasks_app = Some(dir.join("none.sock"));
+        let status = answer(&mut lamp, "update.status", &json!({}))
+            .unwrap()
+            .unwrap();
+        assert!(status["engines"].get("default").is_none(), "{status}");
+        assert_eq!(status["engines"]["hermes"]["state"], "installed");
+        // The update page's switch off: not here.
+        lamp.update_page = false;
+        assert_eq!(
+            answer(&mut lamp, "engines.default", &openclaw),
+            Err(not_here("engines.default"))
+        );
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A switch's name, how it is turned on, and the kinds it brings.

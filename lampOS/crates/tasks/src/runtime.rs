@@ -248,6 +248,11 @@ pub struct LampSide {
     /// is installed here (its `machines engines` needs the sign-in), so an
     /// engine is installed here while its program is there (#6407).
     pub bin: PathBuf,
+    /// The owner's choice of the lamp's default engine in the app (#6492,
+    /// [`ENGINE_DEFAULT_FILE`]): first in [`lamp_order`] while it is in
+    /// [`Self::order`], ahead of [`LAMP_ENGINE`]'s. Changed live, without a
+    /// restart (`app_engine_default`).
+    pub app: Arc<Mutex<Option<EngineKind>>>,
 }
 
 impl LampSide {
@@ -263,7 +268,13 @@ impl LampSide {
             order,
             gateway: Default::default(),
             bin: PathBuf::from(LAMP_ENGINES_BIN),
+            app: Default::default(),
         }
+    }
+
+    /// The owner's choice in the app (#6492), whatever the order.
+    pub fn app_choice(&self) -> Option<EngineKind> {
+        self.app.lock().ok().and_then(|app| *app)
     }
 }
 
@@ -271,13 +282,113 @@ impl LampSide {
 /// [`LampSide::order`], without OpenClaw while the Harness on the lamp is
 /// too old for it (before 0.6.11). No memory floor (the owner, #6226:
 /// every lamp has 6 GB).
+///
+/// The owner's choice in the app (#6492, [`LampSide::app`]) goes first
+/// while it is switched on: it wins over [`LAMP_ENGINE`]'s.
 pub fn lamp_order(side: &LampSide) -> Vec<EngineKind> {
     let refused = side.gateway.refused.load(Ordering::Acquire);
-    side.order
+    let mut order: Vec<EngineKind> = side
+        .order
         .iter()
         .copied()
         .filter(|engine| !(refused && *engine == EngineKind::Openclaw))
-        .collect()
+        .collect();
+    if let Some(at) = side
+        .app_choice()
+        .and_then(|app| order.iter().position(|engine| *engine == app))
+    {
+        let app = order.remove(at);
+        order.insert(0, app);
+    }
+    order
+}
+
+/// The file in the tasks folder where the owner's choice of the lamp's
+/// default engine in the app is kept (#6492): `{"version":1,"engine":
+/// "hermes"}`. Read at start; the lamp's reset wipes it with the folder.
+pub const ENGINE_DEFAULT_FILE: &str = "engine-default.json";
+
+/// The engine the app chose, from [`ENGINE_DEFAULT_FILE`] (#6492): None
+/// when the file is missing, not valid, or names another engine.
+pub fn read_engine_default(file: &Path) -> Option<EngineKind> {
+    let bytes = fs::read(file).ok()?;
+    let value: Value = serde_json::from_slice(&bytes).ok()?;
+    if value.get("version").and_then(Value::as_u64) != Some(1) {
+        return None;
+    }
+    lamp_engine_named(value.get("engine")?.as_str()?)
+}
+
+/// `hermes` or `openclaw`, the lamp's own engines (#6492); None for any
+/// other name.
+pub fn lamp_engine_named(name: &str) -> Option<EngineKind> {
+    match name {
+        "hermes" => Some(EngineKind::Hermes),
+        "openclaw" => Some(EngineKind::Openclaw),
+        _ => None,
+    }
+}
+
+/// An app engine-default refusal (#6492): the engine is not switched on
+/// or installed on this lamp.
+pub const ENGINE_NOT_INSTALLED: &str = "engine_not_installed";
+
+/// The app's engine-default operations (#6492), on the app's route only:
+/// `app_engine_default` keeps the choice in `file` and uses it at once;
+/// `app_engine_default_state` says the default now. Either answers
+/// `{"default":<engine or null>,"chosen_in_app":<bool>}`.
+pub fn app_engine_default_operation(
+    request: &Request,
+    side: Option<&LampSide>,
+    file: &Path,
+) -> Result<Value, EngineError> {
+    if let Request::AppEngineDefault { engine } = request {
+        let engine = lamp_engine_named(engine).ok_or(EngineError {
+            code: crate::engine::ENGINE_UNKNOWN,
+            message: "The engine named is not one the lamp knows: hermes or openclaw.",
+        })?;
+        let side = side
+            .filter(|side| {
+                side.order.contains(&engine)
+                    && !(engine == EngineKind::Openclaw
+                        && side.gateway.refused.load(Ordering::Acquire))
+            })
+            .ok_or(EngineError {
+                code: ENGINE_NOT_INSTALLED,
+                message: "That engine is not switched on or installed on this lamp.",
+            })?;
+        let body = serde_json::to_vec(&json!({"version":1,"engine":engine.argument()}))
+            .map_err(|_| engine_default_unsaved())?;
+        write_atomically(file, &body).map_err(|error| {
+            eprintln!(
+                "tasks: the app's default engine could not be kept: {}",
+                error.kind()
+            );
+            engine_default_unsaved()
+        })?;
+        if let Ok(mut app) = side.app.lock() {
+            *app = Some(engine);
+        }
+        eprintln!(
+            "tasks: the lamp's default engine is {} (chosen in the app)",
+            engine.argument()
+        );
+    }
+    let default = side.and_then(|side| lamp_order(side).first().copied());
+    let chosen_in_app = side
+        .and_then(LampSide::app_choice)
+        .is_some_and(|app| Some(app) == default);
+    Ok(json!({
+        "default": default.map(EngineKind::argument),
+        "chosen_in_app": chosen_in_app,
+    }))
+}
+
+fn engine_default_unsaved() -> EngineError {
+    EngineError {
+        code: "engine_default_unsaved",
+        message: "The lamp's default engine could not be kept.",
+    }
 }
 
 /// Where lamp-update puts each of the lamp's own engines for Harness, by
@@ -1345,8 +1456,14 @@ fn owner<C: Clock>(
     (jobs, outcomes): (SyncSender<Job>, Receiver<Outcome>),
     current: Arc<Mutex<Report>>,
     // When to stop, and the file keeping the newest sign-in id (#5198).
-    // And the index of the sessions the lamp started (#6274).
-    (stop, sign_in_ids, session_index): (Arc<AtomicBool>, PathBuf, PathBuf),
+    // And the index of the sessions the lamp started (#6274), and the
+    // app's choice of the lamp's default engine (#6492).
+    (stop, sign_in_ids, session_index, engine_default): (
+        Arc<AtomicBool>,
+        PathBuf,
+        PathBuf,
+        PathBuf,
+    ),
     (
         watch,
         progress,
@@ -1362,6 +1479,18 @@ fn owner<C: Clock>(
     ): Switches,
 ) -> io::Result<()> {
     let mut looks = Looks::new(session_lane);
+    // The app's choice of the lamp's default engine (#6492), as kept.
+    let lamp = set_up_later.as_ref().and_then(|later| later.lamp.clone());
+    if let Some(side) = lamp.as_ref()
+        && let Some(chosen) = read_engine_default(&engine_default)
+        && let Ok(mut app) = side.app.lock()
+    {
+        eprintln!(
+            "tasks: the lamp's default engine chosen in the app: {}",
+            chosen.argument()
+        );
+        *app = Some(chosen);
+    }
     let mut requests = 0u64;
     let mut busy = false;
     // Declared before `waits`, so dropped after it, but still before the
@@ -1759,6 +1888,25 @@ fn owner<C: Clock>(
                         code: "untrusted",
                         message: "This operation requires the app's route.",
                     }));
+                } else if matches!(
+                    work.request,
+                    Request::AppEngineDefault { .. } | Request::AppEngineDefaultState {}
+                ) {
+                    // The app's choice of the lamp's default engine (#6492):
+                    // used at once, and the lamp's target written again.
+                    let answer =
+                        app_engine_default_operation(&work.request, lamp.as_ref(), &engine_default)
+                            .map(|mut body| {
+                                body["ok"] = true.into();
+                                body
+                            });
+                    if answer.is_ok() && matches!(work.request, Request::AppEngineDefault { .. }) {
+                        targets_due = Instant::now();
+                        machines_due = Instant::now();
+                        sign_in_due = Instant::now();
+                    }
+                    requests = requests.saturating_add(1);
+                    let _ = work.response.try_send(answer);
                 } else if let (Some(starter), true) = (sign_in_starter.as_mut(), work.request.app())
                 {
                     // Not `identified`: its store revision is not the
@@ -1898,6 +2046,10 @@ fn owner<C: Clock>(
                     let _ = work.response.try_send(answer);
                 } else {
                     moved = true;
+                    // The lamp's engines as they are now (#6492).
+                    if let Some(side) = lamp.as_ref() {
+                        engine.set_lamp_engines(lamp_order(side), side.app_choice());
+                    }
                     let answer =
                         engine.handle(&work.request, &clock.sample()?, work.route == Route::Voice);
                     let answer = with_sign_in(
@@ -4020,6 +4172,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
         .unwrap_or(&config.dir)
         .join(SIGN_IN_ID_FILE);
     let session_index = config.dir.join(SESSION_INDEX_FILE);
+    let engine_default = config.dir.join(ENGINE_DEFAULT_FILE);
     let owner = thread::Builder::new()
         .name("tasks-store".into())
         .spawn(move || {
@@ -4029,7 +4182,7 @@ pub fn serve_with_adapter<C: Clock, A: Adapter>(
                 owner_rx,
                 (jobs_tx, outcomes_rx),
                 report,
-                (owner_stop, sign_in_ids, session_index),
+                (owner_stop, sign_in_ids, session_index, engine_default),
                 (
                     switches.0,
                     switches.1,
@@ -5284,6 +5437,80 @@ mod tests {
         let only = LampSide::with_order(PathBuf::new(), vec![Openclaw]);
         only.gateway.refused.store(true, Ordering::Release);
         assert!(lamp_order(&only).is_empty());
+    }
+
+    /// #6492: the app's choice of the lamp's default engine is refused
+    /// for an engine unknown or not on here, kept in its file, puts the
+    /// engine first in the lamp's order at once, and is read again at
+    /// start.
+    #[test]
+    fn the_apps_engine_default_is_kept_used_at_once_and_read_again() {
+        use EngineKind::{Hermes, Openclaw};
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(ENGINE_DEFAULT_FILE);
+        let side = LampSide::new(PathBuf::new());
+        let state = Request::AppEngineDefaultState {};
+        assert_eq!(
+            app_engine_default_operation(&state, Some(&side), &file).unwrap(),
+            serde_json::json!({"default":"openclaw","chosen_in_app":false})
+        );
+        let unknown = Request::AppEngineDefault {
+            engine: "codex".into(),
+        };
+        assert_eq!(
+            app_engine_default_operation(&unknown, Some(&side), &file)
+                .unwrap_err()
+                .code,
+            crate::engine::ENGINE_UNKNOWN
+        );
+        let hermes = Request::AppEngineDefault {
+            engine: "hermes".into(),
+        };
+        let only = LampSide::with_order(PathBuf::new(), vec![Openclaw]);
+        assert_eq!(
+            app_engine_default_operation(&hermes, Some(&only), &file)
+                .unwrap_err()
+                .code,
+            ENGINE_NOT_INSTALLED
+        );
+        assert_eq!(
+            app_engine_default_operation(&hermes, None, &file)
+                .unwrap_err()
+                .code,
+            ENGINE_NOT_INSTALLED
+        );
+        assert!(!file.exists(), "a refusal keeps nothing");
+        // Chosen: kept, and first at once.
+        assert_eq!(
+            app_engine_default_operation(&hermes, Some(&side), &file).unwrap(),
+            serde_json::json!({"default":"hermes","chosen_in_app":true})
+        );
+        assert_eq!(lamp_order(&side), [Hermes, Openclaw]);
+        let kept: serde_json::Value = serde_json::from_slice(&fs::read(&file).unwrap()).unwrap();
+        assert_eq!(kept, serde_json::json!({"version":1,"engine":"hermes"}));
+        assert_eq!(
+            app_engine_default_operation(&state, Some(&side), &file).unwrap(),
+            serde_json::json!({"default":"hermes","chosen_in_app":true})
+        );
+        // Read again, as at start; a file not valid is no choice.
+        assert_eq!(read_engine_default(&file), Some(Hermes));
+        fs::write(&file, br#"{"version":1,"engine":"codex"}"#).unwrap();
+        assert_eq!(read_engine_default(&file), None);
+        fs::write(&file, b"not json").unwrap();
+        assert_eq!(read_engine_default(&file), None);
+        assert_eq!(read_engine_default(&dir.path().join("none.json")), None);
+        // The app's choice switched off since: the lamp's own order.
+        *only.app.lock().unwrap() = Some(Hermes);
+        assert_eq!(lamp_order(&only), [Openclaw]);
+        assert_eq!(
+            app_engine_default_operation(&state, Some(&only), &file).unwrap(),
+            serde_json::json!({"default":"openclaw","chosen_in_app":false})
+        );
+        let none = LampSide::with_order(PathBuf::new(), Vec::new());
+        assert_eq!(
+            app_engine_default_operation(&state, Some(&none), &file).unwrap(),
+            serde_json::json!({"default":null,"chosen_in_app":false})
+        );
     }
 
     /// #6226: the lamp's own machine is the target `lamp` with OpenClaw
