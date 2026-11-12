@@ -379,16 +379,19 @@ pub(crate) fn set_code_at_once_here(on: Option<bool>) {
 
 /// The grants a made skill's code may hold and still go on at once with
 /// [`CODE_AT_ONCE_ENVIRONMENT`] (the first builder's ruling on #6059,
-/// 19:14): its light, the kinds of sound it hears and its head and arm; a
-/// timer is a trigger and needs no grant. Any other grant keeps the spoken
-/// yes ([`CODE_YES_GRANTS`] among them).
-pub const CODE_AT_ONCE_GRANTS: [&str; 3] = ["light", "sound", "body"];
+/// 19:14, and his 19:44 line: "sound" is the lamp's own sounds and voice):
+/// its light, its voice and sounds (`speak`) and its head and arm; a timer
+/// is a trigger and needs no grant. Any other grant keeps the spoken yes
+/// ([`CODE_YES_GRANTS`] among them).
+pub const CODE_AT_ONCE_GRANTS: [&str; 3] = ["light", "speak", "body"];
 
 /// The grants that always keep a made skill's code to its spoken yes, the
-/// switch on or off (the same ruling): the camera and the microphone. A
+/// switch on or off (the same ruling): the camera, the microphone and
+/// `sound`, which is hearing, not playing (lamp-control's grant: "can hear
+/// kinds of sound, never words"; hearing keeps its yes, the 19:44 line). A
 /// send (a write, or messages to the phone) keeps it too
 /// ([`code_goes_on_at_once`]).
-pub const CODE_YES_GRANTS: [&str; 2] = ["camera", "microphone"];
+pub const CODE_YES_GRANTS: [&str; 3] = ["camera", "microphone", "sound"];
 
 /// Whether code granted `grants` may go on at once: the switch on and
 /// every grant one of [`CODE_AT_ONCE_GRANTS`] (none at all is one).

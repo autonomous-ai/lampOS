@@ -5595,12 +5595,16 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     }
 
     /// The first builder's ruling on #6059 (19:14): the grants that go on
-    /// at once are light, sound and the body alone; the camera and the
-    /// microphone always keep the spoken yes.
+    /// at once are light, the lamp's own voice and sounds (`speak`) and the
+    /// body alone (19:44: `sound` is hearing); the camera, the microphone
+    /// and `sound` always keep the spoken yes.
     #[test]
     fn the_grants_that_go_on_at_once_never_hold_the_camera_or_the_microphone() {
-        assert_eq!(made_skill::CODE_AT_ONCE_GRANTS, ["light", "sound", "body"]);
-        assert_eq!(made_skill::CODE_YES_GRANTS, ["camera", "microphone"]);
+        assert_eq!(made_skill::CODE_AT_ONCE_GRANTS, ["light", "speak", "body"]);
+        assert_eq!(
+            made_skill::CODE_YES_GRANTS,
+            ["camera", "microphone", "sound"]
+        );
         for grant in made_skill::CODE_AT_ONCE_GRANTS {
             assert!(!made_skill::CODE_YES_GRANTS.contains(&grant), "{grant}");
             assert!(made_skill::GRANTS.iter().any(|(name, _)| *name == grant));
@@ -5612,9 +5616,17 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         made_skill::set_code_at_once_here(Some(true));
         assert!(made_skill::grants_go_on_at_once(&grants(&[])));
         assert!(made_skill::grants_go_on_at_once(&grants(&[
-            "light", "sound", "body"
+            "light", "speak", "body"
         ])));
-        for kept in ["camera", "microphone", "speech", "notes", "look"] {
+        for kept in [
+            "camera",
+            "microphone",
+            "sound",
+            "hear",
+            "speech",
+            "notes",
+            "look",
+        ] {
             assert!(
                 !made_skill::grants_go_on_at_once(&grants(&["light", kept])),
                 "{kept}"
