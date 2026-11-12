@@ -36,8 +36,8 @@
 //!   the sentence's end bare or after "now", "a touch", "a bit", "a little"
 //!   or "for you". An offer, a condition, a question, "I'll tell you when
 //!   …" and "I'll remember that." are none. "It" or "that" turned off or
-//!   down may be an alarm, so a Schedule call or `cancel_reminder` backs it
-//!   too ([`Claim::OffOrDown`]).
+//!   down may be an alarm, so a `cancel_reminder` or `snooze_reminder`
+//!   backs it too, never a set ([`Claim::OffOrDown`]).
 //!
 //! Such a claim stands when its turn made a call of its kind
 //! ([`Claim::made_by`]); otherwise it is held, the model is asked once more
@@ -237,8 +237,9 @@ pub enum Claim {
     Made,
     /// "I'll turn it off." or "I'll switch that down." promised
     /// ([`PROMISED`]): "it" may be the light, the volume, or an alarm or a
-    /// timer, so a light or volume call, a Schedule set or a
-    /// `cancel_reminder` makes it (the Reviewer-lead's P3 on #6467).
+    /// timer, so a light or volume call, a `cancel_reminder` or a
+    /// `snooze_reminder` makes it (the Reviewer-lead's P3 on #6467); a set
+    /// never does.
     OffOrDown,
 }
 
@@ -263,10 +264,10 @@ impl Claim {
             Self::Forgot => false,
             Self::Snoozed => name == "snooze_reminder",
             Self::Made => name == crate::made_skill::MAKE,
+            // A set turns nothing off (Thirteen's P3 on #6481).
             Self::OffOrDown => {
                 Self::LightOrVolume.made_by(name)
-                    || Self::Schedule.made_by(name)
-                    || name == "cancel_reminder"
+                    || matches!(name, "cancel_reminder" | "snooze_reminder")
             }
         }
     }
@@ -2822,11 +2823,12 @@ pub(crate) mod tests {
     }
 
     /// The Reviewer-lead's P3 on #6467: "it" or "that" turned off or down
-    /// may be an alarm or a timer, so a Schedule call or a
-    /// `cancel_reminder` backs it as well as a light or volume call; the
-    /// light or the volume named, or turned on or up, still needs its own.
+    /// may be an alarm or a timer, so a `cancel_reminder` or a
+    /// `snooze_reminder` backs it as well as a light or volume call, never a
+    /// set (Thirteen's P3 on #6481); the light or the volume named, or
+    /// turned on or up, still needs its own.
     #[test]
-    fn it_turned_off_or_down_stands_beside_a_schedule_call_too() {
+    fn it_turned_off_or_down_stands_beside_a_cancel_or_snooze_too() {
         let none = serde_json::json!({});
         for reply in [
             "I'll turn it off.",
@@ -2851,11 +2853,24 @@ pub(crate) mod tests {
                 );
             }
             assert!(!stands(Claim::OffOrDown, reply, false, []), "{reply:?}");
+            for name in ["set_timer", "set_reminder", "repeat_reminder"] {
+                assert!(
+                    !stands(Claim::OffOrDown, reply, false, [(name, &none)]),
+                    "{reply:?} beside {name}"
+                );
+            }
             assert!(
                 !stands(Claim::OffOrDown, reply, false, [("list_reminders", &none)]),
                 "{reply:?}"
             );
         }
+        // Thirteen's case: a set alone never backs a turn-off promised.
+        assert!(!stands(
+            Claim::OffOrDown,
+            "Timer set. I'll turn it off.",
+            false,
+            [("set_timer", &none)]
+        ));
         for (reply, kind) in [
             ("I'll turn the light off.", Claim::LightOrVolume),
             ("I'll turn the volume down.", Claim::LightOrVolume),
