@@ -1794,12 +1794,51 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      turned on and off over an installed Hermes.
    - **A skill's run gets its own network namespace, with two ways out**
      (#6306, the first builder's design on #6443; behind `LAMP_SKILL_TASKS`
-     as the control socket is). lamp-tasks starts a skill's run with
-     `LAMP_NS_NET=run` (`skill_task::HermesRunner`); it is the only opt-in,
-     and it only takes access away. Harness's own panes never set it, so
-     Hermes started there keeps its network as before. With the switch on,
-     the wrapper is written with these lines too
-     (`hermes_install::wrapper_text(true)`, `WRAPPER_TASKS_EDITS`):
+     as the control socket is). A skill's run has `LAMP_NS_NET=run`: set
+     by the wrapper itself for a run Harness starts in the run's own folder
+     (#6510 Part 1 step 2, `skill_task::HarnessRunner`, next), or by
+     lamp-tasks for a run it starts itself (`skill_task::HermesRunner`, kept
+     for #6643's skill make). It is the only opt-in, and it only takes
+     access away. Harness's own panes never set it, so Hermes started there
+     in any other folder keeps its network as before. With the switch on,
+     the wrapper is written with these lines first
+     (`hermes_install::RUN_LINES`, the same in every engine's wrapper),
+     before the forwarder token is read:
+
+     ```sh
+     P=$(pwd -P 2>/dev/null) || P=
+     R=
+     case $P in /var/lib/lampos-tasks/harnesses/lamp-tasks/skill-?*) R=${P#/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-} ;; esac
+     case $R in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) R= ;; esac
+     [ ${#R} -le 64 ] || R=
+     if [ -n "$R" ]; then
+       F=/run/lampos-tasks/runs/$R
+       C=
+       if [ -f "$F" ] && [ ! -L "$F" ]; then C=$(cat -- "$F") || C=; fi
+       rm -f -- "$F" || { echo "${0##*/}: the token file of run $R is not deleted" >&2; exit 1; }
+       [ -n "$C" ] || { echo "${0##*/}: no token for run $R" >&2; exit 1; }
+       LAMP_CONTROL_TOKEN=$C LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock PYTHONPATH=/usr/local/lib/lampos/sdk-python LAMP_NS_NET=run
+       unset C
+       export LAMP_CONTROL_TOKEN LAMP_CONTROL_SOCKET PYTHONPATH LAMP_NS_NET
+     fi
+     ```
+
+     Harness passes an engine no variable of lamp-tasks', so a run is
+     named by its folder: only when `pwd -P` is exactly lamp-tasks' Harness
+     project `/var/lib/lampos-tasks/harnesses/lamp-tasks` plus
+     `skill-<run-id>`, with a plain run id (`a-z`, `0-9`, `-`, at most 64),
+     is it a run. Then lamp-tasks' token file for it (0600 in `lampos`'s
+     0700 tmpfs folder) is read once if it is a regular file (a link is
+     never read through), deleted whatever it is, and no token ends the
+     run before anything else runs, so a second start in the same folder
+     (Harness relaunching the session, a Restart, `harness resume`) gets
+     none. The token goes on in the environment only, never an argument,
+     with lamp-control's socket and the SDK's `PYTHONPATH`, as
+     `HermesRunner` gives them. Any other folder: these lines change
+     nothing. Inside the namespace `/run` is a fresh empty tmpfs, so no
+     namespaced session can read another run's token file; a process
+     outside a namespace running as `lampos` still could (a known limit).
+     Then:
 
      ```sh
      if [ "${LAMP_NS_NET-}" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi
@@ -1861,7 +1900,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      model forwarder (what its forwarder token allows). Off, the wrapper
      and the script are unchanged; OpenClaw's never get any of it. Tests:
      the wrapper run by `sh` with `LAMP_NS_NET` `run`, unset and other
-     values (`--net` and the variable only with `run`), the script run by
+     values (`--net` and the variable only with `run`), the wrapper run by
+     `sh` in a run's folder (`hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once`:
+     the token file read once and deleted, the token, socket, SDK and
+     `--net` given, a second start refused "no token for run", a link
+     refused, any other folder as before), the script run by
      `sh` with a net run (each new step failing stops it, `ip` missing or
      the bridge missing too; with the switch off, the variable changes
      nothing), the text with every step behind `run`, and OpenClaw's texts
@@ -2298,17 +2341,18 @@ yet on a lamp.
     lamp-update wrapper or the hook stand-in); only full folders of `PATH`
     count. None, and it ends. No path to the program is written in any
     text;
-  - for a skill's run, `LAMP_RUN_ID` set (**provisional name**: Harness
-    passes an engine only a fixed list of variables today, so Harness has
-    to pass it, or the run be found another way, before step 2), checks the
-    id is plain (`a-z`, `0-9`, `-`, at most 64), reads
-    `/run/lampos-tasks/runs/<run-id>` (lamp-tasks' token file, 0600 in
-    `lampos`'s 0700 folder; a link there is never read through) into a
-    shell variable once, deletes the file whatever it held, and ends if
-    there was no token. The token goes on as `LAMP_CONTROL_TOKEN` in the
-    environment only, never in an argument; the run gets `--net` and
-    `LAMP_NS_NET=run`, as Hermes's skill runs do. Without a run, a
-    `LAMP_CONTROL_TOKEN` or `LAMP_NS_NET` from the caller is unset;
+  - for a skill's run, found by its folder alone (#6510 Part 1 step 2:
+    `pwd -P` exactly `/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run-id>`
+    with a plain run id; Hermes's run lines, `hermes_install::RUN_LINES`,
+    above), reads `/run/lampos-tasks/runs/<run-id>` (lamp-tasks' token
+    file, 0600 in `lampos`'s 0700 folder; a link there is never read
+    through) into a shell variable once, deletes the file whatever it
+    held, and ends if there was no token. The token goes on as
+    `LAMP_CONTROL_TOKEN` in the environment only, never in an argument,
+    with `LAMP_CONTROL_SOCKET` and `PYTHONPATH`; the run gets `--net` and
+    `LAMP_NS_NET=run`, as Hermes's skill runs do. The provisional
+    `LAMP_RUN_ID` is gone. Not in a run's folder, a `LAMP_CONTROL_TOKEN` or
+    `LAMP_NS_NET` from the caller is unset;
   - writes the hook stand-in's journal line with the engine as its tag;
   - runs `/usr/local/lib/lampos/agent-ns` through `unshare
     --map-root-user [--net] --mount --pid --kill-child --mount-proc
@@ -2371,10 +2415,12 @@ yet on a lamp.
 Tests (`agent_ns::wrapper::tests`, on any computer): plain names only; the
 mark in the first 512 bytes; no path to the program in the wrapper; the
 token only assigned and exported; the wrapper run with a stand-in
-`unshare`: the token file read once and deleted, the token in the
-environment and never in argv, a second start of the same run refused, a
-link or a run id that is not plain refused, no token or `--net` without a
-run, the program found past the wrapper and another marked wrapper; the
+`unshare`, started in a run's folder: the token file read once and
+deleted, the token, socket and SDK in the environment and never in argv, a
+second start in the same folder refused, a link refused; a run-like folder
+whose id is not plain, the project, the lamp's folder or one under a run's
+folder: no token or `--net` (even with the caller's own, or the old
+`LAMP_RUN_ID`), the program found past the wrapper and another marked wrapper; the
 namespace script naming no engine, for every switch, with `HOME` per
 engine; `sh -n` on every text; the writer's modes and its refusal to
 replace a file that is not lamp-update's; no token file left when no

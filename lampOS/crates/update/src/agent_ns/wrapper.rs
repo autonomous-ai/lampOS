@@ -12,12 +12,16 @@
 //!   as Harness starts it): the first `<engine>` there that is not this
 //!   wrapper and carries no [`MARK`] (so never another lamp-update wrapper
 //!   or the hook stand-in). No path to it is written in any text;
-//! - with [`RUN_ID_ENV`] set (a skill's run), reads the run's one-run token
-//!   from [`RUNS`]`/<run-id>` once, deletes the file, and passes the token
-//!   on in the environment only, as [`TOKEN_ENV`], never in argv; the run
-//!   also gets a network namespace of its own (`--net`, `LAMP_NS_NET=run`,
-//!   as Hermes's skill runs). A run id that is not plain, or no token, ends
-//!   it before anything runs;
+//! - started in a skill run's own folder (`pwd -P` exactly
+//!   [`hermes_install::RUN_FOLDERS`]`/skill-<run-id>`, a plain run id;
+//!   #6510 Part 1 step 2), reads the run's one-run token from
+//!   [`RUNS`]`/<run-id>` once, deletes the file, and passes the token on in
+//!   the environment only, as [`TOKEN_ENV`], never in argv, with
+//!   lamp-control's socket and the SDK's `PYTHONPATH`; the run also gets a
+//!   network namespace of its own (`--net`, `LAMP_NS_NET=run`), as Hermes's
+//!   skill runs ([`hermes_install::RUN_LINES`], the same lines). No token
+//!   ends it before anything runs. In any other folder: no token and no
+//!   `--net`, whatever the caller's environment says;
 //! - writes the hook stand-in's journal line ([`super::with_hook_note`]);
 //! - runs [`NS`] in a new user, mount and PID namespace with its own
 //!   `/proc`, as Hermes's wrapper does.
@@ -61,15 +65,8 @@ pub const NS: &str = "/usr/local/lib/lampos/agent-ns";
 /// `lampos`'s, 0700 ([`home_of`]).
 pub const HOMES: &str = "/var/lib/lampos-agents";
 /// Where lamp-tasks leaves a run's one-run token, as `<run-id>`
-/// (`lamp_tasks::run_token_file::RUNS_DIR`: tmpfs, 0600 in `lampos`'s
-/// 0700 folder; the wrapper runs as `lampos` too).
-pub const RUNS: &str = "/run/lampos-tasks/runs";
-/// The variable that names a skill's run to the wrapper. **Provisional**:
-/// Harness passes an engine only a fixed list of variables today
-/// (openharness `hold.rs`), so this needs Harness to pass it, or the run
-/// found another way (its folder), before skill runs go through Harness
-/// (#6510 Part 1 step 2).
-pub const RUN_ID_ENV: &str = "LAMP_RUN_ID";
+/// ([`hermes_install::RUNS`]).
+pub const RUNS: &str = hermes_install::RUNS;
 /// The variable the engine gets the run's token in: the one a skill's run
 /// already reads (`lamp_tasks::skill_task::TOKEN_ENV`).
 pub const TOKEN_ENV: &str = "LAMP_CONTROL_TOKEN";
@@ -114,39 +111,25 @@ pub fn home_of(engine: &str) -> Result<String, String> {
 }
 
 /// [`wrapper_text`]'s text, `@E@` the engine. The engine's program is
-/// looked for by name on `PATH`, never by a path. The token is read into a
-/// shell variable (never a command's argument) and exported alone. The
-/// run's token file is read and deleted first, so a wrapper that fails
-/// later (no engine program found) leaves none behind.
-const WRAPPER_TEMPLATE: &str = r#"#!/bin/sh
+/// looked for by name on `PATH`, never by a path. A skill run's token file
+/// is read and deleted first ([`hermes_install::run_lines`]), so a wrapper
+/// that fails later (no engine program found) leaves none behind; the
+/// token is read into a shell variable (never a command's argument) and
+/// exported alone.
+const WRAPPER_TEMPLATE: &str = concat!(
+    r#"#!/bin/sh
 # lampOS: @E@ on the lamp, in the one agent namespace (#6510). Written by lamp-update.
 # lampOS/docs/install.md, "One agent namespace for every engine". It runs @E@'s own program, the first `@E@` on the
 # caller's PATH that is not a lamp-update wrapper, as its caller (lampos, Harness's user), in a user, mount and PID
 # namespace (/usr/local/lib/lampos/agent-ns) with HOME /var/lib/lampos-agents/@E@: no lamp service's files or
-# sockets, no camera, mic or serial device, no lamp process. A skill's run (LAMP_RUN_ID, provisional) gets its
-# one-run token from /run/lampos-tasks/runs/<run-id>, read once and deleted, in its environment only.
+# sockets, no camera, mic or serial device, no lamp process.
 E=@E@
 fail() { echo "$E: $1" >&2; exit 1; }
-N=
-unset LAMP_CONTROL_TOKEN
-if [ -n "${LAMP_RUN_ID+set}" ]; then
-  case $LAMP_RUN_ID in ''|*[!abcdefghijklmnopqrstuvwxyz0123456789-]*) fail "LAMP_RUN_ID is not a plain run id" ;; esac
-  [ ${#LAMP_RUN_ID} -le 64 ] || fail "LAMP_RUN_ID is not a plain run id"
-  F=/run/lampos-tasks/runs/$LAMP_RUN_ID
-  T=
-  if [ -f "$F" ] && [ ! -L "$F" ]; then T=$(cat -- "$F") || T=; fi
-  rm -f -- "$F" || fail "the run's token file is not deleted"
-  [ -n "$T" ] || fail "no token for run $LAMP_RUN_ID"
-  LAMP_CONTROL_TOKEN=$T
-  unset T
-  export LAMP_CONTROL_TOKEN
-  LAMP_NS_NET=run
-  export LAMP_NS_NET
-  N=--net
-else
-  unset LAMP_NS_NET
-fi
-unset LAMP_RUN_ID
+unset LAMP_CONTROL_TOKEN LAMP_NS_NET
+"#,
+    hermes_install::run_lines!(),
+    r#"N=
+[ "${LAMP_NS_NET-}" != run ] || N=--net
 I=$(readlink -f "$0") || fail "this wrapper is not found"
 X=
 o=$IFS
@@ -169,7 +152,8 @@ LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
 LAMP_NS_ENGINE=$E LAMP_NS_ENGINE_BIN=$X
 export LAMP_NS_UID LAMP_NS_GID LAMP_NS_ENGINE LAMP_NS_ENGINE_BIN
 exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/agent-ns "$@"
-"#;
+"#
+);
 
 /// The engine's wrapper ([`wrapper_path`]): [`WRAPPER_TEMPLATE`] for
 /// `engine`, with the hook stand-in's journal line tagged with it

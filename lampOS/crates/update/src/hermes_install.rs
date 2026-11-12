@@ -305,18 +305,78 @@ unset T
 exec /usr/bin/unshare --map-root-user --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/hermes-ns "$@"
 "#;
 
+/// The folder a skill's run starts in, as `<RUN_FOLDERS>/skill-<run-id>`
+/// (#6510 Part 1 step 2): lamp-tasks' Harness project [`WORK`], where
+/// lamp-tasks makes the run's folder (0700) and has Harness start the
+/// engine (`lamp_tasks::skill_task::HarnessRunner`).
+pub const RUN_FOLDERS: &str = WORK;
+/// Where lamp-tasks leaves a run's one-run token, as `<run-id>`
+/// (`lamp_tasks::run_token_file::RUNS_DIR`: tmpfs, 0600 in `lampos`'s
+/// 0700 folder; the wrapper runs as `lampos` too).
+pub const RUNS: &str = "/run/lampos-tasks/runs";
+/// The lampos SDK a skill's script imports (`crate::sdk_tree::DIR`,
+/// `lamp_tasks::skill_task::SDK_PYTHONPATH`): a run's `PYTHONPATH`.
+pub const SDK_PYTHONPATH: &str = "/usr/local/lib/lampos/sdk-python";
+
+/// The lines a wrapper finds a skill's run by (#6510 Part 1 step 2), as
+/// text for `concat!`: Harness passes an engine no variable of
+/// lamp-tasks', so the run is named by its folder. Only when `pwd -P` is
+/// exactly [`RUN_FOLDERS`]`/skill-<run-id>` with a plain run id (`a-z`,
+/// `0-9`, `-`, at most 64 bytes) is it a run: then [`RUNS`]`/<run-id>`
+/// is read once if it is a regular file (never through a link) and
+/// deleted whatever it is, and no token there ends it before anything
+/// runs (`no token for run <run-id>`), so a second start in the same
+/// folder (a Harness relaunch, `resume`) gets none. A run's environment
+/// then has the token ([`agent_ns::wrapper::TOKEN_ENV`]),
+/// [`CONTROL_SOCKET`], [`SDK_PYTHONPATH`] and [`NET_ENV`] `run` (its own
+/// network namespace), as lamp-tasks' `HermesRunner` gives them; the
+/// token is assigned and exported, never a command's argument. Any other
+/// folder: nothing here changes. Hermes's ([`WRAPPER_TASKS_EDITS`]) and
+/// every engine's ([`agent_ns::wrapper::wrapper_text`]) carry these.
+macro_rules! run_lines {
+    () => {
+        r#"# A skill's run (#6510): started by lamp-tasks through Harness in /var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run-id>,
+# it gets its one-run token from /run/lampos-tasks/runs/<run-id>, read once and deleted, in its environment only.
+P=$(pwd -P 2>/dev/null) || P=
+R=
+case $P in /var/lib/lampos-tasks/harnesses/lamp-tasks/skill-?*) R=${P#/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-} ;; esac
+case $R in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) R= ;; esac
+[ ${#R} -le 64 ] || R=
+if [ -n "$R" ]; then
+  F=/run/lampos-tasks/runs/$R
+  C=
+  if [ -f "$F" ] && [ ! -L "$F" ]; then C=$(cat -- "$F") || C=; fi
+  rm -f -- "$F" || { echo "${0##*/}: the token file of run $R is not deleted" >&2; exit 1; }
+  [ -n "$C" ] || { echo "${0##*/}: no token for run $R" >&2; exit 1; }
+  LAMP_CONTROL_TOKEN=$C LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock PYTHONPATH=/usr/local/lib/lampos/sdk-python LAMP_NS_NET=run
+  unset C
+  export LAMP_CONTROL_TOKEN LAMP_CONTROL_SOCKET PYTHONPATH LAMP_NS_NET
+fi
+"#
+    };
+}
+pub(crate) use run_lines;
+/// [`run_lines`]'s text.
+pub const RUN_LINES: &str = run_lines!();
+
 /// What [`wrapper_text`] changes in [`WRAPPER_TEXT`] with [`TASKS_SWITCH`]
-/// on, each found exactly once (a test holds it): with [`NET_ENV`] `run`
-/// exactly, `--net` is added to the first `unshare`, so the new network
+/// on, each found exactly once (a test holds it): [`RUN_LINES`] first, so
+/// a skill's run started by Harness in its own folder has its token file
+/// read and deleted before anything else; then with [`NET_ENV`] `run`
+/// exactly (set by [`RUN_LINES`], or by lamp-tasks' `HermesRunner`),
+/// `--net` is added to the first `unshare`, so the new network
 /// namespace is owned by the new user namespace (one `unshare(2)` with
 /// `CLONE_NEWUSER`), and the variable passed on to [`NS`]; any other
 /// value is unset, so [`NS`] never sees `run` without `--net`.
 const WRAPPER_TASKS_EDITS: [(&str, &str); 2] = [
     (
         "# serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never run any other way.\n",
-        "# serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never run any other way.\n\
-         # LAMP_SKILL_TASKS=on (#6306): a skill's run, started with LAMP_NS_NET=run, also gets a network namespace of its own,\n\
-         # with only lo: out only to control.sock and lamp-cloud's model forwarder, through lamp-tasks' bridge socket.\n",
+        concat!(
+            "# serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never run any other way.\n\
+             # LAMP_SKILL_TASKS=on (#6306): a skill's run, started with LAMP_NS_NET=run, also gets a network namespace of its own,\n\
+             # with only lo: out only to control.sock and lamp-cloud's model forwarder, through lamp-tasks' bridge socket.\n",
+            run_lines!()
+        ),
     ),
     (
         "unset T\nexec /usr/bin/unshare --map-root-user --mount ",

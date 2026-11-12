@@ -2289,6 +2289,117 @@ fn the_wrapper_adds_net_only_for_a_net_run_with_the_tasks_switch_on() {
     assert_eq!(ran(WRAPPER_TEXT, None), format!("net=unset\n{plain}"));
 }
 
+/// #6510 Part 1 step 2: Hermes's wrapper with [`TASKS_SWITCH`] on finds a
+/// skill's run by its folder alone ([`RUN_LINES`]): started in
+/// [`RUN_FOLDERS`]`/skill-<run-id>`, it reads [`RUNS`]`/<run-id>` once,
+/// deletes it, and gives the run the token, the socket, the SDK's
+/// `PYTHONPATH` and `--net`; a second start there finds no token and runs
+/// nothing; a link at the token's place is refused; any other folder is
+/// as before (lamp-tasks' `HermesRunner` still sets [`NET_ENV`] itself).
+/// Off, the wrapper has none of it. Run under `sh` with a stand-in
+/// `unshare` that prints its environment.
+#[test]
+fn hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once() {
+    assert!(!WRAPPER_TEXT.contains("skill-") && !WRAPPER_TEXT.contains(RUNS));
+    let on = wrapper_text(true);
+    assert_eq!(on.matches(RUN_LINES).count(), 1);
+    // The run's file goes before the forwarder token is read.
+    assert!(on.find(RUN_LINES).unwrap() < on.find("T=$(cat ").unwrap());
+    let folder = tempfile::tempdir().unwrap();
+    let top = fs::canonicalize(folder.path()).unwrap();
+    for dir in [
+        "runs",
+        "project/lamp",
+        "project/skill-run-1",
+        "project/skill-Run-2",
+    ] {
+        fs::create_dir_all(top.join(dir)).unwrap();
+    }
+    let printer = top.join("unshare");
+    fs::write(
+        &printer,
+        "#!/bin/sh\necho \"args: $*\"\nenv | grep -E '^(LAMP_CONTROL_TOKEN|LAMP_CONTROL_SOCKET|PYTHONPATH|LAMP_NS_NET)=' | sort\n",
+    )
+    .unwrap();
+    fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
+    let forwarder = top.join("hermes-token");
+    fs::write(&forwarder, "tok_0123456789abcdef0123456789abcdef\n").unwrap();
+    let wrapper = top.join("hermes");
+    fs::write(
+        &wrapper,
+        on.replace(TOKEN, &forwarder.to_string_lossy())
+            .replace(RUNS, &top.join("runs").to_string_lossy())
+            .replace(RUN_FOLDERS, &top.join("project").to_string_lossy())
+            .replace("/usr/bin/unshare", &printer.to_string_lossy()),
+    )
+    .unwrap();
+    let run = |cwd: &str, env: &[(&str, &str)]| {
+        let out = std::process::Command::new("/bin/sh")
+            .arg(&wrapper)
+            .args(["chat", "-q", "a"])
+            .current_dir(top.join(cwd))
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin")
+            .envs(env.iter().copied())
+            .output()
+            .unwrap();
+        (
+            out.status.success(),
+            String::from_utf8_lossy(&out.stdout).into_owned(),
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )
+    };
+    let secret = "run-token-0123456789";
+    let token = top.join("runs/run-1");
+    fs::write(&token, secret).unwrap();
+    let (ok, out, err) = run("project/skill-run-1", &[]);
+    assert!(ok, "{err}");
+    assert!(!token.exists(), "read once and deleted");
+    assert_eq!(
+        out,
+        format!(
+            "args: --map-root-user --net --mount --pid --kill-child --mount-proc \
+             --propagation private {NS} chat -q a\n\
+             LAMP_CONTROL_SOCKET={CONTROL_SOCKET}\n\
+             LAMP_CONTROL_TOKEN={secret}\n\
+             LAMP_NS_NET=run\n\
+             PYTHONPATH={SDK_PYTHONPATH}\n"
+        )
+    );
+    assert!(!err.contains(secret));
+    // A second start in the same folder: no token, nothing run.
+    let (ok, out, err) = run("project/skill-run-1", &[]);
+    assert!(!ok && out.is_empty(), "{out}");
+    assert!(err.contains("hermes: no token for run run-1"), "{err}");
+    // A link at the token's place: never read through, removed, refused.
+    let elsewhere = top.join("elsewhere");
+    fs::write(&elsewhere, secret).unwrap();
+    symlink(&elsewhere, &token).unwrap();
+    let (ok, out, _) = run("project/skill-run-1", &[]);
+    assert!(!ok && out.is_empty());
+    assert!(fs::symlink_metadata(&token).is_err() && elsewhere.exists());
+    // Any other folder, a run-like one with an id that is not plain among
+    // them: as before, the caller's own LAMP_NS_NET deciding `--net`.
+    fs::write(top.join("runs/Run-2"), secret).unwrap();
+    for cwd in ["project/lamp", "project", "project/skill-Run-2"] {
+        let (ok, out, err) = run(cwd, &[]);
+        assert!(ok, "{cwd}: {err}");
+        assert_eq!(
+            out,
+            format!(
+                "args: --map-root-user --mount --pid --kill-child --mount-proc \
+                 --propagation private {NS} chat -q a\n"
+            ),
+            "{cwd}"
+        );
+        let (ok, out, _) = run(cwd, &[(NET_ENV, "run"), ("LAMP_CONTROL_TOKEN", "given")]);
+        assert!(ok && out.contains(" --net ") && out.contains("LAMP_CONTROL_TOKEN=given\n"));
+    }
+    assert!(top.join("runs/Run-2").exists());
+    // Off: no run lines; a run's folder is any folder.
+    assert!(!wrapper_text(false).contains(RUN_LINES));
+}
+
 /// OpenClaw shares Hermes's namespace script without the tasks edits, and
 /// its own wrapper: never `--net`, never the bridge or the relay.
 #[test]

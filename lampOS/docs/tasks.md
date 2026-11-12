@@ -1079,8 +1079,8 @@ started once its answer is told:
     the agent's own id, never `--now`. Harness saves its screen and stops it,
     and keeps its conversation, so the person can still open and resume it.
     `Cli::close_now` (`harness close ... --now`, stopping it even while it
-    works) exists only for a skill run lamp-tasks started, at its deadline
-    or end (#6510 step 2); it is not used yet.
+    works) is only for a skill's run lamp-tasks started itself
+    (`HarnessRunner`, #6510 Part 1 step 2), at its deadline or end.
   - **Any other turn or state:** the person went on with it at the computer,
     so it's theirs. It's left for good (`left`), never asked again.
   - **Stopped or failed already:** nothing to close (`closed`, code `gone`).
@@ -2472,9 +2472,10 @@ for each run, and is answered once the run ends
   wrapper's process environment (`/proc/<pid>/environ`), readable by other
   processes of lamp-tasks' uid; that is accepted for a one-run token that
   lives 14 minutes at most.
-- **The run-token file** (#6510 Part 1, not used yet): `harness new` takes
-  no environment, so once runs go through Harness (#6510 Part 1 step 2)
-  the token is handed over as a file instead of `LAMP_CONTROL_TOKEN`:
+- **The run-token file** (#6510 Part 1): `harness new` takes no
+  environment, so a run that goes through Harness (`HarnessRunner`, #6510
+  Part 1 step 2, below) is handed its token as a file instead of
+  `LAMP_CONTROL_TOKEN`:
   `/run/lampos-tasks/runs/<run-id>` (`run_token_file::RUNS_DIR`, tmpfs),
   the run id a plain id (`a-z`, `0-9`, `-`, 1 to 64), else refused before
   anything is made. `RunTokenFile::write` makes the folder 0700 when
@@ -2492,8 +2493,78 @@ for each run, and is answered once the run ends
   lamp (`SkillRun::prompt`), through the `Runner` trait, which waits for the
   run's end. The runner ends the run at `SkillRun::deadline`, the token's
   life, itself, never by the prompt's words alone. The lamp's runner gives
-  the run its own network namespace (next).
-- **The lamp's runner** (`HermesRunner::lamp`): the lamp's Hermes started
+  the run its own network namespace (below).
+- **The lamp's runner, through Harness** (`HarnessRunner::lamp`, #6510
+  Part 1 step 2; `HandOvers::lamp` uses it for every `do.task`): the lamp's
+  Hermes started by Harness, as a spoken task to target `lamp` is, never by
+  lamp-tasks itself.
+  - **Always the lamp's Hermes** (V2's (b), #1711, 12 Nov 21:34). Whatever
+    the lamp's default engine is (OpenClaw, or any other), a skill's run
+    goes to the lamp's own Hermes, on the machine of the lamp's own target
+    (`lamp` in the targets file `serve --set-up-later` reads, read at each
+    run). The person's own spoken tasks still go to the chosen or named
+    engine (#6506). The control socket, SDK and bridge inside other
+    engines' namespaces are step 2b. No lamp target, or Harness not set
+    up yet (no Harness program, or the part still starting), is refused in
+    words too. A `/usr/local/bin/hermes` that lacks the run lines
+    (`WRAPPER_RUN_LINES`) or the network lines (`WRAPPER_NET_LINES`) is
+    refused `NOT_FOUND_BY_FOLDER` (lamp-update's `LAMP_SKILL_TASKS` off or
+    its round not run): nothing is made or started, so a run never starts
+    with no token on the lamp's network.
+  - **Its own folder.** lamp-tasks makes `skill-<run-id>` (0700,
+    `RUN_FOLDER_PREFIX`) in its Harness project
+    `/var/lib/lampos-tasks/harnesses/lamp-tasks` (made 0700 when missing),
+    never one already there, and writes the run's token file (above). It
+    then hands the run over with the Cli spoken tasks use
+    (`Cli::launch`), with routing, named sessions, resumes, `--new`
+    folders, the sessions index and the daemon's restart off
+    (`SkillHarness::new`): `harness new hermes --machine <lamp> <folder>
+    --name skill-<run-id> --json --task <words>`, the folder `new`'s
+    positional argument (Harness only checks that it is a folder; Hermes
+    has no folder trust to register). The run id comes from that folder:
+    Hermes's wrapper takes it from `pwd -P` (docs/install.md, "Hermes on
+    the lamp"), reads the token file once, deletes it, and gives the run
+    `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH` and
+    `LAMP_NS_NET=run`, before its namespace starts. The token is never in
+    Harness's arguments, environment or state.
+  - **Its end.** `harness wait --machine <lamp> <agent> --any --timeout
+    600s --json` on the one agent, asked again (a failed `wait` after 1 s,
+    `WAIT_RETRY`) until it ends or the deadline (14 minutes, the token's
+    life) cancels it. Ended `idle`, `stopped`, `closed` or `gone` is
+    `{"ok":true,"id":0}`; `failed`, or `needs-input` (no one answers a
+    skill's run), is `run_failed`. At the deadline the run is closed with
+    `harness close --machine <lamp> <agent> --now --json`
+    (`Cli::close_now`) and is `run_failed` "the run was ended at its
+    deadline, 840 s". `new` not started (`not_sent`, `uncertain`, or a
+    `pending` creation) is `run_failed` too.
+  - **However it ends**, its guard first has lamp-control end the run's
+    token (`{"end":{"run"}}`, once), then closes the session (`close
+    --now`, once; not for one Harness says is `closed` or `gone`), removes
+    the run's folder, and deletes the token file if the wrapper hasn't
+    (V2's order on #6510: revoke, then `close --now`, then the SIGKILL
+    below, so a run being stopped can do nothing on the lamp). A creation Harness
+    finishes later finds no folder or no token, and its wrapper ends it
+    ("no token for run <run-id>"). Nothing the run printed is kept by
+    lamp-tasks; Harness's own record of the session and Hermes's session
+    under its `HERMES_HOME` are as for any Harness session.
+  - **No SIGKILL backstop yet.** The design's backstop, SIGKILL to the
+    namespace's `unshare` pid when `close --now` fails, is not built:
+    Harness's daemon starts Hermes in its own pane, and neither `new` nor
+    `show` gives lamp-tasks that pid (a `TODO(#6510)` in `skill_task.rs`).
+    A failed `close --now` is said in the journal; the run's token is
+    refused by lamp-control from its end (or its 14-minute life), and the
+    token file is gone, so a run left going holds no way to the lamp.
+  - **Known limits.** Each run shares Hermes's one `HOME`
+    (`/var/lib/lampos-hermes`); a fresh home for each run is still open
+    (Heron's and the Reviewer-lead's P3 on #6652). `/run/lampos-tasks/runs`
+    is out of reach of every namespaced session: the namespace lays a fresh
+    empty tmpfs over `/run`, so no engine Harness starts on the lamp, and
+    no other skill run, can read another run's token file. A process
+    outside a namespace running as `lampos` (lamp-tasks' and Harness's own
+    user) still can, between the file's write and the wrapper's read.
+- **The lamp's runner without Harness** (`HermesRunner::lamp`, kept for
+  #6643's skill make until it moves onto `HarnessRunner`; no `do.task`
+  uses it): the lamp's Hermes started
   as Harness starts it for target `lamp`: `/usr/local/bin/hermes chat -q`
   and the run's words as the last argument (the wrapper runs Hermes only in
   its namespace, `hermes-ns`: no lamp service's folder or socket, the
@@ -2540,7 +2611,9 @@ for each run, and is answered once the run ends
   network lines (`WRAPPER_NET_LINES`, `NOT_HELD_OFF`: lamp-update's
   `LAMP_SKILL_TASKS` off or its round not run yet), so a run is never
   started with the lamp's own network (Heron's and Fourteen's P2 on
-  #6443). Its two ways out are files shown
+  #6443); `HarnessRunner` likewise, and also without the run lines
+  (`NOT_FOUND_BY_FOLDER`). A run through Harness has `LAMP_NS_NET=run` set
+  by the wrapper itself, from its folder. Its two ways out are files shown
   read-only in it: lamp-control's `control.sock` (above), and lamp-tasks'
   bridge to lamp-cloud's model forwarder (`net_bridge`):
   - **The bridge** (`Bridge`): with `LAMP_SKILL_TASKS=on`, `serve` binds
@@ -2619,7 +2692,17 @@ relay's arguments; the switch off binding nothing), and the caps
 (`skill_task::tests`: each in the product unit's `[Service]` once, no hard
 memory line, each cap holding two tasks with half again, the least
 MemAvailable less a second task's delta at or over Hermes's floor, the run time and half again within a run's
-life), on any computer, with no Hermes.
+life), on any computer, with no Hermes. `HarnessRunner` (#6510 Part 1
+step 2): `skill_task::tests::the_wrapper_run_lines_are_lamp_updates_own`
+(the lines it looks for held to lamp-update's source, and the folder they
+match the one it makes), and, in `tests/harness.rs` with the fixture as
+Harness, `a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothing`
+(the `new`, `wait` and `close --now` arguments, the folder the positional
+argument, no token in any argument or environment, the folder and token
+file gone), `a_skill_run_past_its_deadline_is_closed_now`,
+`a_skill_run_that_fails_leaves_nothing` and
+`a_skill_run_is_refused_with_no_harness_or_an_old_wrapper` (no target, no
+Harness, an old wrapper: refused, nothing asked or made).
 
 **The lamp row (not yet run):** on a lamp with Hermes installed,
 lamp-control serving and `LAMP_SKILL_TASKS=on` in both units, a skill's run
@@ -2628,19 +2711,19 @@ resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
 
 **Every engine's wrapper (#6510 Part 1, step 1, off unless
-`LAMP_AGENT_NS=on`):** once a
-skill's run goes through Harness, lamp-update's one wrapper for every
-engine (docs/install.md, "One agent namespace for every engine") is what
-picks up the run's token: with `LAMP_RUN_ID` (a provisional name) set, it
-reads `/run/lampos-tasks/runs/<run-id>` once, deletes it, and gives the
-engine the token as `LAMP_CONTROL_TOKEN` in its environment only, with
-`LAMP_NS_NET=run`; the engine's `HOME` is its own
-`/var/lib/lampos-agents/<engine>`. An engine counts as present only when
-`lampos`'s login shell finds the wrapper first (not its own program in
-`~/.local/bin`). With lamp-update's own `LAMP_AGENT_NS=on` (and
-`LAMP_APP_ENGINES=on`), each round writes it for every engine Harness
-says is installed except Hermes and OpenClaw. No skill run uses it yet:
-Hermes's runner above is unchanged until step 2.
+`LAMP_AGENT_NS=on`):** lamp-update's one wrapper for every engine
+(docs/install.md, "One agent namespace for every engine") carries the same
+run lines as Hermes's (step 2): started in
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run-id>`, it reads
+`/run/lampos-tasks/runs/<run-id>` once, deletes it, and gives the engine
+`LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET` and `PYTHONPATH` in its
+environment only, with `LAMP_NS_NET=run`; the provisional `LAMP_RUN_ID` is
+gone. The engine's `HOME` is its own `/var/lib/lampos-agents/<engine>`.
+An engine counts as present only when `lampos`'s login shell finds the
+wrapper first (not its own program in `~/.local/bin`). With lamp-update's
+own `LAMP_AGENT_NS=on` (and `LAMP_APP_ENGINES=on`), each round writes it
+for every engine Harness says is installed except Hermes and OpenClaw.
+Skill runs still go to Hermes alone (`HarnessRunner`, above).
 
 ## Devin (#1854)
 

@@ -23,8 +23,11 @@
 //! - **The run** ([`Runner`]): one task for target `lamp` (the lamp's own
 //!   Hermes), its words the skill's task and its script's place
 //!   ([`SkillRun::prompt`]). The runner blocks until the run ends. On a
-//!   lamp, [`HermesRunner`]: `hermes chat -q` through Hermes's own wrapper
-//!   and namespace, killed at the run's deadline.
+//!   lamp, [`HarnessRunner`] (#6510 Part 1 step 2): Hermes started by
+//!   Harness in the run's own folder, whose wrapper reads the run's token
+//!   file once, closed with `harness close --now` at the run's deadline.
+//!   [`HermesRunner`] (`hermes chat -q` started by lamp-tasks itself) is
+//!   kept for #6643's skill make; no `do.task` uses it.
 //! - **The socket** ([`HandOvers`]): with the switch on, `serve` binds
 //!   [`HAND_OVER_SOCKET`] for lamp-skills alone, one line a connection,
 //!   one run at a time (another is refused `busy`).
@@ -535,6 +538,9 @@ pub fn run_id() -> String {
 /// One run for the lamp's own Hermes: its words, the skill's folder, and
 /// what its environment is given. Its `Debug` never shows the token.
 pub struct SkillRun {
+    /// lamp-tasks' run id ([`run_id`]), the one lamp-control minted the
+    /// token for: plain, so it names the run's folder and token file.
+    pub run: String,
     pub skill: String,
     pub prompt: String,
     pub folder: PathBuf,
@@ -562,6 +568,7 @@ impl std::fmt::Debug for SkillRun {
             })
             .collect();
         f.debug_struct("SkillRun")
+            .field("run", &self.run)
             .field("skill", &self.skill)
             .field("prompt", &self.prompt)
             .field("folder", &self.folder)
@@ -572,8 +579,9 @@ impl std::fmt::Debug for SkillRun {
 }
 
 impl SkillRun {
-    fn of(hand: &HandOver, token: &RunToken) -> Self {
+    fn of(hand: &HandOver, run: &str, token: &RunToken) -> Self {
         Self {
+            run: run.to_owned(),
             skill: hand.skill.clone(),
             prompt: Self::prompt(hand),
             folder: hand.folder.clone(),
@@ -613,19 +621,35 @@ impl SkillRun {
 /// namespace ([`NET_ENV`]). The run's environment is cleared to
 /// [`SkillRun::env`] alone: nothing of lamp-tasks' own environment reaches
 /// Hermes.
+///
+/// `end_token` ends the run's token with lamp-control at once (once only,
+/// however often it is called): a runner that stops a run calls it first,
+/// before it stops the run, so a run being stopped can do nothing on the
+/// lamp (V2's order on #6510: revoke, then `harness close --now`, then the
+/// namespace's SIGKILL).
 pub trait Runner {
-    fn run(&self, run: &SkillRun) -> Result<u64, String>;
+    fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String>;
 }
 
-/// Ends the token however the run ends, a panic too.
+/// Ends the token however the run ends, a panic too, and once only: the
+/// runner may end it first ([`Runner::run`]'s `end_token`).
 struct Ending<'a> {
     tokens: &'a dyn Tokens,
     run: String,
+    ended: std::cell::Cell<bool>,
+}
+
+impl Ending<'_> {
+    fn end(&self) {
+        if !self.ended.replace(true) {
+            self.tokens.end(&self.run);
+        }
+    }
 }
 
 impl Drop for Ending<'_> {
     fn drop(&mut self) {
-        self.tokens.end(&self.run);
+        self.end();
     }
 }
 
@@ -656,7 +680,8 @@ pub fn answer(
     };
     let ending = Ending {
         tokens,
-        run: run_id,
+        run: run_id.clone(),
+        ended: std::cell::Cell::new(false),
     };
     let asked: BTreeSet<&String> = hand.grants.iter().collect();
     if minted.grants.iter().collect::<BTreeSet<_>>() != asked {
@@ -667,8 +692,8 @@ pub fn answer(
              the owner says yes again in the app",
         );
     }
-    let run = SkillRun::of(&hand, &minted.token);
-    let ran = runner.run(&run);
+    let run = SkillRun::of(&hand, &run_id, &minted.token);
+    let ran = runner.run(&run, &|| ending.end());
     drop(run);
     drop(minted);
     drop(ending);
@@ -770,7 +795,9 @@ impl HermesRunner {
 }
 
 impl Runner for HermesRunner {
-    fn run(&self, run: &SkillRun) -> Result<u64, String> {
+    // Its token is ended by the caller after the run ends (`answer`); this
+    // runner is kept only for #6643's skill make.
+    fn run(&self, run: &SkillRun, _end_token: &dyn Fn()) -> Result<u64, String> {
         use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
         use std::os::unix::process::CommandExt;
         use std::process::{Command, Stdio};
@@ -838,6 +865,355 @@ impl Runner for HermesRunner {
     }
 }
 
+/// The lines lamp-update's wrappers carry with its own `LAMP_SKILL_TASKS`
+/// on (`lamp_update::hermes_install::RUN_LINES`, #6510 Part 1 step 2):
+/// only with them does a run Harness starts in its own folder get its
+/// token, read once from its file, and a network namespace of its own. A
+/// wrapper without them would start the run with no token on the lamp's
+/// network, so no run starts ([`NOT_FOUND_BY_FOLDER`]).
+pub const WRAPPER_RUN_LINES: [&str; 2] = [
+    "case $P in /var/lib/lampos-tasks/harnesses/lamp-tasks/skill-?*) R=${P#/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-} ;; esac\n",
+    "  export LAMP_CONTROL_TOKEN LAMP_CONTROL_SOCKET PYTHONPATH LAMP_NS_NET\n",
+];
+
+/// Said when the wrapper lacks [`WRAPPER_RUN_LINES`]: nothing is started.
+pub const NOT_FOUND_BY_FOLDER: &str = "the lamp's Hermes can't take a skill's run through Harness yet (its wrapper doesn't find a run by its folder: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
+
+/// Whether `wrapper` (a wrapper's text) carries [`WRAPPER_RUN_LINES`] and
+/// [`WRAPPER_NET_LINES`].
+pub fn finds_runs_by_folder(wrapper: &str) -> bool {
+    holds_off_network(wrapper) && WRAPPER_RUN_LINES.iter().all(|line| wrapper.contains(line))
+}
+
+/// What a run folder is named, `skill-<run-id>`, under lamp-tasks' Harness
+/// project ([`HarnessRunner::project`]); the wrappers take a run id only
+/// from a folder named so ([`WRAPPER_RUN_LINES`]).
+pub const RUN_FOLDER_PREFIX: &str = "skill-";
+/// How long a failed `harness wait` is let rest before it is asked again,
+/// until the run's deadline.
+pub const WAIT_RETRY: Duration = Duration::from_secs(1);
+
+/// The Harness a skill's run is started through, as lamp-tasks has set it
+/// up for spoken tasks (`runtime::serve`): its settings with routing,
+/// named sessions, resumes, folder making and the daemon's restart off
+/// ([`SkillHarness::new`]), the caller session, and the lamp's own target
+/// (`runtime::LAMP_TARGET`) as lamp-tasks reads it at each run.
+pub struct SkillHarness {
+    pub config: crate::harness::CliConfig,
+    pub session: String,
+    pub lamp: Box<dyn Fn() -> Option<crate::harness::Target> + Send + Sync>,
+}
+
+impl SkillHarness {
+    /// `config` as spoken tasks have it, with what a skill's run never
+    /// uses turned off: the router (the run is new work, always),
+    /// sessions found by name, resumes, `--new` folders (the run's folder
+    /// is made here), the sessions index, the absolute-folder learning (its
+    /// folder is absolute already), the engines look and the daemon's
+    /// restart (spoken tasks' own).
+    pub fn new(
+        mut config: crate::harness::CliConfig,
+        session: String,
+        lamp: Box<dyn Fn() -> Option<crate::harness::Target> + Send + Sync>,
+    ) -> Self {
+        config.route = false;
+        config.reply_named = false;
+        config.resume_closed = false;
+        config.new_folder = None;
+        config.new_folder_only = None;
+        config.session_index = None;
+        config.absolute_folder = false;
+        config.engines_ready = false;
+        config.restart_daemon = false;
+        config.health_after_start = false;
+        config.session_machines = None;
+        Self {
+            config,
+            session,
+            lamp,
+        }
+    }
+}
+
+/// Where lamp-tasks puts its [`SkillHarness`] once Harness is set up;
+/// empty until then (no Harness program, or the part still starting).
+pub type SkillHarnessSlot = std::sync::Arc<std::sync::OnceLock<SkillHarness>>;
+
+/// Runs a [`SkillRun`] with the lamp's own Hermes started through Harness
+/// (#6510 Part 1 step 2), as spoken tasks start it (`harness new`,
+/// [`crate::harness::Cli::launch`]):
+///
+/// - **Always the lamp's Hermes**, whatever the lamp's default engine
+///   (V2's (b), #1711): on the machine of the lamp's target
+///   (`runtime::LAMP_TARGET`). No target, no Harness yet, or a wrapper
+///   that doesn't find a run by its folder ([`finds_runs_by_folder`]) is
+///   refused in words, and nothing is made or started.
+/// - **The run's folder** `skill-<run-id>` ([`RUN_FOLDER_PREFIX`]) is made
+///   0700 in lamp-tasks' Harness project ([`HarnessRunner::project`],
+///   `~/harnesses/lamp-tasks`), and the run's token written to
+///   [`HarnessRunner::runs`]`/<run-id>` ([`RunTokenFile`]). Hermes is
+///   started there, the folder `new`'s positional argument, with routing
+///   off ([`SkillHarness::new`]); its wrapper reads the token file once,
+///   deletes it, and gives the run the token, the socket, the SDK and a
+///   network namespace of its own. The token is never in Harness's
+///   arguments or state.
+/// - **Its end:** `harness wait --any` on the one agent, asked again until
+///   it ends or the run's deadline ([`SkillRun::deadline`]) cancels it.
+///   At the deadline, `harness close --now` ([`crate::harness::Cli::close_now`]).
+///   However it ends, its guard closes the session (`close --now`),
+///   removes the folder and the token file, and the caller ends the token
+///   with lamp-control ([`answer`]). Nothing the run printed is kept by
+///   lamp-tasks.
+///
+/// TODO(#6510): the design's SIGKILL backstop, to the namespace's
+/// `unshare` pid when `close --now` fails, is not here: Harness's daemon
+/// starts the engine in its own pane, and neither `harness new` nor `show`
+/// gives lamp-tasks that pid. Until one is found a sure way, a failed
+/// `close --now` is only said; lamp-control refuses the run's token once
+/// the run ends (the caller's end, or its own [`RUN_LIFETIME`]), and the
+/// token file is gone, so a run left going holds no way to the lamp.
+pub struct HarnessRunner {
+    /// lamp-tasks' Harness project, where each run's folder is made: the
+    /// wrappers' `lamp_update::hermes_install::RUN_FOLDERS` on a lamp.
+    pub project: PathBuf,
+    /// Where each run's token file is written
+    /// ([`crate::run_token_file::RUNS_DIR`] on a lamp).
+    pub runs: PathBuf,
+    pub harness: SkillHarnessSlot,
+    /// The wrapper that must carry [`WRAPPER_RUN_LINES`] before a run
+    /// starts: the lamp's [`HERMES`]. `None` only in tests with no wrapper.
+    pub held_by: Option<PathBuf>,
+    /// How long a failed `wait` rests before it is asked again.
+    pub retry: Duration,
+}
+
+impl HarnessRunner {
+    /// The lamp's: runs in `home`'s `~/harnesses/lamp-tasks`
+    /// (`runtime::MACHINES_PROJECT`), token files in
+    /// [`crate::run_token_file::RUNS_DIR`], held by [`HERMES`].
+    pub fn lamp(home: &Path, harness: SkillHarnessSlot) -> Self {
+        let project = crate::runtime::MACHINES_PROJECT
+            .strip_prefix("~/")
+            .unwrap_or(crate::runtime::MACHINES_PROJECT);
+        Self {
+            project: home.join(project),
+            runs: PathBuf::from(crate::run_token_file::RUNS_DIR),
+            harness,
+            held_by: Some(PathBuf::from(HERMES)),
+            retry: WAIT_RETRY,
+        }
+    }
+}
+
+/// A run started through Harness, undone however the run ends: its
+/// session closed (`close --now`), then its folder removed, then its token
+/// file deleted (when the wrapper hasn't already).
+struct Started<'a> {
+    cli: &'a crate::harness::Cli,
+    end_token: &'a dyn Fn(),
+    machine: String,
+    agent: Option<String>,
+    folder: PathBuf,
+    token: Option<crate::run_token_file::RunTokenFile>,
+}
+
+impl Started<'_> {
+    /// The run's token ended with lamp-control first, then `harness close
+    /// --now`, once (V2's order on #6510): its outcome, or `None` when
+    /// there was no session to close.
+    fn close(&mut self) -> Option<Result<crate::harness::Closed, String>> {
+        (self.end_token)();
+        let agent = self.agent.take()?;
+        let closed = self
+            .cli
+            .close_now(&self.machine, &agent, crate::harness::CLOSE_BUDGET);
+        if let Err(why) = &closed {
+            // TODO(#6510): the SIGKILL backstop to the namespace's `unshare`
+            // pid goes here once lamp-tasks has a sure way to that pid.
+            eprintln!("[lamp-tasks] skill task: the run's session was not closed: {why}");
+        }
+        Some(closed)
+    }
+}
+
+impl Drop for Started<'_> {
+    fn drop(&mut self) {
+        self.close();
+        if let Err(error) = std::fs::remove_dir_all(&self.folder)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            eprintln!(
+                "[lamp-tasks] skill task: the run's folder {} was not removed: {error}",
+                self.folder.display()
+            );
+        }
+        drop(self.token.take());
+    }
+}
+
+/// What a run that ended as Harness says `state` comes to.
+fn ended_as(state: &str) -> Result<u64, String> {
+    match state {
+        "idle" | "stopped" | "closed" | "gone" => Ok(0),
+        "needs-input" => Err(
+            "the lamp's Hermes stopped to ask something, and a skill's run has no one to answer, so it was ended"
+                .into(),
+        ),
+        "failed" => Err("the lamp's Hermes failed (Harness says failed)".into()),
+        other => Err(format!("the run ended as Harness says {other}")),
+    }
+}
+
+impl Runner for HarnessRunner {
+    fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
+        use crate::harness::{Cli, EngineKind, Launch, LaunchOutcome, Target};
+        use std::os::unix::fs::DirBuilderExt;
+        use std::sync::atomic::AtomicBool;
+        let began = std::time::Instant::now();
+        let Some(harness) = self.harness.get() else {
+            return Err(
+                "Harness isn't set up on this lamp yet, so a skill's run can't be started".into(),
+            );
+        };
+        let Some(lamp) = (harness.lamp)() else {
+            return Err(
+                "the lamp has no Harness target of its own yet (Hermes on the lamp is off, or Harness hasn't looked), so nothing was started"
+                    .into(),
+            );
+        };
+        // Whatever the lamp's default engine (OpenClaw, or any other), a
+        // skill's run goes to the lamp's own Hermes on the lamp's machine
+        // (V2's (b), #1711 21:34): one path for every lamp. The person's
+        // own spoken tasks still go to the chosen or named engine (#6506).
+        if let Some(wrapper) = &self.held_by
+            && !std::fs::read_to_string(wrapper).is_ok_and(|text| finds_runs_by_folder(&text))
+        {
+            return Err(NOT_FOUND_BY_FOLDER.into());
+        }
+        let token = run
+            .env
+            .iter()
+            .find(|(name, _)| *name == TOKEN_ENV)
+            .map(|(_, secret)| RunToken::new(secret.clone()))
+            .ok_or("the run has no token, so nothing was started")?;
+        let cli = Cli::new(harness.config.clone(), harness.session.clone())
+            .map_err(|error| format!("Harness can't be asked: {error}"))?;
+        // The project as Harness's own folder for the lamp is made (0700,
+        // `lampos`'s); the run's folder in it is new, never one there.
+        if !self.project.is_dir() {
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(&self.project)
+                .map_err(|error| format!("lamp-tasks' Harness project not made: {error}"))?;
+        }
+        let folder = self.project.join(format!("{RUN_FOLDER_PREFIX}{}", run.run));
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&folder)
+            .map_err(|error| format!("the run's folder not made: {error}"))?;
+        let mut started = Started {
+            cli: &cli,
+            end_token,
+            machine: lamp.machine_id.clone(),
+            agent: None,
+            folder,
+            token: None,
+        };
+        started.token = Some(crate::run_token_file::RunTokenFile::write(
+            &self.runs, &run.run, &token,
+        )?);
+        drop(token);
+        let Some(project) = started.folder.to_str().map(str::to_owned) else {
+            return Err("the run's folder is not a plain path".into());
+        };
+        let launch = Launch {
+            name: format!("{RUN_FOLDER_PREFIX}{}", run.run),
+            prompt: run.prompt.clone(),
+            target: Target {
+                machine_id: lamp.machine_id.clone(),
+                project,
+                engine: EngineKind::Hermes,
+            },
+            session: None,
+        };
+        let agent = match cli.launch(&launch) {
+            LaunchOutcome::Created { agent_id } => agent_id,
+            // Never asked for: no route, no named session.
+            LaunchOutcome::Joined { .. } | LaunchOutcome::JoinedOn { .. } => {
+                return Err("Harness handed the run to a session already there".into());
+            }
+            // A creation Harness may still finish: the folder and the token
+            // file go with this guard, so it starts with no token, and its
+            // wrapper ends it ("no token for run").
+            LaunchOutcome::Pending { .. } => {
+                return Err("Harness didn't start the run at once, so it was given up".into());
+            }
+            LaunchOutcome::NotSent { code } | LaunchOutcome::Uncertain { code } => {
+                return Err(format!("Harness didn't start the run ({code})"));
+            }
+        };
+        started.agent = Some(agent.clone());
+        let agents = [agent];
+        let cancel = AtomicBool::new(false);
+        let deadline = run.deadline.saturating_sub(began.elapsed());
+        let ended = std::thread::scope(|scope| {
+            let (done, wakes) = std::sync::mpsc::channel::<()>();
+            let cancel = &cancel;
+            scope.spawn(move || {
+                if let Err(std::sync::mpsc::RecvTimeoutError::Timeout) =
+                    wakes.recv_timeout(deadline)
+                {
+                    cancel.store(true, Ordering::Release);
+                }
+            });
+            let ended = loop {
+                if cancel.load(Ordering::Acquire) {
+                    break None;
+                }
+                match cli.wait(&lamp.machine_id, &agents, cancel) {
+                    // None: Harness's own hold passed with no end, asked again.
+                    Ok(ended) => {
+                        if let Some(ended) = ended.into_iter().next() {
+                            break Some(ended.state);
+                        }
+                    }
+                    Err(code) if code == "cancelled" => break None,
+                    Err(code) => {
+                        eprintln!("[lamp-tasks] skill task: harness wait: {code}");
+                        let rest = std::time::Instant::now() + self.retry;
+                        while std::time::Instant::now() < rest && !cancel.load(Ordering::Acquire) {
+                            std::thread::sleep(RUN_TICK);
+                        }
+                    }
+                }
+            };
+            drop(done);
+            ended
+        });
+        match ended {
+            Some(state) => {
+                // Already closed or gone: nothing left for the guard to close.
+                if matches!(state.as_str(), "closed" | "gone") {
+                    started.agent = None;
+                }
+                ended_as(&state)
+            }
+            None => {
+                started.close();
+                if began.elapsed() >= run.deadline {
+                    Err(format!(
+                        "the run was ended at its deadline, {} s",
+                        run.deadline.as_secs()
+                    ))
+                } else {
+                    Err("the run was ended as lamp-tasks stops".into())
+                }
+            }
+        }
+    }
+}
+
 /// lamp-tasks' hand-over socket, in its own runtime folder (`lampos`'s,
 /// 0700), the socket 0600 as its others: lamp-skills (run as `lampos`)
 /// names it with `--tasks-socket` or `LAMP_SKILLS_TASKS_SOCKET` (#6346).
@@ -880,14 +1256,16 @@ pub const BUSY: &str = "a skill's task is already running on this lamp; one runs
 
 impl HandOvers {
     /// The lamp's: [`HAND_OVER_SOCKET`], [`SKILLS`], lamp-control's tokens
-    /// ([`ControlTokens`]), the lamp's Hermes ([`HermesRunner::lamp`]) and
-    /// lamp-skills alone as caller.
-    pub fn lamp(home: &Path) -> Self {
+    /// ([`ControlTokens`]), the lamp's Hermes started through Harness
+    /// ([`HarnessRunner::lamp`], #6510 Part 1 step 2, with the Harness
+    /// lamp-tasks sets up once it has one: `harness`) and lamp-skills alone
+    /// as caller.
+    pub fn lamp(home: &Path, harness: SkillHarnessSlot) -> Self {
         Self {
             socket: PathBuf::from(HAND_OVER_SOCKET),
             skills: PathBuf::from(SKILLS),
             tokens: std::sync::Arc::new(ControlTokens::default()),
-            runner: std::sync::Arc::new(HermesRunner::lamp(home)),
+            runner: std::sync::Arc::new(HarnessRunner::lamp(home, harness)),
             caller: caller_is_lamp_skills,
         }
     }
@@ -1122,7 +1500,7 @@ mod tests {
     }
 
     impl Runner for FakeRunner<'_> {
-        fn run(&self, run: &SkillRun) -> Result<u64, String> {
+        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
             let token = run
                 .env
                 .iter()
@@ -1482,7 +1860,7 @@ mod tests {
     #[test]
     fn the_task_is_data_in_the_words_and_the_run_has_the_tokens_life() {
         let hand = HandOver::parse(&line(|_| {}), skills()).unwrap();
-        let run = SkillRun::of(&hand, &RunToken::new("secret".into()));
+        let run = SkillRun::of(&hand, "task-1", &RunToken::new("secret".into()));
         assert_eq!(run.deadline, RUN_LIFETIME);
         assert!(
             run.prompt
@@ -1623,7 +2001,7 @@ mod tests {
     }
 
     impl Runner for HeldRunner {
-        fn run(&self, _: &SkillRun) -> Result<u64, String> {
+        fn run(&self, _: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
             let _ = self.began.lock().unwrap().send(());
             if let Some(release) = self.release.lock().unwrap().as_ref() {
                 let _ = release.recv_timeout(Duration::from_secs(10));
@@ -1797,7 +2175,7 @@ mod tests {
 
     fn skill_run(token: &str, deadline: Duration) -> SkillRun {
         let hand = HandOver::parse(&line(|_| {}), skills()).unwrap();
-        let mut run = SkillRun::of(&hand, &RunToken::new(token.into()));
+        let mut run = SkillRun::of(&hand, "task-1", &RunToken::new(token.into()));
         run.deadline = deadline;
         run
     }
@@ -1829,7 +2207,7 @@ mod tests {
                 std::fs::write(&wrapper, text).unwrap();
             }
             let why = runner
-                .run(&skill_run("tok", Duration::from_secs(5)))
+                .run(&skill_run("tok", Duration::from_secs(5)), &|| {})
                 .unwrap_err();
             assert_eq!(why, NOT_HELD_OFF);
             assert!(!ran.exists(), "nothing started");
@@ -1842,7 +2220,10 @@ mod tests {
             ),
         )
         .unwrap();
-        assert_eq!(runner.run(&skill_run("tok", Duration::from_secs(5))), Ok(0));
+        assert_eq!(
+            runner.run(&skill_run("tok", Duration::from_secs(5)), &|| {}),
+            Ok(0)
+        );
         assert!(ran.exists());
         assert_eq!(
             HermesRunner::lamp(dir.path()).held_by.as_deref(),
@@ -1858,13 +2239,37 @@ mod tests {
         }
     }
 
+    /// #6510 Part 1 step 2: the lines [`HarnessRunner`] looks for are
+    /// lamp-update's own run lines, held to its source, and a wrapper is
+    /// taken only with them and the network lines both.
+    #[test]
+    fn the_wrapper_run_lines_are_lamp_updates_own() {
+        let source = include_str!("../../update/src/hermes_install.rs");
+        for line in WRAPPER_RUN_LINES {
+            assert_eq!(source.matches(line).count(), 1, "{line:?}");
+        }
+        let net = format!("{}{}", WRAPPER_NET_LINES[0], WRAPPER_NET_LINES[1]);
+        let run = format!("{}{}", WRAPPER_RUN_LINES[0], WRAPPER_RUN_LINES[1]);
+        assert!(finds_runs_by_folder(&format!("{run}{net}")));
+        assert!(!finds_runs_by_folder(&net));
+        assert!(!finds_runs_by_folder(&run));
+        // The folder the wrappers match is the one the lamp's runner makes.
+        let runner = HarnessRunner::lamp(Path::new("/var/lib/lampos-tasks"), Default::default());
+        assert!(WRAPPER_RUN_LINES[0].contains(&format!(
+            "{}/{RUN_FOLDER_PREFIX}?*)",
+            runner.project.display()
+        )));
+        assert_eq!(runner.runs, Path::new(crate::run_token_file::RUNS_DIR));
+        assert_eq!(runner.held_by.as_deref(), Some(Path::new(HERMES)));
+    }
+
     #[test]
     fn a_run_past_its_deadline_is_killed() {
         let dir = tempfile::tempdir().unwrap();
         let runner = shell("sleep 30", dir.path());
         let began = std::time::Instant::now();
         let why = runner
-            .run(&skill_run("tok", Duration::from_millis(200)))
+            .run(&skill_run("tok", Duration::from_millis(200)), &|| {})
             .unwrap_err();
         assert!(why.contains("deadline"), "{why}");
         assert!(
@@ -1883,7 +2288,7 @@ mod tests {
         );
         let secret = "secret-token-6306";
         assert_eq!(
-            runner.run(&skill_run(secret, Duration::from_secs(10))),
+            runner.run(&skill_run(secret, Duration::from_secs(10)), &|| {}),
             Ok(0)
         );
         let argv = std::fs::read_to_string(dir.path().join("argv")).unwrap();
@@ -1901,12 +2306,12 @@ mod tests {
     fn a_run_returns_its_exit_status() {
         let dir = tempfile::tempdir().unwrap();
         let why = shell("exit 3", dir.path())
-            .run(&skill_run("tok", Duration::from_secs(10)))
+            .run(&skill_run("tok", Duration::from_secs(10)), &|| {})
             .unwrap_err();
         assert!(why.contains("status 3"), "{why}");
         let gone = dir.path().join("gone");
         let why = shell("true", &gone)
-            .run(&skill_run("tok", Duration::from_secs(10)))
+            .run(&skill_run("tok", Duration::from_secs(10)), &|| {})
             .unwrap_err();
         assert!(why.contains("not there"), "{why}");
     }
@@ -1943,7 +2348,7 @@ mod tests {
     #[test]
     fn a_runs_debug_line_never_shows_its_token() {
         let hand = HandOver::parse(&line(|_| {}), Path::new(SKILLS)).unwrap();
-        let run = SkillRun::of(&hand, &RunToken::new("secret-value".into()));
+        let run = SkillRun::of(&hand, "task-1", &RunToken::new("secret-value".into()));
         let shown = format!("{run:?}");
         assert!(!shown.contains("secret-value"), "{shown}");
         assert!(
