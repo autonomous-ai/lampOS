@@ -760,10 +760,20 @@ pub const MODELS_SETTING: (&str, &str) = (
     include_str!("../../../deploy/product/settings/models.env"),
 );
 
+/// lamp-update's own switch file a build carries (`manifest::UPDATE_ENV`,
+/// from updater 12, #6607): `LAMP_APP_ENGINES` and `LAMP_SKILL_TASKS` on.
+/// Read by lamp-update itself, so a lamp in a home takes them with no change
+/// to its own unit. Install doesn't write it: the product unit it writes
+/// sets both, which wins over the file.
+pub const UPDATE_SETTING: (&str, &str) = (
+    manifest::UPDATE_ENV,
+    include_str!("../../../deploy/product/settings/update.env"),
+);
+
 /// The product's settings as a build carries them (#1680, crate::apply):
 /// every one of [`SETTINGS`], the tmpfiles, the Store's switch file
-/// (`manifest::STORE_ENV`) and the models switch file ([`MODELS_SETTING`]),
-/// 0644. Never setup's, the
+/// (`manifest::STORE_ENV`), the models switch file ([`MODELS_SETTING`])
+/// and lamp-update's own switch file ([`UPDATE_SETTING`]), 0644. Never setup's, the
 /// voice's service, the keys or the zone, which are the lamp's; nor the
 /// product skills' files, which a round places from the build's
 /// `lamp-product-skills` (crate::product_skills) and the skills guard judges.
@@ -778,7 +788,7 @@ pub fn product_settings() -> Vec<manifest::Setting> {
                 .iter()
                 .filter(|(path, _)| *path == manifest::STORE_ENV),
         )
-        .chain([&MODELS_SETTING])
+        .chain([&MODELS_SETTING, &UPDATE_SETTING])
         .map(|(path, text)| manifest::Setting::new(path, text))
         .collect()
 }

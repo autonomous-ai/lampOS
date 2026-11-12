@@ -220,6 +220,13 @@ pub fn make_with(
     {
         min_updater = Some(min_updater.unwrap_or(1).max(manifest::MODELS_ENV_UPDATER));
     }
+    // And lamp-update's own switch file's (#6607).
+    if settings
+        .iter()
+        .any(|setting| setting.path == manifest::UPDATE_ENV)
+    {
+        min_updater = Some(min_updater.unwrap_or(1).max(manifest::UPDATE_ENV_UPDATER));
+    }
     // A template by its name on the lamp (`manifest::lamp_name`).
     if units
         .iter()
@@ -680,9 +687,10 @@ mod tests {
         .unwrap();
         assert_eq!(made.settings, settings);
         // With setup's reset plan, in its own field (#806), the Store's
-        // switch file, which only updater 10 takes, and the models switch
-        // file, which only updater 11 takes.
-        assert_eq!(made.min_updater, Some(manifest::MODELS_ENV_UPDATER));
+        // switch file, which only updater 10 takes, the models switch file,
+        // which only updater 11 takes, and lamp-update's own switch file,
+        // which only updater 12 takes.
+        assert_eq!(made.min_updater, Some(manifest::UPDATE_ENV_UPDATER));
         assert_eq!(
             made.reset_plan
                 .as_ref()
@@ -697,6 +705,7 @@ mod tests {
         assert!(paths.contains(&"/etc/tmpfiles.d/lampos.conf"));
         assert!(paths.contains(&manifest::STORE_ENV));
         assert!(paths.contains(&manifest::MODELS_ENV));
+        assert!(paths.contains(&manifest::UPDATE_ENV));
         assert!(
             !paths
                 .iter()

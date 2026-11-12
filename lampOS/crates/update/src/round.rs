@@ -1450,11 +1450,14 @@ impl Run<'_, '_> {
                 // the writer this lamp-update. Only in a round that applies: a
                 // dry one (a climbed updater's confirm) writes nothing.
                 // So is the models switch file, from updater 11
-                // (`manifest::MODELS_ENV_UPDATER`).
+                // (`manifest::MODELS_ENV_UPDATER`), and lamp-update's own
+                // switch file, from updater 12 (`manifest::UPDATE_ENV_UPDATER`).
                 if self.config.apply
                     && !these.is_empty()
                     && let Some(newer) = manifest.settings.iter().find(|setting| {
-                        setting.path == manifest::STORE_ENV || setting.path == manifest::MODELS_ENV
+                        setting.path == manifest::STORE_ENV
+                            || setting.path == manifest::MODELS_ENV
+                            || setting.path == manifest::UPDATE_ENV
                     })
                     && let Some(running) = &self.config.writer_from
                     && fs::read(self.config.on(crate::own::BACK))

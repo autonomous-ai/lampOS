@@ -2261,6 +2261,20 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
   the same way (`build N carries /etc/lampOS/models.env, and this lamp's
   settings writer is older ...`). It is outside `/etc/lampOS/update/`,
   which `lamp-update-apply` may not write.
+- **The update switch file.** `/etc/lampOS/update.env`
+  (`manifest::UPDATE_ENV`, `deploy/product/settings/update.env`,
+  `install::UPDATE_SETTING`) is carried by every build with settings from
+  updater 12 (`manifest::UPDATE_ENV_UPDATER`, #6607): `LAMP_APP_ENGINES=on`
+  and `LAMP_SKILL_TASKS=on`. No round rewrites lamp-update's own unit, so
+  these lines in `lamp-update.service` never reached a lamp already in a
+  home. lamp-update reads each switch once at its start
+  (`switches::update_switch`): set in its environment, `on` exactly, and
+  that always wins; not set there at all, this file, by the models switch
+  file's rule; a missing or garbled file is off. A round places it as it
+  does `models.env`, so the switches take effect when lamp-update next
+  starts, after the round. Install doesn't write it. A build carrying it asks
+  for updater 12 and waits for the writer's refresh the same way. Every
+  future lamp-update switch goes in this file, never only in the unit.
 - **Root, small.** At the switch, after the journal and normally before any
   unit, link or model moves (the paired head-pins exception is below), the round stages `apply/request.json` and the
   build's envelope in its records and starts `lamp-update-apply.service`
