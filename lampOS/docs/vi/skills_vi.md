@@ -2426,7 +2426,8 @@ giọng nói một lần, ở lần chạy đầu. Khóa hay token không bao gi
 hỏi bằng giọng nói hay giữ trong thư mục kỹ năng: tệp chứa giá trị giống
 khóa hay token bị từ chối, kể cả khi nó nằm trong đường dẫn của một liên kết
 (mỗi phần giữa các `/` sau scheme và host, và mỗi phần quanh `:`, như khóa
-của webhook hay bot); đưa bí mật qua app là việc tiếp theo.
+của webhook hay bot); đường vào của chúng là app (`LAMP_SKILL_SECRETS` bên
+dưới).
 Một dịch vụ đã liên kết mà tệp dùng được cấp quyền của dịch vụ đó (phán quyết
 của chủ, 13/11: mọi thứ chạm tới các kết nối đều đi qua agent của đèn từ đầu
 đến cuối), như `do.task` của một kỹ năng dịch vụ tạo bằng giọng nói, khi
@@ -2441,6 +2442,42 @@ kết nối của đèn (`lamp-services mcp`, `skill_make::fresh_home_for`), nê
 chỉ tới dịch vụ qua lamp-control với token riêng của lần chạy, không bao giờ
 bằng khóa của tệp. Tắt: tệp nêu một dịch vụ bị từ chối.
 `lamp_voice::upload_agent`; xem bản tiếng Anh, "Run by the lamp's agent".
+
+#### Khóa của kỹ năng, nhập trong app (`LAMP_SKILL_SECRETS=on`, tắt)
+
+Phán quyết của người xây dựng đầu tiên (12/11 19:44 trên #6059): bí mật của
+một tệp (khóa API, token bot) không bao giờ được nói ra hay giữ trong thư
+mục kỹ năng; chúng được nhập qua app, vào kho của root như token dịch vụ,
+và tới lần chạy chỉ qua một tệp môi trường đọc một lần; agent không bao giờ
+hỏi khóa bằng giọng nói. Tắt trừ khi `LAMP_SKILL_SECRETS=on`, không unit nào
+đặt; `lamp-voice`, `lamp-cloud`, `lamp-services` và `lamp-tasks serve` cùng
+đọc nó.
+
+- **Tên trong tệp, giá trị trong app.** Khi tải lên, đèn đọc tên các biến
+  môi trường mà lần chạy cần (`^[A-Z][A-Z0-9_]{2,63}$`, như
+  `os.environ["X"]`, `$X`, "set X"), trừ tên của shell, của đèn và của
+  agent (`PATH`, `LAMP_*`, `HERMES_*`, ...), tối đa 16, và ghi chúng vào
+  `skill.toml` là `secrets = [...]`; câu trả lời cho app mang chúng trong
+  `secrets`. Tệp vẫn chứa giá trị thì bị từ chối, với lời bảo bỏ giá trị ra
+  khỏi tệp và nhập nó trong app.
+- **Ba lệnh của app:** `skills.secrets {skill}` trả `{skill, needed, set}`
+  (chỉ tên); `skills.secret_set {skill, name, value}` (tên kỹ năng cần, giá
+  trị 1 đến 4096 byte, không ký tự điều khiển) và `skills.secret_unset
+  {skill, name}` trả như vậy sau khi đổi. Chỉ qua kênh tài khoản của chính
+  đèn, như `skills.upload`.
+- **Kho của root:** `lamp-services` giữ giá trị trong
+  `/var/lib/lampos-services/skill-secrets/<skill>.json` (0600, thư mục
+  0700), cạnh token dịch vụ; journal chỉ ghi tên và độ dài. Gỡ kỹ năng, hay
+  xóa sạch dịch vụ, thì khóa của nó cũng mất.
+- **Lần chạy:** lamp-tasks hỏi lamp-services (chỉ lamp-tasks.service được
+  hỏi), ghi `.run-env` (0400) trong thư mục và home mới riêng của lần chạy (`skill_make::fresh_home`), và `/bin/sh`
+  đọc nó một lần rồi xóa trước khi Hermes khởi động. Thiếu một tên thì lần
+  chạy không bắt đầu, và đèn nói rõ tên nào cần nhập trong app.
+- **Không bao giờ bằng giọng nói:** công cụ của kỹ năng agent nói cần nhập
+  khóa trong app, không nhận khóa bằng giọng nói.
+
+`lamp_services::skill_secrets`, `lamp_tasks::skill_keys`; xem bản tiếng
+Anh, "Its keys, given in the app".
 
 ## Trigger theo ngày trong tuần (`trigger.days`, #6066)
 
