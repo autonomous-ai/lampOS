@@ -34,5 +34,6 @@ pub mod skills;
 pub mod unasked;
 pub mod update;
 pub mod update_alerts;
+pub mod update_events;
 pub mod upload;
 pub mod wire;

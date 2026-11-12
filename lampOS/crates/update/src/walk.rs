@@ -56,6 +56,29 @@ pub fn under_way(config: &Config) -> bool {
         .any(|step| !steps.contains_key(*step))
 }
 
+/// Whether the walk holds a round: under way, and no first update after
+/// setup owed before the walk began (#6284, crate::first_update), whose
+/// round the walk has not begun for. With `LAMP_FIRST_UPDATE` off,
+/// [`under_way`] alone.
+pub fn holds(config: &Config) -> bool {
+    under_way(config) && !crate::first_update::before_walk(config, records::unix_ms())
+}
+
+/// Whether the walk has begun: its progress file keeps at least one step's
+/// outcome. A walk not yet begun has none, or no file.
+pub fn begun(config: &Config) -> bool {
+    let (_, progress) = file(config);
+    fs::read(config.on(&progress))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|file| {
+            file.get("steps")
+                .and_then(serde_json::Value::as_object)
+                .map(|steps| !steps.is_empty())
+        })
+        .unwrap_or(false)
+}
+
 /// Whether the installed voice unit walks (`LAMP_ONBOARDING=on`), and
 /// the onboarding file it names.
 fn file(config: &Config) -> (bool, String) {

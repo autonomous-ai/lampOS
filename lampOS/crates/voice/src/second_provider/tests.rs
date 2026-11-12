@@ -5851,6 +5851,7 @@ async fn told_the_walk_is_under_way_a_made_up_step_is_not_said() {
         request: 1,
         privacy_generation: 1,
         on: true,
+        updating: None,
     })
     .unwrap();
     engine.submit(serde_json::from_str(&wire).unwrap());

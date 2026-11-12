@@ -107,6 +107,29 @@ const RISE_US: u64 = 80_000_000;
 /// words), said once per voice start.
 pub(crate) const INVITE: &str = "(Say only this, nothing before or after it: \"Hi! I'm your lamp. \
      Come sit in front of me, and we'll get to know each other.\")";
+/// The first update after setup holds the walk's beginning (#6284), with
+/// `on` exactly: while setup's first-update file
+/// ([`lamp_msgs::FIRST_UPDATE_FILE`]) is there and owed, a walk not yet
+/// begun waits, and says [`FIRST_UPDATE_LINE`] once if lamp-update says it
+/// is fetching a build. Off, the walk is as before.
+pub const FIRST_UPDATE_ENVIRONMENT: &str = "LAMP_FIRST_UPDATE";
+/// The first-update file is looked at no more often than this.
+const FIRST_UPDATE_LOOK_US: u64 = 1_000_000;
+/// The walk's own line while a build with changes is fetched for the first
+/// update (#6284), said once per file, in the owner's language.
+pub(crate) const FIRST_UPDATE_LINE: &str = "(Say only this, nothing before or after it: \"I'm updating my software first. \
+     This takes a few minutes.\")";
+/// The walk's own line once that first update has switched the lamp to its
+/// new build (#6284, the owner's ask on 11 Nov: say when it is done), said
+/// once per file, just before the walk begins.
+pub(crate) const FIRST_UPDATE_DONE_LINE: &str = "(Say only this, nothing before or after it: \"My software update is finished, and I'm ready now.\")";
+/// What the lamp says to a person who talks to it while the first update
+/// holds the walk (#6284, the owner's ask on 12 Nov): no chat, only this,
+/// in the owner's language.
+pub(crate) const FIRST_UPDATE_WAIT_LINE: &str = "(Say only this, nothing before or after it: \"I'm still updating my software. Please wait a moment, I'll be ready soon.\")";
+/// How long the walk waits, once the update is done, for a quiet moment to
+/// say [`FIRST_UPDATE_DONE_LINE`]; past it the walk begins without it.
+const FIRST_UPDATE_DONE_WAIT_US: u64 = 15_000_000;
 /// One word on how to move the lamp, after this much quiet.
 const GUIDE_EVERY_US: u64 = 8_000_000;
 /// A step the model leads and never reports has failed after this long,
@@ -1135,6 +1158,10 @@ pub struct Onboarding {
     /// Turns held while refusing: nothing is begun until the minute's try,
     /// which is the walk's own re-offer.
     model_held: bool,
+    /// The first update's hold on the walk's beginning (#6284,
+    /// [`FIRST_UPDATE_ENVIRONMENT`]): `None` with the switch off, and once
+    /// the walk is let go, for the rest of this voice start.
+    first_update: Option<FirstUpdateHold>,
     /// Whether the voice can save a face (`remember_my_face`, the eyes' who
     /// socket set): "who you are" then asks for the face, and is done when it
     /// is saved, not on a name and a yes (#3883's follow-up).
@@ -1205,6 +1232,100 @@ fn heard(
         }
         _ => Heard::Stale,
     }
+}
+
+/// The first update's hold (#6284): what the walk last read of setup's
+/// first-update file and of lamp-update's round, by the file's date
+/// (`at_unix_ms`), so the line is said once per file.
+#[derive(Debug)]
+struct FirstUpdateHold {
+    file: PathBuf,
+    /// When the file was last looked at, by the walk's clock.
+    looked_us: Option<u64>,
+    /// The file's date while it is there and owed.
+    owed: Option<u64>,
+    /// The file a `fetching` round was heard for.
+    fetching: Option<u64>,
+    /// The file the line was said for.
+    told: Option<u64>,
+    /// The walk has been held this voice start (its records).
+    held: bool,
+    /// The last owed file's date seen this voice start: a voice started
+    /// by the switch itself sees it while the switch is watched.
+    seen: Option<u64>,
+    /// The file the done line was said for.
+    done: Option<u64>,
+    /// When the file was found gone with its update switched, by the walk's
+    /// clock: the done line waits from then for a quiet moment.
+    done_since_us: Option<u64>,
+}
+
+impl FirstUpdateHold {
+    fn at(file: PathBuf) -> Self {
+        Self {
+            file,
+            looked_us: None,
+            owed: None,
+            fetching: None,
+            told: None,
+            held: false,
+            seen: None,
+            done: None,
+            done_since_us: None,
+        }
+    }
+}
+
+/// Whether lamp-update says now, on `update/status`, that its round brings a
+/// newer build (its target read, or fetching on), said since `since_unix_ms` (the first-update file's
+/// date) and not stale.
+fn update_fetching(bus: Option<&lamp_bus::Bus>, since_unix_ms: u64) -> bool {
+    bus.and_then(|bus| bus.latest(lamp_msgs::UpdateStatus::TOPIC).ok().flatten())
+        .filter(|message| !message.expired && message.header.at_unix_ms >= since_unix_ms)
+        .and_then(|message| message.parse::<lamp_msgs::UpdateStatus>().ok())
+        // Before the switch only: a voice started by the switch itself
+        // reads `switching` or `watching`, and never says it again.
+        .is_some_and(|status| {
+            status.brings_a_build() && matches!(status.now.as_str(), "checking" | "fetching")
+        })
+}
+
+/// Whether lamp-update's last round, begun since `since_unix_ms` (the
+/// first-update file's date), has ended for good: any end but lamp-update
+/// switching itself, after which the new lamp-update takes another round.
+/// The walk reads this as well as the file, since a lamp-update whose own
+/// unit can't write setup's folder keeps the end in its records only.
+fn update_ended(bus: Option<&lamp_bus::Bus>, since_unix_ms: u64) -> bool {
+    bus.and_then(|bus| bus.latest(lamp_msgs::UpdateStatus::TOPIC).ok().flatten())
+        .filter(|message| !message.expired)
+        .and_then(|message| message.parse::<lamp_msgs::UpdateStatus>().ok())
+        .filter(|status| status.now == "idle")
+        .and_then(|status| status.last)
+        .is_some_and(|last| {
+            last.outcome != "self-switched"
+                && last
+                    .started_at_unix_ms
+                    .map_or(last.at_unix_ms >= since_unix_ms, |started| {
+                        started >= since_unix_ms
+                    })
+        })
+}
+
+/// Whether lamp-update's last round, begun since `since_unix_ms` (the
+/// first-update file's date), ended by switching the lamp to its new build.
+fn update_switched(bus: Option<&lamp_bus::Bus>, since_unix_ms: u64) -> bool {
+    bus.and_then(|bus| bus.latest(lamp_msgs::UpdateStatus::TOPIC).ok().flatten())
+        .filter(|message| !message.expired)
+        .and_then(|message| message.parse::<lamp_msgs::UpdateStatus>().ok())
+        .and_then(|status| status.last)
+        .is_some_and(|last| {
+            last.outcome == "switched"
+                && last
+                    .started_at_unix_ms
+                    .map_or(last.at_unix_ms >= since_unix_ms, |started| {
+                        started >= since_unix_ms
+                    })
+        })
 }
 
 /// What the body last said on a topic.
@@ -1294,6 +1415,40 @@ static UNDER_WAY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool:
 #[cfg(test)]
 thread_local! {
     static UNDER_WAY: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// The first update's waiting line, in the owner's language, while it
+/// holds the walk ([`FIRST_UPDATE_WAIT_LINE`]); none otherwise.
+#[cfg(not(test))]
+static UPDATING: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+// Per test thread, as `UNDER_WAY`.
+#[cfg(test)]
+thread_local! {
+    static UPDATING: std::cell::RefCell<Option<String>> = const { std::cell::RefCell::new(None) };
+}
+
+pub(crate) fn set_updating(line: Option<String>) {
+    #[cfg(not(test))]
+    if let Ok(mut updating) = UPDATING.lock() {
+        *updating = line;
+    }
+    #[cfg(test)]
+    UPDATING.with(|updating| *updating.borrow_mut() = line);
+}
+
+/// The first update's waiting line as the walk set it, for the coordinator
+/// to tell the second route's worker, another process (`WalkUnderWay`).
+pub(crate) fn updating_line() -> Option<String> {
+    #[cfg(not(test))]
+    return UPDATING.lock().ok()?.clone();
+    #[cfg(test)]
+    UPDATING.with(|updating| updating.borrow().clone())
+}
+
+/// The words a person's line is answered with while the first update holds
+/// the walk: said as they are, no chat asked.
+pub(crate) fn updating_words() -> Option<String> {
+    own_words(&updating_line()?).map(str::to_owned)
 }
 
 pub(crate) fn set_under_way(on: bool) {
@@ -1442,6 +1597,11 @@ impl Onboarding {
                 .as_deref(),
         );
         walk.face_ask = std::env::var(FACE_EXPRESSIONS_ASK_ENVIRONMENT).as_deref() == Ok("on");
+        if std::env::var(FIRST_UPDATE_ENVIRONMENT).as_deref() == Ok("on") {
+            walk.first_update = Some(FirstUpdateHold::at(PathBuf::from(
+                lamp_msgs::FIRST_UPDATE_FILE,
+            )));
+        }
         walk.language = crate::language::at_start();
         Some(walk)
     }
@@ -1524,6 +1684,7 @@ impl Onboarding {
             harness_spawn: harness_line::spawn,
             model_refusing: false,
             model_held: false,
+            first_update: None,
             face_kept: false,
             released: true,
             near_since: None,
@@ -3448,6 +3609,10 @@ impl Onboarding {
         if self.model_held {
             return None;
         }
+        // The first update after setup (#6284): a walk not yet begun waits.
+        if let Some(line) = self.first_update_hold(now_us, quiet_us, can_speak) {
+            return line;
+        }
         if can_speak
             && let Some(note) = self.owed.take().or_else(|| {
                 let line = self.closing_line();
@@ -4140,6 +4305,115 @@ impl Onboarding {
     pub fn set_model_refusing(&mut self, refusing: bool, held: bool) {
         self.model_refusing = refusing;
         self.model_held = refusing && held;
+    }
+
+    /// The first update's hold (#6284, [`FIRST_UPDATE_ENVIRONMENT`]): `Some`
+    /// while the walk waits to begin, holding [`FIRST_UPDATE_LINE`] the one
+    /// time it is said; `None` when the walk goes on as before. A walk begun
+    /// (an outcome kept, its intro heard or a step asked) is never held, and
+    /// once the file is gone or no longer owed the walk is let go for the
+    /// rest of this voice start. The file and `update/status` are read at
+    /// most once a second.
+    fn first_update_hold(
+        &mut self,
+        now_us: u64,
+        quiet_us: u64,
+        can_speak: bool,
+    ) -> Option<Option<String>> {
+        let held = self.first_update_held(now_us, quiet_us, can_speak);
+        // While it holds the walk for an owed update, a person who talks to
+        // the lamp hears the waiting line (`updating_words`).
+        let updating = held.is_some()
+            && self
+                .first_update
+                .as_ref()
+                .is_some_and(|hold| hold.owed.is_some());
+        set_updating(updating.then(|| {
+            in_language::said(own_line(FIRST_UPDATE_WAIT_LINE.to_owned()), self.language)
+        }));
+        held
+    }
+
+    fn first_update_held(
+        &mut self,
+        now_us: u64,
+        quiet_us: u64,
+        can_speak: bool,
+    ) -> Option<Option<String>> {
+        self.first_update.as_ref()?;
+        let begun = !self.desired.steps.is_empty()
+            || self.desired.opened
+            || self.led.as_ref().is_some_and(|led| led.asked_us.is_some());
+        let mut hold = self.first_update.take()?;
+        if !begun
+            && hold
+                .looked_us
+                .is_none_or(|at| now_us.saturating_sub(at) >= FIRST_UPDATE_LOOK_US)
+        {
+            hold.looked_us = Some(now_us);
+            let now_ms = (self.unix_clock)();
+            hold.owed = lamp_msgs::FirstUpdate::read(&hold.file)
+                .filter(|first| first.owed(now_ms))
+                .map(|first| first.at_unix_ms)
+                .filter(|at| !update_ended(self.eyes.as_ref(), *at));
+            if let Some(at) = hold.owed
+                && hold.fetching != Some(at)
+                && update_fetching(self.eyes.as_ref(), at)
+            {
+                hold.fetching = Some(at);
+            }
+        }
+        if let Some(at) = hold.owed {
+            hold.seen = Some(at);
+        }
+        // Done: the file gone, its round switched the lamp: one line before
+        // the walk begins, at a quiet moment, waited for at most 15 s.
+        if !begun
+            && hold.owed.is_none()
+            && let Some(at) = hold.seen
+            && hold.done != Some(at)
+            && update_switched(self.eyes.as_ref(), at)
+        {
+            let since = *hold.done_since_us.get_or_insert(now_us);
+            if can_speak && quiet_us >= START_QUIET_US {
+                hold.done = Some(at);
+                self.records.push(
+                    json!({"kind":"onboarding_first_update","state":"done_told","at_us":now_us}),
+                );
+                self.first_update = Some(hold);
+                return Some(Some(own_line(FIRST_UPDATE_DONE_LINE.to_owned())));
+            }
+            if now_us.saturating_sub(since) < FIRST_UPDATE_DONE_WAIT_US {
+                self.first_update = Some(hold);
+                return Some(None);
+            }
+            hold.done = Some(at);
+        }
+        let Some(at) = hold.owed.filter(|_| !begun) else {
+            if hold.held {
+                self.records.push(
+                    json!({"kind":"onboarding_first_update","state":"let_go","at_us":now_us}),
+                );
+            }
+            return None;
+        };
+        if !hold.held {
+            hold.held = true;
+            self.records
+                .push(json!({"kind":"onboarding_first_update","state":"held","at_us":now_us}));
+        }
+        let line = (hold.fetching == Some(at)
+            && hold.told != Some(at)
+            && can_speak
+            && quiet_us >= START_QUIET_US)
+            .then(|| {
+                hold.told = Some(at);
+                self.records
+                    .push(json!({"kind":"onboarding_first_update","state":"told","at_us":now_us}));
+                own_line(FIRST_UPDATE_LINE.to_owned())
+            });
+        self.first_update = Some(hold);
+        Some(line)
     }
 
     fn finish(&mut self, step: Step, outcome: Outcome, framing: Option<Framing>, now_us: u64) {
@@ -10293,6 +10567,286 @@ mod tests {
         room.walk
             .finish(Step::Touch, Outcome::Failed, None, room.at);
         assert_eq!(room.walk.desired.steps["touch"].outcome, Outcome::Failed);
+    }
+
+    /// A walk with the first-update switch on (#6284): its file beside the
+    /// walk's, and lamp-update's `update/status` on a bus of the walk's own.
+    fn first_update_room(name: &str) -> (Room, PathBuf, lamp_bus::Publisher) {
+        use lamp_msgs::UpdateStatus;
+        // Short, for the sockets' path limit.
+        let root = PathBuf::from(format!("/tmp/lvfu-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let bus = lamp_bus::Bus::new(&root).unwrap();
+        let says = bus
+            .publisher_declared(UpdateStatus::TOPIC, &UpdateStatus::declaration(), "update")
+            .unwrap();
+        let mut room = Room::new(name);
+        let file = room.walk.file.with_file_name("first-update");
+        room.walk.eyes = Some(bus);
+        room.walk.first_update = Some(FirstUpdateHold::at(file.clone()));
+        (room, file, says)
+    }
+
+    fn first_update_written(file: &Path, at_unix_ms: u64) {
+        std::fs::write(file, format!("{{\"at_unix_ms\":{at_unix_ms}}}")).unwrap();
+    }
+
+    fn update_now(says: &mut lamp_bus::Publisher, at_us: u64, now: &str) {
+        let status = lamp_msgs::UpdateStatus {
+            running: None,
+            now: now.into(),
+            last: None,
+            harness: None,
+            engines: None,
+            refused: None,
+            round: None,
+        };
+        says.publish_json(at_us + 1, &status).unwrap();
+    }
+
+    fn first_update_states(walk: &Onboarding) -> Vec<String> {
+        walk.records
+            .iter()
+            .filter(|record| record["kind"] == "onboarding_first_update")
+            .map(|record| record["state"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    /// #6284, the switch off: a first update owed and fetched holds nothing.
+    #[test]
+    fn without_the_first_update_switch_the_walk_begins_as_before() {
+        let (mut room, file, mut says) = first_update_room("fu-off");
+        room.walk.first_update = None;
+        first_update_written(&file, unix_ms());
+        update_now(&mut says, room.at, "fetching");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert!(first_update_states(&room.walk).is_empty());
+    }
+
+    /// #6284: while the first update is owed and the build is already
+    /// current, the walk waits without a word, and begins as before as soon
+    /// as lamp-update removes the file.
+    #[test]
+    fn a_walk_waits_while_the_first_update_is_owed_and_begins_once_it_is_gone() {
+        let (mut room, file, mut says) = first_update_room("fu-held");
+        first_update_written(&file, unix_ms());
+        update_now(&mut says, room.at, "checking");
+        assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+        assert!(!room.walk.rising(room.at));
+        assert_eq!(room.outcome(Step::WhereYouSit), None);
+        update_now(&mut says, room.at, "idle");
+        std::fs::remove_file(&file).unwrap();
+        // The room was quiet all along: the walk goes on as at once.
+        assert_eq!(
+            room.wait(7 * S, Some(NEAR_MIDDLE)),
+            [SIT_NOTE, SIT_DONE, WHO_NOTE]
+        );
+        assert_eq!(first_update_states(&room.walk), ["held", "let_go"]);
+        assert!(room.walk.first_update.is_none());
+    }
+
+    /// #6284: a build with changes fetched, the lamp says its one line,
+    /// once per file, as the walk's own line in the owner's language, and
+    /// the walk still waits until the file is gone.
+    #[test]
+    fn the_first_update_line_is_said_once_when_a_build_is_fetched() {
+        for language in [None, Some(crate::language::Language::Vietnamese)] {
+            let (mut room, file, mut says) = first_update_room("fu-told");
+            room.walk.language = language;
+            first_update_written(&file, unix_ms());
+            update_now(&mut says, room.at, "checking");
+            assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+            update_now(&mut says, room.at, "fetching");
+            let told = room.wait(5 * S, Some(NEAR_MIDDLE));
+            let words = if language.is_some() {
+                "Mình cập nhật phần mềm trước nhé, mất vài phút thôi."
+            } else {
+                "I'm updating my software first. This takes a few minutes."
+            };
+            assert_eq!(told.len(), 1, "{language:?}");
+            assert_eq!(own_words(&told[0]), Some(words), "{language:?}");
+            // Said again while fetching: never twice for the same file.
+            update_now(&mut says, room.at, "fetching");
+            assert_eq!(room.wait(60 * S, Some(NEAR_MIDDLE)), NONE);
+            update_now(&mut says, room.at, "watching");
+            assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+            std::fs::remove_file(&file).unwrap();
+            assert!(room.wait(7 * S, Some(NEAR_MIDDLE)).len() >= 2);
+            assert!(room.walk.kept().steps.contains_key("where_you_sit"));
+            assert_eq!(
+                first_update_states(&room.walk),
+                ["held", "told", "let_go"],
+                "{language:?}"
+            );
+        }
+    }
+
+    /// #6284, the owner's ask: once the first update has switched the lamp
+    /// (its round's `last` says `switched`, begun since the file), the lamp
+    /// says it is done, once, just before the walk begins; a round that
+    /// ended any other way says nothing.
+    #[test]
+    fn the_first_update_done_line_is_said_before_the_walk_once_switched() {
+        fn ended(says: &mut lamp_bus::Publisher, at_us: u64, outcome: &str, started: u64) {
+            let status = lamp_msgs::UpdateStatus {
+                running: None,
+                now: "idle".into(),
+                last: Some(lamp_msgs::UpdateResult {
+                    outcome: outcome.into(),
+                    sequence: Some(2),
+                    at_unix_ms: started + 1_000,
+                    reason: None,
+                    started_at_unix_ms: Some(started),
+                }),
+                harness: None,
+                engines: None,
+                refused: None,
+                round: None,
+            };
+            says.publish_json(at_us + 1, &status).unwrap();
+        }
+        for language in [None, Some(crate::language::Language::Vietnamese)] {
+            let (mut room, file, mut says) = first_update_room("fu-done");
+            room.walk.language = language;
+            let at = unix_ms();
+            first_update_written(&file, at);
+            update_now(&mut says, room.at, "watching");
+            assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+            ended(&mut says, room.at, "switched", at + 500);
+            std::fs::remove_file(&file).unwrap();
+            let said = room.wait(7 * S, Some(NEAR_MIDDLE));
+            let words = if language.is_some() {
+                "Mình đã cập nhật phần mềm xong rồi, giờ mình sẵn sàng rồi nhé."
+            } else {
+                "My software update is finished, and I'm ready now."
+            };
+            assert_eq!(own_words(&said[0]), Some(words), "{language:?}");
+            assert!(room.walk.kept().steps.contains_key("where_you_sit") || said.len() >= 2);
+            assert_eq!(
+                first_update_states(&room.walk),
+                ["held", "done_told", "let_go"],
+                "{language:?}"
+            );
+        }
+        // Up to date, refused, failed: no done line.
+        let (mut room, file, mut says) = first_update_room("fu-not-done");
+        let at = unix_ms();
+        first_update_written(&file, at);
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        ended(&mut says, room.at, "up-to-date", at + 500);
+        std::fs::remove_file(&file).unwrap();
+        assert_eq!(
+            room.wait(7 * S, Some(NEAR_MIDDLE)),
+            [SIT_NOTE, SIT_DONE, WHO_NOTE]
+        );
+        assert_eq!(first_update_states(&room.walk), ["held", "let_go"]);
+    }
+
+    /// #6284: on a lamp whose lamp-update can't remove setup's file (its
+    /// 7071 unit), the walk begins once the round's end is on the bus,
+    /// the file notwithstanding; lamp-update switching itself holds on.
+    #[test]
+    fn the_walk_begins_on_the_rounds_end_though_the_file_stays() {
+        fn ended(says: &mut lamp_bus::Publisher, at_us: u64, outcome: &str, started: u64) {
+            let status = lamp_msgs::UpdateStatus {
+                running: None,
+                now: "idle".into(),
+                last: Some(lamp_msgs::UpdateResult {
+                    outcome: outcome.into(),
+                    sequence: Some(2),
+                    at_unix_ms: started + 1_000,
+                    reason: None,
+                    started_at_unix_ms: Some(started),
+                }),
+                harness: None,
+                engines: None,
+                refused: None,
+                round: None,
+            };
+            says.publish_json(at_us + 1, &status).unwrap();
+        }
+        let (mut room, file, mut says) = first_update_room("fu-kept");
+        let at = unix_ms();
+        first_update_written(&file, at);
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        ended(&mut says, room.at, "self-switched", at + 500);
+        assert_eq!(room.wait(10 * S, Some(NEAR_MIDDLE)), NONE);
+        ended(&mut says, room.at, "up-to-date", at + 20_000);
+        assert_eq!(
+            room.wait(7 * S, Some(NEAR_MIDDLE)),
+            [SIT_NOTE, SIT_DONE, WHO_NOTE]
+        );
+        assert!(file.exists());
+    }
+
+    /// #6284, the owner's ask on 12 Nov: while the first update holds the
+    /// walk, a person who talks to the lamp is answered with the waiting
+    /// line, and with nothing of it once the walk is let go.
+    #[test]
+    fn a_person_heard_while_the_first_update_holds_is_told_to_wait() {
+        let (mut room, file, mut says) = first_update_room("fu-wait");
+        assert_eq!(updating_words(), None);
+        let at = unix_ms();
+        first_update_written(&file, at);
+        assert_eq!(room.wait(3 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(
+            updating_words().as_deref(),
+            Some("I'm still updating my software. Please wait a moment, I'll be ready soon.")
+        );
+        let status = lamp_msgs::UpdateStatus {
+            running: None,
+            now: "idle".into(),
+            last: Some(lamp_msgs::UpdateResult {
+                outcome: "up-to-date".into(),
+                sequence: Some(2),
+                at_unix_ms: at + 2_000,
+                reason: None,
+                started_at_unix_ms: Some(at + 1_000),
+            }),
+            harness: None,
+            engines: None,
+            refused: None,
+            round: None,
+        };
+        says.publish_json(room.at + 1, &status).unwrap();
+        assert_eq!(
+            room.wait(7 * S, Some(NEAR_MIDDLE)),
+            [SIT_NOTE, SIT_DONE, WHO_NOTE]
+        );
+        assert_eq!(updating_words(), None);
+    }
+
+    /// #6284: a file past its 20 minutes (lamp-update failed to remove it)
+    /// holds nothing, and neither does a fetch said before it was written.
+    #[test]
+    fn a_stale_first_update_file_holds_nothing() {
+        let (mut room, file, mut says) = first_update_room("fu-stale");
+        first_update_written(&file, unix_ms() - lamp_msgs::FIRST_UPDATE_WITHIN_MS - 1_000);
+        update_now(&mut says, room.at, "fetching");
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        assert!(first_update_states(&room.walk).is_empty());
+
+        let (mut room, file, mut says) = first_update_room("fu-early");
+        update_now(&mut says, room.at, "fetching");
+        first_update_written(&file, unix_ms() + 2_000);
+        assert_eq!(room.wait(30 * S, Some(NEAR_MIDDLE)), NONE);
+        assert_eq!(first_update_states(&room.walk), ["held"]);
+    }
+
+    /// #6284: a walk already begun is never held, a file and a fetch
+    /// notwithstanding.
+    #[test]
+    fn a_begun_walk_is_never_held_for_the_first_update() {
+        let (mut room, file, mut says) = first_update_room("fu-begun");
+        let hold = room.walk.first_update.take();
+        assert_eq!(room.wait(7 * S, Some(NEAR_MIDDLE)), [SIT_NOTE, SIT_DONE]);
+        room.walk.first_update = hold;
+        first_update_written(&file, unix_ms());
+        update_now(&mut says, room.at, "fetching");
+        assert_eq!(room.wait(20 * S, Some(NEAR_MIDDLE)), [WHO_NOTE]);
+        assert!(first_update_states(&room.walk).is_empty());
+        assert!(room.walk.first_update.is_none());
     }
 
     // The first builder's P2 on #2526: none of these is a name, so a yes

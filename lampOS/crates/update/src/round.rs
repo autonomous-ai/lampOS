@@ -120,6 +120,9 @@ pub struct Config {
     /// `LAMP_UPDATE_IMAGE=on`: the image's own files a build carries are
     /// written the same way (crate::image, #1369).
     pub image: bool,
+    /// `LAMP_FIRST_UPDATE=on` (#6284, crate::first_update): while the first
+    /// update after a setup is owed, the setup walk does not hold a round.
+    pub first_update: bool,
     /// This program's own bytes, from which a round refreshes the settings
     /// writer before it looks at a build (crate::writer_swap). None: the
     /// writer is never refreshed.
@@ -540,8 +543,14 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     {
         outcome = switched;
     }
-    run.records
-        .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
+    // Before setup, a channel out of reach is a plain line, not a round's
+    // end that `update/status` reads back at a restart (#6284).
+    if crate::first_update::kept(crate::first_update::before_setup(config), &outcome) {
+        run.records
+            .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
+    } else {
+        run.records.log(outcome.kind(), &outcome.kept());
+    }
     outcome
 }
 
@@ -736,6 +745,13 @@ impl Run<'_, '_> {
             && crate::setup_lifecycle::done(&self.config.root)
     }
 
+    /// Setup left unrestarted by the first update after it
+    /// ([`crate::setup_lifecycle::first_update_leaves`]).
+    fn leave_setup_for_first_update(&self, back: &Back, unit: &str) -> bool {
+        self.forced()
+            && crate::setup_lifecycle::first_update_leaves(&self.config.root, &back.unit, unit)
+    }
+
     fn say(&mut self, line: &str) {
         (self.world.say)(line);
     }
@@ -807,10 +823,14 @@ impl Run<'_, '_> {
         }
         // The setup walk under way: nothing fetched or switched this round,
         // at most `walk::MOST_HELD` rounds on a lamp (#3689, crate::walk).
-        if crate::walk::under_way(self.config)
-            && let Some(held) = crate::walk::hold(self.records.folder())
-        {
-            return Outcome::NotQuiet(crate::walk::held(held));
+        // Not while the first update after setup is owed (#6284): the walk
+        // has not begun, the voice holding it until that round ends.
+        if crate::walk::under_way(self.config) {
+            if crate::first_update::before_walk(self.config, crate::records::unix_ms()) {
+                self.say(crate::first_update::NOT_HELD);
+            } else if let Some(held) = crate::walk::hold(self.records.folder()) {
+                return Outcome::NotQuiet(crate::walk::held(held));
+            }
         }
         // A template is never active itself, and never restarted: only its
         // instances run.
@@ -2136,10 +2156,10 @@ impl Run<'_, '_> {
         // "says nothing" for 22 minutes of someone talking to the lamp).
         let mut looked = false;
         loop {
-            if !self.voice_running() {
+            if !self.voice_running() || self.forced() {
                 return Ok(());
             }
-            if walk && crate::walk::under_way(self.config) {
+            if walk && crate::walk::holds(self.config) {
                 return Err(crate::walk::UNDER_WAY.to_owned());
             }
             let now = self.world.clock.now_ms();
@@ -2393,6 +2413,22 @@ impl Run<'_, '_> {
         }
     }
 
+    /// How long the voice must have been quiet before it is switched: 45 s.
+    /// The first update after setup waits for none ([`Run::forced`]).
+    fn quiet_needed(&self) -> Duration {
+        QUIET
+    }
+
+    /// The first update after setup is forced (#6284, the product's call on
+    /// 12 Nov): it switches as soon as it is fetched, with no quiet moment
+    /// and whoever is heard, since the walk has not begun and the lamp has
+    /// said only its update line. On lamp-e82d on 12 Nov, office noise
+    /// ("heard 0 words") ended the 5 s wait `not-quiet` and the walk ran
+    /// on the old build.
+    fn forced(&self) -> bool {
+        crate::first_update::before_walk(self.config, crate::records::unix_ms())
+    }
+
     /// Steps 7 and 8.
     fn switch(
         &mut self,
@@ -2406,12 +2442,13 @@ impl Run<'_, '_> {
         // A count that can't be kept holds nothing: the wait goes on as
         // before, with the walk no longer looked at.
         let walk = !crate::walk::spent(self.records.folder());
-        let waited = match self.wait_quiet(QUIET, self.config.quiet_wait, false, walk) {
+        let waited = match self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, walk)
+        {
             Err(why) if walk && why == crate::walk::UNDER_WAY => {
                 if let Some(held) = crate::walk::hold(self.records.folder()) {
                     return Outcome::NotQuiet(crate::walk::held(held));
                 }
-                self.wait_quiet(QUIET, self.config.quiet_wait, false, false)
+                self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, false)
             }
             waited => waited,
         };
@@ -2556,7 +2593,8 @@ impl Run<'_, '_> {
         self.listen(Duration::ZERO);
         let now = self.world.clock.now_ms();
         if self.voice_running()
-            && let Err(why) = self.quiet.for_at_least(QUIET, now)
+            && !self.forced()
+            && let Err(why) = self.quiet.for_at_least(self.quiet_needed(), now)
         {
             let restored = self.put_units_and_links_back(&backs);
             self.settings_now(state);
@@ -2599,7 +2637,9 @@ impl Run<'_, '_> {
                     .any(|back| back.was_active && !unrestarted.contains(&back.unit)) =>
             {
                 self.listen(Duration::ZERO);
-                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false, false) {
+                if let Err(why) =
+                    self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, false)
+                {
                     return self.put_back(state, &build, &backs, None, why, String::new());
                 }
                 backs[voice_at].restarted = true;
@@ -2618,12 +2658,24 @@ impl Run<'_, '_> {
                 continue;
             }
             let back = &backs[at];
-            if changes
+            let after = changes
                 .iter()
                 .find(|change| change.unit == back.unit)
-                .is_some_and(|change| self.leave_completed_setup(back, &change.after))
+                .map(|change| change.after.clone());
+            if after
+                .as_deref()
+                .is_some_and(|after| self.leave_completed_setup(back, after))
             {
                 self.say("setup is complete; its phone grace period is not restarted");
+                continue;
+            }
+            if after
+                .as_deref()
+                .is_some_and(|after| self.leave_setup_for_first_update(back, after))
+            {
+                self.say(
+                    "the first update after setup: setup is done; its phone grace period is not restarted",
+                );
                 continue;
             }
             if backs[at].unit == VOICE_UNIT && !voice_stopped {
@@ -2632,7 +2684,9 @@ impl Run<'_, '_> {
                 // before marking it restarted or stopping its old process.
                 // A voice stopped first was judged before its stop.
                 self.listen(Duration::ZERO);
-                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false, false) {
+                if let Err(why) =
+                    self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, false)
+                {
                     return self.put_back(state, &build, &backs, None, why, String::new());
                 }
             }
@@ -3027,7 +3081,10 @@ impl Run<'_, '_> {
             // Recovery's journal truthfully retains was_active, even when
             // Setup completed while fetching. Recheck its restored product
             // lifecycle here as well as at the forward restart boundary.
-            if files_back && self.leave_completed_setup(back, &back.text) {
+            if files_back
+                && (self.leave_completed_setup(back, &back.text)
+                    || self.leave_setup_for_first_update(back, &back.text))
+            {
                 self.say("setup is complete; restoring its files needs no restart");
                 continue;
             }
@@ -4353,6 +4410,7 @@ mod tests {
             settings: false,
             product_settings: false,
             image: false,
+            first_update: false,
             writer_from: None,
         }
     }

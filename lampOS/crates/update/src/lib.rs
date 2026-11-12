@@ -19,6 +19,7 @@ pub mod check_units;
 pub mod companion;
 pub mod engines;
 pub mod fetch;
+pub mod first_update;
 pub mod fixed_copy;
 pub mod harness_install;
 mod head_touch;
