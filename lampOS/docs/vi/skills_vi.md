@@ -1472,7 +1472,7 @@ grant"; dịch vụ chưa liên kết bị lamp-services từ chối lúc gọi.
 từ máy tính không bao giờ mang quyền này. Tắt, quyền dịch vụ là "not a
 grant" như trước.
 
-### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, tắt, đề xuất trên #6059)
+### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, bật trong sản phẩm, đề xuất trên #6059)
 
 Đề xuất trên #6059 (chủ sở hữu đồng ý, 11/11), first builder đã đồng ý
 (Queue #6059, 11/11 22:44 +07). Khi bật công tắc, một lần tạo bằng giọng
@@ -1528,8 +1528,8 @@ cả hai người viết.
   agent đang làm, nên việc đó tiếp tục chạy, có ghi nhật ký, và tin của nó,
   là một brief, không bao giờ được kể.
 - **Công cụ của agent.** Agent chạy với công cụ riêng của nó trong lúc tạo:
-  chưa có chế độ tắt công cụ. Công tắc vẫn tắt cho tới khi điều đó được
-  quyết định.
+  chưa có chế độ tắt công cụ. Sản phẩm vẫn bật công tắc, theo yêu cầu của
+  chủ sở hữu (12/11: kỹ năng DeepSeek không tạo được thì đi qua agent).
 - **Giới hạn.** Mỗi câu trả lời của agent trong 45 giây
   (`make_skill_agent::WRITE_WITHIN`); một lần sửa chỉ bắt đầu khi thêm một
   câu trả lời vẫn vừa 120 giây của agent (`make_skill_agent::MAKE_WITHIN`).
@@ -1550,9 +1550,12 @@ cả hai người viết.
   one answer, given no repairs, stands as not made", "DeepSeek's cannot is
   one the brief asks for: not handed to the agent", "no agent on the lamp:
   DeepSeek makes it alone"; lần sửa của agent ghi "by the agent".
-- **Tắt** (mặc định, không có trong unit sản phẩm nào): không có gì ở trên;
-  đường đi giữ nguyên từng byte như hôm nay. Tạo bằng cách gõ trong ứng dụng
-  vẫn do DeepSeek.
+- **Bật trong sản phẩm** (`deploy/product/lamp-voice.service`, worker của
+  tuyến thứ hai nhận nó; test kiểm kê cài đặt
+  `the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent`). Tắt
+  (nếu không đặt, như một unit không đặt gì): không có gì ở trên; đường đi
+  giữ nguyên từng byte như cũ. Tạo bằng cách gõ trong ứng dụng vẫn do
+  DeepSeek trong cả hai trường hợp.
 - **Test:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
   `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
   `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`,

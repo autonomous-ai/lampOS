@@ -19,7 +19,7 @@
 //!
 //! [`made_skill::MAKE`] is the voice's own, whether or not a tasks part is
 //! there: a computer's agent is never handed a skill to make. With
-//! `LAMP_MAKE_SKILL_AGENT=on` (off, in no product unit) a voice make the
+//! `LAMP_MAKE_SKILL_AGENT=on` (on in the product's lamp-voice) a voice make the
 //! lamp's model didn't make goes to the lamp's own agent, OpenClaw or
 //! Hermes, when the lamp has one ([`crate::make_skill_agent`]): DeepSeek
 //! then gets one try and no repairs, and the agent gets them.

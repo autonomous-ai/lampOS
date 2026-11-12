@@ -4025,7 +4025,7 @@ grant", as before. Tests: lamp-skills'
 lamp-control's `the_yes_covers_a_skills_service_grants`, the voice's
 `service_grants_are_said_back_plainly_only_on`.
 
-##### Handed to the lamp's agent when DeepSeek fails (`LAMP_MAKE_SKILL_AGENT=on`, off, proposal on #6059)
+##### Handed to the lamp's agent when DeepSeek fails (`LAMP_MAKE_SKILL_AGENT=on`, on in the product, proposal on #6059)
 
 A proposal on #6059 (the owner's OK, 11 Nov), with the first builder's
 yes (Queue #6059, 11 Nov 22:44 +07). With the switch, a voice make the
@@ -4082,8 +4082,9 @@ the same code for both writers.
   that ends work the agent has, so such work is left running, journaled,
   and its news, a brief's, is never told.
 - **The agent's tools.** The agent runs with its own tools during a make:
-  there is no tools-off mode yet. The switch stays off until that is
-  decided.
+  there is no tools-off mode yet. The product turns the switch on all the
+  same, at the owner's ask (12 Nov: skills DeepSeek can't make go through
+  the agent).
 - **Bounds.** Each of the agent's answers within 45 s
   (`make_skill_agent::WRITE_WITHIN`); a repair is begun only while one
   more answer fits the agent's 120 s (`make_skill_agent::MAKE_WITHIN`).
@@ -4106,8 +4107,12 @@ the same code for both writers.
   cannot is one the brief asks for: not handed to the agent", "no agent on
   the lamp: DeepSeek makes it alone"; an agent's repair says "by the
   agent".
-- **Off** (unless set, in no product unit): nothing above; the path is
-  byte for byte today's. The app's typed makes stay DeepSeek's.
+- **On in the product** (`deploy/product/lamp-voice.service`, whose second
+  route's worker is given it; the install census test
+  `the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent`). Off
+  (unless set, as in a unit that sets nothing): nothing above; the path is
+  byte for byte the old one. The app's typed makes stay DeepSeek's either
+  way.
 - **Tests:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
   `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
   `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`,
