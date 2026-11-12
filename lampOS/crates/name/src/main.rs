@@ -532,6 +532,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             .with_rescue(&given.path, &given.sha256)
             .map_err(io::Error::other)?;
     }
+    // The start's silence worked out once, copied back at each forget
+    // (#6462).
+    let models = models.with_lead(quiet::LEAD).map_err(io::Error::other)?;
     let mut hearer = Quiet::new(models, arguments.quiet_below);
     // `--wake`'s counts at the last minute line, to say the minute's.
     let mut woken_before = (0u64, 0u64, 0u64);
@@ -1088,6 +1091,7 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
             .with_rescue(&given.path, &given.sha256)
             .map_err(io::Error::other)?;
     }
+    let loaded = loaded.with_lead(quiet::LEAD).map_err(io::Error::other)?;
     let mut hearer = Quiet::new(loaded, *quiet_below);
     let (mut steps, mut worked, mut busy) = (0u64, 0u64, Duration::ZERO);
     for file in *files {
