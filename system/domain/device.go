@@ -1396,6 +1396,8 @@ type ConfigPublicResponse struct {
 	TapChime        bool              `json:"tap_chime"`
 	TapLight        *config.WakeLight `json:"tap_light,omitempty"`
 	TapLightEnabled bool              `json:"tap_light_enabled"`
+	// SleepMode is the effective sleep mode toggle (default false).
+	SleepMode       bool              `json:"sleep_mode"`
 	DeviceID        string            `json:"device_id"`
 	Mac             string            `json:"mac"`
 	NetworkSSID     string            `json:"network_ssid"`
@@ -1501,6 +1503,8 @@ type UpdateConfigRequest struct {
 	TapChime *bool `json:"tap_chime,omitempty"`
 	// TapLight replaces the tap-to-talk light look and toggle; nil keeps it.
 	TapLight *config.WakeLight `json:"tap_light,omitempty"`
+	// SleepMode turns sleep mode on or off; nil keeps it.
+	SleepMode *bool `json:"sleep_mode,omitempty"`
 
 	// CloudPerception changes camera cloud opt-ins; omitted keys and an omitted object keep their value.
 	CloudPerception *CloudPerceptionSetData `json:"cloud_perception,omitempty"`

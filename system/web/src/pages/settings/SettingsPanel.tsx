@@ -153,6 +153,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
   const [wakeLightOn, setWakeLightOn] = useState(true);
   const [wakeLook, setWakeLook] = useState<WakeLook>(WAKE_LOOK_DEFAULT);
   const [tapChime, setTapChime] = useState(true);
+  const [sleepMode, setSleepMode] = useState(false);
   const [tapLightOn, setTapLightOn] = useState(true);
   const [tapLook, setTapLook] = useState<WakeLook>(WAKE_LOOK_DEFAULT);
   const [realtimeProvider, setRealtimeProvider] = useState("gemini");
@@ -219,6 +220,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     wakeLightOn: boolean;
     wakeLook: WakeLook;
     tapChime: boolean;
+    sleepMode: boolean;
     tapLightOn: boolean;
     tapLook: WakeLook;
     voiceInputMode: VoiceInputMode;
@@ -300,6 +302,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
         setWakeLightOn(cfg.wake_light_enabled ?? true);
         setWakeLook(wakeLookFrom(cfg.wake_light));
         setTapChime(cfg.tap_chime ?? true);
+        setSleepMode(cfg.sleep_mode ?? false);
         setTapLightOn(cfg.tap_light_enabled ?? true);
         setTapLook(wakeLookFrom(cfg.tap_light));
         if (cfg.realtime) {
@@ -399,6 +402,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
           wakeLightOn: cfg.wake_light_enabled ?? true,
           wakeLook: wakeLookFrom(cfg.wake_light),
           tapChime: cfg.tap_chime ?? true,
+          sleepMode: cfg.sleep_mode ?? false,
           tapLightOn: cfg.tap_light_enabled ?? true,
           tapLook: wakeLookFrom(cfg.tap_light),
           voiceInputMode: cfg.voice_input_mode ?? "automatic",
@@ -500,6 +504,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     wakeLightOn !== baseline.wakeLightOn ||
     !sameWakeLook(wakeLook, baseline.wakeLook) ||
     tapChime !== baseline.tapChime ||
+    sleepMode !== baseline.sleepMode ||
     tapLightOn !== baseline.tapLightOn ||
     !sameWakeLook(tapLook, baseline.tapLook) ||
     voiceInputMode !== baseline.voiceInputMode ||
@@ -593,6 +598,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
         body.wake_light = light;
       }
       if (tapChime !== baseline?.tapChime) body.tap_chime = tapChime;
+      if (sleepMode !== baseline?.sleepMode) body.sleep_mode = sleepMode;
       if (tapLightOn !== baseline?.tapLightOn || !baseline || !sameWakeLook(tapLook, baseline.tapLook)) {
         const light: WakeLightConfig = { enabled: tapLightOn, ...tapLook };
         body.tap_light = light;
@@ -664,7 +670,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
         sttBaseUrl, sttProvider, sttLanguage,
         ttsBaseUrl, ttsProvider, ttsVoice, ttsSpeed,
         wakeWord, wakePhrases, wakeChime, wakeFollowupS, wakeLightOn, wakeLook,
-        tapChime, tapLightOn, tapLook, voiceInputMode,
+        tapChime, tapLightOn, tapLook, voiceInputMode, sleepMode,
         channel,
         teleUserId, slackUserId,
         discordGuildId, discordUserId, discordOpenChannels, discordGuests,
@@ -704,7 +710,7 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
     sttProvider, sttLanguage, sttLoaded,
     ttsApiKey, ttsBaseUrl, ttsLoaded, ttsProvider, ttsVoice, ttsSpeed, deviceId,
     mqttEndpoint, mqttUsername, mqttPassword, mqttPort, faChannel, fdChannel,
-    realtimeEnabled, wakeWord, wakePhrases, wakePhrasesDefault, wakeChime, wakeFollowupS, wakeLightOn, wakeLook, tapChime, tapLightOn, tapLook, voiceInputMode, realtimeProvider, realtimeVoice, realtimeReasoning, realtimeApiKey, realtimeBaseUrl,
+    realtimeEnabled, wakeWord, wakePhrases, wakePhrasesDefault, wakeChime, wakeFollowupS, wakeLightOn, wakeLook, tapChime, tapLightOn, tapLook, voiceInputMode, sleepMode, realtimeProvider, realtimeVoice, realtimeReasoning, realtimeApiKey, realtimeBaseUrl,
     realtimeWebSearch, realtimeFastVoice, realtimeFastVoicePauseS, realtimeFastVoiceSilentS,
   ]);
 
@@ -784,6 +790,8 @@ export function SettingsPanel({ activeSection }: { activeSection: SettingsSectio
               setWakeLook={setWakeLook}
               tapChime={tapChime}
               setTapChime={setTapChime}
+              sleepMode={sleepMode}
+              setSleepMode={setSleepMode}
               tapLightOn={tapLightOn}
               setTapLightOn={setTapLightOn}
               tapLook={tapLook}

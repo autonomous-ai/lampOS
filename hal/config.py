@@ -193,6 +193,15 @@ def wake_chime_enabled() -> bool:
     return _os_cfg_get("wake_chime", True) is not False
 
 
+def sleep_mode_enabled() -> bool:
+    """Owner toggle (config.json `sleep_mode`, default OFF) for sleepy mode.
+
+    Off means nothing (button hold, voice, agent, scene) can put the device to sleep,
+    and a device found asleep is woken quietly at boot and when the owner turns it off.
+    """
+    return _os_cfg_get("sleep_mode", False) is True
+
+
 def tap_chime_enabled() -> bool:
     """Owner toggle (config.json `tap_chime`, default on) for the tap-to-talk ready chime."""
     return _os_cfg_get("tap_chime", True) is not False

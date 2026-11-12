@@ -88,6 +88,7 @@ def test_sleep_mutes_before_camera_cleanup(sleepy, monkeypatch):
     state._sleeping = False
     state._current_emotion = "idle"
     monkeypatch.setattr(emotion, "harness_blocks_sleep", lambda: False)
+    monkeypatch.setattr(emotion.config, "sleep_mode_enabled", lambda: True)
     monkeypatch.setattr(emotion.threading, "Timer", Mock())
 
     def camera_off(_reason):

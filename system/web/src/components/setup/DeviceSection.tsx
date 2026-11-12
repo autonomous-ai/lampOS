@@ -332,6 +332,7 @@ export function DeviceSection({
   wakeFollowupS, setWakeFollowupS,
   wakeLightOn, setWakeLightOn, wakeLook, setWakeLook,
   tapChime, setTapChime, tapLightOn, setTapLightOn, tapLook, setTapLook,
+  sleepMode, setSleepMode,
 }: {
   active: boolean;
   deviceId: string;
@@ -369,6 +370,9 @@ export function DeviceSection({
   setTapLightOn?: (v: boolean) => void;
   tapLook?: WakeLook;
   setTapLook?: (v: WakeLook) => void;
+  // Sleep mode toggle (default off); present only in Settings.
+  sleepMode?: boolean;
+  setSleepMode?: (v: boolean) => void;
 }) {
   const showAdminPasswordFields = setAdminPassword !== undefined;
   const showRotateField = setRotateAdminPassword !== undefined;
@@ -524,6 +528,18 @@ export function DeviceSection({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {setSleepMode && (
+        <div style={{ marginTop: 18, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+          <label htmlFor="sleep_mode" style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13, color: C.text }}>
+            <input id="sleep_mode" type="checkbox" checked={sleepMode ?? false} onChange={(e) => setSleepMode(e.target.checked)} style={{ flexShrink: 0 }} />
+            <span>Allow sleep mode</span>
+          </label>
+          <div style={{ ...HINT_STYLE, marginTop: 5, marginLeft: 23 }}>
+            When on, holding the button for about 2 seconds, asking by voice or a night scene can put your device to sleep: the light, microphone and speaker turn off until it is woken. When off, nothing puts it to sleep, and a sleeping device wakes up.
+          </div>
         </div>
       )}
 

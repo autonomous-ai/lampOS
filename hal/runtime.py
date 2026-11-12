@@ -854,6 +854,17 @@ async def lifespan(app: FastAPI):
             )
         except Exception as e:
             logger.warning(f"Sleep restore bookkeeping failed: {e}")
+        # Sleep mode is opt-in: a device restored asleep with it off (e.g. put to
+        # sleep before the toggle existed) wakes quietly instead of staying dark.
+        try:
+            from hal.routes.emotion import release_disabled_sleep
+
+            threading.Thread(
+                target=release_disabled_sleep, args=("boot_sleep_mode_off",),
+                daemon=True, name="sleep-mode-off-wake",
+            ).start()
+        except Exception as e:
+            logger.warning(f"Sleep-mode-off wake scheduling failed: {e}")
 
     # Thermal fail-safe monitor (only when `thermal` bounds are declared).
     if _safety and _safety.thermal:

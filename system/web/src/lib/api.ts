@@ -343,6 +343,8 @@ export interface DeviceConfig {
   tap_chime?: boolean;
   tap_light?: WakeLightConfig | null;
   tap_light_enabled?: boolean;
+  // Sleep mode (default false): when off nothing can put the device to sleep.
+  sleep_mode?: boolean;
   realtime?: {
     enabled?: boolean;
     provider?: string;
