@@ -1,7 +1,8 @@
 //! The real `lamp-voice` on a developer's computer (`lamp-sim run DIR --real-voice --microphone`): the
 //! voice's LIVE route with one Google (Gemini) key, from `~/.config/lampos/voice-keys.toml` or the
 //! environment (`keys.rs`). This is the voice's Live route, not the route a customer lamp runs (every
-//! product lamp answers through its second route); the second route comes next.
+//! product lamp answers through its second route); `--real-voice=second` starts that second route on the
+//! developer's own DeepSeek, Deepgram and ElevenLabs-or-OpenAI keys ([`prepare_second`]).
 //!
 //! lamp-sim writes the voice's private files in `DIR/voice` (folder 0700, files 0600, gone with the
 //! lamp's folder) and starts `lamp-voice serve` with the least argv that starts it. The key goes into
@@ -40,6 +41,10 @@ pub const DEFAULT_MODEL: &str = "gemini-3.8-live";
 pub const MODEL_ENVIRONMENT: &str = "LAMPOS_VOICE_GEMINI_MODEL";
 /// The ALSA device lamp-voice plays to (`--speaker-device`); the host's default unless this names another.
 pub const SPEAKER_ENVIRONMENT: &str = "LAMP_SIM_VOICE_SPEAKER";
+/// The names `lamp-voice` reads its own keys by (`second_config.rs`): each file in `CREDENTIALS_DIRECTORY`.
+const OWN_DEEPSEEK_KEY: &str = "own_deepseek.key";
+const OWN_DEEPSEEK_URL: &str = "own_deepseek.url";
+const OWN_DEEPGRAM_KEY: &str = "own_deepgram.key";
 /// The ONLY names of lamp-sim's own environment that reach the voice, besides what [`launch`] sets by hand: a login's
 /// basics, the locale and the sound and session variables a capture and a speaker need. Everything else stays with
 /// lamp-sim: a developer's `LAMP_*` switches (the product turns many on, a desktop run none: `docs`/K3), every
@@ -70,9 +75,17 @@ const PASSED_NAMES: [&str; 18] = [
 /// And the names that start with one of these.
 const PASSED_PREFIXES: [&str; 4] = ["LC_", "PULSE_", "PIPEWIRE_", "ALSA_"];
 
-/// Whether `--real-voice` was given to `lamp-sim run`.
+/// `--real-voice=second`: the voice's SECOND route, the one a customer lamp runs, on the developer's own keys.
+pub const FLAG_SECOND: &str = "--real-voice=second";
+
+/// Whether `--real-voice` (the Live route) or `--real-voice=second` was given to `lamp-sim run`.
 pub fn wanted(args: &[String]) -> bool {
-    args.iter().any(|arg| arg == FLAG)
+    args.iter().any(|arg| arg == FLAG || arg == FLAG_SECOND)
+}
+
+/// Whether it is the second route that was asked for.
+pub fn second_wanted(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == FLAG_SECOND)
 }
 
 /// Why the voice cannot be started with these flags and this bin folder, said before anything starts.
@@ -201,6 +214,18 @@ impl Drop for KeyGuard {
     }
 }
 
+/// One new file in `folder`, mode 0600 (never over an existing one).
+fn write_private(folder: &Path, name: &str, text: &str) -> io::Result<PathBuf> {
+    let path = folder.join(name);
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)?;
+    file.write_all(text.as_bytes())?;
+    Ok(path)
+}
+
 /// What to run: the program, its arguments and the variables set (the rest of its environment is [`PASSED_NAMES`]).
 #[derive(Debug, PartialEq, Eq)]
 pub struct Launch {
@@ -273,12 +298,10 @@ pub fn prepare(setup: &Setup, key: &Key) -> io::Result<Launch> {
     };
     let Setup {
         dir,
-        bin,
-        bus_root,
         model,
         speaker,
-        unix_ms,
         home,
+        ..
     } = *setup;
     if !speaker_name_ok(speaker) {
         return Err(io::Error::other(format!(
@@ -298,17 +321,7 @@ pub fn prepare(setup: &Setup, key: &Key) -> io::Result<Launch> {
     fs::DirBuilder::new().mode(0o700).create(&home.path)?;
     // From here the copy exists: any early return below removes it again.
     let guard = KeyGuard::new(&home.path);
-    let private_in = |folder: &Path, name: &str, text: &str| -> io::Result<PathBuf> {
-        let path = folder.join(name);
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&path)?;
-        file.write_all(text.as_bytes())?;
-        Ok(path)
-    };
-    let credential = private_in(&home.path, "gemini.key", key.expose())?;
+    let credential = write_private(&home.path, "gemini.key", key.expose())?;
     let provider = serde_json::json!({
         "endpoint": ENDPOINT,
         "model": model,
@@ -318,13 +331,35 @@ pub fn prepare(setup: &Setup, key: &Key) -> io::Result<Launch> {
         "credential_file": credential,
         "authentication": "api_key",
     });
-    let provider = private_in(&home.path, "provider.json", &provider.to_string())?;
-    let language = private_in(&voice, "language", "en\n")?;
-    let session = voice.join(format!("session-{unix_ms}"));
-    let path = |name: &str| voice.join(name).display().to_string();
+    let provider = write_private(&home.path, "provider.json", &provider.to_string())?;
+    let language = write_private(&voice, "language", "en\n")?;
     guard.disarm();
-    Ok(Launch {
-        program: bin.join(PROGRAM),
+    Ok(launch(setup, &provider, &language, Vec::new()))
+}
+
+/// What to start, whichever route: the same argv and the same fenced environment, with `extra` set besides (the second
+/// route's switches). `provider` is the file `serve` is given first; `language` is the owner's language file.
+fn launch(setup: &Setup, provider: &Path, language: &Path, extra: Vec<(String, String)>) -> Launch {
+    let voice = setup.dir.join("voice");
+    let session = voice.join(format!("session-{}", setup.unix_ms));
+    let path = |name: &str| voice.join(name).display().to_string();
+    let mut set = vec![
+        ("LAMP_BUS".to_owned(), "on".to_owned()),
+        (
+            "LAMP_BUS_ROOT".to_owned(),
+            setup.bus_root.display().to_string(),
+        ),
+        ("LAMP_PRIVACY_CONTROLS".to_owned(), "no-slide".to_owned()),
+        (
+            "LAMP_LANGUAGE_FILE".to_owned(),
+            language.display().to_string(),
+        ),
+        ("LAMP_REGION_FILE".to_owned(), path("region")),
+        ("LAMP_THREAD_FILE".to_owned(), path("thread.json")),
+    ];
+    set.extend(extra);
+    Launch {
+        program: setup.bin.join(PROGRAM),
         args: vec![
             "serve".to_owned(),
             provider.display().to_string(),
@@ -334,25 +369,203 @@ pub fn prepare(setup: &Setup, key: &Key) -> io::Result<Launch> {
             "--microphone-device".to_owned(),
             "bus:mic1".to_owned(),
             "--speaker-device".to_owned(),
-            speaker.to_owned(),
+            setup.speaker.to_owned(),
             "--controls-stop".to_owned(),
             "--controls-mute".to_owned(),
             path("mute.json"),
         ],
-        set: vec![
-            ("LAMP_BUS".to_owned(), "on".to_owned()),
-            ("LAMP_BUS_ROOT".to_owned(), bus_root.display().to_string()),
-            ("LAMP_PRIVACY_CONTROLS".to_owned(), "no-slide".to_owned()),
-            (
-                "LAMP_LANGUAGE_FILE".to_owned(),
-                language.display().to_string(),
-            ),
-            ("LAMP_REGION_FILE".to_owned(), path("region")),
-            ("LAMP_THREAD_FILE".to_owned(), path("thread.json")),
-        ],
+        set,
         session,
-        key_home: home.path.clone(),
-    })
+        key_home: setup.home.path.clone(),
+    }
+}
+
+/// What speaks on the second route: ElevenLabs or OpenAI, with the developer's key for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Speech {
+    ElevenLabs,
+    OpenAi,
+}
+
+impl Speech {
+    /// `tts_provider` and `LAMP_SECOND_SPEECH` as lamp-voice names it.
+    fn name(self) -> &'static str {
+        match self {
+            Self::ElevenLabs => "elevenlabs",
+            Self::OpenAi => "openai",
+        }
+    }
+
+    /// The provider's own API, as `net::tts` joins its paths onto it (`{base}/text-to-speech/..`,
+    /// `{base}/audio/speech`): with the `/v1`, so the request is the one the provider documents, the key in its
+    /// own header (`xi-api-key`, a bearer) and nothing through the company's relay.
+    fn base_url(self) -> &'static str {
+        match self {
+            Self::ElevenLabs => "https://api.elevenlabs.io/v1",
+            Self::OpenAi => "https://api.openai.com/v1",
+        }
+    }
+}
+
+/// The developer's own keys for the second route: DeepSeek (text, with its endpoint when it is not DeepSeek's own),
+/// Deepgram (speech to text) and the one that speaks.
+pub struct SecondKeys<'a> {
+    pub deepseek: &'a Key,
+    pub deepseek_url: Option<&'a Key>,
+    pub deepgram: &'a Key,
+    pub speech: Speech,
+    pub speech_key: &'a Key,
+}
+
+/// The second route's keys from what was found: all three services, or why not (said before anything starts).
+pub fn second_keys(keys: &crate::keys::Keys) -> Result<SecondKeys<'_>, String> {
+    let mut missing = Vec::new();
+    if keys.deepseek.is_none() {
+        missing.push("own.deepseek");
+    }
+    if keys.deepgram.is_none() {
+        missing.push("own.deepgram");
+    }
+    let speech = match (&keys.elevenlabs, &keys.openai) {
+        (Some(key), _) => Some((Speech::ElevenLabs, key)),
+        (None, Some(key)) => Some((Speech::OpenAi, key)),
+        (None, None) => {
+            missing.push("own.elevenlabs or own.openai");
+            None
+        }
+    };
+    if let Some(url) = &keys.deepseek_url
+        && !url.expose().trim().starts_with("https://")
+    {
+        return Err(
+            "own.deepseek_url must start with https:// (your DeepSeek key is sent there; nothing is started)"
+                .to_owned(),
+        );
+    }
+    match (&keys.deepseek, &keys.deepgram, speech) {
+        (Some(deepseek), Some(deepgram), Some((speech, speech_key))) => Ok(SecondKeys {
+            deepseek,
+            deepseek_url: keys.deepseek_url.as_ref(),
+            deepgram,
+            speech,
+            speech_key,
+        }),
+        _ => Err(format!(
+            "{FLAG_SECOND} needs {} in ~/.config/lampos/voice-keys.toml (or the LAMPOS_VOICE_* variables); `lamp-sim voice-keys` says which are set",
+            missing.join(", ")
+        )),
+    }
+}
+
+/// The product's own second-route file. lamp-sim never names it: lamp-voice WRITES it when it is asked for exactly
+/// there and nothing is, and a run on a developer's keys must never touch the product's place. Built from two
+/// pieces so that no file of lamp-sim holds the whole name (the test below looks for it).
+fn product_second_path() -> String {
+    ["/etc/lampOS", "voice/second.json"].join("/")
+}
+
+/// The second route (`LAMP_VOICE_ROUTE=second`) on the developer's own keys: `DIR/voice` as for the Live route, and in
+/// the key's folder (`CREDENTIALS_DIRECTORY` for the voice) one file per key, `second.json` (the route's own
+/// configuration, which names the key files and holds no key) and a `provider.json` the voice reads first. Every
+/// copy of a key is in that one folder, which a [`KeyGuard`] removes on any failure here, and the run's own guard and
+/// the voice's watcher remove at the end.
+pub fn prepare_second(setup: &Setup, keys: &SecondKeys) -> io::Result<Launch> {
+    let (dir_abs, bin_abs, bus_abs, home_abs) = absolute_paths(setup)?;
+    let setup = &Setup {
+        dir: &dir_abs,
+        bin: &bin_abs,
+        bus_root: &bus_abs,
+        home: &home_abs,
+        ..*setup
+    };
+    let Setup {
+        dir, speaker, home, ..
+    } = *setup;
+    if !speaker_name_ok(speaker) {
+        return Err(io::Error::other(format!(
+            "{SPEAKER_ENVIRONMENT} is not an ALSA device name (letters, digits and : , . _ = -, 1 to 64, starting with a letter or digit)"
+        )));
+    }
+    // The file the voice is told to read, and the folder it takes its credentials from, are in the key's folder: neither may
+    // be the product's file nor anywhere under the product's own folder, checked before anything is written.
+    let config_path = home.path.join("second.json");
+    let product = product_second_path();
+    let product_folder = Path::new(&product)
+        .ancestors()
+        .nth(2)
+        .map(Path::to_path_buf);
+    let under_product = |path: &Path| {
+        path == Path::new(&product)
+            || product_folder
+                .as_deref()
+                .is_some_and(|folder| path.starts_with(folder))
+    };
+    if under_product(&config_path) || under_product(&home.path) {
+        return Err(io::Error::other(
+            "the second route's configuration and credentials may not be the product's own",
+        ));
+    }
+    let voice = dir.join("voice");
+    remove_key_home(&home.path);
+    let _ = fs::remove_dir_all(&voice);
+    fs::DirBuilder::new().mode(0o700).create(&voice)?;
+    fs::DirBuilder::new().mode(0o700).create(&home.path)?;
+    let guard = KeyGuard::new(&home.path);
+    let deepseek = write_private(&home.path, OWN_DEEPSEEK_KEY, keys.deepseek.expose())?;
+    if let Some(url) = keys.deepseek_url {
+        write_private(&home.path, OWN_DEEPSEEK_URL, url.expose())?;
+    }
+    let deepgram = write_private(&home.path, OWN_DEEPGRAM_KEY, keys.deepgram.expose())?;
+    let speech = write_private(&home.path, "speech.key", keys.speech_key.expose())?;
+    // The route's required fields name key files; the chat is DeepSeek's (LAMP_SECOND_CHAT=deepseek) with the
+    // developer's own key over the relay's (LAMP_OWN_KEYS=on), so `llm_*` is DeepSeek's too and is never the company's.
+    let deepseek_base = keys
+        .deepseek_url
+        .map_or("https://api.deepseek.com", |url| url.expose().trim());
+    let second = serde_json::json!({
+        "llm_base_url": deepseek_base,
+        "llm_model": "deepseek-chat",
+        "llm_credential_file": deepseek,
+        "deepgram_credential_file": deepgram,
+        "tts_provider": keys.speech.name(),
+        "tts_base_url": keys.speech.base_url(),
+        "tts_credential_file": speech,
+    });
+    let second = write_private(&home.path, "second.json", &second.to_string())?;
+    // `serve`'s first argument: the Live route's file, which the second route still reads for the character. Its credential
+    // is a file of its own holding a fixed word that is no key, never another service's key paired with Google's endpoint:
+    // whatever path ever opened the Live route under the second route would send that word and nothing of the developer's.
+    let placeholder = write_private(&home.path, "provider.key", "no-key-on-the-second-route")?;
+    let provider = serde_json::json!({
+        "endpoint": ENDPOINT,
+        "model": DEFAULT_MODEL,
+        "voice": "Kore",
+        "thinking_budget": 0,
+        "resumption": "off",
+        "credential_file": placeholder,
+        "authentication": "api_key",
+    });
+    let provider = write_private(&home.path, "provider.json", &provider.to_string())?;
+    let language = write_private(&voice, "language", "en\n")?;
+    guard.disarm();
+    let extra = vec![
+        ("LAMP_VOICE_ROUTE".to_owned(), "second".to_owned()),
+        (
+            "LAMP_VOICE_SECOND_CONFIG".to_owned(),
+            second.display().to_string(),
+        ),
+        ("LAMP_OWN_KEYS".to_owned(), "on".to_owned()),
+        ("LAMP_SECOND_CHAT".to_owned(), "deepseek".to_owned()),
+        (
+            "LAMP_SECOND_SPEECH".to_owned(),
+            keys.speech.name().to_owned(),
+        ),
+        (
+            "CREDENTIALS_DIRECTORY".to_owned(),
+            home.path.display().to_string(),
+        ),
+    ];
+    Ok(launch(setup, &provider, &language, extra))
 }
 
 /// The environment lamp-voice is given: what lamp-sim inherited (any bytes: a name or a value need not be
@@ -1026,5 +1239,303 @@ mod tests {
             .is_ok()
         );
         let _ = (fs::remove_dir_all(&dir), fs::remove_dir_all(&run));
+    }
+
+    const OWN: [(&str, &str); 5] = [
+        ("LAMPOS_VOICE_DEEPSEEK_KEY", "test-not-real-deepseek-key"),
+        (
+            "LAMPOS_VOICE_DEEPSEEK_URL",
+            "https://deepseek.test-not-real.invalid/v1",
+        ),
+        ("LAMPOS_VOICE_DEEPGRAM_KEY", "test-not-real-deepgram-key"),
+        (
+            "LAMPOS_VOICE_ELEVENLABS_KEY",
+            "test-not-real-elevenlabs-key",
+        ),
+        ("LAMPOS_VOICE_OPENAI_KEY", "test-not-real-openai-key"),
+    ];
+
+    /// The keys found with exactly these variables set (no file).
+    fn keys_with(set: &[(&str, &str)]) -> keys::Keys {
+        let given: Vec<(String, String)> = set
+            .iter()
+            .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+            .collect();
+        let environment = move |name: &str| {
+            given
+                .iter()
+                .find(|(set, _)| set == name)
+                .map(|(_, value)| OsString::from(value))
+        };
+        keys::load(&environment, None).unwrap()
+    }
+
+    fn prep_second(dir: &Path, home: &KeyHome, set: &[(&str, &str)]) -> io::Result<Launch> {
+        let found = keys_with(set);
+        let own = second_keys(&found).unwrap();
+        prepare_second(
+            &Setup {
+                dir,
+                bin: Path::new("/bin-dir"),
+                bus_root: Path::new("/lamp/bus"),
+                model: DEFAULT_MODEL,
+                speaker: "default",
+                unix_ms: 7,
+                home,
+            },
+            &own,
+        )
+    }
+
+    #[test]
+    fn the_second_route_needs_the_three_services_and_says_which_are_missing() {
+        let found = keys_with(&OWN[..1]);
+        let why = second_keys(&found).err().unwrap();
+        assert!(
+            why.contains("own.deepgram, own.elevenlabs or own.openai"),
+            "{why}"
+        );
+        assert!(!why.contains("own.deepseek,"), "{why}");
+        for (_, value) in OWN {
+            assert!(!why.contains(value), "no value in the words");
+        }
+        // ElevenLabs speaks when both are set; OpenAI when it is the only one.
+        let both = keys_with(&OWN);
+        assert_eq!(second_keys(&both).unwrap().speech, Speech::ElevenLabs);
+        let openai = keys_with(&[OWN[0], OWN[2], OWN[4]]);
+        assert_eq!(second_keys(&openai).unwrap().speech, Speech::OpenAi);
+    }
+
+    #[test]
+    fn the_second_route_writes_each_key_once_in_one_private_folder_and_names_them_in_its_files() {
+        let dir = folder("second");
+        let run = runtime("second-run");
+        let home = key_home(&dir, Some(run.as_os_str()));
+        let launch = prep_second(&dir, &home, &OWN).unwrap();
+        // One folder holds every copy, mode 0700, each file 0600.
+        assert_eq!(fs::metadata(&home.path).unwrap().mode() & 0o777, 0o700);
+        let mut names: Vec<String> = fs::read_dir(&home.path)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        assert_eq!(
+            names,
+            [
+                "own_deepgram.key",
+                "own_deepseek.key",
+                "own_deepseek.url",
+                "provider.json",
+                "provider.key",
+                "second.json",
+                "speech.key"
+            ]
+        );
+        for name in &names {
+            assert_eq!(
+                fs::metadata(home.path.join(name)).unwrap().mode() & 0o777,
+                0o600,
+                "{name}"
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(home.path.join("speech.key")).unwrap(),
+            OWN[3].1,
+            "ElevenLabs speaks"
+        );
+        // The route's own file names the key files and holds no key; the provider file neither.
+        let second: serde_json::Value =
+            serde_json::from_slice(&fs::read(home.path.join("second.json")).unwrap()).unwrap();
+        assert_eq!(second["tts_provider"], "elevenlabs");
+        assert_eq!(
+            second["tts_base_url"], "https://api.elevenlabs.io/v1",
+            "the provider's own address, with its /v1"
+        );
+        assert_eq!(
+            second["llm_base_url"], OWN[1].1,
+            "the developer's own DeepSeek endpoint"
+        );
+        assert_eq!(
+            second["deepgram_credential_file"],
+            home.path.join("own_deepgram.key").display().to_string()
+        );
+        for file in ["second.json", "provider.json"] {
+            let text = fs::read_to_string(home.path.join(file)).unwrap();
+            for (name, value) in OWN {
+                if name != "LAMPOS_VOICE_DEEPSEEK_URL" {
+                    assert!(!text.contains(value), "{file} holds a key");
+                }
+            }
+        }
+        // The environment names the second route and the credentials folder; neither it nor the argv holds a key.
+        let set: std::collections::HashMap<_, _> = launch.set.iter().cloned().collect();
+        assert_eq!(set["LAMP_VOICE_ROUTE"], "second");
+        assert_eq!(
+            set["LAMP_VOICE_SECOND_CONFIG"],
+            home.path.join("second.json").display().to_string()
+        );
+        assert_eq!(set["LAMP_OWN_KEYS"], "on");
+        assert_eq!(set["LAMP_SECOND_CHAT"], "deepseek");
+        assert_eq!(set["LAMP_SECOND_SPEECH"], "elevenlabs");
+        assert_eq!(
+            set["CREDENTIALS_DIRECTORY"],
+            home.path.display().to_string()
+        );
+        let everything = format!("{:?} {:?}", launch.args, launch.set);
+        for (_, value) in OWN {
+            assert!(
+                !everything.contains(value),
+                "a key is in the argv or the environment"
+            );
+        }
+        let _ = (fs::remove_dir_all(&dir), fs::remove_dir_all(&run));
+    }
+
+    #[test]
+    fn a_failed_second_prepare_leaves_no_copy_of_any_key() {
+        let dir = folder("second-late");
+        let home = KeyHome {
+            path: dir.join("voice").join("language"),
+            in_memory: false,
+        };
+        assert!(
+            prep_second(&dir, &home, &OWN).is_err(),
+            "the language file cannot be made"
+        );
+        assert!(!home.path.exists(), "every key's folder is gone");
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The DANGER TEST: lamp-voice WRITES the product's second.json (under /etc/lampOS/voice) when the second route is configured at exactly
+    /// that path and it is absent (`second_config.rs` `place_product_if_missing`). lamp-sim never names it, in the
+    /// files it writes, the argv and environment it builds, or its own source.
+    #[test]
+    fn lamp_sim_never_names_the_products_second_json() {
+        let product = product_second_path();
+        assert_eq!(
+            product,
+            ["/etc", "lampOS", "voice", "second.json"].join("/"),
+            "the name the test looks for is lamp-voice's"
+        );
+        // The name is the one lamp-voice has as its `PRODUCT_PATH`.
+        let voice_source = include_str!("../../voice/src/second_config.rs");
+        assert!(
+            voice_source.contains(&format!("pub const PRODUCT_PATH: &str = \"{product}\";")),
+            "lamp-voice's PRODUCT_PATH is no longer the name this test guards"
+        );
+        let dir = folder("danger");
+        let run = runtime("danger-run");
+        let home = key_home(&dir, Some(run.as_os_str()));
+        let launch = prep_second(&dir, &home, &OWN).unwrap();
+        let built = format!("{:?} {:?}", launch.args, launch.set);
+        assert!(
+            !built.contains(&product),
+            "the argv or the environment names the product's file"
+        );
+        for entry in fs::read_dir(&home.path).unwrap() {
+            let text = fs::read_to_string(entry.unwrap().path()).unwrap();
+            assert!(
+                !text.contains(&product),
+                "a written file names the product's file"
+            );
+        }
+        // Where the second route is configured is inside the lamp's own folder, never the product's place.
+        let set: std::collections::HashMap<_, _> = launch.set.iter().cloned().collect();
+        assert_ne!(set["LAMP_VOICE_SECOND_CONFIG"], product);
+        // And no source file of this crate holds the whole name (this test builds it from pieces).
+        let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        for entry in fs::read_dir(&source).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_some_and(|ext| ext == "rs") {
+                let text = fs::read_to_string(&path).unwrap();
+                assert!(
+                    !text.contains(&product),
+                    "{} names the product's second.json",
+                    path.display()
+                );
+            }
+        }
+        let _ = (fs::remove_dir_all(&dir), fs::remove_dir_all(&run));
+    }
+
+    #[test]
+    fn no_file_pairs_one_services_key_with_anothers_endpoint() {
+        let dir = folder("pairing");
+        let run = runtime("pairing-run");
+        let home = key_home(&dir, Some(run.as_os_str()));
+        prep_second(&dir, &home, &OWN).unwrap();
+        let provider: serde_json::Value =
+            serde_json::from_slice(&fs::read(home.path.join("provider.json")).unwrap()).unwrap();
+        // Google's endpoint is paired with a file that holds no key of anyone's.
+        assert_eq!(provider["endpoint"], ENDPOINT);
+        let credential = provider["credential_file"].as_str().unwrap();
+        for key_file in [OWN_DEEPSEEK_KEY, OWN_DEEPGRAM_KEY, "speech.key"] {
+            assert!(
+                !credential.ends_with(key_file),
+                "provider.json names {key_file}"
+            );
+        }
+        let held = fs::read_to_string(credential).unwrap();
+        assert_eq!(held, "no-key-on-the-second-route");
+        for (_, value) in OWN {
+            assert!(!held.contains(value));
+        }
+        // And second.json pairs each key with its own service only: DeepSeek's file with DeepSeek's address, the speech key
+        // with its provider's.
+        let second: serde_json::Value =
+            serde_json::from_slice(&fs::read(home.path.join("second.json")).unwrap()).unwrap();
+        assert_eq!(
+            second["llm_credential_file"],
+            home.path.join(OWN_DEEPSEEK_KEY).display().to_string()
+        );
+        assert_eq!(
+            second["tts_credential_file"],
+            home.path.join("speech.key").display().to_string()
+        );
+        assert!(
+            second["llm_base_url"]
+                .as_str()
+                .unwrap()
+                .starts_with("https://deepseek.")
+        );
+        assert_eq!(second["tts_base_url"], "https://api.elevenlabs.io/v1");
+        let _ = (fs::remove_dir_all(&dir), fs::remove_dir_all(&run));
+    }
+
+    #[test]
+    fn the_second_routes_files_may_not_be_the_products() {
+        let dir = folder("product-home");
+        // A key folder under the product's own folder (where lamp-voice would place the product's second.json).
+        let home = KeyHome {
+            path: PathBuf::from(["/etc", "lampOS", "voice", "mine"].join("/")),
+            in_memory: false,
+        };
+        let why = prep_second(&dir, &home, &OWN).err().unwrap().to_string();
+        assert!(why.contains("may not be the product's own"), "{why}");
+        assert!(
+            !home.path.exists() && !dir.join("voice").exists(),
+            "nothing was written"
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_deepseek_address_that_is_not_https_is_refused_before_anything_is_written() {
+        let plain = keys_with(&[
+            OWN[0],
+            (
+                "LAMPOS_VOICE_DEEPSEEK_URL",
+                "http://deepseek.test-not-real.invalid",
+            ),
+            OWN[2],
+            OWN[3],
+        ]);
+        let why = second_keys(&plain).err().unwrap();
+        assert!(why.contains("must start with https://"), "{why}");
+        assert!(
+            !why.contains("test-not-real"),
+            "no value in the words: {why}"
+        );
+        assert!(second_keys(&keys_with(&OWN)).is_ok());
     }
 }
