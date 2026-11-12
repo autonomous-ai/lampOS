@@ -1208,7 +1208,12 @@ fn code_asks(made: &Made) -> crate::skill_write_yes::Asks {
         skill: made.name.clone(),
         sha256: made.sha256.clone(),
         writes: Vec::new(),
-        say_back: made_skill::code_said(&made.uses.grants).trim().to_owned(),
+        say_back: made_skill::code_said_as(
+            &made.uses.grants,
+            made_skill::code_goes_on_at_once(made),
+        )
+        .trim()
+        .to_owned(),
         grants: Some(made.uses.grants.clone()),
         code: true,
     }
@@ -5634,6 +5639,48 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         }
         made_skill::set_code_at_once_here(Some(false));
         assert!(!made_skill::grants_go_on_at_once(&grants(&["light"])));
+        made_skill::set_code_at_once_here(None);
+        made_skill::set_scripts_here(None);
+    }
+
+    /// `LAMP_MADE_CODE_ON_AT_ONCE` on: a voice make whose code is granted
+    /// only its light but knows who is at the lamp (`who`, `known_faces`:
+    /// the first builder at 20:16 on #6659) keeps its spoken yes, its
+    /// say-back ending on its wait.
+    #[test]
+    fn with_the_switch_a_voice_code_make_knowing_who_is_there_still_waits_for_its_yes() {
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_code_at_once_here(Some(true));
+        for (at, key) in [(0, "who"), (1, "known_faces")] {
+            let (root, keeping) = keeping(&format!("code-at-once-{key}"));
+            let toml = code_light_toml()
+                .replace("[permissions]\n", &format!("[permissions]\n{key} = true\n"));
+            let (url, served) = service(vec![(200, code_answer_of(&toml))]);
+            let told = make_with(
+                7 + at,
+                Some(CODE_REQUEST),
+                CODE_REQUEST,
+                &keeping,
+                chat_at(url),
+                NOW + at,
+                || None,
+            );
+            assert_eq!(served.join().unwrap(), 1, "{key}: {told}");
+            assert_eq!(told["on"], false, "{key}: {told}");
+            assert_eq!(told["code_waits_for_yes"], true, "{key}: {told}");
+            let next = told["next"].as_str().unwrap();
+            assert!(next.contains("knowing who is in view"), "{key}: {next}");
+            assert!(
+                next.contains(made_skill::RUNS_AFTER_YES.trim()),
+                "{key}: {next}"
+            );
+            assert!(!next.contains("it's on"), "{key}: {next}");
+            assert_ne!(made_skill::entries(&keeping.directory)[0]["on"], true);
+            let _ = take_said_line();
+            let id = told[crate::skill_write_yes::APPROVE_ID].as_str().unwrap();
+            crate::skill_write_yes::drop_wait(id);
+            let _ = std::fs::remove_dir_all(&root);
+        }
         made_skill::set_code_at_once_here(None);
         made_skill::set_scripts_here(None);
     }
