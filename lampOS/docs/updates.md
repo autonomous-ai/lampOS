@@ -2282,6 +2282,13 @@ installs a build is run by the updater the lamp had, and the new updater
 up to date. So a lamp whose old updater lacks this gets lamp-control started
 by the new updater's first round, within one `--every-s`.
 
+A part whose own `Condition…=` skipped its last start (`ConditionResult=no`,
+such as lamp-control before the setup marker exists) is not started: the
+condition would skip it again, every round. A part stopped on purpose with
+`systemctl stop` also reads as ended cleanly, so a developer who stops
+lamp-control (with a switch on) sees it started again by the next round,
+within `--every-s`. To keep it off, turn its switches off in a drop-in.
+
 All of it rides the switch's journal (`Switching::added`). A build put
 back, or a switch cut short and recovered at the next start, stops each
 added unit and removes its file, its links, an emptied `.wants` folder and

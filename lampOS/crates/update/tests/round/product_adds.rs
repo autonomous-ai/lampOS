@@ -606,9 +606,21 @@ fn lamp_control_ended_cleanly_with_its_switch_on_is_started_by_a_switch_or_an_up
 }
 
 /// Off by both switches it exits 0 by design and is left; a failed one is
-/// left as any failed part is.
+/// left as any failed part is; one its unit's condition skipped (no setup
+/// marker) is left too, or every round would start it again (Twelve's P3
+/// on #6708).
 #[test]
 fn lamp_control_off_by_both_switches_or_failed_is_not_started() {
+    let skipped = Running {
+        condition: "no".into(),
+        ..ended("success")
+    };
+    let mut lamp = with_control(product_lamp(), "LAMP_SKILL_TASKS=on", skipped);
+    publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.round(), Outcome::UpToDate(2));
+    assert_eq!(control_starts(&lamp), 0, "{:?}", lamp.calls());
+
     let mut lamp = with_control(product_lamp(), "", ended("success"));
     publish_all(&mut lamp, manifest::ADDS_UPDATER, "mood 1");
     assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
