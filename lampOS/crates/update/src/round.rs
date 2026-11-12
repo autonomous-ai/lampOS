@@ -833,6 +833,18 @@ impl Run<'_, '_> {
                 return Outcome::NotQuiet(crate::walk::held(held));
             }
         }
+        // A reset of the lamp may be under way, or the lamp has only just
+        // booted: no switch yet, and not refused either (crate::reset_hold,
+        // #6266).
+        if crate::reset_hold::stale_beside_marker(self.config) {
+            self.say(&format!(
+                "{} is beside the setup marker and is not new: a failed unlink or a restore left it, not a reset, so it holds nothing",
+                crate::reset_hold::JOURNAL
+            ));
+        }
+        if let Some(why) = crate::reset_hold::hold(self.config, self.forced()) {
+            return Outcome::NotQuiet(why);
+        }
         // A template is never active itself, and never restarted: only its
         // instances run.
         let units: Vec<String> = changes
@@ -2471,6 +2483,11 @@ impl Run<'_, '_> {
             waited => waited,
         };
         if let Err(why) = waited {
+            return Outcome::NotQuiet(why);
+        }
+        // A reset that began while the round fetched or waited holds it too,
+        // before anything is written (crate::reset_hold, #6266).
+        if let Some(why) = crate::reset_hold::hold(self.config, self.forced()) {
             return Outcome::NotQuiet(why);
         }
         // The product skills' files as they are now, and as they were: kept
