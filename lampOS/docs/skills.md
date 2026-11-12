@@ -1509,7 +1509,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   or for a pushed skill `/var/lib/lampOS/skills-dev/<name>`
   (`task::folder_of`); lamp-tasks takes exactly those two, lamp-control
   hashes the same folder at its mint (a lamp skill's when both have the
-  name, as lamp-skills never loads a pushed one over it), and a skill's
+  name, as lamp-skills never loads a pushed one over it: anything of that
+  name under `skills/`, a file or a link too, `task::lamp_has_skill_named`,
+  blocks the pushed one in all three), and a skill's
   run is shown the pushed skills read-only (docs/install.md). lamp-tasks answers `{"ok": true, "id"?}` when the run ends, or
   `{"ok": false, "error", "message"}`, waited for at most 15 minutes; the
   skill holds its one place until then. The run itself (target `lamp`, the

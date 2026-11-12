@@ -203,11 +203,19 @@ impl HandOver {
             return Err("the task's words have a control character");
         }
         // Exactly one of the two roots, joined with the skill's own name
-        // (checked plain above: no `/`, no `..`), compared as written.
-        if self.folder != skills.join(&self.skill)
-            && self.folder != pushed_beside(skills).join(&self.skill)
-        {
-            return Err("the skill's folder is not its own among the lamp's skills");
+        // (checked plain above: no `/`, no `..`), compared as written; the
+        // pushed one only while nothing of that name is under `skills`
+        // ([`lamp_has_skill_named`]), the folder lamp-control hashes at the
+        // mint (SubDarren's P2 on #6608).
+        if self.folder != skills.join(&self.skill) {
+            if self.folder != pushed_beside(skills).join(&self.skill) {
+                return Err("the skill's folder is not its own among the lamp's skills");
+            }
+            if lamp_has_skill_named(skills, &self.skill) {
+                return Err(
+                    "a skill of that name is on the lamp: a pushed one never runs in its place",
+                );
+            }
         }
         let run = Path::new(&self.run);
         let mut parts = run.components();
@@ -261,6 +269,17 @@ impl HandOver {
 /// [`SKILLS`].
 pub fn pushed_beside(skills: &Path) -> PathBuf {
     skills.with_file_name(PUSHED_NAME)
+}
+
+/// Whether anything named `name` (a plain name) is under `skills`: a
+/// folder, a file or a link, never followed (`symlink_metadata`). While one
+/// is, the pushed skill of that name is neither handed over nor run, and
+/// lamp-control hashes `skills/<name>` at the mint. The same rule as
+/// `lamp_skills::task::lamp_has_skill_named`, which lamp-skills and
+/// lamp-control use; lamp-tasks does not depend on lamp-skills, so it is
+/// written here again.
+pub fn lamp_has_skill_named(skills: &Path, name: &str) -> bool {
+    std::fs::symlink_metadata(skills.join(name)).is_ok()
 }
 
 /// A one-run token from lamp-control (#6304). Its text is never shown in a
@@ -1110,6 +1129,44 @@ mod tests {
         );
         assert!(tokens.live.borrow().is_empty());
         assert_eq!(tokens.ended.borrow().len(), 1);
+    }
+
+    /// A pushed skill whose name is on the lamp under `skills` (a folder, a
+    /// file or a link) is refused before any token: lamp-control would hash
+    /// `skills/<name>`, so a yes for that one never runs the pushed one
+    /// (SubDarren's P2 on #6608). With nothing there, it is handed over.
+    #[test]
+    fn a_pushed_skill_is_refused_while_its_name_is_under_the_lamps_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        let skills = dir.path().join("skills");
+        std::fs::create_dir_all(&skills).unwrap();
+        let pushed = pushed_beside(&skills).join("photo-booth");
+        std::fs::create_dir_all(&pushed).unwrap();
+        let folder = pushed.to_string_lossy().into_owned();
+        let pushed_line = || line(|v| v["folder"] = json!(folder));
+        let own = skills.join("photo-booth");
+        for what in ["a folder", "a file", "a link"] {
+            match what {
+                "a folder" => std::fs::create_dir(&own).unwrap(),
+                "a file" => std::fs::write(&own, "x").unwrap(),
+                _ => std::os::unix::fs::symlink(&pushed, &own).unwrap(),
+            }
+            let tokens = FakeTokens::default();
+            let runner = runner(&tokens, Ok(1));
+            let answer = answer(&pushed_line(), true, &skills, &tokens, &runner);
+            assert_eq!(answer["error"], "bad_request", "{what}: {answer}");
+            assert!(tokens.minted.borrow().is_empty(), "{what}");
+            assert!(runner.seen.borrow().is_empty(), "{what}");
+            if std::fs::symlink_metadata(&own).unwrap().is_dir() {
+                std::fs::remove_dir(&own).unwrap();
+            } else {
+                std::fs::remove_file(&own).unwrap();
+            }
+        }
+        let tokens = FakeTokens::default();
+        let runner = runner(&tokens, Ok(4));
+        let answer = answer(&pushed_line(), true, &skills, &tokens, &runner);
+        assert_eq!(answer, json!({"ok": true, "id": 4}));
     }
 
     #[test]

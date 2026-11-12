@@ -168,7 +168,11 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   hoặc, với kỹ năng do máy tính của chủ đèn đẩy lên,
   `/var/lib/lampOS/skills-dev/<skill>` (`skill_task::PUSHED`, chỉ lần chạy
   của kỹ năng mới thấy, chỉ đọc), so đúng như viết (`..` hay thư mục khác bị
-  từ chối "the skill's folder is not its own among the lamp's skills"),
+  từ chối "the skill's folder is not its own among the lamp's skills"); thư
+  mục được đẩy lên chỉ được nhận khi trong `skills/` không có gì mang tên đó
+  (thư mục, tệp hay liên kết; `skill_task::lamp_has_skill_named`, cùng quy
+  tắc với lamp-control và lamp-skills), nếu không thì bị từ chối "a skill of
+  that name is on the lamp: a pushed one never runs in its place",
   `run` là một tệp trong `scripts/` của kỹ năng (mỗi phần chỉ gồm `A-Z a-z
   0-9 . _ -`, không bắt đầu bằng `.`, nên không `..`, không phần ẩn, không
   xuống dòng, dấu backtick hay khoảng trắng,

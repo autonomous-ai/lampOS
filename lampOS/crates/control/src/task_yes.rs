@@ -207,11 +207,11 @@ pub const PUSHED_NAME: &str = "skills-dev";
 /// The folder of the skill `name` (a plain name) a mint hashes: under
 /// `skills` when anything of that name is there (as lamp-skills, a pushed
 /// skill never takes the place of one of the lamp's), else the pushed
-/// skills' folder beside it.
+/// skills' folder beside it. The one rule lamp-skills and lamp-tasks hold
+/// (`lamp_skills::task::lamp_has_skill_named`).
 fn folder_of(skills: &Path, name: &str) -> std::path::PathBuf {
-    let own = skills.join(name);
-    if std::fs::symlink_metadata(&own).is_ok() {
-        return own;
+    if lamp_skills::task::lamp_has_skill_named(skills, name) {
+        return skills.join(name);
     }
     skills.with_file_name(PUSHED_NAME).join(name)
 }
