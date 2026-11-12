@@ -22,7 +22,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `lib.sh` | Sourced by the scripts: the writers list and the fetches, each failing closed, and the build-input and lane tests (`coord_input`, `coord_lane`), read from `lampos-arm64.yml`'s and `lampos-sdk.yml`'s `pull_request` paths. |
 | `lane.sh PR...` | Prints the lane each PR goes to, as the bot decides it. Read-only but for local fetches. |
 | `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
-| `tests/test_red_checks.py` | Tests for #6556 B and C: a red check of any kind ends `merge-when-green.sh`'s wait, a failed job's own log is read (`coord_red_jobs`), the PRs a red workflow takes (`coord_prs_taken`), a PR with a red check on its own head sits out (also when it went red between the round's read and the cut), and the bot's per-PR cache. Run with the others. |
+| `tests/test_red_checks.py` | Tests for #6556 B and C: a red check of any kind ends `merge-when-green.sh`'s wait, a failed job's own log is read (`coord_red_jobs`), the PRs a red workflow takes (`coord_prs_taken`), a PR with a red check on its own head sits out (also when it went red between the round's read and the cut), a PR the ARM64 run takes waits for its own head's ARM64 run all green, and the bot's per-PR cache. Run with the others. |
 | `tests/test_behind_unrelated.py`, `tests/test_lanes.py` | Tests for `behind-unrelated.sh`, `merge-when-green.sh`, the lanes and the bot's dry round, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
 | `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
 | `build-rows-pr.sh` | Regenerates `lampOS/docs/build-rows.md` from the review page. If it changed, it pushes a branch `first/build-rows-MMDD-HHMM` and opens a docs-only PR. |
@@ -221,7 +221,7 @@ and a login whose READ-OKs on the head are all unsigned is one reader.
 
 **Trains.**
 
-- A PR with a red check on its own head sits out; a check still running is not red. The checks are read again just before the PR is cherry-picked into a train, so one that went red after the round read it is left out (train 836, #6556).
+- A PR with a red check on its own head sits out; a check still running is not red. A PR with a file the ARM64 run takes (lib.sh, `coord_arm_takes`) also waits until its own head's ARM64 run is there and all green: `(build)`, `(release)` and every shard `(k/N)`, at least one (`coord_arm64_green_jq`). Absent or still running, it is left out and told once per head (train 841, #6662: #6572's head had no ARM64 run at the cut). A PR the ARM64 run doesn't take (docs, tools, the SDK alone) is unchanged. The checks are read again just before the PR is cherry-picked into a train, so one that went red after the round read it is left out (train 836, #6556).
 - A PR stacked on another open PR sits out until that PR is on `lamp-voice`.
 - No merge commits: the bot cherry-picks with `--no-merges` and merges by rebase.
 - Each lane runs one train at a time: the no-crates lane waits while a `first/train-nc-*` PR is open, the crate lane while any other `first/train-*` PR is open. With `NOCRATES_LANE=off`, one lane waits while any `first/train-*` PR is open.

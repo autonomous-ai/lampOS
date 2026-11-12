@@ -7,7 +7,7 @@ import json, os, subprocess, sys, unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import test_lanes
-from test_lanes import ARM_CHECKS, BOT, LIB, MWG, TOOL, Repo, run
+from test_lanes import ARM, ARM_CHECKS, ARM_GREEN, BOT, LIB, MWG, TOOL, Repo, run
 
 # The stand-in gh, with the Actions API the failure read asks (runs on a sha, a run's jobs, a job's log) and a file
 # list per PR, answered ahead of test_lanes.py's cases.
@@ -22,6 +22,7 @@ CRATE = "lampOS/crates/x/src/lib.rs"
 
 def check(name, status="COMPLETED", conclusion="SUCCESS"):
     return {"__typename": "CheckRun", "name": name, "status": status, "conclusion": conclusion}
+
 
 
 class Red(Repo):
@@ -101,6 +102,11 @@ class FailureRead(Red):
 
 
 class Eligible(Red):
+    def setUp(self):
+        super().setUp()
+        # Every PR's own head: its ARM64 run green, unless a test says otherwise.
+        self.fakefile("checks.json", json.dumps({"statusCheckRollup": ARM_GREEN}))
+
     def round(self, prs_lines, **extra):
         self.fakefile("prs.txt", "".join(l + "\n" for l in prs_lines))
         env = dict(self.env, DRY="1", NOCRATES_LANE="off", WORKTREE=os.path.join(self.tmp, "wt"),
@@ -130,7 +136,8 @@ class Eligible(Red):
 
     def test_a_check_still_running_is_not_red(self):
         self.two()
-        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": [check("build and test", "IN_PROGRESS", None)]}))
+        # Not red; and its ARM64 run is green, which a PR the ARM64 run takes needs (#6556, train 841).
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": ARM_GREEN + [check("doc links", "IN_PROGRESS", None)]}))
         r, lines = self.round(["7", "8"])
         self.assertEqual(lines[-1], "dry: would carry 7 8 onto " + self.base[:9])
 
@@ -181,20 +188,21 @@ class Eligible(Red):
 
     def test_a_pr_eligible_while_its_run_ran_and_red_by_the_cut_is_left_out(self):
         # Train 836 (#6611): #6506's ARM64 run on 024930deaa was still running when the round read it (09:22-09:29Z) and
-        # red by the cut (09:35Z); build_train reads each PR's checks again just before cherry-picking it.
+        # red by the cut (09:35Z); build_train reads each PR's checks again just before cherry-picking it. Since train 841
+        # a running ARM64 run already waits at the round, so here another check is the one still running and red by the cut.
         self.pr(7, [CRATE])
         h8 = self.pr(8, ["lampOS/crates/x/src/other.rs"])
         self.heads()
-        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": [check("lampOS — build and test on Linux ARM64 (1/1)", "IN_PROGRESS", None)]}))
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": ARM_GREEN + [check("doc links", "IN_PROGRESS", None)]}))
         r, lines = self.round(["7", "8"])
         self.assertEqual(lines[-1], "dry: would carry 7 8 onto " + self.base[:9])
-        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": [check("lampOS — build and test on Linux ARM64 (1/1)", conclusion="FAILURE")]}))
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": ARM_GREEN + [check("doc links", conclusion="FAILURE")]}))
         fn = ('REPO=autonomous-ai/lampOS; SP="$2"; told=$SP/told; touch $told; W=$3/wt; WNC=$3/wtnc; n=835; m=0; LV=x; '
               'say() { print -r -- "$*"; }; tell() { print -r -- "$1" >> $told; }; once() { say "$2"; }; fine() { :; }; '
               'source "$1"; eval "$(sed -n -e \'/^head_green()/,/^}/p\' -e \'/^build_train()/,/^}/p\' "$4")"; build_train crates 7 8')
         b = run(["zsh", "-c", fn, "x", LIB, self.state, self.tmp, BOT], self.work, env=self.env, check=False)
         out = b.stdout + b.stderr
-        self.assertIn("#8 left out: a check on its own head %s is red (lampOS — build and test on Linux ARM64 (1/1))" % h8[:9], out)
+        self.assertIn("#8 left out: a check on its own head %s is red (doc links)" % h8[:9], out)
         self.assertIn("train 836 (#): 7 on x", out)
         self.assertEqual(self.git("rev-list", "--count", "%s..origin/first/train-836" % self.base).strip(), "1", out)
 
@@ -206,6 +214,48 @@ class Eligible(Red):
             fh.write(json.dumps({"login": "w1", "body": "HOLD " + h8, "created_at": "2026-11-12T07:04:00Z"}) + "\n")
         r, lines = self.round(["7 %s 2026-11-12T07:00:00Z" % h7, "8 %s 2026-11-12T07:04:00Z" % h8])
         self.assertEqual(lines[-1], "dry: would carry 7 onto " + self.base[:9], r.stdout + r.stderr)
+
+    # #6556, train 841 (#6662): #6572's head ec26212c11 had no ARM64 pull_request run at the cut (a force-push started
+    # none); its release job went red after the train took it. A PR the ARM64 run takes waits for its own head's run.
+
+    def test_a_crate_pr_with_no_arm64_checks_is_left_out(self):
+        h7, h8 = self.two()
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": [check("clippy"), check("Python 3.12 (pytest)")]}))
+        r, lines = self.round(["7", "8"])
+        self.assertEqual(lines[-1], "dry: would carry 7 onto " + self.base[:9], r.stdout + r.stderr)
+        self.assertIn("#8 left out: its own head %s's ARM64 run is not all green yet" % h8[:9], r.stderr)
+        # Said once per head.
+        r, lines = self.round(["7", "8"])
+        self.assertNotIn("#8 left out: its own head", r.stderr)
+
+    def test_a_crate_pr_with_arm64_pending_is_left_out(self):
+        self.two()
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": [check(ARM % "build"), check(ARM % "release", "IN_PROGRESS", None)]}))
+        r, lines = self.round(["7", "8"])
+        self.assertEqual(lines[-1], "dry: would carry 7 onto " + self.base[:9], r.stdout + r.stderr)
+
+    def test_a_crate_pr_missing_a_shard_or_the_release_is_left_out(self):
+        self.two()
+        for checks in ([check(ARM % "build"), check(ARM % "1/1")], [check(ARM % "build"), check(ARM % "release")],
+                       [check(ARM % "build"), check(ARM % "release"), check(ARM % "1/3"), check(ARM % "2/3")]):
+            self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": checks}))
+            r, lines = self.round(["7", "8"])
+            self.assertEqual(lines[-1], "dry: would carry 7 onto " + self.base[:9], checks)
+
+    def test_a_crate_pr_with_every_arm64_job_green_is_carried(self):
+        self.two()
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": [check(ARM % "build"), check(ARM % "release"), check(ARM % "1/2"),
+                                                                         check(ARM % "2/2"), check("promote", conclusion="SKIPPED")]}))
+        r, lines = self.round(["7", "8"])
+        self.assertEqual(lines[-1], "dry: would carry 7 8 onto " + self.base[:9], r.stdout + r.stderr)
+
+    def test_a_no_crates_pr_with_no_arm64_is_still_carried(self):
+        self.pr(7, [CRATE])
+        self.pr(8, ["lampOS/docs/other.md"])
+        self.heads()
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": [check("doc links")]}))
+        r, lines = self.round(["7", "8"])
+        self.assertEqual(lines[-1], "dry: would carry 7 8 onto " + self.base[:9], r.stdout + r.stderr)
 
 
 CI_YML = """name: CI

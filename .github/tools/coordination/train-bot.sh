@@ -64,14 +64,23 @@ fine() { grep -qx -- "$1" $said && { grep -vx -- "$1" $said > $said.new; mv $sai
 # red); otherwise it says why, once per head, and fails. Checks that can't be read fail it (fail closed). eligible() and
 # build_train() both ask it. 12 Nov (#6556): build_train asks again just before the cherry-pick, as train 836 (#6611)
 # carried #6506, whose ARM64 run on 024930deaa was still running when its round read it and red 6 min before the cut.
+# 12 Nov (#6556, train 841 #6662): a PR the ARM64 run takes (lib.sh, coord_arm_takes) also needs its own head's ARM64
+# run there and all green (coord_arm64_green_jq); absent or still running, it waits, said once per head. #6572's head
+# ec26212c11 had no ARM64 run at the cut (a force-push started none); its release job went red after the train took it.
 head_green() {
-  local own
-  if ! own=$(gh pr view $1 -R $REPO --json statusCheckRollup 2>/dev/null | jq -r "$coord_red_checks_jq" 2>/dev/null) || [[ -z $own ]]; then
+  local own all arm
+  if ! all=$(gh pr view $1 -R $REPO --json statusCheckRollup 2>/dev/null) || ! own=$(jq -r "$coord_red_checks_jq" <<< $all 2>/dev/null) || [[ -z $own ]]; then
     once run$1 "#$1 left out: the checks on ${2:0:9} can't be read"; return 1
   fi
   fine run$1
-  [[ $own == ok ]] && return 0
-  grep -qx "$1 red $2" $told || { say "#$1 left out: a check on its own head ${2:0:9} is red (${own#red })" >&2; tell "$1 red $2"; }
+  if [[ $own != ok ]]; then
+    grep -qx "$1 red $2" $told || { say "#$1 left out: a check on its own head ${2:0:9} is red (${own#red })" >&2; tell "$1 red $2"; }
+    return 1
+  fi
+  coord_arm_takes $2 || return 0
+  arm=$(jq -r "$coord_arm64_green_jq" <<< $all 2>/dev/null)
+  [[ $arm == ok ]] && return 0
+  grep -qx "$1 arm $2" $told || { say "#$1 left out: its own head ${2:0:9}'s ARM64 run is not all green yet (${arm#waiting }); it waits" >&2; tell "$1 arm $2"; }
   return 1
 }
 eligible() {
