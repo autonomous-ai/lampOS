@@ -283,6 +283,26 @@ and none of the skills' own (`crate::use_skill`):
   room from the thread as it keeps the room for what it can't do right now;
   the cascade (`LAMP_VOICE_ROUTE=second`) tells it in each turn's system
   message.
+- **`when` lines** (#6218, `LAMP_USE_SKILL_SUMMARY=on` on lamp-skills, off
+  unless set). With the switch, the tools file gives a `when` beside its tools
+  (`lamp_skills::tools_file`): by tool, a line of at most 200 bytes. It comes
+  from `SKILL.md`'s `when:`, a `[stop]`'s `when`, or `stay_plugged_in`'s own
+  line, and says when to call the skill and when not. It also keeps what the
+  lamp says or doesn't say as it calls (the first builder's ruling: a realtime
+  model often speaks in the same turn as the call, before its answer comes).
+  - **The line told:** a skill with a `when` is told it in place of its
+    description (`use_skill::section_told`, `tools::skill_whens`): its name,
+    its `when`, then its choice's name and words and its yes-or-no's name, as
+    on a short line. That is the same line whole and short.
+  - **The answer:** the skill's whole line, as the session would have been
+    told it, comes with its call's answer under `now` ("Now, as dance's own
+    words say: …", `use_skill::now`), after `ran`, and never on a refusal.
+    So the how-to and after-the-call words are read on the turn the model
+    acts on them.
+  - **Without a `when`:** a skill with none (a Store skill, or an older file)
+    is told and answered as before. With no `when` at all, the section is the
+    same byte for byte
+    (`a_skill_with_a_when_line_is_told_it_and_answered_with_its_words`).
 - **A call:** routed as `Route::UseSkill` and made the skill's own call
   when it runs (`use_skill::translate`). The choice and the yes-or-no go
   under the skill's own parameters' names. The skill's own names are taken

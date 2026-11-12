@@ -344,6 +344,8 @@ pub const BUDGET_WAIT_LIVE_US: u64 = 120_000_000;
 struct StopFile {
     tool: String,
     about: String,
+    #[serde(default)]
+    when: Option<String>,
 }
 
 /// `[stop]` as loaded: the function's name and when to call it, as the
@@ -352,6 +354,9 @@ struct StopFile {
 pub struct Stop {
     pub tool: String,
     pub about: String,
+    /// When to call it and when not, in short (#6218): the tools file's
+    /// `when` with [`SUMMARY_ENVIRONMENT`] on.
+    pub when: Option<String>,
 }
 
 /// The one argument of a `[stop]` function, and its values: `snooze` until
@@ -363,6 +368,35 @@ pub const STOP_WAYS: [&str; 3] = ["snooze", "off", "on"];
 pub const STOP_ALL: &str = "all";
 /// The most a `[stop]`'s `about` may say.
 pub const STOP_ABOUT_MOST_BYTES: usize = 512;
+/// The most a `when` may say: `SKILL.md`'s, or a `[stop]`'s (#6218).
+pub const WHEN_MOST_BYTES: usize = 200;
+/// The switch that gives the tools file its `when` lines (#6218): each
+/// tool's short when to call it and when not, which the voice lists in
+/// place of the description. Off unless `on`; off, the file is as before,
+/// byte for byte.
+pub const SUMMARY_ENVIRONMENT: &str = "LAMP_USE_SKILL_SUMMARY";
+/// Whether [`SUMMARY_ENVIRONMENT`]'s value turns the `when` lines on: `on`
+/// only.
+pub fn summary_on(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// A `when`, or why it is refused: some text, at most [`WHEN_MOST_BYTES`],
+/// with no control characters.
+fn checked_when(when: Option<String>, whose: &str) -> Result<Option<String>, String> {
+    match when {
+        Some(when)
+            if when.trim().is_empty()
+                || when.len() > WHEN_MOST_BYTES
+                || when.chars().any(char::is_control) =>
+        {
+            Err(format!(
+                "{whose} when is at most {WHEN_MOST_BYTES} bytes, not empty, with no control characters"
+            ))
+        }
+        when => Ok(when),
+    }
+}
 /// The file in `--state-dir` that keeps the skills turned off: one line
 /// each, the skill's name, and nothing else.
 pub const OFF_FILE: &str = "off";
@@ -1891,6 +1925,9 @@ pub fn version_ok(version: &str) -> bool {
 pub struct Skill {
     pub name: String,
     pub description: String,
+    /// `SKILL.md`'s `when`, if it has one (#6218): when to call its tool and
+    /// when not, in short, at most [`WHEN_MOST_BYTES`].
+    pub when: Option<String>,
     pub enabled: bool,
     pub limits: Option<routine::Limits>,
     pub needs: Vec<String>,
@@ -2938,21 +2975,23 @@ fn plain_name(name: &str) -> bool {
         })
 }
 
-/// `name` and `description` from `SKILL.md`'s front matter (Agent Skills).
-fn front_matter(text: &str) -> Result<(String, String), String> {
+/// `name` and `description` from `SKILL.md`'s front matter (Agent Skills),
+/// and its `when`, if it has one (#6218).
+fn front_matter(text: &str) -> Result<(String, String, Option<String>), String> {
     let body = text
         .strip_prefix("---\n")
         .and_then(|rest| rest.split_once("\n---"))
         .ok_or("SKILL.md begins with front matter between two --- lines")?
         .0;
-    let field = |key: &str| {
+    let optional = |key: &str| {
         body.lines()
             .find_map(|line| line.strip_prefix(key)?.strip_prefix(':'))
             .map(|value| value.trim().to_owned())
             .filter(|value| !value.is_empty())
-            .ok_or(format!("SKILL.md's front matter has no {key}"))
     };
-    Ok((field("name")?, field("description")?))
+    let field = |key: &str| optional(key).ok_or(format!("SKILL.md's front matter has no {key}"));
+    let when = checked_when(optional("when"), "SKILL.md's")?;
+    Ok((field("name")?, field("description")?, when))
 }
 
 /// A field's path: names joined by dots, none empty (Jarvis on #1920: a
@@ -3392,7 +3431,7 @@ pub fn load_with(dir: &Path, present: bool) -> Result<Skill, String> {
     let read =
         |file: &str| fs::read_to_string(dir.join(file)).map_err(|error| format!("{file}: {error}"));
     let description_text = read("SKILL.md")?;
-    let (name, description) = front_matter(&description_text)?;
+    let (name, description, when) = front_matter(&description_text)?;
     if dir.file_name().and_then(|folder| folder.to_str()) != Some(name.as_str()) {
         return Err(format!(
             "SKILL.md names {name:?}, which is not its folder's name"
@@ -3413,7 +3452,7 @@ pub fn load_with(dir: &Path, present: bool) -> Result<Skill, String> {
     let Some(overlay) = table.remove("present") else {
         let file =
             toml::from_str(&manifest_text).map_err(|error| format!("skill.toml: {error}"))?;
-        return manifest(dir, name, description, texts, file);
+        return manifest(dir, name, description, texts, file).map(|skill| Skill { when, ..skill });
     };
     let toml::Value::Table(overlay) = overlay else {
         return Err("skill.toml: [present] is a table".into());
@@ -3437,7 +3476,10 @@ pub fn load_with(dir: &Path, present: bool) -> Result<Skill, String> {
     let own = manifest(dir, name.clone(), description.clone(), texts, own)?;
     let with =
         manifest(dir, name, description, texts, with).map_err(|why| format!("[present]: {why}"))?;
-    Ok(if present { with } else { own })
+    Ok(Skill {
+        when,
+        ..if present { with } else { own }
+    })
 }
 
 /// A skill's `skill.toml`, as [`load_with`] has it, loaded; `texts` are
@@ -4039,6 +4081,7 @@ fn manifest(
             Some(Stop {
                 tool: stop.tool,
                 about: stop.about,
+                when: checked_when(stop.when, "[stop]")?,
             })
         }
     };
@@ -4884,6 +4927,7 @@ fn manifest(
     let skill = Skill {
         name,
         description,
+        when: None,
         pushed_by: None,
         enabled: file.enabled,
         limits: file.limits.map(routine::LimitsFile::checked).transpose()?,
@@ -9274,10 +9318,11 @@ fn calls(
 /// Each is in the tools' names' order, whatever order `skills` is in, so
 /// the voice's cut past its bound, the last first, is by name.
 pub fn tools_file(skills: &[Skill]) -> Value {
-    tools_file_with(
+    tools_file_summary(
         skills,
         requested_audio::from_environment(),
         watch::words_v2(std::env::var(watch::WORDS_ENVIRONMENT).ok().as_deref()),
+        summary_on(std::env::var(SUMMARY_ENVIRONMENT).ok().as_deref()),
     )
 }
 
@@ -9296,6 +9341,23 @@ pub fn tools_file_with_requested_audio(skills: &[Skill], enabled: bool) -> Value
 /// `[choice]` `about` (#2827, `LAMP_GUARD_WORDS_V2`); off, every tool is
 /// as its skill says, byte for byte.
 pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) -> Value {
+    tools_file_summary(skills, enabled, guard_words_v2, false)
+}
+
+/// [`tools_file_with`] with the `when` lines too (#6218,
+/// [`SUMMARY_ENVIRONMENT`]): with `summary`, `"when"` maps each tool in the
+/// file that has one to it, a skill's tool to its `SKILL.md`'s, a `[stop]`
+/// function to the `[stop]` `when` of the skill it was taken from (the
+/// first in order, as its `about`), and `stay_plugged_in` to
+/// [`unplug::STAY_WHEN`]. No tool with one, or `summary` off, and there is
+/// no `"when"`: the file is as [`tools_file_with`] made it before.
+pub fn tools_file_summary(
+    skills: &[Skill],
+    enabled: bool,
+    guard_words_v2: bool,
+    summary: bool,
+) -> Value {
+    let mut whens = serde_json::Map::new();
     let mut tools: Vec<Value> = Vec::new();
     let mut moving: Vec<&str> = Vec::new();
     let mut core: Vec<&str> = Vec::new();
@@ -9353,6 +9415,9 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
             if !properties.is_empty() {
                 tool["parameters"] = json!({"type": "object", "properties": properties});
             }
+            if let Some(when) = &skill.when {
+                whens.insert(name.clone(), json!(when));
+            }
             tools.push(tool);
         }
         // One function a skill to snooze it or turn it off (#1685): counted
@@ -9403,6 +9468,9 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
             }) {
                 core.push(&stop.tool);
             }
+            if let Some(when) = &stop.when {
+                whens.insert(stop.tool.clone(), json!(when));
+            }
             tools.push(json!({
                 "name": stop.tool,
                 "description": stop.about,
@@ -9417,6 +9485,7 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
         && !tools.iter().any(|tool| tool["name"] == unplug::STAY_TOOL)
     {
         tools.push(unplug::stay_tool());
+        whens.insert(unplug::STAY_TOOL.into(), json!(unplug::STAY_WHEN));
         moving.push(unplug::STAY_TOOL);
         if skills
             .iter()
@@ -9440,6 +9509,10 @@ pub fn tools_file_with(skills: &[Skill], enabled: bool, guard_words_v2: bool) ->
     }
     if !searches.is_empty() {
         file["searches"] = Value::Object(searches);
+    }
+    if summary && !whens.is_empty() {
+        // By name, as the tools are.
+        file["when"] = json!(whens.into_iter().collect::<BTreeMap<_, _>>());
     }
     file
 }

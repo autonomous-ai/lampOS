@@ -76,6 +76,9 @@ after_ignored = 2
 [stop]
 tool = "wellbeing_nudges"
 about = "When someone asks you to stop a wellbeing nudge, the lamp's short hints after a long sitting (a slow blue glow for water, a tilt to rest the eyes, a turn to stand up, an evening droop): snooze it until tomorrow morning, turn it off until they ask again, or on again. Leave all out for the one that came last; all = true for every one of them. Never a reminder they set ('stop reminding me to drink water'): that is cancel_reminder."
+# In short, with LAMP_USE_SKILL_SUMMARY on (#6218); the same in every
+# wellbeing skill, so whichever is first in folder order says it.
+when = "When asked to snooze, turn off or turn on again the lamp's own wellbeing nudges (water, eyes, stand up, a break, a meal, sit back, wind down). Never for a reminder they set: that is cancel_reminder."
 
 [ask]
 policy = "nudge"

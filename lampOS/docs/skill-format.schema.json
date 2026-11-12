@@ -335,6 +335,12 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 512
+        },
+        "when": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "When to call the stop function and when not, in short (#6218): the tools file's when with LAMP_USE_SKILL_SUMMARY on."
         }
       }
     },

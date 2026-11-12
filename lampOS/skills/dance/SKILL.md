@@ -1,6 +1,7 @@
 ---
 name: dance
 description: When someone asks the lamp to dance ("Lamp, dance", "show me a dance", "dance to this"), it says one short playful line and dances one of its dances, calm, upbeat or jazzy to suit the ask; a long one if they asked for long. Only when asked.
+when: When someone asks you to dance ("dance", "show me a dance", "dance to this"); a long one only if they ask for long. Only when asked, never on your own.
 ---
 
 # Dance
