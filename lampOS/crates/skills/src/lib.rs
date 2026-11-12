@@ -5638,12 +5638,19 @@ pub fn load_each_with(
             let name = folder
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned());
-            let taken = loaded[..here].iter().any(|(other, _)| {
-                other
-                    .file_name()
-                    .map(|other| other.to_string_lossy().into_owned())
-                    == name
-            });
+            // Anything of that name under `root`, a file or a link too
+            // (`task::lamp_has_skill_named`, the rule lamp-control and
+            // lamp-tasks hold): lamp-control would hash that one at the
+            // mint, never this (SubDarren's P2/P3 on #6608).
+            let taken = folder
+                .file_name()
+                .is_some_and(|name| task::lamp_has_skill_named(root, name))
+                || loaded[..here].iter().any(|(other, _)| {
+                    other
+                        .file_name()
+                        .map(|other| other.to_string_lossy().into_owned())
+                        == name
+                });
             let skill = if taken {
                 Err("a skill of that name is already on the lamp: a pushed skill never takes its place".to_owned())
             } else {
@@ -10639,6 +10646,61 @@ mod tests {
             let refused = result(name).unwrap_err();
             assert!(refused.contains(why), "{name}: {refused}");
         }
+    }
+
+    /// A pushed skill whose name is on the lamp under `root` as a folder, a
+    /// file or a link is not loaded, so it is never handed over: lamp-control
+    /// would hash `root/<name>` at the mint (SubDarren's P2/P3 on #6608).
+    #[test]
+    fn a_pushed_skill_never_loads_while_its_name_is_under_the_lamps_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let dev = dir.path().join("dev");
+        std::fs::create_dir_all(&root).unwrap();
+        task_skill(
+            &dev,
+            "pushed-booth",
+            &PHOTO_BOOTH.replace("photo_booth", "pushed_booth"),
+        );
+        let none = BTreeSet::new();
+        let pushed = || {
+            load_each_with(
+                &root,
+                Some(Pushed {
+                    dir: &dev,
+                    picture_yes: &none,
+                }),
+            )
+            .into_iter()
+            .find(|(folder, _)| folder.starts_with(&dev))
+            .map(|(_, result)| result)
+            .unwrap()
+        };
+        assert!(pushed().unwrap().pushed_by.is_some());
+        let own = root.join("pushed-booth");
+        for what in ["a folder", "a file", "a link"] {
+            match what {
+                "a folder" => std::fs::create_dir(&own).unwrap(),
+                "a file" => std::fs::write(&own, "x").unwrap(),
+                _ => std::os::unix::fs::symlink(dir.path().join("nowhere"), &own).unwrap(),
+            }
+            let refused = pushed().unwrap_err();
+            assert!(refused.contains("already on the lamp"), "{what}: {refused}");
+            assert_eq!(
+                task::folder_of(&root, Some(&dev), "pushed-booth", true),
+                None,
+                "{what}"
+            );
+            if std::fs::symlink_metadata(&own).unwrap().is_dir() {
+                std::fs::remove_dir(&own).unwrap();
+            } else {
+                std::fs::remove_file(&own).unwrap();
+            }
+        }
+        assert_eq!(
+            task::folder_of(&root, Some(&dev), "pushed-booth", true),
+            Some(dev.join("pushed-booth"))
+        );
     }
 
     /// #6305: the manage helper reads a skill's task back for the voice,

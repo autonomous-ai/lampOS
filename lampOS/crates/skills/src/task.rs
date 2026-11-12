@@ -537,7 +537,8 @@ pub struct Place<'a> {
 /// skills `root`, or, for one the owner's computer pushed (`pushed`), under
 /// the developer folder `dev` (on a lamp [`crate::PUSHED_DIR`]), the one
 /// other place lamp-tasks and lamp-control take. `None` for a pushed skill
-/// with no developer folder, or a name that is not a plain one.
+/// with no developer folder or whose name is on the lamp under `root`
+/// ([`lamp_has_skill_named`]), or a name that is not a plain one.
 pub fn folder_of(
     root: &Path,
     dev: Option<&Path>,
@@ -552,10 +553,24 @@ pub fn folder_of(
         return None;
     }
     Some(if pushed {
+        if lamp_has_skill_named(root, name) {
+            return None;
+        }
         dev?.join(name)
     } else {
         root.join(name)
     })
+}
+
+/// Whether anything named `name` (a plain name) is under the lamp's skills
+/// `root`: a folder, a file or a link, never followed (`symlink_metadata`).
+/// While one is, a pushed skill of that name is not loaded or handed over
+/// here, lamp-control hashes `root/<name>` at the mint, and lamp-tasks
+/// refuses the pushed folder (`lamp_tasks::skill_task::lamp_has_skill_named`,
+/// the same rule written again there): one name, one folder, in all three
+/// (SubDarren's P2 on #6608).
+pub fn lamp_has_skill_named(root: &Path, name: impl AsRef<Path>) -> bool {
+    std::fs::symlink_metadata(root.join(name)).is_ok()
 }
 
 /// The `do.task` `step` of the skill `skill` in `folder`, declaring

@@ -61,6 +61,18 @@ và thoát với mã 0.
   mỗi giây chỉ một lần thử trên cả đèn. **Hello** trên mỗi kết nối, ký bằng
   khóa đó, một lần cho mỗi kết nối.
 
+## Token cho skill run
+
+Khi cấp token (`mint`, #6304, `task_yes::KeptYes`), `lamp-control` tự băm
+thư mục `/var/lib/lampOS/skills/<skill>`, hoặc, với tên không có ở đó, thư
+mục của skill được đẩy lên `/var/lib/lampOS/skills-dev/<skill>`
+(`task_yes::folder_of`). Chỉ cần có bất cứ thứ gì mang tên đó trong
+`skills/` (thư mục, tệp hay liên kết) là skill được đẩy lên không bao giờ
+thay chỗ nó; lamp-skills và lamp-tasks giữ cùng quy tắc đó. Một thư mục là
+liên kết thì không bao giờ được băm. Token chỉ nêu các quyền khi
+`task-yes.json` giữ lời đồng ý của chủ đèn cho đúng mã SHA-256 đó và các
+quyền đó.
+
 ## Ai thắng
 
 Giới hạn an toàn của thân đèn, rồi người (tay trên đầu, công tắc riêng tư,
