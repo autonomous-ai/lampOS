@@ -1634,6 +1634,20 @@ handed over once it is; the state file never naming the skill
 or holding its words, 0600), and
 `online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`.
 
+### Run by the lamp's agent (`LAMP_UPLOAD_TO_AGENT`, off)
+
+The owner's ask (12 Nov): a `SKILL.md` uploaded from the app runs through
+the lamp's agent, as V1's did; the first builder's yes at 19:44, behind
+two switches, both off and set in no unit. With `LAMP_UPLOAD_TO_AGENT=on`
+in `lamp-cloud`'s unit (`upload::AGENT_ENVIRONMENT`, `Uploads::to_agent`),
+a bare `SKILL.md` may be up to 64 KiB (`MOST_AGENT_BYTES`; past it,
+`failure` with "its SKILL.md is longer than 64 KiB") and goes to
+`lamp-voice` whole, which makes it an agent skill (docs/skills.md, "Run by
+the lamp's agent"). Its `success` carries `grants`, the task grants read
+from the file (`["light", "speak", "camera", "net"]` for a photo booth),
+null for any other skill. Off, a bare `SKILL.md` past 8 KiB is refused
+for its length as before. The file's words never reach the journal.
+
 ## Health and crash reports (#1683, step 1)
 
 If something on a lamp breaks in a home, the company should know and fix it

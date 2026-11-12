@@ -1589,7 +1589,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (`lamp_voice::skill_task_yes::GRANTS`: `body`, `light`, `speak`, `look`,
   `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
   `speech`), once each, never `skills` (a script never puts skills on the
-  lamp). An unknown one refuses the skill. A pushed skill is held to its
+  lamp). With `LAMP_TASK_NET=on` (off, set in no unit) one more, `net`
+  ("reaches the internet"): the run keeps the lamp's network; never one of
+  lamp-control's own, so the yes holds it and the token never names it. An unknown one refuses the skill. A pushed skill is held to its
   computer's own grants for them too (`package::grants_asked`).
 - **First kind only.** A skill with a `do.task` loads only when its script
   came from the Skills Store (its `.package.json` says `from_store`) or was
@@ -4718,6 +4720,70 @@ why without a helper; the socket's line with the switch off, without the
 say service, kept and then `on`) and, with the
 real `lamp-skills`,
 `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
+
+##### Run by the lamp's agent (`LAMP_UPLOAD_TO_AGENT=on`, off)
+
+The owner's ask (12 Nov: a `SKILL.md` uploaded from the app runs through
+the lamp's agent, as V1's did); the first builder's yes at 19:44, both
+switches off and set in no unit. `lamp_voice::upload_agent`. With
+`LAMP_UPLOAD_TO_AGENT=on` in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
+its manage helper, a bare `SKILL.md` of at most 64 KiB becomes an agent
+skill instead of a written one (off: a written skill, its note at most 900
+bytes, as above):
+
+- **The file is its instructions**, kept whole in its folder as
+  `scripts/SKILL.md`. The lamp reads only its front matter, its trigger
+  phrases (quoted on a line that says "trigger", or a list under a heading
+  that does, at most 8) and the words its grants are read from.
+- **A voice tool** (`tool = name`, `-` as `_`), its card the lamp's own
+  words, `made: here`, `added: file` and `agent: file`; its description,
+  the tool's note, is the file's description and its trigger phrases, so
+  the model calls it when the person says one. Its one step is
+  `task = { task = DESCRIPTION, run = "scripts/SKILL.md" }`, with
+  `grants` and nothing else (`upload_agent::capped`, held again by the
+  manage helper's `install_made` with the package's files: exactly its
+  three).
+- **Its grants are read from the file**, conservatively, by plain words:
+  `light` (light, flash, LED, glow), `speak` (say, speak, aloud, announce),
+  `sound` (sound, beep, chime), `camera` (camera, photo, picture, snapshot,
+  selfie) and `net` (a URL, HTTP, an API, a webhook or an endpoint), never
+  more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on`;
+  off, such a file is refused ("it reaches the internet, which a skill's
+  task can't on this lamp").
+- **No secret is the lamp's** (the first builder's 19:44 ruling): a key or
+  token is never said aloud, asked by voice or kept in the skill's folder.
+  Its way in (the app, into root's store as a service's tokens, reaching
+  the run as an environment file read once) is a follow-up; until then a
+  file carrying a value that looks like one (a run of 24 or more letters,
+  digits, `_ - . :` with four letters and four digits, outside a link) is
+  refused: "it carries what looks like a key or a token; a skill added
+  from a file can't hold one yet, so add it without the key or token". The
+  value is never journaled.
+- **It goes on as an uploaded skill does** (#5977), said aloud: "I added
+  photo booth from a file, not from the Skills Store, and it's on: only
+  when you ask for it, the lamp's agent follows the file, and it changes
+  the light, speaks and plays sounds, uses the camera and reaches the
+  internet. The first time it runs, I'll ask you to agree." With grants
+  only of `light`, `sound`, `body` and `speak`, the voice records its
+  task's yes with lamp-control as it goes on (`upload_agent::went_on`,
+  `task_yes_record`, the folder as the manage helper reads it) and the
+  line ends at what it uses. With the camera, the microphone, a send or
+  `net`, it keeps its spoken yes once (the first builder's 19:14 line):
+  the model's first call of its tool is answered with the task's say-back
+  and the wait for the yes (`upload_agent::first_run`, the task-yes path
+  above), and nothing runs; on the yes the model is told to call it again
+  at once. A read-back by name ("what does photo booth use?") works as for
+  any skill with a task; its script is said to come from "a file added in
+  the app".
+- **At each run**, lamp-skills hands its task to lamp-tasks as any
+  `do.task` (docs/tasks.md, "An agent skill's run and the `net` grant"):
+  `task::origin_refuses` lets it through only with the switch on, as a
+  package that is not the Store's and not pushed, its card marked and its
+  `skill.toml` within the cap (`task::agent_from_file`).
+
+Tests: `upload_agent::tests` (the 4 KB photobooth file, the switch off,
+a short light-and-speak file, the first run's yes, no secret written,
+a key refused), `task::tests::an_agent_skill_from_a_file_carries_its_task_only_with_its_switch`.
 
 #### Written in the app (`LAMP_SKILL_WRITTEN=on`, off)
 
