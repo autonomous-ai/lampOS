@@ -61,6 +61,20 @@ put the floor before the two limits. That number is recorded with a fixed
 floor too, so a room can be watched before the floor is let go in it.
 Host tests for the rule (`room_floor::tests`).
 
+**A call under the floor is said in the journal** (#5540,
+`crates/voice/src/faint_named.rs`). A call said just under the floor opens
+no line, since the line comes from the voice's own detector, not from the
+name. When `lamp-name` hears the name (`name/heard`, read on its own
+subscriber `voice_faint`, with the floor and the bus on) and the floor
+turned away blocks the detector scored as speech from 0.3 s before the name
+began until it was heard, the voice logs one line for that hearing, and
+none for another hearing begun within it:
+`lamp-voice: the lamp's name was heard (score 0.94) but the faint floor
+turned the line away: 40 of 40 speech blocks were under it, the loudest at
+-29.2 dBFS (level 141) against a floor of -28.0 dBFS (level 150)`. It is
+only said: nothing is heard that was not before. Host tests
+(`faint_named::tests`).
+
 **A question put to the lamp stays its own** (the character file,
 [character.md](character.md)): "you will often be asked something and then
 hear other people talking to each other before you have had the chance to
