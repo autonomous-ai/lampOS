@@ -565,9 +565,15 @@ export class Lamp {
     return new Lamp(ws, welcome, reply, frames);
   }
 
-  // Connect to a paired lamp (by its id, or the only one paired) and say hello.
+  // Connect to a paired lamp (by its id, or the only one paired) and say hello. With no pairing and no `host`,
+  // inside a skill's run on the lamp (`LAMP_CONTROL_TOKEN` set and not empty) it is `Lamp.local(token)`: the run's
+  // own grants. A pairing, when there is one, wins as before.
   static async connect(lamp, { host, keyring = new Keyring() } = {}) {
     const pairing = keyring.pairing(lamp);
+    if (!pairing && !host) {
+      const token = (process.env.LAMP_CONTROL_TOKEN ?? '').trim();
+      if (token) return Lamp.local(token);
+    }
     // With no pairing, on the lamp itself, as the user the owner turned on: the
     // agent socket. Never when a `host` was asked for.
     const local = pairing || host ? null : agentSocket();

@@ -710,10 +710,17 @@ class Lamp:
         keyring: Keyring | None = None,
     ) -> "Lamp":
         """Connect to a paired lamp (by its id, or the only one paired) and
-        say hello."""
+        say hello. With no pairing and no `host`, inside a skill's run on the
+        lamp (`LAMP_CONTROL_TOKEN` set and not empty) it is `Lamp.local(token)`:
+        the run's own grants, not the local agent's. A pairing, when there is
+        one, wins as before."""
         keyring = keyring or Keyring()
         pairing = keyring.pairing(lamp)
         local = None
+        if pairing is None and not host:
+            token = (os.environ.get("LAMP_CONTROL_TOKEN") or "").strip()
+            if token:
+                return await cls.local(token)
         if pairing is None:
             # On the lamp itself, as the user the owner turned on: no pairing,
             # the agent socket. Never when a `host` was asked for.

@@ -248,7 +248,7 @@ await Lamp.keep_connected(setup)
 `FakeLamp.restart()` closes every connection as a lamp's restart does, to
 test it.
 
-**On the lamp itself**, a skill's script connects as its run with `await Lamp.local(token)` (the token from `LAMP_CONTROL_TOKEN`, the socket `LAMP_CONTROL_SOCKET`, default `/run/lampos-control/control.sock`): the same `Lamp`, with exactly the grants the owner said yes to for that skill; `lamp.run` is the run's id and `lamp.skill` the skill it runs for. No pairing: the one-run token is the way in, and a wrong or ended one is refused `no_grant`. It is not the local agent's socket (docs/control.md, "The control socket"). The fake lamp serves it with `FakeLamp(local=True)`, `fake.mint_token(grants, run)` and `fake.end_run(run)`.
+**On the lamp itself**, a skill's script connects as its run with `await Lamp.connect()` (with no pairing and no `host`, a `LAMP_CONTROL_TOKEN` that is set and not empty makes it `Lamp.local(token)`; a pairing wins) or `await Lamp.local(token)` (the token from `LAMP_CONTROL_TOKEN`, the socket `LAMP_CONTROL_SOCKET`, default `/run/lampos-control/control.sock`): the same `Lamp`, with exactly the grants the owner said yes to for that skill; `lamp.run` is the run's id and `lamp.skill` the skill it runs for. No pairing: the one-run token is the way in, and a wrong or ended one is refused `no_grant`. It is not the local agent's socket (docs/control.md, "The control socket"). The fake lamp serves it with `FakeLamp(local=True)`, `fake.mint_token(grants, run)` and `fake.end_run(run)`.
 
 **Dependencies** (`websockets`, `cryptography`; `zeroconf` to find lamps)
 have lower bounds only, as a library's should: the application that uses

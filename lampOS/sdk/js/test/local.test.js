@@ -76,3 +76,31 @@ test("the control socket refuses a real client's id or signature beside a token,
     }
   });
 });
+
+test('connect() with no pairing and a run token is the run\'s local connection; an empty token, a host or a pairing keep the old way', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { Keyring, NotPaired } = await import('../src/index.js');
+  const saved = { ...process.env };
+  try {
+    await withLocal(['body', 'light'], async (fake) => {
+      const keyring = () => new Keyring(mkdtempSync(join(tmpdir(), 'lampos-token-')));
+      process.env.LAMPOS_AGENT_SOCKET = join(tmpdir(), 'lampos-no-agent.sock');
+      process.env.LAMP_CONTROL_SOCKET = fake.localPath;
+      process.env.LAMP_CONTROL_TOKEN = fake.mintToken(['light'], 'r1', 'water');
+      const lamp = await Lamp.connect(undefined, { keyring: keyring() });
+      assert.deepEqual([lamp.grants, lamp.run, lamp.skill], [['light'], 'r1', 'water']);
+      await lamp.close();
+      for (const unset of ['', '   ']) {
+        process.env.LAMP_CONTROL_TOKEN = unset;
+        await assert.rejects(Lamp.connect(undefined, { keyring: keyring() }), NotPaired);
+      }
+      process.env.LAMP_CONTROL_TOKEN = fake.mintToken(['light'], 'r2');
+      await assert.rejects(Lamp.connect(undefined, { host: '127.0.0.1', keyring: keyring() }), NotPaired);
+      const bad = 'B'.repeat(43);
+      process.env.LAMP_CONTROL_TOKEN = bad;
+      await assert.rejects(Lamp.connect(undefined, { keyring: keyring() }), (error) => error instanceof byCode.no_grant && !String(error.message).includes(bad) && !String(error.why).includes(bad));
+    });
+  } finally { process.env = saved; }
+});
