@@ -458,6 +458,39 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
   `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
   `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
+- **Nêu trong lời nghe được, do code đặt (#6492, V2 của lead):** khi đèn
+  có target riêng, voice đọc câu chính người nói trong request đó (câu do
+  đèn viết thì không) và tự đặt `where`/`engine`/`who`, để model bỏ sót
+  cũng không gửi việc đi nơi khác. Tên chỉ lấy từ những gì đèn này có: các
+  engine của đèn như lần đọc gần nhất (theo id hoặc tên gọi) và staff trên
+  máy tính (Claude Code khi chưa đọc được); không bao giờ là danh sách agent
+  cố định. Tên chỉ tính khi là người làm: sau "ask", "have", "tell", "get"
+  hoặc "let", hoặc "with", "using", "via" hoặc "use" (không tính "don't ask
+  …", "did you ask …"), hoặc đứng đầu câu trước dấu phẩy ("Hey Lamp,
+  Hermes, …"); hoa thường gì cũng được, các chữ của tên viết liền hay rời
+  ("Open Claw"). Nêu một engine của đèn: `where` `lamp` và `engine` đó, bất
+  kể model gửi gì. Nêu một staff: `where` `computer`, `who` là họ, không có
+  `engine`. Tên có cả trên đèn và trên máy tính thì chạy trên đèn, trừ khi
+  máy tính được nêu là nơi làm hoặc lời nói cần đồ của máy tính: "my" +
+  repo, repository, codebase, code, project, folder, files hoặc branch,
+  hoặc "the repo/repository/codebase" (chỉ là từ chung; riêng dấu hiệu đó
+  thì không đặt gì). "On/use my/the computer", "Mac", "MacBook", "laptop"
+  hoặc "PC" (có thể có một từ ở giữa: "my office computer") đặt `where`
+  `computer` và bỏ `engine` (và `who` chỉ nêu engine của đèn); phủ định
+  ("don't use my computer") hoặc "on the lamp", "yourself", "right here"
+  đặt `where` `lamp`, giữ `engine` của model. Chỉ nhắc tên thì không tính
+  ("what is Hermes?", "OpenClaw's update"), tên không có trong danh sách
+  nào cũng không; lời mâu thuẫn (hai agent, đèn và máy tính, agent chỉ có
+  trên đèn kèm "on my computer", agent chỉ có trên máy tính kèm "on the
+  lamp") không đặt gì, giữ nguyên tham số của model. Mỗi lần ghi đè log một
+  dòng nêu cái được đặt và cái model gửi, không bao giờ ghi lời nói. Câu
+  đọc lại vẫn nói nơi chạy như trước ("OpenClaw on the lamp", "Claude Code
+  on the office computer"). Lượt mà model không gọi `start_agent_task` thì
+  không bị đổi. Test:
+  `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
+  `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
+  `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
+  `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
 - **Khởi động** như Harness khởi động OpenClaw:
   `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
   chế độ quyền và không định tuyến model (OpenClaw tự chọn model, theo phần
