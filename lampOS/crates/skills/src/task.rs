@@ -34,6 +34,16 @@
 //!   the folder is hashed again and lamp-control asked ([`yes_refuses`]):
 //!   no yes, a yes for other bytes or grants, or lamp-control not reached
 //!   hands nothing over, and the person is asked again.
+//! - **Asked aloud** (#6071's V2): a run refused for want of the yes
+//!   ([`WAITING`], [`CHANGED`]) asks the voice's say service to say the
+//!   read-back itself and ask for the yes (`{"skill", "task_yes": true}`,
+//!   [`ask_yes`]): the voice builds it from the skill on the lamp
+//!   (`lamp_voice::skill_task_yes::asked_aloud`) and says it only where it
+//!   can be said whole. Once a folder's SHA-256 a day at most
+//!   ([`ASK_AGAIN_MS`]), at most [`ASKS_ALL`] across every skill in 24
+//!   hours, one not said tried again after [`ASK_RETRY_MS`] at a later
+//!   trigger ([`ASKS_FILE`] in `--state-dir`). On the yes, the task runs at
+//!   its next trigger, never this one's.
 //! - **Limits**: one `do.task` at a time a skill, and at most [`PER_SKILL`]
 //!   a skill and [`ALL_SKILLS`] across every skill in any 24 hours
 //!   ([`Runs`]).
@@ -126,8 +136,10 @@ pub const DAY_MS: u64 = 86_400_000;
 pub const RUN_MOST: Duration = Duration::from_secs(15 * 60);
 /// In `--state-dir`: when each skill's task was handed over, for the bounds.
 pub const RUNS_FILE: &str = "task-runs.json";
-/// What a task with no yes for its skill is told.
-pub const WAITING: &str = "do.task: not handed over: waiting for the owner's yes (asked what the skill uses, the lamp says it back)";
+/// What a task with no yes for its skill is told; the lamp then asks for
+/// the yes itself ([`ask_yes`]).
+pub const WAITING: &str =
+    "do.task: not handed over: waiting for the owner's yes (the lamp says it back and asks)";
 /// What a task whose folder or grants changed since the yes is told.
 pub const CHANGED: &str = "do.task: not handed over: its script or grants changed since the owner's yes, so it asks again";
 /// What a task is told when lamp-control, which keeps the owner's yes,
@@ -434,6 +446,149 @@ pub fn yes_refuses(
     }
 }
 
+/// In `--state-dir`: when each skill's task was asked for its yes aloud,
+/// by its folder's SHA-256, and whether it was said ([`ask_yes`]).
+pub const ASKS_FILE: &str = "task-asks.json";
+/// A folder's SHA-256 said aloud is asked again no sooner than this: once a
+/// day at most, so a trigger that fires often never nags.
+pub const ASK_AGAIN_MS: u64 = DAY_MS;
+/// The most asks said aloud across every skill in any 24 hours.
+pub const ASKS_ALL: usize = 3;
+/// An ask the voice did not say (not said whole there, quiet hours, the
+/// lamp busy) is tried again no sooner than this, at a later trigger.
+pub const ASK_RETRY_MS: u64 = 10 * 60_000;
+/// How long the voice may take to begin an ask: the trigger's moment, when
+/// the person is there, not later.
+pub const ASK_EXPIRES_MS: u64 = 60_000;
+/// The say service's outcome of an ask said whole.
+pub const SPOKEN: &str = "say: spoken";
+
+/// One ask in [`ASKS_FILE`].
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, serde::Serialize)]
+pub struct Asked {
+    pub skill: String,
+    pub sha256: String,
+    pub at: u64,
+    /// Said aloud (or being said); false: tried, not said.
+    pub said: bool,
+}
+
+/// Why `skill`'s task, its folder hashed `sha256`, is not asked aloud at
+/// `now_ms` by the asks in `asks`, or none: an ask after now (a clock set
+/// back), that very folder said within [`ASK_AGAIN_MS`] or tried within
+/// [`ASK_RETRY_MS`], or [`ASKS_ALL`] said across every skill in 24 hours.
+/// A folder changed since is another SHA-256, so it asks again.
+pub fn ask_refuses(asks: &[Asked], skill: &str, sha256: &str, now_ms: u64) -> Option<String> {
+    if asks.iter().any(|asked| asked.at > now_ms) {
+        return Some("its asks' ledger has one after now".into());
+    }
+    let since = |asked: &Asked| now_ms - asked.at;
+    let this = |asked: &&Asked| asked.skill == skill && asked.sha256 == sha256;
+    if asks
+        .iter()
+        .filter(this)
+        .any(|asked| asked.said && since(asked) < ASK_AGAIN_MS)
+    {
+        return Some("asked aloud already today".into());
+    }
+    if asks
+        .iter()
+        .filter(this)
+        .any(|asked| !asked.said && since(asked) < ASK_RETRY_MS)
+    {
+        return Some("tried lately, not said: kept for a later trigger".into());
+    }
+    let said = asks
+        .iter()
+        .filter(|asked| asked.said && since(asked) < DAY_MS)
+        .count();
+    (said >= ASKS_ALL).then(|| format!("the lamp's {ASKS_ALL} asks in 24 hours are said"))
+}
+
+/// The asks under way, one a skill.
+static ASKING: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
+/// Held while [`ASKS_FILE`] is read and written, never while the voice
+/// says an ask: every skill's ask is counted in one ledger.
+static LEDGER: Mutex<()> = Mutex::new(());
+
+fn read_asks(state: &Path) -> Result<Vec<Asked>, String> {
+    match read_small(&state.join(ASKS_FILE), 64 * 1024) {
+        Ok(None) => Ok(Vec::new()),
+        Ok(Some(bytes)) => {
+            serde_json::from_slice(&bytes).map_err(|_| "its asks' ledger can't be read".into())
+        }
+        Err(_) => Err("its asks' ledger can't be read".into()),
+    }
+}
+
+fn write_asks(state: &Path, asks: &[Asked]) -> Result<(), String> {
+    let json = serde_json::to_vec(asks).map_err(|error| error.to_string())?;
+    lamp_update::records::write_whole(&state.join(ASKS_FILE), &json, 0o644)
+        .map_err(|error| format!("its asks' ledger: {error}"))
+}
+
+/// The yes to `skill`'s task, its folder hashed `sha256`, asked aloud at
+/// `now_ms` through `say` (the voice's say service's `task_yes`, which says
+/// the read-back itself, built from the skill on the lamp, and answers its
+/// outcome), unless [`ask_refuses`] says not, or one is under way for it.
+/// Counted in `state`'s [`ASKS_FILE`] as it begins, so asks at once are
+/// held to [`ASKS_ALL`] too; one not [`SPOKEN`] is kept as tried, for a
+/// later trigger. An unreadable ledger asks nothing. The journal's words,
+/// never the task's.
+pub fn ask_yes(
+    skill: &str,
+    sha256: &str,
+    state: &Path,
+    now_ms: u64,
+    say: impl FnOnce() -> String,
+) -> String {
+    {
+        let mut asking = ASKING.lock().unwrap_or_else(|poison| poison.into_inner());
+        if !asking.insert(skill.to_owned()) {
+            return "not asked aloud: its ask is under way".into();
+        }
+    }
+    let ledger = || LEDGER.lock().unwrap_or_else(|poison| poison.into_inner());
+    let said = (|| {
+        {
+            let _ledger = ledger();
+            let mut asks = read_asks(state).map_err(|why| format!("not asked aloud: {why}"))?;
+            if let Some(why) = ask_refuses(&asks, skill, sha256, now_ms) {
+                return Err(format!("not asked aloud: {why}"));
+            }
+            asks.retain(|asked| now_ms - asked.at < DAY_MS);
+            asks.push(Asked {
+                skill: skill.to_owned(),
+                sha256: sha256.to_owned(),
+                at: now_ms,
+                said: true,
+            });
+            write_asks(state, &asks).map_err(|why| format!("not asked aloud: {why}"))?;
+        }
+        let outcome = say();
+        if outcome != SPOKEN {
+            // Read again: another skill's ask may have been kept meanwhile.
+            let _ledger = ledger();
+            let mut asks =
+                read_asks(state).map_err(|why| format!("asked aloud, {outcome}; {why}"))?;
+            if let Some(asked) = asks
+                .iter_mut()
+                .find(|asked| asked.skill == skill && asked.sha256 == sha256 && asked.at == now_ms)
+            {
+                asked.said = false;
+            }
+            write_asks(state, &asks).map_err(|why| format!("asked aloud, {outcome}; {why}"))?;
+        }
+        Ok(format!("asked aloud: {outcome}"))
+    })()
+    .unwrap_or_else(|why| why);
+    ASKING
+        .lock()
+        .unwrap_or_else(|poison| poison.into_inner())
+        .remove(skill);
+    said
+}
+
 /// The runs under way, one a skill.
 static UNDER_WAY: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 /// Without `--state-dir`, when each run was handed over, for the bounds.
@@ -612,9 +767,12 @@ pub fn lamp_has_skill_named(root: &Path, name: impl AsRef<Path>) -> bool {
 /// `grants`, handed over at `now_ms` through `send` (the socket and the
 /// line; lamp-tasks' answer), or why not: the journal's words. With the
 /// switch off, nothing ([`OFF`]); with no yes for the folder as it is now
-/// and these grants, nothing ([`WAITING`], [`CHANGED`]); past the bounds or
+/// and these grants, nothing ([`WAITING`], [`CHANGED`]), and the yes is
+/// asked aloud through `say_yes` ([`ask_yes`]): the run waits for its next
+/// trigger once agreed, never for this one; past the bounds or
 /// with its last still under way, nothing. The run is counted once it is
 /// handed over, and the skill holds its one place until `send` returns.
+#[allow(clippy::too_many_arguments)] // the run's two ways out, lamp-tasks and the voice, each its own
 pub fn hand(
     skill: &str,
     step: &TaskStep,
@@ -623,6 +781,7 @@ pub fn hand(
     place: Place<'_>,
     now_ms: u64,
     send: impl FnOnce(&Path, &str) -> Result<String, String>,
+    say_yes: impl FnOnce() -> String,
 ) -> String {
     if !on() {
         return OFF.into();
@@ -635,6 +794,11 @@ pub fn hand(
         Err(why) => return format!("do.task: not handed over: its folder can't be read: {why}"),
     };
     if let Some(why) = yes_refuses(place.control, skill, &sha256, grants) {
+        // No yes for the folder as it is (#6071's V2): the lamp asks for
+        // it itself, once a folder, never lamp-control's no answer.
+        if why == WAITING || why == CHANGED {
+            return format!("{why}; {}", ask_yes(skill, &sha256, state, now_ms, say_yes));
+        }
         return why.into();
     }
     let Some(socket) = place.socket else {
@@ -1056,15 +1220,35 @@ mod tests {
             ],
         );
         let never = |_: &Path, _: &str| -> Result<String, String> { panic!("handed over") };
+        let unasked = || -> String { panic!("asked aloud") };
+        let spoken = || SPOKEN.to_owned();
         set_on_here(Some(false));
         assert_eq!(
-            hand("photo-booth", &step, &folder, &grants, place, 1, never),
+            hand(
+                "photo-booth",
+                &step,
+                &folder,
+                &grants,
+                place,
+                1,
+                never,
+                unasked
+            ),
             OFF
         );
         set_on_here(Some(true));
-        assert_eq!(
-            hand("photo-booth", &step, &folder, &grants, place, 1, never),
-            WAITING
+        assert!(
+            hand(
+                "photo-booth",
+                &step,
+                &folder,
+                &grants,
+                place,
+                1,
+                never,
+                spoken
+            )
+            .starts_with(WAITING)
         );
         let sha256 = folder_sha256(&folder).unwrap();
         let mut sent = None;
@@ -1080,6 +1264,7 @@ mod tests {
                 sent = Some(line.to_owned());
                 answered("{\"ok\":true,\"id\":7}")
             },
+            unasked,
         );
         assert_eq!(said, "do.task: handed to lamp-tasks: its run ended, task 7");
         let line: serde_json::Value = serde_json::from_str(&sent.unwrap()).unwrap();
@@ -1088,23 +1273,49 @@ mod tests {
         assert_eq!(line["grants"], serde_json::json!(["light"]));
         assert_eq!(line["run"], "scripts/main.py");
         fs::write(folder.join(SCRIPTS).join("main.py"), "print('changed')\n").unwrap();
-        assert_eq!(
-            hand("photo-booth", &step, &folder, &grants, place, 2, never),
-            CHANGED
+        assert!(
+            hand(
+                "photo-booth",
+                &step,
+                &folder,
+                &grants,
+                place,
+                2,
+                never,
+                spoken
+            )
+            .starts_with(CHANGED)
         );
         // Each run asked lamp-control of the folder as hashed then.
         fs::write(folder.join(SCRIPTS).join("main.py"), "print('hi')\n").unwrap();
-        let refused = hand("photo-booth", &step, &folder, &grants, place, 4, |_, _| {
-            answered("{\"ok\":false,\"error\":\"unknown_op\",\"message\":\"no\"}")
-        });
+        let refused = hand(
+            "photo-booth",
+            &step,
+            &folder,
+            &grants,
+            place,
+            4,
+            |_, _| answered("{\"ok\":false,\"error\":\"unknown_op\",\"message\":\"no\"}"),
+            unasked,
+        );
         assert!(refused.contains("did not take it: unknown_op"), "{refused}");
         let asked = lamp_control.join().unwrap();
         let check = |at: usize| asked[at][lamp_voice::skill_task_yes::CHECK]["sha256"].clone();
         assert_eq!(check(1), sha256.as_str());
         assert_ne!(check(2), sha256.as_str());
         // lamp-control not there: nothing handed over.
+        // lamp-control not there: nothing is asked aloud either.
         assert_eq!(
-            hand("photo-booth", &step, &folder, &grants, place, 5, never),
+            hand(
+                "photo-booth",
+                &step,
+                &folder,
+                &grants,
+                place,
+                5,
+                never,
+                unasked
+            ),
             NO_CONTROL
         );
         // No hand-over yet on this lamp: said so.
@@ -1114,7 +1325,19 @@ mod tests {
             control: &control_socket,
             socket: None,
         };
-        assert!(hand("photo-booth", &step, &folder, &grants, none, 6, never).contains("#6306"));
+        assert!(
+            hand(
+                "photo-booth",
+                &step,
+                &folder,
+                &grants,
+                none,
+                6,
+                never,
+                unasked
+            )
+            .contains("#6306")
+        );
         lamp_control.join().unwrap();
         set_on_here(None);
     }
@@ -1177,6 +1400,7 @@ mod tests {
                 sent = Some(line.to_owned());
                 answered("{\"ok\":true,\"id\":3}")
             },
+            || -> String { panic!("asked aloud") },
         );
         assert_eq!(said, "do.task: handed to lamp-tasks: its run ended, task 3");
         let line: serde_json::Value = serde_json::from_str(&sent.unwrap()).unwrap();
@@ -1184,14 +1408,143 @@ mod tests {
         assert_eq!(line["sha256"], unpushed.as_str());
         fs::write(pushed.join(SCRIPTS).join("main.py"), "print('changed')\n").unwrap();
         let never = |_: &Path, _: &str| -> Result<String, String> { panic!("handed over") };
-        assert_eq!(
-            hand("pushed-booth", &step, &pushed, &grants, place, 2, never),
-            CHANGED
+        let changed = hand(
+            "pushed-booth",
+            &step,
+            &pushed,
+            &grants,
+            place,
+            2,
+            never,
+            || SPOKEN.to_owned(),
         );
+        assert!(changed.starts_with(CHANGED), "{changed}");
         let asked = lamp_control.join().unwrap();
         let check = |at: usize| asked[at][lamp_voice::skill_task_yes::CHECK]["sha256"].clone();
         assert_eq!(check(0), unpushed.as_str());
         assert_ne!(check(1), unpushed.as_str());
         set_on_here(None);
+    }
+
+    /// #6071's V2: a `do.task` with no yes is not refused silently. Its
+    /// trigger fired, the lamp asks for the yes itself (the voice's say
+    /// service, `task_yes`), once a folder's SHA-256: the next trigger of the
+    /// same folder asks nothing, and a changed folder asks again.
+    #[test]
+    fn a_task_with_no_yes_asks_for_it_aloud_once_a_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        fs::create_dir_all(&state).unwrap();
+        let folder = folder(dir.path());
+        let step = step(&folder, "scripts/main.py").unwrap();
+        let grants = vec!["camera".to_owned()];
+        let control_socket = dir.path().join("control.sock");
+        let tasks = dir.path().join("tasks.sock");
+        let place = Place {
+            state: Some(&state),
+            control: &control_socket,
+            socket: Some(&tasks),
+        };
+        let waiting = serde_json::json!({"agreed": false, "why": "waiting"});
+        let changed = serde_json::json!({"agreed": false, "why": "changed"});
+        let lamp_control = control(&control_socket, vec![waiting.clone(), waiting, changed]);
+        let never = |_: &Path, _: &str| -> Result<String, String> { panic!("handed over") };
+        set_on_here(Some(true));
+        let mut asked = 0;
+        let said = hand(
+            "asking-booth",
+            &step,
+            &folder,
+            &grants,
+            place,
+            1_000,
+            never,
+            || {
+                asked += 1;
+                SPOKEN.to_owned()
+            },
+        );
+        assert_eq!(asked, 1, "the yes is asked aloud: {said}");
+        assert_eq!(said, format!("{WAITING}; asked aloud: {SPOKEN}"));
+        // The task's words are never the journal's.
+        assert!(!said.contains("Take a photo"), "{said}");
+        // Its next trigger, the same folder: nothing is said again.
+        let again = hand(
+            "asking-booth",
+            &step,
+            &folder,
+            &grants,
+            place,
+            60_000,
+            never,
+            || panic!("asked twice"),
+        );
+        assert!(again.contains("asked aloud already today"), "{again}");
+        // Its script changed: another SHA-256, asked again.
+        fs::write(folder.join(SCRIPTS).join("main.py"), "print('new')\n").unwrap();
+        let mut asked = 0;
+        let changed = hand(
+            "asking-booth",
+            &step,
+            &folder,
+            &grants,
+            place,
+            120_000,
+            never,
+            || {
+                asked += 1;
+                SPOKEN.to_owned()
+            },
+        );
+        assert_eq!(asked, 1, "{changed}");
+        assert!(changed.starts_with(CHANGED), "{changed}");
+        lamp_control.join().unwrap();
+        let asks = read_asks(&state).unwrap();
+        assert_eq!(asks.len(), 2);
+        assert_ne!(asks[0].sha256, asks[1].sha256);
+        set_on_here(None);
+    }
+
+    /// The bounds: one SHA-256 said at most once a day, at most
+    /// [`ASKS_ALL`] said across every skill in 24 hours; an ask the voice
+    /// did not say (not said whole there, the lamp's quiet hours) is kept
+    /// for a later trigger, tried again after [`ASK_RETRY_MS`]; a ledger
+    /// that can't be read, or has an ask after now, asks nothing.
+    #[test]
+    fn asks_aloud_are_capped_and_one_not_said_is_kept_for_later() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path();
+        let sha = |n: u8| format!("{n:02x}").repeat(32);
+        let refused = || "say: refused (its read-back can't be said whole here)".to_owned();
+        // Not said: kept as tried, not counted toward the cap.
+        let first = ask_yes("booth", &sha(1), state, 1_000, refused);
+        assert!(first.contains("refused"), "{first}");
+        let soon = ask_yes("booth", &sha(1), state, 2_000, || panic!("asked"));
+        assert!(soon.contains("kept for a later trigger"), "{soon}");
+        let mut asked = false;
+        let later = ask_yes("booth", &sha(1), state, 1_000 + ASK_RETRY_MS, || {
+            asked = true;
+            SPOKEN.to_owned()
+        });
+        assert!(asked, "{later}");
+        // A day on, the same folder may be asked again.
+        let day = 1_000 + ASK_RETRY_MS + ASK_AGAIN_MS;
+        assert!(ask_refuses(&read_asks(state).unwrap(), "booth", &sha(1), day).is_none());
+        // Across skills: at most three said in 24 hours.
+        let at = 1_000 + ASK_RETRY_MS;
+        for n in 2..=ASKS_ALL as u8 {
+            let said = ask_yes(&format!("skill-{n}"), &sha(n), state, at + n as u64, || {
+                SPOKEN.to_owned()
+            });
+            assert_eq!(said, format!("asked aloud: {SPOKEN}"));
+        }
+        let capped = ask_yes("another", &sha(9), state, at + 50, || panic!("asked"));
+        assert!(capped.contains("3 asks in 24 hours"), "{capped}");
+        // Set back, or unreadable: nothing asked.
+        let back = ask_yes("another", &sha(9), state, 10, || panic!("asked"));
+        assert!(back.contains("after now"), "{back}");
+        fs::write(state.join(ASKS_FILE), "not json").unwrap();
+        let unread = ask_yes("another", &sha(9), state, at + 60, || panic!("asked"));
+        assert!(unread.contains("can't be read"), "{unread}");
     }
 }
