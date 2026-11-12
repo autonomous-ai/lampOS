@@ -1,7 +1,7 @@
 use super::*;
 use std::{
     os::unix::fs::{MetadataExt, symlink},
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Output},
 };
 
@@ -113,24 +113,27 @@ fn the_wrapper_never_names_the_engines_program_by_a_path() {
 }
 
 /// The token is read into a variable and exported alone: never a command's
-/// argument in the wrapper's own text.
+/// argument in the wrapper's own text. The run lines are Hermes's own.
 #[test]
 fn the_token_is_only_assigned_and_exported() {
     let text = wrapper_text("eng").unwrap();
     let uses: Vec<&str> = text
         .lines()
-        .filter(|l| l.contains("$T") || l.contains("${T"))
+        .filter(|l| l.contains("$C") || l.contains("${C"))
         .map(str::trim)
         .collect();
     assert_eq!(
         uses,
         [
-            "[ -n \"$T\" ] || fail \"no token for run $LAMP_RUN_ID\"".to_owned(),
-            format!("{TOKEN_ENV}=$T")
+            "[ -n \"$C\" ] || { echo \"${0##*/}: no token for run $R\" >&2; exit 1; }",
+            "LAMP_CONTROL_TOKEN=$C LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock \
+             PYTHONPATH=/usr/local/lib/lampos/sdk-python LAMP_NS_NET=run",
         ]
     );
-    assert!(text.contains(&format!("export {TOKEN_ENV}\n")));
-    assert!(text.contains(&format!("F={RUNS}/${RUN_ID_ENV}\n")));
+    assert!(text.contains(&format!("export {TOKEN_ENV} ")));
+    assert!(text.contains(&format!("F={RUNS}/$R\n")));
+    assert_eq!(text.matches(hermes_install::RUN_LINES).count(), 1);
+    assert!(!text.contains("LAMP_RUN_ID"));
 }
 
 /// A lamp laid out under a folder, with the wrapper's fixed paths moved
@@ -147,7 +150,15 @@ const TOKEN: &str = "s3cret-token-0123456789";
 fn lamp(engine: &str) -> Lamp {
     let folder = tempfile::tempdir().unwrap();
     let top = fs::canonicalize(folder.path()).unwrap();
-    for dir in ["runs", "bin1", "bin2", "bin3", "out"] {
+    for dir in [
+        "runs",
+        "project",
+        "elsewhere",
+        "bin1",
+        "bin2",
+        "bin3",
+        "out",
+    ] {
         fs::create_dir(top.join(dir)).unwrap();
     }
     fs::set_permissions(top.join("runs"), fs::Permissions::from_mode(0o700)).unwrap();
@@ -161,6 +172,10 @@ fn lamp(engine: &str) -> Lamp {
     let text = wrapper_text(engine)
         .unwrap()
         .replace(RUNS, top.join("runs").to_str().unwrap())
+        .replace(
+            hermes_install::RUN_FOLDERS,
+            top.join("project").to_str().unwrap(),
+        )
         .replace("/usr/bin/unshare", stub.to_str().unwrap());
     let wrapper = top.join("bin1").join(engine);
     fs::write(&wrapper, text).unwrap();
@@ -181,11 +196,24 @@ fn lamp(engine: &str) -> Lamp {
 }
 
 impl Lamp {
+    /// The wrapper run in `top`'s `elsewhere`, a folder that is no run's.
     fn run(&self, env: &[(&str, &str)], path: &str) -> Output {
+        self.run_in(&self.top.join("elsewhere"), env, path)
+    }
+
+    /// A run's own folder, `project/skill-<run>`, made when missing.
+    fn folder(&self, run: &str) -> PathBuf {
+        let folder = self.top.join("project").join(format!("skill-{run}"));
+        fs::create_dir_all(&folder).unwrap();
+        folder
+    }
+
+    fn run_in(&self, cwd: &Path, env: &[(&str, &str)], path: &str) -> Output {
         let _ = fs::remove_file(self.top.join("out/argv"));
         let _ = fs::remove_file(self.top.join("out/env"));
         Command::new(&self.wrapper)
             .args(["chat", "-q", "hi"])
+            .current_dir(cwd)
             .env_clear()
             .env("PATH", path)
             .env("OUT", self.top.join("out"))
@@ -215,15 +243,18 @@ impl Lamp {
     }
 }
 
-/// (#6510) A skill's run: the token file is read once and deleted, the
-/// token reaches the engine in its environment only, never in argv; the
-/// run gets `--net`; the program is the first `<engine>` on `PATH` that is
-/// neither the wrapper nor another marked wrapper.
+/// (#6510 step 2) A skill's run, found by its folder: the token file is
+/// read once and deleted, the token reaches the engine in its environment
+/// only, never in argv, with the socket and the SDK's `PYTHONPATH`; the run
+/// gets `--net`; the program is the first `<engine>` on `PATH` that is
+/// neither the wrapper nor another marked wrapper. A second start in the
+/// same folder (a Harness relaunch) finds no token and runs nothing.
 #[test]
 fn a_runs_token_file_is_read_once_deleted_and_never_in_argv() {
     let lamp = lamp("eng");
     let file = lamp.token_file("run-1");
-    let out = lamp.run(&[(RUN_ID_ENV, "run-1")], &lamp.path());
+    let folder = lamp.folder("run-1");
+    let out = lamp.run_in(&folder, &[], &lamp.path());
     assert!(out.status.success(), "{out:?}");
     assert!(!file.exists(), "the token file is deleted");
     let argv = lamp.read("argv").unwrap();
@@ -249,59 +280,79 @@ fn a_runs_token_file_is_read_once_deleted_and_never_in_argv() {
         ]
     );
     let lines: Vec<&str> = env.lines().collect();
-    assert!(
-        lines.contains(&format!("{TOKEN_ENV}={TOKEN}").as_str()),
-        "{env}"
-    );
-    assert!(lines.contains(&"LAMP_NS_NET=run"));
-    assert!(lines.contains(&"LAMP_NS_ENGINE=eng"));
-    assert!(lines.contains(&format!("LAMP_NS_ENGINE_BIN={}", lamp.real.display()).as_str()));
-    assert!(!env.contains(RUN_ID_ENV), "{env}");
+    for line in [
+        format!("{TOKEN_ENV}={TOKEN}"),
+        format!("LAMP_CONTROL_SOCKET={}", hermes_install::CONTROL_SOCKET),
+        format!("PYTHONPATH={}", hermes_install::SDK_PYTHONPATH),
+        "LAMP_NS_NET=run".to_owned(),
+        "LAMP_NS_ENGINE=eng".to_owned(),
+        format!("LAMP_NS_ENGINE_BIN={}", lamp.real.display()),
+    ] {
+        assert!(lines.contains(&line.as_str()), "{line}: {env}");
+    }
 
-    // Once only: the same run again finds no token and runs nothing.
-    let again = lamp.run(&[(RUN_ID_ENV, "run-1")], &lamp.path());
+    // Once only: the same folder again finds no token and runs nothing.
+    let again = lamp.run_in(&folder, &[], &lamp.path());
     assert!(!again.status.success());
     assert!(lamp.read("argv").is_none());
-    assert!(String::from_utf8_lossy(&again.stderr).contains("no token for run run-1"));
+    assert!(String::from_utf8_lossy(&again.stderr).contains("eng: no token for run run-1"));
 }
 
-/// Not a run: no token (even one already in the caller's environment), no
-/// `--net` (even `LAMP_NS_NET=run` from the caller), and no run file read.
+/// Not a run's folder: no token (even one already in the caller's
+/// environment, or the old `LAMP_RUN_ID`), no `--net` (even
+/// `LAMP_NS_NET=run` from the caller), and no run file read.
 #[test]
 fn without_a_run_there_is_no_token_and_no_net() {
     let lamp = lamp("eng");
     let file = lamp.token_file("run-2");
-    let out = lamp.run(
-        &[(TOKEN_ENV, "from-the-caller"), ("LAMP_NS_NET", "run")],
-        &lamp.path(),
-    );
-    assert!(out.status.success(), "{out:?}");
-    assert!(file.exists(), "another run's file is left alone");
-    let argv = lamp.read("argv").unwrap();
-    let env = lamp.read("env").unwrap();
-    assert!(!argv.contains("--net"));
-    assert!(
-        !env.contains(TOKEN_ENV) && !env.contains("LAMP_NS_NET"),
-        "{env}"
-    );
+    let project = lamp.top.join("project");
+    let lamps = project.join("lamp");
+    fs::create_dir_all(&lamps).unwrap();
+    let nested = lamp.folder("run-2").join("deeper");
+    fs::create_dir_all(&nested).unwrap();
+    for cwd in [lamp.top.join("elsewhere"), project, lamps, nested] {
+        let out = lamp.run_in(
+            &cwd,
+            &[
+                (TOKEN_ENV, "from-the-caller"),
+                ("LAMP_NS_NET", "run"),
+                ("LAMP_RUN_ID", "run-2"),
+            ],
+            &lamp.path(),
+        );
+        assert!(out.status.success(), "{cwd:?}: {out:?}");
+        assert!(file.exists(), "another run's file is left alone");
+        let argv = lamp.read("argv").unwrap();
+        let env = lamp.read("env").unwrap();
+        assert!(!argv.contains("--net"), "{cwd:?}");
+        assert!(
+            !env.contains(TOKEN_ENV) && !env.contains("LAMP_NS_NET"),
+            "{cwd:?}: {env}"
+        );
+    }
 }
 
+/// A folder named like a run's with an id that is not plain is no run's:
+/// as any other folder. A link at the token's place is never read
+/// through, is removed, and the run ends with no token.
 #[test]
 fn a_run_id_that_is_not_plain_or_a_linked_token_file_runs_nothing() {
     let lamp = lamp("eng");
-    for run in ["", "../x", "Run", "a/b", &"a".repeat(65)] {
-        let out = lamp.run(&[(RUN_ID_ENV, run)], &lamp.path());
-        assert!(!out.status.success(), "{run:?}");
-        assert!(lamp.read("argv").is_none(), "{run:?}");
+    for run in ["Run", "a_b", "a.b", &"a".repeat(65)] {
+        let file = lamp.token_file(run);
+        let out = lamp.run_in(&lamp.folder(run), &[], &lamp.path());
+        assert!(out.status.success(), "{run:?}: {out:?}");
+        assert!(!lamp.read("argv").unwrap().contains("--net"), "{run:?}");
+        assert!(file.exists(), "{run:?}: not read");
     }
-    // A link in the runs folder is never read through, and is removed.
-    let elsewhere = lamp.top.join("elsewhere");
+    let elsewhere = lamp.top.join("elsewhere/token");
     fs::write(&elsewhere, TOKEN).unwrap();
     let link = lamp.top.join("runs/run-3");
     symlink(&elsewhere, &link).unwrap();
-    let out = lamp.run(&[(RUN_ID_ENV, "run-3")], &lamp.path());
+    let out = lamp.run_in(&lamp.folder("run-3"), &[], &lamp.path());
     assert!(!out.status.success());
     assert!(lamp.read("argv").is_none());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("no token for run run-3"));
     assert!(fs::symlink_metadata(&link).is_err());
     assert!(elsewhere.exists());
 }
@@ -327,7 +378,7 @@ fn a_run_with_no_engine_program_leaves_no_token_file() {
     let lamp = lamp("eng");
     let file = lamp.token_file("run-2");
     let path = format!("{}:/usr/bin:/bin", lamp.top.join("bin1").display());
-    let out = lamp.run(&[(RUN_ID_ENV, "run-2")], &path);
+    let out = lamp.run_in(&lamp.folder("run-2"), &[], &path);
     assert!(!out.status.success());
     assert!(lamp.read("argv").is_none());
     assert!(!file.exists());

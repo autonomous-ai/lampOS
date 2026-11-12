@@ -3977,9 +3977,14 @@ pub fn serve<C: Clock>(
     // skill tasks off and the rest of the part as it is.
     let skill_tasks =
         crate::skill_task::on(std::env::var(crate::skill_task::SWITCH).ok().as_deref());
+    // The Harness a skill's run is started through (#6510 Part 1 step 2):
+    // set below once Harness is, as spoken tasks have it.
+    let skill_harness: crate::skill_task::SkillHarnessSlot = Arc::default();
     match std::env::var_os("HOME").map(PathBuf::from) {
         Some(home) if skill_tasks => {
-            match crate::skill_task::HandOvers::lamp(&home).start(true, stop.clone()) {
+            match crate::skill_task::HandOvers::lamp(&home, skill_harness.clone())
+                .start(true, stop.clone())
+            {
                 Ok(_) => eprintln!(
                     "tasks: a skill's tasks are taken on {}",
                     crate::skill_task::HAND_OVER_SOCKET
@@ -4003,6 +4008,23 @@ pub fn serve<C: Clock>(
         Err(error) => eprintln!("tasks: a skill run's model bridge is not there: {error}"),
     }
     let dir = config.dir.clone();
+    // Where a skill's run finds the lamp's own target at each run: the
+    // targets file `serve --set-up-later` reads, else the targets given.
+    let lamp_target: Box<dyn Fn() -> Option<Target> + Send + Sync> =
+        match config.set_up_later.as_ref() {
+            Some(later) => {
+                let file = later.targets.clone();
+                Box::new(move || {
+                    read_targets(&file)
+                        .ok()
+                        .and_then(|mut targets| targets.remove(LAMP_TARGET))
+                })
+            }
+            None => {
+                let lamp = config.targets.get(LAMP_TARGET).cloned();
+                Box::new(move || lamp.clone())
+            }
+        };
     let from_machines = config
         .set_up_later
         .as_ref()
@@ -4141,6 +4163,13 @@ pub fn serve<C: Clock>(
         // An OpenClaw launch waits for the Gateway lamp-update keeps
         // running (#6226); lamp-tasks never starts or stops it.
         cli.openclaw_gateway = openclaw_on;
+        if skill_tasks {
+            let _ = skill_harness.set(crate::skill_task::SkillHarness::new(
+                cli.clone(),
+                session.into(),
+                lamp_target,
+            ));
+        }
         let cli = Cli::new(cli, session.into())?;
         // A Harness before 0.6.11 has no OpenClaw (#6226): the lamp's
         // target is never OpenClaw with it.

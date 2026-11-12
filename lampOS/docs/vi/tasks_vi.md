@@ -248,9 +248,9 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   trong môi trường tiến trình của wrapper ngoài cùng (`/proc/<pid>/environ`),
   các tiến trình khác cùng uid với lamp-tasks đọc được; điều này được chấp
   nhận cho một token chỉ dùng một lần chạy và sống tối đa 14 phút.
-- **File token của lần chạy** (#6510 Part 1, chưa dùng): `harness new`
-  không nhận môi trường, nên khi các lần chạy đi qua Harness (#6510 Part 1
-  bước 2), token được giao bằng một file thay cho `LAMP_CONTROL_TOKEN`:
+- **File token của lần chạy** (#6510 Part 1): `harness new` không nhận môi
+  trường, nên lần chạy đi qua Harness (`HarnessRunner`, #6510 Part 1 bước 2,
+  bên dưới) được giao token bằng một file thay cho `LAMP_CONTROL_TOKEN`:
   `/run/lampos-tasks/runs/<run-id>` (`run_token_file::RUNS_DIR`, tmpfs),
   run id phải là id thuần (`a-z`, `0-9`, `-`, 1 đến 64 ký tự), nếu không
   thì bị từ chối trước khi tạo gì. `RunTokenFile::write` tạo thư mục 0700
@@ -269,7 +269,79 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   chạy ở `SkillRun::deadline`, đúng thời hạn của token, tự nó làm, không
   chỉ dựa vào lời trong prompt. Runner của đèn cho lần chạy một network
   namespace riêng (bên dưới).
-- **Runner của đèn** (`HermesRunner::lamp`): Hermes của đèn được khởi động
+- **Runner của đèn, qua Harness** (`HarnessRunner::lamp`, #6510 Part 1
+  bước 2; `HandOvers::lamp` dùng nó cho mọi `do.task`): Hermes của đèn do
+  Harness khởi động, như một việc nói cho đích `lamp`, không bao giờ do
+  chính lamp-tasks.
+  - **Luôn là Hermes của đèn** (phương án (b) của V2, #1711, 12/11 21:34).
+    Dù engine mặc định của đèn là gì (OpenClaw hay engine khác), lần chạy
+    của kỹ năng luôn tới Hermes của chính đèn, trên máy của đích riêng của
+    đèn (`lamp` trong file đích mà `serve --set-up-later` đọc, đọc lại ở mỗi
+    lần chạy). Việc người dùng nói ra vẫn tới engine được chọn hay được gọi
+    tên (#6506). Socket điều khiển, SDK và bridge trong namespace của các
+    engine khác là bước 2b. Không có đích của đèn, hay Harness chưa sẵn sàng (không
+    có chương trình Harness, hay phần này đang khởi động), cũng bị từ chối
+    bằng lời. Một `/usr/local/bin/hermes` thiếu các dòng nhận lần chạy
+    (`WRAPPER_RUN_LINES`) hay các dòng mạng (`WRAPPER_NET_LINES`) bị từ
+    chối `NOT_FOUND_BY_FOLDER` (`LAMP_SKILL_TASKS` của lamp-update tắt hoặc
+    vòng của nó chưa chạy): không tạo hay khởi động gì, nên một lần chạy
+    không bao giờ bắt đầu mà không có token trên mạng của đèn.
+  - **Thư mục riêng.** lamp-tasks tạo `skill-<run-id>` (0700,
+    `RUN_FOLDER_PREFIX`) trong project Harness của nó
+    `/var/lib/lampos-tasks/harnesses/lamp-tasks` (tạo 0700 khi chưa có),
+    không bao giờ dùng thư mục đã có, và ghi file token của lần chạy (ở
+    trên). Rồi nó giao lần chạy bằng Cli mà việc nói dùng (`Cli::launch`),
+    với định tuyến, phiên theo tên, resume, thư mục `--new`, chỉ mục phiên
+    và việc khởi động lại daemon đều tắt (`SkillHarness::new`): `harness new
+    hermes --machine <lamp> <folder> --name skill-<run-id> --json --task
+    <words>`, thư mục là đối số vị trí của `new` (Harness chỉ kiểm tra đó là
+    thư mục; Hermes không có folder trust cần đăng ký). Run id lấy từ thư
+    mục đó: wrapper của Hermes lấy nó từ `pwd -P` (docs/install.md, "Hermes
+    on the lamp"), đọc file token một lần, xoá nó, và cho lần chạy
+    `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH` và
+    `LAMP_NS_NET=run`, trước khi namespace bắt đầu. Token không bao giờ
+    nằm trong đối số, môi trường hay trạng thái của Harness.
+  - **Kết thúc.** `harness wait --machine <lamp> <agent> --any --timeout
+    600s --json` trên một agent đó, hỏi lại (một `wait` lỗi thì sau 1 s,
+    `WAIT_RETRY`) cho tới khi nó kết thúc hoặc hạn chót (14 phút, đời của
+    token) huỷ nó. Kết thúc `idle`, `stopped`, `closed` hay `gone` là
+    `{"ok":true,"id":0}`; `failed`, hay `needs-input` (không ai trả lời lần
+    chạy của kỹ năng), là `run_failed`. Ở hạn chót, lần chạy bị đóng bằng
+    `harness close --machine <lamp> <agent> --now --json`
+    (`Cli::close_now`) và là `run_failed` "the run was ended at its
+    deadline, 840 s". `new` không khởi động được (`not_sent`, `uncertain`,
+    hay một lần tạo `pending`) cũng là `run_failed`.
+  - **Dù kết thúc thế nào**, guard của nó trước hết nhờ lamp-control kết
+    thúc token của lần chạy (`{"end":{"run"}}`, một lần), rồi đóng phiên
+    (`close --now`, một lần; không đóng phiên Harness báo đã `closed` hay
+    `gone`), xoá thư mục của lần chạy, và xoá file token nếu wrapper chưa
+    xoá (thứ tự V2 chốt trên #6510: thu hồi token, rồi `close --now`, rồi
+    SIGKILL bên dưới, để lần chạy đang bị dừng không làm được gì trên
+    đèn). Một lần tạo mà Harness hoàn tất sau
+    đó không thấy thư mục hay token, và wrapper của nó dừng lại ("no token
+    for run <run-id>"). lamp-tasks không giữ gì lần chạy in ra; bản ghi
+    phiên của Harness và phiên của Hermes trong `HERMES_HOME` như với mọi
+    phiên Harness.
+  - **Chưa có SIGKILL dự phòng.** Phần dự phòng trong thiết kế, SIGKILL
+    tới pid `unshare` của namespace khi `close --now` lỗi, chưa được xây:
+    daemon của Harness khởi động Hermes trong pane riêng, và cả `new` lẫn
+    `show` đều không cho lamp-tasks pid đó (một `TODO(#6510)` trong
+    `skill_task.rs`). Một `close --now` lỗi được ghi trong nhật ký; token
+    của lần chạy bị lamp-control từ chối từ lúc nó kết thúc (hay hết đời 14
+    phút), và file token đã mất, nên lần chạy còn sót không còn đường nào
+    tới đèn.
+  - **Giới hạn đã biết.** Mọi lần chạy dùng chung một `HOME` của Hermes
+    (`/var/lib/lampos-hermes`); một home mới cho mỗi lần chạy vẫn còn mở
+    (P3 của Heron và Reviewer-lead trên #6652). `/run/lampos-tasks/runs`
+    nằm ngoài tầm của mọi phiên trong namespace: namespace phủ một tmpfs
+    trống mới lên `/run`, nên không engine nào Harness khởi động trên đèn,
+    và không lần chạy kỹ năng nào khác, đọc được file token của lần chạy
+    khác. Một tiến trình ngoài namespace chạy bằng `lampos` (user của chính
+    lamp-tasks và Harness) vẫn đọc được, giữa lúc file được ghi và lúc
+    wrapper đọc.
+- **Runner của đèn không qua Harness** (`HermesRunner::lamp`, giữ lại cho
+  việc tạo kỹ năng của #6643 tới khi nó chuyển sang `HarnessRunner`; không
+  `do.task` nào dùng nó): Hermes của đèn được khởi động
   như Harness khởi động nó cho đích `lamp`: `/usr/local/bin/hermes chat -q`
   và lời của lần chạy là đối số cuối (wrapper chỉ chạy Hermes trong
   namespace của nó, `hermes-ns`: không thư mục hay socket nào của dịch vụ
@@ -314,7 +386,10 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `HermesRunner` không khởi động gì khi wrapper đã cài thiếu các dòng mạng
   (`WRAPPER_NET_LINES`, `NOT_HELD_OFF`: `LAMP_SKILL_TASKS` của lamp-update
   đang tắt hoặc vòng của nó chưa chạy), nên một lần chạy không bao giờ được
-  khởi động với mạng của chính đèn (P2 của Heron và Fourteen trên #6443).
+  khởi động với mạng của chính đèn (P2 của Heron và Fourteen trên #6443);
+  `HarnessRunner` cũng vậy, và cả khi thiếu các dòng nhận lần chạy
+  (`NOT_FOUND_BY_FOLDER`). Lần chạy qua Harness có `LAMP_NS_NET=run` do
+  chính wrapper đặt, theo thư mục của nó.
   Hai đường ra là các tệp được cho thấy ở chế độ
   chỉ đọc trong đó: `control.sock` của lamp-control (ở trên), và cầu nối
   của lamp-tasks tới bộ chuyển tiếp model của lamp-cloud (`net_bridge`):
@@ -398,7 +473,17 @@ phẩm, không có dòng giới hạn bộ nhớ cứng, mỗi giới hạn đ�
 phần nhân 1,5, MemAvailable thấp nhất trừ phần tăng của việc thứ hai bằng
 hoặc trên mức sàn của Hermes, thời gian chạy
 nhân 1,5 nằm trong vòng đời một lần chạy), chạy trên máy tính bất kỳ, không
-cần Hermes.
+cần Hermes. `HarnessRunner` (#6510 Part 1 bước 2):
+`skill_task::tests::the_wrapper_run_lines_are_lamp_updates_own` (các dòng
+nó tìm khớp với mã nguồn của lamp-update, và thư mục chúng khớp là thư mục
+nó tạo), và trong `tests/harness.rs` với fixture đóng vai Harness,
+`a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothing`
+(đối số của `new`, `wait` và `close --now`, thư mục là đối số vị trí,
+không token nào trong đối số hay môi trường, thư mục và file token đã
+mất), `a_skill_run_past_its_deadline_is_closed_now`,
+`a_skill_run_that_fails_leaves_nothing` và
+`a_skill_run_is_refused_with_no_harness_or_an_old_wrapper` (không đích,
+không Harness, wrapper cũ: bị từ chối, không hỏi hay tạo gì).
 
 **Dòng kiểm tra trên đèn (chưa chạy):** trên một đèn đã cài Hermes,
 lamp-control đang phục vụ và `LAMP_SKILL_TASKS=on` trong cả hai unit, lần
@@ -408,19 +493,19 @@ cùng lần chạy được trả lời và lệnh gọi `control.sock` của n�
 token.
 
 **Wrapper của mọi engine (#6510 phần 1, bước 1, tắt trừ khi
-`LAMP_AGENT_NS=on`):** khi lần
-chạy của một kỹ năng đi qua Harness, wrapper chung của lamp-update cho mọi
-engine (docs/install.md, "One agent namespace for every engine") là nơi
-nhận token của lần chạy: khi có `LAMP_RUN_ID` (tên tạm thời), nó đọc
-`/run/lampos-tasks/runs/<run-id>` một lần, xoá tệp, và đưa token cho
-engine dưới dạng `LAMP_CONTROL_TOKEN` chỉ trong môi trường, kèm
-`LAMP_NS_NET=run`; `HOME` của engine là thư mục riêng
-`/var/lib/lampos-agents/<engine>`. Một engine chỉ được coi là có khi login
-shell của `lampos` tìm thấy wrapper trước (không phải chương trình của chính
-nó trong `~/.local/bin`). Khi unit riêng của lamp-update có
-`LAMP_AGENT_NS=on` (và `LAMP_APP_ENGINES=on`), mỗi vòng ghi nó cho mọi
-engine mà Harness báo đã cài, trừ Hermes và OpenClaw. Chưa có lần chạy kỹ
-năng nào dùng nó: runner của Hermes ở trên giữ nguyên cho đến bước 2.
+`LAMP_AGENT_NS=on`):** wrapper chung của lamp-update cho mọi engine
+(docs/install.md, "One agent namespace for every engine") mang cùng các
+dòng nhận lần chạy như của Hermes (bước 2): khởi động trong
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run-id>`, nó đọc
+`/run/lampos-tasks/runs/<run-id>` một lần, xoá tệp, và đưa cho engine
+`LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET` và `PYTHONPATH` chỉ trong môi
+trường, kèm `LAMP_NS_NET=run`; `LAMP_RUN_ID` tạm thời đã bỏ. `HOME` của
+engine là thư mục riêng `/var/lib/lampos-agents/<engine>`. Một engine chỉ
+được coi là có khi login shell của `lampos` tìm thấy wrapper trước (không
+phải chương trình của chính nó trong `~/.local/bin`). Khi unit riêng của
+lamp-update có `LAMP_AGENT_NS=on` (và `LAMP_APP_ENGINES=on`), mỗi vòng ghi
+nó cho mọi engine mà Harness báo đã cài, trừ Hermes và OpenClaw. Lần chạy
+của kỹ năng vẫn chỉ tới Hermes (`HarnessRunner`, ở trên).
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
@@ -881,9 +966,9 @@ lại hơn 7 phút trong `epoll_wait`.
 - **Harness trên máy tính** vẫn chờ kể tin xong mới đóng, vì người đó có thể
   đang ngồi ở màn hình.
 - **`Cli::close_now`** (`harness close ... --now`, dừng phiên kể cả khi đang
-  làm) chỉ dành cho lần chạy skill do lamp-tasks mở, lúc hết hạn hay khi
-  xong (#6510 bước 2); chưa được dùng. Việc đóng ở trên không bao giờ dùng
-  `--now`.
+  làm) chỉ dành cho lần chạy skill do chính lamp-tasks mở
+  (`HarnessRunner`, #6510 Part 1 bước 2), lúc hết hạn hay khi xong. Việc
+  đóng ở trên không bao giờ dùng `--now`.
 - **Test:** `the_lamps_own_agent_is_closed_once_done_its_news_untold`. Đang
   làm, hay idle chưa có câu trả lời: để mở. Xong mà chưa kể: để mở dưới một
   phút, rồi đóng. Trên máy tính: chờ kể.
