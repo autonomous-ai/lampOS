@@ -47,6 +47,7 @@ if (!existsSync(glbPath) || readFileSync(glbPath).toString('latin1', 0, 4) !== '
 const NAMES = model.joints.map((joint) => joint.name);
 const DEG_A_COUNT = 360 / 4096;
 
+const mode = options.fake ? 'fake' : 'lamp-sim';
 const { lamp, sim, fakeLamp } = options.fake ? await fakeBody() : { lamp: await Lamp.connect() };
 const pages = new Set();
 const tell = (message) => {
@@ -159,6 +160,9 @@ async function press(message, page) {
     if (message.type === 'call') {
       const control = findControl(name);
       if (!control) throw refuse(`no button ${name}`);
+      // A row the page draws off (the lamp did not grant what it takes, or lamp-sim cannot do it) is refused here too, on a raw call.
+      const off = describe(mode, { grants: lamp.grants }).controls.find((c) => c.id === control.id)?.disabled;
+      if (off) throw refuse(`n/a: ${off}`);
       // A picture goes to the page that pressed, as one message to it: not through `tell`, never logged, never kept.
       const show = (jpeg) => page?.send(JSON.stringify({ type: 'picture', id, jpeg: Buffer.from(jpeg).toString('base64') }));
       const call = await control.run({ lamp, release, listenFor, show, audio: audioTo(page, id) }, checked(control.fields, args));
@@ -216,7 +220,8 @@ const files = {
   '/lamp.glb': ['model/gltf-binary', () => readFileSync(glbPath)],
   '/model.json': ['application/json', () => JSON.stringify(model)],
   // `lamp` and `mode` name the checklist's key: the lamp's own id and name from hello, and what this page is driving.
-  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ ...describe(), camera: lamp.grants.includes('camera'), microphone: lamp.grants.includes('microphone'), lamp: { id: String(lamp.info?.id ?? 'lamp'), name: String(lamp.info?.name ?? '') }, mode: options.fake ? 'fake' : 'lamp-sim' })] } : {}),
+  // `grants` are hello's: each row says if it is `disabled` (describe). `camera`/`microphone` say the picture or the sound may show.
+  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ ...describe(mode, { grants: lamp.grants }), camera: lamp.grants.includes('camera'), microphone: lamp.grants.includes('microphone'), lamp: { id: String(lamp.info?.id ?? 'lamp'), name: String(lamp.info?.name ?? '') }, mode })] } : {}),
   ...(stimDir ? { '/panel.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./panel.js'))] } : {}),
   ...(stimDir ? { '/checklist.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./checklist.js'))] } : {}),
 };
