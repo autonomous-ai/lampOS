@@ -567,11 +567,50 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   dòng nêu cái được đặt và cái model gửi, không bao giờ ghi lời nói. Câu
   đọc lại vẫn nói nơi chạy như trước ("OpenClaw on the lamp", "Claude Code
   on the office computer"). Lượt mà model không gọi `start_agent_task` thì
-  không bị đổi. Test:
+  được bắt ở route thứ hai (mục kế tiếp). Test:
   `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
   `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
   `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
   `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
+- **Có nêu tên mà không giao việc: hỏi lại một lần (#6547 (1b)).** Ở route
+  thứ hai, khi có phần tasks, một câu nói mà chính lời người nói nêu một
+  agent để làm việc, đọc đúng như trên (chỉ tính người làm, lấy từ các
+  engine của đèn khi đèn có target riêng và từ staff, Claude Code khi chưa
+  đọc được; chỉ nhắc tên như "What is Hermes?" thì không tính), có lời của
+  vòng 1 bị giữ đến hết vòng (`agent_tasks::named_for_work`,
+  `Engine::catching_named_agents`). Nếu vòng 1 chỉ trả lời bằng lời, không
+  gọi hàm nào, lời đó không được nói: lượt được hỏi lại một lần với một ghi
+  chú hệ thống nêu tên agent ("the person asked Hermes to do this … Call
+  start_agent_task now to hand the work to Hermes; never do it yourself"),
+  và journal ghi `request N: named agent, no start_agent_task: asked
+  again`, rồi kết quả (`…: asked again: start_agent_task called`, `…: still
+  no call, said as it came`, hoặc `…: called <tên>, not start_agent_task`).
+  Mỗi request chỉ một lần (`agent_tasks::AskedAgain`, giữ 8 request gần
+  nhất): câu trả lời thứ hai được nói như nó đến, và request đã hỏi lại
+  trước đó được nói kèm dòng `…: asked again before, said as it came`;
+  không bao giờ lặp. Vòng 1 có gọi bất kỳ hàm nào (`start_agent_task`,
+  `not_for_me`, một skill) thì như trước, lời của nó được nói khi hết vòng;
+  câu không nêu agent nào thì không bị đụng tới và vẫn phát luồng như
+  trước. Route Live không được bắt. Test:
+  `second_provider::tests::agent_tasks_named`
+  (`named_with_no_start_is_asked_again_once`,
+  `named_with_no_start_twice_is_said_the_second_time`,
+  `named_with_start_is_untouched`,
+  `not_named_and_a_question_about_an_agent_are_untouched`,
+  `a_request_asked_again_before_is_not_asked_again`),
+  `agent_tasks::tests::a_named_agent_is_the_doer_and_asked_again_once_a_request`.
+- **Không có máy tính trong `where` khi chưa ghép đôi (#6547 (1c)).** Khi
+  chưa ghép máy tính nào (không có staff: cùng phép thử mà phần mô tả đã
+  dùng), `enum` của `where` chỉ còn `["lamp"]` và phần mô tả của nó không
+  nhắc tới máy tính; khi có máy ghép đôi thì `["lamp", "computer"]` như
+  trước. Một `where` `"computer"` vẫn đến trong trạng thái đó (hoặc do lời
+  nghe được đặt từ "on my computer") được chạy trên đèn khi đèn có target
+  riêng, không bao giờ gửi tới máy tính không có; khi công tắc
+  `LAMP_TASKS_WHO` tắt, nơi staff không bao giờ được đọc, nó đi tới target
+  đã cấu hình như trước. Test:
+  `agent_tasks::tests::where_offers_no_computer_without_a_pairing`,
+  `agent_tasks::tests::no_computer_paired_a_computer_named_goes_to_the_lamp`,
+  `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
 - **Khởi động** như Harness khởi động OpenClaw:
   `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
   chế độ quyền và không định tuyến model (OpenClaw tự chọn model, theo phần

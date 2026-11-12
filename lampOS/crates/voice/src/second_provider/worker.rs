@@ -2926,6 +2926,9 @@ pub fn serve(
         .tasks
         .clone()
         .filter(|_| crate::agent_tasks::named_ask_on());
+    // The agent a line's words name for the work, with the tasks part: a
+    // round 1 that hands nothing over is asked again once (#6547 (1b)).
+    let named_agent = tools.tasks.clone();
     let declines = tools.decline;
     // A skill the heard words ask what it uses, by name, read back in code
     // with the voice's own `make_skill` (V2 on #6413).
@@ -3654,6 +3657,11 @@ pub fn serve(
     if let Some(place) = tasks_declined {
         engine = engine.declining_a_task_waiting(Arc::new(move |request, words: &str| {
             crate::agent_tasks::declined(&place, request, words)
+        }));
+    }
+    if let Some(place) = named_agent {
+        engine = engine.catching_named_agents(Arc::new(move |words: &str| {
+            crate::agent_tasks::named_for_work(&place, words)
         }));
     }
     // A look reads the eyes' look file with the Live route's bounds: a full

@@ -1453,6 +1453,9 @@ pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
 /// The skill a heard line asks what it uses, by name, or none
 /// (`crate::make_skill_local::read_back_heard`, V2 on #6413).
 pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+/// The agent a spoken line's own words name to do the work, as the person
+/// calls it, or none (#6547 (1b), `crate::agent_tasks::named_for_work`).
+pub type NamedAgent = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// The note a spoken request gets while a task this voice prepared waits
 /// for the person's yes (`crate::agent_tasks::pending_note`): with its
 /// request, to the note or nothing.
@@ -1791,6 +1794,12 @@ struct Shared {
     /// Which skill a heard line asks what it uses: read back in code
     /// before round 1 ([`Engine::reading_back_by_words`]).
     read_back_asked: Option<ReadBackAsked>,
+    /// With the tasks part: the agent a spoken line's words name for the
+    /// work, whose round 1 answered in words alone is asked again once
+    /// ([`Engine::catching_named_agents`], #6547 (1b)).
+    named_agent: Option<NamedAgent>,
+    /// The requests so asked again: once each, never a loop.
+    named_asked_again: crate::agent_tasks::AskedAgain,
     /// A test's copy of each named-ask journal line ([`Shared::named_ask_said`]).
     #[cfg(test)]
     named_ask_journal: Option<Arc<Mutex<Vec<String>>>>,
@@ -4518,6 +4527,8 @@ impl Engine {
                 untied: None,
                 named_ask: None,
                 read_back_asked: None,
+                named_agent: None,
+                named_asked_again: crate::agent_tasks::AskedAgain::default(),
                 #[cfg(test)]
                 named_ask_journal: None,
                 busy: None,
@@ -6169,6 +6180,22 @@ impl Engine {
     pub fn reading_back_by_words(mut self, asked: ReadBackAsked) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.read_back_asked = Some(asked);
+        }
+        self
+    }
+
+    /// With the tasks part (#6547 (1b)): a spoken line whose own words
+    /// name an agent to do the work (`named`, as
+    /// `crate::agent_tasks::named_for_work` reads them: the doer, never a
+    /// mention) has its round 1 words held to the round's end. Answered in
+    /// words alone, with no call, they are not said: the turn is asked
+    /// again once, told the person asked that agent and to call
+    /// `start_agent_task`, and the journal says so and what came of it. A
+    /// round 1 that calls anything, and a second such answer in the same
+    /// request, go on as before. Before any turn only.
+    pub fn catching_named_agents(mut self, named: NamedAgent) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.named_agent = Some(named);
         }
         self
     }
@@ -14422,6 +14449,13 @@ async fn answer(
         .named_ask
         .as_ref()
         .map(|named| (named(&said), said.split_whitespace().count()));
+    // The agent the line's own words name for the work (#6547 (1b)): its
+    // round 1 is held, and asked again once if it hands nothing over.
+    let named_agent = shared
+        .named_agent
+        .as_ref()
+        .filter(|_| heard && !quoted)
+        .and_then(|named| named(&said));
     // Whether the line began with the lamp's name and asks for no silence
     // to be broken (`LAMP_NO_WORDS_AGAIN`): "Lamp, stop." or "Lamp, never
     // mind." is rightly answered with nothing (the Reviewer-lead's P2 on
@@ -14573,7 +14607,10 @@ async fn answer(
             "lamp-voice second: request {request}: a quiet room, one voice, no second face: its words are not held (LAMP_DECLINE_SILENT)"
         );
     }
-    let mut decline_held = round_one_held.then(String::new);
+    // Held too on a line naming an agent for the work (#6547 (1b)), so
+    // round 1's words are not said before it is known whether it handed
+    // the work over.
+    let mut decline_held = (round_one_held || named_agent.is_some()).then(String::new);
     let writing = async move {
         if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
             return Err(Stop::Gone);
@@ -15036,6 +15073,9 @@ async fn answer(
         // non-memory actions may still have their content-free confirmation.
         let mut confirmed_other_call = carried.other;
         let mut keep_claim_asked = false;
+        // Whether the turn was asked again for a named agent with no
+        // `start_agent_task` (#6547 (1b)): what came of it is journalled once.
+        let mut named_outcome_owed = false;
         // Told before the round after one whose claim went unsaid beside
         // other calls, once those calls are answered: what the model is
         // told of a keep claim, or of a face claim (#5141 row 8).
@@ -15744,6 +15784,43 @@ async fn answer(
             // below or the model is asked once more; "not for me" written as
             // the reply is the decline itself. Else they go on as streamed,
             // now as one piece. Later rounds hold nothing.
+            // The line's words named an agent for the work and round 1
+            // answered in words alone (#6547 (1b)): those words are not said,
+            // and the turn is asked again once, told to hand the work over.
+            // Once a request ([`crate::agent_tasks::AskedAgain`]): a second
+            // such answer is said.
+            if let Some(agent) = named_agent.as_deref() {
+                let start = crate::agent_tasks::START;
+                if round == 1 && calls.is_empty() && decline_held.is_some() {
+                    if round < MAX_ROUNDS && shared.named_asked_again.first(request) {
+                        shared.named_ask_said(format!(
+                            "lamp-voice second: request {request}: named agent, no {start}: asked again"
+                        ));
+                        decline_held = None;
+                        named_outcome_owed = true;
+                        messages.push(Message::system(crate::agent_tasks::named_no_start_note(
+                            agent,
+                        )));
+                        continue;
+                    }
+                    shared.named_ask_said(format!(
+                        "lamp-voice second: request {request}: named agent, no {start}: asked again before, said as it came"
+                    ));
+                } else if std::mem::take(&mut named_outcome_owed) {
+                    let came = if calls.iter().any(|call| call.name == start) {
+                        format!("{start} called")
+                    } else if calls.is_empty() {
+                        "still no call, said as it came".to_owned()
+                    } else {
+                        let names: Vec<&str> =
+                            calls.iter().map(|call| call.name.as_str()).collect();
+                        format!("called {}, not {start}", names.join(", "))
+                    };
+                    shared.named_ask_said(format!(
+                        "lamp-voice second: request {request}: named agent, no {start}: asked again: {came}"
+                    ));
+                }
+            }
             if let Some(held) = decline_held.take() {
                 if calls.iter().any(|call| call.name == NOT_FOR_ME) {
                     if held.chars().any(char::is_alphanumeric) {

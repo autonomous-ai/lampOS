@@ -599,14 +599,18 @@ fn declared_with_the_lamp() -> bool {
 /// before. `there` is whether the lamp has its target now or the tool was
 /// declared with the lamp's words: a call naming no machine from such a
 /// declaration goes to the lamp even when the target went away since, and
-/// is then said not set up, never sent to a computer.
-fn on_the_lamp_now(args: &Value, there: bool) -> bool {
-    on_the_lamp_with(args, there, &lamp_engines())
+/// is then said not set up, never sent to a computer. With no computer
+/// paired (`unpaired`: the staff read and none there, #6547), `where` is
+/// declared with the lamp alone; a `where` `"computer"` that still comes
+/// while the lamp has its target goes to the lamp too, never to a computer
+/// that isn't there.
+fn on_the_lamp_now(args: &Value, there: bool, unpaired: bool) -> bool {
+    on_the_lamp_with(args, there, unpaired, &lamp_engines())
 }
 
 /// [`on_the_lamp_now`] with the lamp's `engines` given: a name said in
 /// `who` is the lamp's own engine when it is one of them.
-fn on_the_lamp_with(args: &Value, there: bool, engines: &[String]) -> bool {
+fn on_the_lamp_with(args: &Value, there: bool, unpaired: bool, engines: &[String]) -> bool {
     let said = |key: &str| {
         args.get(key)
             .and_then(Value::as_str)
@@ -615,7 +619,7 @@ fn on_the_lamp_with(args: &Value, there: bool, engines: &[String]) -> bool {
     };
     match said("where") {
         Some(LAMP_TARGET) => true,
-        Some(_) => false,
+        Some(_) => there && unpaired,
         None => match said("who") {
             None => there,
             Some(who) => {
@@ -643,7 +647,7 @@ pub fn route_of(args: &Value, default: &str) -> (&'static str, String) {
     if engines.is_empty() {
         engines = vec!["hermes".to_owned(), "openclaw".to_owned()];
     }
-    if on_the_lamp_with(args, true, &engines) {
+    if on_the_lamp_with(args, true, false, &engines) {
         let engine = who
             .and_then(|who| lamp_engine_called(&engines, who))
             .map_or(lamp_name(), |engine| display_name(engine));
@@ -1086,6 +1090,86 @@ fn heard_words(request: u64, heard: bool) -> Option<String> {
     }
 }
 
+/// The agent the person's own heard words name to do the work (#6547
+/// (1b)): as [`named_in`] reads them, the doer only ("ask Hermes to …",
+/// "Hermes, look up …"), never a mention ("what is Hermes?", "OpenClaw's
+/// update"); as the person calls it. The lamp's engines count only while
+/// the lamp has its own target (or the tools were declared with it), as
+/// for [`START`]; the staff as last read, or Claude Code with none read.
+/// `None` when the words name no agent for work, or disagree.
+pub fn named_for_work(place: &Place, heard: &str) -> Option<String> {
+    let engines = if lamp_there() || declared_with_the_lamp() {
+        lamp_engines()
+    } else {
+        Vec::new()
+    };
+    let staff = staff_now(place);
+    let mut staff_names: Vec<&str> = Vec::new();
+    for member in &staff {
+        if !staff_names.contains(&member.kind.name) {
+            staff_names.push(member.kind.name);
+        }
+    }
+    if staff_names.is_empty() {
+        staff_names.push(CLAUDE_CODE);
+    }
+    named_for_work_in(heard, &engines, &staff_names)
+}
+
+/// [`named_for_work`] with the lamp's engines and the staff's names given.
+pub fn named_for_work_in(
+    heard: &str,
+    lamp_engines: &[String],
+    staff_names: &[&str],
+) -> Option<String> {
+    let named = named_in(heard, lamp_engines, staff_names);
+    named
+        .lamp_engine
+        .as_deref()
+        .map(|engine| display_name(engine).to_owned())
+        .or(named.computer_who)
+}
+
+/// What a turn is asked again with when the person's words name `agent`
+/// for the work ([`named_for_work`]) and the model's answer called no
+/// [`START`] (#6547 (1b)): its answer was not said.
+pub fn named_no_start_note(agent: &str) -> String {
+    format!(
+        "(For you to know, not to answer: the person asked {agent} to do this, and your reply \
+         did not hand it over, so it was not said. Call {START} now to hand the work to \
+         {agent}; never do it yourself, and never say you cannot.)"
+    )
+}
+
+/// How many requests [`AskedAgain`] keeps: one is in hand at a time; a few
+/// more cost nothing.
+const ASKED_AGAIN_KEPT: usize = 8;
+
+/// The requests a turn was asked again for because the words named an
+/// agent and no [`START`] was called (#6547 (1b)), the last
+/// [`ASKED_AGAIN_KEPT`] of them: each request is asked again once only,
+/// so a second answer with no call is said and nothing ever loops.
+#[derive(Default)]
+pub struct AskedAgain(Mutex<Vec<u64>>);
+
+impl AskedAgain {
+    /// Whether `request` may be asked again now: `true` the first time
+    /// only, and kept so.
+    pub fn first(&self, request: u64) -> bool {
+        let Ok(mut asked) = self.0.lock() else {
+            return false;
+        };
+        if asked.contains(&request) {
+            return false;
+        }
+        if asked.len() == ASKED_AGAIN_KEPT {
+            asked.remove(0);
+        }
+        asked.push(request);
+        true
+    }
+}
+
 /// What the model is told when the tasks part refuses a hand-over to the
 /// lamp naming an engine (#6492): `engine_not_here`, that engine is off or
 /// not installed on the lamp, or else `engine_unknown`; `name` is how the
@@ -1100,10 +1184,16 @@ fn engine_refused(code: &str, name: &str) -> String {
 }
 
 /// `start_agent_task`'s `where` while the lamp has its own target (#5978),
-/// naming the lamp's own engine (`name`, #6226).
-fn where_description(name: &str) -> String {
+/// naming the lamp's own engine (`name`, #6226); the computer only when
+/// one is paired (`computer`, #6547).
+fn where_description(name: &str, computer: bool) -> String {
+    let computer = if computer {
+        " \"computer\" only when they name their computer (\"on my computer\", \"on the Mac\"): then it goes there, as when they name an agent on it."
+    } else {
+        ""
+    };
     format!(
-        "Where the work is done. Hand over work that takes longer than a quick answer: writing code or files, research across pages, a job of several steps. Leave it out and it goes into an earlier session of theirs that fits by its name or its work, the lamp's own first, else to a new one here on the lamp, done by the lamp's own {name}. \"computer\" only when they name their computer (\"on my computer\", \"on the Mac\"): then it goes there, as when they name an agent on it. \"lamp\" when they say \"on the lamp\" or \"do it yourself\". The task is said back and starts on their yes, as always."
+        "Where the work is done. Hand over work that takes longer than a quick answer: writing code or files, research across pages, a job of several steps. Leave it out and it goes into an earlier session of theirs that fits by its name or its work, the lamp's own first, else to a new one here on the lamp, done by the lamp's own {name}.{computer} \"lamp\" when they say \"on the lamp\" or \"do it yourself\". The task is said back and starts on their yes, as always."
     )
 }
 
@@ -1562,10 +1652,17 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
     }
     let mut start_description = start_description;
     if lamp {
+        // With no computer paired (no staff: the test the description
+        // uses, #5978), the lamp alone is offered (#6547).
+        let places = if staff.is_empty() {
+            json!([LAMP_TARGET])
+        } else {
+            json!([LAMP_TARGET, "computer"])
+        };
         start_parameters["properties"]["where"] = json!({
             "type": "string",
-            "enum": [LAMP_TARGET, "computer"],
-            "description": where_description(lamp_name())
+            "enum": places,
+            "description": where_description(lamp_name(), !staff.is_empty())
         });
         // The lamp's engine, only when one is named (#6492).
         // Offered from the lamp's engines as last read, whatever they are
@@ -3936,7 +4033,11 @@ fn run_for_asked(
             // by default while the tasks part has it, unless the person
             // named their computer or an agent on it; never a staff member,
             // so never looked for among them.
-            let on_the_lamp = on_the_lamp_now(&call.args, lamp_there() || declared_with_the_lamp());
+            let on_the_lamp = on_the_lamp_now(
+                &call.args,
+                lamp_there() || declared_with_the_lamp(),
+                place.who && staff.is_empty(),
+            );
             let member = if on_the_lamp {
                 None
             } else {
@@ -4333,7 +4434,11 @@ fn session_target<'a>(
     staff: &'a [Member],
     call: &ToolCall,
 ) -> Result<&'a str, Value> {
-    if on_the_lamp_now(&call.args, lamp_there() || declared_with_the_lamp()) {
+    if on_the_lamp_now(
+        &call.args,
+        lamp_there() || declared_with_the_lamp(),
+        place.who && staff.is_empty(),
+    ) {
         return Ok(LAMP_TARGET);
     }
     let member = chosen(place, staff, &call.args)?;
@@ -11766,7 +11871,158 @@ pub(crate) mod tests {
             "{}",
             start.description
         );
-        assert!(on_the_lamp_now(&json!({}), true));
+        assert!(on_the_lamp_now(&json!({}), true, true));
+    }
+
+    /// #6547 (1c): with no computer paired (no staff, the test the
+    /// description uses), `where` offers the lamp alone and its description
+    /// never names the computer; with one paired, both, as before. A
+    /// `where` `"computer"` that still comes with none paired goes to the
+    /// lamp while the lamp has its target; with a computer paired, or
+    /// without the lamp's target, as before.
+    #[test]
+    fn where_offers_no_computer_without_a_pairing() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let off = place(Path::new("/run/t"), false);
+        let where_of = |staff: &[Member]| {
+            declared_on(&off, staff, true)
+                .into_iter()
+                .find(|tool| tool.name == START)
+                .expect("start_agent_task declared")
+                .parameters
+                .unwrap()["properties"]["where"]
+                .clone()
+        };
+        let unpaired = where_of(&[]);
+        assert_eq!(unpaired["enum"], json!(["lamp"]));
+        assert_eq!(unpaired["description"], where_description(HERMES, false));
+        assert!(
+            !unpaired["description"]
+                .as_str()
+                .unwrap()
+                .contains("computer"),
+            "{unpaired}"
+        );
+        let paired = where_of(&[member("office", "claude")]);
+        assert_eq!(paired["enum"], json!(["lamp", "computer"]));
+        assert_eq!(paired["description"], where_description(HERMES, true));
+        let computer = json!({"where":"computer"});
+        assert!(on_the_lamp_now(&computer, true, true));
+        assert!(!on_the_lamp_now(&computer, true, false));
+        assert!(!on_the_lamp_now(&computer, false, true));
+        assert!(on_the_lamp_now(&json!({"where":"lamp"}), true, true));
+    }
+
+    /// #6547 (1c), through the hand-over: no computer paired (the switch
+    /// on, no staff, the lamp's target only). The heard words "on my
+    /// computer, make a doc" set `where` `"computer"`, and a model sending
+    /// `where` `"computer"` alone does too; either way the task is prepared
+    /// on the lamp and said as the lamp's, never sent to a computer.
+    #[test]
+    fn no_computer_paired_a_computer_named_goes_to_the_lamp() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        STAFF.lock().unwrap().clear();
+        let directory = std::env::temp_dir().join(format!("agent-unpaired-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let prepared = json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1});
+        let mut answers = Vec::new();
+        for _ in 0..2 {
+            answers.push(("request.sock", status.clone()));
+            answers.push(("request.sock", prepared.clone()));
+        }
+        let seen = tasks_part(&directory, answers);
+        let at = place(&directory, true);
+        assert!(staff_now(&at).is_empty());
+        let run_with = |heard: Option<&'static str>, args: Value, request: u64| {
+            LAMP_THERE_HERE.with(|here| here.set(Some(true)));
+            lamp_engines_here(Some(&["hermes"]));
+            HEARD_HERE.with(|here| here.set(heard));
+            let call = ToolCall {
+                id: "c".into(),
+                name: START.into(),
+                args,
+            };
+            let told = run(&at, &call, request, true, PEER_WAIT).0;
+            HEARD_HERE.with(|here| here.set(None));
+            lamp_engines_here(None);
+            LAMP_THERE_HERE.with(|here| here.set(None));
+            told
+        };
+        let prepare = || loop {
+            let line = seen.recv_timeout(PEER_WAIT).unwrap();
+            if line["op"] == "prepare" {
+                return line;
+            }
+        };
+        // The heard words name the computer; the model sent no place.
+        assert_eq!(
+            named_in(
+                "On my computer, make a doc.",
+                &["hermes".to_owned()],
+                &[CLAUDE_CODE]
+            )
+            .place,
+            Some(NamedPlace::Computer)
+        );
+        let heard = run_with(
+            Some("On my computer, make a doc."),
+            json!({"task":"Make a doc"}),
+            3,
+        );
+        assert_eq!(heard["where"], "Hermes on the lamp", "{heard}");
+        assert_eq!(prepare()["target"], "lamp");
+        // The model sent the computer, nothing heard.
+        let sent = run_with(None, json!({"task":"Make a doc","where":"computer"}), 4);
+        assert_eq!(sent["where"], "Hermes on the lamp", "{sent}");
+        assert_eq!(prepare()["target"], "lamp");
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #6547 (1b): the agent the words name for the work, as the person
+    /// calls it, by [`named_in`]: the doer only, never a mention; and each
+    /// request is asked again once only, the last few kept.
+    #[test]
+    fn a_named_agent_is_the_doer_and_asked_again_once_a_request() {
+        let engines = ["hermes".to_owned(), "openclaw".to_owned()];
+        let staff = ["Claude Code", "Codex"];
+        for (heard, agent) in [
+            ("Ask Hermes to look up the weather.", Some("Hermes")),
+            ("Hermes, look up the weather.", Some("Hermes")),
+            ("have open claw write a poem", Some("OpenClaw")),
+            ("ask Codex to fix my repo", Some("Codex")),
+            ("ask Claude Code to fix my repo", Some("Claude Code")),
+            ("What is Hermes?", None),
+            ("Is OpenClaw's update out?", None),
+            ("don't ask Hermes, just tell me", None),
+            ("ask Hermes, not OpenClaw", None),
+            ("set a timer for five minutes", None),
+        ] {
+            assert_eq!(
+                named_for_work_in(heard, &engines, &staff).as_deref(),
+                agent,
+                "{heard}"
+            );
+        }
+        let note = named_no_start_note("Hermes");
+        assert!(note.contains("the person asked Hermes"), "{note}");
+        assert!(note.contains(START), "{note}");
+        let asked = AskedAgain::default();
+        assert!(asked.first(6_547_001));
+        assert!(!asked.first(6_547_001));
+        assert!(asked.first(6_547_002));
+        for request in 0..ASKED_AGAIN_KEPT as u64 {
+            asked.first(7_000_000 + request);
+        }
+        // Past the kept few, the oldest is let go.
+        assert!(asked.first(6_547_001));
     }
 
     /// #6492: the lamp's engines are whatever the tasks part reports there,
@@ -11860,10 +12116,19 @@ pub(crate) mod tests {
         let on = start(true);
         assert!(on.validate().is_ok());
         let said = on.parameters.unwrap()["properties"]["where"].clone();
-        assert_eq!(said["enum"], json!(["lamp", "computer"]));
+        // No computer paired here (no staff): the lamp alone (#6547).
+        assert_eq!(said["enum"], json!(["lamp"]));
         // Hermes, the lamp's default engine until read (#6498).
-        assert_eq!(said["description"], where_description(HERMES));
-        let where_said = where_description(HERMES);
+        assert_eq!(said["description"], where_description(HERMES, false));
+        let paired = declared_on(&off, &[member("office", "claude")], true)
+            .into_iter()
+            .find(|tool| tool.name == START)
+            .unwrap();
+        assert_eq!(
+            paired.parameters.unwrap()["properties"]["where"]["enum"],
+            json!(["lamp", "computer"])
+        );
+        let where_said = where_description(HERMES, true);
         for words in [
             "longer than a quick answer",
             "writing code or files, research across pages, a job of several steps",
@@ -11895,7 +12160,7 @@ pub(crate) mod tests {
             (json!({}), false, false),
             (json!({"where":"lamp"}), false, true),
         ] {
-            assert_eq!(on_the_lamp_now(&args, there), lamp, "{args} {there}");
+            assert_eq!(on_the_lamp_now(&args, there, false), lamp, "{args} {there}");
         }
         lamp_engines_here(None);
         // #6492: any engine in the lamp's list is the lamp's when named, by
@@ -11913,7 +12178,7 @@ pub(crate) mod tests {
             (json!({"who":"Claude Code","where":"lamp"}), true),
         ] {
             lamp_engines_here(Some(&["openclaw", "pi", "codex", "claude"]));
-            let said = on_the_lamp_now(&args, true);
+            let said = on_the_lamp_now(&args, true, false);
             lamp_engines_here(None);
             assert_eq!(said, lamp, "{args}");
         }
@@ -12517,9 +12782,10 @@ pub(crate) mod tests {
             .into_iter()
             .find(|tool| tool.name == START)
             .unwrap();
+        // No computer paired here: the lamp alone (#6547).
         assert_eq!(
             start.parameters.unwrap()["properties"]["where"]["enum"],
-            json!(["lamp", "computer"])
+            json!(["lamp"])
         );
         LAMP_THERE_HERE.with(|here| here.set(Some(false)));
         let call = ToolCall {
