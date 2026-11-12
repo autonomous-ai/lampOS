@@ -551,25 +551,7 @@ pub fn merge_config_for(text: &str, port: u16, agent_services: bool) -> Result<S
         Some(&one("mode", APPROVALS)),
     )?;
     add_to_list(&mut parts, "skills", "external_dirs", SKILLS_DIR)?;
-    let entry = mcp_entry();
-    let had_servers = parts
-        .iter()
-        .any(|part| part.key.as_deref() == Some("mcp_servers"));
-    set_child(
-        &mut parts,
-        "mcp_servers",
-        MCP_NAME,
-        agent_services.then_some(&entry[..]),
-    )?;
-    if had_servers && !agent_services {
-        parts.retain(|part| {
-            part.key.as_deref() != Some("mcp_servers")
-                || part.lines[1..]
-                    .iter()
-                    .any(|line| !is_blank_or_comment(line))
-                || !inline_value(&part.lines[0]).is_empty()
-        });
-    }
+    merge_mcp_servers(&mut parts, agent_services)?;
     let mut out = String::new();
     for part in &parts {
         for line in &part.lines {
@@ -578,6 +560,72 @@ pub fn merge_config_for(text: &str, port: u16, agent_services: bool) -> Result<S
         }
     }
     Ok(out)
+}
+
+/// What `mcp_servers` is in the file, for the lamp's entry.
+enum Servers {
+    /// No `mcp_servers` key.
+    Missing,
+    /// What a reset leaves (`{}`, `null`, …) on the key's own line.
+    Unset,
+    /// A block mapping evenly indented; whether it holds [`MCP_NAME`].
+    Block { holds_ours: bool },
+    /// Anything else: a flow mapping, a list, an anchor, alias or tag, an
+    /// uneven indent. Never touched.
+    Other,
+}
+
+fn servers(parts: &[Part]) -> Servers {
+    let Some(part) = parts
+        .iter()
+        .find(|part| part.key.as_deref() == Some("mcp_servers"))
+    else {
+        return Servers::Missing;
+    };
+    let value = inline_value(&part.lines[0]);
+    let below = part.lines[1..]
+        .iter()
+        .any(|line| !is_blank_or_comment(line));
+    if !value.is_empty() {
+        return if is_unset(value) && !below {
+            Servers::Unset
+        } else {
+            Servers::Other
+        };
+    }
+    match children(part, "mcp_servers") {
+        Ok((_, starts)) => Servers::Block {
+            holds_ours: starts.iter().any(|(_, key)| key == MCP_NAME),
+        },
+        Err(_) => Servers::Other,
+    }
+}
+
+/// The lamp's `mcp_servers` entry ([`mcp_entry`]) set with
+/// `agent_services`, or taken out without it. Only a missing key, a reset's
+/// unset value or a block mapping is ever changed: any other shape (a flow
+/// mapping, a list, an anchor, an uneven indent) is the person's and is
+/// kept byte for byte, with the lamp's entry not added, so the rest of the
+/// merge still goes on. Off, the key is touched only when it is a block
+/// holding the lamp's entry, and goes only when nothing else is left in it.
+fn merge_mcp_servers(parts: &mut Vec<Part>, agent_services: bool) -> Result<(), Refused> {
+    match (servers(parts), agent_services) {
+        (Servers::Missing | Servers::Unset | Servers::Block { .. }, true) => {
+            let entry = mcp_entry();
+            set_child(parts, "mcp_servers", MCP_NAME, Some(&entry[..]))
+        }
+        (Servers::Block { holds_ours: true }, false) => {
+            set_child(parts, "mcp_servers", MCP_NAME, None)?;
+            parts.retain(|part| {
+                part.key.as_deref() != Some("mcp_servers")
+                    || part.lines[1..]
+                        .iter()
+                        .any(|line| !is_blank_or_comment(line))
+            });
+            Ok(())
+        }
+        _ => Ok(()),
+    }
 }
 
 /// `.env`'s text with [`TOKEN_ENV`] set to `token`, the [`DROPPED_KEYS`]
@@ -863,6 +911,58 @@ custom_providers:
         // What a reset leaves (`mcp_servers` cut), merged on again.
         let reset = merge_config_for("updates:\n  check: false\n", 7741, true).unwrap();
         assert!(reset.ends_with(SERVERS), "{reset}");
+    }
+
+    /// Off, `mcp_servers` is changed only when it is a block holding the
+    /// lamp's entry; any other shape is kept byte for byte and never makes
+    /// the merge refuse, so the provider lines are still written. On, a
+    /// shape that isn't a block is kept too, without the lamp's entry.
+    #[test]
+    fn only_a_block_holding_the_lamps_entry_is_changed_off() {
+        let provider = format!("  {PROVIDER}:\n");
+        // A flow mapping: kept untouched, both ways.
+        let flow = "mcp_servers: {notes: {command: /x}}\n";
+        for on in [false, true] {
+            let merged = merge_config_for(flow, 7741, on).unwrap();
+            assert!(merged.starts_with(flow), "{merged}");
+            assert!(merged.contains(&provider) && !merged.contains(MCP_NAME));
+        }
+        // A list, an anchor, an uneven indent: kept, provider lines written.
+        for other in [
+            "mcp_servers:\n- notes\n",
+            "mcp_servers:\n  - notes\n",
+            "mcp_servers: &servers\n  notes:\n    command: /x\n",
+            "mcp_servers:\n    notes:\n      command: /x\n  lamp-services:\n    command: /y\n",
+        ] {
+            for on in [false, true] {
+                let merged = merge_config_for(other, 7741, on).unwrap();
+                assert!(merged.starts_with(other), "{other} -> {merged}");
+                assert!(merged.contains(&provider), "{merged}");
+            }
+        }
+        // A block holding only the lamp's entry: the key goes.
+        let ours = merge_config_for("", 7741, true).unwrap();
+        assert!(ours.contains(SERVERS), "{ours}");
+        let off = merge_config_for(&ours, 7741, false).unwrap();
+        assert!(!off.contains("mcp_servers"), "{off}");
+        // A person's server beside the lamp's: the person's is kept.
+        let both = format!(
+            "mcp_servers:\n  notes:\n    command: /x\n{}",
+            &SERVERS[13..]
+        );
+        let kept = merge_config_for(&both, 7741, false).unwrap();
+        assert!(
+            kept.starts_with("mcp_servers:\n  notes:\n    command: /x\n"),
+            "{kept}"
+        );
+        assert!(!kept.contains(MCP_NAME), "{kept}");
+        // A block without the lamp's entry, off: byte for byte.
+        let theirs = "mcp_servers:\n  notes:\n    command: /x\n\n# mine\n";
+        assert!(
+            merge_config_for(theirs, 7741, false)
+                .unwrap()
+                .starts_with(theirs)
+        );
     }
 
     /// A skill's run sees the server with its own token: the entry names
