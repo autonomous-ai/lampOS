@@ -632,6 +632,86 @@ chạy của một kỹ năng có script chạy `curl https://example.com` thì 
 cùng lần chạy được trả lời và lệnh gọi `control.sock` của nó chạy được với
 token.
 
+### Một lần tạo bằng giọng nói trong namespace của lần chạy kỹ năng (`skill_make`, #6643)
+
+Điều kiện của first builder trên #6643 (12/11 18:15): một lần tạo bằng giọng
+nói mà DeepSeek không giữ được, được giao cho agent của đèn
+(`LAMP_MAKE_SKILL_AGENT`, [skills_vi.md](skills_vi.md), "Giao cho agent của
+đèn khi DeepSeek thất bại"), chạy trong namespace của lần chạy kỹ
+năng và không bao giờ chạy như một task Harness có công cụ riêng của
+agent (`lamp_tasks::skill_make`).
+
+- **Socket:** khi có `LAMP_SKILL_TASKS=on` (công tắc mà các chỉnh sửa
+  namespace của lamp-update dùng), `serve` mở
+  `/run/lampos-tasks/skill-make.sock` (`MAKE_SOCKET`) cạnh
+  `skill-task.sock`, tạo như các socket khác của nó. Nó chỉ nhận dòng từ
+  `lamp-voice.service` chạy bằng root, theo tên người gọi mà kernel cho;
+  người gọi khác bị đóng mà không được trả lời. Mỗi lần chỉ chạy một lần
+  tạo; lần thứ hai bị từ chối `busy`.
+- **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
+  vẹn (`MakeLine::parse`): không có trường nào khác, luật (system prompt và
+  brief) tối đa 48 KiB và không có NUL, `within_ms` từ 1 đến 120 giây.
+- **Lần chạy:** Hermes của đèn được khởi động đúng như một lần chạy
+  `do.task` của kỹ năng (`skill_task::HermesRunner`, đường của row-6443),
+  qua wrapper namespace của nó: chỉ thư mục riêng, thư mục làm việc và các
+  kỹ năng, và chỉ `control.sock` của lamp-control, không bao giờ
+  `admin.sock`. Không token nào được tạo và môi trường của lần chạy không có
+  gì riêng: một lần tạo không có quyền nào. Lần chạy bị giết khi hết
+  `within_ms`, cùng cả nhóm tiến trình.
+- **Mạng của nó (`LAMP_MAKE_AGENT_NET`, không unit nào đặt):** mặc định giữ
+  mạng, như agent của V1 (yêu cầu của chủ sở hữu, 12/11; quyết định của first
+  builder còn chờ trên Queue #6059). Khi đó mô hình được gọi qua bộ chuyển
+  tiếp của lamp-cloud trên `127.0.0.1:7741`, chính nơi `model.sock` nối tới.
+  Đúng giá trị `held` cho lần chạy nghiêm ngặt, `LAMP_NS_NET=run`: chỉ `lo`
+  và các tunnel `@NONE` của kernel, mô hình chỉ qua `model.sock`. Khi
+  `held`, wrapper không có các dòng mạng (`WRAPPER_NET_LINES`) bị từ chối
+  `not_held_off` trước khi bất cứ gì được tạo (`Runner::ready`). lamp-tasks
+  ghi nhật ký chế độ nó dùng khi khởi động.
+- **Thư mục của lần tạo:** `make-<run id>` trong thư mục làm việc của đèn
+  (thư mục mà lần chạy kỹ năng bắt đầu trong đó, namespace của Hermes cho
+  thấy), 0700, luật nằm trong `rules.md`, 0600. Lần chạy bắt đầu ở đó và được
+  bảo ghi câu trả lời vào `answer.md` ở đó và không gì khác. Khi lần chạy đã
+  kết thúc, `answer.md` được đọc (một tệp thường, không bao giờ đi theo liên
+  kết, tối đa 20 KiB). Thư mục bị xóa dù lần tạo kết thúc thế nào.
+- **Các câu trả lời:** `{"ok":true,"started":true}` khi lần chạy sắp bắt đầu
+  (giọng nói chỉ nói câu chờ khi đó), rồi `{"ok":true,"answer"}`. Nếu không,
+  một lời từ chối: `off`, `bad_request`, `too_long`, `busy`, `not_held_off`,
+  `run_failed` hoặc `no_answer`. Giọng nói không giao gì khi gặp `off`,
+  `not_held_off` hoặc không có socket (bản cũ). Nhật ký chỉ ghi mã kết quả,
+  không bao giờ ghi luật hay câu trả lời.
+- **Kiểm thử:** `skill_make::tests`: một lần tạo chạy trong thư mục riêng,
+  luật nằm ở đó và câu trả lời được đọc lại, không có môi trường riêng, thư
+  mục bị xóa; lần chạy không cách ly được thì không khởi động gì và không tạo
+  thư mục; không có câu trả lời, câu trả lời là liên kết, công tắc tắt và mọi
+  dòng sai đều bị từ chối; lần tạo được khởi động như một lần chạy kỹ năng
+  cách ly, qua wrapper phải có các dòng mạng, với `LAMP_NS_NET=run`, không có
+  token và không có admin socket trong môi trường, trong thư mục của lần
+  tạo; văn bản namespace của lamp-update chỉ cho thấy `control.sock` và
+  không bao giờ nhắc `admin.sock`; chỉ lamp-voice chạy bằng root được giao
+  một lần tạo; socket nói `started`, rồi câu trả lời; mặc định giữ mạng mà
+  vẫn không cho thấy admin socket, và `held` cho `LAMP_NS_NET=run`.
+
+**Các dòng kiểm tra trên đèn (chưa chạy):** trên lamp-9adf với bản này, hỏi
+"Hey Lamp, make me a skill that checks the weather every morning". Câu trả
+lời của DeepSeek không được giữ, và nhật ký ghi "handed to the agent". Trong
+lúc lần tạo chạy, tìm Hermes của nó và xem từ bên trong namespace:
+
+```sh
+P=$(pgrep -u lampos -f 'hermes chat -q Everything you need' | head -1)
+sudo nsenter -t "$P" -m ls /run/lampos-control                # chỉ control.sock, không có admin.sock
+sudo nsenter -t "$P" -n ip -o link show                       # các link của mạng
+sudo nsenter -t "$P" -n curl -sS -m 5 -o /dev/null -w '%{http_code}\n' https://example.com; echo "exit $?"
+```
+
+- **Mặc định (giữ mạng):** `curl` trả 200 (mã thoát 0), và
+  `/run/lampos-control` chỉ có `control.sock`.
+- **Held** (`sudo systemctl edit lamp-tasks` với
+  `Environment=LAMP_MAKE_AGENT_NET=held`, rồi khởi động lại; nhật ký ghi "is
+  held off the network"): `ip` chỉ cho thấy `lo` và các tunnel `@NONE`,
+  `curl` thất bại (mã thoát 6 hoặc 7), `/run/lampos-control` vẫn chỉ có
+  `control.sock`, và lần tạo vẫn kết thúc với câu trả lời qua relay mô hình.
+  Sau đó xóa drop-in.
+
 **Wrapper của mọi engine (#6510 phần 1, bước 1, tắt trừ khi
 `LAMP_AGENT_NS=on`):** wrapper chung của lamp-update cho mọi engine
 (docs/install.md, "One agent namespace for every engine") mang cùng các

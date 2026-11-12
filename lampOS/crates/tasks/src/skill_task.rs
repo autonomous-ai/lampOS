@@ -667,6 +667,9 @@ pub struct SkillRun {
     /// is refused [`NOT_STARTED`], so lamp-skills may send it itself, and
     /// never after (the first builder's ruling on #6823).
     pub started: std::sync::atomic::AtomicBool,
+    /// The folder the run starts in, when not the runner's own work
+    /// folder: a make's folder (`crate::skill_make`). None for a skill's.
+    pub start_in: Option<PathBuf>,
 }
 
 /// The code of a fixed write's run refused before its agent began
@@ -696,6 +699,7 @@ impl std::fmt::Debug for SkillRun {
             .field("folder", &self.folder)
             .field("env", &env)
             .field("deadline", &self.deadline)
+            .field("start_in", &self.start_in)
             .finish()
     }
 }
@@ -715,6 +719,7 @@ impl SkillRun {
             ],
             deadline: RUN_LIFETIME,
             started: std::sync::atomic::AtomicBool::new(false),
+            start_in: None,
         }
     }
 
@@ -768,6 +773,12 @@ pub trait Runner {
     /// Whatever the runner makes before its first run, at
     /// [`HandOvers::start`]; nothing by default.
     fn prepare(&self) {}
+    /// Whether a run can be held off the network now, before anything is
+    /// made for it: [`NOT_HELD_OFF`] when it can't. A runner with no
+    /// namespace of its own to check (a test's) is ready.
+    fn ready(&self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 /// Ends the token however the run ends, a panic too, and once only: the
@@ -999,6 +1010,17 @@ impl HermesRunner {
 }
 
 impl Runner for HermesRunner {
+    fn ready(&self) -> Result<(), String> {
+        match &self.held_by {
+            Some(wrapper)
+                if !std::fs::read_to_string(wrapper).is_ok_and(|text| holds_off_network(&text)) =>
+            {
+                Err(NOT_HELD_OFF.into())
+            }
+            _ => Ok(()),
+        }
+    }
+
     // Its token is ended by the caller after the run ends (`answer`); this
     // runner is kept only for #6643's skill make.
     fn run(&self, run: &SkillRun, _end_token: &dyn Fn()) -> Result<u64, String> {
@@ -1007,17 +1029,14 @@ impl Runner for HermesRunner {
         use std::process::{Command, Stdio};
         // No network namespace, no run (Heron's P2 on #6443): the wrapper
         // must carry the lines that act on NET_ENV.
-        if let Some(wrapper) = &self.held_by
-            && !std::fs::read_to_string(wrapper).is_ok_and(|text| holds_off_network(&text))
-        {
-            return Err(NOT_HELD_OFF.into());
-        }
+        self.ready()?;
         // Hermes's namespace refuses a folder it doesn't show: said here,
         // before anything is started.
-        if !self.folder.is_dir() {
+        let folder = run.start_in.as_deref().unwrap_or(&self.folder);
+        if !folder.is_dir() {
             return Err(format!(
                 "the lamp's work folder {} is not there",
-                self.folder.display()
+                folder.display()
             ));
         }
         let mut child = Command::new(&self.program)
@@ -1026,7 +1045,7 @@ impl Runner for HermesRunner {
             .env_clear()
             .envs(self.env.iter().map(|(name, value)| (name, value)))
             .envs(run.env.iter().map(|(name, value)| (name, value)))
-            .current_dir(&self.folder)
+            .current_dir(folder)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -2094,7 +2113,11 @@ impl Drop for Place<'_> {
 /// [`crate::protocol::MAX_LINE_BYTES`] are answered, more is `too_long`; no
 /// whole line in [`LINE_WAIT`] is `bad_request`.
 fn read_line(stream: &UnixStream) -> Result<Vec<u8>, Value> {
-    let most = crate::protocol::MAX_LINE_BYTES;
+    read_line_within(stream, crate::protocol::MAX_LINE_BYTES)
+}
+
+/// [`read_line`], at most `most` bytes answered.
+pub(crate) fn read_line_within(stream: &UnixStream, most: usize) -> Result<Vec<u8>, Value> {
     let mut line = Vec::new();
     BufReader::new(std::io::Read::take(stream, most as u64 + 2))
         .read_until(b'\n', &mut line)
@@ -2110,7 +2133,7 @@ fn read_line(stream: &UnixStream) -> Result<Vec<u8>, Value> {
 }
 
 /// `answer` and a newline; a caller already gone is only said.
-fn write_answer(mut stream: &UnixStream, answer: &Value) {
+pub(crate) fn write_answer(mut stream: &UnixStream, answer: &Value) {
     let mut out = answer.to_string();
     out.push('\n');
     if let Err(error) = stream.write_all(out.as_bytes()) {

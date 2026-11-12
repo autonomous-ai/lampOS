@@ -1519,35 +1519,45 @@ cả hai người viết.
 - **`cannot:` của chính agent không bao giờ được nói nguyên văn.** Đèn nói
   câu cố định của nó, "I couldn't make that one."
   (`make_skill_agent::CANNOT_LINE`).
-- **Cách tới agent.** Như giọng nói giao bất kỳ việc nào (`crate::agent_tasks`,
-  #5978, #6226): chuẩn bị cho target `lamp` trên socket request của phần
-  tasks và xác nhận ngay trên socket riêng của giọng nói (lời người dùng nói
-  là lời yêu cầu), rồi đọc từ các quan sát của task, mà `lamp-tasks serve
-  --push-wait` giữ ngay khi agent kết thúc lượt, xem mỗi 0,5 giây. Không có
-  đường truyền mới. Phần tasks nhận tối đa 2.000 byte văn bản và system
-  prompt dài hơn, nên system prompt và brief nằm trong một tệp riêng,
-  `/run/lampos-make-skill/make-<ngẫu nhiên>.md` (16 byte từ nguồn ngẫu nhiên
-  của kernel), task ghi tên tệp đó: thư mục 0750 và tệp 0640, cùng thuộc
-  nhóm `lamp-agents` của các agent cục bộ (trình cài đặt tạo nhóm này, cùng
-  người dùng `lampagent`), tệp được xóa khi có câu trả lời; nếu không có
-  nhóm đó thì 0700 và 0600, có ghi nhật ký. Worker của tuyến thứ hai dọn mọi
-  `make-*.md` còn sót ở đó khi khởi động. Địa chỉ riêng của người dùng
-  (người nhận của chính họ khi ghi) không bao giờ nằm trong tệp: mỗi địa chỉ
-  là một chỗ giữ (`own1.lamp@example.invalid`), được đặt lại trong câu trả
-  lời của agent trước khi kiểm tra. Văn bản task bắt đầu như một brief
-  (`made_skill::is_brief`), nên câu trả lời, hay lần giao thất bại, không bao
-  giờ được kể như tin, và cả "việc của tôi thế nào" lẫn "các agent đang làm
-  gì" đều không nhắc tới nó (`check` và `tasks_now` của `agent_tasks` bỏ
-  qua). Đọc xong, câu trả lời được đánh dấu đã kể, nên `--close-told` đóng
-  phiên của agent.
-- **Agent im lặng.** Agent không trả lời trong 45 giây thì task được gửi
-  `cancel`, các lần thử nằm trong một hạn 1,5 giây. Phần tasks chỉ nhận
-  `cancel` cho việc chưa giao cho agent và không có lệnh nào kết thúc việc
-  agent đang làm, nên việc đó tiếp tục chạy, có ghi nhật ký, và tin của nó,
-  là một brief, không bao giờ được kể.
-- **Công cụ của agent.** Agent chạy với công cụ riêng của nó trong lúc tạo:
-  chưa có chế độ tắt công cụ. Sản phẩm vẫn bật công tắc, theo yêu cầu của
-  chủ sở hữu (12/11: kỹ năng DeepSeek không tạo được thì đi qua agent).
+- **Cách tới agent: trong namespace của lần chạy kỹ năng** (#6643, điều
+  kiện của first builder, 12/11 18:15). Lần tạo đi tới socket tạo của
+  lamp-tasks, `/run/lampos-tasks/skill-make.sock` (`lamp_tasks::skill_make`,
+  [tasks_vi.md](tasks_vi.md), "Một lần tạo bằng giọng nói trong namespace
+  của lần chạy kỹ năng"), không bao giờ tới một task Harness có công cụ
+  riêng của agent. Một dòng duy nhất, `{"op":"skill_make","rules","within_ms"}`,
+  mang system prompt và brief thành một văn bản. lamp-tasks chạy Hermes của
+  đèn đúng như một lần chạy `do.task` của kỹ năng (`skill_task::HermesRunner`,
+  đường của row-6443), qua wrapper namespace của nó: chỉ thư mục riêng, thư
+  mục làm việc và các kỹ năng, và `control.sock` của lamp-control nhưng
+  không bao giờ `admin.sock`. Terminal và công cụ của nó chỉ chạy trong
+  namespace đó, và không token nào được tạo.
+- **Mạng của nó: `LAMP_MAKE_AGENT_NET`** (không unit nào đặt; yêu cầu của
+  chủ sở hữu, 12/11, quyết định của first builder còn chờ trên Queue
+  #6059). Mặc định lần chạy giữ mạng, như agent của V1, và gọi mô hình qua
+  bộ chuyển tiếp của lamp-cloud trên `127.0.0.1:7741`, chính nơi
+  `model.sock` nối tới. Đúng giá trị `held` cho lần chạy nghiêm ngặt,
+  `LAMP_NS_NET=run`: chỉ `lo` và các tunnel `@NONE` của kernel, và mô hình
+  chỉ qua `model.sock`. Khi `held`, wrapper của Hermes không có các dòng
+  mạng bị từ chối (`not_held_off`).
+- **Câu trả lời của nó.** Lần chạy bắt đầu
+  trong một thư mục tạo riêng (`make-<run id>` trong thư mục làm việc của
+  đèn, 0700, luật trong `rules.md`, 0600) và ghi câu trả lời vào
+  `answer.md` ở đó. lamp-tasks đọc lại tệp đó khi lần chạy đã kết thúc (một
+  tệp thường, không bao giờ là liên kết, tối đa 20 KiB), xóa thư mục dù lần
+  tạo kết thúc thế nào, rồi trả lời giọng nói. Giọng nói cho câu trả lời đi
+  qua đúng các kiểm tra như của DeepSeek. Địa chỉ riêng của người dùng
+  (người nhận của chính họ khi ghi) không bao giờ nằm trong luật: mỗi địa
+  chỉ là một chỗ giữ (`own1.lamp@example.invalid`), được đặt lại trong câu
+  trả lời của agent trước khi kiểm tra.
+- **Không có lần chạy tạo thì không giao.** Khi lamp-tasks không cho được
+  lần chạy đó (bản cũ không có socket tạo, `LAMP_SKILL_TASKS` tắt, hoặc khi
+  `held` mà wrapper của Hermes không có các dòng mạng), lần tạo không được
+  giao (`NotWritten::NoMakeRun`). Thất bại của một câu trả lời của DeepSeek
+  vẫn giữ nguyên và được nói rõ ràng. Nhật ký ghi "can't be run in a skill
+  run's namespace here".
+- **Agent im lặng.** lamp-tasks giết cả nhóm tiến trình của lần chạy khi
+  hết 45 giây. Giọng nói chờ chừng đó và thêm một chút (tối đa 5 giây), rồi
+  thất bại vẫn giữ nguyên.
 - **Giới hạn.** Mỗi câu trả lời của agent trong 45 giây
   (`make_skill_agent::WRITE_WITHIN`); một lần sửa chỉ bắt đầu khi thêm một
   câu trả lời vẫn vừa 120 giây của agent (`make_skill_agent::MAKE_WITHIN`).
@@ -1558,7 +1568,7 @@ cả hai người viết.
   tạo có thể kéo dài tới 240 giây, và tuyến thứ hai chờ câu của lần tạo theo
   đúng mức đó (`make_skill_local::longest_make`).
 - **Người dùng nghe gì.** "I'll make it now" vẫn nói ngay, không đổi. Khi
-  lần giao đầu tiên cho agent được nhận, đèn nói "Let me think about that a
+  lamp-tasks báo lần chạy tạo đầu tiên của agent bắt đầu, đèn nói "Let me think about that a
   little longer." qua dịch vụ nói (`app_make::say_waiting_at`, một lần,
   không bắt đầu sau 15 giây); không bao giờ khi lần giao thất bại ngay, hay
   khi lượt đã bị cắt. Câu báo đã tạo không đổi.
@@ -1582,11 +1592,14 @@ cả hai người viết.
   `the_agents_own_cannot_is_said_as_the_lamps_line`,
   `own_addresses_are_placeholders_for_the_agent`,
   `agent_tasks::tests::a_check_after_a_make_handed_to_the_agent_tells_the_persons_task`,
-  và `make_skill_agent::tests` (luật trong một tệp của nhóm agent, task là
-  một brief trong 2.000 byte, được xác nhận và đánh dấu đã kể; không có
-  target `lamp` là không có agent; agent im lặng thì hết giờ và được gửi
-  `cancel`; `cancel` luôn bị trả lời busy vẫn kết thúc đúng hạn; tệp luật cũ
-  được dọn).
+  `a_make_whose_make_run_is_refused_stays_deepseeks`,
+  `a_say_handing_the_ask_back_goes_to_the_agent_and_a_reminder_stays`,
+  `make_skill_agent::tests` (luật gửi thành một dòng `skill_make` và câu trả
+  lời được đọc lại, không bao giờ là `prepare`; lamp-tasks cũ hay lần chạy
+  bị từ chối thì không bao giờ được giao; không có target `lamp` là
+  không có agent; lần chạy im lặng thì hết giờ), và `skill_make::tests` của
+  lamp-tasks (xem [tasks_vi.md](tasks_vi.md)). Chưa thử trên đèn: một lệnh
+  `curl` từ bên trong lần chạy của một lần tạo phải thất bại.
 - **Chưa thử trên đèn:** hàng kiểm tra của nó, 16 lần tạo (mười hai lần đơn
   giản, bốn lỗi DeepSeek đã biết) trên một đèn có agent, so sánh với
   DeepSeek: có giữ không, phần nói lại và thời gian. Người dùng của agent có
