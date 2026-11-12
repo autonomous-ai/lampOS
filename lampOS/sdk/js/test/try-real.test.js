@@ -33,7 +33,7 @@ test('the code and pin come from the environment first, then a prompt that is as
   assert.match(asked[1], /pin/i);
 });
 
-async function run(t, { args = [], env = {}, fake, home }) {
+async function run(t, { args = [], env = {}, home }) {
   const glb = join(home, 'lamp.glb');
   writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
   const child = spawn(process.execPath, [tryJs, '--real', '--twin-port', String(await freePort()), '--glb', glb, ...args], {
@@ -50,7 +50,6 @@ async function run(t, { args = [], env = {}, fake, home }) {
     new Promise((resolve) => { const timer = setInterval(() => { const m = /(http:\/\/[\d.a-z]+:\d+)\/\?t=(\S+)/.exec(out.text); if (m) { clearInterval(timer); resolve({ base: `http://127.0.0.1:${new URL(m[1]).port}`, token: m[2] }); } }, 50); }),
     ended.then((code) => { throw new Error(`ended ${code}: ${out.text}`); }),
   ]);
-  void fake;
   return { child, out, ended, ...url };
 }
 
@@ -204,6 +203,61 @@ test('the say row speaks its own default on a real lamp, not the virtual lamp\'s
   t.after(() => page.socket.close());
   assert.equal((await page.press('say')).ok, true);
   assert.deepEqual(fake.asked('say'), [{ text: 'Hello from the try-it page.' }]);
+});
+
+test('a note key that the run\'s prefix would push past the lamp\'s 64 bytes is refused in words; the longest that fits is taken', async (t) => {
+  const fake = await FakeLamp.start({ grants: ['notes'] });
+  const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
+  t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
+  const real = await run(t, { args: ['--host', fake.host, '--port', String(fake.port)], env: { LAMP_TRY_CODE: fake.code, LAMP_TRY_PIN: fake.pin }, fake, home });
+  const page = await raw(real);
+  t.after(() => page.socket.close());
+  const longest = await page.press('notes_set', { key: 'k'.repeat(53), value: '1' });
+  assert.equal(longest.ok, true, longest.answer);
+  const over = await page.press('notes_set', { key: 'k'.repeat(54), value: '1' });
+  assert.equal(over.ok, false);
+  assert.match(over.answer, /1 to 53 bytes here \(this run's own prefix takes 11 of the lamp's 64\)/);
+  const listed = await page.press('notes_list', { prefix: 'p'.repeat(54) });
+  assert.equal(listed.ok, false);
+  assert.match(listed.answer, /1 to 53 bytes here/);
+  assert.equal(fake.asked('notes.set').length, 1, 'the lamp was asked once: the refused ones never reached it');
+});
+
+test('the try-wave skill this run pushed and did not remove is taken off the lamp at the end; one it removed is not removed twice', async (t) => {
+  const fake = await FakeLamp.start({ grants: ['skills', 'body'] });
+  const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
+  t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
+  const real = await run(t, { args: ['--host', fake.host, '--port', String(fake.port)], env: { LAMP_TRY_CODE: fake.code, LAMP_TRY_PIN: fake.pin }, fake, home });
+  const page = await raw(real);
+  assert.equal((await page.press('skill_push')).ok, true);
+  assert.equal(fake.pushed.size, 1, 'the skill is on the lamp');
+  page.socket.close();
+  real.child.kill('SIGINT');
+  assert.equal(await real.ended, 0);
+  assert.equal(fake.pushed.size, 0, 'taken off at the end');
+  assert.equal(fake.asked('skill.remove').length, 1);
+  // Pushed and removed by the person: nothing is asked again.
+  const again = await FakeLamp.start({ grants: ['skills', 'body'] });
+  t.after(() => again.stop());
+  const home2 = mkdtempSync(join(tmpdir(), 'try-real-home-'));
+  t.after(() => rmSync(home2, { recursive: true, force: true }));
+  const second = await run(t, { args: ['--host', again.host, '--port', String(again.port)], env: { LAMP_TRY_CODE: again.code, LAMP_TRY_PIN: again.pin }, home: home2 });
+  const page2 = await raw(second);
+  await page2.press('skill_push');
+  await page2.press('skill_remove');
+  page2.socket.close();
+  second.child.kill('SIGINT');
+  assert.equal(await second.ended, 0);
+  assert.equal(again.asked('skill.remove').length, 1, 'only the person\'s own remove');
+});
+
+test('the twin started without try.js\'s keyring is refused, and does not fall to the SDK\'s default one', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const env = { ...process.env };
+  delete env.LAMP_TRY_KEYRING;
+  const alone = spawnSync(process.execPath, [new URL('../examples/twin/server.js', import.meta.url).pathname, '--real', '--port', '0'], { env, encoding: 'utf8', timeout: 15000 });
+  assert.equal(alone.status, 2);
+  assert.match(alone.stderr, /a real run takes its keyring from try\.js --real \(LAMP_TRY_KEYRING\)/);
 });
 
 test('a raw call of a row that moves the lamp is refused until the page says yes, and runs after', async (t) => {

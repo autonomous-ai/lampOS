@@ -73,7 +73,13 @@ const SCRATCH_CLIP = `try-${randomBytes(3).toString('hex')}`;
 let clipKept = false;
 // In real mode a note is this run's own: its key carries this prefix, and nothing else is read, listed or deleted.
 const NOTE_PREFIX = `try-${randomBytes(3).toString('hex')}`;
-const noteKey = (ctx, key) => (ctx.mode === 'real' ? `${NOTE_PREFIX}.${key}` : key);
+// The lamp takes at most 64 bytes of key; the run's prefix and its dot take some, so a real run's own text may be MOST_NOTE_TEXT.
+const MOST_NOTE_TEXT = 64 - (NOTE_PREFIX.length + 1);
+const noteText = (text) => {
+  if (Buffer.byteLength(text) > MOST_NOTE_TEXT) throw refuse(`1 to ${MOST_NOTE_TEXT} bytes here (this run's own prefix takes ${NOTE_PREFIX.length + 1} of the lamp's 64)`);
+  return text;
+};
+const noteKey = (ctx, key) => (ctx.mode === 'real' ? `${NOTE_PREFIX}.${noteText(key)}` : key);
 // The names this app gives its own test clips: the only ones a row removes.
 const TRY_CLIP = /^try-[0-9a-f]{6}$/;
 // A quiet tone as the lamp takes a clip: 16-bit mono PCM at 24 kHz, peak 1000 (-30 dBFS, under the voice's -12 dBFS cap and
@@ -111,6 +117,14 @@ export async function cleanScratch(lamp) {
   let removed = false;
   if (clipKept) { await lamp.removeSound(SCRATCH_CLIP); clipKept = false; removed = true; }
   return removed;
+}
+// The try-wave skill, if THIS run pushed it and did not remove it (inert, but it would stay on the owner's lamp).
+let skillPushed = false;
+export async function cleanScratchSkill(lamp) {
+  if (!skillPushed) return false;
+  await lamp.removeSkill('try-wave');
+  skillPushed = false;
+  return true;
 }
 // And the notes this run made on a real lamp (keys under its prefix), at the end of a run.
 export async function cleanScratchNotes(lamp) {
@@ -194,7 +208,7 @@ export const CONTROLS = [
     run: async (ctx, a) => `lamp.notesDelete(${q(noteKey(ctx, a.key))}) -> ${q(await ctx.lamp.notesDelete(noteKey(ctx, a.key)))}` },
   { id: 'notes_list', group: 'Notes', needs: ['notes'], ops: ['notes.list'], shows: [], label: 'List the notes', fields: [text('prefix', 64, '', { optional: true })],
     run: async (ctx, a) => {
-      const prefix = ctx.mode === 'real' ? `${NOTE_PREFIX}.${a.prefix ?? ''}` : (a.prefix ?? '');
+      const prefix = ctx.mode === 'real' ? `${NOTE_PREFIX}.${noteText(a.prefix ?? '')}` : (a.prefix ?? '');
       return `lamp.notesList(${q(prefix)}) -> ${q(await ctx.lamp.notesList(prefix))}`;
     } },
   // A light kept on past the 30 s one ask lasts: asked again at half the lamp's hold limit until stopped. One hold at a
@@ -349,6 +363,7 @@ export const CONTROLS = [
   { id: 'skill_push', group: 'Skills', needs: ['skills'], ops: ['skill.push'], shows: [], label: 'Push the try-wave skill', fields: [],
     run: async ({ lamp }) => {
       const skill = await lamp.pushSkill(TRY_SKILL);
+      skillPushed = true;
       return `lamp.pushSkill('skills/try-wave')  // ${skill.held ? `held: ${skill.held}` : skill.on ? 'on' : 'off'}`;
     } },
   { id: 'skills', group: 'Skills', needs: ['skills'], ops: ['skill.list'], shows: [], label: 'List my skills', fields: [],
@@ -365,7 +380,7 @@ export const CONTROLS = [
       return `lamp.withLease(['body'], () => lamp.play(${q(a.name)}, { wait: true }))`;
     } },
   { id: 'skill_remove', group: 'Skills', needs: ['skills'], ops: ['skill.remove'], shows: [], label: 'Remove the try-wave skill', fields: [],
-    run: async ({ lamp }) => { await lamp.removeSkill('try-wave'); return "lamp.removeSkill('try-wave')"; } },
+    run: async ({ lamp }) => { await lamp.removeSkill('try-wave'); skillPushed = false; return "lamp.removeSkill('try-wave')"; } },
   // What the lamp says of itself, by name (`lamp.get`), and the three named reads (the `air`, `device` and `body`
   // states): the answer is in the log; a `known: false` is the lamp having nothing to say yet.
   { id: 'get', group: 'Reads', ops: ['get'], shows: [], label: 'Read a state', fields: [select('state', [...schema.states], 'lamp')],

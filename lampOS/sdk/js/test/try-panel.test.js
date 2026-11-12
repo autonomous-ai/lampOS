@@ -22,5 +22,6 @@ test('panel.js still builds the panel, shows a picture and listens for the serve
   for (const part of ['function row(', 'function section(', 'function showPicture(', "id: 'panel'", "addEventListener('twin-message'", 'const hearing = ', "detail.type === 'audio'", "detail.type === 'hear'"]) {
     assert.ok(source.includes(part), `panel.js lost ${part}`);
   }
+  assert.match(source, /addEventListener\('twin-open', \(\) => \{ movesAllowed = false;/, 'a new connection is asked the yes again (the server forgot it)');
   assert.match(source.trimEnd(), /addEventListener\('twin-message'[\s\S]*\}\);$/, 'the twin-message listener is the last statement');
 });
