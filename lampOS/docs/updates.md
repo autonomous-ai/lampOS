@@ -284,8 +284,21 @@ These tests do not establish a real stable promotion or lamp acceptance.
 
 - The job checks out that run's `github.sha` and downloads
   `lampos-arm64-<github.sha>` from the same run. No artifact from another
-  run, branch, pull request or manual input is accepted. The manifest's
-  commit is that SHA and its sequence is `github.run_number`.
+  run, branch or manual input is accepted, and from a pull request only as
+  below. The manifest's commit is that SHA and its sequence is
+  `github.run_number`.
+- **A train's tested build (#6556).** A `first/train-*` pull request's run
+  tests every crate with the push's profile. When lamp-voice's push is that
+  pull request's merge and its tree is the tree that run built and tested,
+  the `reuse` job (`.github/scripts/lampos-reuse.py`) names the run, whose
+  build and every test runner passed; the push skips `arm64` and `arm64-test`
+  and `publish` downloads `lampos-arm64-<pull request head>` from that run.
+  Every artifact carries `TREE`, its build's `HEAD^{tree}`, and publish
+  refuses one whose `TREE` is not `github.sha`'s tree. Anything else (not a
+  train's merge, lamp-voice moved under the train, a run not green, an
+  expired artifact, an API error) builds and tests on the push as before,
+  and saves the cache only then. Promotion counts the successful `reuse` job
+  in place of the skipped ARM64 jobs.
 - A run eligible to publish builds on GitHub-hosted from the cache, like a
   pull request: it restores lamp-voice's newest build and gives unchanged
   source files their cached times back, so cargo rebuilds only the crates
