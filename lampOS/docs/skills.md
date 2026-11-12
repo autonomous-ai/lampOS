@@ -4987,15 +4987,14 @@ bytes, as above):
   this lamp").
 - **No secret is the lamp's** (the first builder's 19:44 ruling): a key or
   token is never said aloud, asked by voice or kept in the skill's folder.
-  Its way in (the app, into root's store as a service's tokens, reaching
-  the run as an environment file read once) is a follow-up; until then a
-  file carrying a value that looks like one (a run of 24 or more letters,
-  digits, `_ - . :` with four letters and four digits, checked whole
-  outside a link, and in a link each `/` part past its scheme and host and
-  each `:` part of it, so a webhook's or a bot's key is found) is
+  A file carrying a value that looks like one (a run of 24 or more
+  letters, digits, `_ - . :` with four letters and four digits, checked
+  whole outside a link, and in a link each `/` part past its scheme and
+  host and each `:` part of it, so a webhook's or a bot's key is found) is
   refused: "it carries what looks like a key or a token; a skill added
   from a file can't hold one yet, so add it without the key or token". The
-  value is never journaled.
+  value is never journaled. Its way in, the app, is `LAMP_SKILL_SECRETS`
+  below.
 - **It goes on as an uploaded skill does** (#5977), said aloud: "I added
   photo booth from a file, not from the Skills Store, and it's on: only
   when you ask for it, the lamp's agent follows the file, and it changes
@@ -5029,6 +5028,94 @@ a short light-and-speak file, the first run's yes, no secret written,
 a key refused, a linked service's grants, services read by their names),
 `task::tests::an_agent_skill_from_a_file_carries_its_task_only_with_its_switch`,
 `an_agent_skill_from_a_file_carries_a_service_grant_only_with_its_switch`.
+
+###### Its keys, given in the app (`LAMP_SKILL_SECRETS=on`, off)
+
+The first builder's ruling (12 Nov 19:44 on #6059): "A file's secrets (an
+API key, a bot token) are never said aloud and never kept in the skill
+folder. They go in through the app, into root's store like service
+tokens, and reach the run only as an environment file read once. The
+agent never asks for one by voice." Off unless `LAMP_SKILL_SECRETS=on`,
+set in no unit; it is read by `lamp-voice` (passed to the provider and
+second routes), `lamp-cloud`, `lamp-services` and `lamp-tasks serve`, so a
+lamp turns it on with a drop-in on each of the four. `lamp-skills` takes a
+`secrets` list either way, so a skill kept with it on still loads with it
+off.
+
+- **Names in the file, values in the app.** The upload reads the names of
+  the variables the file's run needs (`lamp_services::skill_secrets::names_in`):
+  `^[A-Z][A-Z0-9_]{2,63}$`, read as one in code (`os.environ["X"]`,
+  `os.getenv("X")`, `process.env.X`), named one in words ("the environment
+  variable X", "env var X", `export X`, a line `X=...`), or a secret's
+  name with a `_` (`..._KEY`, `..._TOKEN`, `..._SECRET`, an `API`, ...)
+  written `$X` or on a line that says set, env, key, token or secret. The
+  shell's, the loader's, the lamp's and the agent's own are never names
+  (`PATH`, `HOME`, `LD_*`, `LAMP_*`, `HERMES_*`, `PYTHON*`, `*_PROXY`, ...).
+  At most 16; more refuses the file ("it needs more than 16 keys or
+  tokens"). They go in its `skill.toml` as `secrets = ["GEMINI_API_KEY",
+  ...]`, held by `upload_agent::capped` and by `lamp-skills` (only beside
+  a `do.task`, plain names once each), and the upload's answer to the app
+  carries them as `secrets`. A file still carrying a value is refused,
+  now with "its SKILL.md carries a key or token itself: take the value out
+  of the file (leave its name, like GEMINI_API_KEY) and add the value in
+  the app instead".
+- **The app's three kinds** (docs/cloud.md, "A skill's keys"):
+  `skills.secrets {skill}` answers `{skill, needed, set}`, names only;
+  `skills.secret_set {skill, name, value}` (a name the skill needs, a
+  value of 1 to 4096 bytes with no control character) and
+  `skills.secret_unset {skill, name}` answer the same after. Only over the
+  lamp's own account channel, as `skills.upload`; listed in `can` only
+  with the switch, the skills page and lamp-services there.
+- **Root's store.** `lamp-cloud` keeps nothing: each kind goes to
+  `lamp-services`' admin socket (lamp-cloud.service alone), which keeps
+  the values in `/var/lib/lampos-services/skill-secrets/<skill>.json`,
+  root's, 0600 in a 0700 folder, beside the services' tokens: lamp-services
+  is the one unit that already writes that root-only state folder
+  (`StateDirectory=lampos-services`, 0700), and the app's path to it
+  (`connector.*`) is already lamp-cloud's admin socket. Each file is
+  written whole (beside, synced, renamed), tied to the skill's installed
+  package; the journal says a skill, a name and a value's length, never a
+  value. Removing the skill (`skills.remove`) drops its keys; so does the
+  services' wipe (a sign-out, an unpairing, a reset), and a skill no
+  longer on the lamp, or on again as another package, has its file dropped
+  at the next ask.
+- **The run.** Before its token is minted, lamp-tasks asks lamp-services'
+  tools socket (`{"op":"run_secrets","skill"}`, answered for
+  lamp-tasks.service alone) for the set values and the names missing
+  (`lamp_tasks::skill_keys`). A name missing: the run doesn't start, and
+  lamp-tasks answers `missing_secret`, "photo booth didn't run: it needs
+  TELEGRAM_BOT_TOKEN added in the app, on the skill's page". Otherwise it
+  writes `.run-env` (0400, its own user's, the run's: `export NAME='value'`
+  a line, single-quoted) in the run's own fresh folder and home
+  (`skill_make::fresh_home`, as an agent skill's run), and starts the run
+  through `/bin/sh`, which reads the file once and deletes it before
+  Hermes's wrapper starts (`skill_keys::LAUNCH`). The values are in the
+  run's environment alone: never in its token, its arguments, its words
+  (which name the variables only), its transcript or the skill's folder;
+  the folder goes when the run ends. lamp-services not reached: a skill
+  that names no `secrets` runs with none, one that does is refused.
+- **Never by voice.** An agent skill that needs keys says in its tool's
+  note that a key is never asked for, taken or repeated by voice, only
+  added in the app. Its tool called while one is missing is answered,
+  before anything runs, with which names to add in the app and not to take
+  one by voice (`upload_agent::keys_missing`, the voice's own
+  `skill_secrets_named` call on lamp-services' tools socket, names only, at
+  most 500 ms).
+
+Tests: `lamp_services::skill_secrets::tests` (names read and the run's
+own refused; the store's 0600 file in a 0700 folder; the value never in
+the journal's line, the answer or a `Debug`; a name not needed and a bad
+value refused; unset, drop, a skill gone and another package; the run's
+values and names missing), `serve::tests::a_skills_keys_go_in_from_the_app_and_out_to_lamp_tasks_alone`,
+`lamp_cloud::skill_secrets::tests` and
+`answer::tests::a_skills_keys_are_kinds_only_with_their_switch_and_the_page`,
+`upload_agent::tests` (`with_the_keys_switch_...`,
+`a_tool_missing_a_key_says_to_add_it_in_the_app_and_never_by_voice`),
+`lamp_tasks::skill_keys::tests` (the file 0400 and shell-quoted, the
+launch reading it once, deleting it and starting the program with the
+values) and `skill_task::tests` (`a_runs_keys_reach_it_only_in_its_environment_file_and_a_missing_one_runs_nothing`,
+`the_lamps_runner_reads_the_keys_file_once_and_deletes_it_before_the_run`),
+and `lamp-skills`' `a_task_step_and_its_grants_load_checked`.
 
 #### Written in the app (`LAMP_SKILL_WRITTEN=on`, off)
 

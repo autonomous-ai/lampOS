@@ -3475,6 +3475,49 @@ Tests: `skill_task::tests::the_net_grant_keeps_the_network_and_no_grant_holds_it
 `an_agent_run_follows_its_file_in_a_fresh_home_with_no_key`,
 `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 
+### A run's keys, read once (`LAMP_SKILL_SECRETS`, off)
+
+The first builder's ruling (12 Nov 19:44 on #6059): a skill's keys reach
+its run only as an environment file read once (docs/skills.md, "Its keys,
+given in the app"). With `LAMP_SKILL_SECRETS=on` in lamp-tasks
+(`skill_keys::SWITCH`, set in no unit), each hand-over, before its token
+is minted (`skill_task::answer_with`, `Agent::keys`):
+
+- **Asked of lamp-services** (`skill_keys::ServicesKeys`): one line on
+  its tools socket, `/run/lampos-services/tools/call.sock`,
+  `{"op":"run_secrets","skill"}`, which lamp-services answers for
+  lamp-tasks.service's cgroup alone: the set values of the names the
+  skill's `skill.toml` needs and the names missing, each checked here
+  again (plain names, one-line values of at most 4096 bytes, at most 16).
+  A skill's run (Hermes) stays in lamp-tasks.service's cgroup, but its
+  namespace shows it no `/run`, so it never reaches that socket.
+- **A name missing:** refused `missing_secret`, "photo booth didn't run: it
+  needs TELEGRAM_BOT_TOKEN added in the app, on the skill's page", with no
+  token minted and nothing started. lamp-services not reached: a skill
+  whose `skill.toml` has no `secrets` line runs with none; one that has is
+  refused `no_secrets`.
+- **The file:** `.run-env` in the run's own fresh folder (`make-<run id>`,
+  with its fresh home, `skill_make::fresh_home`: a run given keys always
+  gets one, through the make's runner, held off the network unless it is
+  granted `net`), made new, never through a link, 0400 from its first byte, lamp-tasks' own
+  user's, the run's: one `export NAME='value'` a line, each value
+  single-quoted for the shell (`skill_keys::shell_quoted`).
+- **Read once:** the runner starts `/bin/sh -c LAUNCH lamp-run <file>
+  /usr/local/bin/hermes chat -q <words>` (`skill_keys::LAUNCH`): the shell
+  reads the file, deletes it whatever came of the read, and only then
+  execs Hermes's wrapper, so the values are in the run's environment
+  alone; a file it can't read starts nothing (exit 97). lamp-tasks
+  removes the file again after the run, and the folder with it. The
+  values are never in the token, the arguments, the run's words (which
+  name the variables and say never to print, write, send or say one), a
+  journal line (counts only) or the skill's folder.
+
+Tests: `skill_keys::tests` (the answer read whole or not at all, the file
+0400 and quoted, the launch reading it once and deleting it before the
+program, a missing name said, a `skill.toml` naming `secrets` seen),
+`skill_task::tests::a_runs_keys_reach_it_only_in_its_environment_file_and_a_missing_one_runs_nothing`,
+`the_lamps_runner_reads_the_keys_file_once_and_deletes_it_before_the_run`.
+
 ## Devin (#1854)
 
 `devin` is Devin's own terminal program on the person's computer, which
