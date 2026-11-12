@@ -621,24 +621,29 @@ của giọng nói và `lamp-tasks --reply-named`):
     0.6.12 nói `resume <id>` và `show <id>` tới được phiên đó), và thời gian
     thêm của một lần `show`.
 
-## Đóng harness của chính đèn khi việc xong, không chờ kể tin (#6530)
+## Đóng harness của chính đèn khi việc xong, chờ kể tin tối đa một phút (#6530)
 
 Với `serve --close-told` (bật trong unit của sản phẩm), lamp-tasks đóng
-harness mà đèn mở khi câu trả lời đã được kể. Riêng việc giao cho chính đèn
+harness mà đèn mở khi câu trả lời đã được kể. Việc giao cho chính đèn
 (target `lamp`: Hermes hay OpenClaw trên đèn, không phải phiên nối trên máy
-tính) được đóng ngay khi câu trả lời mới nhất đã giữ, từ agent `idle` có câu
-trả lời, vẫn là lời nhờ của đèn, mà không chờ kể tin (`closes_untold`). Không
-ai ngồi ở harness của chính đèn để làm tiếp. Trên 52e6 (12226), một lượt Hermes
-xong trong 10 s bị cắt khi đang kể tin (`user_interrupted`), nên không bao giờ
-được tính là đã kể, và phiên chat ở lại hơn 7 phút trong `epoll_wait`.
+tính) cũng được đóng khi tin đã kể. Nếu chưa kể, nó được đóng
+`UNTOLD_CLOSE_MS` (60 s) sau khi câu trả lời mới nhất được giữ, từ agent
+`idle` có câu trả lời, vẫn là lời nhờ của đèn (`closes_untold`). Trên 52e6
+(12226), một lượt Hermes xong trong 10 s bị cắt khi đang kể tin
+(`user_interrupted`), nên không bao giờ được tính là đã kể, và phiên chat ở
+lại hơn 7 phút trong `epoll_wait`.
 
+- **Một phút đó giữ chỗ cho câu nói tiếp:** người dùng nói tiếp ("thêm táo
+  vào đó") vẫn nối vào cùng phiên trong lúc ấy (Twelve đọc trên #6536). Câu
+  nói tiếp đến sau khi đã đóng thì mở phiên mới.
 - **Tin không cần phiên:** voice kể câu trả lời đã giữ trong store, nên việc
   đóng không cắt được tin. Một lần đóng kiểu này không được tính là đã kể
   trong record (`Engine::recent`).
-- **Thời gian:** watch xem mỗi 30 s và xem lại sau 10 s để xác nhận, nên
-  harness được đóng khoảng 10 đến 40 s sau lượt cuối.
+- **Thời gian:** watch xem mỗi 30 s và xem lại sau 10 s để xác nhận. Việc
+  chưa kể được đóng khoảng 70 đến 100 s sau lượt cuối, việc đã kể thì đóng
+  ngay sau khi kể.
 - **Harness trên máy tính** vẫn chờ kể tin xong mới đóng, vì người đó có thể
   đang ngồi ở màn hình.
-- **Test:** `the_lamps_own_agent_is_closed_once_done_its_news_untold` (đang
-  làm, hay idle chưa có câu trả lời: để mở; xong: đóng dù chưa kể; trên máy
-  tính: chờ kể).
+- **Test:** `the_lamps_own_agent_is_closed_once_done_its_news_untold`. Đang
+  làm, hay idle chưa có câu trả lời: để mở. Xong mà chưa kể: để mở dưới một
+  phút, rồi đóng. Trên máy tính: chờ kể.

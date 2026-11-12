@@ -28,6 +28,9 @@ pub const SPEECH_AGE_MS: u64 = 600_000;
 /// [`CLOSE_TRIES`] times in all, each time after reading the agent again.
 pub const CLOSE_RETRY_MS: u64 = 60_000;
 pub const CLOSE_TRIES: u8 = 3;
+/// How long the lamp's own agent is left open with its answer kept but not
+/// yet told ([`closes_untold`], #6530): room for a follow-up, then closed.
+pub const UNTOLD_CLOSE_MS: u64 = 60_000;
 /// How often a task handed over is looked at on its own (unless `serve --no-watch`):
 /// every half minute for its first ten minutes, then every two, until the
 /// agent has finished or asks something, and for at most a day. After that
@@ -688,7 +691,7 @@ fn close_due(task: &Task, now: &Clock) -> bool {
     newest.data.ask == first.data.ask
         && newest.data.state == "idle"
         && settled(&newest.data)
-        && (closes_untold(task)
+        && (closes_untold(task, now)
             || match &newest.speech {
                 // A playout under way is not told yet.
                 Some(speech) => speech.state != SpeechState::Claimed,
@@ -696,16 +699,27 @@ fn close_due(task: &Task, now: &Clock) -> bool {
             })
 }
 
-/// Whether `task`'s harness is closed once its answer is kept, told or not
-/// (#6530): one on the lamp's own agent ([`crate::runtime::LAMP_TARGET`]),
-/// not joined on a computer. Nobody sits at the lamp's own harness to go on
-/// with it, and its session left open lingers (on 52e6 a Hermes chat stayed
-/// seven minutes after a ten-second turn whose news was cut short, so never
-/// told). The news is the kept answer's, told by the voice from the store,
-/// so the close cannot cut it. A computer's harness still waits for its
-/// telling: the person may be at that screen.
-fn closes_untold(task: &Task) -> bool {
-    task.dispatch.joined_on.is_none() && task.target_alias == crate::runtime::LAMP_TARGET
+/// Whether `task`'s harness is closed though its answer is not told yet
+/// (#6530): one on the lamp's own agent ([`crate::runtime::LAMP_TARGET`],
+/// not joined on a computer) whose newest answer was kept at least
+/// [`UNTOLD_CLOSE_MS`] ago (or in an earlier boot). Told sooner, it is
+/// closed then, as any other. On 52e6 a Hermes chat stayed seven minutes
+/// after a ten-second turn whose news was cut short, so never told. The
+/// wait keeps the person's follow-up ("now add apples to that") joining
+/// the same session meanwhile (Twelve's read on #6536). The news is the
+/// kept answer's, told by the voice from the store, so the close cannot
+/// cut it. A computer's harness still waits for its telling: the person
+/// may be at that screen.
+fn closes_untold(task: &Task, now: &Clock) -> bool {
+    task.dispatch.joined_on.is_none()
+        && task.target_alias == crate::runtime::LAMP_TARGET
+        && task.observations.last().is_some_and(|newest| {
+            newest.observed.boot_id != now.boot_id
+                || now
+                    .monotonic_ms
+                    .saturating_sub(newest.observed.monotonic_ms)
+                    >= UNTOLD_CLOSE_MS
+        })
 }
 
 /// Whether a task is over, so that it may give way to a new one when the
@@ -2376,7 +2390,7 @@ impl<P: Persistence> Engine<P> {
                         .or(task
                             .close
                             .as_ref()
-                            .filter(|_| !closes_untold(task))
+                            .filter(|_| !closes_untold(task, now))
                             .map(|close| &close.attempted))
                 });
                 Some(Recent {
@@ -3929,8 +3943,8 @@ mod tests {
         assert_eq!(stored(&memory), before);
     }
 
-    /// #6530: the lamp's own agent is closed once its one turn is done and
-    /// kept, its news still untold (on 52e6 a telling cut short left a
+    /// #6530: the lamp's own agent is closed a minute after its one turn is
+    /// done and kept, its news still untold (on 52e6 a telling cut short left a
     /// Hermes chat open seven minutes). One still working, or idle with no
     /// answer yet, is not; a computer's harness still waits for its telling;
     /// and the news of the closed one is still to tell.
@@ -3960,9 +3974,20 @@ mod tests {
         keep(&mut engine, id, 20, "idle", "");
         assert!(engine.begin_close(&clock(21)).unwrap().is_none());
 
-        // Done in one turn: closed at once, told or not.
+        // Done in one turn: left open a minute for a follow-up, then
+        // closed, told or not.
         keep(&mut engine, id, 30, "idle", "Done.");
-        let job = engine.begin_close(&clock(31)).unwrap().unwrap();
+        assert!(engine.begin_close(&clock(31)).unwrap().is_none());
+        assert!(
+            engine
+                .begin_close(&clock(30 + UNTOLD_CLOSE_MS - 1))
+                .unwrap()
+                .is_none()
+        );
+        let job = engine
+            .begin_close(&clock(30 + UNTOLD_CLOSE_MS))
+            .unwrap()
+            .unwrap();
         assert_eq!((job.task_id, job.agent_id.as_str()), (id, AGENT));
         assert!(
             engine.state.tasks[0]
@@ -3973,10 +3998,14 @@ mod tests {
                 .is_none()
         );
         engine
-            .finish_close(&job, Ok(crate::harness::Closed::Closed), &clock(32))
+            .finish_close(
+                &job,
+                Ok(crate::harness::Closed::Closed),
+                &clock(31 + UNTOLD_CLOSE_MS),
+            )
             .unwrap();
         // Its news is not taken as told by the close.
-        let recent = engine.recent(&clock(33));
+        let recent = engine.recent(&clock(32 + UNTOLD_CLOSE_MS));
         assert_eq!(recent.len(), 1);
         assert_eq!(recent[0].settled.as_deref(), Some("idle"));
         assert!(!recent[0].told);
@@ -3985,7 +4014,12 @@ mod tests {
         let (mut engine, _) = opened();
         let id = accepted(&mut engine, 0);
         keep(&mut engine, id, 30, "idle", "Done.");
-        assert!(engine.begin_close(&clock(31)).unwrap().is_none());
+        assert!(
+            engine
+                .begin_close(&clock(30 + 10 * UNTOLD_CLOSE_MS))
+                .unwrap()
+                .is_none()
+        );
     }
 
     /// One that waits for the person is left to them, however long; one the
