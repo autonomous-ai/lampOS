@@ -269,6 +269,77 @@ pub(crate) fn set_scripts_here(on: Option<bool>) {
     SCRIPTS_HERE.with(|here| here.set(on));
 }
 
+/// The switch for a made skill that uses a linked service (mail, a
+/// calendar, GitHub, ...) through the lamp's agent (the owner's ask, 12
+/// Nov): `on` exactly, off unless set. On, with [`SCRIPTS_ENVIRONMENT`] on
+/// too (a made `task` step is held to its cap), the making model is told to
+/// make such a skill as one `do.task` for the lamp's agent (Hermes, which
+/// reaches the linked services through its `lamp-services` MCP tools
+/// `services_connected`, `service_read` and `service_write`; a send goes
+/// back to the voice for the owner's spoken yes), never as a `do.read` or
+/// `do.write` step. Off, the make is as before. Skills already made with a
+/// `do.read` or `do.write` load and run as they did: nothing migrates.
+pub const AGENT_SERVICES_ENVIRONMENT: &str = "LAMP_AGENT_SERVICES";
+
+/// Whether [`AGENT_SERVICES_ENVIRONMENT`]'s value `var` turns it on: `on`
+/// exactly.
+pub fn agent_services_on(var: Option<&str>) -> bool {
+    var == Some("on")
+}
+
+#[cfg(test)]
+thread_local! {
+    /// [`AGENT_SERVICES_ENVIRONMENT`] as a test of this thread sets it.
+    static AGENT_SERVICES_HERE: std::cell::Cell<Option<bool>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// [`agent_services_on`] as this process has it.
+pub fn agent_services_here() -> bool {
+    #[cfg(test)]
+    if let Some(on) = AGENT_SERVICES_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    agent_services_on(std::env::var(AGENT_SERVICES_ENVIRONMENT).ok().as_deref())
+}
+
+/// [`agent_services_here`] for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_agent_services_here(on: Option<bool>) {
+    AGENT_SERVICES_HERE.with(|here| here.set(on));
+}
+
+/// The linked services a service task's run may be granted, by their
+/// catalog code (the first builder's ruling on #6432): its grants are
+/// `<code>-read` and `<code>-write`, as `lamp_control::protocol::SERVICE_CODES`
+/// names them (the same list; lamp-tasks' grant check follows it).
+pub const SERVICE_GRANT_CODES: [&str; 14] = [
+    "gmail",
+    "google_calendar",
+    "google_drive",
+    "figma",
+    "github",
+    "linear",
+    "asana",
+    "ahrefs",
+    "facebook",
+    "slack",
+    "mondaydotcom",
+    "hubspot",
+    "amplitude",
+    "notion",
+];
+
+/// A service task's grant (`gmail-read`, `github-write`): its service's
+/// code and whether it writes; `None` for any other name.
+pub fn service_grant(grant: &str) -> Option<(&str, bool)> {
+    let (code, write) = grant
+        .strip_suffix("-read")
+        .map(|code| (code, false))
+        .or_else(|| grant.strip_suffix("-write").map(|code| (code, true)))?;
+    SERVICE_GRANT_CODES.contains(&code).then_some((code, write))
+}
+
 /// What the lamp can't do yet with [`SCRIPTS_ENVIRONMENT`] off, said as
 /// [`cant_yet`]: "I can't do that yet: running code of its own".
 pub const CODE_OF_ITS_OWN: &str = "running code of its own";
@@ -416,6 +487,14 @@ pub fn brief(request: &str) -> Result<String, &'static str> {
 /// with since the lamp's own model became the only one (3 Nov). Only an empty or too long
 /// request is refused here, before the model is asked.
 pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
+    brief_for(request, reads, agent_services_here() && scripts_on())
+}
+
+/// [`brief_with`], with a linked service made as a task for the lamp's
+/// agent or not (`agent`, [`AGENT_SERVICES_ENVIRONMENT`] with
+/// [`SCRIPTS_ENVIRONMENT`]): on, the brief points to that task ("as
+/// above": the system prompt says its form) in place of a read or a write.
+pub fn brief_for(request: &str, reads: bool, agent: bool) -> Result<String, &'static str> {
     let request = request.split_whitespace().collect::<Vec<_>>().join(" ");
     if request.is_empty() {
         return Err("Say what the skill should do.");
@@ -426,6 +505,7 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     // A read or a write as the system prompt says them (`make_skill_local`),
     // a write's words only the request's own (#6066).
     let read = match (reads, writes_on()) {
+        _ if agent => "",
         (true, true) => " Or a read/write as above.",
         (true, false) => " Or one read, as above.",
         (false, true) => " Or one write, as above.",
@@ -433,7 +513,11 @@ pub fn brief_with(request: &str, reads: bool) -> Result<String, &'static str> {
     };
     // Code of its own as the system prompt says it (#6307), only with its
     // switch: off, the brief never offers it.
-    let code = if scripts_on() {
+    // With a service made as a task for the lamp's agent, one line points
+    // to both, within [`MOST_BRIEF_BYTES`].
+    let code = if agent {
+        " Or a task, as above."
+    } else if scripts_on() {
         " Or code, as above."
     } else {
         ""
@@ -1184,6 +1268,14 @@ fn grants_plainly(grants: &[String]) -> Option<String> {
     let said: Vec<String> = grants
         .iter()
         .map(|grant| {
+            if let Some((code, write)) = service_grant(grant) {
+                let service = code.replace('_', " ");
+                return if write {
+                    format!("sending with your {service}, each send only on your yes")
+                } else {
+                    format!("reading your {service}")
+                };
+            }
             GRANTS
                 .iter()
                 .find(|(name, _)| name == grant)
@@ -2786,6 +2878,7 @@ pub const BRIEFS_OWN_REFUSALS: &[&str] = &[
     "You can ask me for it yourself any time",
     SENDS_ON_ITS_OWN,
     "Not possible yet: a skill can't",
+    "deleting or changing what is in your services",
 ];
 
 /// Whether the model's `cannot:` reason `why` is one of the brief's own
@@ -3179,7 +3272,10 @@ fn code_held(
             if grant == SKILLS_GRANT.0 {
                 return Err(Refused::new(cant_yet(SKILLS_GRANT.1)));
             }
-            if !GRANTS.iter().any(|(name, _)| *name == grant) {
+            // A linked service's grant, only for a service task for the
+            // lamp's agent (`LAMP_AGENT_SERVICES`, #6432's ruling).
+            let service = agent_services_here() && service_grant(grant).is_some();
+            if !service && !GRANTS.iter().any(|(name, _)| *name == grant) {
                 eprintln!(
                     "lamp-voice: a made skill's code asks for a grant the lamp doesn't have: {}",
                     named(grant)
@@ -7698,6 +7794,79 @@ light = { dim = 1 }
         assert!(brief(&"x".repeat(MOST_REQUEST_BYTES + 1)).is_err());
         assert!(brief("  ").is_err());
         assert!(!is_brief("Write a poem about lamps"));
+    }
+
+    /// `LAMP_AGENT_SERVICES` (the owner's ask, 12 Nov): on, the brief of a
+    /// read or a send points to a service task for the lamp's agent in place
+    /// of a read or a write; off, as before; the longest fits either way.
+    #[test]
+    fn a_services_brief_points_to_the_agents_task_only_with_its_switch() {
+        set_writes_here(Some(true));
+        for request in [
+            "every morning read my new mail",
+            "when I leave, email x@example.com that I'm out",
+        ] {
+            for reads in [true, false] {
+                let on = brief_for(request, reads, true).unwrap();
+                assert!(is_brief(&on) && request_of(&on) == request, "{on}");
+                assert!(on.contains(" Or a task, as above."), "{on}");
+                assert!(
+                    !on.contains("read/write") && !on.contains("one write"),
+                    "{on}"
+                );
+                let off = brief_for(request, reads, false).unwrap();
+                assert!(!off.contains("Or a task"), "{off}");
+                let said = if reads {
+                    " Or a read/write as above."
+                } else {
+                    " Or one write, as above."
+                };
+                assert!(off.contains(said), "{off}");
+            }
+        }
+        set_scripts_here(Some(true));
+        let longest = brief_for(&"x".repeat(MOST_REQUEST_BYTES), true, true).unwrap();
+        assert!(longest.len() <= MOST_BRIEF_BYTES, "{}", longest.len());
+        set_scripts_here(None);
+        set_writes_here(None);
+    }
+
+    /// #6432's ruling: a service task's grants are `<code>-read` and
+    /// `<code>-write` of the catalog's codes, kept by the cap only with
+    /// `LAMP_AGENT_SERVICES` on, and said back in plain words.
+    #[test]
+    fn a_service_tasks_grants_are_held_only_with_its_switch_and_said_back() {
+        assert_eq!(service_grant("gmail-read"), Some(("gmail", false)));
+        assert_eq!(
+            service_grant("google_calendar-write"),
+            Some(("google_calendar", true))
+        );
+        for no in [
+            "gmail",
+            "gmail-app-read",
+            "-read",
+            "drive-read",
+            "github-read-write",
+        ] {
+            assert_eq!(service_grant(no), None, "{no}");
+        }
+        set_scripts_here(Some(true));
+        let toml = CODE_TOML.replace(
+            "grants = [\"camera\", \"light\"]",
+            "grants = [\"gmail-read\"]",
+        );
+        set_agent_services_here(Some(false));
+        assert!(capped(&toml).is_err());
+        set_agent_services_here(Some(true));
+        let (_, uses) = capped(&toml).unwrap();
+        assert_eq!(uses.grants, ["gmail-read"]);
+        assert!(code_said(&uses.grants).contains("reading your gmail"));
+        assert!(
+            code_said(&["gmail-write".to_owned()])
+                .contains("sending with your gmail, each send only on your yes")
+        );
+        set_agent_services_here(None);
+        set_scripts_here(None);
     }
 
     /// The owner, 10 Nov: whether a request asks for a linked service, a

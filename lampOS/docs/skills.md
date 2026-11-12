@@ -3611,6 +3611,44 @@ Tests:
   `made::a_made_skill_goes_on_through_the_helper_with_no_yes` (the
   voice's call through the real helper).
 
+##### A linked service as a task for the lamp's agent (`LAMP_AGENT_SERVICES=on`, off)
+
+The owner's ask, 12 Nov. With `LAMP_AGENT_SERVICES=on` in `lamp-voice`
+(`on` exactly; `made_skill::AGENT_SERVICES_ENVIRONMENT`,
+`made_skill::agent_services_on`), and `LAMP_MADE_SCRIPTS=on` beside it (a
+made `task` step is held to that cap and loads only with it), a voice make
+of a skill that reads or writes a linked service (Gmail, Calendar, GitHub,
+...) is made as one `do.task` for the lamp's agent (Hermes, with the
+connectors MCP `lamp-services`: `services_connected`, `service_read`,
+`service_write`; a send goes back to the voice for the owner's spoken
+yes), never as a `do.read` or `do.write` step. The making model is told
+(`make_skill_local::agent_services`, with a whole example for "every
+morning at eight, read me my new mail"): `[permissions]` only its
+trigger's topics, no `services`; `grants` exactly the services it uses,
+`<code>-read` to read one and `<code>-write` to send with it (#6432's
+ruling; a send alone only `-write`; `made_skill::service_grant`, the codes
+`made_skill::SERVICE_GRANT_CODES`, the same as lamp-control's
+`protocol::SERVICE_CODES`), kept by the cap only with the switch and said
+back ("reading your gmail", "sending with your gmail, each send only on
+your yes"); the lamp's own trigger;
+exactly one `[[do]]` step `task = { task = "...", run = "scripts/main.py" }`,
+its words (at most 120 characters) saying plainly what to read and tell,
+or what to send and to whom; and a `scripts/main.py` that only prints a
+line. The brief says " Or a task, as above." in place of the read, write
+and code lines (`made_skill::brief_for`). Such a make is checked, said back
+and agreed to as any made skill with code. Off, or with
+`LAMP_MADE_SCRIPTS` off, the prompt and the brief are as before, word for
+word. Skills already made with `do.read`/`do.write` keep loading and
+running as today and are not migrated. Open: the do.task run's prompt in
+lamp-tasks (`SkillRun::prompt`) still tells Hermes to run the script, the
+task's words given as data. Tests:
+`a_service_skill_is_made_as_a_task_for_the_agent_only_with_its_switch`,
+`a_service_skill_made_as_a_task_passes_the_lamps_checks`,
+`a_services_brief_points_to_the_agents_task_only_with_its_switch`,
+`a_service_tasks_grants_are_held_only_with_its_switch_and_said_back`.
+Open: lamp-skills' own grant check (`task::grants_of`) and the voice's
+task yes (`skill_task_yes::GRANTS`) don't take the service grants yet.
+
 ##### Handed to the lamp's agent when DeepSeek fails (`LAMP_MAKE_SKILL_AGENT=on`, off, proposal on #6059)
 
 A proposal on #6059 (the owner's OK, 11 Nov), with the first builder's
