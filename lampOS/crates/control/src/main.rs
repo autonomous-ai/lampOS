@@ -132,9 +132,20 @@ fn ask(admin: &PathBuf, asked: &serde_json::Value) -> Result<(), String> {
 }
 
 fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
-    if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
+    // The door (paired computers over TLS on `--listen`) only with
+    // LAMP_CONTROL=on, the owner's developer setting. Without it, a lamp
+    // with a skill's tasks on (`LAMP_SKILL_TASKS=on`) still serves the
+    // owner's side (`--admin-socket`: the voice's yes records, lamp-tasks'
+    // mints) and the run socket, and nothing listens on the network.
+    let door_on = std::env::var(ENVIRONMENT).ok().as_deref() == Some("on");
+    if !door_on && !lamp_control::task_yes::on() {
         eprintln!("lamp-control: off ({ENVIRONMENT} is not on): nothing listens");
         return Ok(());
+    }
+    if !door_on {
+        eprintln!(
+            "lamp-control: the door is off ({ENVIRONMENT} is not on): only the owner's side and skill runs, nothing on the network"
+        );
     }
     let state =
         PathBuf::from(option(arguments, "--state-dir").unwrap_or_else(|| STATE_DIR.to_owned()));
@@ -153,7 +164,8 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let clients =
         Clients::load(&clients_path).map_err(|e| format!("{}: {e}", clients_path.display()))?;
     eprintln!(
-        "lamp-control: on, {listen}, {} paired, certificate pin {}",
+        "lamp-control: on, {}, {} paired, certificate pin {}",
+        if door_on { listen.as_str() } else { "no door" },
         clients.clients.len(),
         identity.pin
     );
@@ -544,9 +556,15 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         .build()
         .map_err(|e| e.to_string())?;
     runtime.block_on(async move {
-        let listener = tokio::net::TcpListener::bind(&listen)
-            .await
-            .map_err(|e| format!("{listen}: {e}"))?;
+        let listener = if door_on {
+            Some(
+                tokio::net::TcpListener::bind(&listen)
+                    .await
+                    .map_err(|e| format!("{listen}: {e}"))?,
+            )
+        } else {
+            None
+        };
         let _ = std::fs::remove_file(&admin);
         // The owner's side: its folder 0700 before the socket is bound, so
         // nobody else can reach it even before its own 0600 (the
@@ -615,9 +633,15 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                 looked,
             ));
         }
-        tokio::select! {
-            () = server::serve(listener, tls, shared) => {}
-            _ = tokio::signal::ctrl_c() => {}
+        match listener {
+            Some(listener) => tokio::select! {
+                () = server::serve(listener, tls, shared) => {}
+                _ = tokio::signal::ctrl_c() => {}
+            },
+            None => {
+                server::keep_ticking(shared);
+                let _ = tokio::signal::ctrl_c().await;
+            }
         }
         Ok::<(), String>(())
     })
