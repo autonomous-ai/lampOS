@@ -473,16 +473,18 @@ pub struct Asked {
     pub said: bool,
 }
 
+/// The most asks kept in [`ASKS_FILE`]: the ledger stays well under its
+/// read cap however often triggers fire ([`prune_asks`]).
+pub const ASKS_KEPT: usize = 64;
+
 /// Why `skill`'s task, its folder hashed `sha256`, is not asked aloud at
-/// `now_ms` by the asks in `asks`, or none: an ask after now (a clock set
-/// back), that very folder said within [`ASK_AGAIN_MS`] or tried within
-/// [`ASK_RETRY_MS`], or [`ASKS_ALL`] said across every skill in 24 hours.
-/// A folder changed since is another SHA-256, so it asks again.
+/// `now_ms` by the asks in `asks`, or none: that very folder said within
+/// [`ASK_AGAIN_MS`] or tried within [`ASK_RETRY_MS`], or [`ASKS_ALL`] said
+/// across every skill in 24 hours. An ask after now (a clock set back)
+/// counts as made now, so it never blocks every ask until that time. A
+/// folder changed since is another SHA-256, so it asks again.
 pub fn ask_refuses(asks: &[Asked], skill: &str, sha256: &str, now_ms: u64) -> Option<String> {
-    if asks.iter().any(|asked| asked.at > now_ms) {
-        return Some("its asks' ledger has one after now".into());
-    }
-    let since = |asked: &Asked| now_ms - asked.at;
+    let since = |asked: &Asked| now_ms.saturating_sub(asked.at);
     let this = |asked: &&Asked| asked.skill == skill && asked.sha256 == sha256;
     if asks
         .iter()
@@ -521,6 +523,29 @@ fn read_asks(state: &Path) -> Result<Vec<Asked>, String> {
     }
 }
 
+/// `asks` at `now_ms` as the ledger keeps them: an ask after now (a clock
+/// set back) dated now, none older than a day, only the latest try not
+/// said of each skill (a trigger that fires often keeps one, not one every
+/// [`ASK_RETRY_MS`]), and at most [`ASKS_KEPT`], the oldest tries dropped
+/// first. The asks said are at most [`ASKS_ALL`] a day, so all are kept.
+pub fn prune_asks(asks: &mut Vec<Asked>, now_ms: u64) {
+    for asked in asks.iter_mut() {
+        asked.at = asked.at.min(now_ms);
+    }
+    asks.retain(|asked| now_ms - asked.at < DAY_MS);
+    asks.sort_by_key(|asked| asked.at);
+    let mut tried = BTreeSet::new();
+    for at in (0..asks.len()).rev() {
+        if !asks[at].said && !tried.insert(asks[at].skill.clone()) {
+            asks.remove(at);
+        }
+    }
+    while asks.len() > ASKS_KEPT {
+        let oldest = asks.iter().position(|asked| !asked.said).unwrap_or(0);
+        asks.remove(oldest);
+    }
+}
+
 fn write_asks(state: &Path, asks: &[Asked]) -> Result<(), String> {
     let json = serde_json::to_vec(asks).map_err(|error| error.to_string())?;
     lamp_update::records::write_whole(&state.join(ASKS_FILE), &json, 0o644)
@@ -553,10 +578,10 @@ pub fn ask_yes(
         {
             let _ledger = ledger();
             let mut asks = read_asks(state).map_err(|why| format!("not asked aloud: {why}"))?;
+            prune_asks(&mut asks, now_ms);
             if let Some(why) = ask_refuses(&asks, skill, sha256, now_ms) {
                 return Err(format!("not asked aloud: {why}"));
             }
-            asks.retain(|asked| now_ms - asked.at < DAY_MS);
             asks.push(Asked {
                 skill: skill.to_owned(),
                 sha256: sha256.to_owned(),
@@ -577,6 +602,7 @@ pub fn ask_yes(
             {
                 asked.said = false;
             }
+            prune_asks(&mut asks, now_ms);
             write_asks(state, &asks).map_err(|why| format!("asked aloud, {outcome}; {why}"))?;
         }
         Ok(format!("asked aloud: {outcome}"))
@@ -1509,7 +1535,8 @@ mod tests {
     /// [`ASKS_ALL`] said across every skill in 24 hours; an ask the voice
     /// did not say (not said whole there, the lamp's quiet hours) is kept
     /// for a later trigger, tried again after [`ASK_RETRY_MS`]; a ledger
-    /// that can't be read, or has an ask after now, asks nothing.
+    /// that can't be read asks nothing, and one with an ask after now
+    /// counts it as made now.
     #[test]
     fn asks_aloud_are_capped_and_one_not_said_is_kept_for_later() {
         let dir = tempfile::tempdir().unwrap();
@@ -1540,11 +1567,49 @@ mod tests {
         }
         let capped = ask_yes("another", &sha(9), state, at + 50, || panic!("asked"));
         assert!(capped.contains("3 asks in 24 hours"), "{capped}");
-        // Set back, or unreadable: nothing asked.
+        // Set back: the asks after now count as made now, so the cap holds
+        // and nothing is blocked past it. Unreadable: nothing asked.
         let back = ask_yes("another", &sha(9), state, 10, || panic!("asked"));
-        assert!(back.contains("after now"), "{back}");
+        assert!(back.contains("3 asks in 24 hours"), "{back}");
         fs::write(state.join(ASKS_FILE), "not json").unwrap();
         let unread = ask_yes("another", &sha(9), state, at + 60, || panic!("asked"));
         assert!(unread.contains("can't be read"), "{unread}");
+    }
+
+    /// Tries not said, every [`ASK_RETRY_MS`] across many skills, never
+    /// fill the ledger: each skill keeps its latest try, the
+    /// ledger stays within [`ASKS_KEPT`] and its read cap, and asks are
+    /// still made.
+    #[test]
+    fn tries_not_said_never_fill_the_ledger_nor_block_asks() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path();
+        let sha = |n: usize| format!("{n:064x}");
+        let refused = || "say: refused (the lamp's quiet hours: kept for later)".to_owned();
+        let mut now = 1_000;
+        // Two hours of tries: unpruned, over 1,000 asks, past the read cap.
+        for _ in 0..12 {
+            for n in 0..(ASKS_KEPT + 20) {
+                let tried = ask_yes(&format!("skill-{n:03}"), &sha(n), state, now, refused);
+                assert!(tried.contains("refused"), "{tried}");
+            }
+            now += ASK_RETRY_MS;
+        }
+        let asks = read_asks(state).unwrap();
+        assert!(asks.len() <= ASKS_KEPT, "{}", asks.len());
+        let names: BTreeSet<&str> = asks.iter().map(|asked| asked.skill.as_str()).collect();
+        assert_eq!(names.len(), asks.len(), "one try a skill");
+        assert!(fs::metadata(state.join(ASKS_FILE)).unwrap().len() < 64 * 1024);
+        let mut asked = false;
+        let said = ask_yes("skill-000", &sha(0), state, now, || {
+            asked = true;
+            SPOKEN.to_owned()
+        });
+        assert!(asked, "{said}");
+        // Every try dated after now (the clock set back) is dated now: it
+        // blocks only its own skill's retry, never every ask.
+        let back = now - 6 * ASK_RETRY_MS;
+        let other = ask_yes("fresh", &sha(999), state, back, || SPOKEN.to_owned());
+        assert_eq!(other, format!("asked aloud: {SPOKEN}"));
     }
 }

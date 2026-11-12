@@ -1547,7 +1547,15 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   route's worker in `/run/lampos-voice/task-asked.json` (the voice's own
   runtime folder, 0600, two minutes at most), and only that very note
   starts the wait (`skill_task_yes::asked_in`), so a skill's own note
-  copying its words waits for nothing. The wait is the read-back's, with
+  copying its words waits for nothing and leaves the kept note for its own
+  turn (`skill_task_yes::take_kept`). One task ask on the lamp at a time
+  (App Only's P2 on #6581): while another skill's note is kept for its turn,
+  or any yes is awaited (a task's, a make's writes, an app's code), a new
+  ask is refused and nothing is said ("another skill's ask waits for its
+  turn: kept for later", "another yes is awaited: kept for later",
+  `skill_task_yes::keep_one`), so it is not counted as said and is tried
+  again at a later trigger; each ask said gets its own wait. The wait is
+  the read-back's, with
   every guard: said whole and uncut first, a later heard line, the echo
   held, `YES_WITHIN`, its `approve_id` noted on each later heard line, and
   the owner's yes only (`make_skill_local::not_owners_yes_refused`).
@@ -1561,7 +1569,12 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   not say (refused, dropped, expired, the voice not reached) is tried again
   no sooner than 10 minutes later, at a later trigger; a changed script is
   another SHA-256 and asks again; one ask at a time a skill; a ledger that
-  can't be read or has an ask after now asks nothing. The journal says what
+  can't be read asks nothing. The ledger is pruned as it is read, before
+  any check (`task::prune_asks`): an ask dated after now (the clock set
+  back) counts as made now, none older than a day is kept, each skill keeps
+  only its latest try not said, and at most 64 asks are kept
+  (`task::ASKS_KEPT`), so triggers that fire often never fill it. The
+  journal says what
   became of it ("asked aloud: say: spoken", "not asked aloud: asked aloud
   already today"), never the task's words.
 - **At each run.** The skill's other steps (light, cue, say) run at once.

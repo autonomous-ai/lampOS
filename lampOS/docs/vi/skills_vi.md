@@ -2222,16 +2222,29 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   của một say của kỹ năng, như lượt riêng của đèn mà không ai nói. Ghi chú
   được giữ cho worker của route thứ hai trong
   `/run/lampos-voice/task-asked.json` (0600, tối đa hai phút), và chỉ đúng
-  ghi chú đó mới bắt đầu việc chờ (`skill_task_yes::asked_in`). Việc chờ là
+  ghi chú đó mới bắt đầu việc chờ (`skill_task_yes::asked_in`); một ghi chú
+  khác chép lời mở đầu không chờ gì và để nguyên ghi chú đã giữ cho lượt
+  của nó (`skill_task_yes::take_kept`). Mỗi lúc chỉ một lần hỏi tác vụ trên
+  đèn (P2 của App Only trên #6581): khi ghi chú của kỹ năng khác còn được
+  giữ chờ lượt, hoặc đang chờ bất kỳ cái "có" nào (của tác vụ, của write khi
+  tạo kỹ năng, của code ứng dụng), lần hỏi mới bị từ chối và không nói gì
+  (`skill_task_yes::keep_one`), nên không bị tính là đã nói và được thử lại
+  ở lần kích hoạt sau; mỗi lần hỏi đã nói đều có việc chờ riêng. Việc chờ là
   của read-back, đủ mọi cổng: nói trọn trước, một câu nghe được sau đó, giữ
   tiếng vọng, `YES_WITHIN`, `approve_id` được ghi chú ở các câu nghe sau, và
-  chỉ cái "có" của chủ đèn. Route Live không bao giờ bắt đầu nó. Khi có
+  chỉ cái "có" của chủ đèn. Mỗi lúc chỉ một việc chờ, như mọi read-back: việc
+  chờ mới hơn thay thế nó. Route Live không bao giờ bắt đầu nó. Khi có
   "có", lamp-control ghi đúng SHA-256 thư mục và các grant đó, và tác vụ
   chạy ở lần kích hoạt kế tiếp. Giới hạn (`task-asks.json` trong
   `--state-dir` của lamp-skills): một SHA-256 đã nói thì không hỏi lại
   trước một ngày; tối đa 3 lần hỏi đã nói cho mọi kỹ năng trong 24 giờ; lần
   không nói được thì thử lại sau ít nhất 10 phút, ở lần kích hoạt sau;
-  script đổi là SHA-256 khác nên hỏi lại.
+  script đổi là SHA-256 khác nên hỏi lại; mỗi lúc một lần hỏi cho mỗi kỹ
+  năng; sổ ghi không đọc được thì không hỏi gì. Sổ được tỉa ngay khi đọc,
+  trước mọi kiểm tra (`task::prune_asks`): lần hỏi ghi ngày sau hiện tại
+  (đồng hồ bị lùi) được tính là lúc này, không giữ lần nào cũ hơn một ngày,
+  mỗi kỹ năng chỉ giữ lần thử chưa nói gần nhất, và giữ tối đa 64 lần hỏi
+  (`task::ASKS_KEPT`), nên trigger chạy thường xuyên không bao giờ làm đầy sổ.
 - **Giao cho lamp-tasks** (#6306 xây): một dòng `{"op": "skill_task", ...}`
   trên `--tasks-socket` (hoặc `LAMP_SKILLS_TASKS_SOCKET`; unit lamp-skills
   của sản phẩm truyền `/run/lampos-tasks/skill-task.sock`). `folder` là thư
