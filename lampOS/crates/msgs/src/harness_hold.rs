@@ -10,7 +10,7 @@
 //! ([`CANARY_FEED`]: a dev or beta lamp, which takes each lamp-voice
 //! publish) is the canary: there the hold is lifted, so Harness's own
 //! updater runs. Every other lamp keeps it exactly as before: one on the
-//! stable feed (`lampos-stable`, every product lamp), a local `file:///`
+//! stable feed (its CDN mirror or `lampos-stable`, every product lamp), a local `file:///`
 //! feed, any other feed, and a lamp whose feed can't be read.
 //!
 //! The feed is the `--channel-url` of lamp-update's own `ExecStart`, which
@@ -23,10 +23,10 @@
 pub const CANARY_FEED: &str =
     "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/";
 
-/// The stable feed, which every product lamp follows. Named for the docs
-/// and tests: any feed but [`CANARY_FEED`] keeps the hold.
-pub const STABLE_FEED: &str =
-    "https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/";
+/// The stable feed's CDN mirror, which the product unit follows (#6256 F2);
+/// a lamp installed before it keeps the GitHub stable feed it was given.
+/// Named for the docs and tests: any feed but [`CANARY_FEED`] keeps the hold.
+pub const STABLE_FEED: &str = "https://cdn.autonomous.ai/lampos/stable/";
 
 /// What a writer of the hold does.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -97,6 +97,7 @@ mod tests {
         assert_eq!(harness_hold(Some("on"), Some(product)), HarnessHold::Held);
         for kept in [
             STABLE_FEED,
+            "https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/",
             "file:///var/tmp/lampos-channel/",
             "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice-11308/",
             "https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice",

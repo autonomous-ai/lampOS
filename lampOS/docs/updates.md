@@ -232,7 +232,14 @@ immutable `lampos-lamp-voice-<sequence>` release. Stable is a selection feed,
 not a new signature or sequence namespace. A lamp pointed at it still uses
 `--channel lamp-voice`. The product unit (`deploy/product/lamp-update.service`)
 and the V2 image's default (`scripts/imager/build-orangepi-v2.sh`) follow it
-from the first customer lamps on (26 Oct): a lamp in a home gets a build only
+from the first customer lamps on (26 Oct), and since #6256 (F2) through its
+CDN mirror, `--channel-url https://cdn.autonomous.ai/lampos/stable/` ("The
+stable build on the CDN"), so a lamp in China, which can't reach GitHub,
+updates too. There is no GitHub fallback: the updater reads one feed. No
+round switches its own unit, so a lamp installed before keeps the GitHub
+stable feed. `lamp-update install` still fetches the models it lacks from
+the URLs `deploy/product/models.json` compiles in (GitHub); a round takes
+them from the manifest, which the mirror points at the CDN. A lamp in a home gets a build only
 once it is promoted here, never each lamp-voice publish, and a lamp the image
 makes starts on the promoted build. Until a first promotion the feed is absent
 and such a lamp keeps the build it has. This tool does not install anything on

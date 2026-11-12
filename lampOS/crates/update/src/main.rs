@@ -1314,15 +1314,18 @@ mod own_unit_line_tests {
             .lines()
             .find_map(|line| line.strip_prefix("ExecStart="))
             .unwrap();
-        for line in [LINE_7071, product] {
+        for (line, feed) in [
+            (
+                LINE_7071,
+                "https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/",
+            ),
+            // The product unit follows the stable feed's CDN mirror (#6256 F2).
+            (product, "https://cdn.autonomous.ai/lampos/stable/"),
+        ] {
             let (command, config) =
                 read(line, root.path()).unwrap_or_else(|why| panic!("{line}: {why}"));
             assert_eq!(command, "serve", "{line}");
-            assert_eq!(
-                config.channel_url,
-                "https://github.com/autonomous-ai/lampOS/releases/download/lampos-stable/",
-                "{line}"
-            );
+            assert_eq!(config.channel_url, feed, "{line}");
             assert_eq!(config.channel, "lamp-voice", "{line}");
             assert_eq!(config.key, [7_u8; 32], "{line}");
             assert_eq!(config.lamp, "lamp-7071", "{line}");

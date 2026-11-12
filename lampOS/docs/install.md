@@ -1439,8 +1439,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        the hold's two lines out of the launcher instead of putting them in
        (`Harness's launcher unpinned: this lamp follows the lamp-voice
        feed, …`), and lamp-tasks writes no hold (tasks.md, "Dev and beta
-       lamps: the hold lifted"). A stable lamp (`lampos-stable`, every
-       product lamp), any other feed, and a lamp whose feed `systemctl show
+       lamps: the hold lifted"). A stable lamp (`lampos-stable` or its CDN
+       mirror, every product lamp), any other feed, and a lamp whose feed `systemctl show
        lamp-update.service --property=ExecStart` can't give keep the hold
        exactly as above. The pin itself is unchanged: a canary lamp still
        installs the build's pin, and a move to a newer pin moves only a
