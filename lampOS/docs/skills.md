@@ -56,6 +56,20 @@ eyes' `LAMP_PRESENCE=on`, [presence.md](presence.md)), `name/heard`,
 `body/joint_states`, `body/hand`, `light/state`, `policy/decisions`,
 `lamp/pause`, `mood/state`.
 
+Declared for #6543 (cloud perception), with no publisher yet:
+`humans/doing` (seconds since a drink, eating or a stretch was seen this
+sitting, the last seen and how sure), `humans/doing_seen` (each newly seen,
+an event) and `humans/posture` (the window's length, its share of bad
+samples and the region most often bad) ([msgs.md](msgs.md)). `lamp-seen`
+publishes them, coming with #6543 phases 2 and 3. A skill that names one in
+`[permissions] topics` shows the `seen` use, private ([cloud.md](cloud.md)).
+`humans/doing`'s three timers are always said, counted from the desk
+arrival when nothing was seen, so `[[while]] topic = "humans/doing" field =
+"drank_s_ago" above = 5399 unknown = "holds"` holds for someone the lamp has
+not seen drink, as the clock alone would; `humans/posture` always says
+`window_s` (0 at its start). A topic whose last value has run out still
+holds no `[[while]]`: `unknown = "holds"` covers only a topic never said.
+
 Services: the actions part (light and volume, and the schedule tools;
 `/run/lampos-actions/call.sock`), Schedule, Tasks (work handed to Claude
 Code or Codex), Memory, the eyes (`permit.sock` for the camera, `who.sock`

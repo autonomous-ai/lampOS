@@ -304,7 +304,7 @@ pub struct Use {
 }
 
 /// What a skill may use, by machine name, in the order the page shows it.
-pub const USES: [Use; 21] = [
+pub const USES: [Use; 22] = [
     use_of("speak", "speaks, or plays a short sound", false),
     use_of("light", "changes the light", false),
     use_of("body", "moves the lamp", false),
@@ -352,6 +352,13 @@ pub const USES: [Use; 21] = [
         "notices whether someone is at the desk, with the camera",
         true,
     ),
+    // What the person at the desk was seen doing and how they sat, from
+    // pictures sent to be labelled (#6543): the camera's, so private.
+    use_of(
+        "seen",
+        "knows when you were last seen drinking, eating or stretching, and how you sat, from pictures sent to be labelled",
+        true,
+    ),
     use_of("hearing", "hears what is said to it", true),
     use_of("room_sound", "hears how loud the room is", true),
     use_of("touch", "feels a touch on the lamp", false),
@@ -384,6 +391,7 @@ fn topic_use(topic: &str) -> &'static str {
     match topic {
         "humans/faces/tracked" => "faces",
         "room/presence" | "room/activity" => "presence",
+        "humans/doing" | "humans/doing_seen" | "humans/posture" => "seen",
         "voice/heard" | "name/heard" => "hearing",
         "ears/level" | "ears/sudden" => "room_sound",
         // A pet on the head (#3997) is a touch, as the head's others are.
@@ -1517,6 +1525,21 @@ pub mod tests {
             ]
         );
         assert!(may_use(&Permissions::default()).is_empty());
+        // The cloud-perception topics (#6543) are the camera's, so private,
+        // never the lamp's own state.
+        for topic in ["humans/doing", "humans/doing_seen", "humans/posture"] {
+            let seen = may_use(&Permissions {
+                topics: vec![topic.into()],
+                ..Permissions::default()
+            });
+            assert_eq!(
+                seen.iter()
+                    .map(|used| (used.name, used.privacy))
+                    .collect::<Vec<_>>(),
+                [("seen", Some(PRIVACY))],
+                "{topic}"
+            );
+        }
         // An add-on: each act it may propose, in the page's order, and its
         // say grant the same row as proposing `say`.
         let addon = Permissions {
