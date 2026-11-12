@@ -1759,7 +1759,7 @@ mod tests {
         };
         assert!(yes_in(false, Some(0.6))());
         assert_eq!(
-            crate::make_skill_local::app_code_yes_refused(&id, yes_in(false, None)),
+            crate::make_skill_local::not_owners_yes_refused(&id, yes_in(false, None)),
             Some(json!({ "error": crate::services::OTHER_VOICE }))
         );
         assert!(!yes::awaited(now));
@@ -1774,7 +1774,7 @@ mod tests {
         let id = turn.rsplit('"').nth(1).unwrap().to_owned();
         yes::lamp_said(8, line);
         assert_eq!(
-            crate::make_skill_local::app_code_yes_refused(&id, yes_in(true, None)),
+            crate::make_skill_local::not_owners_yes_refused(&id, yes_in(true, None)),
             None
         );
         let asked = manage_helper(&keeping.manage);
