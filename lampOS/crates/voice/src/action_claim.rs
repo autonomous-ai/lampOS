@@ -125,6 +125,33 @@
 //! [`NOT_DONE_LINE`]. Only the first sentence that says more than a lead
 //! ("Okay.") is judged: a forget said done in a later one is a known gap.
 
+//!
+//! **Unplug acts said** (`LAMP_ACTION_CLAIM_UNPLUG`, beside [`ENVIRONMENT`],
+//! #6457): on lamp-52e6 at 12200 (row-5747n, 12 Nov) the unplug ask's
+//! answers were said in the model's own words with nothing behind them.
+//! Case B: "No." got a `use_skill` that ran no stay, and "Staying on, then
+//! — standing back up." was said while the arm stayed folded. Case D:
+//! "Yes." got `calls=none`, and "Still preparing — give it a moment, it
+//! isn't confirmed safe to unplug yet." was said while the lamp was folded
+//! and ready. With this switch a reply that opens (bare or after a lead-in)
+//! with one of [`UNPLUG_SAID`]'s runs is a claim ([`Claim::Unplug`]), judged
+//! by outcome only, as a forget is, never by a call's name:
+//! - the lamp staying on or standing back up ([`Unplug::Stay`]) stands only
+//!   when a `stay_plugged_in` ran in the turn, called itself or through
+//!   `use_skill`, and its answer was no error ([`stayed_by`]). Otherwise it
+//!   is held, asked again once with [`NOTE`], and said as [`NOT_DONE_LINE`]
+//!   a second time, beside any call (a `use_skill` that ran no stay backs
+//!   nothing). The skill's own "Okay, I'll stay." is no claim;
+//! - the lamp not ready or not safe to unplug yet ([`Unplug::NotReady`])
+//!   stands unless the fold is proven: the lamp's last line before the
+//!   person's is the skill's ask to turn off or its ready line
+//!   ([`fold_said`]). Then it is not said, and the skill's line for that
+//!   state is said in its place: after the ask, its update line (the
+//!   turn-off held by an update, case D), after the ready line, that line
+//!   again. Never asked again. A real "not ready" (no fold said) stands.
+//!
+//! English only. Only the reply's opening is read, as the other runs.
+
 /// Where the second worker reads the switch. `on` only.
 pub const ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_CHECKED";
 
@@ -140,6 +167,15 @@ pub const WORDED_ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_WORDED";
 /// Whether the worded claims' switch is on in this process's environment.
 pub fn worded_on() -> bool {
     std::env::var(WORDED_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// Where the second worker reads the unplug claims' switch (#6457). `on`
+/// only, and it does nothing without [`ENVIRONMENT`].
+pub const UNPLUG_ENVIRONMENT: &str = "LAMP_ACTION_CLAIM_UNPLUG";
+
+/// Whether the unplug claims' switch is on in this process's environment.
+pub fn unplug_on() -> bool {
+    std::env::var(UNPLUG_ENVIRONMENT).ok().as_deref() == Some("on")
 }
 
 /// The executive's own lines after a light or volume call
@@ -241,6 +277,22 @@ pub enum Claim {
     /// `snooze_reminder` makes it (the Reviewer-lead's P3 on #6467); a set
     /// never does.
     OffOrDown,
+    /// An unplug act said in the model's own words ([`UNPLUG_SAID`],
+    /// #6457): judged by the turn's fold and stay records ([`Unplugged`]),
+    /// never a call by its name.
+    Unplug(Unplug),
+}
+
+/// What an unplug claim says ([`Claim::Unplug`]).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Unplug {
+    /// The lamp staying on or standing back up ("Staying on, then —
+    /// standing back up."): only a `stay_plugged_in` that ran backs it.
+    Stay,
+    /// The lamp not ready, or not safe to unplug yet ("Still preparing —
+    /// …", "It isn't confirmed safe to unplug yet."): it stands unless the
+    /// fold is proven.
+    NotReady,
 }
 
 impl Claim {
@@ -269,6 +321,9 @@ impl Claim {
                 Self::LightOrVolume.made_by(name)
                     || matches!(name, "cancel_reminder" | "snooze_reminder")
             }
+            // Only by outcome ([`stands_with`]): a `use_skill` that ran no
+            // stay backs nothing (row-5747n case B).
+            Self::Unplug(_) => false,
         }
     }
 
@@ -284,6 +339,8 @@ impl Claim {
             Self::Snoozed => "a reminder snoozed",
             Self::Made => "a skill made",
             Self::OffOrDown => "turning something off or down",
+            Self::Unplug(Unplug::Stay) => "staying plugged in",
+            Self::Unplug(Unplug::NotReady) => "the unplug not being ready",
         }
     }
 
@@ -299,6 +356,8 @@ impl Claim {
             Self::Snoozed => "snooze",
             Self::Made => "made",
             Self::OffOrDown => "off or down",
+            Self::Unplug(Unplug::Stay) => "unplug stay",
+            Self::Unplug(Unplug::NotReady) => "unplug not ready",
         }
     }
 }
@@ -627,6 +686,163 @@ pub fn is_forget(name: &str) -> bool {
             | crate::rules::FORGET_RULE
     )
 }
+
+/// [`claim_on`], and with `unplug` ([`UNPLUG_ENVIRONMENT`]) an unplug act
+/// said ([`UNPLUG_SAID`], [`Claim::Unplug`]) too. Without `unplug` this is
+/// [`claim_on`] exactly.
+pub fn claim_in(
+    reply: &str,
+    ended: bool,
+    worded: bool,
+    forget: bool,
+    unplug: bool,
+) -> Option<Option<Claim>> {
+    let found = claim_on(reply, ended, worded, forget);
+    if !unplug || matches!(found, Some(Some(_))) {
+        return found;
+    }
+    let mut text = normalised(reply);
+    if ended {
+        text.truncate(text.trim_end().len());
+    }
+    match (found, runs_claim(&UNPLUG_SAID, &text, ended, true, true)) {
+        (_, Some(Some(kind))) => Some(Some(kind)),
+        (Some(None), Some(None)) => Some(None),
+        _ => None,
+    }
+}
+
+/// The records an unplug claim is judged by ([`stands_with`]), as a
+/// forget's by [`forgot_in`].
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Unplugged {
+    /// A `stay_plugged_in` ran in the turn ([`stayed_by`]).
+    pub stayed: bool,
+    /// The fold is proven ([`fold_said`]): the skill's line said in place
+    /// of a "not ready" claim, in English. `None`: no fold said.
+    pub instead: Option<&'static str>,
+}
+
+/// [`stands_on`], and an unplug claim ([`Claim::Unplug`]) by `unplugged`
+/// alone: staying on only when a stay ran, "not ready" only with no fold
+/// proven.
+pub fn stands_with<'a>(
+    kind: Claim,
+    reply: &str,
+    read: bool,
+    calls: impl IntoIterator<Item = (&'a str, &'a serde_json::Value)>,
+    forgot: bool,
+    unplugged: Unplugged,
+) -> bool {
+    match kind {
+        Claim::Unplug(Unplug::Stay) => unplugged.stayed,
+        Claim::Unplug(Unplug::NotReady) => unplugged.instead.is_none(),
+        _ => stands_on(kind, reply, read, calls, forgot),
+    }
+}
+
+/// prepare-unplug's "never mind" tool (`lamp_skills::unplug::STAY_TOOL`;
+/// lamp-skills links the voice, never the other way).
+pub const STAY_TOOL: &str = "stay_plugged_in";
+
+/// Whether a call of `name` with `args`, answered `told`, ran the
+/// unplug's stay: `stay_plugged_in` called itself, or `use_skill` naming
+/// it, with an answer that is no error (lamp-skills sends every refusal,
+/// one with no unplug under way included, as `error`). A `use_skill` for
+/// another skill, or one refused, ran none (row-5747n case B).
+pub fn stayed_by(name: &str, args: &serde_json::Value, told: &serde_json::Value) -> bool {
+    let named = name == STAY_TOOL || (name == crate::use_skill::NAME && args["skill"] == STAY_TOOL);
+    named && !told.is_null() && told.get("error").is_none()
+}
+
+/// The skill's line said in place of a "not ready" claim when
+/// `last_lamp`, the lamp's last words before the person's line, end with
+/// a line said only at a proven fold: after its ask to turn off
+/// (`language::UNPLUG_ASK_OFF`), the update line
+/// (`language::UNPLUG_UPDATING`: a yes the turn-off didn't take while an
+/// update held it, row-5747n case D); after its ready line
+/// (`language::UNPLUG_READY`), that line. `fixed` gives a line in the
+/// owner's language, as the thread keeps it. `None`: no fold said.
+pub fn fold_said(
+    last_lamp: &str,
+    fixed: impl Fn(&'static str) -> &'static str,
+) -> Option<&'static str> {
+    let said = normalised(last_lamp);
+    let said = said.trim_end();
+    [
+        (
+            crate::language::UNPLUG_ASK_OFF,
+            crate::language::UNPLUG_UPDATING,
+        ),
+        (crate::language::UNPLUG_READY, crate::language::UNPLUG_READY),
+    ]
+    .into_iter()
+    .find(|(line, _)| {
+        [*line, fixed(line)]
+            .iter()
+            .any(|line| said.ends_with(normalised(line).trim_end()))
+    })
+    .map(|(_, instead)| instead)
+}
+
+/// The unplug's acts said in the model's own words (#6457), read as
+/// [`WORDED`]'s runs are, bare or after one of [`LEAD_INS`]: staying on or
+/// standing back up ([`Unplug::Stay`]: "Staying on, then — standing back
+/// up.", "I'll stay plugged in."), and not ready or not safe to unplug yet
+/// ([`Unplug::NotReady`]: "Still preparing — give it a moment …", the
+/// skill's own "I am still preparing. Please wait; it is not confirmed
+/// safe to unplug.", "It isn't safe to unplug me yet."). The skill's "Okay,
+/// I'll stay." is none, nor is a sentence that ends in a '?'.
+const UNPLUG_SAID: [(&str, Claim); 18] = [
+    ("staying on|up|put|plugged $", Claim::Unplug(Unplug::Stay)),
+    ("staying plugged in $", Claim::Unplug(Unplug::Stay)),
+    (
+        "i'm|i'll staying|stay on|up|put|plugged $",
+        Claim::Unplug(Unplug::Stay),
+    ),
+    (
+        "i'm|i'll staying|stay plugged in $",
+        Claim::Unplug(Unplug::Stay),
+    ),
+    ("i will stay on|plugged $", Claim::Unplug(Unplug::Stay)),
+    ("i will stay plugged in $", Claim::Unplug(Unplug::Stay)),
+    ("standing|getting back up $", Claim::Unplug(Unplug::Stay)),
+    (
+        "i'm|i'll standing|getting|stand|get back up $",
+        Claim::Unplug(Unplug::Stay),
+    ),
+    ("still preparing|folding $", Claim::Unplug(Unplug::NotReady)),
+    (
+        "i'm still preparing|folding $",
+        Claim::Unplug(Unplug::NotReady),
+    ),
+    (
+        "i am still preparing|folding $",
+        Claim::Unplug(Unplug::NotReady),
+    ),
+    ("it isn't safe to unplug", Claim::Unplug(Unplug::NotReady)),
+    (
+        "it isn't confirmed|yet safe to unplug",
+        Claim::Unplug(Unplug::NotReady),
+    ),
+    (
+        "it's|that's not safe to unplug",
+        Claim::Unplug(Unplug::NotReady),
+    ),
+    (
+        "it's|that's not confirmed|yet safe to unplug",
+        Claim::Unplug(Unplug::NotReady),
+    ),
+    ("it is not safe to unplug", Claim::Unplug(Unplug::NotReady)),
+    (
+        "it is not confirmed|yet safe to unplug",
+        Claim::Unplug(Unplug::NotReady),
+    ),
+    (
+        "not confirmed|yet safe to unplug",
+        Claim::Unplug(Unplug::NotReady),
+    ),
+];
 
 /// The words a forget said done opens with, anywhere in its clause: "I've
 /// forgotten …", "I forgot …". Lower case, straight apostrophes.
@@ -2318,6 +2534,178 @@ fn runs_claim(
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
+    /// #6457, row-5747n on lamp-52e6 at 12200: B's and D's replies, the
+    /// skill's own "still" line and their kin are unplug claims with the
+    /// switch, and none without it; the skill's "Okay, I'll stay.", a
+    /// question, a refusal and talk are none.
+    #[test]
+    fn an_unplug_act_said_is_a_claim_only_with_its_switch() {
+        let stay = Some(Some(Claim::Unplug(Unplug::Stay)));
+        let not_ready = Some(Some(Claim::Unplug(Unplug::NotReady)));
+        for (reply, kind) in [
+            ("Staying on, then \u{2014} standing back up.", stay),
+            ("Okay, staying on.", stay),
+            ("I'll stay plugged in.", stay),
+            ("I'm staying put.", stay),
+            ("Standing back up.", stay),
+            ("Got it, I'll get back up.", stay),
+            (
+                "Still preparing \u{2014} give it a moment, it isn't confirmed safe to unplug yet.",
+                not_ready,
+            ),
+            (
+                "I am still preparing. Please wait; it is not confirmed safe to unplug.",
+                not_ready,
+            ),
+            ("It isn't safe to unplug me yet.", not_ready),
+            ("It\u{2019}s not yet safe to unplug me.", not_ready),
+            ("Okay, still folding.", not_ready),
+        ] {
+            assert_eq!(claim_in(reply, true, true, false, true), kind, "{reply}");
+            assert_eq!(
+                claim_in(reply, true, true, false, false),
+                Some(None),
+                "{reply}"
+            );
+        }
+        for reply in [
+            crate::language::UNPLUG_STAY,
+            crate::language::UNPLUG_ASK_OFF,
+            crate::language::UNPLUG_FAILED,
+            crate::language::UNPLUG_NOT_OFF,
+            crate::language::UNPLUG_UPDATING,
+            crate::language::UNPLUG_TIMEOUT,
+            "Should I stay plugged in?",
+            "Staying on?",
+            "I can't turn myself off.",
+            "Staying on top of things is hard.",
+            "Still, it's a lovely day.",
+            "It's safe to unplug me now.",
+        ] {
+            assert_eq!(
+                claim_in(reply, true, true, false, true),
+                Some(None),
+                "{reply}"
+            );
+        }
+        // Decided as it streams: a reply that can't open with a run is said
+        // at once; one that may is held until it can be told.
+        assert_eq!(claim_in("The", false, false, false, true), Some(None));
+        assert_eq!(claim_in("Stay", false, true, false, true), None);
+        assert_eq!(claim_in("Staying on, then", false, true, false, true), None);
+        assert_eq!(
+            claim_in(
+                "Staying on, then \u{2014} standing back up.",
+                false,
+                true,
+                false,
+                true
+            ),
+            stay
+        );
+    }
+
+    /// #6457: an unplug claim stands by the turn's records alone. Staying
+    /// on needs a stay that ran (B's `use_skill` ran none); "not ready"
+    /// stands unless the fold is proven by the skill's own line.
+    #[test]
+    fn an_unplug_claim_stands_by_the_fold_and_stay_records() {
+        let none = serde_json::Value::Null;
+        let stay = Claim::Unplug(Unplug::Stay);
+        let not_ready = Claim::Unplug(Unplug::NotReady);
+        let reply = "Staying on, then \u{2014} standing back up.";
+        let calls = [("use_skill", &none)];
+        assert!(!stands_with(
+            stay,
+            reply,
+            false,
+            calls,
+            false,
+            Unplugged::default()
+        ));
+        let stayed = Unplugged {
+            stayed: true,
+            instead: None,
+        };
+        assert!(stands_with(stay, reply, false, [], false, stayed));
+        let folded = Unplugged {
+            stayed: false,
+            instead: Some(crate::language::UNPLUG_UPDATING),
+        };
+        assert!(stands_with(
+            not_ready,
+            "Still preparing.",
+            false,
+            [],
+            false,
+            Unplugged::default()
+        ));
+        assert!(!stands_with(
+            not_ready,
+            "Still preparing.",
+            false,
+            [("prepare_to_unplug", &none)],
+            false,
+            folded
+        ));
+        // Other kinds are judged as before.
+        assert!(stands_with(
+            Claim::LightOrVolume,
+            "Louder.",
+            false,
+            [("volume_up", &none)],
+            false,
+            folded
+        ));
+
+        let ok = serde_json::json!({"ok": true});
+        let refused = serde_json::json!({"error": "nothing to stay for"});
+        let skill = |name: &str| serde_json::json!({"skill": name});
+        assert!(stayed_by(STAY_TOOL, &none, &ok));
+        assert!(stayed_by("use_skill", &skill(STAY_TOOL), &ok));
+        assert!(!stayed_by("use_skill", &skill("prepare_to_unplug"), &ok));
+        assert!(!stayed_by("use_skill", &serde_json::json!({}), &ok));
+        assert!(!stayed_by("use_skill", &skill(STAY_TOOL), &refused));
+        assert!(!stayed_by(STAY_TOOL, &none, &refused));
+        assert!(!stayed_by("prepare_to_unplug", &none, &ok));
+
+        let english = |line: &'static str| line;
+        assert_eq!(
+            fold_said(crate::language::UNPLUG_ASK_OFF, english),
+            Some(crate::language::UNPLUG_UPDATING)
+        );
+        assert_eq!(
+            fold_said(
+                &format!("Okay. {} ", crate::language::UNPLUG_ASK_OFF),
+                english
+            ),
+            Some(crate::language::UNPLUG_UPDATING)
+        );
+        assert_eq!(
+            fold_said(crate::language::UNPLUG_READY, english),
+            Some(crate::language::UNPLUG_READY)
+        );
+        for last in [
+            "I'm preparing to fold \u{2014} please wait before you pull the plug.",
+            crate::language::UNPLUG_STAY,
+            crate::language::UNPLUG_FAILED,
+            "",
+        ] {
+            assert_eq!(fold_said(last, english), None, "{last}");
+        }
+        // Said in the owner's language, as the thread keeps it.
+        assert_eq!(
+            fold_said("Tay mình gập rồi. Tắt nhé?", |line| {
+                if line == crate::language::UNPLUG_ASK_OFF {
+                    "Tay mình gập rồi. Tắt nhé?"
+                } else {
+                    line
+                }
+            }),
+            Some(crate::language::UNPLUG_UPDATING)
+        );
+    }
 
     /// C-make (Fourteen, lamp-9adf, 11 Nov 21:28): `make_skill`'s own line
     /// said with no `make_skill` in the turn is a claim only a make backs.

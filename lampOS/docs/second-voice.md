@@ -3953,6 +3953,45 @@ after a take-over, but now for every turn:
   `a_reminders_time_beside_only_a_listing_after_a_set_ask_is_held`,
   `a_kept_lights_claim_is_held_beside_any_call` and
   `action_claim::tests::*`.
+- **With `LAMP_ACTION_CLAIM_UNPLUG=on` too, an unplug act said with nothing
+  behind it is held** (off; #6457, row-5747n on lamp-52e6 at 12200, 12
+  Nov: case B, "No." to the skill's ask got a `use_skill` that ran no stay
+  and "Staying on, then — standing back up." while the arm stayed folded;
+  case D, "Yes." got `calls=none` and "Still preparing — give it a moment,
+  it isn't confirmed safe to unplug yet." at a proven fold, and no update
+  line). `action_claim::claim_in` reads, beside the claims above, a short
+  run at the reply's start, bare or after a lead-in (`action_claim::UNPLUG_SAID`),
+  judged only by the turn's fold and stay records (`action_claim::stands_with`),
+  as a forget is by its outcome, never by a call's name. **Staying on or
+  standing back up** ("Staying on, then — standing back up.", "I'll stay
+  plugged in.", "I'm getting back up."; the skill's own "Okay, I'll stay."
+  is none) stands only when a `stay_plugged_in` ran in the turn, by its own
+  name or through `use_skill` naming it, with an answer that is no `error`
+  (`action_claim::stayed_by`). Otherwise it is held beside any call, a
+  `use_skill` for another skill or a refused one included: asked again
+  once with `action_claim::NOTE`, said not done the second time, its held
+  lines ending `(LAMP_ACTION_CLAIM_CHECKED, an unplug act:
+  LAMP_ACTION_CLAIM_UNPLUG)`. **Not ready or not safe to unplug yet**
+  ("Still preparing …", the skill's own "I am still preparing. …", "It
+  isn't safe to unplug me yet.") stands unless the lamp's last words before
+  the person's line, as the thread tells the turn, end with the skill's ask
+  to turn off or its ready line, which it says only at a proven fold
+  (`action_claim::fold_said`, in English or the owner's language). Then,
+  in a round with no call, it is not said, nothing is asked again, and the
+  skill's own line for that state is said instead: after the ask, its
+  update line (`language::UNPLUG_UPDATING`, a yes the turn-off didn't
+  take), after the ready line, that line again; the journal says `its
+  reply says the unplug isn't ready while the lamp's last line proved the
+  fold (N call(s) in the turn): not said, the skill's line said instead
+  (LAMP_ACTION_CLAIM_UNPLUG)`. A stay that ran, a "not ready" with no fold
+  said, answers that claim nothing and the switch off are byte for byte as
+  before; it does nothing without `LAMP_ACTION_CLAIM_CHECKED`. Known gaps:
+  English only, the reply's opening only, and "I'm preparing to fold." with
+  no call (12104's case D) is not judged. Tests:
+  `second_provider::tests::action_claim::staying_on_said_with_no_stay_run_is_held_and_asked_again`,
+  `a_real_refusal_stands`, `not_ready_said_at_a_proven_fold_is_the_skills_line`,
+  `a_real_not_ready_stands`, `unplug_claims_off_change_nothing` and
+  `action_claim::tests::an_unplug_*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?
   Kept — library now, not the bakery." in one breath). On by default, on

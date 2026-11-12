@@ -1629,6 +1629,8 @@ struct Shared {
     action_claims: bool,
     /// [`Engine::checking_worded_claims`] (#5215).
     worded_claims: bool,
+    /// [`Engine::checking_unplug_claims`] (#6457).
+    unplug_claims: bool,
     /// [`Engine::asking_again_for_no_words`] (#3704).
     no_words_again: bool,
     /// [`Engine::asking_again_for_answers`] (Queue #4710, item 3).
@@ -4453,6 +4455,7 @@ impl Engine {
                 keep_at_once: false,
                 action_claims: false,
                 worded_claims: false,
+                unplug_claims: false,
                 no_words_again: false,
                 answer_again: false,
                 cut_ask_answered: false,
@@ -5664,6 +5667,22 @@ impl Engine {
     pub fn checking_worded_claims(mut self, on: bool) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.worded_claims = on;
+        }
+        self
+    }
+
+    /// `LAMP_ACTION_CLAIM_UNPLUG=on` ([`crate::action_claim::claim_in`],
+    /// #6457), beside [`Engine::checking_action_claims`]: a reply that says
+    /// the lamp is staying on or standing back up, in a turn where no
+    /// `stay_plugged_in` ran, is held and judged as a claim with no call,
+    /// beside any call; one that says the unplug isn't ready or safe yet,
+    /// when the lamp's last line was the skill's ask to turn off or its
+    /// ready line, is not said, and the skill's line for that state is
+    /// said instead ([`crate::action_claim::fold_said`]). Nothing without
+    /// the claim check. Before any turn only.
+    pub fn checking_unplug_claims(mut self, on: bool) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.unplug_claims = on;
         }
         self
     }
@@ -14138,6 +14157,28 @@ async fn said_not_done(
         .await
 }
 
+/// A turn whose reply said the unplug wasn't ready or safe yet while the
+/// lamp's last line proved the fold (`LAMP_ACTION_CLAIM_UNPLUG`, #6457,
+/// [`crate::action_claim::fold_said`]): what an earlier round held is said,
+/// then the skill's own line for that state (`instead`), and the turn ends.
+/// The journal says why and how many calls the turn made, never the words.
+async fn said_instead_of_not_ready(
+    shared: &Shared,
+    queue: &mut Queue<'_>,
+    offer_hold: &mut crate::remember::OfferHold,
+    (request, round): (u64, usize),
+    instead: &'static str,
+    called: usize,
+) -> Result<(), Stop> {
+    eprintln!(
+        "lamp-voice second: request {request} chat round {round}: its reply says the unplug isn't ready while the lamp's last line proved the fold ({called} call(s) in the turn): not said, the skill's line said instead (LAMP_ACTION_CLAIM_UNPLUG)"
+    );
+    for sentence in offered(offer_hold, false, request, round) {
+        queue.push(sentence).await?;
+    }
+    queue.push(shared.fixed(instead).to_owned()).await
+}
+
 /// Chat, speech and the turn's last events, for the person's `said`, with
 /// the picture of a look (`looking`). The picture goes in this request only,
 /// never into the thread or a later turn's history.
@@ -14487,6 +14528,20 @@ async fn answer(
         // note's read still reached the chat).
         notes.retain(|note| crate::services::waiting_note_stands(note));
         let mut messages = cut_event(shared, told).messages();
+        // Whether the lamp's last words before this line prove the unplug's
+        // fold (`LAMP_ACTION_CLAIM_UNPLUG`, #6457): the skill's ask to turn
+        // off or its ready line, which it says only at a proven fold. Read
+        // once, from the thread as the turn is told.
+        let unplug_fold = if shared.unplug_claims {
+            messages
+                .iter()
+                .rev()
+                .find(|message| message.role == "assistant")
+                .and_then(|message| message.content.as_ref().and_then(Value::as_str))
+                .and_then(|last| crate::action_claim::fold_said(last, |line| shared.fixed(line)))
+        } else {
+            None
+        };
         // A chat begun on the early words stands for round 1 if it fits.
         let mut prepared = prepared_for.and_then(|(prepared, said)| {
             match prepared.misfit(&messages, &notes, &said) {
@@ -14516,6 +14571,9 @@ async fn answer(
         // carried line's): its round's "Kept." is no claim with no keep.
         let mut held_keep_ran = false;
         let mut call_statuses = Vec::new();
+        // Whether a `stay_plugged_in` ran in the turn, by its answer
+        // (`LAMP_ACTION_CLAIM_UNPLUG`, #6457).
+        let mut unplug_stayed = false;
         let mut forgot_before_question = false;
         if let Some((call, line)) = held_forget_runs.take() {
             let by_rule = shared
@@ -15316,15 +15374,16 @@ async fn answer(
                             None => piece,
                             Some(held) => {
                                 held.push_str(&piece);
-                                match crate::action_claim::claim_on(
+                                match crate::action_claim::claim_in(
                                     held,
                                     false,
                                     worded_turn,
                                     forget_turn,
+                                    shared.unplug_claims,
                                 ) {
                                     Some(None) => action_held.take().unwrap_or_default(),
                                     Some(Some(kind))
-                                        if crate::action_claim::stands_on(
+                                        if crate::action_claim::stands_with(
                                             kind,
                                             held,
                                             read_asked,
@@ -15332,6 +15391,10 @@ async fn answer(
                                                 .iter()
                                                 .map(|(name, args)| (name.as_str(), args)),
                                             crate::action_claim::forgot_in(&call_statuses),
+                                            crate::action_claim::Unplugged {
+                                                stayed: unplug_stayed,
+                                                instead: unplug_fold,
+                                            },
                                         ) =>
                                     {
                                         action_held.take().unwrap_or_default()
@@ -15768,13 +15831,33 @@ async fn answer(
                         .chain(calls.iter().map(|call| (call.name.as_str(), &call.args)))
                 };
                 let forgot = crate::action_claim::forgot_in(&call_statuses);
-                let unmade = crate::action_claim::claim_on(&held, true, worded_turn, forget_turn)
-                    .flatten()
-                    .filter(|kind| {
-                        !crate::action_claim::stands_on(*kind, &held, read_asked, called(), forgot)
-                    });
+                let unplugged = crate::action_claim::Unplugged {
+                    stayed: unplug_stayed,
+                    instead: unplug_fold,
+                };
+                let unmade = crate::action_claim::claim_in(
+                    &held,
+                    true,
+                    worded_turn,
+                    forget_turn,
+                    shared.unplug_claims,
+                )
+                .flatten()
+                .filter(|kind| {
+                    !crate::action_claim::stands_with(
+                        *kind,
+                        &held,
+                        read_asked,
+                        called(),
+                        forgot,
+                        unplugged,
+                    )
+                });
                 // A forget said done is told its own note (C88).
                 let forget_said = unmade == Some(crate::action_claim::Claim::Forgot);
+                // An unplug act said that the fold and stay records don't
+                // back (#6457): judged by those records alone, never a limit.
+                let unplug_said = matches!(unmade, Some(crate::action_claim::Claim::Unplug(_)));
                 // Said in the round that calls a forget, the words ran ahead
                 // of it: not said, and no note, so the next round speaks from
                 // its answer (Thirteen's P2-2 on #5942).
@@ -15787,13 +15870,16 @@ async fn answer(
                 // first builder's ruling on #5215): its note says so, never
                 // that nothing ran.
                 let limited = !forget_said
+                    && !unplug_said
                     && unmade.is_some_and(|kind| {
                         kind == crate::action_claim::Claim::LightKept
                             || crate::action_claim::worded_limit(&held).is_some()
                     })
                     && called().next().is_some();
                 // Whether only the worded claims found it: the journal says so.
-                let worded = if limited {
+                let worded = if unplug_said {
+                    ", an unplug act: LAMP_ACTION_CLAIM_UNPLUG"
+                } else if limited {
                     ", in other words: LAMP_ACTION_CLAIM_WORDED, a said limit no call carried"
                 } else if worded_turn
                     && !forget_said
@@ -15810,6 +15896,23 @@ async fn answer(
                                 queue.push(sentence).await?;
                             }
                         }
+                    }
+                    // "Not ready" said at a proven fold (row-5747n case D:
+                    // "Yes." to the skill's ask, `calls=none`, "Still
+                    // preparing …" said): not said, never asked again, and
+                    // the skill's line for that state is said instead.
+                    Some(crate::action_claim::Claim::Unplug(
+                        crate::action_claim::Unplug::NotReady,
+                    )) if calls.is_empty() => {
+                        return said_instead_of_not_ready(
+                            shared,
+                            &mut queue,
+                            &mut offer_hold,
+                            (request, round),
+                            unplug_fold.unwrap_or(crate::language::UNPLUG_UPDATING),
+                            turn_called.len(),
+                        )
+                        .await;
                     }
                     Some(_) if forget_calling => {
                         eprintln!(
@@ -16630,6 +16733,8 @@ async fn answer(
                     );
                 }
                 call_statuses.push(after_forget::status(&call.name, &answer.told));
+                unplug_stayed |= shared.unplug_claims
+                    && crate::action_claim::stayed_by(&call.name, &call.args, &answer.told);
                 if crate::remember::is_forget(&call.name) {
                     context_epoch = shared.send_content_epoch.load(Ordering::Acquire);
                     messages = after_forget::context(

@@ -2105,6 +2105,8 @@ fn second_route_worker_environment(
         crate::action_claim::ENVIRONMENT,
         // And one worded its own way (#5215).
         crate::action_claim::WORDED_ENVIRONMENT,
+        // And an unplug act said with nothing behind it (#6457).
+        crate::action_claim::UNPLUG_ENVIRONMENT,
         crate::second_provider::CHECKING_LINE_ENVIRONMENT,
         crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
         // A light or volume turn answered with the call's own line (#2877).
@@ -2369,6 +2371,7 @@ mod tests {
             crate::keep_at_once::ENVIRONMENT,
             crate::action_claim::ENVIRONMENT,
             crate::action_claim::WORDED_ENVIRONMENT,
+            crate::action_claim::UNPLUG_ENVIRONMENT,
             crate::second_provider::CHECKING_LINE_ENVIRONMENT,
             crate::second_provider::SPEECH_TAGS_ENVIRONMENT,
             crate::second_provider::SHORT_DONE_ENVIRONMENT,
@@ -3335,6 +3338,7 @@ mod tests {
                     || name == crate::keep_at_once::ENVIRONMENT
                     || name == crate::action_claim::ENVIRONMENT
                     || name == crate::action_claim::WORDED_ENVIRONMENT
+                    || name == crate::action_claim::UNPLUG_ENVIRONMENT
                     || name == crate::second_provider::CHECKING_LINE_ENVIRONMENT
                     || name == crate::second_provider::SPEECH_TAGS_ENVIRONMENT
                     || name == crate::second_provider::SHORT_DONE_ENVIRONMENT
@@ -3488,6 +3492,7 @@ mod tests {
                 vec![
                     "CREDENTIALS_DIRECTORY=/run/credentials/lamp-voice.service",
                     "LAMP_ACTION_CLAIM_CHECKED=on",
+                    "LAMP_ACTION_CLAIM_UNPLUG=on",
                     "LAMP_ACTION_CLAIM_WORDED=on",
                     "LAMP_ANSWER_ASK_AGAIN=on",
                     "LAMP_ATTENTION_NEAR_CALIBRATED=on",
