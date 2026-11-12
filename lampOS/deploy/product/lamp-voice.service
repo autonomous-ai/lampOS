@@ -241,6 +241,9 @@ Environment=LAMP_SECOND_MEMORY_HITS=on
 # The owner's approximate place from the app, city level (#4333): told only beside a line that needs a place
 # ("near me", the weather). The lead's yes on 3 Nov; shown on lamp-0c89 on 30 Oct (asked nothing back, and asked after a clear).
 Environment=LAMP_OWNER_PLACE=on
+# The owner's chosen voice and character words (#5394): spoken in the chosen voice, the words told after its
+# character; the same line in lamp-cloud.service. On in the product on 12 Nov for the lead (#6590).
+Environment=LAMP_CHOSEN_VOICE=on
 # Speed: the relay's near routes, the chat's connection kept, the link said for lamp/online.
 Environment=LAMP_RELAY_ROUTES=on
 Environment=LAMP_SECOND_CHAT_KEPT=on

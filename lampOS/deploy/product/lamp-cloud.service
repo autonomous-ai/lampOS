@@ -51,6 +51,9 @@ Environment=LAMP_NUDGES_PRESENT=on
 # The owner's approximate place from the app (#4333): owner.place and owner.place.clear, rounded to about a
 # kilometre and kept in the person's folder through `lamp-setup change`. The lead's yes on 3 Nov.
 Environment=LAMP_OWNER_PLACE=on
+# The owner's chosen voice and character words from the app (#5394): voice.set and character.set, kept through
+# `lamp-setup change`; the same line in lamp-voice.service. On in the product on 12 Nov for the lead (#6590).
+Environment=LAMP_CHOSEN_VOICE=on
 # A skill typed in the app (#2813, fourteen-P15): `can` names skills.make only while lamp-voice's maker
 # has a computer to hand it to (make_skill::watch, asked every 60 s).
 Environment=LAMP_APP_MAKE_SKILL=on
