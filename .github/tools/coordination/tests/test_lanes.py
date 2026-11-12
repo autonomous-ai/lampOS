@@ -58,7 +58,7 @@ case "$*" in
   *"--json body"*) echo '{"login":"","body":"","pr_body":true}' ;;
   *title,createdAt*) n=$(echo "$*" | sed -E 's/^pr view ([0-9]+).*/\1/'); if [ -f "$FAKE_DIR/title-$n.txt" ]; then cat "$FAKE_DIR/title-$n.txt"; else printf 'lampOS: a change\t2026-11-04T01:00:00Z\n'; fi ;;
   *headRefOid*) cat "$FAKE_DIR/head.txt" ;;
-  *statusCheckRollup*) cat "$FAKE_DIR/checks.json" ;;
+  *statusCheckRollup*) n=$(echo "$*" | sed -E 's/^pr view ([0-9]+).*/\1/'); if [ -f "$FAKE_DIR/checks-$n.json" ]; then cat "$FAKE_DIR/checks-$n.json"; elif [ -f "$FAKE_DIR/checks.json" ]; then cat "$FAKE_DIR/checks.json"; else echo '{"statusCheckRollup":[]}'; fi ;;
   "run list"*) echo 0 ;;
   "pr merge"*) if [ -n "$FAKE_MERGE_5XX" ]; then n=$(cat "$FAKE_DIR/5xx" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "$FAKE_DIR/5xx"
                  [ "$n" -le "$FAKE_MERGE_5XX" ] && { [ -n "$FAKE_ON_5XX" ] && sh -c "$FAKE_ON_5XX"; echo "HTTP 502: Bad Gateway (https://api.github.com/graphql)" >&2; exit 1; }
@@ -69,6 +69,9 @@ esac
 """
 ARM_CHECKS = [{"__typename": "CheckRun", "name": "build and test", "status": "COMPLETED", "conclusion": "SUCCESS"},
               {"__typename": "CheckRun", "name": "clippy", "status": "COMPLETED", "conclusion": "SUCCESS"}]
+# A PR's own ARM64 run with every job green, as the train bot needs it on a PR the ARM64 run takes (#6556, train 841).
+ARM = "lampOS — build and test on Linux ARM64 (%s)"
+ARM_GREEN = [{"__typename": "CheckRun", "name": ARM % j, "status": "COMPLETED", "conclusion": "SUCCESS"} for j in ("build", "release", "1/1")]
 CI_CHECKS = [{"__typename": "CheckRun", "name": "Go (system) — build · vet · test", "status": "COMPLETED", "conclusion": "SUCCESS"},
              {"__typename": "CheckRun", "name": "Python (hal) — unit tests · syntax", "status": "COMPLETED", "conclusion": "SUCCESS"}]
 TOOL = ".github/tools/coordination/x.sh"
@@ -417,6 +420,7 @@ class BotDryRound(Repo):
         self.fakefile("prs.txt", "7\n8\n9\n")
         self.fakefile("heads.txt", "".join("%d %s\n" % (n, open(os.path.join(self.fake, "head-%d.txt" % n)).read().strip())
                                            for n in (7, 8, 9)))
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": ARM_GREEN}))
         if before:
             before()
         env = dict(self.env, DRY="1", WORKTREE=os.path.join(self.tmp, "wt"), WORKTREE_NC=os.path.join(self.tmp, "wtnc"), **extra)

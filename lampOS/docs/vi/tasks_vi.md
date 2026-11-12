@@ -154,6 +154,40 @@ chạy thật gửi thêm (ghi chú của bộ nhớ, các dòng của skill, c�
 web, tên vừa nghe thấy) không có trong probe. D giúp việc giao việc không còn
 phụ thuộc vào những thứ đó. Chưa được phát thử trên đèn.
 
+### Một tiếng "không" cho lời đọc lại bỏ việc đã chuẩn bị (#6582)
+
+Trước đây (#2838), sau khi đèn đọc lại một việc, một tiếng "không" đơn thuần
+không gọi gì cả: việc đã chuẩn bị vẫn chờ, trong giọng nói (`PENDING`) và trong
+phần tasks, suốt `CONFIRM_WITHIN` (120 s), nên một tiếng "có" sau đó vẫn bắt
+đầu được nó. Nay, trên tuyến thứ hai, một câu nghe được là một tiếng không đơn
+thuần (`services::plain_no`, danh sách giọng nói đã dùng cho tiếng không với
+một lần ghi của kỹ năng: "No.", "No thanks.", "Never mind.", "Don't.",
+"Cancel that.", "Không, thôi.") trong lúc một việc đang chờ, từ một yêu cầu
+có thể nói có với nó (`may_confirm`), bỏ việc đó (`agent_tasks::declined`,
+gắn vào engine bằng `declining_a_task_waiting`):
+
+- `PENDING` được xoá, nên không tiếng "có" nào sau đó trong 120 s bắt đầu nó;
+- phần tasks được gửi lệnh `cancel` cho việc đó, cùng lệnh mà một lời sửa gửi,
+  sau một `status` để lấy guard, trên một luồng riêng giới hạn bởi `DEADLINE`
+  (3,5 s): một lệnh huỷ bị từ chối hoặc không được trả lời không bao giờ giữ
+  giọng nói lại (nhật ký ghi `could not be cancelled; this voice no longer
+  confirms it, and it lapses in the tasks part`);
+- nhật ký ghi `lamp-voice: tasks: request N: task <id> dropped: the person
+  said no to its read-back`;
+- câu đó được báo, thay cho ghi chú việc đang chờ, rằng người ta đã nói không,
+  việc đã bị bỏ và chưa có gì bắt đầu: chỉ nói là sẽ không bắt đầu nó, không
+  gọi gì.
+
+Một tiếng không có thêm nội dung ("no, write a poem about tea instead", "no,
+I said tea", "no, ask Codex") không phải tiếng không đơn thuần: nó vẫn là một
+lời sửa như trước (#2838). Một tiếng không khi không có việc nào chờ, trong
+chính yêu cầu đã chuẩn bị việc, hoặc sau 120 s, không làm gì. Tuyến Live chưa
+có chỗ gắn này: ở đó một tiếng không vẫn không gọi gì. Test:
+`a_plain_no_drops_the_task_and_a_failed_cancel_keeps_the_correction`,
+`a_plain_no_then_a_yes_within_the_window_starts_nothing`,
+`a_correction_after_the_read_back_is_not_a_plain_no`,
+`a_plain_no_with_nothing_pending_does_nothing`.
+
 ## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`, bật trong sản phẩm)
 
 Bước `do.task` của một kỹ năng (#6305, docs/skills.md, "A skill's task")
@@ -164,7 +198,15 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 - **Dòng gửi:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`.
   Cần đủ mọi trường và không nhận trường nào khác. `skill` là tên một kỹ năng
   (`a-z`, `0-9`, `-`, `_`, tối đa 64), `folder` đúng là
-  `/var/lib/lampOS/skills/<skill>` (các kỹ năng Hermes thấy ở chế độ chỉ đọc),
+  `/var/lib/lampOS/skills/<skill>` (các kỹ năng Hermes thấy ở chế độ chỉ đọc)
+  hoặc, với kỹ năng do máy tính của chủ đèn đẩy lên,
+  `/var/lib/lampOS/skills-dev/<skill>` (`skill_task::PUSHED`, chỉ lần chạy
+  của kỹ năng mới thấy, chỉ đọc), so đúng như viết (`..` hay thư mục khác bị
+  từ chối "the skill's folder is not its own among the lamp's skills"); thư
+  mục được đẩy lên chỉ được nhận khi trong `skills/` không có gì mang tên đó
+  (thư mục, tệp hay liên kết; `skill_task::lamp_has_skill_named`, cùng quy
+  tắc với lamp-control và lamp-skills), nếu không thì bị từ chối "a skill of
+  that name is on the lamp: a pushed one never runs in its place",
   `run` là một tệp trong `scripts/` của kỹ năng (mỗi phần chỉ gồm `A-Z a-z
   0-9 . _ -`, không bắt đầu bằng `.`, nên không `..`, không phần ẩn, không
   xuống dòng, dấu backtick hay khoảng trắng,
@@ -204,6 +246,19 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   trong môi trường tiến trình của wrapper ngoài cùng (`/proc/<pid>/environ`),
   các tiến trình khác cùng uid với lamp-tasks đọc được; điều này được chấp
   nhận cho một token chỉ dùng một lần chạy và sống tối đa 14 phút.
+- **File token của lần chạy** (#6510 Part 1, chưa dùng): `harness new`
+  không nhận môi trường, nên khi các lần chạy đi qua Harness (#6510 Part 1
+  bước 2), token được giao bằng một file thay cho `LAMP_CONTROL_TOKEN`:
+  `/run/lampos-tasks/runs/<run-id>` (`run_token_file::RUNS_DIR`, tmpfs),
+  run id phải là id thuần (`a-z`, `0-9`, `-`, 1 đến 64 ký tự), nếu không
+  thì bị từ chối trước khi tạo gì. `RunTokenFile::write` tạo thư mục 0700
+  khi chưa có và từ chối thư mục là link, không thuộc user của lamp-tasks
+  hoặc mở cho người khác; file được tạo 0600, độc quyền (file có sẵn hay
+  link ở đó bị từ chối, không bao giờ đi theo hay ghi đè), ghi đủ rồi sync.
+  Wrapper của engine (lamp-update) đọc nó một lần rồi xóa; lamp-tasks cũng
+  xóa nó khi lần chạy kết thúc dù kết thúc thế nào (drop của guard; đã bị
+  xóa trước thì không sao). Token không bao giờ có trong argv, dòng debug,
+  nhật ký, lỗi hay trạng thái của Harness; đường dẫn chỉ chứa run id.
 - **Lần chạy:** một việc cho đích `lamp`, lời của nó là việc của kỹ năng,
   script cần chạy từ thư mục chỉ đọc của kỹ năng, và đường duy nhất tới đèn
   (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
@@ -296,11 +351,36 @@ phần đó vào. hermes-ns cũng chỉ cho lần chạy thấy
 chính lamp-update; network namespace riêng của lần chạy cũng vậy. Kết quả của
 lần chạy chưa thành Task news, và thư mục của kỹ năng được
 nêu trong lời của lần chạy, chưa nằm trong `AGENTS.md` của thư mục làm việc.
-Giới hạn
-của lamp-tasks.service (`MemoryHigh`, `CPUQuota`) chờ số đo RAM và CPU của
-Hermes khi chạy một việc trên lamp-52e6 (đèn 6 GB: mọi giới hạn RAM được
-tính theo loại đèn này), so với mức sàn khi cài Hermes
-(≥1.350 MB còn trống), trong lúc giọng nói trả lời một câu. Kiểm thử:
+
+**Giới hạn của lamp-tasks.service** (#6306; bình luận 09:32 của first
+builder trên #6306, 12/11). Lần chạy của một kỹ năng do chính lamp-tasks
+khởi động, và wrapper của Hermes chỉ tách namespace, nên lần chạy vẫn nằm
+trong cgroup của lamp-tasks.service, cạnh các tiến trình con Harness của
+phần này (một `harness wait` và tối đa bốn `harness watch`, Node, mỗi cái
+khoảng 130 MB trên lamp-75c9). Các pane của chính Harness chạy dưới user
+unit của harnessd, không ở đây. Một việc của kỹ năng có thể chạy cạnh một việc nói, nên cgroup được tính
+cho hai phần tăng của việc cùng lúc (`skill_task::TASKS_AT_ONCE`): giới hạn
+bộ nhớ và task là **lúc nghỉ + 2 × phần tăng × 1,5**, làm tròn lên
+(`skill_task::two_tasks_cap`), còn giới hạn CPU là CPU của hai việc nhân
+1,5. Các số đo là của Fourteen cho một việc Hermes thật
+bằng giọng nói (một danh sách đồ cần mang, 80 s) trên lamp-9adf, một đèn
+6 GB chạy build 12255, đọc từ cgroup của lamp-tasks.service bằng
+`systemctl show`; số CPU do first builder chuyển (13:14 trên #6059). Các
+đỉnh được lấy mẫu mỗi 2 s, nên chỉ là mức sàn; phần nhân 1,5 bù cho phần
+nằm giữa hai lần lấy mẫu. Sau khi việc đóng, cgroup giữ 727 MiB và 89 task.
+
+| Số đo (`skill_task::`) | Đã đo | Nguồn | Giới hạn trong unit sản phẩm |
+|---|---|---|---|
+| Bộ nhớ cgroup, `MemoryCurrent` (`MEASURED_REST_MEMORY_MB`, `MEASURED_PEAK_MEMORY_MB`) | 632 MiB lúc nghỉ, đỉnh 1120 MiB (+488; mức sàn: mẫu mỗi 2 s) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | `MemoryHigh=2100M` (`MEMORY_HIGH`): 632 + 2 × 488 × 1,5 = 2096, làm tròn lên 100 MB. Vượt mức này kernel làm chậm và thu hồi bộ nhớ của chính phần này, không bao giờ kill: không có `MemoryMax`. Đèn không có swap, nên vượt mức này mọi tiến trình trong lamp-tasks.service, kể cả serve, bị dừng chờ thu hồi bộ nhớ cho tới khi cgroup xuống lại dưới mức (suy luận, chưa đo) |
+| Task của cgroup, `TasksCurrent`, tiến trình gồm cả thread (`MEASURED_REST_TASKS`, `MEASURED_TASKS`) | 91 lúc nghỉ, đỉnh 126 (+35; mức sàn: mẫu mỗi 2 s) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | `TasksMax=512` (`TASKS_MAX`): 91 + 2 × 53 = 197, làm tròn lên 10 thành 200, nâng lên mức tối thiểu 512 (`TASKS_MAX_LEAST`): một lần chạy nhiều công cụ (Python, Node, các thread của trình duyệt) có thể vượt 100 ngay. Vượt mức này thì fork thất bại, kể cả của chính lamp-tasks; không gì bị kill |
+| CPU (`MEASURED_CPU_PERCENT`) | khoảng 1,2 nhân (120%): trung bình trên cả lần chạy 80 s từ `CPUUsageNSec` của cgroup, là cận trên, không phải đỉnh | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059); first builder, 13:14 | `CPUQuota=360%` (`CPU_QUOTA`): 2 × 120 × 1,5 = 360%, để lại hơn 4 trong 8 nhân của đèn (`LAMP_CORES`, chip A733) cho giọng nói; một kiểm thử giữ nó dưới 7 nhân |
+| MemAvailable thấp nhất (`MEASURED_MIN_AVAILABLE_MB`) | 3208 MB (3.285.476 kB) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | không có; một kiểm thử giữ nó, trừ 488 MB của việc thứ hai (2720 MB), bằng hoặc trên mức sàn khi cài Hermes (`HERMES_FLOOR_MB`, ≥1.350 MB) |
+| Thời gian chạy, từ `new` tới khi đóng (`MEASURED_RUN_SECS`) | 75 s | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | không có; một kiểm thử giữ nó, nhân 1,5, trong vòng đời một lần chạy (`RUN_LIFETIME`, 14 phút) |
+| Kích thước thư mục làm việc (`MEASURED_WORK_FOLDER_MB`) | 1 MB, làm tròn lên (36K trước, 40K sau) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | không có; chỉ ghi lại |
+
+Mỗi `MEASURED_*` và giới hạn của nó phải khớp nhau, cả trong unit: các kiểm
+thử thất bại khi một số đo đổi mà giới hạn không đổi theo.
+Kiểm thử:
 `skill_task::tests` (công tắc, vòng đời token, lần chạy lỗi, không có token,
 mọi dòng bị từ chối; socket trả lời một dòng, lần chạy thứ hai bị từ chối
 `busy`, tắt công tắc thì không mở gì, người gọi không phải lamp-skills không
@@ -310,8 +390,13 @@ trong môi trường, không bao giờ trong đối số; runner của đèn đ�
 unix sang TCP và câu trả lời quay về, đúng từng byte, qua một bộ chuyển
 tiếp giả trên cổng tạm; kết nối vượt mức tối đa bị đóng ngay và chỗ được
 trả lại; đường nối không hoạt động bị kết thúc; không gì được nối bị ghi
-nhật ký; đối số của relay; tắt công tắc thì không mở gì), chạy trên máy
-tính bất kỳ, không cần Hermes.
+nhật ký; đối số của relay; tắt công tắc thì không mở gì), và các giới hạn
+(`skill_task::tests`: mỗi giới hạn có một lần trong `[Service]` của unit sản
+phẩm, không có dòng giới hạn bộ nhớ cứng, mỗi giới hạn đủ cho hai việc với
+phần nhân 1,5, MemAvailable thấp nhất trừ phần tăng của việc thứ hai bằng
+hoặc trên mức sàn của Hermes, thời gian chạy
+nhân 1,5 nằm trong vòng đời một lần chạy), chạy trên máy tính bất kỳ, không
+cần Hermes.
 
 **Dòng kiểm tra trên đèn (chưa chạy):** trên một đèn đã cài Hermes,
 lamp-control đang phục vụ và `LAMP_SKILL_TASKS=on` trong cả hai unit, lần
@@ -319,6 +404,21 @@ chạy của một kỹ năng có script chạy `curl https://example.com` thì 
 (không tên nào phân giải được, không có route), trong khi lệnh gọi model của
 cùng lần chạy được trả lời và lệnh gọi `control.sock` của nó chạy được với
 token.
+
+**Wrapper của mọi engine (#6510 phần 1, bước 1, tắt trừ khi
+`LAMP_AGENT_NS=on`):** khi lần
+chạy của một kỹ năng đi qua Harness, wrapper chung của lamp-update cho mọi
+engine (docs/install.md, "One agent namespace for every engine") là nơi
+nhận token của lần chạy: khi có `LAMP_RUN_ID` (tên tạm thời), nó đọc
+`/run/lampos-tasks/runs/<run-id>` một lần, xoá tệp, và đưa token cho
+engine dưới dạng `LAMP_CONTROL_TOKEN` chỉ trong môi trường, kèm
+`LAMP_NS_NET=run`; `HOME` của engine là thư mục riêng
+`/var/lib/lampos-agents/<engine>`. Một engine chỉ được coi là có khi login
+shell của `lampos` tìm thấy wrapper trước (không phải chương trình của chính
+nó trong `~/.local/bin`). Khi unit riêng của lamp-update có
+`LAMP_AGENT_NS=on` (và `LAMP_APP_ENGINES=on`), mỗi vòng ghi nó cho mọi
+engine mà Harness báo đã cài, trừ Hermes và OpenClaw. Chưa có lần chạy kỹ
+năng nào dùng nó: runner của Hermes ở trên giữ nguyên cho đến bước 2.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
@@ -371,6 +471,107 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   thì `hermes`, mặc định (#6498; #6226 từng là `openclaw`). Target
   của đèn vẫn là `lamp`, với engine đó; khi engine được chọn chưa cài mà
   engine kia đã cài, dùng engine kia.
+- **Các engine của đèn, có nêu hay không, và lựa chọn trong app (#6492).**
+  Không có gì trên đèn được dựng riêng cho từng engine: Harness có nhiều
+  engine, Hermes và OpenClaw chỉ là hai trong số đó. Các engine của đèn là
+  những engine mà lần xem engine của Harness
+  (`harness machines engines <id> --json`, đọc cùng các lần xem máy tính,
+  có giới hạn và làm mới như chúng) báo là đã cài trên chính máy của đèn
+  (máy mà `harness machines` đánh dấu `current`), theo thứ tự của Harness,
+  trong số những engine Harness khởi động được kèm một việc: engine mà
+  lamp-tasks không có tên là engine Harness khởi động không có prompt đầu
+  (`PROMPT_UNSUPPORTED`), nên không bao giờ được đưa ra, và Devin Cloud
+  chạy trong cloud của Devin, không bao giờ trên đèn. `LAMP_HERMES_ON_LAMP`
+  và `LAMP_OPENCLAW_ON_LAMP` chỉ là công tắc tắt: engine có công tắc tắt
+  thì không được đưa ra (OpenClaw cũng không khi Harness cũ hơn 0.6.11);
+  mọi engine khác không có công tắc. Trên đèn, một engine chỉ được đưa ra
+  khi `/usr/local/bin/<engine>` của nó là wrapper do lamp-update ghi, có dòng
+  `Written by lamp-update.` trong 512 byte đầu (`LAMP_WRAPPER_MARK`, #6506):
+  wrapper chạy engine trong namespace riêng, tách khỏi các dịch vụ của đèn và
+  đồ của người dùng. Chương trình đặt ở đó theo cách khác (một `claude` cài
+  tay) thì không được đưa ra và app không đặt nó làm mặc định được
+  (`engine_not_installed`), dù Harness báo gì. Trước khi một lần xem báo về (hoặc khi
+  đăng xuất, #6407), các engine của đèn là những engine đang bật, như
+  trước. Engine mặc định đứng đầu, rồi mọi engine khác theo thứ tự của
+  Harness (`lamp_order`): lựa chọn của chủ trong app khi nó nằm trong số
+  đó, nếu không thì của `LAMP_LAMP_ENGINE` (tên bất kỳ engine nào), nếu
+  không thì của bản build (engine đầu tiên đang bật của `lamp_engines`),
+  nếu không thì engine đầu tiên trong số đó. Mục `lamp` trong câu trả lời
+  `targets` báo engine mặc định là `engine` của nó và liệt kê tất cả, mặc
+  định đứng đầu:
+  `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
+  (không có `engines` khi không có engine nào). Một `prepare` cho target
+  `lamp` có thể mang `"engine"` với tên bất kỳ engine nào (không có thì
+  không ghi; target khác bỏ qua). Có nêu, việc chạy đúng trên engine đó khi
+  nó nằm trong các engine của đèn và không được biết là thiếu ở đó, được
+  chuyển cho Harness theo tên (`harness new <engine>` trong thư mục của
+  đèn, như Harness khởi động engine đó: không có runner riêng cho từng
+  engine ở đây; phần chờ Gateway và kiểm tra mất prompt đầu của OpenClaw,
+  #6226, vẫn theo tên nó vì đó là hành vi Harness đã ghi rõ); nếu không,
+  `prepare` bị từ chối với `engine_not_here` và không khởi chạy gì: không
+  bao giờ chuyển sang engine khác. Tên rỗng hoặc chỉ có khoảng trắng bị từ
+  chối với `engine_unknown`. Không nêu, việc chạy trên engine mặc định.
+  Thư mục của đèn chỉ nhận hướng dẫn của Hermes hoặc OpenClaw cho hai
+  engine đó; engine khác đọc cài đặt riêng của nó, như Harness khởi động
+  nó. App đặt engine mặc định trên route của app (`--app-socket`) với
+  `{"op":"app_engine_default","engine":"claude"}`: nằm trong các engine của
+  đèn thì được lưu và có hiệu lực ngay; rỗng thì `engine_unknown`; không
+  nằm trong số đó thì `engine_not_installed`; `engine_default_unsaved` khi
+  không ghi được file. Nó được lưu ở `engine-default.json` trong thư mục
+  tasks (`--dir`) dạng `{"version":1,"engine":"claude"}`, ghi bên cạnh rồi
+  đổi tên đè, và có hiệu lực ngay, không cần khởi động lại: thứ tự của đèn
+  đặt nó lên đầu, câu trả lời `targets` báo nó là engine của target `lamp`
+  (để voice gọi đúng tên), và target của đèn được ghi lại ở lần xem kế
+  tiếp. `{"op":"app_engine_default_state"}` đọc nó. Cả hai trả
+  `{"ok":true,"default":"claude","chosen_in_app":true}` (`default` là null
+  khi đèn không có engine; `chosen_in_app` chỉ true khi lựa chọn của app
+  đang là mặc định). File được đọc khi khởi động; thiếu, không hợp lệ, hoặc
+  nêu một engine Harness khởi động không kèm việc thì là chưa chọn. Một lựa
+  chọn không còn nằm trong các engine của đèn (Harness không còn báo nó,
+  hoặc công tắc của nó tắt) bị bỏ qua, không bị xoá. Reset của đèn xoá nó
+  cùng thư mục tasks. Có trong test:
+  `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
+  `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
+  `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
+  `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default`,
+  `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
+  `runtime::tests::the_lamps_engines_are_harness_s_the_default_first_then_harness_s_order`,
+  `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
+  `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
+  `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
+- **Nêu trong lời nghe được, do code đặt (#6492, V2 của lead):** khi đèn
+  có target riêng, voice đọc câu chính người nói trong request đó (câu do
+  đèn viết thì không) và tự đặt `where`/`engine`/`who`, để model bỏ sót
+  cũng không gửi việc đi nơi khác. Tên chỉ lấy từ những gì đèn này có: các
+  engine của đèn như lần đọc gần nhất (theo id hoặc tên gọi) và staff trên
+  máy tính (Claude Code khi chưa đọc được); không bao giờ là danh sách agent
+  cố định. Tên chỉ tính khi là người làm: sau "ask", "have", "tell", "get"
+  hoặc "let", hoặc "with", "using", "via" hoặc "use" (không tính "don't ask
+  …", "did you ask …"), hoặc đứng đầu câu trước dấu phẩy ("Hey Lamp,
+  Hermes, …"); hoa thường gì cũng được, các chữ của tên viết liền hay rời
+  ("Open Claw"). Nêu một engine của đèn: `where` `lamp` và `engine` đó, bất
+  kể model gửi gì. Nêu một staff: `where` `computer`, `who` là họ, không có
+  `engine`. Tên có cả trên đèn và trên máy tính thì chạy trên đèn, trừ khi
+  máy tính được nêu là nơi làm hoặc lời nói cần đồ của máy tính: "my" +
+  repo, repository, codebase, code, project, folder, files hoặc branch,
+  hoặc "the repo/repository/codebase" (chỉ là từ chung; riêng dấu hiệu đó
+  thì không đặt gì). "On/use my/the computer", "Mac", "MacBook", "laptop"
+  hoặc "PC" (có thể có một từ ở giữa: "my office computer") đặt `where`
+  `computer` và bỏ `engine` (và `who` chỉ nêu engine của đèn); phủ định
+  ("don't use my computer") hoặc "on the lamp", "yourself", "right here"
+  đặt `where` `lamp`, giữ `engine` của model. Chỉ nhắc tên thì không tính
+  ("what is Hermes?", "OpenClaw's update"), tên không có trong danh sách
+  nào cũng không; lời mâu thuẫn (hai agent, đèn và máy tính, agent chỉ có
+  trên đèn kèm "on my computer", agent chỉ có trên máy tính kèm "on the
+  lamp") không đặt gì, giữ nguyên tham số của model. Mỗi lần ghi đè log một
+  dòng nêu cái được đặt và cái model gửi, không bao giờ ghi lời nói. Câu
+  đọc lại vẫn nói nơi chạy như trước ("OpenClaw on the lamp", "Claude Code
+  on the office computer"). Lượt mà model không gọi `start_agent_task` thì
+  không bị đổi. Test:
+  `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
+  `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
+  `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
+  `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
 - **Khởi động** như Harness khởi động OpenClaw:
   `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
   chế độ quyền và không định tuyến model (OpenClaw tự chọn model, theo phần
@@ -437,6 +638,22 @@ là phần của một coder khác trong #6226; thiết kế:
   home của `lampos`), nơi các khóa skill của đèn trỏ tới và hướng dẫn
   (`AGENTS.md`) được ghi, như với Hermes.
 
+## Hook của Harness bên trong namespace agent của đèn (#6530)
+
+Hook của Harness cho một engine (`harness hook hermes session-start`,
+`harness hook hermes tool`) chạy bên trong namespace agent của đèn, nơi CLI và
+trạng thái của Harness bị ẩn. Phần namespace dùng chung
+(`crates/update/src/agent_ns.rs`, "một namespace cho mọi engine" của #6510,
+hiện được namespace của Hermes và OpenClaw dùng) đặt một `harness` thay thế lên
+đầu `PATH` của namespace: `/usr/local/lib/lampos/ns-bin/harness`, của root,
+0755, do lamp-update ghi. Nó trả lời `harness hook …` bằng không gì cả và mã
+thoát 0, từ chối mọi lệnh khác, và không lộ trạng thái nào của Harness. Mỗi lần
+engine khởi động ghi một dòng journal: "Harness hooks aren't available inside
+the lamp's agent namespace yet (openharness#4194)". Vì vậy, tạm thời Harness
+không theo dõi được phiên của engine chạy trong namespace qua hook. Bản thay
+thế này sẽ được gỡ khi Harness được ghim có chế độ hook cho sandbox
+(openharness#4194) (docs/install.md, "Hermes on the lamp").
+
 ## Đèn chưa đăng nhập vẫn giao việc cho engine của chính nó (#6407)
 
 Một đèn product chưa từng đăng nhập Harness, đã cài Hermes 0.22.2, trả lời
@@ -451,7 +668,9 @@ và có `--targets-from-machines`:
 - **Target lấy từ chính đèn.** Mỗi lần đọc sign-in thấy chưa đăng nhập và có id
   của máy này, engine của đèn coi là đã cài khi chương trình của nó nằm ở chỗ
   Harness tìm, `/usr/local/bin/<engine>` (`LAMP_ENGINES_BIN`; `hermes` và
-  `openclaw` là wrapper của lamp-update), chạy được. Khi đó file target được ghi như khi ghi
+  `openclaw` là wrapper của lamp-update), chạy được, và là wrapper do
+  lamp-update ghi: 512 byte đầu có `Written by lamp-update.`
+  (`LAMP_WRAPPER_MARK`, #6506). Khi đó file target được ghi như khi ghi
   từ danh sách máy, không bao giờ đè file mà phần tasks không tự ghi, chỉ có
   đèn: `lamp`, engine đó, `~/harnesses/lamp-tasks/lamp`, dưới id của máy này.
   Target của các máy tính ghi trước đó bị bỏ, vì chưa đăng nhập thì không tới
@@ -660,3 +879,44 @@ lại hơn 7 phút trong `epoll_wait`.
 - **Test:** `the_lamps_own_agent_is_closed_once_done_its_news_untold`. Đang
   làm, hay idle chưa có câu trả lời: để mở. Xong mà chưa kể: để mở dưới một
   phút, rồi đóng. Trên máy tính: chờ kể.
+
+## Việc giao là toàn bộ lời nhờ (#6527)
+
+Trên 52e6 ngày 12/11 (row-6361c), câu "have your agent list five fruits that
+are good when you're sick and write them to fruits dot md" tới Hermes chỉ còn
+"Create a file called fruits.md": mất danh sách và con số, tệp không có loại
+quả nào. Với `LAMP_TASKS_ONE_YES`, tham số `task` của `start_agent_task` giờ
+đọc "Every part of what the person asked, in their own words: what to do, and
+any count, list, topic, file name or place they said. Never shorten it; the
+agent works out the rest." (thay cho "A short ask is enough: the agent works
+out the details", câu mô hình hiểu là được rút gọn). `start_agent_task` còn
+kiểm tra bằng mã (`agent_tasks::whole_ask`), có hay không có công tắc, trước
+khi hỏi phần tasks:
+
+- **Lời đã nghe.** Chỉ câu của chính request (`thread::heard_in_own_line`:
+  câu được giữ cho nó, hoặc câu trong lượt trao đổi của nó), không bao giờ là
+  lời mới nhất nghe được từ lần trả lời trước, vì đó có thể là câu của người
+  khác (#6537). Tin
+  nhắn gõ, câu do đèn tự viết, hay request không nghe được gì thì không kiểm
+  tra; một câu "yes" đơn thuần cũng không, và một câu có hơn một phần tư từ
+  nội dung không phải ASCII thuần (lời nhờ tiếng Việt được giao bằng tiếng
+  Anh) cũng không.
+- **Từ nội dung** (`ask_words`): các chuỗi chữ và số viết thường, bỏ một tập
+  nhỏ từ nhờ và từ nối (`NOT_ASK`: "the", "to", "your", "agent", "have",
+  "please", …, và các dấu nói "dot", "slash", "underscore", "dash"), các từ
+  nơi chốn "lamp", "computer", "mac", "macbook", "laptop", và mọi dạng tên
+  agent giọng nói biết (`KINDS`), so cả cụm nên "open" trong "open the file"
+  vẫn giữ. Số đọc bằng chữ là chữ số ("five" là "5", `NUMBER_WORDS`), nên
+  "fruits dot md" và "fruits.md" là cùng từ; các từ khác so theo gốc. Chỉ
+  tính các từ sau tên agent cuối cùng (hoặc chữ "agent"): phần trước đó
+  thường là lời nói bâng quơ ("ugh, work was rough today, anyway have Claude
+  fix the login bug"), và lời bâng quơ không bao giờ được đẩy vào task gửi
+  ra khỏi đèn (#6537, bài đọc quyền riêng tư).
+- **Quy tắc.** Khi nghe được ít nhất `WHOLE_ASK_FEWEST` (4) từ nội dung, một
+  task giữ dưới `WHOLE_ASK_SHARE` (một nửa) số từ đó bị từ chối: "Nothing
+  was prepared: the task looks shorter than what the person asked of the
+  agent. If part of the task was left out (a count, a list or a file name),
+  call start_agent_task again now with the whole task; leave out anything
+  said that is not part of it." Các từ bị bỏ không bao giờ được nêu lại. Mỗi request chỉ từ chối một lần:
+  lần gọi thứ hai trong cùng request được cho qua, nên người dùng không bao
+  giờ bị kẹt.

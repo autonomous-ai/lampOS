@@ -3691,7 +3691,23 @@ after a take-over, but now for every turn:
   it."). Not held after any call of the same request but a `recall` ran
   unrefused, so a reminder set in round 1 may be confirmed in round 2,
   "Got it, I've saved that for five." (reviewer-three's and the
-  reviewer-lead's P2 on #3628). Tests: `a reply never says it kept something with no remember
+  reviewer-lead's P2 on #3628). A cut answer's finished rounds carried into
+  a held line (#5026) count as the turn's own here too: a carried call that
+  did something (its own round's result, matched by id within that round
+  since ids repeat across rounds, neither `remembered:false` nor an error) backs
+  the held line's "Kept: …", and a carried `remember_my_face` that saved
+  backs its face claim; a carried keep refused or failed backs nothing
+  (C135, lamp-06c1, 12 Nov, build 12226: request 26 kept the umbrella,
+  entry 1665, a newer line cut it before its words, and request 27's
+  "Kept: …" was said as `NOT_KEPT_LINE`). Tests: `a held line confirming a
+  carried keep says kept`, `a held line after a refused carried keep still
+  says not kept`, `a held line confirming a carried face save says saved`,
+  `a carried keep after a refused one with the same id says kept`, `a
+  refused carried keep never takes an earlier rounds result with its id`,
+  `a carried keep held for a yes backs no kept`, `a forget not run in the
+  held turn leaves a carried keep standing`, `a carried call with no
+  result of its own round counts nothing`,
+  `a reply never says it kept something with no remember
   call`, `a turn offered no function is never held for a claim`,
   `a keep said back to a yes with no remember is a claim`,
   `remember::tests::a_keep_said_back_on_a_yes_is_a_hard_claim` and
@@ -4655,7 +4671,12 @@ after a take-over, but now for every turn:
       `face_cleanup_uncertain`. The three fixed cleanup states survive, but
       this inner path never introduces `everything: true` because it does
       not perform the outer setup-name, place, voice-print, journal or
-      reminder cleanup ([memory.md](memory.md)). The same-turn reset also
+      reminder cleanup ([memory.md](memory.md)). A memory forget refused
+      to ask which (`ask_which`) keeps that fixed flag as
+      `asked_which=true`, never its note, and the fresh chat tells the
+      model to ask which and not call forget again in this turn (C134,
+      `after_forget::tests::a_forget_that_asked_which_stays_asked_past_the_reset`).
+      The same-turn reset also
       discards a pending rename note already composed before the face call.
       Tests are in `second_provider/tests/after_forget.rs`
       and `held_forget.rs`, with the prior acting-answer case in

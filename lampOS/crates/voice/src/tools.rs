@@ -1825,7 +1825,14 @@ fn run_call_with_scope(
                         .heard_for(request, std::time::Instant::now())
                 })
                 .flatten();
-            let named = crate::remember::named_forget(call, said.as_deref(), lease);
+            // A spoken forget whose line is no longer held (an earlier
+            // forget in this request let the thread go) is never the
+            // model's call unchecked: it asks which (C134).
+            let unheard = heard
+                && said.is_none()
+                && !lease.is_some_and(|lease| lease.undoes_own_keep(&call.args));
+            let named = crate::remember::forget_unheard(call, unheard)
+                .or_else(|| crate::remember::named_forget(call, said.as_deref(), lease));
             let call = named.as_ref().unwrap_or(call);
             // With `LAMP_MEMORY_KEEP_HEARD`, a `remember` whose sentence has
             // words the line did not keeps that line instead (#2176).
@@ -6653,6 +6660,14 @@ mod tests {
     /// thread answering each line it is sent with `answer`, and keeping
     /// what it was sent.
     fn services_folder(name: &str) -> (PathBuf, std::sync::Arc<std::sync::Mutex<Vec<Value>>>) {
+        services_folder_reading(name, json!({"items":[{"from":"Ann","subject":"Hi"}]}))
+    }
+
+    /// [`services_folder`], a read answered `read`.
+    fn services_folder_reading(
+        name: &str,
+        read: Value,
+    ) -> (PathBuf, std::sync::Arc<std::sync::Mutex<Vec<Value>>>) {
         let dir = schedule_directory(name);
         let tools: Vec<Value> = crate::services::NAMES
             .iter()
@@ -6681,7 +6696,7 @@ mod tests {
                     Some(crate::services::WRITE) => {
                         json!({"read_back":"To Ann: hello","send_id":"s1","sent":false})
                     }
-                    _ => json!({"items":[{"from":"Ann","subject":"Hi"}]}),
+                    _ => read.clone(),
                 };
                 kept.lock().unwrap().push(line);
                 writeln!(stream, "{}", json!({"ok":true,"result":result})).unwrap();
@@ -6768,6 +6783,80 @@ mod tests {
             }
             assert!(!crate::services::pending_for_test_is_some(), "{said}");
         }
+    }
+
+    /// Tracker row C132: with `LAMP_SERVICE_READ_IDS_KEPT` on, a calendar
+    /// read keeps its events' ids for the asker's next request, but a write
+    /// in the read's own request is still refused by the after-read rule,
+    /// exactly as with it off, and the service is never asked for it.
+    #[test]
+    fn a_write_in_a_reads_own_request_is_refused_with_read_ids_kept_on() {
+        let (dir, asked) = services_folder_reading(
+            "services-read-ids",
+            json!({"quoted":[{"id":"kctlh9nnt7045gm342qucliu0k","summary":"lamp train test 2",
+                "start":{"dateTime":"2026-11-13T21:00:00+07:00"}}]}),
+        );
+        let services = Route::Services(dir.clone());
+        crate::known_faces::owner_for_test(Some(Some("Ann".into())));
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        for (on, request) in [(false, 4_730_001_u64), (true, 4_730_011)] {
+            crate::service_read_ids::on_for_test(on);
+            crate::service_read_ids::forget();
+            let owner = crate::memory_scope::RequestScope::new(
+                crate::memory_scope::RequestKey {
+                    worker: lamp_turn_owner::BootId::new([7; 16]).unwrap(),
+                    session: 1,
+                    request,
+                },
+                crate::memory_scope::ScopeSnapshot::of("Ann"),
+            );
+            let (_, (told, _)) = run_call_scoped(
+                &services,
+                &call(
+                    crate::services::READ,
+                    json!({"service":"google_calendar","what":"events"}),
+                ),
+                request,
+                true,
+                &owner.lease(),
+            );
+            assert!(told.get("error").is_none(), "on {on}: {told}");
+            assert_eq!(
+                crate::service_read_ids::note_for(
+                    crate::services::owner_of(Some(&owner.lease())).as_deref(),
+                    Instant::now(),
+                )
+                .is_some_and(|note| note.contains("kctlh9nnt7045gm342qucliu0k")),
+                on,
+                "kept only with the switch on"
+            );
+            let before = asked.lock().unwrap().len();
+            for action in ["delete_event", "update_event"] {
+                let (_, (told, _)) = run_call_scoped(
+                    &services,
+                    &call(
+                        crate::services::WRITE,
+                        json!({"service":"google_calendar","action":action,
+                            "event_id":"kctlh9nnt7045gm342qucliu0k"}),
+                    ),
+                    request,
+                    true,
+                    &owner.lease(),
+                );
+                assert_eq!(
+                    told["error"],
+                    crate::services::AFTER_READ,
+                    "on {on}: {action}"
+                );
+            }
+            assert_eq!(asked.lock().unwrap().len(), before, "on {on}: never asked");
+        }
+        crate::service_read_ids::on_for_test(false);
+        crate::service_read_ids::forget();
     }
 
     #[test]

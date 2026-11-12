@@ -70,6 +70,17 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=lamp-tasks
 NoNewPrivileges=yes
+# Caps (#6306; crates/tasks/src/skill_task.rs: MEMORY_HIGH, CPU_QUOTA, TASKS_MAX; docs/tasks.md). A skill's run on the
+# lamp's Hermes is started by this part, so it stays in this cgroup beside Harness's `wait` and up to four `watch`es.
+# Sized for a skill task beside a spoken one: rest + 2 x delta x 1.5, rounded up. Measures: lamp-9adf, 12 Nov,
+# lamp-tasks.service cgroup (#6059), a real Hermes task: MemoryCurrent 632 MiB at rest, 1120 peak; TasksCurrent 91 at
+# rest, 126 peak (peaks sampled every 2 s, so a floor); CPU about 1.2 cores (an average over the run, an upper bound).
+# CPUQuota: 2 x 120% x 1.5 = 360%, leaving over 4 of the A733's 8 cores to the voice. MemoryHigh: past it the part is
+# throttled, never killed (no MemoryMax); with no swap on the lamp, every process here (serve included) stalls in reclaim
+# until the cgroup is back under it (inferred, not measured). TasksMax: past it a fork fails.
+MemoryHigh=2100M
+CPUQuota=360%
+TasksMax=512
 
 [Install]
 WantedBy=lampos.target

@@ -317,7 +317,27 @@ fn run() -> Result<()> {
             let note=lamp_voice::agent_tasks::session_note(&place).unwrap_or_default();
             // The lamp's own light functions, as the actions part declares them, so a step warmer is told apart from the colour warm (#6456).
             let light=lamp_actions::catalog(false,true).into_iter().map(|function|lamp_gemini::Tool{name:function.name.into(),description:function.description.into(),parameters:function.parameters,silent:false});
-            let tools:Vec<lamp_gemini::Tool>=lamp_voice::tools::declared(&lamp_voice::tools::Settings{decline:true,exec:None,memory:None,clock:false,..Default::default()}).into_iter().chain(light).chain(lamp_voice::agent_tasks::tools(&place)).collect();
+            let (tools,note,computer)=if flag=="--hand-overs" {
+                // #6547: declared as the lamp's own are, from its environment (its actions,
+                // skills, clock, use_skill), with its own target, so each request's route can
+                // be scored; nothing that writes or asks a socket. LAMP_HAND_OVERS_COMPUTER=ENGINE
+                // (`claude`, `codex`) adds one paired computer whose agent runs ENGINE.
+                let (mut settings,_)=lamp_voice::tools::take(&lamp_voice::tools::arguments_from_environment())?;
+                let place=settings.tasks.take().unwrap_or(place);
+                let engine=std::env::var(lamp_voice::tool_turns::COMPUTER_ENVIRONMENT).ok();
+                let place=lamp_voice::agent_tasks::Place{who:engine.is_some(),..place};
+                settings=lamp_voice::tools::Settings{decline:true,memory:None,who:None,mark:None,onboarding:None,tasks:Some(place.clone()),..settings};
+                // The tasks' functions as with the lamp's own target, each in its place, so the bound is the lamp's.
+                let (tasks,computer)=lamp_voice::agent_tasks::tools_on_the_lamp(&place,engine.as_deref());
+                let mut tools:Vec<lamp_gemini::Tool>=lamp_voice::tools::declared(&settings).into_iter().map(|tool|tasks.iter().find(|task|task.name==tool.name).cloned().unwrap_or(tool)).collect();
+                let light:Vec<lamp_gemini::Tool>=light.filter(|tool|!tools.iter().any(|known|known.name==tool.name)).collect();
+                tools.extend(light);
+                let after=lamp_voice::session_tools::told_after(&tools,&settings).unwrap_or_default();
+                let note=format!("{}{after}",lamp_voice::agent_tasks::session_note(&place).unwrap_or_default());
+                (tools,note,computer)
+            } else {
+                (lamp_voice::tools::declared(&lamp_voice::tools::Settings{decline:true,exec:None,memory:None,clock:false,..Default::default()}).into_iter().chain(light).chain(lamp_voice::agent_tasks::tools(&place)).collect(),note,"")
+            };
             let mut results=Vec::new();
             tokio::runtime::Builder::new_current_thread().enable_all().build()?.block_on(async {
                 use lamp_gemini::Event;
@@ -344,7 +364,7 @@ fn run() -> Result<()> {
                         };
                         pause=next_pause(pause,false);
                         let input=connection.input();
-                        let mut timeline=Timeline::default();
+                        let mut timeline=Timeline{computer,..Timeline::default()};
                         let mut broke=None;
                         for (index,line) in scripted.lines.iter().enumerate() {
                             // Only the last line is timed; those before it set the scene.
@@ -359,7 +379,7 @@ fn run() -> Result<()> {
                             loop {
                                 match tokio::time::timeout_at(deadline,connection.next_event()).await {
                                     Ok(Some(Event::ToolCall{call,..})) => {
-                                        if timed { timeline.call(&call.name,since()); }
+                                        if timed { timeline.call(&call.name,&call.args,since()); }
                                         let answer=stand_in(&call.name,&call.args,lead_in);
                                         if input.try_tool_response(&call.id,&call.name,&answer).is_ok() && timed { timeline.answered(since()); }
                                     }
@@ -389,6 +409,8 @@ fn run() -> Result<()> {
             summary["thinking_budget"]=serde_json::json!(thinking.map_or("as in CONFIG".to_owned(),|tokens|tokens.to_string()));
             summary["lead_in"]=serde_json::json!(lead_in);
             println!("{summary}");
+            // #6547: the routes as a table, a line a request, then the totals by class.
+            print!("{}",lamp_voice::tool_turns::table(&summary,script));
         },
         // A written request to a session that was told of two functions:
         // the voice's own way of saying a thing was not for it, and one of

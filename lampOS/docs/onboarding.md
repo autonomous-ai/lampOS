@@ -788,6 +788,17 @@ instead, with one journal line, and offered again only after the skill's
 `later` re-offer cut that way gets its count back, and is offered again by
 the `later` rules above. Off unless set.
 
+### Held for the first update (#6284, `LAMP_FIRST_UPDATE`)
+
+With `LAMP_FIRST_UPDATE=on` exactly (off, the walk is as above):
+
+- While setup's first-update file (`/var/lib/lampos-setup/first-update`) is there and owed (`FirstUpdate::owed`: within 20 min of its `at_unix_ms`), a walk not yet begun waits: no intro, no invite, no rise. A walk begun (an outcome kept, its intro heard or a step asked) is never held. The file is looked at once a second at most.
+- While held, as soon as lamp-update's `update/status` says its round brings a newer build (`UpdateStatus::brings_a_build`: the round's `target` newer than the running build, read a few seconds into `checking` before anything is fetched, or any phase after it; said after the file's date and not stale), the lamp says once per file, as the walk's own line in the owner's language: "I'm updating my software first. This takes a few minutes." (`FIRST_UPDATE_LINE`; vi "Mình cập nhật phần mềm trước nhé, mất vài phút thôi.", ja "先にソフトウェアを更新しますね。数分かかります。", zh "我先更新一下软件，需要几分钟。", ko "먼저 소프트웨어를 업데이트할게요. 몇 분 걸려요."). Already current, nothing is said.
+- Once the file is gone or past its 20 min, or `update/status` says a round begun since the file ended for good (`idle`, its `last` begun at or after the file's date, any outcome but `self-switched`: lamp-update in a home can't remove setup's file), the walk begins as before, and is not held again this voice start. A switch restarts the voice, and the new voice holds by the same rules: the file gone, the walk begins on the new build.
+- While held for an owed file, a person who talks to the lamp (a spoken line with words heard) is answered with no chat, only: "I'm still updating my software. Please wait a moment, I'll be ready soon." (`FIRST_UPDATE_WAIT_LINE`, the owner's ask on 12 Nov; vi "Mình vẫn đang cập nhật phần mềm. Bạn chờ mình một chút nhé, mình sắp xong rồi.", ja "まだソフトウェアを更新しています。少しお待ちください、もうすぐ準備できます。", zh "我还在更新软件，请稍等一下，马上就好。", ko "아직 소프트웨어를 업데이트하고 있어요. 조금만 기다려 주세요, 곧 준비돼요."). The walk's tick sets it (`set_updating`) and the second route reads it (`updating_words`), as it reads the walk's own lines. Once the walk is let go, lines get their chat as before.
+- `update/status` is read off the walk's own bus (`Bus::latest`), on the walk's tick, with the file: no thread of its own.
+- Records: `onboarding_first_update` with `state` `held`, `told` and `let_go`, once each. Tests: `onboarding::tests::without_the_first_update_switch_the_walk_begins_as_before`, `a_walk_waits_while_the_first_update_is_owed_and_begins_once_it_is_gone`, `the_first_update_line_is_said_once_when_a_build_is_fetched`, `a_stale_first_update_file_holds_nothing`, `a_begun_walk_is_never_held_for_the_first_update`, `a_person_heard_while_the_first_update_holds_is_told_to_wait`.
+
 ## Why a step is not_available
 
 Each measured step needs these, by switch, checked at every poll of the walk:

@@ -94,6 +94,9 @@ impl Fake {
                 "lampOS — sign and publish the tested lamp-voice artifact",
                 "lampOS — build and test on Linux ARM64 (2/3)",
                 "lampOS — build and test on Linux ARM64 (3/3)",
+                // Since #6556 the build and the release are two jobs beside the shards.
+                "lampOS — build and test on Linux ARM64 (build)",
+                "lampOS — build and test on Linux ARM64 (release)",
             ]
             .map(|name| Job {
                 name: name.into(),
@@ -532,6 +535,52 @@ fn source_provenance_must_match_original_successful_attempt() {
             // A later test runner of the same build failed, or none is there.
             13 => fake.jobs[3].conclusion = Some("failure".into()),
             14 => fake.jobs.retain(|j| !j.name.contains("ARM64")),
+            _ => unreachable!(),
+        }
+        assert!(promote(&mut fake, &context(10)).is_err(), "case {change}");
+        assert_eq!(fake.writes, 0);
+    }
+}
+/// lamp-voice's push that published the train pull request's tested build
+/// (#6556) skipped its ARM64 jobs; its successful reuse job stands for them,
+/// and only then may an ARM64 job be skipped.
+#[test]
+fn a_reused_build_promotes_only_with_its_reuse_job() {
+    let reuse = |fake: &mut Fake, conclusion: &str| {
+        for job in fake.jobs.iter_mut().filter(|j| j.name.contains("ARM64")) {
+            job.conclusion = Some("skipped".into());
+        }
+        let mut job = fake.jobs[1].clone();
+        job.name = "lampOS — reuse the train's tested ARM64 build".into();
+        job.conclusion = Some(conclusion.into());
+        fake.jobs.push(job);
+    };
+    let mut fake = Fake::new(Some(9));
+    reuse(&mut fake, "success");
+    promote(&mut fake, &context(10)).unwrap();
+    for change in 0..4 {
+        let mut fake = Fake::new(Some(9));
+        match change {
+            0 => reuse(&mut fake, "failure"),
+            1 => {
+                reuse(&mut fake, "success");
+                fake.jobs[0].conclusion = Some("failure".into());
+            }
+            2 => {
+                for job in fake.jobs.iter_mut().filter(|j| j.name.contains("ARM64")) {
+                    job.conclusion = Some("skipped".into());
+                }
+            }
+            // The release job failed while the reuse job passed.
+            3 => {
+                reuse(&mut fake, "success");
+                let release = fake
+                    .jobs
+                    .iter_mut()
+                    .find(|j| j.name.ends_with("(release)"))
+                    .unwrap();
+                release.conclusion = Some("failure".into());
+            }
             _ => unreachable!(),
         }
         assert!(promote(&mut fake, &context(10)).is_err(), "case {change}");

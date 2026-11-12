@@ -147,8 +147,9 @@ impl Lamp {
     /// Hermes and its two entry points, as this build's install leaves them.
     fn hermes_there(&self) {
         self.hermes_at(COMMIT);
-        fs::write(self.at(WRAPPER), WRAPPER_TEXT).unwrap();
-        fs::write(self.at(NS), NS_TEXT).unwrap();
+        fs::write(self.at(WRAPPER), wrapper_text(false)).unwrap();
+        fs::write(self.at(NS), ns_text(false, false)).unwrap();
+        agent_ns::write_hook_shim(self.root()).unwrap();
         // The build's own lampos SDK beside them (#6507).
         crate::sdk_tree::write(self.root()).unwrap();
     }
@@ -477,18 +478,31 @@ fn on_with_harness_there_installs_the_pinned_hermes_as_lampos() {
     }
     // What lampos reaches Hermes by: root's (the test's own user here),
     // each with its mode and text, and nothing left beside.
-    for (path, text) in [(WRAPPER, WRAPPER_TEXT), (NS, NS_TEXT)] {
+    for (path, text) in [
+        (WRAPPER, wrapper_text(false)),
+        (NS, ns_text(false, false)),
+        (agent_ns::HOOK_SHIM, agent_ns::HOOK_SHIM_TEXT.to_owned()),
+    ] {
         let place = lamp.at(path);
         assert_eq!(fs::read_to_string(&place).unwrap(), text, "{path}");
         assert_eq!(mode(&place), 0o755, "{path}");
     }
-    // The namespace script and the build's own lampos SDK (#6507, one folder, no staging left beside).
-    assert_eq!(
-        fs::read_dir(lamp.at("/usr/local/lib/lampos"))
+    assert_eq!(mode(&lamp.at(agent_ns::BIN)), 0o755);
+    let names = |folder: &str| {
+        let mut names: Vec<String> = fs::read_dir(lamp.at(folder))
             .unwrap()
-            .count(),
-        2
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    };
+    // The namespace script, the shared hook stand-in's folder (#6530) and
+    // the build's own lampos SDK (#6507, one folder, no staging left beside).
+    assert_eq!(
+        names("/usr/local/lib/lampos"),
+        ["hermes-ns", "ns-bin", "sdk-python"]
     );
+    assert_eq!(names(agent_ns::BIN), ["harness"]);
     assert!(crate::sdk_tree::present(lamp.root()));
 }
 
@@ -914,9 +928,11 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         "/dev/shm",
         "/run/systemd/resolve",
         SKILLS_SOCKET,
+        PUSHED,
     ] {
         fs::create_dir_all(at(made)).unwrap();
     }
+    let pushed = at(PUSHED);
     fs::write(&resolv, "nameserver 127.0.0.53\n").unwrap();
     let control = at(CONTROL_SOCKET);
     let control_folder = at("/run/lampos-control");
@@ -1029,6 +1045,8 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         when_tasks(format!("mount --bind {control} {stage}/l")),
         when_net(format!("touch {stage}/b")),
         when_net(format!("mount --bind {bridge} {stage}/b")),
+        when_net(format!("mkdir -m 0700 {stage}/p")),
+        when_net(format!("mount --bind {pushed} {stage}/p")),
         Some(format!(
             "mount -t tmpfs -o size=1m,mode=0755,nosuid,nodev,noexec none {}",
             at("/run")
@@ -1068,11 +1086,17 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         when_net(format!(
             "mount -o remount,bind,ro,nosuid,nodev,relatime {bridge}"
         )),
+        when_net(format!("mkdir -p {pushed}")),
+        when_net(format!("mount --move {stage}/p {pushed}")),
+        when_net(format!(
+            "mount -o remount,bind,ro,nosuid,nodev,relatime {pushed}"
+        )),
         Some(if tasks {
             format!("rm -f {stage}/r {stage}/l {stage}/b")
         } else {
             format!("rm -f {stage}/r")
         }),
+        when_net(format!("rmdir {stage}/p")),
         Some(if skills {
             format!("rmdir {stage}/h {stage}/w {stage}/k {stage}/c {stage}")
         } else {
@@ -1128,6 +1152,12 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
             "{lines:#?}"
         );
         assert!(!lines.iter().any(|line| line.contains("net-relay")));
+        // Nor the pushed skills, there on this root: only a skill's run
+        // sees them.
+        assert!(
+            !lines.iter().any(|line| line.contains(&pushed)),
+            "{lines:#?}"
+        );
     }
     // Never lamp-control's owner socket, either way.
     assert!(
@@ -1148,6 +1178,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         .chain([resolv.clone()])
         .chain(tasks.then(|| control.clone()))
         .chain(netted.then(|| bridge.clone()))
+        .chain(netted.then(|| pushed.clone()))
         .collect();
     assert_eq!(
         shown,
@@ -1195,6 +1226,12 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         format!("mount --move {stage}/b"),
         format!("findmnt -no VFS-OPTIONS -M {bridge}"),
         format!("remount,bind,ro,nosuid,nodev,relatime {bridge}"),
+        format!("mkdir -m 0700 {stage}/p"),
+        format!("--bind {pushed}"),
+        format!("mount --move {stage}/p"),
+        format!("findmnt -no VFS-OPTIONS -M {pushed}"),
+        format!("remount,bind,ro,nosuid,nodev,relatime {pushed}"),
+        format!("rmdir {stage}/p"),
         "ip link set lo up".to_owned(),
         "net-relay".to_owned(),
     ];
@@ -1252,6 +1289,16 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         assert!(String::from_utf8_lossy(&out.stderr).contains(&format!("no {bridge}")));
         assert!(!lines.iter().any(|line| line.ends_with(" chat -q a b")));
         let _bridge = std::os::unix::net::UnixListener::bind(&bridge).unwrap();
+        // No pushed skills on this lamp: skipped, and Hermes still runs.
+        fs::remove_dir(&pushed).unwrap();
+        let (out, lines) = run("");
+        assert!(out.status.success(), "{lines:#?}");
+        assert!(lines.iter().any(|line| line.ends_with(" chat -q a b")));
+        assert!(
+            !lines.iter().any(|line| line.contains(&pushed)),
+            "{lines:#?}"
+        );
+        fs::create_dir_all(&pushed).unwrap();
     }
     if tasks {
         // A lamp with no control socket (lamp-control not serving): skipped,
@@ -1287,6 +1334,7 @@ fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
         [at(PLACE), at(WORK), at(SKILLS), resolv.clone()]
             .iter()
             .chain(netted.then_some(&bridge))
+            .chain(netted.then_some(&pushed))
             .map(String::as_str)
             .collect::<Vec<_>>()
     );
@@ -1729,6 +1777,10 @@ fn the_switch_off_takes_the_wrapper_out() {
     drop(run);
     assert!(runs.lines().is_empty(), "{:?}", runs.lines());
     assert!(lamp.entry_points().is_empty());
+    assert!(
+        !lamp.at(agent_ns::BIN).exists(),
+        "the hook stand-in goes with the last namespace script"
+    );
     assert!(lamp.at(HERMES).exists(), "Hermes in its folder stays");
     assert_eq!(lamp.asked(), None);
     assert_eq!(lamp.said(), None);
@@ -1969,7 +2021,7 @@ fn the_skills_switch_is_on_by_default_on_every_lamp() {
 /// removes its staging folder; nothing else of the script changes.
 #[test]
 fn the_skills_text_is_the_namespace_script_with_only_the_skills_socket_added() {
-    assert_eq!(ns_text(false, false), NS_TEXT);
+    assert_eq!(ns_text(false, false), agent_ns::with_ns_path(NS_TEXT));
     assert!(!NS_TEXT.contains(SKILLS_SOCKET));
     assert!(!NS_TEXT.contains("$C"));
     let on = ns_text(true, false);
@@ -2056,7 +2108,7 @@ fn the_tasks_switch_is_lamp_tasks_own_and_on_in_the_product() {
 /// Off, the text is unchanged.
 #[test]
 fn the_tasks_text_is_the_namespace_script_with_only_the_control_socket_added() {
-    assert_eq!(ns_text(false, false), NS_TEXT);
+    assert_eq!(ns_text(false, false), agent_ns::with_ns_path(NS_TEXT));
     assert!(!NS_TEXT.contains("lampos-control"));
     assert!(!NS_TEXT.contains("\"$L\""));
     let with_skills = ns_text(true, false);
@@ -2116,9 +2168,11 @@ fn the_tasks_text_is_the_namespace_script_with_only_the_control_socket_added() {
 fn a_net_run_shows_the_bridge_brings_lo_up_and_starts_the_relay() {
     let on = ns_text(false, true);
     for line in [
-        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S=/tmp/.lampos-ns\n",
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n",
         "if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n",
         "if [ \"${LAMP_NS_NET-}\" = run ]; then mkdir -p \"${B%/*}\" && touch \"$B\" && mount --move \"$S/b\" \"$B\" && ro \"$B\" || fail \"$B not shown\"; fi\n",
+        "if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]; then mkdir -m 0700 \"$S/p\" && mount --bind \"$P\" \"$S/p\" || fail \"no $P\"; else P=; fi\n",
+        "if [ -n \"$P\" ]; then mkdir -p \"$P\" && mount --move \"$S/p\" \"$P\" && ro \"$P\" || fail \"$P not shown\"; fi\n",
         "  I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x \"$p\" ]; then I=$p; break; fi; done\n",
         "  [ -n \"$I\" ] || fail \"no ip: lo not up, the run has no way out\"\n",
         "  \"$I\" link set lo up || fail \"lo not up\"\n",
@@ -2176,7 +2230,10 @@ fn a_net_run_shows_the_bridge_brings_lo_up_and_starts_the_relay() {
 /// then (unset otherwise). Run under `sh` with a stand-in `unshare`.
 #[test]
 fn the_wrapper_adds_net_only_for_a_net_run_with_the_tasks_switch_on() {
-    assert_eq!(wrapper_text(false), WRAPPER_TEXT);
+    assert_eq!(
+        wrapper_text(false),
+        agent_ns::with_hook_note(WRAPPER_TEXT, "hermes")
+    );
     for (from, _) in WRAPPER_TASKS_EDITS {
         assert_eq!(WRAPPER_TEXT.matches(from).count(), 1, "{from}");
     }
@@ -2268,7 +2325,7 @@ fn both_switches_on_make_both_edits() {
     assert!(both.contains("mount --move \"$S/c\" \"$C\" && ro \"$C\""));
     assert!(both.contains("mount --move \"$S/l\" \"$L\" && ro \"$L\""));
     assert!(both.contains(
-        " C=/run/lampos-skills L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S="
+        " C=/run/lampos-skills L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S="
     ));
     assert!(!both.contains("admin.sock"));
     assert_eq!(
@@ -2328,7 +2385,10 @@ fn turning_the_tasks_switch_on_or_off_writes_the_namespace_script_again() {
     assert!(!text.contains("tasks"), "{text}");
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 50).unwrap().install, "installed");
-    assert_eq!(fs::read_to_string(lamp.at(NS)).unwrap(), NS_TEXT);
+    assert_eq!(
+        fs::read_to_string(lamp.at(NS)).unwrap(),
+        ns_text(false, false)
+    );
 }
 
 /// Turning the skills switch on with Hermes there (written with it off):
@@ -2365,7 +2425,10 @@ fn turning_the_skills_switch_on_or_off_writes_the_namespace_script_again() {
         fs::read_to_string(lamp.at(NS)).unwrap(),
         ns_text(true, false)
     );
-    assert_eq!(fs::read_to_string(lamp.at(WRAPPER)).unwrap(), WRAPPER_TEXT);
+    assert_eq!(
+        fs::read_to_string(lamp.at(WRAPPER)).unwrap(),
+        wrapper_text(false)
+    );
     assert_eq!(mode(&lamp.at(NS)), 0o755);
     assert!(present(lamp.root(), SKILLS_ON) && !present(lamp.root(), OFF));
     assert_eq!(
@@ -2385,7 +2448,10 @@ fn turning_the_skills_switch_on_or_off_writes_the_namespace_script_again() {
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 50).unwrap().install, "installed");
     assert!(runs.stages().is_empty());
-    assert_eq!(fs::read_to_string(lamp.at(NS)).unwrap(), NS_TEXT);
+    assert_eq!(
+        fs::read_to_string(lamp.at(NS)).unwrap(),
+        ns_text(false, false)
+    );
     assert!(present(lamp.root(), OFF));
 }
 
@@ -2401,7 +2467,10 @@ fn an_ask_without_skills_is_off() {
     lamp.ask();
     let runs = Runs::new(&lamp);
     assert_eq!(install(&lamp, &runs, 5).unwrap().install, "installed");
-    assert_eq!(fs::read_to_string(lamp.at(NS)).unwrap(), NS_TEXT);
+    assert_eq!(
+        fs::read_to_string(lamp.at(NS)).unwrap(),
+        ns_text(false, false)
+    );
 }
 
 /// Under 1 GiB of memory available (`MemAvailable`; lamp-c0a4 had about
@@ -2623,4 +2692,123 @@ fn an_ask_from_the_app_tries_a_recent_failure_again_but_not_an_install_under_way
     let mut again = Fake::default();
     assert_eq!(asked_round(&lamp, &mut again, 100 + 2 * HOUR_MS), None);
     assert!(again.asked.is_empty());
+}
+
+/// (#6530) The shared hook stand-in is written with the namespace script
+/// and kept while another engine's namespace script (OpenClaw's) is there:
+/// Hermes's entry points taken out leave it for OpenClaw.
+#[test]
+fn the_hook_stand_in_stays_while_another_engines_namespace_uses_it() {
+    let lamp = Lamp::new();
+    lamp.hermes_there();
+    assert!(present(lamp.root(), OFF));
+    fs::write(lamp.at(crate::openclaw_install::NS), "").unwrap();
+    remove_entry_points(lamp.root(), &mut quiet());
+    assert!(lamp.entry_points().is_empty());
+    assert!(
+        agent_ns::hook_shim_there(lamp.root()),
+        "OpenClaw still uses it"
+    );
+    fs::remove_file(lamp.at(crate::openclaw_install::NS)).unwrap();
+    remove_entry_points(lamp.root(), &mut quiet());
+    assert!(!lamp.at(agent_ns::HOOK_SHIM).exists());
+    assert!(!lamp.at(agent_ns::BIN).exists());
+    // Hermes as this build puts it needs the stand-in: one missing is
+    // Hermes missing, written again.
+    lamp.hermes_there();
+    fs::remove_file(lamp.at(agent_ns::HOOK_SHIM)).unwrap();
+    assert!(!present(lamp.root(), OFF));
+}
+
+/// (#6530) Every namespace script, for every switch, puts the stand-in's
+/// folder first on the `PATH` once, right before the line that runs
+/// Hermes, after anything the switches add; and the wrapper says once,
+/// outside the namespace, that Harness's hooks aren't there yet.
+#[test]
+fn every_namespace_script_finds_the_hook_stand_in_first_on_its_path() {
+    let path_line =
+        "PATH=/usr/local/lib/lampos/ns-bin:${PATH:-/usr/local/bin:/usr/bin:/bin}\nexport PATH\n";
+    for skills in [false, true] {
+        for tasks in [false, true] {
+            let text = ns_text(skills, tasks);
+            assert_eq!(text.matches(path_line).count(), 1, "{skills} {tasks}");
+            assert!(
+                text.ends_with(&format!(
+                    "{path_line}exec /usr/bin/unshare --user --map-user=\"$U\" --map-group=\"$G\" {HERMES} \"$@\"\n"
+                )),
+                "{skills} {tasks}"
+            );
+            let wrapper = wrapper_text(tasks);
+            let note = agent_ns::hook_note_line("hermes");
+            assert_eq!(wrapper.matches(&note).count(), 1);
+            assert!(wrapper.find(&note) < wrapper.find("LAMP_NS_UID="));
+            assert!(wrapper[..512].contains("Written by lamp-update."));
+        }
+    }
+    assert!(agent_ns::hook_note_line("hermes").starts_with(
+        "logger -t hermes \"Harness hooks aren't available inside the lamp's agent namespace yet (openharness#4194)\" 2>/dev/null || :"
+    ));
+}
+
+/// (#6530) The wrapper's journal line never fails a start: with a
+/// `logger` that fails, Hermes's namespace is still entered.
+#[test]
+fn a_failing_logger_never_fails_the_wrapper() {
+    let folder = tempfile::tempdir().unwrap();
+    let bin = folder.path().join("bin");
+    fs::create_dir(&bin).unwrap();
+    let logged = folder.path().join("logged");
+    for (name, body) in [
+        (
+            "logger",
+            format!("echo \"$*\" > {}\nexit 1\n", logged.display()),
+        ),
+        ("unshare", "echo ran\n".to_owned()),
+    ] {
+        let place = bin.join(name);
+        fs::write(&place, format!("#!/bin/sh\n{body}")).unwrap();
+        fs::set_permissions(&place, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let token = folder.path().join("hermes-token");
+    fs::write(&token, "tok\n").unwrap();
+    let wrapper = folder.path().join("hermes");
+    fs::write(
+        &wrapper,
+        wrapper_text(false)
+            .replace(TOKEN, &token.to_string_lossy())
+            .replace("/usr/bin/unshare", &bin.join("unshare").to_string_lossy()),
+    )
+    .unwrap();
+    let out = std::process::Command::new("/bin/sh")
+        .arg(&wrapper)
+        .env("PATH", format!("{}:/usr/bin:/bin", bin.display()))
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "ran\n");
+    assert_eq!(
+        fs::read_to_string(&logged).unwrap(),
+        format!("-t hermes {}\n", agent_ns::HOOK_NOTE)
+    );
+}
+
+/// #6506: lamp-tasks offers an engine on the lamp only when its program
+/// in `/usr/local/bin` carries this line in its first 512 bytes
+/// (`lamp_tasks::runtime::LAMP_WRAPPER_MARK`). Hermes's and OpenClaw's
+/// wrappers, with the tasks switch on or off, all do.
+#[test]
+fn every_engine_wrapper_carries_the_mark_lamp_tasks_looks_for() {
+    const MARK: &str = "Written by lamp-update.";
+    for text in [
+        wrapper_text(false),
+        wrapper_text(true),
+        crate::openclaw_install::WRAPPER_TEXT.to_owned(),
+    ] {
+        let head = &text.as_bytes()[..text.len().min(512)];
+        assert!(
+            head.windows(MARK.len()).any(|w| w == MARK.as_bytes()),
+            "{}",
+            text.lines().nth(1).unwrap_or_default()
+        );
+    }
 }

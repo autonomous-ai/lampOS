@@ -50,6 +50,9 @@ const READ: &[(&str, &str, Type)] = &[
     // This lamp takes `onboarding.page` and sends `onboarding.page_done`
     // (#6076), with the same switch.
     ("system.info", "onboarding_page_supported", Type::Flag),
+    // This lamp sends `update.started` and `update.ended` (#6284): said only
+    // with LAMP_APP_UPDATE_EVENTS on.
+    ("system.info", "update_events_supported", Type::Flag),
     // Which page contract (#6366): 2 is per-tap Add and the `done` page.
     ("system.info", "onboarding_page_version", Type::Whole),
     ("volume.get", "volume", Type::Percent),
@@ -171,6 +174,8 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         .unwrap();
     // The switch on, with a state folder (#5812); no other test here reads it.
     lamp_cloud::onboarding_done::switch(Some(root.join(lamp_cloud::onboarding_done::FILE)));
+    // And the update's events' switch (#6284).
+    lamp_cloud::update_events::switch(Some(root.join(lamp_cloud::update_events::FILE)));
     // The voice's heartbeat, its walk ended (#5812).
     let mut walk = ring
         .publisher_declared(
@@ -727,6 +732,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
                     commit: "5b40a1523".into(),
                 }),
             }),
+            refused: None,
             engines: None,
         },
     )
@@ -783,6 +789,7 @@ fn the_software_update_is_answered_from_lamp_updates_status() {
         last: None,
         harness: None,
         round: None,
+        refused: None,
         engines: None,
     };
     says.publish_json(0, &idle).unwrap();
@@ -957,6 +964,7 @@ fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
         last: None,
         harness: None,
         round: None,
+        refused: None,
         engines: Some(std::collections::BTreeMap::from([(
             "hermes".to_owned(),
             lamp_msgs::EngineInstall {
@@ -985,6 +993,15 @@ fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
     let refused = sent(&mut real, "engines.install", json!({"engine": "hermes"}));
     assert_eq!(refused["status"], "failure", "{refused}");
     assert_eq!(refused["error"], lamp_cloud::update::NOT_MISSING);
+    // #6492: the default agent, an empty name refused before lamp-tasks is
+    // asked; the reply the app reads carries the refusal's code.
+    let unknown = sent(&mut real, "engines.default", json!({"engine": ""}));
+    assert_eq!(unknown["status"], "failure", "{unknown}");
+    assert_eq!(
+        unknown["error"],
+        lamp_cloud::engine_default::ENGINE_UNKNOWN,
+        "{unknown}"
+    );
 
     says.publish_json(0, &with("failed", None, Some("no_memory")))
         .unwrap();
@@ -1021,6 +1038,7 @@ fn the_lamps_agents_are_answered_and_a_missing_one_installed() {
     let told = sent(&mut real, "update.status", json!({}));
     assert!(told["data"].get("engines").is_none(), "{told}");
     assert!(answer(&mut real, "engines.install", &json!({"engine": "hermes"})).is_err());
+    assert!(answer(&mut real, "engines.default", &json!({"engine": "hermes"})).is_err());
     let _ = std::fs::remove_dir_all(root);
 }
 

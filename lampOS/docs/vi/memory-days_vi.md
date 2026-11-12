@@ -20,7 +20,13 @@ thời tiết được giữ.
 
 Điều kiện của first builder (#3504): để sót một bản sao là lỗi quan trọng
 nhất, nên lượt có liên kết bị xóa chỉ cần trùng một từ, chấp nhận xóa thừa vài
-lượt không liên quan. Lượt không liên kết phải chứa đủ mọi từ, nếu không
+lượt không liên quan. Từ trùng ấy không bao giờ là động từ mở đầu của bộ ghi
+quan sát (`days::OPENERS`: want, ask, like, prefer, enjoy và các dạng của
+chúng, như `tidy` coi là chung chung): trên lamp-06c1 (12/11, C136), quên
+«Wants the light a little warmer.» từng xóa năm quan sát lịch «Wants an event
+…» và một câu «Wants a long story …» có liên kết, chỉ vì chữ «want». Ghi chú
+chỉ gồm những động từ đó thì vẫn giữ chúng, nên lượt đi không bao giờ rộng hơn
+trước; tìm kiếm và quy tắc bản sao dưới đây cũng vẫn giữ chúng. Lượt không liên kết phải chứa đủ mọi từ, nếu không
 «màu yêu thích là tím» sẽ xóa mọi câu có chữ «yêu thích».
 
 Mã chuẩn hóa chữ hoa/thường và `đ`, bỏ từ quá ngắn hoặc quá thông dụng, coi
@@ -118,6 +124,20 @@ không nghe được gì hoặc các từ của nó có trong phần yêu cầu 
 một `about` chưa từng được nói bị bỏ và lệnh quên được xem là không nêu tên
 (lamp-06c1, 9/11, bản 10824: «Lamp, forget that.» đi kèm một `about` 2 từ,
 chạy đúng như gọi và xóa chiếc khăn mà không hỏi là thứ nào).
+Một lệnh quên nói ra mà câu của nó không còn được giữ thì không bao giờ
+chạy đúng như mô hình gọi (`remember::forget_unheard`, C134): mỗi lệnh quên
+xóa luồng hội thoại, cả câu của chính yêu cầu đó, nên lần gọi lại của mô
+hình trong cùng yêu cầu không còn câu nào. Không có `source_id` và không có
+`about` thì nó được đánh dấu là không nêu tên và đi qua các bước kiểm tra
+ở trên, không bao giờ tự xóa thứ được giữ mới nhất (`forget_last`) mà không
+hỏi; có một trong hai thì nó được xem là không rõ và không xóa gì. Sau khi
+một lệnh quên đã xóa một thứ, không còn gì là «vừa cho ra», nên lệnh «quên
+cái đó» thứ hai không bao giờ xóa thứ mới nhất kế tiếp, của họ hay, trên
+câu của phòng, của phòng. Một lần từ chối để hỏi là thứ nào mang cờ cố
+định `ask_which` (`remember::ASK_WHICH`), được giữ qua lần đặt lại cuộc trò
+chuyện sau lệnh quên dưới dạng `asked_which=true`, nên mô hình hỏi lại thay
+vì gọi quên lần nữa (lamp-06c1, 12/11, bản 12226: «Lamp, forget that.» bị
+từ chối rồi được gọi lại trong cùng yêu cầu đã xóa chiếc ô).
 
 ## Nhật ký dừng sau một lệnh quên, rồi chạy lại
 
@@ -141,7 +161,13 @@ locker code is 441.» đã giữ và «My gym locker code is 441.» bị giữ l
 và trước đó cả «They said: » mà một câu giữ theo lời nghe được mở đầu: C81,
 bản 11091, 10/11, «They said: my gym locker code is 441.» là «Gym locker code
 is 441.»; không bao giờ trong phạm vi căn phòng, nơi «my» là của bất kỳ ai nói,
-`days::own_text`), là chính điều đã giữ đó, không ghi
+`days::own_text`; và trong cả hai phạm vi, một chữ số đọc thành chữ trọn
+từ «zero» đến «nine» là chữ số của nó, mỗi chuỗi chữ số đơn liền nhau là
+một số, nên «four four one» và «4 4 1» là «441»: C81, bản 12226, 12/11,
+«They said: my gym locker code is four four one.» giữ theo lời nghe được
+và «My gym locker code is 441.» bị giữ lại thành id mới; «someone» hay
+«tone» vẫn là chữ, «oh» không bao giờ là số không, và câu đã giữ không bao
+giờ bị đổi, `days::digit_text`), là chính điều đã giữ đó, không ghi
 thêm dòng nào. Một lời sửa có `once` mà nêu đúng điều đã giữ bằng cùng chữ như
 vậy (`Days::restates`) cũng là điều đó được nói lại: không có bản mới, và nó
 mang thời điểm được nói lại («last said»). Lời sửa (`replaces`) luôn ghi bản mới; câu của người khác, hoặc
@@ -1151,6 +1177,54 @@ mỗi người đã biết được gửi qua relay tới mô hình một lần 
 những gì qua được kiểm tra, từng mục một. Không nói hay hiện gì; nhật ký chỉ
 có số đếm.
 
+## Chương tuần (B2, `LAMP_MEMORY_WEEKLY_CHAPTERS`, C109)
+
+Kế hoạch trích xuất của người phụ trách trí nhớ, B2, sau lượt ban đêm B: mỗi
+tuần một lần, một chương ngắn về tuần địa phương (thứ Hai đến Chủ nhật) của
+một người đã biết, do cùng luồng ban đêm viết từ những gì lượt B đã kiểm tra
+và giữ trong tuần đó. Chương không bao giờ đọc một lượt trao đổi; nó dẫn các
+mục nó dựa vào (`crates/memory/src/chapters.rs`, `nightly.rs` của voice).
+
+- **Khi nào:** `LAMP_MEMORY_WEEKLY_CHAPTERS=on` của voice, cùng với
+  `LAMP_MEMORY_NIGHTLY=on` (tắt nếu không đặt). Mỗi người đã biết được nghe
+  trong một tuần được xếp hàng cho tuần đó (chỉ trong bộ nhớ, như các ngày);
+  sau khi các ngày của đêm đó xong, một tuần đã qua được một lần gọi, trong
+  cùng giờ, yên lặng, công tắc riêng tư và ngân sách đêm như một ngày. Tuần
+  được bỏ sau lần gọi, hoặc 7 ngày sau Chủ nhật của nó.
+- **`weekly_prepare`** `{"person","week"}` (`week` là một thứ Hai,
+  `YYYY-MM-DD`, của một tuần đã qua; nếu không thì `bad_day`): các tập,
+  sự kiện, việc sắp tới, khuôn mẫu và cảm xúc hiện hành của người đó có ngày
+  trong tuần, theo thứ tự ngày, tối đa 48 mục và 24 KiB; ít hơn 2 là
+  `"reason":"nothing"`. Tuần đã có chương là `done`. Việc chỉ giữ id
+  (`nightly_weeks`), không bao giờ giữ chữ, và mất sau một ngày.
+- **`weekly_apply`** `{"person","job","proposal"}`: `{"chapter":{"text",
+  "cites"}}` của đề xuất được kiểm tra: `shape` (trống, quá 600 byte, ký tự
+  điều khiển, dẫn rỗng, quá 16, lặp), `unknown_source` (dẫn ngoài việc),
+  `forgotten` (một mục việc đã đưa, được dẫn hay không, đã mất từ lúc chuẩn
+  bị), `grounded` (dưới một
+  phần ba từ nội dung có trong các mục được dẫn: mô hình tóm tắt, không thêm
+  gì), `private_kind` (kiểm tra từ sức khoẻ và tiền bạc của lượt ban đêm,
+  trừ khi mọi mục được dẫn dựa trên một điều được giữ), `full`, `done`.
+- **Lưu** như một quan sát `entries` (`category='chapter'`, ngày là Chủ nhật
+  của tuần) với dòng `nightly_items` (`kind='chapter'`, hết hạn 90 ngày sau
+  Chủ nhật) và các cạnh `sources` tới mọi mục việc đã đưa, được dẫn hay
+  không (mô hình đã đọc hết, nên chữ của nó có thể kể một mục nó không dẫn).
+  Không phai, không nhường chỗ, và một mục bên dưới hết hạn thì không kéo nó
+  theo: nó đóng vào ngày của nó, hoặc khi bị quên. Một tập nằm dưới một
+  chương còn hiệu lực không phai khi chương còn sống, nên một nguồn có thể
+  sống quá hạn phai của chính nó tối đa bằng tuổi của chương.
+- **`chapters`** `{"person","day_from","day_to"}`: các chương của người đó
+  có tuần chạm khoảng ngày, mới nhất trước, tối đa 2 và 1.200 byte. Voice
+  chỉ hỏi khi một người đã biết tự hỏi lại về một ngày hay một khoảng ngày,
+  và đưa các chương lên đầu như bản tóm tắt của chính họ. Chương không bao
+  giờ vào ghi chú phiên, nên không lượt nào có lời nhắc dài thêm.
+- **Riêng tư:** chỉ phạm vi riêng của một người đã biết: phòng chung, phạm vi
+  quy tắc và người lạ là `bad_person` ở cả ba lệnh. Quên bất cứ thứ gì chương
+  đã được đưa, dù chương có dẫn hay không, sẽ xoá chương; `forget_all` và `forget_person` xoá mọi chương và
+  việc tuần của người đó. Không nói hay hiện gì; nhật ký voice chỉ có số đếm.
+- **Tắt:** không gửi lệnh tuần hay `chapters`; không có dòng chương nào, mọi
+  câu trả lời giữ nguyên từng byte. lamp-memory cũ trả lời `unknown_op`.
+
 ## Đầu dò của bộ đo (#4748)
 
 Bộ đo bộ nhớ (`docs/memory-bench.md`) chạy một tháng qua chính client Days của
@@ -1358,6 +1432,16 @@ mô hình được hỏi lại một lần, lần thứ hai thì lamp nói «I d
 Tell me again and I'll remember it.». Chi tiết ở
 [second-voice.md](../second-voice.md).
 
+Các vòng đã xong của một câu trả lời bị cắt, được mang sang một câu bị giữ
+(#5026), cũng tính là của lượt đó: một lệnh mang sang đã làm được việc (kết
+quả của chính vòng của nó, khớp theo id trong vòng đó vì id lặp lại giữa các
+vòng, không phải `remembered:false` hay một lỗi) chống lưng cho «Kept: …» của
+câu bị giữ, và một `remember_my_face` mang sang đã lưu chống lưng cho lời
+nói đã lưu khuôn mặt; một lệnh giữ mang sang bị từ chối hay lỗi thì không
+(C135, lamp-06c1, 12/11, bản 12226: yêu cầu 26 đã giữ chiếc ô, mục 1665, một
+câu mới cắt nó trước khi kịp nói, và «Kept: …» của yêu cầu 27 bị nói thành
+`NOT_KEPT_LINE`).
+
 ## Lời bị cắt giữ phạm vi mà câu của nó đã định (lamp-0c4e, 10/11)
 
 Trên lamp-0c4e, một câu hỏi được mang theo (yêu cầu 238, về trà nhài) đã
@@ -1375,3 +1459,34 @@ mà câu này được mang theo cho (`second_provider::said_saying`), nó giữ
 vi của người đó; nếu không, nó là của phòng như trước. Câu có lời mà không
 quy tắc nào xét vẫn là của phòng, và một giọng khác xuất hiện vẫn thu hẹp về
 phòng. Chi tiết ở [memory.md](../memory.md).
+
+## Gỡ hẳn một người ngay trên lamp, không cần app
+
+Bản tiếng Việt của mục `lamp-cloud face-remove NAME` trong
+[cloud.md](../cloud.md) («The faces it knows») và
+[memory.md](../memory.md) («Forgetting a person»).
+
+`lamp-cloud face-remove TÊN` làm đúng việc nút «Remove» của app làm với
+`entirely: true` (`faces::remove`): mắt quên khuôn mặt, rồi bộ nhớ chạy
+`forget_person` cho từng id mà câu trả lời của mắt nêu, không hủy nhắc nhở
+(như bản product, không có `LAMP_APP_SCHEDULE`). Lệnh không cần công tắc,
+không qua broker và không mở socket nào mới: nó chỉ kết nối tới socket của
+mắt (`/run/lampos-eyes/who.sock`, hoặc `LAMP_EYES_WHO_SOCKET`) và của bộ nhớ
+(`/run/lampos-memory/memory.sock`, 0600 cho user của bộ nhớ, hoặc socket hẹp
+trong `LAMP_MEMORY_FORGET_SOCKET`). Vì vậy lệnh chạy bằng root; `lampos` chỉ
+chạy được khi socket hẹp của bộ nhớ đang mở và được chỉ ra. User khác bị từ
+chối trước khi chạm tới socket nào. Socket của bộ nhớ được kiểm tra trước
+tiên (`access(2)`, quyền ghi, theo user thật): nếu user này không mở được nó,
+hoặc nó không có ở đó, lệnh từ chối trước khi hỏi mắt bất cứ điều gì, nêu tên
+socket và bảo chạy bằng root hoặc chỉ ra socket hẹp; nhờ vậy khuôn mặt không
+bao giờ bị xóa trong khi bộ nhớ vẫn giữ người đó (P3 của Reviewer-lead trên
+#6580).
+
+Lệnh chặt hơn app ở một điểm: một tên mà mắt không liệt kê
+(`{"list":true,"waiting":true}`, không phân biệt hoa thường) bị từ chối, kèm
+danh sách tên mắt đang biết, và không có gì bị quên; gõ nhầm tên không bao giờ
+xóa nhầm một id theo tên. Lệnh in một dòng: `removed: ` và câu trả lời như app
+nhận, thêm `people` là các id bộ nhớ đã hỏi; hoặc `refused: LÝ DO`. Mã thoát
+là 0 chỉ khi cả khuôn mặt lẫn bộ nhớ đều đã đi; 1 trong mọi trường hợp khác
+(kể cả bộ nhớ trả `kept`); 2 khi gọi sai. `LAMP_FACES_PAGE` và các unit giữ
+nguyên.

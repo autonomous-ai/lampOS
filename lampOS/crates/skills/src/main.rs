@@ -1213,6 +1213,8 @@ fn serve(
     // a skill for this run of the program, not at every reload (Thirteen's
     // P3 on #5402).
     let mut order_said: HashSet<String> = HashSet::new();
+    // A made skill whose old limits are ignored, said once a run.
+    let mut shed_said: HashSet<String> = HashSet::new();
     // Night sleep's live claim (#940), with routines on: said at each
     // reload, every minute and when its rest path goes down or comes back,
     // so Expression knows the night is a skill's. Its third part is why the
@@ -1352,6 +1354,19 @@ fn serve(
                         skill.name
                     );
                 }
+                // A made skill's old default limits, ignored as it loads
+                // with LAMP_MADE_SKILL_LOOSE on, its folder left as it is
+                // (`lamp_skills::shed_made_manners`). Its name alone.
+                for skill in skills.iter().filter(|skill| {
+                    !skill.manners_shed.is_empty() && shed_said.insert(skill.name.clone())
+                }) {
+                    eprintln!(
+                        "lamp-skills: {}: made here, {}=on: the lamp's old {} ignored, its files as they are",
+                        skill.name,
+                        lamp_voice::made_skill::LOOSE_ENVIRONMENT,
+                        skill.manners_shed.join(" and ")
+                    );
+                }
                 // Keep the previous accepted generation intact if its
                 // cap declarations cannot be installed as one bounded set.
                 // The earlier asset scan still revokes changed media;
@@ -1388,10 +1403,12 @@ fn serve(
                     .iter()
                     .filter(|skill| skill.task_step().is_some())
                     .filter_map(|skill| {
-                        let folder = match &skill.pushed_by {
-                            Some(_) => options.dev_dir.as_deref()?.join(&skill.name),
-                            None => dir.join(&skill.name),
-                        };
+                        let folder = lamp_skills::task::folder_of(
+                            dir,
+                            options.dev_dir.as_deref(),
+                            &skill.name,
+                            skill.pushed_by.is_some(),
+                        )?;
                         Some((skill.name.clone(), (folder, skill.grants.clone())))
                     })
                     .collect();

@@ -24,6 +24,17 @@ use std::{
 /// round within about this, plus the bus's own wake.
 pub const LOOK_EVERY: Duration = Duration::from_secs(1);
 
+/// What ended [`AppCheck::wait_or`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Woken {
+    /// The whole wait.
+    Waited,
+    /// The app's check.
+    Asked,
+    /// The first update after setup is owed (#6284).
+    Due,
+}
+
 /// `serve`'s side of the check: its subscription, and when a check last
 /// started a round.
 pub struct AppCheck {
@@ -34,7 +45,13 @@ pub struct AppCheck {
     look: Duration,
     /// The app's taps to install an agent (#6240), with its switch on.
     engines: Option<crate::engines::Asks>,
+    /// The sequences of refused builds the owner asked to retry (#6266),
+    /// heard with the checks that started the round and not yet taken.
+    retries: Vec<u64>,
 }
+
+/// Whether the first update is due, saying what it does (#6284).
+pub type Due<'a> = dyn FnMut(&mut dyn FnMut(&str)) -> bool + 'a;
 
 impl AppCheck {
     /// Subscribed to `update/check` on the bus at `root`. A bus or topic
@@ -59,6 +76,7 @@ impl AppCheck {
             last: None,
             look: LOOK_EVERY,
             engines: None,
+            retries: Vec::new(),
         }
     }
 
@@ -82,6 +100,7 @@ impl AppCheck {
     /// the install waits for a round anyway.
     pub fn forget(&mut self, say: &mut dyn FnMut(&str)) {
         self.waiting();
+        self.retries.clear();
         if let Some(engines) = &mut self.engines {
             engines.take(Instant::now(), say);
         }
@@ -99,10 +118,19 @@ impl AppCheck {
             .last
             .is_some_and(|last| now.saturating_duration_since(last) < UpdateCheck::AGAIN_AFTER)
         {
+            // Dropped with the check, as the check is.
+            self.retries.clear();
             return false;
         }
         self.last = Some(now);
         true
+    }
+
+    /// The refused builds the owner asked to retry (#6266) with the checks
+    /// that started this round: taken once, for the caller to drop their
+    /// refusals before the round.
+    pub fn take_retries(&mut self) -> Vec<u64> {
+        std::mem::take(&mut self.retries)
     }
 
     /// Takes every check waiting; whether there was one that reads.
@@ -112,9 +140,48 @@ impl AppCheck {
         };
         let mut any = false;
         while let Ok(Some(message)) = checks.recv(Duration::ZERO) {
-            any |= message.parse::<UpdateCheck>().is_ok();
+            if let Ok(check) = message.parse::<UpdateCheck>() {
+                any = true;
+                self.retries.extend(check.retry);
+            }
         }
         any
+    }
+
+    /// The wait between rounds with the first update after setup on
+    /// (#6284, crate::first_update): as [`AppCheck::wait`], and `due`
+    /// looked at first and then after each look, every [`LOOK_EVERY`] even
+    /// without a subscription. A check or a tap to install an agent taken
+    /// ends it as [`Woken::Asked`], `due` as [`Woken::Due`].
+    pub fn wait_or(
+        &mut self,
+        ears: &mut dyn Ears,
+        every: Duration,
+        say: &mut dyn FnMut(&str),
+        due: &mut Due<'_>,
+    ) -> Woken {
+        if due(say) {
+            return Woken::Due;
+        }
+        let until = Instant::now() + every;
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Woken::Waited;
+            }
+            let _ = ears.listen(left.min(self.look));
+            let now = Instant::now();
+            let installs = self
+                .engines
+                .as_mut()
+                .is_some_and(|engines| engines.take(now, say));
+            if self.asked(now) || installs {
+                return Woken::Asked;
+            }
+            if due(say) {
+                return Woken::Due;
+            }
+        }
     }
 
     /// The wait between rounds: `ears` listen for `every`, as before, and
@@ -150,6 +217,47 @@ impl AppCheck {
                 return true;
             }
         }
+    }
+}
+
+/// The owner's retry of refused builds (#6266): each of `sequences` that is
+/// refused is dropped from the state, under the records' lock, so the round
+/// that follows takes that build again. A sequence that is not refused is
+/// ignored, and the round is a plain check. A build that is really unwell is
+/// refused again by the round itself, so a retry never loops. Said, one line
+/// each.
+pub fn drop_refusals(
+    records: &crate::records::Records,
+    sequences: &[u64],
+    say: &mut dyn FnMut(&str),
+) {
+    if sequences.is_empty() {
+        return;
+    }
+    // Not while another lamp-update holds the records: the retry is then a
+    // plain check, and the app asks again (the round is not going to start).
+    let Ok(_lock) = records.lock() else {
+        say("a retry of a refused build: another lamp-update is at work, so it is a plain check");
+        return;
+    };
+    let Ok(mut state) = records.state(say) else {
+        return;
+    };
+    let mut dropped = false;
+    for sequence in sequences {
+        if state.forget_refusal(*sequence) {
+            say(&format!(
+                "the owner asked to retry build {sequence}: its refusal is dropped"
+            ));
+            dropped = true;
+        } else {
+            say(&format!(
+                "the owner asked to retry build {sequence}: it is not refused, so a plain check"
+            ));
+        }
+    }
+    if dropped && let Err(error) = records.save_state(&state) {
+        say(&format!("the refusals could not be saved: {error}"));
     }
 }
 
@@ -212,7 +320,7 @@ mod tests {
         // A check said during the wait ends it within about a look.
         let sender = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(30));
-            cloud.publish_json(0, &UpdateCheck {}).unwrap();
+            cloud.publish_json(0, &UpdateCheck::default()).unwrap();
             cloud
         });
         let started = Instant::now();
@@ -222,10 +330,10 @@ mod tests {
         let mut cloud = sender.join().unwrap();
 
         // Asked again within the minute: dropped, and the wait goes on.
-        cloud.publish_json(0, &UpdateCheck {}).unwrap();
+        cloud.publish_json(0, &UpdateCheck::default()).unwrap();
         assert!(!check.wait(&mut ears, Duration::from_millis(120), &mut |_| {}));
         // A minute after the last that started a round, it may again.
-        cloud.publish_json(0, &UpdateCheck {}).unwrap();
+        cloud.publish_json(0, &UpdateCheck::default()).unwrap();
         assert!(check.asked(Instant::now() + UpdateCheck::AGAIN_AFTER));
     }
 
@@ -235,12 +343,12 @@ mod tests {
         let mut check = AppCheck::new(root.path(), &mut |_| {});
         let mut cloud = cloud(&Bus::new(root.path()).unwrap());
         // Two taps while the round ran.
-        cloud.publish_json(0, &UpdateCheck {}).unwrap();
-        cloud.publish_json(0, &UpdateCheck {}).unwrap();
+        cloud.publish_json(0, &UpdateCheck::default()).unwrap();
+        cloud.publish_json(0, &UpdateCheck::default()).unwrap();
         check.forget(&mut |_| {});
         assert!(!check.asked(Instant::now()));
         // The next is taken.
-        cloud.publish_json(0, &UpdateCheck {}).unwrap();
+        cloud.publish_json(0, &UpdateCheck::default()).unwrap();
         assert!(check.asked(Instant::now()));
     }
 
@@ -251,12 +359,51 @@ mod tests {
         let mut cloud = bus
             .publisher_declared(UpdateCheck::TOPIC, &UpdateCheck::declaration(), "cloud")
             .unwrap();
-        let said = cloud.publish_json(0, &UpdateCheck {}).unwrap();
+        let said = cloud.publish_json(0, &UpdateCheck::default()).unwrap();
         assert_eq!(said.delivered, 0, "nobody reads it yet");
         assert!(bus.latest(UpdateCheck::TOPIC).unwrap().is_none());
         let mut check = AppCheck::new(root.path(), &mut |_| {});
         std::thread::sleep(Duration::from_millis(250));
         assert!(!check.asked(Instant::now()));
+    }
+
+    /// #6284: an owed first update ends the wait at the next look, a bus
+    /// or not; nothing owed, the whole wait.
+    #[test]
+    fn the_first_update_owed_ends_the_wait_at_its_next_look() {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("not-a-folder");
+        std::fs::write(&file, "").unwrap();
+        let mut check = AppCheck::new(&file, &mut |_| {}).looking_every(LOOK);
+        let mut ears = Waits::default();
+        // Owed already: no listen at all.
+        assert_eq!(
+            check.wait_or(&mut ears, Duration::from_secs(60), &mut |_| {}, &mut |_| {
+                true
+            }),
+            Woken::Due
+        );
+        assert!(ears.0.is_empty());
+        // Owed from the third look on.
+        let mut looks = 0;
+        let started = Instant::now();
+        let woken = check.wait_or(&mut ears, Duration::from_secs(60), &mut |_| {}, &mut |_| {
+            looks += 1;
+            looks > 3
+        });
+        assert_eq!(woken, Woken::Due);
+        assert!(started.elapsed() < Duration::from_secs(1));
+        assert_eq!(ears.0.len(), 3);
+        // Never owed: the whole wait.
+        assert_eq!(
+            check.wait_or(
+                &mut ears,
+                Duration::from_millis(120),
+                &mut |_| {},
+                &mut |_| false
+            ),
+            Woken::Waited
+        );
     }
 
     #[test]
@@ -328,5 +475,33 @@ mod tests {
         check.forget(&mut |_| {});
         assert!(engines.pending());
         assert!(!check.wait(&mut ears, Duration::from_millis(120), &mut |_| {}));
+    }
+
+    /// The owner's retry of a refused build (#6266) comes with the check that
+    /// starts the round, once; one dropped with a too-soon check is dropped
+    /// with it, and a plain check carries none.
+    #[test]
+    fn a_retry_in_the_check_is_heard_once_with_the_round_it_starts() {
+        let root = tempfile::tempdir().unwrap();
+        let mut check = AppCheck::new(root.path(), &mut |_| {}).looking_every(LOOK);
+        let mut cloud = cloud(&Bus::new(root.path()).unwrap());
+        let mut ears = Waits::default();
+        cloud
+            .publish_json(0, &UpdateCheck { retry: Some(7) })
+            .unwrap();
+        assert!(check.wait(&mut ears, Duration::from_secs(2), &mut |_| {}));
+        assert_eq!(check.take_retries(), vec![7]);
+        assert!(check.take_retries().is_empty(), "taken once");
+        // Within the minute: the check is dropped, and the retry with it.
+        cloud
+            .publish_json(0, &UpdateCheck { retry: Some(8) })
+            .unwrap();
+        assert!(!check.asked(Instant::now()));
+        assert!(check.take_retries().is_empty());
+        // A plain check carries none.
+        let later = Instant::now() + UpdateCheck::AGAIN_AFTER;
+        cloud.publish_json(0, &UpdateCheck::default()).unwrap();
+        assert!(check.asked(later));
+        assert!(check.take_retries().is_empty());
     }
 }

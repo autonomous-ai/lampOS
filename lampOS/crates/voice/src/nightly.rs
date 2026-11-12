@@ -64,6 +64,24 @@ pub const ENVIRONMENT: &str = "LAMP_MEMORY_NIGHTLY";
 pub const PATTERNS_ENVIRONMENT: &str = "LAMP_MEMORY_NIGHTLY_PATTERNS";
 /// Feelings asked for and sent `feelings:true`: `on` only.
 pub const FEELINGS_ENVIRONMENT: &str = "LAMP_MEMORY_NIGHTLY_FEELINGS";
+/// Weekly chapters (B2): `on` only, and only with [`ENVIRONMENT`] on. Each
+/// known person heard in a week gets one call for that week's chapter, the
+/// first night after it ends, after that night's days; and a recall of
+/// theirs naming a day or span is told their chapters of it
+/// ([`chapters_on`]).
+pub const CHAPTERS_ENVIRONMENT: &str = "LAMP_MEMORY_WEEKLY_CHAPTERS";
+/// A week waits for its chapter this many days after its Sunday at most.
+pub const WEEKS_BACK: i64 = 7;
+/// The drop reasons Days counts for a chapter; any other key is not read.
+pub const CHAPTER_REASONS: [&str; 7] = [
+    "shape",
+    "unknown_source",
+    "forgotten",
+    "grounded",
+    "private_kind",
+    "full",
+    "done",
+];
 /// The night's hours, local.
 pub const NIGHT_FROM_HOUR: u8 = 3;
 pub const NIGHT_UNTIL_HOUR: u8 = 6;
@@ -124,6 +142,13 @@ pub const REASONS: [&str; 16] = [
 ];
 
 static ON: AtomicBool = AtomicBool::new(false);
+static CHAPTERS: AtomicBool = AtomicBool::new(false);
+
+/// Whether a recall is told chapters: [`CHAPTERS_ENVIRONMENT`] and
+/// [`ENVIRONMENT`] both `on` when the voice started. Off, one load.
+pub fn chapters_on() -> bool {
+    CHAPTERS.load(Ordering::Relaxed)
+}
 /// Speech, a line, or the slide closing: each moves it on.
 static STIRS: AtomicU64 = AtomicU64::new(0);
 static LAST_STIR_US: AtomicU64 = AtomicU64::new(0);
@@ -192,6 +217,11 @@ impl Lamp for Told {
 pub trait Memory: Send {
     fn prepare(&mut self, line: &Value) -> Option<Value>;
     fn apply(&mut self, line: &Value) -> Option<Value>;
+    /// A weekly chapter's op (`weekly_prepare`, `weekly_apply`); none
+    /// unless Days has them.
+    fn weekly(&mut self, _line: &Value) -> Option<Value> {
+        None
+    }
 }
 
 /// Days on its socket.
@@ -203,6 +233,15 @@ impl Memory for Socket {
     fn apply(&mut self, line: &Value) -> Option<Value> {
         crate::tools::exchange(&self.0, line, MEMORY_WAIT)
     }
+    fn weekly(&mut self, line: &Value) -> Option<Value> {
+        crate::tools::exchange_up_to(&self.0, line, MEMORY_WAIT, MOST_PREPARE_BYTES)
+    }
+}
+
+/// The Monday (days since 1970-01-01) of the week of local day `day`.
+pub fn monday_of(day: i64) -> i64 {
+    // 1970-01-01 was a Thursday.
+    day - (day + 3).rem_euclid(7)
 }
 
 /// The `nightly_prepare` line for `person`'s `day` (`YYYY-MM-DD`), after
@@ -446,6 +485,9 @@ pub enum Step {
     Refused,
     /// The proposal was applied; Days' counts.
     Applied(Box<Counts>),
+    /// A week's chapter was applied: kept or not, and Days' drop reasons
+    /// ([`CHAPTER_REASONS`] only).
+    Chapter { kept: bool, reasons: String },
     /// The proposal could not be read, or the call timed out: applied
     /// empty, which closes the job with nothing kept.
     Emptied(Emptied),
@@ -479,6 +521,10 @@ pub struct Night<M, L, K> {
     pending: BTreeSet<(i64, String)>,
     /// The next batch of the first pending day: (day, person, after id).
     after: Option<(i64, String, u64)>,
+    /// Weekly chapters ([`CHAPTERS_ENVIRONMENT`]): off by default.
+    pub chapters: bool,
+    /// (the week's Monday, person) waiting for a chapter.
+    weeks: BTreeSet<(i64, String)>,
     /// The lamp's stirs at the last look.
     seen_stirs: u64,
     runtime: tokio::runtime::Runtime,
@@ -505,6 +551,8 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
             tokens: 0,
             pending: BTreeSet::new(),
             after: None,
+            chapters: false,
+            weeks: BTreeSet::new(),
             seen_stirs: 0,
             runtime: tokio::runtime::Builder::new_current_thread()
                 .enable_time()
@@ -532,8 +580,11 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
     /// known person's id ([`lamp_msgs::known::is_person_id`]).
     pub fn note(&mut self, person: &str, at_unix_ms: u64) {
         if lamp_msgs::known::is_person_id(person) {
-            self.pending
-                .insert((self.local.day(at_unix_ms), person.to_owned()));
+            let day = self.local.day(at_unix_ms);
+            self.pending.insert((day, person.to_owned()));
+            if self.chapters {
+                self.weeks.insert((monday_of(day), person.to_owned()));
+            }
         }
     }
 
@@ -553,6 +604,16 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
         while self.pending.len() > MOST_PENDING {
             self.pending.pop_first();
         }
+        self.weeks
+            .retain(|(monday, _)| *monday + 6 >= today - WEEKS_BACK && *monday <= today);
+        while self.weeks.len() > MOST_PENDING {
+            self.weeks.pop_first();
+        }
+    }
+
+    /// How many person-weeks wait for a chapter.
+    pub fn weeks_waiting(&self) -> usize {
+        self.weeks.len()
     }
 
     /// The day `day` is done for `person`: its batches all applied, or let
@@ -584,7 +645,16 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
             return Step::Spent;
         }
         let Some((day, person)) = self.pending.iter().find(|(day, _)| *day < today).cloned() else {
-            return Step::NoWork;
+            // The days done: a week over waits for its chapter.
+            let week = self
+                .weeks
+                .iter()
+                .find(|(monday, _)| *monday + 6 < today)
+                .cloned();
+            return match week {
+                Some((monday, person)) if self.chapters => self.chapter(monday, &person),
+                _ => Step::NoWork,
+            };
         };
         let after_id = match &self.after {
             Some((d, p, after)) if *d == day && *p == person => *after,
@@ -609,6 +679,34 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
         };
         let system = crate::nightly_prompt::system(self.switches);
         let input = crate::nightly_prompt::user(&prepared.input);
+        let (proposal, emptied) = match self.ask(&system, &input, stirs) {
+            Ok(asked) => asked,
+            Err(step) => return self.told(step),
+        };
+        let answer =
+            self.memory
+                .apply(&apply_line(&person, &prepared.job, self.switches, proposal));
+        match prepared.more_after.filter(|after| *after > after_id) {
+            Some(after) => self.after = Some((day, person, after)),
+            None => self.done(day, &person),
+        }
+        let step = match (emptied, answer.as_ref().and_then(Counts::of)) {
+            (Some(emptied), _) => Step::Emptied(emptied),
+            (None, Some(counts)) => Step::Applied(Box::new(counts)),
+            (None, None) => Step::Unanswered,
+        };
+        self.told(step)
+    }
+
+    /// One model call within the night's bounds: the proposal read (empty
+    /// when unread or timed out, and why), or the step that ends it
+    /// ([`Step::Spent`], [`Step::Stopped`]).
+    fn ask(
+        &mut self,
+        system: &str,
+        input: &str,
+        stirs: u64,
+    ) -> Result<(Value, Option<Emptied>), Step> {
         let size = (system.len() + input.len()) as u64;
         let reserve = size / BYTES_A_TOKEN + REPLY_TOKENS;
         if self.bytes + size + MOST_REPLY_BYTES as u64 > self.bounds.bytes
@@ -617,16 +715,16 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
             // Not asked: the job waits in Days, and the day for the next
             // night (within DAYS_BACK).
             self.calls = self.bounds.calls;
-            return self.told(Step::Spent);
+            return Err(Step::Spent);
         }
         if self.lamp.stirs() != stirs || !self.may_work() {
-            return self.told(Step::Stopped);
+            return Err(Step::Stopped);
         }
         self.calls += 1;
         self.bytes += size;
         let (lamp, model, timeout) = (&self.lamp, &self.model, self.bounds.timeout);
         let asked = self.runtime.block_on(async {
-            let call = tokio::time::timeout(timeout, model.ask(&system, &input));
+            let call = tokio::time::timeout(timeout, model.ask(system, input));
             tokio::pin!(call);
             loop {
                 tokio::select! {
@@ -643,7 +741,7 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
             }
         });
         let (proposal, emptied) = match asked {
-            None => return self.told(Step::Stopped),
+            None => return Err(Step::Stopped),
             Some(Err(_)) => {
                 self.tokens += reserve;
                 (json!({}), Some(Emptied::TimedOut))
@@ -653,7 +751,7 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
                 self.bytes += text.len() as u64;
                 self.tokens += tokens.unwrap_or(size + text.len() as u64);
                 if self.lamp.stirs() != stirs || !self.lamp.open() {
-                    return self.told(Step::Stopped);
+                    return Err(Step::Stopped);
                 }
                 match proposal_of(&text) {
                     Some(proposal) => (proposal, None),
@@ -661,17 +759,53 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
                 }
             }
         };
-        let answer =
-            self.memory
-                .apply(&apply_line(&person, &prepared.job, self.switches, proposal));
-        match prepared.more_after.filter(|after| *after > after_id) {
-            Some(after) => self.after = Some((day, person, after)),
-            None => self.done(day, &person),
-        }
-        let step = match (emptied, answer.as_ref().and_then(Counts::of)) {
+        Ok((proposal, emptied))
+    }
+
+    /// A week's chapter for `person`: prepared, asked and applied once;
+    /// the week is let go whatever came of it.
+    fn chapter(&mut self, monday: i64, person: &str) -> Step {
+        let stirs = self.lamp.stirs();
+        let line = json!({"op":"weekly_prepare","person":person,"week":day_name(monday)});
+        let input = match self.memory.weekly(&line) {
+            Some(answer) if answer["ok"] == true && answer["reason"] == "nothing" => {
+                self.weeks.remove(&(monday, person.to_owned()));
+                return self.told(Step::Nothing);
+            }
+            Some(answer)
+                if answer["ok"] == true
+                    && answer["input"]["job"]
+                        .as_str()
+                        .is_some_and(|job| !job.is_empty()) =>
+            {
+                answer["input"].clone()
+            }
+            _ => {
+                self.weeks.remove(&(monday, person.to_owned()));
+                return self.told(Step::Refused);
+            }
+        };
+        let system = crate::nightly_prompt::chapter_system();
+        let user = crate::nightly_prompt::chapter_user(&input);
+        let (proposal, emptied) = match self.ask(system, &user, stirs) {
+            Ok(asked) => asked,
+            Err(step) => return self.told(step),
+        };
+        let applied = self
+            .memory
+            .weekly(&json!({"op":"weekly_apply","person":person,
+            "job":input["job"],"proposal":proposal}));
+        self.weeks.remove(&(monday, person.to_owned()));
+        let step = match (emptied, applied) {
             (Some(emptied), _) => Step::Emptied(emptied),
-            (None, Some(counts)) => Step::Applied(Box::new(counts)),
-            (None, None) => Step::Unanswered,
+            (None, Some(answer)) if answer["ok"] == true => Step::Chapter {
+                kept: answer["accepted"] == 1,
+                reasons: nonzero(
+                    &CHAPTER_REASONS,
+                    &CHAPTER_REASONS.map(|key| answer["reasons"][key].as_u64().unwrap_or(0)),
+                ),
+            },
+            (None, _) => Step::Unanswered,
         };
         self.told(step)
     }
@@ -698,7 +832,11 @@ impl<M: Memory, L: Lamp, K: Model> Night<M, L, K> {
             let step = self.step();
             if !matches!(
                 step,
-                Step::Applied(_) | Step::Emptied(_) | Step::Nothing | Step::Unanswered
+                Step::Applied(_)
+                    | Step::Chapter { .. }
+                    | Step::Emptied(_)
+                    | Step::Nothing
+                    | Step::Unanswered
             ) {
                 std::thread::sleep(LOOK_EVERY);
             }
@@ -716,6 +854,10 @@ fn told(step: &Step) -> String {
         Step::Nothing => "nothing of that day".into(),
         Step::Refused => "the memory refused the prepare; that day let go".into(),
         Step::Applied(counts) => format!("applied, {}", counts.told()),
+        Step::Chapter { kept, reasons } => format!(
+            "a week's chapter {}, reasons {reasons}",
+            if *kept { "kept" } else { "not kept" }
+        ),
         Step::Emptied(Emptied::TimedOut) => "the model's call timed out; applied empty".into(),
         Step::Emptied(Emptied::Unread) => "the model's reply did not read; applied empty".into(),
         Step::Unanswered => "applied; the memory's answer did not read".into(),
@@ -767,7 +909,16 @@ pub fn start_from_environment() {
         Ok(local) => local,
         Err(error) => return said(&error.to_string()),
     };
-    start(&socket, model, local, Switches::from_environment());
+    let chapters = switched_on(std::env::var(CHAPTERS_ENVIRONMENT).ok().as_deref());
+    // A recall finds the chapters already made even when no night runs.
+    CHAPTERS.store(chapters, Ordering::Relaxed);
+    start(
+        &socket,
+        model,
+        local,
+        Switches::from_environment(),
+        chapters,
+    );
 }
 
 /// The relay's model as the second route's file names it: the relay's own
@@ -801,7 +952,7 @@ pub fn relay_of(config: &crate::second_config::SecondConfig) -> Result<Relay, St
     .map_err(|error| error.to_string())
 }
 
-fn start(socket: &Path, model: Relay, local: LocalTime, switches: Switches) {
+fn start(socket: &Path, model: Relay, local: LocalTime, switches: Switches, chapters: bool) {
     LAST_STIR_US.store(lamp_ipc::monotonic_us(), Ordering::Relaxed);
     ON.store(true, Ordering::Relaxed);
     let mut night = match Night::new(Socket(socket.to_owned()), Told, model, local) {
@@ -812,15 +963,17 @@ fn start(socket: &Path, model: Relay, local: LocalTime, switches: Switches) {
         }
     };
     night.switches = switches;
+    night.chapters = chapters;
     let spawned = std::thread::Builder::new()
         .name("lamp-voice-nightly".into())
         .spawn(move || night.run());
     match spawned {
         Ok(_) => eprintln!(
-            "lamp-voice: nightly on: {NIGHT_FROM_HOUR:02}:00 to {NIGHT_UNTIL_HOUR:02}:00, after {} min quiet with the slide open, at most {NIGHT_CALLS} calls, {NIGHT_BYTES} bytes and {NIGHT_TOKENS} tokens a night; patterns {}, feelings {} (LAMP_MEMORY_NIGHTLY)",
+            "lamp-voice: nightly on: {NIGHT_FROM_HOUR:02}:00 to {NIGHT_UNTIL_HOUR:02}:00, after {} min quiet with the slide open, at most {NIGHT_CALLS} calls, {NIGHT_BYTES} bytes and {NIGHT_TOKENS} tokens a night; patterns {}, feelings {}, weekly chapters {} (LAMP_MEMORY_NIGHTLY)",
             QUIET_FOR.as_secs() / 60,
             if switches.patterns { "on" } else { "off" },
             if switches.feelings { "on" } else { "off" },
+            if chapters { "on" } else { "off" },
         ),
         Err(error) => {
             ON.store(false, Ordering::Relaxed);

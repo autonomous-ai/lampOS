@@ -120,6 +120,9 @@ pub struct Config {
     /// `LAMP_UPDATE_IMAGE=on`: the image's own files a build carries are
     /// written the same way (crate::image, #1369).
     pub image: bool,
+    /// `LAMP_FIRST_UPDATE=on` (#6284, crate::first_update): while the first
+    /// update after a setup is owed, the setup walk does not hold a round.
+    pub first_update: bool,
     /// This program's own bytes, from which a round refreshes the settings
     /// writer before it looks at a build (crate::writer_swap). None: the
     /// writer is never refreshed.
@@ -453,8 +456,9 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         apply_failed: false,
     };
     if !config.apply {
-        let state = run.records.peek_state();
-        return match run.look(&state) {
+        // A dry round: the state is only looked at, never kept.
+        let mut state = run.records.peek_state();
+        return match run.look(&mut state) {
             Ok((manifest, changes, placing))
                 if changes.is_empty()
                     && run.placings.is_empty()
@@ -540,8 +544,14 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     {
         outcome = switched;
     }
-    run.records
-        .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
+    // Before setup, a channel out of reach is a plain line, not a round's
+    // end that `update/status` reads back at a restart (#6284).
+    if crate::first_update::kept(crate::first_update::before_setup(config), &outcome) {
+        run.records
+            .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
+    } else {
+        run.records.log(outcome.kind(), &outcome.kept());
+    }
     outcome
 }
 
@@ -736,6 +746,13 @@ impl Run<'_, '_> {
             && crate::setup_lifecycle::done(&self.config.root)
     }
 
+    /// Setup left unrestarted by the first update after it
+    /// ([`crate::setup_lifecycle::first_update_leaves`]).
+    fn leave_setup_for_first_update(&self, back: &Back, unit: &str) -> bool {
+        self.forced()
+            && crate::setup_lifecycle::first_update_leaves(&self.config.root, &back.unit, unit)
+    }
+
     fn say(&mut self, line: &str) {
         (self.world.say)(line);
     }
@@ -770,7 +787,7 @@ impl Run<'_, '_> {
             Ok(state) => state,
             Err(error) => return Outcome::Failed(format!("the state cannot be read: {error}")),
         };
-        let (manifest, mut changes, placing) = match self.look(&state) {
+        let (manifest, mut changes, placing) = match self.look(&mut state) {
             Ok(found) => found,
             Err(outcome) => return outcome,
         };
@@ -807,10 +824,14 @@ impl Run<'_, '_> {
         }
         // The setup walk under way: nothing fetched or switched this round,
         // at most `walk::MOST_HELD` rounds on a lamp (#3689, crate::walk).
-        if crate::walk::under_way(self.config)
-            && let Some(held) = crate::walk::hold(self.records.folder())
-        {
-            return Outcome::NotQuiet(crate::walk::held(held));
+        // Not while the first update after setup is owed (#6284): the walk
+        // has not begun, the voice holding it until that round ends.
+        if crate::walk::under_way(self.config) {
+            if crate::first_update::before_walk(self.config, crate::records::unix_ms()) {
+                self.say(crate::first_update::NOT_HELD);
+            } else if let Some(held) = crate::walk::hold(self.records.folder()) {
+                return Outcome::NotQuiet(crate::walk::held(held));
+            }
         }
         // A template is never active itself, and never restarted: only its
         // instances run.
@@ -919,7 +940,10 @@ impl Run<'_, '_> {
 
     /// Steps 2 to 5: what the newest build would change here, or why
     /// nothing will.
-    fn look(&mut self, state: &State) -> Result<(Manifest, Vec<Change>, Option<Placing>), Outcome> {
+    fn look(
+        &mut self,
+        state: &mut State,
+    ) -> Result<(Manifest, Vec<Change>, Option<Placing>), Outcome> {
         let url = format!("{}{}", self.config.channel_url, manifest::ENVELOPE);
         let mut envelope = Vec::new();
         match self
@@ -955,6 +979,17 @@ impl Run<'_, '_> {
                     manifest.sequence, installed.sequence
                 )));
             }
+        }
+        // A build put back while a part was held by a passing local state is no
+        // fault of its own: one more try after 24 hours or a reboot (#6266).
+        let boot = crate::own::boot_id(&self.config.root);
+        if let Some(after) =
+            state.lapse_held(manifest.sequence, records::unix_ms(), boot.as_deref())
+        {
+            self.say(&format!(
+                "build {} was put back while a part was held by a passing local state; after {after} it is tried once more",
+                manifest.sequence
+            ));
         }
         if let Some(refusal) = state.refusal(manifest.sequence) {
             return Err(Outcome::Refused(format!(
@@ -1450,11 +1485,14 @@ impl Run<'_, '_> {
                 // the writer this lamp-update. Only in a round that applies: a
                 // dry one (a climbed updater's confirm) writes nothing.
                 // So is the models switch file, from updater 11
-                // (`manifest::MODELS_ENV_UPDATER`).
+                // (`manifest::MODELS_ENV_UPDATER`), and lamp-update's own
+                // switch file, from updater 12 (`manifest::UPDATE_ENV_UPDATER`).
                 if self.config.apply
                     && !these.is_empty()
                     && let Some(newer) = manifest.settings.iter().find(|setting| {
-                        setting.path == manifest::STORE_ENV || setting.path == manifest::MODELS_ENV
+                        setting.path == manifest::STORE_ENV
+                            || setting.path == manifest::MODELS_ENV
+                            || setting.path == manifest::UPDATE_ENV
                     })
                     && let Some(running) = &self.config.writer_from
                     && fs::read(self.config.on(crate::own::BACK))
@@ -2136,10 +2174,10 @@ impl Run<'_, '_> {
         // "says nothing" for 22 minutes of someone talking to the lamp).
         let mut looked = false;
         loop {
-            if !self.voice_running() {
+            if !self.voice_running() || self.forced() {
                 return Ok(());
             }
-            if walk && crate::walk::under_way(self.config) {
+            if walk && crate::walk::holds(self.config) {
                 return Err(crate::walk::UNDER_WAY.to_owned());
             }
             let now = self.world.clock.now_ms();
@@ -2393,6 +2431,22 @@ impl Run<'_, '_> {
         }
     }
 
+    /// How long the voice must have been quiet before it is switched: 45 s.
+    /// The first update after setup waits for none ([`Run::forced`]).
+    fn quiet_needed(&self) -> Duration {
+        QUIET
+    }
+
+    /// The first update after setup is forced (#6284, the product's call on
+    /// 12 Nov): it switches as soon as it is fetched, with no quiet moment
+    /// and whoever is heard, since the walk has not begun and the lamp has
+    /// said only its update line. On lamp-e82d on 12 Nov, office noise
+    /// ("heard 0 words") ended the 5 s wait `not-quiet` and the walk ran
+    /// on the old build.
+    fn forced(&self) -> bool {
+        crate::first_update::before_walk(self.config, crate::records::unix_ms())
+    }
+
     /// Steps 7 and 8.
     fn switch(
         &mut self,
@@ -2406,12 +2460,13 @@ impl Run<'_, '_> {
         // A count that can't be kept holds nothing: the wait goes on as
         // before, with the walk no longer looked at.
         let walk = !crate::walk::spent(self.records.folder());
-        let waited = match self.wait_quiet(QUIET, self.config.quiet_wait, false, walk) {
+        let waited = match self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, walk)
+        {
             Err(why) if walk && why == crate::walk::UNDER_WAY => {
                 if let Some(held) = crate::walk::hold(self.records.folder()) {
                     return Outcome::NotQuiet(crate::walk::held(held));
                 }
-                self.wait_quiet(QUIET, self.config.quiet_wait, false, false)
+                self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, false)
             }
             waited => waited,
         };
@@ -2556,7 +2611,8 @@ impl Run<'_, '_> {
         self.listen(Duration::ZERO);
         let now = self.world.clock.now_ms();
         if self.voice_running()
-            && let Err(why) = self.quiet.for_at_least(QUIET, now)
+            && !self.forced()
+            && let Err(why) = self.quiet.for_at_least(self.quiet_needed(), now)
         {
             let restored = self.put_units_and_links_back(&backs);
             self.settings_now(state);
@@ -2599,7 +2655,9 @@ impl Run<'_, '_> {
                     .any(|back| back.was_active && !unrestarted.contains(&back.unit)) =>
             {
                 self.listen(Duration::ZERO);
-                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false, false) {
+                if let Err(why) =
+                    self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, false)
+                {
                     return self.put_back(state, &build, &backs, None, why, String::new());
                 }
                 backs[voice_at].restarted = true;
@@ -2618,12 +2676,24 @@ impl Run<'_, '_> {
                 continue;
             }
             let back = &backs[at];
-            if changes
+            let after = changes
                 .iter()
                 .find(|change| change.unit == back.unit)
-                .is_some_and(|change| self.leave_completed_setup(back, &change.after))
+                .map(|change| change.after.clone());
+            if after
+                .as_deref()
+                .is_some_and(|after| self.leave_completed_setup(back, after))
             {
                 self.say("setup is complete; its phone grace period is not restarted");
+                continue;
+            }
+            if after
+                .as_deref()
+                .is_some_and(|after| self.leave_setup_for_first_update(back, after))
+            {
+                self.say(
+                    "the first update after setup: setup is done; its phone grace period is not restarted",
+                );
                 continue;
             }
             if backs[at].unit == VOICE_UNIT && !voice_stopped {
@@ -2632,7 +2702,9 @@ impl Run<'_, '_> {
                 // before marking it restarted or stopping its old process.
                 // A voice stopped first was judged before its stop.
                 self.listen(Duration::ZERO);
-                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false, false) {
+                if let Err(why) =
+                    self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, false)
+                {
                     return self.put_back(state, &build, &backs, None, why, String::new());
                 }
             }
@@ -2915,12 +2987,23 @@ impl Run<'_, '_> {
             };
         }
         if !cut_short {
-            state.refuse(build, &why);
+            let kind = refusal_kind(&why, failed);
+            state.refuse_as(
+                build,
+                &why,
+                Some(kind),
+                crate::own::boot_id(&self.config.root).as_deref(),
+            );
         } else {
             let times = state.count_cut_short(build);
             if times >= CUT_SHORTS_REFUSE {
                 state.cut_short = None;
-                state.refuse(build, &format!("{why}, {times} times in a row"));
+                state.refuse_as(
+                    build,
+                    &format!("{why}, {times} times in a row"),
+                    Some("cut_short"),
+                    crate::own::boot_id(&self.config.root).as_deref(),
+                );
             } else {
                 self.say(&format!(
                     "build {} is not refused: cut short {times} of {CUT_SHORTS_REFUSE} times in a row; the next round tries it again",
@@ -3022,7 +3105,10 @@ impl Run<'_, '_> {
             // Recovery's journal truthfully retains was_active, even when
             // Setup completed while fetching. Recheck its restored product
             // lifecycle here as well as at the forward restart boundary.
-            if files_back && self.leave_completed_setup(back, &back.text) {
+            if files_back
+                && (self.leave_completed_setup(back, &back.text)
+                    || self.leave_setup_for_first_update(back, &back.text))
+            {
                 self.say("setup is complete; restoring its files needs no restart");
                 continue;
             }
@@ -4308,6 +4394,21 @@ fn conditions(text: &str) -> Vec<&str> {
         .collect()
 }
 
+/// A refusal's fixed name for the app (#6266, `lamp_msgs::UpdateRefused`): a
+/// part held still by a passing local state right after the switch
+/// (`judge::HELD`, a kept unplug request) is `held`; any other part not well
+/// (`failed` names its unit) is `part_unwell`; the rest (the switch's own
+/// steps, the quiet moment) is `other`. Never the text.
+pub(crate) fn refusal_kind(why: &str, failed: Option<&str>) -> &'static str {
+    if why.contains(crate::judge::HELD) {
+        "held"
+    } else if failed.is_some() {
+        "part_unwell"
+    } else {
+        "other"
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4333,6 +4434,7 @@ mod tests {
             settings: false,
             product_settings: false,
             image: false,
+            first_update: false,
             writer_from: None,
         }
     }

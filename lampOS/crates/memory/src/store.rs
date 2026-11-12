@@ -151,6 +151,19 @@ impl Day {
         (0..=LAST_DAY).contains(&day).then_some(Self(day))
     }
 
+    /// The day this many calendar days after this one, if a journal can be
+    /// named for it.
+    pub fn after(self, days: u32) -> Option<Self> {
+        let day = self.0 + i64::from(days);
+        (0..=LAST_DAY).contains(&day).then_some(Self(day))
+    }
+
+    /// Whether it is a Monday, the first day of a week's chapter.
+    pub fn is_monday(self) -> bool {
+        // 1970-01-01 was a Thursday.
+        (self.0 + 3).rem_euclid(7) == 0
+    }
+
     /// [`Self::of`], with the offset the lamp's local time has at that
     /// moment: a zone's summer time counts on the days it is kept (#820).
     pub fn at(at_unix_ms: u64, local: &LocalTime) -> Option<Self> {

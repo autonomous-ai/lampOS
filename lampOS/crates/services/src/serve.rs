@@ -308,6 +308,14 @@ pub struct Services<H, M> {
     /// deleted by its id, read back and saved as any draft.
     pub draft_edits: bool,
     pub desk: Desk,
+    /// `LAMP_SERVICES_LINKED_TOOLS=on` (#6218): the voice's tools folder,
+    /// whose `tools.json` names only the linked services, written again on
+    /// each link, unlink and wipe ([`crate::tools::write_linked`]).
+    pub linked_tools: Option<(std::path::PathBuf, crate::tools::Edits)>,
+    /// Held from reading what is linked to the file's rename, so admin
+    /// calls on other threads never write a list older than one already
+    /// written, nor share the temporary file (Jarvis's P3 on #6476).
+    linked_tools_write: Mutex<()>,
 }
 
 /// What a call to a service not linked is told, after its name: and where
@@ -413,6 +421,8 @@ impl<H: Http, M: Mail> Services<H, M> {
             run_held: Mutex::new(None),
             calendar_edits: false,
             draft_edits: false,
+            linked_tools: None,
+            linked_tools_write: Mutex::new(()),
             desk: Desk::default(),
         }
     }
@@ -637,9 +647,65 @@ impl<H: Http, M: Mail> Services<H, M> {
         self
     }
 
+    /// With `LAMP_SERVICES_LINKED_TOOLS` as `on` gives it: the voice's
+    /// tools in `dir` name only the linked services, written now.
+    pub fn with_linked_tools(
+        mut self,
+        dir: std::path::PathBuf,
+        edits: crate::tools::Edits,
+    ) -> Self {
+        self.linked_tools = Some((dir, edits));
+        self.write_linked_tools();
+        self
+    }
+
+    /// Write the voice's `tools.json` for the services linked now, with
+    /// [`Services::linked_tools`]; the journal says a failure, and the
+    /// last file stays.
+    pub fn write_linked_tools(&self) {
+        let Some((dir, edits)) = &self.linked_tools else {
+            return;
+        };
+        // A poisoned lock still guards the write: the file is whole either way.
+        let _writing = self
+            .linked_tools_write
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let linked: Vec<String> = self
+            .store
+            .list(crate::now_secs())
+            .iter()
+            .filter_map(|linked| linked["code"].as_str().map(str::to_owned))
+            .collect();
+        match crate::tools::write_linked(dir, *edits, Some(&linked)) {
+            Ok(()) => eprintln!(
+                "lamp-services: the voice's tools name {} linked service(s)",
+                linked.len()
+            ),
+            Err(error) => eprintln!(
+                "lamp-services: the voice's tools were not written: {}",
+                error.kind()
+            ),
+        }
+    }
+
     /// The admin socket's answer to one line, and the journal's words for
-    /// it (a code and what happened, never a secret).
+    /// it (a code and what happened, never a secret). A link, an unlink or
+    /// a wipe writes the voice's tools again ([`Services::write_linked_tools`]),
+    /// done or not, since a refused one may still have changed the store.
     pub async fn admin(&self, line: &str) -> (Value, String) {
+        let changes = matches!(
+            parse_admin(line.trim_end_matches(['\r', '\n'])),
+            Ok(Admin::Set { .. } | Admin::Remove(_) | Admin::Wipe)
+        );
+        let answer = self.admin_once(line).await;
+        if changes {
+            self.write_linked_tools();
+        }
+        answer
+    }
+
+    async fn admin_once(&self, line: &str) -> (Value, String) {
         let refused = |why: &str| json!({"ok": false, "error": why});
         let asked = match parse_admin(line.trim_end_matches(['\r', '\n'])) {
             Ok(asked) => asked,
@@ -3109,6 +3175,128 @@ mod tests {
             json!({"ok":true})
         );
         assert_eq!(std::fs::read_dir(dir.path().join("s")).unwrap().count(), 0);
+    }
+
+    /// Jarvis's P3 on #6476: writes from the admin socket's threads at once
+    /// each read what is linked and write it whole, one at a time, so the
+    /// file is never torn and the last one names what is linked.
+    #[test]
+    fn writes_of_the_voices_tools_at_once_leave_one_whole_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let tools_dir = dir.path().join("t");
+        std::fs::create_dir_all(&tools_dir).unwrap();
+        let services = services(dir.path(), "{}", false)
+            .with_linked_tools(tools_dir.clone(), crate::tools::Edits::default());
+        run(services.admin(&set_line(
+            "github",
+            json!({"auth_type":"oauth","access_token":"t"}),
+        )));
+        std::thread::scope(|threads| {
+            for _ in 0..8 {
+                threads.spawn(|| {
+                    for _ in 0..25 {
+                        services.write_linked_tools();
+                    }
+                });
+            }
+        });
+        let file = std::fs::read_to_string(tools_dir.join(crate::tools::CATALOG_FILE)).unwrap();
+        let catalog: Value = serde_json::from_str(&file).unwrap();
+        assert_eq!(
+            catalog["tools"][1]["parameters"]["properties"]["service"]["enum"],
+            json!(["github"])
+        );
+        assert!(!tools_dir.join(".tools.json").exists());
+    }
+
+    /// With `LAMP_SERVICES_LINKED_TOOLS=on` (#6218), the voice's tools name
+    /// only what is linked: written at start, again on a link, an unlink
+    /// and a wipe; a refused link leaves them as they were.
+    #[test]
+    fn the_voices_tools_follow_each_link_unlink_and_wipe() {
+        let dir = tempfile::tempdir().unwrap();
+        let tools_dir = dir.path().join("t");
+        std::fs::create_dir_all(&tools_dir).unwrap();
+        let services = services(dir.path(), "{}", false)
+            .with_linked_tools(tools_dir.clone(), crate::tools::Edits::default());
+        let offered = || -> Vec<String> {
+            let file = std::fs::read_to_string(tools_dir.join(crate::tools::CATALOG_FILE)).unwrap();
+            let catalog: Value = serde_json::from_str(&file).unwrap();
+            let mut seen: Vec<String> = catalog["tools"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|tool| tool["name"].as_str().unwrap().to_owned())
+                .collect();
+            if let Some(codes) =
+                catalog["tools"][1]["parameters"]["properties"]["service"]["enum"].as_array()
+            {
+                seen.extend(codes.iter().map(|code| code.as_str().unwrap().to_owned()));
+            }
+            seen
+        };
+        assert_eq!(offered(), ["services_connected"]);
+        let gmail = |pass: &str| {
+            set_line(
+                "gmail",
+                json!({"connector":"gmail","auth_type":"pat","api_key":pass,"credentials":{"email":"me@home.test"},"scopes":["mail"]}),
+            )
+        };
+        run(services.admin(&gmail("planted-wrong")));
+        assert_eq!(offered(), ["services_connected"]);
+        run(services.admin(&gmail("good pass word")));
+        assert_eq!(
+            offered(),
+            [
+                "services_connected",
+                "service_read",
+                "service_write",
+                "gmail"
+            ]
+        );
+        run(services.admin(&set_line(
+            "github",
+            json!({"auth_type":"oauth","access_token":"t"}),
+        )));
+        assert_eq!(
+            offered(),
+            [
+                "services_connected",
+                "service_read",
+                "service_write",
+                "gmail",
+                "github"
+            ]
+        );
+        run(services.admin(r#"{"op":"remove","code":"gmail"}"#));
+        assert_eq!(
+            offered(),
+            [
+                "services_connected",
+                "service_read",
+                "service_write",
+                "github"
+            ]
+        );
+        run(services.admin(r#"{"op":"list"}"#));
+        assert_eq!(
+            offered(),
+            [
+                "services_connected",
+                "service_read",
+                "service_write",
+                "github"
+            ]
+        );
+        run(services.admin(r#"{"op":"wipe"}"#));
+        assert_eq!(offered(), ["services_connected"]);
+        // A late call, from a request made before the wipe, still answers
+        // as with every service named (the first builder, #6218 (a)).
+        let late = run(services.tool(
+            r#"{"op":"call","name":"service_read","args":{"service":"gmail","what":"recent"}}"#,
+        ))
+        .to_string();
+        assert!(late.contains(NOT_LINKED), "{late}");
     }
 
     /// The owner's 9 Nov: the owner's `message` reads a security mail, every

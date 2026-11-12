@@ -5,6 +5,7 @@ mod action_claim;
 mod after_forget;
 mod chat_second_try;
 mod checking_line;
+mod clash_note;
 mod cut_to_a_person;
 mod decline_silent;
 mod dont_know;
@@ -25,6 +26,7 @@ mod not_for_me_words;
 mod opens_further;
 mod pause_join;
 mod person_scope_seen;
+mod read_back_words;
 mod remember_speaker;
 mod sent_write;
 mod short_done;
@@ -5851,6 +5853,7 @@ async fn told_the_walk_is_under_way_a_made_up_step_is_not_said() {
         request: 1,
         privacy_generation: 1,
         on: true,
+        updating: None,
     })
     .unwrap();
     engine.submit(serde_json::from_str(&wire).unwrap());
@@ -9572,6 +9575,358 @@ async fn an_empty_held_line_does_not_repeat_a_carried_memory_write() {
         a_carried_write("Remember Saturn.", remember, true, true).await,
         (1, false),
         "a gap-held captured line's remember reaches no runner, then runs once"
+    );
+}
+
+/// One line's words (`said`), whose first chat round calls `first` and
+/// is told `told`, cut while their answer waits after that call, then
+/// answered again by an empty held line whose chats reply `replies` in
+/// turn. With `faces`, a face claim is judged too. What request 2 said,
+/// and how many chats were asked.
+async fn a_carried_claim(
+    said: &str,
+    first: ToolCall,
+    told: Value,
+    replies: &[&str],
+    faces: bool,
+) -> (Vec<String>, usize) {
+    carried_claims(
+        said,
+        vec![(first, told)],
+        replies
+            .iter()
+            .map(|reply| vec![text(reply), Ok(ChatEvent::Done)])
+            .collect(),
+        faces,
+    )
+    .await
+}
+
+/// [`a_carried_claim`] with one finished round for each of `rounds` (its
+/// call, and what that call is told), and the held line's chats as given.
+/// Calls past those of `rounds` (the held line's own) are told ok.
+async fn carried_claims(
+    said: &str,
+    rounds: Vec<(ToolCall, Value)>,
+    replies: Vec<Vec<net::Result<ChatEvent>>>,
+    faces: bool,
+) -> (Vec<String>, usize) {
+    let begun = Arc::new(tokio::sync::Notify::new());
+    let finished = rounds.len();
+    let (calls, told): (Vec<_>, VecDeque<_>) = rounds.into_iter().unzip();
+    let mut chats: Vec<_> = calls
+        .into_iter()
+        .map(|call| vec![Ok(ChatEvent::ToolCalls(vec![call])), Ok(ChatEvent::Done)])
+        .collect();
+    chats.push(vec![]); // The first request waits for its reply when cut.
+    chats.extend(replies);
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(said.to_owned()), Ok(String::new())].into()),
+        chats: Mutex::new(chats.into()),
+        chat_began: Some(begun.clone()),
+        hold_chat: true,
+        ..Script::default()
+    });
+    let told = Arc::new(Mutex::new(told));
+    let runner: ToolRunner = Arc::new(move |_, _, _, _| {
+        let told = told.lock().unwrap().pop_front();
+        Box::pin(async move { told.unwrap_or_else(|| json!({"ok":true})) })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        runner,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .claiming_faces(faces);
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while script.asked.lock().unwrap().len() < finished + 1 {
+            begun.notified().await;
+        }
+    })
+    .await
+    .expect("the carried calls were answered before their reply was cut");
+    engine.submit(start(2));
+    engine.retire_through(1);
+    engine.submit(audio(2, 1));
+    engine.submit(end(2));
+    let mut spoken = Vec::new();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            match engine.next().await {
+                ProviderOutput::Transcript {
+                    request: Some(2),
+                    text,
+                    ..
+                } if !text.is_empty() => spoken.push(text),
+                ProviderOutput::TurnComplete { request: 2, .. } => break,
+                _ => {}
+            }
+        }
+    })
+    .await
+    .expect("the held line answers the carried words");
+    let asked = script.asked.lock().unwrap().len();
+    (spoken, asked)
+}
+
+/// C135, lamp-06c1, 12 Nov, build 12226: "Remember that my umbrella is
+/// yellow." was kept (entry 1665) by a turn a newer line cut before its
+/// words. The held line after it went on from that turn's finished rounds,
+/// and its "Kept: …" was judged against its own calls only: held, asked
+/// again, then said as "I didn't keep that." A carried keep that kept is
+/// the turn's own, as its calls are for action claims.
+#[tokio::test]
+async fn a_held_line_confirming_a_carried_keep_says_kept() {
+    let (said, asked) = a_carried_claim(
+        "Remember that my umbrella is yellow.",
+        call(
+            "c1",
+            "remember",
+            json!({"text":"Their umbrella is yellow."}),
+        ),
+        json!({"ok":true}),
+        &["Kept: your umbrella is yellow.", "Kept."],
+        false,
+    )
+    .await;
+    assert!(
+        !said
+            .iter()
+            .any(|said| said.contains(crate::remember::NOT_KEPT_LINE)),
+        "{said:?}"
+    );
+    assert!(
+        said.iter()
+            .any(|said| said.contains("Kept: your umbrella is yellow.")),
+        "{said:?}"
+    );
+    assert_eq!(asked, 3, "not asked again: {said:?}");
+}
+
+/// C135's other side: a carried keep refused (`remembered:false`) kept
+/// nothing, so the held line's "Kept." is still a claim with no keep.
+#[tokio::test]
+async fn a_held_line_after_a_refused_carried_keep_still_says_not_kept() {
+    let (said, asked) = a_carried_claim(
+        "Remember that my umbrella is yellow.",
+        call(
+            "c1",
+            "remember",
+            json!({"text":"Their umbrella is yellow."}),
+        ),
+        json!({"remembered":false,"reason":"not now"}),
+        &["Kept.", "Kept."],
+        false,
+    )
+    .await;
+    assert!(
+        said.iter()
+            .any(|said| said.contains(crate::remember::NOT_KEPT_LINE)),
+        "{said:?}"
+    );
+    assert_eq!(asked, 4, "asked again once: {said:?}");
+}
+
+/// C135, the face's side: a carried `remember_my_face` that saved backs
+/// the held line's "I've saved your face."; a refused one does not.
+#[tokio::test]
+async fn a_held_line_confirming_a_carried_face_save_says_saved() {
+    let face = || call("c1", crate::known_faces::REMEMBER, json!({"name":"Sam"}));
+    let (said, asked) = a_carried_claim(
+        "Remember my face as Sam.",
+        face(),
+        json!({"ok":true}),
+        &["I've saved your face.", "I've saved your face."],
+        true,
+    )
+    .await;
+    assert!(
+        !said
+            .iter()
+            .any(|said| said.contains(crate::remember::FACE_NOT_SAVED_LINE)),
+        "{said:?}"
+    );
+    assert!(
+        said.iter().any(|said| said.contains("saved your face")),
+        "{said:?}"
+    );
+    assert_eq!(asked, 3, "not asked again: {said:?}");
+    let (said, _) = a_carried_claim(
+        "Remember my face as Sam.",
+        face(),
+        json!({"error":"no face in view"}),
+        &["I've saved your face.", "I've saved your face."],
+        true,
+    )
+    .await;
+    assert!(
+        said.iter()
+            .any(|said| said.contains(crate::remember::FACE_NOT_SAVED_LINE)),
+        "a refused one backs nothing: {said:?}"
+    );
+}
+
+/// Jarvis's P2 on #6570: a call made with no id is `call_0` in every
+/// round, so a carried call's result is its own round's. Round 1's
+/// `remember` refused and round 2's kept, both `call_0` (C135's own two
+/// rounds): the keep backs the held line's "Kept: …".
+#[tokio::test]
+async fn a_carried_keep_after_a_refused_one_with_the_same_id_says_kept() {
+    let remember = || {
+        call(
+            "call_0",
+            "remember",
+            json!({"text":"Their umbrella is yellow."}),
+        )
+    };
+    let (said, asked) = carried_claims(
+        "Remember that my umbrella is yellow.",
+        vec![
+            (remember(), json!({"remembered":false,"reason":"not now"})),
+            (remember(), json!({"ok":true})),
+        ],
+        vec![
+            vec![text("Kept: your umbrella is yellow."), Ok(ChatEvent::Done)],
+            vec![text("Kept."), Ok(ChatEvent::Done)],
+        ],
+        false,
+    )
+    .await;
+    assert!(
+        !said
+            .iter()
+            .any(|said| said.contains(crate::remember::NOT_KEPT_LINE)),
+        "{said:?}"
+    );
+    assert!(
+        said.iter()
+            .any(|said| said.contains("Kept: your umbrella is yellow.")),
+        "{said:?}"
+    );
+    assert_eq!(asked, 4, "not asked again: {said:?}");
+}
+
+/// Jarvis's P2 on #6570, the other order: round 1's `recall` answered and
+/// round 2's `remember` refused, both `call_0`. The refused keep never
+/// takes the recall's result, so "Kept." is a claim with no keep.
+#[tokio::test]
+async fn a_refused_carried_keep_never_takes_an_earlier_rounds_result_with_its_id() {
+    let (said, asked) = carried_claims(
+        "Remember that my umbrella is yellow.",
+        vec![
+            (
+                call("call_0", "recall", json!({"query":"umbrella"})),
+                json!({"memories":[]}),
+            ),
+            (
+                call(
+                    "call_0",
+                    "remember",
+                    json!({"text":"Their umbrella is yellow."}),
+                ),
+                json!({"remembered":false,"reason":"not now"}),
+            ),
+        ],
+        vec![
+            vec![text("Kept."), Ok(ChatEvent::Done)],
+            vec![text("Kept."), Ok(ChatEvent::Done)],
+        ],
+        false,
+    )
+    .await;
+    assert!(
+        said.iter()
+            .any(|said| said.contains(crate::remember::NOT_KEPT_LINE)),
+        "{said:?}"
+    );
+    assert_eq!(asked, 5, "asked again once: {said:?}");
+}
+
+/// Jarvis's P3 on #6570: a carried keep held for the person's yes
+/// (`held_keep_told`) kept nothing yet, so "Kept." is still a claim.
+#[tokio::test]
+async fn a_carried_keep_held_for_a_yes_backs_no_kept() {
+    let (said, _) = a_carried_claim(
+        "Remember that my umbrella is yellow.",
+        call(
+            "c1",
+            "remember",
+            json!({"text":"Their umbrella is yellow."}),
+        ),
+        crate::remember::held_keep_told(),
+        &["Kept.", "Kept."],
+        false,
+    )
+    .await;
+    assert!(
+        said.iter()
+            .any(|said| said.contains(crate::remember::NOT_KEPT_LINE)),
+        "{said:?}"
+    );
+}
+
+/// Jarvis's P3 on #6570: a forget in the held line's own turn. The carried
+/// keep was these words' one memory write, so the forget is not run
+/// ("a memory write was already tried for these words", #3614) and the
+/// keep stands: "Kept." is true and said. (A forget in the carried rounds
+/// carries none of them, #4848.)
+#[tokio::test]
+async fn a_forget_not_run_in_the_held_turn_leaves_a_carried_keep_standing() {
+    let (said, asked) = carried_claims(
+        "Remember that my umbrella is yellow. No, forget my umbrella.",
+        vec![(
+            call(
+                "c1",
+                "remember",
+                json!({"text":"Their umbrella is yellow."}),
+            ),
+            json!({"ok":true}),
+        )],
+        vec![
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call(
+                    "c2",
+                    "forget",
+                    json!({"query":"umbrella"}),
+                )])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![text("Kept."), Ok(ChatEvent::Done)],
+            vec![text("Kept."), Ok(ChatEvent::Done)],
+        ],
+        false,
+    )
+    .await;
+    assert_eq!(said, ["Kept."]);
+    assert_eq!(asked, 4, "not asked again: {said:?}");
+}
+
+/// Jarvis's P3 on #6570: [`carried_done`] counts a call only with its own
+/// round's result. One with none (a round whose result never came) counts
+/// nothing, nor a later round's result under the same id.
+#[test]
+fn a_carried_call_with_no_result_of_its_own_round_counts_nothing() {
+    let remember = |id: &str| call(id, "remember", json!({"text":"Their umbrella is yellow."}));
+    let alone = [Message::assistant_calls(None, &[remember("c1")])];
+    assert_eq!(carried_done(&alone), CarriedDone::default());
+    let later = [
+        Message::assistant_calls(None, &[remember("call_0")]),
+        Message::assistant_calls(None, &[call("call_0", "set_timer", json!({}))]),
+        Message::tool("call_0", r#"{"ok":true}"#),
+    ];
+    assert_eq!(
+        carried_done(&later),
+        CarriedDone {
+            kept: true,
+            remembered: false,
+            other: true,
+        },
+        "the timer's result is the timer's alone"
     );
 }
 

@@ -161,13 +161,29 @@ fn system() -> String {
 
 /// [`system`], with a made skill's reads on or off.
 fn system_with(reads: bool) -> String {
+    system_for(reads, made_skill::agent_services_here())
+}
+
+/// [`system_with`], with a linked service made as a task for the lamp's
+/// agent or not (`agent`, [`made_skill::AGENT_SERVICES_ENVIRONMENT`]): on
+/// only with a made skill's code on too ([`made_skill::scripts_on`]), as a
+/// made `task` step is held to that cap; else the prompt is as before.
+fn system_for(reads: bool, agent: bool) -> String {
     let (cannot, left_out) = (made_skill::CANNOT, made_skill::LEFT_OUT);
+    let agent = agent && made_skill::scripts_on();
     let writes = made_skill::writes_on();
     // Today and the offset only for a write's calendar event (#6066).
-    let today = writes
+    let today = (writes && !agent)
         .then(crate::local_time::today_and_offset_here)
         .flatten();
-    let services = services(reads, writes, &own_accounts(), today.as_ref());
+    let services = if agent {
+        agent_services()
+    } else {
+        services(reads, writes, &own_accounts(), today.as_ref())
+    };
+    // A send through the lamp's agent is one of what a skill may do, as a
+    // made write is.
+    let writes = writes || agent;
     // With a made skill's writes (#6066) a write to a linked service is
     // one of what a skill may do, told below; a text to a phone stays out
     // of reach. Its can't-yet example is then no send: on lamp-9adf, 11
@@ -272,6 +288,84 @@ fn code_rules() -> String {
         each = made_skill::MOST_SCRIPT_BYTES / 1024,
         all = made_skill::MOST_SCRIPTS_BYTES / 1024,
         grants = grants.join(", "),
+    )
+}
+
+/// The request [`AGENT_SERVICES_EXAMPLE`] is made for.
+const AGENT_SERVICES_ASKED: &str = "every morning at eight, read me my new mail";
+
+/// One whole service skill made as a task for the lamp's agent, shown the
+/// model with [`agent_services`].
+const AGENT_SERVICES_EXAMPLE: &str = "```skill.toml
+kind = \"installable\"
+version = \"1.0.0\"
+grants = [\"gmail-read\"]
+
+[permissions]
+topics = [\"clock/local\"]
+
+[trigger]
+topic = \"clock/local\"
+field = \"known\"
+equals = true
+rearm = \"ends\"
+during = { from = \"08:00\", to = \"08:01\" }
+
+[ask]
+policy = \"nudge\"
+
+[[do]]
+task = { task = \"Read the owner's new mail since yesterday and tell them who wrote and what about\", run = \"scripts/main.py\" }
+```
+
+```SKILL.md
+---
+name: morning-mail
+description: Every morning at eight, the lamp's agent reads me my new mail.
+---
+
+# Morning mail
+
+Every morning at eight, the lamp's agent reads the new mail and tells me.
+```
+
+```scripts/main.py
+print(\"The lamp's agent does this task with its lamp-services tools.\")
+```";
+
+/// What the making model is told of the person's linked services with
+/// [`made_skill::AGENT_SERVICES_ENVIRONMENT`] on (the owner's ask, 12 Nov):
+/// a skill that reads or writes one is one `do.task` for the lamp's agent,
+/// which reaches the linked services through its `lamp-services` tools; a
+/// send is read back by the lamp and goes only on the owner's spoken yes.
+/// Never a `read = {...}` or `write = {...}` step: those stay for the
+/// skills already made with them, which load and run as before.
+fn agent_services() -> String {
+    let cannot = made_skill::CANNOT;
+    let most = made_skill::MOST_TASK_CHARS;
+    format!(
+        "A skill that reads or writes the person's mail, calendar, GitHub or any other linked \
+         service hands that part to the lamp's agent, which reaches the linked services through \
+         its lamp-services tools (services_connected, service_read, service_write). Such a skill \
+         is made with code of its own as told at the end; its grants = [ ... ] exactly the \
+         services it uses, each CODE-read to read it or CODE-write to send with it (a send \
+         alone only CODE-write, CODE-read beside it only when it reads too), CODE one of: \
+         {codes}; no other grant, and no services in [permissions]: only its trigger's \
+         topics, and speak = true only beside a say step; its \
+         trigger the lamp's own (a time, someone coming or leaving, as above); and exactly one \
+         [[do]] step, alone in its step: task = {{ task = \"...\", run = \"scripts/main.py\" }}, \
+         the task's words, at most {most} characters, saying plainly for the lamp's agent what \
+         to read and what to tell the person, or what to send, in the request's own words, and \
+         to whom (an address the request says, or the person's own for me); and one \
+         ```scripts/main.py block that only prints a line, as in the example. Never a read = \
+         {{ ... }} or write = {{ ... }} step. What the agent finds comes back as the lamp's task \
+         news. Any send is read back by the lamp and goes only on the person's spoken yes. A \
+         request to delete or change anything already in a service is answered with one line \
+         and no blocks: {cannot} {cant_yet} deleting or changing what is in your services. \
+         Never tell them to link a service. A whole such skill, for \"{AGENT_SERVICES_ASKED}\":\
+         \n\n{AGENT_SERVICES_EXAMPLE}\n",
+        cant_yet = made_skill::CANT_YET,
+        codes = made_skill::SERVICE_GRANT_CODES.join(", "),
     )
 }
 
@@ -547,7 +641,18 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
                 "description": "What this skill should do and when, in the person's own words for this ask, nothing else: never a time, step or trigger of an earlier skill or turn."
             }
         },
-        "required": ["request"]
+        "required": []
+    });
+    // The person's choice on a made skill that clashes with one on the
+    // lamp (#6593, [`crate::made_clash`]): its id and the choice, alone.
+    parameters["properties"][crate::made_clash::CLASH_ID] = json!({
+        "type": "string",
+        "description": "Only when a skill you just made clashes with one on the lamp and the person then chooses: its clash_id, given with choice alone, with no request."
+    });
+    parameters["properties"][crate::made_clash::CHOICE] = json!({
+        "type": "string",
+        "enum": crate::made_clash::CHOICES,
+        "description": "With clash_id only: replace the other skill, keep both (they may take turns), or cancel, as the person chose in any words."
     });
     if writes || tasks || code {
         parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
@@ -780,6 +885,17 @@ fn make_with_by(
     linked: impl FnOnce() -> Option<Vec<String>>,
     agent: Option<&crate::make_skill_agent::Agent>,
 ) -> Value {
+    // One ask makes one skill: a call for an ask made or being made a
+    // moment ago, carried into the next line after its turn was cut, makes
+    // nothing again ([`OneAsk`]). By voice only: `made_in` 0 is no
+    // request of the voice's.
+    let asked = match made_in {
+        0 => None,
+        _ => match OneAsk::begin(&keeping.directory, heard, request, now_unix_ms) {
+            Ok(asked) => Some(asked),
+            Err(told) => return told,
+        },
+    };
     let brief = match made_skill::brief(request) {
         Ok(brief) => brief,
         Err(why) => {
@@ -808,6 +924,24 @@ fn make_with_by(
         .as_ref()
         .ok()
         .and_then(|made| made_skill::needs_link(&made.uses, linked));
+    // A skill made by voice that clashes with one on the lamp (#6593: the
+    // same trigger, both using the light or both moving the head) is not
+    // put on: the person is asked to replace the other, keep both or
+    // cancel ([`crate::made_clash`]). One with code of its own waits for
+    // its yes as it did.
+    if made_in != 0
+        && let Ok(made) = &made
+        && !made.uses.code
+        && let Some(clash) = crate::made_clash::found(keeping, made)
+    {
+        MADE_LINE.with(|kept| kept.replace(Some(crate::made_clash::cut_line(made, &clash))));
+        let told =
+            crate::made_clash::asked(keeping, made, &clash, made_in, std::time::Instant::now());
+        if let Some(asked) = asked {
+            asked.made(&made.name, &told, now_unix_ms);
+        }
+        return told;
+    }
     // One with code of its own (#6307) is not put on here: it waits for
     // the person's yes to its say-back, which puts on that package alone.
     let on = match &made {
@@ -820,7 +954,7 @@ fn make_with_by(
     // A skill that sends or writes, once on (its yes binds the installed
     // package): its writes wait for the person's yes, in a later heard
     // line (#6066, `crate::skill_write_yes`).
-    match (&made, &on) {
+    let told = match (&made, &on) {
         (Ok(made), Ok(())) if made.uses.code => {
             let id = crate::skill_write_yes::wait_for_yes(
                 code_asks(made),
@@ -835,15 +969,187 @@ fn make_with_by(
             }
             told
         }
-        (Ok(made), Ok(())) => {
-            let Some(asks) = asks_of(&keeping.directory, made) else {
-                return told;
-            };
-            let id = crate::skill_write_yes::wait_for_yes(asks, made_in, std::time::Instant::now());
-            waits_for_yes(told, &made_skill::on_line(made), &id)
-        }
+        (Ok(made), Ok(())) => match asks_of(&keeping.directory, made) {
+            Some(asks) => {
+                let id =
+                    crate::skill_write_yes::wait_for_yes(asks, made_in, std::time::Instant::now());
+                waits_for_yes(told, &made_skill::on_line(made), &id)
+            }
+            None => told,
+        },
         _ => told,
+    };
+    // Made and on (or waiting for its yes): held for the same ask asked
+    // again; anything else is let go, so asking again tries again.
+    if let (Some(asked), Ok(made), Ok(())) = (asked, &made, &on) {
+        asked.made(&made.name, &told, now_unix_ms);
     }
+    told
+}
+
+/// How long a voice make's ask is held once its skill is made and on
+/// ([`OneAsk`]): longer than a cut turn's carried line takes to be heard
+/// and answered again, shorter than a person deciding to ask once more.
+pub const ONE_ASK_WITHIN: Duration = Duration::from_secs(180);
+
+/// The fewest words a line holds for another line holding it whole to be
+/// the same ask ([`same_ask`]): "make me a skill" alone is no ask of its
+/// own.
+const ONE_ASK_FEWEST_WORDS: usize = 5;
+
+/// A voice make's ask, held in [`ASKS`]: its keeping folder, the words
+/// heard and the model's request (each [`ask_words`]), and, once made and
+/// on, its skill's name, what its turn was told and when.
+struct HeldAsk {
+    id: u64,
+    directory: std::path::PathBuf,
+    heard: Vec<String>,
+    request: Vec<String>,
+    made: Option<(String, Value, u64)>,
+}
+
+/// The voice's asks under way or made within [`ONE_ASK_WITHIN`].
+static ASKS: std::sync::Mutex<Vec<HeldAsk>> = std::sync::Mutex::new(Vec::new());
+static ASK_IDS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// A line's words for [`same_ask`]: lower case, each run of letters and
+/// digits one word.
+fn ask_words(line: &str) -> Vec<String> {
+    line.split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// Whether two lines' words are one ask: the one of at least
+/// [`ONE_ASK_FEWEST_WORDS`] held whole, in order, in the other (the same
+/// words, or a line carried into the next with the lamp's name or an
+/// earlier piece before it, or without them). Two short lines alike, the
+/// same answer to the lamp's question ("green", "yes", "do it") ending two
+/// asks, are no one ask.
+fn same_ask(one: &[String], other: &[String]) -> bool {
+    if one.is_empty() || other.is_empty() {
+        return false;
+    }
+    if one == other {
+        return one.len() >= ONE_ASK_FEWEST_WORDS;
+    }
+    let (short, long) = if one.len() <= other.len() {
+        (one, other)
+    } else {
+        (other, one)
+    };
+    short.len() >= ONE_ASK_FEWEST_WORDS && long.windows(short.len()).any(|words| words == short)
+}
+
+/// One voice make's ask (lamp-9adf, 12 Nov 15:13: "make me a skill: when
+/// I come back to my desk, blink the light green twice" was cut while it
+/// was made, carried into the next line, and `make_skill` called again
+/// there: two skills of one trigger and the same steps, each outranking
+/// the other's light). A call whose heard line or request is the same ask
+/// ([`same_ask`]) as one under way in the same folder, or made and on
+/// within [`ONE_ASK_WITHIN`] and still kept, makes nothing: it is told the
+/// one under way, or the one made ("You already have that skill: NAME.
+/// It's on.", or its say-back and yes again for one that waits for one).
+/// Dropped before [`Self::made`], the ask is let go.
+struct OneAsk(u64);
+
+impl OneAsk {
+    fn begin(
+        directory: &std::path::Path,
+        heard: Option<&str>,
+        request: &str,
+        now_unix_ms: u64,
+    ) -> Result<Self, Value> {
+        let heard = ask_words(heard.unwrap_or_default());
+        let request = ask_words(request);
+        // Read from the folder before the lock, held by every voice make.
+        let kept = made_skill::kept_names(directory);
+        let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        asks.retain(|ask| match &ask.made {
+            Some((name, _, at)) => {
+                now_unix_ms.saturating_sub(*at) <= ONE_ASK_WITHIN.as_millis() as u64
+                    && (ask.directory != directory || kept.contains(name))
+            }
+            None => true,
+        });
+        let earlier = asks.iter().find(|ask| {
+            ask.directory == directory
+                && (same_ask(&ask.heard, &heard) || same_ask(&ask.request, &request))
+        });
+        match earlier.map(|ask| &ask.made) {
+            Some(Some((name, told, _))) => {
+                eprintln!(
+                    "lamp-voice: a skill wasn't made again: the same ask made {name} a moment ago, and it is still on the lamp"
+                );
+                Err(already_made(name, told))
+            }
+            Some(None) => {
+                eprintln!(
+                    "lamp-voice: a skill wasn't made again: the same ask is being made already"
+                );
+                Err(json!({
+                    "making": true,
+                    "next": format!(
+                        "{}It is being made already, for this same ask, and nothing new is \
+                         made. Tell the person in a few words, in the language of the \
+                         conversation, that it is being made and they'll hear when it's on.",
+                        made_skill::ALREADY_DONE
+                    )
+                }))
+            }
+            None => {
+                let id = ASK_IDS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                asks.push(HeldAsk {
+                    id,
+                    directory: directory.to_path_buf(),
+                    heard,
+                    request,
+                    made: None,
+                });
+                Ok(Self(id))
+            }
+        }
+    }
+
+    /// The ask's skill `name` made and on, its turn told `told`.
+    fn made(self, name: &str, told: &Value, now_unix_ms: u64) {
+        let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(ask) = asks.iter_mut().find(|ask| ask.id == self.0) {
+            ask.made = Some((name.to_owned(), told.clone(), now_unix_ms));
+        }
+        std::mem::forget(self);
+    }
+}
+
+impl Drop for OneAsk {
+    fn drop(&mut self) {
+        let mut asks = ASKS.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        asks.retain(|ask| ask.id != self.0);
+    }
+}
+
+/// What a call for an ask made a moment ago is told: the earlier `told`,
+/// marked `already_made`. One that waits for the person's yes keeps its
+/// say-back and `approve_id`, so the yes the cut turn never asked for can
+/// still be asked; any other is said as had already
+/// ([`made_skill::already_have_line`]).
+fn already_made(name: &str, told: &Value) -> Value {
+    let mut told = told.clone();
+    told["already_made"] = json!(true);
+    // One waiting for the person's yes, or for their choice on a clash
+    // (#6593), keeps its question, so the cut turn's question is asked.
+    if told.get(crate::skill_write_yes::APPROVE_ID).is_none()
+        && told.get(crate::made_clash::CLASH_ID).is_none()
+    {
+        told["next"] = json!(format!(
+            "{}Nothing new was made: this same ask made it a moment ago. Tell the person \
+             this, in the language of the conversation, and add nothing else: \"{}\"",
+            made_skill::ALREADY_DONE,
+            made_skill::already_have_line(name)
+        ));
+    }
+    told
 }
 
 /// What the person's yes to the kept skill `made` would approve: its
@@ -953,19 +1259,21 @@ pub fn app_code_asked_here(request: u64, text: String) -> String {
     )
 }
 
-/// The yes `id` to a made skill with code from the app
-/// ([`app_code_asked`]) not the owner's (`owners_yes`,
+/// The yes `id` to the waiting made skill not the owner's (`owners_yes`,
 /// `services::owners_yes`: outside the private room the owner seen saying
 /// it or in their voice, as a skill run's write's send): its wait dropped,
-/// the skill left off, and the model told [`crate::services::OTHER_VOICE`].
-/// None for any other id, or the owner's yes.
-pub fn app_code_yes_refused(id: &str, owners_yes: impl FnOnce() -> bool) -> Option<Value> {
-    if !crate::skill_write_yes::noted(id) || owners_yes() {
+/// nothing approved, and the model told [`crate::services::OTHER_VOICE`].
+/// Every wait alike: a voice make's writes or code, a read-back's, a task's
+/// and an app make's code (#6307; Heron's P1 on #6558: a voice make's write
+/// approved on anyone's yes would send from the owner's linked account).
+/// None for an id that isn't waiting, or the owner's yes.
+pub fn not_owners_yes_refused(id: &str, owners_yes: impl FnOnce() -> bool) -> Option<Value> {
+    if !crate::skill_write_yes::waits(id) || owners_yes() {
         return None;
     }
-    crate::skill_write_yes::drop_noted(id);
+    crate::skill_write_yes::drop_wait(id);
     eprintln!(
-        "lamp-voice: a skill with code of its own made from the app stays off: not the owner's yes (#6307)"
+        "lamp-voice: a made skill's yes not the owner's: its wait dropped, nothing approved (#6066, #6307)"
     );
     Some(json!({ "error": crate::services::OTHER_VOICE }))
 }
@@ -1148,7 +1456,12 @@ pub fn read_back(
         return json!({ "error": READ_BACK_NOT_ASKED });
     }
     let Some(made) = made_skill::kept_on_named(directory, name) else {
-        eprintln!("lamp-voice: request {request}: a made skill to read back was not found");
+        // Only the name asked, as a skill's name is written (Seventh on
+        // #6071: nothing showed what the model passed).
+        eprintln!(
+            "lamp-voice: request {request}: a made skill to read back was not found by the name asked: {}",
+            made_skill::name_asked(name)
+        );
         if !asking.owner_hears {
             return json!({
                 "error": NO_SKILL_BY_THAT_NAME,
@@ -1244,6 +1557,270 @@ pub fn read_back(
             })
         }
     }
+}
+
+/// The words that start a question about a skill ([`read_back_asked`]).
+const READ_BACK_QUESTIONS: [&str; 2] = ["what", "which"];
+
+/// The words that may come between the question word and a skill's name
+/// ([`read_back_asked`]): "what does desk check use", "what can it reach".
+const READ_BACK_AUX: [&str; 4] = ["does", "do", "can", "will"];
+
+/// The words that may come right before a skill's name
+/// ([`read_back_asked`]): "what does my desk check skill need".
+const READ_BACK_DETERMINERS: [&str; 5] = ["the", "my", "your", "this", "that"];
+
+/// The words right after a skill's name (or after "skill") that ask what
+/// it reaches ([`read_back_asked`]): "what does desk check use?", "what
+/// can desk check reach". Never "say": what a skill says is not what it
+/// reaches. Never "do" or "does" either, which most questions carry; "do"
+/// counts only right after the name, with "does", "can" or "will" before
+/// it ("what does desk check do with my mail", [`READ_BACK_DO`]).
+const READ_BACK_ASKS: [&str; 13] = [
+    "use", "uses", "using", "need", "needs", "access", "accesses", "reach", "reaches", "touch",
+    "touches", "send", "sends",
+];
+
+/// The ask word only right after a skill's name, with an auxiliary before
+/// it ([`READ_BACK_ASKS`]).
+const READ_BACK_DO: &str = "do";
+
+/// The words that run a skill ([`read_back_asked`]): a line that also runs
+/// the skill asked about runs it, never read back in its place.
+const READ_BACK_RUNS: [&str; 4] = ["run", "start", "use", "turn"];
+
+/// The words a run verb may aim at the skill asked about by
+/// ([`read_back_asked`]): "what does desk check use, and run it".
+const READ_BACK_IT: [&str; 4] = ["it", "that", "this", "them"];
+
+/// The most words a skill's name is said in ([`read_back_asked`]).
+const READ_BACK_NAME_WORDS: usize = 6;
+
+/// A heard line's words, lower case, split on anything but a letter or a
+/// digit.
+fn heard_words(heard: &str) -> Vec<String> {
+    heard
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect()
+}
+
+/// A heard line's clauses, each its words ([`heard_words`]): broken at
+/// `,` `;` `.` `?` `!` and at "and" and "then", so an ask word in one
+/// clause is never another's ("what time is it? then run desk check, I
+/// need it").
+fn heard_clauses(heard: &str) -> Vec<Vec<String>> {
+    let mut clauses = Vec::new();
+    for part in heard.split([',', ';', '.', '?', '!']) {
+        let mut clause = Vec::new();
+        for word in heard_words(part) {
+            if word == "and" || word == "then" {
+                clauses.push(std::mem::take(&mut clause));
+            } else {
+                clause.push(word);
+            }
+        }
+        clauses.push(clause);
+    }
+    clauses.retain(|clause| !clause.is_empty());
+    clauses
+}
+
+/// The skill among `names` (kept made skills and pushed ones, as written:
+/// `desk-check`) that a heard line asks what it uses, needs, does,
+/// reaches or sends (V2 on #6413, lamp-52e6 at 12337: "what does desk
+/// check use?" was answered by running the skill, "Hey Lamp, what does
+/// desk check use?" by nothing). Within one clause ([`heard_clauses`]):
+/// "what" or "which", at most one word ("which files"), then "does",
+/// "do", "can" or "will" (needed after that one word), then "the", "my",
+/// "your", "this" or "that" if said, then the name, then "skill" if said,
+/// and then, as the very next word, one of [`READ_BACK_ASKS`], or "do"
+/// after "does", "can" or "will" (SubDarren's and the Reviewer-lead's
+/// HOLDs on #6619: "what music does she like" asks nothing of a `music`
+/// skill). The name is matched loosely, number words as digits and the
+/// dashes left out ([`made_skill::name_digits`]: "desk check",
+/// "deskcheck", "skill two"). The longest name said wins; two different
+/// names said as long, none, and the model is left the line (it never
+/// picks one; no "which one?" is asked). A line that also runs the skill
+/// asked about ([`READ_BACK_RUNS`] before its name, or before "it",
+/// "that", "this" or "them", in any clause but the ask word itself: "what
+/// does desk check use, and run it") asks none, so the run asked for
+/// happens. "Use desk check", "run desk check" and "what time is it" ask
+/// none. The name as written.
+pub fn read_back_asked(heard: &str, names: &[String]) -> Option<String> {
+    let loose = |name: &str| made_skill::name_digits(name).replace('-', "");
+    let wanted: Vec<(String, &String)> = names
+        .iter()
+        .map(|name| (loose(name), name))
+        .filter(|(wanted, _)| !wanted.is_empty())
+        .collect();
+    let clauses = heard_clauses(heard);
+    // The name said at `words[start..]`, with its length.
+    let named_at = |words: &[String], start: usize| -> Vec<(usize, &String)> {
+        let mut found = Vec::new();
+        for length in 1..=READ_BACK_NAME_WORDS.min(words.len().saturating_sub(start)) {
+            let said = loose(&words[start..start + length].join("-"));
+            for (wanted, name) in &wanted {
+                if *wanted == said {
+                    found.push((length, *name));
+                }
+            }
+        }
+        found
+    };
+    let mut best: Option<(usize, &String)> = None;
+    let mut tied = false;
+    // Each ask word matched, by clause and word, so a run check skips it.
+    let mut ask_at: Vec<(usize, usize)> = Vec::new();
+    for (index, words) in clauses.iter().enumerate() {
+        let word = |at: usize| words.get(at).map(String::as_str);
+        for question in 0..words.len() {
+            if !READ_BACK_QUESTIONS.contains(&words[question].as_str()) {
+                continue;
+            }
+            // Where the name may start: after the auxiliary (needed after
+            // one word between), and after a determiner.
+            let mut starts: Vec<(usize, bool)> = Vec::new();
+            let after = question + 1;
+            if word(after).is_some_and(|aux| READ_BACK_AUX.contains(&aux)) {
+                starts.push((after + 1, word(after) != Some("do")));
+            } else {
+                starts.push((after, false));
+                if word(after + 1).is_some_and(|aux| READ_BACK_AUX.contains(&aux)) {
+                    starts.push((after + 2, word(after + 1) != Some("do")));
+                }
+            }
+            for (start, may_do) in starts {
+                let mut at = vec![start];
+                if word(start).is_some_and(|det| READ_BACK_DETERMINERS.contains(&det)) {
+                    at.push(start + 1);
+                }
+                for start in at {
+                    for (length, name) in named_at(words, start) {
+                        let mut next = start + length;
+                        if word(next) == Some("skill") {
+                            next += 1;
+                        }
+                        let asks = word(next).is_some_and(|ask| {
+                            READ_BACK_ASKS.contains(&ask) || (may_do && ask == READ_BACK_DO)
+                        });
+                        if !asks {
+                            continue;
+                        }
+                        ask_at.push((index, next));
+                        match best {
+                            Some((longest, _)) if longest > length => {}
+                            Some((longest, kept)) if longest == length => tied |= kept != name,
+                            _ => {
+                                best = Some((length, name));
+                                tied = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let (_, name) = best.filter(|_| !tied)?;
+    let asked = loose(name);
+    let runs_it = clauses.iter().enumerate().any(|(index, words)| {
+        (0..words.len()).any(|at| {
+            if !READ_BACK_RUNS.contains(&words[at].as_str()) || ask_at.contains(&(index, at)) {
+                return false;
+            }
+            let mut target = at + 1;
+            if words[at] == "turn" {
+                if words.get(target).map(String::as_str) != Some("on") {
+                    return false;
+                }
+                target += 1;
+            }
+            if words
+                .get(target)
+                .is_some_and(|it| READ_BACK_IT.contains(&it.as_str()))
+            {
+                return true;
+            }
+            if words
+                .get(target)
+                .is_some_and(|det| READ_BACK_DETERMINERS.contains(&det.as_str()))
+            {
+                target += 1;
+            }
+            (1..=READ_BACK_NAME_WORDS.min(words.len().saturating_sub(target)))
+                .any(|length| loose(&words[target..target + length].join("-")) == asked)
+        })
+    });
+    (!runs_it).then(|| name.clone())
+}
+
+/// The skill a heard line asks what it uses ([`read_back_asked`]), among
+/// the made skills kept on the lamp ([`made_skill::kept_on_names`]) and
+/// those pushed from a computer ([`crate::skill_task_yes::pushed_names`]),
+/// with the read-back on (`LAMP_SKILL_WRITES` or `LAMP_SKILL_TASKS`): the
+/// second route reads it back in code, never left to the model (V2 on
+/// #6413). The skills' folders are read only for a line with a question
+/// word and an ask word.
+pub fn read_back_heard(heard: &str) -> Option<String> {
+    if !made_skill::writes_on() && !crate::skill_task_yes::on() {
+        return None;
+    }
+    let words = heard_words(heard);
+    let shaped = words
+        .iter()
+        .any(|word| READ_BACK_QUESTIONS.contains(&word.as_str()))
+        && words
+            .iter()
+            .any(|word| READ_BACK_ASKS.contains(&word.as_str()) || word == READ_BACK_DO);
+    if !shaped {
+        return None;
+    }
+    let keeping = Keeping::when(true)?;
+    let mut names = made_skill::kept_on_names(&keeping.directory);
+    names.extend(crate::skill_task_yes::pushed_names(&made_skill::pushed(
+        &keeping.installed,
+    )));
+    read_back_asked(heard, &names)
+}
+
+/// Whether a model's call `name` with `args` is the skill `asked` run or
+/// read back again, in a turn whose heard words already read it back in
+/// code ([`read_back_asked`]): a `use_skill` of it (lamp-52e6 at 12337
+/// ran it instead), or a `make_skill` read-back of it. Names match as
+/// [`made_skill::name_asked`] writes them, number words as digits and
+/// dashes left out.
+pub fn same_skill_again(name: &str, args: &Value, asked: &str) -> bool {
+    let named = match name {
+        crate::use_skill::NAME => args.get("skill"),
+        made_skill::MAKE => args.get(READ_BACK),
+        _ => None,
+    };
+    let loose =
+        |name: &str| made_skill::name_digits(&made_skill::name_asked(name)).replace('-', "");
+    named
+        .and_then(Value::as_str)
+        .is_some_and(|named| loose(named) == loose(asked))
+}
+
+/// What a model's call of the skill already read back in code is told
+/// ([`same_skill_again`]): not run, and the read-back's own result to say.
+pub fn read_back_already(told: &Value) -> Value {
+    json!({
+        "error": "Not run: they asked what this skill uses, not to run it, and it was read back already.",
+        "read_back": told,
+        "next": "Say only what the read-back above tells you to say. Call nothing."
+    })
+}
+
+/// The note round 1 gets once the heard words read `spoken` back in code
+/// ([`read_back_asked`]), with its result `told`.
+pub fn read_back_note(spoken: &str, told: &Value) -> String {
+    format!(
+        "(For you to know: they asked what {spoken} uses, so it was read back for them now, with \
+         this result: {told}. Do as its \"next\" says. Do not run the skill, and do not call \
+         use_skill or make_skill for it.)"
+    )
 }
 
 /// What the model is told of a made skill whose writes wait for the yes
@@ -1734,17 +2311,39 @@ fn told(made: Result<Made, Refused>, on: Result<(), String>, needs: Option<&[Val
 pub const NOT_ASKED_ALOUD: &str =
     "a skill is made only when the person asks for one out loud, or with MAKE IT in the app";
 
+/// What a `make_skill` call with no `request` and no other argument it
+/// takes is told (Heron's P3 on #6614: `request` is not required, so a
+/// clash's choice can come alone): nothing is made.
+pub const NO_REQUEST: &str =
+    "nothing was made: a new skill needs request, what it should do and when";
+
 pub fn answer(
     call: &lamp_gemini::ToolCall,
     request: u64,
     heard: bool,
     lease: Option<&crate::memory_scope::ScopeLease>,
 ) -> Value {
+    // The person's choice on a made skill that clashes with one on the
+    // lamp (#6593): only the owner's own later line, as for a yes.
+    if let Some(id) = call.args[crate::made_clash::CLASH_ID].as_str() {
+        return crate::made_clash::chosen(
+            crate::made_clash::Answer {
+                id,
+                choice: call.args[crate::made_clash::CHOICE].as_str(),
+                request,
+                heard,
+                here: crate::services::sends_here(),
+            },
+            || crate::services::owners_yes_now(request, heard, lease),
+            std::time::Instant::now(),
+            &crate::made_clash::helper_hands(),
+        );
+    }
     // The person's yes to a made skill's writes (#6066): the waiting
     // skill's, in a later heard line, approved by the voice itself.
     if let Some(id) = call.args[crate::skill_write_yes::APPROVE_ID].as_str() {
-        // One made from the app with code (#6307): only the owner's yes.
-        if let Some(refused) = app_code_yes_refused(id, || {
+        // Every made skill's wait: only the owner's yes (#6307, #6558).
+        if let Some(refused) = not_owners_yes_refused(id, || {
             crate::services::owners_yes_now(request, heard, lease)
         }) {
             return refused;
@@ -1808,6 +2407,7 @@ pub fn answer(
             && let Some(told) = crate::skill_task_yes::read_back(
                 name,
                 asking,
+                &made_skill::pushed(&keeping.installed),
                 |asked| {
                     crate::skill_task_yes::asks_by(
                         &keeping.manage,
@@ -1839,6 +2439,19 @@ pub fn answer(
         );
         return serde_json::json!({ "error": NOT_ASKED_ALOUD });
     }
+    // `request` is not required, so a clash's choice can come alone
+    // (#6593): a make with none, or a choice with no clash_id, makes
+    // nothing and is told so plainly (Heron's P3 on #6614).
+    if call.args["request"]
+        .as_str()
+        .is_none_or(|request| request.trim().is_empty())
+    {
+        eprintln!("lamp-voice: request {request}: a skill wasn't made: the call had no request");
+        return serde_json::json!({
+            "error": NO_REQUEST,
+            "next": "Ask them, in a few words, what the skill should do and when. Call nothing now."
+        });
+    }
     let now_unix_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
@@ -1856,6 +2469,170 @@ pub(crate) mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
 
+    /// Heron's P1 on #6558: a voice make's write waits for the owner's yes
+    /// only. A visitor's "yes" approves nothing and drops the wait; the
+    /// owner's approves; an id that isn't waiting is left to `approve`.
+    #[test]
+    fn a_voice_made_writes_yes_is_the_owners_only() {
+        use crate::skill_write_yes as yes;
+        const SAID: &str = "mails mai@example.com from your Gmail, subject “Leaving”";
+        let now = std::time::Instant::now();
+        let asks = || yes::Asks {
+            skill: "leaving-mail".to_owned(),
+            sha256: "ab".repeat(32),
+            writes: vec![json!({"service": "gmail", "action": "send_mail",
+                "to": ["mai@example.com"], "subject": "Leaving", "text": "I'm leaving now."})],
+            say_back: SAID.to_owned(),
+            grants: None,
+            code: false,
+        };
+        let never = |_: &yes::Asks| -> Result<Value, String> { panic!("approved") };
+        let id = yes::wait_for_yes(asks(), 4, now);
+        yes::lamp_said(
+            4,
+            &format!("I made leaving mail: when you get up, it {SAID}."),
+        );
+        // A visitor's yes in request 5: refused, the wait dropped.
+        assert_eq!(
+            not_owners_yes_refused(&id, || false),
+            Some(json!({ "error": crate::services::OTHER_VOICE }))
+        );
+        assert!(!yes::awaited(now));
+        assert_eq!(
+            yes::approve(&id, 5, true, true, now, never)["error"],
+            yes::NOT_APPROVED
+        );
+        // The owner's yes: approved.
+        let id = yes::wait_for_yes(asks(), 6, now);
+        yes::lamp_said(
+            6,
+            &format!("I made leaving mail: when you get up, it {SAID}."),
+        );
+        assert_eq!(not_owners_yes_refused(&id, || true), None);
+        let told = yes::approve(&id, 7, true, true, now, |_| {
+            Ok(json!({"approved": 1, "public": []}))
+        });
+        assert_eq!(told["approved"], true, "{told}");
+        // Nothing waiting: not asked whose it is.
+        assert_eq!(not_owners_yes_refused(&id, || panic!("asked whose")), None);
+    }
+
+    /// V2 on #6413: the heard words, not the model, ask for a read-back.
+    /// A question word, the skill's name said loosely, then what it
+    /// reaches; asking to run it, or another question, asks none.
+    #[test]
+    fn the_heard_words_ask_what_a_skill_uses_by_its_name() {
+        let names: Vec<String> = ["desk-check", "skill-2", "desk", "leaving-mail"]
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
+        for (heard, asked) in [
+            ("what does desk check use?", Some("desk-check")),
+            ("Hey Lamp, what does desk check use?", Some("desk-check")),
+            ("What does my desk check skill need?", Some("desk-check")),
+            ("what can desk check reach", Some("desk-check")),
+            ("Which files does deskcheck access?", Some("desk-check")),
+            ("what does desk check do with my mail", Some("desk-check")),
+            ("What does skill two touch?", Some("skill-2")),
+            (
+                "what does my leaving mail skill send?",
+                Some("leaving-mail"),
+            ),
+            ("what does desk use", Some("desk")),
+            ("use desk check", None),
+            ("run desk check", None),
+            ("what time is it", None),
+            ("what does desk check say?", None),
+            ("what do you think of desk check", None),
+            ("run desk check and tell me what it uses", None),
+            ("what does the weather skill use", None),
+            ("what does desk check use, and run it", None),
+            ("what does desk check use? then use it", None),
+            ("what time is it? then run desk check, I need it", None),
+            ("what does desk check use and turn on desk check", None),
+            ("which song should I play, desk check needs me", None),
+        ] {
+            assert_eq!(read_back_asked(heard, &names).as_deref(), asked, "{heard}");
+        }
+    }
+
+    /// SubDarren's and the Reviewer-lead's HOLDs on #6619: the ask word
+    /// comes right after the name, in the same clause, so a one-word name
+    /// in an ordinary question, an ask word in another clause and a line
+    /// that runs a skill ask none.
+    #[test]
+    fn ordinary_questions_and_mixed_lines_ask_no_read_back() {
+        let names: Vec<String> = ["desk-check", "timer", "focus", "news", "music", "mail"]
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
+        for heard in [
+            "what does desk check use, and run it",
+            "what time is it? then run desk check, I need it",
+            "what's the weather, and start the timer so I do my homework",
+            "which song should I play, start focus, I need to concentrate",
+            "what time does the news start, do you know?",
+            "what music does she like",
+            "which mail do I need to answer",
+            "what mail do you need",
+            "what does she do with the mail",
+        ] {
+            assert_eq!(read_back_asked(heard, &names), None, "{heard}");
+        }
+        for (heard, asked) in [
+            ("what does desk check use", "desk-check"),
+            ("what does the news skill need", "news"),
+            ("what does the timer do with my mail", "timer"),
+            ("which mail does my music skill send", "music"),
+        ] {
+            assert_eq!(
+                read_back_asked(heard, &names).as_deref(),
+                Some(asked),
+                "{heard}"
+            );
+        }
+        // Two names alike give none: the model is left the line.
+        let alike: Vec<String> = vec!["desk-check".into(), "deskcheck".into()];
+        assert_eq!(read_back_asked("what does desk check use", &alike), None);
+    }
+
+    /// The model's `use_skill` or `make_skill` read-back of the skill the
+    /// words read back already is the same skill, however it is written.
+    #[test]
+    fn a_call_of_the_skill_read_back_is_the_same_skill_again() {
+        let use_skill = crate::use_skill::NAME;
+        assert!(same_skill_again(
+            use_skill,
+            &json!({"skill": "desk_check"}),
+            "desk-check"
+        ));
+        assert!(same_skill_again(
+            use_skill,
+            &json!({"skill": "desk-check"}),
+            "desk-check"
+        ));
+        assert!(same_skill_again(
+            made_skill::MAKE,
+            &json!({ READ_BACK: "my desk check skill" }),
+            "desk-check"
+        ));
+        assert!(!same_skill_again(
+            use_skill,
+            &json!({"skill": "dance"}),
+            "desk-check"
+        ));
+        assert!(!same_skill_again(
+            made_skill::MAKE,
+            &json!({"request": "desk check"}),
+            "desk-check"
+        ));
+        assert!(!same_skill_again(
+            "light_on",
+            &json!({"skill": "desk-check"}),
+            "desk-check"
+        ));
+    }
+
     /// Thirteen's P2 on #5985: with no spoken yes, a `make_skill` call in a
     /// turn nobody spoke (the lamp's own event turn, a hand-over, the
     /// model's own idea) makes and keeps nothing and puts nothing on; it is
@@ -1871,6 +2648,27 @@ pub(crate) mod tests {
             answer(&call, 1, false, None),
             serde_json::json!({"error": NOT_ASKED_ALOUD})
         );
+    }
+
+    /// Heron's P3 on #6614: with a clash's choice `request` is no longer
+    /// required, so a plain make with none, or a choice with no clash_id,
+    /// is refused with a plain line, and nothing is made.
+    #[test]
+    fn a_make_with_no_request_is_refused_plainly() {
+        for args in [
+            serde_json::json!({}),
+            serde_json::json!({"request": "  "}),
+            serde_json::json!({"choice": "keep"}),
+        ] {
+            let call = lamp_gemini::ToolCall {
+                id: "c1".to_owned(),
+                name: crate::made_skill::MAKE.to_owned(),
+                args,
+            };
+            let told = answer(&call, 2, true, None);
+            assert_eq!(told["error"], NO_REQUEST, "{told}");
+            assert!(told["next"].is_string(), "{told}");
+        }
     }
 
     const TOML: &str = r#"kind = "installable"
@@ -2432,6 +3230,180 @@ light = { dim = 1 }
             assert!(!second_brief.contains(earlier), "{earlier}: {second_brief}");
         }
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Lamp-9adf, 12 Nov 15:13: request 3's turn was cut while its
+    /// `make_skill` ran, its words were carried into request 4 (heard with
+    /// no words of its own), and the model called `make_skill` again with
+    /// its own wording: one skill is made and put on, and the second call
+    /// is told it is had already, nothing asked of the model or the manage
+    /// helper again.
+    #[test]
+    fn a_cut_ask_carried_into_the_next_line_makes_one_skill() {
+        let (root, keeping) = keeping("one-ask");
+        let (url, served) = service(vec![(200, good())]);
+        let url_gone = url.clone();
+        let asked = manage_helper(&keeping.manage);
+        let heard = "make me a skill: when I come back to my desk, blink the light green twice.";
+        let first = make_with(
+            3,
+            Some(heard),
+            "blink the light green twice when I come back to my desk",
+            &keeping,
+            chat_at(url.clone()),
+            NOW,
+            || None,
+        );
+        assert_eq!(first["made"], "evening-dim", "{first}");
+        assert_eq!(first["on"], true, "{first}");
+        let _ = take_said_line();
+        asked.join().unwrap();
+        // Request 4: the carried line, its lamp's name before it, and the
+        // model's request in other words.
+        let carried = format!("Hey Lamp, {heard}");
+        let second = make_with(
+            4,
+            Some(&carried),
+            "when I return to my desk, blink green two times",
+            &keeping,
+            chat_at(url),
+            NOW + 9_000,
+            || None,
+        );
+        assert_eq!(second["already_made"], true, "{second}");
+        assert_eq!(second["made"], "evening-dim", "{second}");
+        assert!(
+            second["next"]
+                .as_str()
+                .unwrap()
+                .contains("You already have that skill: evening dim. It's on."),
+            "{second}"
+        );
+        assert_eq!(take_said_line(), None, "nothing new to say for a cut turn");
+        assert_eq!(served.join().unwrap(), 1, "the model was asked once");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        // Past the window, the same ask is asked of the model again (gone
+        // here, so not made).
+        let later = make_with(
+            5,
+            Some(heard),
+            "blink the light green twice when I come back to my desk",
+            &keeping,
+            chat_at(url_gone),
+            NOW + ONE_ASK_WITHIN.as_millis() as u64 + 1,
+            || None,
+        );
+        assert!(later.get("already_made").is_none(), "{later}");
+        assert!(later["error"].is_string(), "{later}");
+        let _ = take_said_line();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Reviewer-lead's HOLD on #6604: two makes of other asks, each ending
+    /// on the same short answer to the lamp's question ("which colour?",
+    /// "green"), heard within [`ONE_ASK_WITHIN`]: both are made, the second
+    /// not told it is had already.
+    #[test]
+    fn two_asks_both_answered_green_make_two_skills() {
+        let (root, keeping) = keeping("two-greens");
+        let toml = |topic: &str, when: &str| {
+            format!(
+                "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\n\
+                 topics = [\"{topic}\"]\nlight = true\n\n[trigger]\ntopic = \"{topic}\"\n\
+                 {when}\ncooldown = \"1h\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n\
+                 light = {{ colour = \"green\", level = 3, for = \"20s\" }}\n"
+            )
+        };
+        let back = toml("room/presence", "field = \"someone\"\nequals = true");
+        let leaving = toml("room/stood_up", "field = \"sitting_s\"\nabove = 0");
+        let answer = |toml: &str, name: &str| {
+            format!(
+                "```skill.toml\n{toml}```\n\n```SKILL.md\n---\nname: {name}\n\
+                 description: {name}\n---\n\n# {name}\n```\n"
+            )
+        };
+        let (url, served) = service_sent(vec![
+            (200, answer(&back, "green-on-return")),
+            (200, answer(&leaving, "green-on-leaving")),
+        ]);
+        let helper = manage_helper(&keeping.manage);
+        let first = make_with(
+            7,
+            Some("green"),
+            "glow green when I come back to my desk",
+            &keeping,
+            chat_at(url.clone()),
+            NOW,
+            || None,
+        );
+        assert_eq!(first["made"], "green-on-return", "{first}");
+        let _ = take_said_line();
+        helper.join().unwrap();
+        std::fs::remove_file(&keeping.manage).unwrap();
+        let helper = manage_helper(&keeping.manage);
+        let second = make_with(
+            8,
+            Some("green"),
+            "glow green when I leave my desk",
+            &keeping,
+            chat_at(url),
+            NOW + 60_000,
+            || None,
+        );
+        assert!(second.get("already_made").is_none(), "{second}");
+        assert_eq!(second["made"], "green-on-leaving", "{second}");
+        helper.join().unwrap();
+        let _ = take_said_line();
+        assert_eq!(served.join().unwrap().len(), 2, "the model was asked twice");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Only the same ask is held: another ask, a few words alone, or the
+    /// same ask in another folder, let go unmade or no longer kept is made.
+    #[test]
+    fn only_the_same_ask_is_held_as_made() {
+        let words = |line: &str| ask_words(line);
+        let ask = words("make me a skill: when I come back, glow green");
+        assert!(same_ask(
+            &ask,
+            &words("Hey Lamp, make me a skill: when I come back, glow green.")
+        ));
+        assert!(same_ask(
+            &ask,
+            &words("Make me a skill, when I come back glow green")
+        ));
+        assert!(!same_ask(
+            &ask,
+            &words("make me a skill: when I come back, glow blue")
+        ));
+        assert!(!same_ask(
+            &words("make me a skill"),
+            &words("make me a skill that nods")
+        ));
+        assert!(!same_ask(&[], &[]));
+        assert!(!same_ask(&words("green"), &words("Green.")));
+        assert!(!same_ask(&words("do it"), &words("do it")));
+        assert!(same_ask(&ask, &ask));
+        let directory = std::env::temp_dir().join(format!("one-ask-held-{}", std::process::id()));
+        let other = directory.join("other");
+        let held =
+            OneAsk::begin(&directory, Some("glow green when I come back"), "glow", NOW).unwrap();
+        // Under way: the same ask is told so, another folder's is not held.
+        let told = OneAsk::begin(&directory, Some("glow green when I come back"), "x", NOW)
+            .err()
+            .unwrap();
+        assert_eq!(told["making"], true, "{told}");
+        assert!(OneAsk::begin(&other, Some("glow green when I come back"), "x", NOW).is_ok());
+        // Let go unmade: asked again, it is made.
+        drop(held);
+        let again = OneAsk::begin(&directory, Some("glow green when I come back"), "x", NOW);
+        assert!(again.is_ok());
+        // Made, but no longer kept here: made again.
+        again
+            .unwrap()
+            .made("glow-on-return", &json!({"made": "glow-on-return"}), NOW);
+        assert!(OneAsk::begin(&directory, Some("glow green when I come back"), "x", NOW).is_ok());
     }
 
     /// A made skill that mails mai when the person gets up (#6066).
@@ -3138,7 +4110,9 @@ light = { dim = 1 }
                 .get("approve_id")
                 .is_none()
         );
-        assert_eq!(parameters(false, false)["required"], json!(["request"]));
+        // A clash's choice (#6593) comes with no request: none required.
+        assert_eq!(parameters(false, false)["required"], json!([]));
+        assert!(parameters(false, false)["properties"]["clash_id"].is_object());
         made_skill::set_writes_here(Some(true));
         for reads in [true, false] {
             let on = system_with(reads);
@@ -3757,6 +4731,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             services(true, false, &[], None),
             services(false, true, &[], Some(&today)),
             services(true, true, &[], None),
+            agent_services(),
         ]
         .join("\n");
         for refusal in made_skill::BRIEFS_OWN_REFUSALS {
@@ -3897,6 +4872,94 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(made.name, "example-only");
         assert!(system().contains(EXAMPLE));
         assert!(system().contains("never answer with it"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The owner's ask, 12 Nov (`LAMP_AGENT_SERVICES`): on, with a made
+    /// skill's code on, a service skill is steered to one `do.task` for the
+    /// lamp's agent and never to a read or write step; off, or with code
+    /// off, the prompt is as before, word for word.
+    #[test]
+    fn a_service_skill_is_made_as_a_task_for_the_agent_only_with_its_switch() {
+        assert!(made_skill::agent_services_on(Some("on")));
+        for var in [None, Some(""), Some("1"), Some("ON"), Some("true")] {
+            assert!(!made_skill::agent_services_on(var), "{var:?}");
+        }
+        made_skill::set_writes_here(Some(true));
+        made_skill::set_scripts_here(Some(true));
+        let task = "task = { task = \"...\", run = \"scripts/main.py\" }";
+        for reads in [true, false] {
+            let on = system_for(reads, true);
+            for part in [
+                task,
+                "lamp-services tools (services_connected, service_read, service_write)",
+                "goes only on the person's spoken yes",
+                "Never a read = { ... } or write = { ... } step",
+                "no other grant, and no services in [permissions]",
+                "each CODE-read to read it or CODE-write to send with it",
+                "gmail, google_calendar, google_drive",
+                "grants = [\"gmail-read\"]",
+                AGENT_SERVICES_EXAMPLE,
+            ] {
+                assert!(on.contains(part), "{part}: {on}");
+            }
+            assert!(!on.contains("services = { CODE = \"read\" }"), "{on}");
+            assert!(!on.contains("services = { CODE = \"write\" }"), "{on}");
+            let off = system_for(reads, false);
+            assert!(!off.contains(task), "{off}");
+            assert!(!off.contains("lamp-services tools"), "{off}");
+            assert!(off.contains("services = { CODE = \"write\" }"), "{off}");
+            if reads {
+                assert!(off.contains("services = { CODE = \"read\" }"), "{off}");
+            }
+        }
+        // A made task step is held to the code's cap: with code off, the
+        // switch alone changes nothing.
+        made_skill::set_scripts_here(Some(false));
+        assert_eq!(system_for(true, true), system_for(true, false));
+        made_skill::set_scripts_here(None);
+        made_skill::set_writes_here(None);
+    }
+
+    /// With `LAMP_AGENT_SERVICES` on, a made "every morning read my new
+    /// mail" and "when I leave, email X that I'm out", each one `do.task`
+    /// for the lamp's agent, pass the same checks and keeping as any made
+    /// skill with code (`made_skill::keep`, its cap and say-back).
+    #[test]
+    fn a_service_skill_made_as_a_task_passes_the_lamps_checks() {
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_agent_services_here(Some(true));
+        let (root, keeping) = keeping("agent-services");
+        let made = made_skill::keep(AGENT_SERVICES_EXAMPLE, false, "local:1", &keeping).unwrap();
+        assert_eq!(made.name, "morning-mail");
+        assert_eq!(made.uses.grants, ["gmail-read"]);
+        let leave = AGENT_SERVICES_EXAMPLE
+            .replace("grants = [\"gmail-read\"]", "grants = [\"gmail-write\"]")
+            .replace("topics = [\"clock/local\"]", "topics = [\"room/presence\"]")
+            .replace(
+                "topic = \"clock/local\"\nfield = \"known\"\nequals = true\nrearm = \"ends\"\n\
+                 during = { from = \"08:00\", to = \"08:01\" }",
+                "topic = \"room/presence\"\nfield = \"someone\"\nequals = false\nfor = \"5m\"\n\
+                 cooldown = \"1h\"\nrearm = \"ends\"",
+            )
+            .replace(
+                "Read the owner's new mail since yesterday and tell them who wrote and what about",
+                "Email x@example.com saying I'm out",
+            )
+            .replace("morning-mail", "out-mail");
+        assert!(leave.contains("equals = false"), "{leave}");
+        let made = made_skill::keep(&leave, false, "local:2", &keeping).unwrap();
+        assert_eq!(made.name, "out-mail");
+        assert_eq!(made.uses.grants, ["gmail-write"]);
+        // Without the switch, a service grant is refused; without code on,
+        // the cap refuses a made task step, as before.
+        made_skill::set_agent_services_here(Some(false));
+        assert!(made_skill::keep(&leave, false, "local:3", &keeping).is_err());
+        made_skill::set_agent_services_here(Some(true));
+        made_skill::set_scripts_here(Some(false));
+        assert!(made_skill::keep(&leave, false, "local:4", &keeping).is_err());
+        made_skill::set_scripts_here(None);
+        made_skill::set_agent_services_here(None);
         let _ = std::fs::remove_dir_all(&root);
     }
 

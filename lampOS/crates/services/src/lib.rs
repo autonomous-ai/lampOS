@@ -19,6 +19,7 @@
 pub mod catalog;
 pub mod mail;
 pub mod mcp;
+pub mod mcp_server;
 pub mod net;
 pub mod reads;
 pub mod refresh;
@@ -53,6 +54,20 @@ pub const CALENDAR_EDITS_ENVIRONMENT: &str = "LAMP_CALENDAR_EDITS";
 /// (`update_draft`, `delete_draft`), read by this program: off unless
 /// `on`, and only with [`WRITE_ENVIRONMENT`] on too.
 pub const DRAFT_EDITS_ENVIRONMENT: &str = "LAMP_GMAIL_DRAFT_EDITS";
+
+/// The switch for the lamp's agent's connectors (Hermes's MCP server
+/// `lamp-services mcp`, [`mcp_server`]), read by lamp-tasks, which adds
+/// the server to Hermes's `mcp_servers` with it on and takes it out with it
+/// off: off unless `on`. The server opens no door: a skill's run reaches
+/// the services only through lamp-control with its one-run token's
+/// `<code>-read` / `<code>-write` grants, as [`SKILL_TASKS_ENVIRONMENT`]
+/// has it.
+pub const AGENT_SERVICES_ENVIRONMENT: &str = "LAMP_AGENT_SERVICES";
+
+/// The switch for the voice's tools naming only the linked services
+/// (#6218), read by this program: off unless `on`, when every service the
+/// lamp can link is named, linked or not.
+pub const LINKED_TOOLS_ENVIRONMENT: &str = "LAMP_SERVICES_LINKED_TOOLS";
 
 /// Whether a switch is on, as `var` gives it.
 pub fn on(var: Option<&str>) -> bool {

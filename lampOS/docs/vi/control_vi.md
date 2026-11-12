@@ -9,6 +9,12 @@ khác nhau, bản tiếng Anh đúng. Các thông điệp nằm trong
 `lamp-control` là phần sẽ làm việc đó, tắt cho đến khi chủ đèn bật quyền truy
 cập cho nhà phát triển trong ứng dụng.
 
+Khi `LAMP_CONTROL` không bật mà `LAMP_SKILL_TASKS=on`, `lamp-control` vẫn
+chạy nhưng không có cửa: không lắng nghe TCP, không TLS, không ghép đôi. Nó
+chỉ phục vụ phía chủ đèn (`--admin-socket`: lời đồng ý của voice, việc cấp
+token của lamp-tasks) và socket cho skill run. Cả hai đều tắt thì nó báo vậy
+và thoát với mã 0.
+
 ## Bốn quyết định
 
 1. **Nhà phát triển trước.** API trực tiếp, SDK Python và JavaScript và một
@@ -54,6 +60,18 @@ cập cho nhà phát triển trong ứng dụng.
   (HMAC trên mã ghim, khóa và nonce). Bằng chứng sai thì kết nối bị đóng, và
   mỗi giây chỉ một lần thử trên cả đèn. **Hello** trên mỗi kết nối, ký bằng
   khóa đó, một lần cho mỗi kết nối.
+
+## Token cho skill run
+
+Khi cấp token (`mint`, #6304, `task_yes::KeptYes`), `lamp-control` tự băm
+thư mục `/var/lib/lampOS/skills/<skill>`, hoặc, với tên không có ở đó, thư
+mục của skill được đẩy lên `/var/lib/lampOS/skills-dev/<skill>`
+(`task_yes::folder_of`). Chỉ cần có bất cứ thứ gì mang tên đó trong
+`skills/` (thư mục, tệp hay liên kết) là skill được đẩy lên không bao giờ
+thay chỗ nó; lamp-skills và lamp-tasks giữ cùng quy tắc đó. Một thư mục là
+liên kết thì không bao giờ được băm. Token chỉ nêu các quyền khi
+`task-yes.json` giữ lời đồng ý của chủ đèn cho đúng mã SHA-256 đó và các
+quyền đó.
 
 ## Ai thắng
 

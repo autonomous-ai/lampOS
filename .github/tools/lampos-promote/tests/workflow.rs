@@ -12,8 +12,22 @@ fn promotion_is_manual_separate_and_branch_protected() {
         .split("\n    steps:\n")
         .next()
         .unwrap();
-    assert!(arm64.contains("needs: route\n"));
-    assert!(arm64.contains("if: ${{ !cancelled() && !inputs.promote_sequence }}"));
+    assert!(arm64.contains("needs: [route, reuse]\n"));
+    assert!(arm64.contains(
+        "if: ${{ !cancelled() && !inputs.promote_sequence && needs.reuse.outputs.run_id == '' }}"
+    ));
+    // The release job, beside the build (#6556), is skipped the same way.
+    let release = workflow
+        .split("\n  arm64-release:\n")
+        .nth(1)
+        .unwrap()
+        .split("\n    steps:\n")
+        .next()
+        .unwrap();
+    assert!(release.contains("needs: [route, reuse]\n"));
+    assert!(release.contains(
+        "if: ${{ !cancelled() && !inputs.promote_sequence && needs.reuse.outputs.run_id == '' }}"
+    ));
     let publish = workflow
         .split("\n  publish:\n")
         .nth(1)
@@ -21,7 +35,8 @@ fn promotion_is_manual_separate_and_branch_protected() {
         .split("\n    steps:\n")
         .next()
         .unwrap();
-    assert!(publish.contains("if: ${{ !cancelled() && needs.arm64.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'"));
+    // Built and tested here, or the train's tested build of this same tree (#6556).
+    assert!(publish.contains("if: ${{ !cancelled() && ((needs.arm64.result == 'success' && needs.arm64-release.result == 'success' && needs.arm64-test.result == 'success') || needs.reuse.outputs.run_id != '') && github.event_name == 'push' && github.ref == 'refs/heads/lamp-voice'"));
     // The Studio may build lamp-voice's artifact; the signing key stays on GitHub-hosted.
     assert!(publish.contains("    runs-on: ubuntu-22.04-arm\n"));
     let promotion = workflow

@@ -24,7 +24,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
-import { Keyring, Lamp, LampError, model, schema } from 'lampos';
+import { Keyring, Lamp, LampError, SPEAKER_EVENTS, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
 import { checked, describe, findControl, findStimulus, logIt } from './controls.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
@@ -54,25 +54,46 @@ const tell = (message) => {
   for (const page of pages) page.send(text);
 };
 let last = null;
-// `--ring-file PATH`: the virtual desktop lamp's ring pixels (lamp-sim's DIR/ring.json, 32 `#rrggbb`),
-// put in the light's `shows.pixels` until a lamp says them itself: the twin then draws the ring pixel
-// by pixel. It reads a file beside the lamp, not the lamp's door; it goes with the field it stands in for.
+// `--ring-file PATH`: the virtual desktop lamp's ring (lamp-sim's DIR/ring.json: `on`, `colour`, `level`, 32 `#rrggbb` pixels as drawn
+// at that moment, and the `pattern` while one moves), put in the light's `shows` for what the lamp does not say itself: the twin then
+// draws the ring pixel by pixel, moving. It reads a file beside the lamp, not the lamp's door; it goes with the field it stands in
+// for. lamp-sim rewrites the file as the pattern steps (about 25 times a second); a change is read within 100 ms and pushed to the
+// pages as a state of its own, so the picture moves between the lamp's own states.
 const ringFile = options['ring-file'];
+const ringShows = () => {
+  try {
+    const ring = JSON.parse(readFileSync(ringFile, 'utf8'));
+    if (!Array.isArray(ring.pixels)) return null;
+    return { pixels: ring.pixels, ...(typeof ring.on === 'boolean' ? { on: ring.on } : {}), ...(typeof ring.colour === 'string' ? { colour: ring.colour } : {}), ...(Number.isInteger(ring.level) ? { level: ring.level } : {}), ...(typeof ring.pattern === 'string' ? { pattern: ring.pattern } : {}) };
+  } catch { return null; /* no ring file yet, or half written: the one colour shows */ }
+};
 const withRing = (state) => {
   if (!ringFile) return state;
-  try {
-    const { pixels } = JSON.parse(readFileSync(ringFile, 'utf8'));
-    if (Array.isArray(pixels) && !state.lamp?.light?.shows?.pixels) {
-      return { ...state, lamp: { ...state.lamp, light: { ...state.lamp?.light, shows: { ...state.lamp?.light?.shows, pixels } } } };
-    }
-  } catch { /* no ring file yet, or half written: the one colour shows */ }
-  return state;
+  const ring = ringShows();
+  if (!ring) return state;
+  const shows = state.lamp?.light?.shows ?? {};
+  // What the lamp says itself stays; the ring's file fills only what is missing.
+  return { ...state, lamp: { ...state.lamp, light: { ...state.lamp?.light, shows: { ...ring, ...shows } } } };
 };
+let lastRaw = null;
 await lamp.on('body.state', (raw) => {
+  lastRaw = raw;
   const state = withRing(raw);
   last = state;
   tell({ type: 'state', state });
 });
+if (ringFile) {
+  let before = '';
+  setInterval(() => {
+    let text = '';
+    try { text = readFileSync(ringFile, 'utf8'); } catch { return; }
+    if (text === before) return;
+    before = text;
+    if (!lastRaw) return;
+    last = withRing(lastRaw);
+    tell({ type: 'state', state: last });
+  }, 100).unref();
+}
 console.log(`body.state subscribed on ${options.fake ? 'a simulated body' : 'the paired lamp'}`);
 
 // One lease at a time, taken at the first drag and given back 3 s after the last.
@@ -118,13 +139,15 @@ const refuse = (why) => new LampError(why, { code: 'bad_request' });
 const said = (id, call, ok, answer) => tell({ type: 'result', id, call, ok, answer });
 let stimulating = Promise.resolve();
 const lastStimulus = new Map();
-async function press(message) {
+async function press(message, page) {
   const { id, name, args = {} } = message;
   try {
     if (message.type === 'call') {
       const control = findControl(name);
       if (!control) throw refuse(`no button ${name}`);
-      const call = await control.run({ lamp, release, listenFor }, checked(control.fields, args));
+      // A picture goes to the page that pressed, as one message to it: not through `tell`, never logged, never kept.
+      const show = (jpeg) => page?.send(JSON.stringify({ type: 'picture', id, jpeg: Buffer.from(jpeg).toString('base64') }));
+      const call = await control.run({ lamp, release, listenFor, show }, checked(control.fields, args));
       said(id, call, true, 'taken');
     } else {
       const stimulus = findStimulus(name);
@@ -165,7 +188,7 @@ async function listenFor(phrase) {
 }
 if (stimDir) {
   listenFor('good night lamp').catch((error) => console.log(`not listening for a phrase: ${error.message}`));
-  for (const event of [...schema.events.filter((e) => e !== 'body.state' && e !== 'time' && e !== 'phrase.heard'), 'lease', 'done']) {
+  for (const event of [...schema.events.filter((e) => e !== 'body.state' && e !== 'time' && e !== 'phrase.heard'), 'lease', 'done', ...SPEAKER_EVENTS]) {
     lamp.on(event, (frame) => {
       if (!logIt(event, Date.now(), quiet)) return;
       const { ev: _ev, at: _at, ...rest } = frame ?? {};
@@ -178,8 +201,10 @@ const files = {
   '/': ['text/html; charset=utf-8', () => readFileSync(here('./index.html'))],
   '/lamp.glb': ['model/gltf-binary', () => readFileSync(glbPath)],
   '/model.json': ['application/json', () => JSON.stringify(model)],
-  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ ...describe(), camera: lamp.grants.includes('camera'), microphone: lamp.grants.includes('microphone') })] } : {}),
+  // `lamp` and `mode` name the checklist's key: the lamp's own id and name from hello, and what this page is driving.
+  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ ...describe(), camera: lamp.grants.includes('camera'), microphone: lamp.grants.includes('microphone'), lamp: { id: String(lamp.info?.id ?? 'lamp'), name: String(lamp.info?.name ?? '') }, mode: options.fake ? 'fake' : 'lamp-sim' })] } : {}),
   ...(stimDir ? { '/panel.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./panel.js'))] } : {}),
+  ...(stimDir ? { '/checklist.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./checklist.js'))] } : {}),
 };
 // three.js, vendored (examples/twin/vendor/three, three@0.160.0, MIT), so the page works with no internet.
 // A page's import map cannot carry the `?t=` token, so exactly these files are served without it, from this
@@ -286,7 +311,7 @@ wss.on('connection', (page) => {
     if (message.type === 'drag') drag(message.joint, Number(message.deg));
     if (message.type === 'let_go') release();
     if (message.type === 'camera_on') cameraAskedAt = Date.now();
-    if (stimDir && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message);
+    if (stimDir && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message, page);
   });
   page.on('close', () => pages.delete(page));
 });
@@ -329,7 +354,7 @@ function parse(args) {
 // that eases each joint to where it was last sent, said 25 times a second
 // as lamp-control's `body.state` says it.
 async function fakeBody() {
-  const fakeLamp = await FakeLamp.start({ name: 'Fake lamp (twin)', grants: ['body', 'light', 'speak', 'look', 'notes', 'camera', 'skills'] });
+  const fakeLamp = await FakeLamp.start({ name: 'Fake lamp (twin)', grants: ['body', 'light', 'speak', 'look', 'notes', 'camera', 'skills', 'speaker'] });
   // A keyring of its own, so the fake's pairing never sits beside a real lamp's.
   const folder = mkdtempSync(join(tmpdir(), 'lampos-twin-'));
   process.on('exit', () => rmSync(folder, { recursive: true, force: true }));

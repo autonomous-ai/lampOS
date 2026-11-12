@@ -73,6 +73,9 @@ Environment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json
 # setup. Row 10 passed whole on lamp-52e6 on 22 Oct (#2843). Its functions reach every chat request on the
 # second route since #3430.
 Environment=LAMP_ONBOARDING=on
+# The walk waits for the first update after setup (#6284, docs/onboarding.md "Held for the first update"): one line
+# when a newer build is read, one when it has switched. With setup's and lamp-update's.
+Environment=LAMP_FIRST_UPDATE=on
 Environment=LAMP_BUS=on
 # The privacy route (docs/privacy-switch.md): Controls reads the lamp's privacy switch (chip 1 line 9, the pins file's
 # privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
@@ -219,6 +222,9 @@ Environment=LAMP_LIGHT_TOLD=on
 # A reply claiming a light, volume or timer action no call made is asked again once, then said not done: on lamp-52e6
 # "Timer set. It rings at 9:39 am." (9928) and "Louder."/"Brighter."/"Cooler." came with no call (#5215).
 Environment=LAMP_ACTION_CLAIM_CHECKED=on
+# The owner's line is told which services are linked in the app, so "what can you do with my calendar?"
+# is answered from it, not as the app's job (#5523).
+Environment=LAMP_SERVICES_TOLD=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
 # Talk over the lamp's own line (a say, a reminder, news) in a busy room is let go and the line goes on; its name,
@@ -241,6 +247,9 @@ Environment=LAMP_SECOND_MEMORY_HITS=on
 # The owner's approximate place from the app, city level (#4333): told only beside a line that needs a place
 # ("near me", the weather). The lead's yes on 3 Nov; shown on lamp-0c89 on 30 Oct (asked nothing back, and asked after a clear).
 Environment=LAMP_OWNER_PLACE=on
+# The owner's chosen voice and character words (#5394): spoken in the chosen voice, the words told after its
+# character; the same line in lamp-cloud.service. On in the product on 12 Nov for the lead (#6590).
+Environment=LAMP_CHOSEN_VOICE=on
 # Speed: the relay's near routes, the chat's connection kept, the link said for lamp/online.
 Environment=LAMP_RELAY_ROUTES=on
 Environment=LAMP_SECOND_CHAT_KEPT=on
@@ -645,9 +654,11 @@ Environment=LAMP_MEMORY_ROLE=on
 # to the owner's turns, redone from its record, and confirmed mail addresses kept as contacts. On: the owner's call
 # of 11 Nov, on the lamp-06c1 row https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064 (its two forget gaps follow later). Needs same-build lamp-memory.
 Environment=LAMP_SERVICE_RECORDS=on
-# LAMP_SERVICE_RECORDS_TOLD stays off (11 Nov, a P1 on stable 11913: with the records told, the model spoke a
-# read-back and then "done" with no service_write, on lamp-9adf). Records are still kept, just not told, until
-# the history-only rule (#6427) passes its rows.
+# LAMP_SERVICE_RECORDS_TOLD on again (12 Nov): its 11 Nov P1 (a read-back and "done" with no service_write, on
+# lamp-9adf) came from the history dropping service_write calls, fixed by #6453; with it and #6404 on lamp-06c1,
+# 9 of 9 second writes made a real call and every test event was moved or cancelled. Off, the model never sees an
+# event's id, so a move or cancel reads first and the read-then-write rule refuses it (06c1 on 825's code, 12 Nov).
+Environment=LAMP_SERVICE_RECORDS_TOLD=on
 Environment=LAMP_SERVICE_CONTACTS=on
 Environment=LAMP_SERVICE_REDO=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock

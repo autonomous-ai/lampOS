@@ -1996,6 +1996,10 @@ pub struct Skill {
     /// `grants = [...]`: what its `do.task`'s script may reach ([`task`],
     /// #6305); empty without one.
     pub grants: Vec<String>,
+    /// The lamp's old limits a skill made here was written with and that
+    /// are ignored as it loads ([`shed_made_manners`]), as said; empty for
+    /// every other skill.
+    pub manners_shed: Vec<&'static str>,
 }
 
 impl Skill {
@@ -4967,6 +4971,7 @@ fn manifest(
         watch,
         unplug,
         grants,
+        manners_shed: Vec::new(),
     };
     // A watch shows a faint mark while it is on, texts the person, and
     // tells a known face from one it does not know: each needs its key.
@@ -5584,6 +5589,74 @@ pub fn load_each(root: &Path) -> Vec<(PathBuf, Result<Skill, String>)> {
     load_each_with(root, None)
 }
 
+/// Whether the skill in `folder` was made on this lamp by voice or in the
+/// app and put on by the manage helper (`package::install_made`): an
+/// installable skill under the skills folder, never pushed, whose
+/// `SKILL.md` front matter says `made: here` (the lamp's own line, inside
+/// the package its SHA-256 binds; the model's is dropped, and a shared one
+/// has it taken out, `lamp-cloud`'s `share`) and not `added: file`,
+/// `written: app` nor `limits: asked`, with a [`package::INSTALLED_FROM`]
+/// record not from the Store. A core, Store, add-on, pushed, file-added or
+/// written skill is none, nor one whose request asked for limits
+/// (`made_skill::LIMITS_ASKED`, written on its card as it was made): its
+/// limits, the defaults among them, are the person's own.
+pub fn made_by_ask(skill: &Skill, folder: &Path) -> bool {
+    if skill.kind != SkillKind::Installable || skill.pushed_by.is_some() {
+        return false;
+    }
+    let Ok(card) = fs::read_to_string(folder.join("SKILL.md")) else {
+        return false;
+    };
+    let Some((front, _)) = card
+        .strip_prefix("---\n")
+        .and_then(|rest| rest.split_once("\n---"))
+    else {
+        return false;
+    };
+    let marks: Vec<&str> = front.lines().map(str::trim).collect();
+    marks.contains(&"made: here")
+        && !marks.contains(&lamp_voice::made_skill::ADDED_FROM_FILE)
+        && !marks.contains(&lamp_voice::made_skill::WRITTEN_MARK)
+        && !marks.contains(&lamp_voice::made_skill::LIMITS_ASKED)
+        && package::installed_from(folder).is_some_and(|installed| !installed.from_store)
+}
+
+/// With `LAMP_MADE_SKILL_LOOSE=on` (`lamp_voice::made_skill::loose_on`),
+/// the two limits the switch no longer writes on a new make, ignored as a
+/// skill made before it loads ([`made_by_ask`]), never written to its
+/// folder: its files, the SHA-256 its package and a task's yes are bound
+/// to ([`task::folder_sha256`]), stay as they were put on. Only a value the
+/// lamp wrote by default is ignored: a `[budget]` of the nudges' group
+/// (`made_skill::MANNERS_GROUP`) at `made_skill::MANNERS_PER_HOUR` an hour
+/// with no `gap`, no `give_back_unsaid` and no `[stop]`, and `most_a_day`
+/// at `made_skill::MANNERS_MOST_A_DAY`. Any other value is kept, as the
+/// person's ask; `[rest]`, `[quiet]`, a trigger's `cooldown` and `rearm`
+/// are kept whole. What was ignored is kept on the skill
+/// ([`Skill::manners_shed`]) for the program's one line.
+pub fn shed_made_manners(skill: &mut Skill, folder: &Path) {
+    use lamp_voice::made_skill::{MANNERS_GROUP, MANNERS_MOST_A_DAY, MANNERS_PER_HOUR};
+    let lamp_budget =
+        skill.budget.as_ref().is_some_and(|(group, per_hour)| {
+            group == MANNERS_GROUP && *per_hour == MANNERS_PER_HOUR
+        }) && skill.budget_gap_us == 0
+            && !skill.budget_gives_back
+            && skill.stop.is_none();
+    let lamp_most = skill.most_a_day == Some(MANNERS_MOST_A_DAY);
+    if !(lamp_budget || lamp_most) || !made_by_ask(skill, folder) {
+        return;
+    }
+    if lamp_budget {
+        skill.budget = None;
+        skill
+            .manners_shed
+            .push("[budget] group \"wellbeing\" per_hour = 1");
+    }
+    if lamp_most {
+        skill.most_a_day = None;
+        skill.manners_shed.push("most_a_day = 3");
+    }
+}
+
 /// The skill folders under `root`, sorted, but those whose name begins
 /// with a dot.
 fn folders_in(root: &Path) -> Vec<PathBuf> {
@@ -5616,6 +5689,12 @@ pub fn load_each_with(
                 Some(_) => task::origin_refuses(&folder, false).map_or(Ok(skill), Err),
                 None => Ok(skill),
             });
+            let skill = skill.map(|mut skill| {
+                if lamp_voice::made_skill::loose_on() {
+                    shed_made_manners(&mut skill, &folder);
+                }
+                skill
+            });
             (folder, skill)
         })
         .collect();
@@ -5638,12 +5717,19 @@ pub fn load_each_with(
             let name = folder
                 .file_name()
                 .map(|name| name.to_string_lossy().into_owned());
-            let taken = loaded[..here].iter().any(|(other, _)| {
-                other
-                    .file_name()
-                    .map(|other| other.to_string_lossy().into_owned())
-                    == name
-            });
+            // Anything of that name under `root`, a file or a link too
+            // (`task::lamp_has_skill_named`, the rule lamp-control and
+            // lamp-tasks hold): lamp-control would hash that one at the
+            // mint, never this (SubDarren's P2/P3 on #6608).
+            let taken = folder
+                .file_name()
+                .is_some_and(|name| task::lamp_has_skill_named(root, name))
+                || loaded[..here].iter().any(|(other, _)| {
+                    other
+                        .file_name()
+                        .map(|other| other.to_string_lossy().into_owned())
+                        == name
+                });
             let skill = if taken {
                 Err("a skill of that name is already on the lamp: a pushed skill never takes its place".to_owned())
             } else {
@@ -10505,6 +10591,192 @@ mod tests {
         .unwrap();
     }
 
+    /// A made skill as the lamp wrote it before `LAMP_MADE_SKILL_LOOSE`:
+    /// the nudges' group and day, its rest, an hour's cooldown.
+    const MADE_LIGHT_OFF: &str = "version = \"1.0.0\"\nmost_a_day = 3\n\
+        [permissions]\ntopics = [\"room/presence\"]\nlight = true\n\
+        [trigger]\ntopic = \"room/presence\"\nfield = \"present\"\nequals = false\n\
+        cooldown = \"1h\"\n[ask]\npolicy = \"nudge\"\n[[do]]\nlight = { colour = \"warm\" }\n\
+        [quiet]\nfrom = \"22:00\"\nto = \"08:00\"\n\
+        [budget]\ngroup = \"wellbeing\"\nper_hour = 1\n[rest]\nafter_ignored = 2\n";
+
+    /// A skill folder under `root` named `name`, its card's last lines
+    /// `marks`, its `skill.toml` `toml`, put on from a package (`store`, the
+    /// Store's) or from a folder (`None`).
+    fn marked_skill(
+        root: &Path,
+        name: &str,
+        marks: &str,
+        toml: &str,
+        store: Option<bool>,
+    ) -> PathBuf {
+        let folder = write_skill(root, name, toml);
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Lights off when I leave.\n{marks}---\n"),
+        )
+        .unwrap();
+        if let Some(store) = store {
+            from_store(&folder, name, store);
+        }
+        folder
+    }
+
+    /// The owner's 9adf round, 12 Nov 15:06: loosened, a skill made here
+    /// before the switch sheds the lamp's default `[budget]` group and
+    /// `most_a_day` as it loads, its file untouched and its rest, quiet and
+    /// cooldown kept; a value the person asked for, and every core, Store,
+    /// file-added, folder-put or pushed skill, keeps them; off, nothing is
+    /// shed.
+    #[test]
+    fn loosened_a_made_skill_sheds_the_lamps_old_limits_as_it_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let (root, dev) = (dir.path().join("skills"), dir.path().join("dev"));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::create_dir_all(&dev).unwrap();
+        let made = marked_skill(
+            &root,
+            "light-off",
+            "made: here\nmade_by: voice\n",
+            MADE_LIGHT_OFF,
+            Some(false),
+        );
+        // Made before the maker was written on the card: still made here.
+        marked_skill(
+            &root,
+            "glow-off",
+            "made: here\n",
+            MADE_LIGHT_OFF,
+            Some(false),
+        );
+        let asked = MADE_LIGHT_OFF
+            .replace("most_a_day = 3", "most_a_day = 5")
+            .replace("per_hour = 1", "per_hour = 2");
+        marked_skill(
+            &root,
+            "asked",
+            "made: here\nmade_by: app\n",
+            &asked,
+            Some(false),
+        );
+        let gap = MADE_LIGHT_OFF.replace("per_hour = 1\n", "per_hour = 1\ngap = \"30m\"\n");
+        marked_skill(&root, "gapped", "made: here\n", &gap, Some(false));
+        marked_skill(&root, "store", "made: here\n", MADE_LIGHT_OFF, Some(true));
+        marked_skill(
+            &root,
+            "from-file",
+            "made: here\nadded: file\n",
+            MADE_LIGHT_OFF,
+            Some(false),
+        );
+        marked_skill(&root, "by-hand", "made: here\n", MADE_LIGHT_OFF, None);
+        // Made with the switch on, its request asking for limits ("not too
+        // often"): the lamp's defaults, the person's ask, kept.
+        marked_skill(
+            &root,
+            "limits-asked",
+            &format!(
+                "made: here\nmade_by: voice\n{}\n",
+                lamp_voice::made_skill::LIMITS_ASKED
+            ),
+            MADE_LIGHT_OFF,
+            Some(false),
+        );
+        marked_skill(&root, "plain", "", MADE_LIGHT_OFF, Some(false));
+        marked_skill(
+            &root,
+            "core-nudge",
+            "made: here\n",
+            &format!("kind = \"core\"\n{MADE_LIGHT_OFF}"),
+            Some(false),
+        );
+        marked_skill(&dev, "pushed", "made: here\n", MADE_LIGHT_OFF, None);
+        let written = std::fs::read(made.join("skill.toml")).unwrap();
+        let none = BTreeSet::new();
+        let loaded = |on: bool| {
+            lamp_voice::made_skill::set_loose_here(Some(on));
+            let loaded = load_each_with(
+                &root,
+                Some(Pushed {
+                    dir: &dev,
+                    picture_yes: &none,
+                }),
+            );
+            lamp_voice::made_skill::set_loose_here(None);
+            loaded
+                .into_iter()
+                .map(|(folder, skill)| {
+                    let name = folder.file_name().unwrap().to_string_lossy().into_owned();
+                    (name, skill)
+                })
+                .collect::<BTreeMap<_, _>>()
+        };
+        let on = loaded(true);
+        let skill = |name: &str| {
+            on[name]
+                .clone()
+                .unwrap_or_else(|why| panic!("{name}: {why}"))
+        };
+        for name in ["light-off", "glow-off"] {
+            let shed = skill(name);
+            assert_eq!(shed.budget, None, "{name}");
+            assert_eq!(shed.most_a_day, None, "{name}");
+            assert_eq!(
+                shed.manners_shed,
+                [
+                    "[budget] group \"wellbeing\" per_hour = 1",
+                    "most_a_day = 3"
+                ]
+            );
+            // Kept: its rest, its quiet hours and its trigger's cooldown.
+            assert_eq!(shed.rest.map(|rest| rest.after_ignored), Some(2));
+            assert_eq!(shed.quiet, Some((22 * 60, 8 * 60)));
+            assert_eq!(shed.triggers[0].cooldown_us, 3_600_000_000);
+        }
+        assert_eq!(std::fs::read(made.join("skill.toml")).unwrap(), written);
+        // The person's own values, each kept.
+        let asked = skill("asked");
+        assert_eq!(asked.budget, Some(("wellbeing".into(), 2)));
+        assert_eq!(asked.most_a_day, Some(5));
+        assert!(asked.manners_shed.is_empty());
+        // A gap is no default: the group kept, the day shed.
+        let gapped = skill("gapped");
+        assert_eq!(gapped.budget, Some(("wellbeing".into(), 1)));
+        assert_eq!(gapped.most_a_day, None);
+        assert_eq!(gapped.manners_shed, ["most_a_day = 3"]);
+        for name in [
+            "store",
+            "from-file",
+            "by-hand",
+            "plain",
+            "core-nudge",
+            "limits-asked",
+        ] {
+            let kept = skill(name);
+            assert_eq!(kept.budget, Some(("wellbeing".into(), 1)), "{name}");
+            assert_eq!(kept.most_a_day, Some(3), "{name}");
+            assert!(kept.manners_shed.is_empty(), "{name}");
+        }
+        // A pushed skill never joins a lamp skill's group, so it is refused
+        // as before: it is never seen as made here.
+        assert!(on["pushed"].is_err());
+        // Off, every skill keeps what it was written with.
+        let off = loaded(false);
+        for (name, skill) in &off {
+            if let Ok(skill) = skill {
+                assert!(skill.manners_shed.is_empty(), "{name}");
+                assert!(skill.most_a_day.is_some(), "{name}");
+            }
+        }
+        let made_off = off["light-off"].clone().unwrap();
+        assert_eq!(made_off.budget, Some(("wellbeing".into(), 1)));
+        assert_eq!(made_off.most_a_day, Some(3));
+        // The said values are the lamp's own defaults.
+        assert_eq!(lamp_voice::made_skill::MANNERS_GROUP, "wellbeing");
+        assert_eq!(lamp_voice::made_skill::MANNERS_PER_HOUR, 1);
+        assert_eq!(lamp_voice::made_skill::MANNERS_MOST_A_DAY, 3);
+    }
+
     /// #6305: a `do.task` loads with its grants beside the skill's other
     /// steps, which stay steps of their own; its grants and its step are
     /// checked as it loads.
@@ -10639,6 +10911,61 @@ mod tests {
             let refused = result(name).unwrap_err();
             assert!(refused.contains(why), "{name}: {refused}");
         }
+    }
+
+    /// A pushed skill whose name is on the lamp under `root` as a folder, a
+    /// file or a link is not loaded, so it is never handed over: lamp-control
+    /// would hash `root/<name>` at the mint (SubDarren's P2/P3 on #6608).
+    #[test]
+    fn a_pushed_skill_never_loads_while_its_name_is_under_the_lamps_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let dev = dir.path().join("dev");
+        std::fs::create_dir_all(&root).unwrap();
+        task_skill(
+            &dev,
+            "pushed-booth",
+            &PHOTO_BOOTH.replace("photo_booth", "pushed_booth"),
+        );
+        let none = BTreeSet::new();
+        let pushed = || {
+            load_each_with(
+                &root,
+                Some(Pushed {
+                    dir: &dev,
+                    picture_yes: &none,
+                }),
+            )
+            .into_iter()
+            .find(|(folder, _)| folder.starts_with(&dev))
+            .map(|(_, result)| result)
+            .unwrap()
+        };
+        assert!(pushed().unwrap().pushed_by.is_some());
+        let own = root.join("pushed-booth");
+        for what in ["a folder", "a file", "a link"] {
+            match what {
+                "a folder" => std::fs::create_dir(&own).unwrap(),
+                "a file" => std::fs::write(&own, "x").unwrap(),
+                _ => std::os::unix::fs::symlink(dir.path().join("nowhere"), &own).unwrap(),
+            }
+            let refused = pushed().unwrap_err();
+            assert!(refused.contains("already on the lamp"), "{what}: {refused}");
+            assert_eq!(
+                task::folder_of(&root, Some(&dev), "pushed-booth", true),
+                None,
+                "{what}"
+            );
+            if std::fs::symlink_metadata(&own).unwrap().is_dir() {
+                std::fs::remove_dir(&own).unwrap();
+            } else {
+                std::fs::remove_file(&own).unwrap();
+            }
+        }
+        assert_eq!(
+            task::folder_of(&root, Some(&dev), "pushed-booth", true),
+            Some(dev.join("pushed-booth"))
+        );
     }
 
     /// #6305: the manage helper reads a skill's task back for the voice,

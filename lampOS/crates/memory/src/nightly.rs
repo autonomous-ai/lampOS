@@ -91,8 +91,8 @@ const TOPIC_BYTES: usize = 64;
 const TAG_BYTES: usize = 64;
 const LINE_BYTES: usize = 200;
 const LABEL_BYTES: usize = 32;
-const DAY_MS: u64 = 86_400_000;
-const JOB_MS: u64 = DAY_MS;
+pub(crate) const DAY_MS: u64 = 86_400_000;
+pub(crate) const JOB_MS: u64 = DAY_MS;
 /// How many days back a day's pass may still run: the voice's
 /// `lamp_voice::nightly::DAYS_BACK`, mirrored (lamp-voice never links this
 /// crate) and pinned equal by `tests/nightly_days_back.rs`. A forget marks
@@ -105,13 +105,13 @@ pub const DAYS_BACK: u32 = 3;
 /// (Heron's point on #5333). A line said later is read.
 pub const FORGET_TURN_MS: u64 = 60_000;
 
-fn bad(message: &'static str) -> Error {
+pub(crate) fn bad(message: &'static str) -> Error {
     Error::new("bad_request", message)
 }
 
 /// Only a known person's own scope has a nightly pass: never the room, a
 /// rules scope or an unknown speaker.
-fn known(person: &Person) -> Result<()> {
+pub(crate) fn known(person: &Person) -> Result<()> {
     if lamp_msgs::known::is_person_id(person.as_str()) {
         Ok(())
     } else {
@@ -816,7 +816,7 @@ fn existing(db: &rusqlite::Connection, person: &Person) -> Result<Vec<Value>> {
 
 /// An item as a prepare or a search tells it: its fields beside id, kind,
 /// day and text, without its copied quotes.
-fn told(id: u64, kind: &str, day: &str, text: &str, detail: &str) -> Value {
+pub(crate) fn told(id: u64, kind: &str, day: &str, text: &str, detail: &str) -> Value {
     let mut item = json!({"id":id,"kind":kind,"day":day,"text":text});
     if let Ok(Value::Object(fields)) = serde_json::from_str::<Value>(detail) {
         for (name, value) in fields {
@@ -1473,9 +1473,10 @@ pub(crate) fn expire(tx: &Transaction<'_>, today: &str, oldest: &str, now: u64) 
     )?;
     // What cites an item that closes goes with it (a profile line citing a
     // plan fact), as Tiers drops a line whose fact is gone; an exchange that
-    // ages out takes none.
+    // ages out takes none. A weekly chapter stays to its own day: a source's
+    // expiry is no correction (a forget still takes it, [`with_doomed`]).
     while tx.execute(
-        "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN nightly_items n ON n.rid=s.child JOIN nightly_items p ON p.rid=s.parent WHERE s.parent IN (SELECT rid FROM doomed) AND s.child NOT IN (SELECT rid FROM doomed)",
+        "INSERT OR IGNORE INTO doomed SELECT DISTINCT s.child FROM sources s JOIN nightly_items n ON n.rid=s.child JOIN nightly_items p ON p.rid=s.parent WHERE s.parent IN (SELECT rid FROM doomed) AND s.child NOT IN (SELECT rid FROM doomed) AND n.kind!='chapter'",
         [],
     )? > 0
     {}

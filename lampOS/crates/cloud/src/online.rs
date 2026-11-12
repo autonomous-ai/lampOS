@@ -195,6 +195,13 @@ pub fn reply(
             {
                 data["message"] = crate::harness_sign_in::message_for(why).into();
             }
+            // The default agent from the app (#6492): plain words beside
+            // lamp-tasks' code.
+            if let Err(why) = &answered
+                && kind == crate::engine_default::KIND
+            {
+                data["message"] = crate::engine_default::message_for(why).into();
+            }
             data
         }
         Command::Other(cmd) => identity.refused(now, &cmd),
@@ -258,6 +265,8 @@ struct Handed {
     uploads_acked: Vec<crate::settings::Outcome>,
     /// The `onboarding.done` date the broker acknowledged (#5812).
     onboarding_done_acked: Option<u64>,
+    /// The update's events the broker acknowledged, by round (#6284).
+    update_events_acked: Vec<(u64, crate::update_events::Which)>,
     /// Journal lines, one per step of a change's result (Mobile on #1959,
     /// 21:0x): handed, sent as a packet, acked or lost. Never its data.
     journal: Vec<String>,
@@ -282,6 +291,9 @@ enum Tagged {
     /// The app told the walk's end, at this date (`crate::onboarding_done`),
     /// sent again if it is lost before its ack.
     OnboardingDone(u64),
+    /// The app told an update's start or end, of this round
+    /// (`crate::update_events`), sent again if it is lost before its ack.
+    UpdateEvent(u64, crate::update_events::Which),
 }
 
 impl Handed {
@@ -372,6 +384,10 @@ impl Handed {
                 self.onboarding_done_acked = Some(at);
                 None
             }
+            Some(Tagged::UpdateEvent(round, which)) => {
+                self.update_events_acked.push((round, which));
+                None
+            }
             _ => None,
         }
     }
@@ -453,8 +469,13 @@ fn dropped(
     reports: &Option<Arc<crate::reports::Shared>>,
     onboarding_done: &mut Option<crate::onboarding_done::Done>,
     onboarding_step: &mut Option<crate::onboarding_step::Steps>,
+    update_events: &mut Option<crate::update_events::Events>,
 ) {
     let again = handed.lost();
+    // The update's events not acked went too: sent again on the next one.
+    if let Some(events) = update_events {
+        events.lost();
+    }
     // Whatever was not acked went with the connection: the walk's end too.
     if let Some(done) = onboarding_done {
         done.lost();
@@ -593,6 +614,8 @@ async fn session(
     let mut onboarding_step = lamp
         .onboarding_done()
         .map(crate::onboarding_step::Steps::new);
+    // An update's start and end told to the app (#6284), with their switch.
+    let mut update_events = lamp.update_events().map(crate::update_events::Events::new);
     // A skill that needs a connector not linked, told to the app
     // (`crate::skills::NEEDS_LINK_KIND`), with its switch.
     let skill_link = lamp.skills().is_some_and(|places| places.link.is_some());
@@ -636,7 +659,7 @@ async fn session(
                             break None;
                         }
                     }
-                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() => {
+                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() => {
                         let me = identity.borrow().clone();
                         // A skill installed or made that needs a connector
                         // not linked (#6059): only while connected, best
@@ -705,6 +728,25 @@ async fn session(
                             if handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {
                                 done.handed(at);
                                 say.line(&format!("{}: handed to the client, at {at}", crate::onboarding_done::KIND));
+                            }
+                        }
+                        // An update's start and end (#6284): looked at
+                        // connected or not, so a round that ends offline is
+                        // still told; sent only while connected, in order,
+                        // and kept until the broker's ack.
+                        if let Some(events) = update_events.as_mut() {
+                            if let Some(line) = events.look(looked, crate::chat::now_ms(), || lamp.update_now()) {
+                                say.line(&line);
+                            }
+                            if connected {
+                                for (round, which, data) in events.due() {
+                                    let event = me.data(&now(), which.kind(), &Ok(Some(data))).to_string();
+                                    let tag = Tagged::UpdateEvent(round, which);
+                                    if !handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {
+                                        break;
+                                    }
+                                    say.line(&events.handed(round, which));
+                                }
                             }
                         }
                         if texting {
@@ -801,6 +843,7 @@ async fn session(
                 &reports,
                 &mut onboarding_done,
                 &mut onboarding_step,
+                &mut update_events,
             );
             connected = false;
             for line in std::mem::take(&mut handed.journal) {
@@ -877,6 +920,11 @@ async fn session(
                 {
                     say.line(&done.acked(at));
                 }
+                for (round, which) in std::mem::take(&mut handed.update_events_acked) {
+                    if let Some(events) = update_events.as_mut() {
+                        say.line(&events.acked(round, which));
+                    }
+                }
                 // A skill from a file's result acked: no longer in flight.
                 for outcome in std::mem::take(&mut handed.uploads_acked) {
                     if let Some(uploads) = lamp.upload() {
@@ -902,6 +950,7 @@ async fn session(
                     &reports,
                     &mut onboarding_done,
                     &mut onboarding_step,
+                    &mut update_events,
                 );
                 for line in std::mem::take(&mut handed.journal) {
                     say.line(&line);
@@ -1028,6 +1077,9 @@ mod tests {
         /// Takes every connection, but closes the first on its first
         /// `onboarding.done`, unacknowledged (#5812).
         DropsDoneUnacked,
+        /// Takes every connection, but closes the first on its first
+        /// `update.ended`, unacknowledged (#6284).
+        DropsEndUnacked,
     }
 
     /// How long [`Broker::HoldsFirstAck`] holds the first PUBACK back.
@@ -1198,9 +1250,11 @@ mod tests {
                         }
                         Packet::Publish(publish) => {
                             let payload = String::from_utf8_lossy(&publish.payload).into_owned();
-                            let unacked = behaves == Broker::DropsDoneUnacked
-                                && connections == 1
-                                && payload.contains("\"kind\":\"onboarding.done\"");
+                            let unacked = connections == 1
+                                && ((behaves == Broker::DropsDoneUnacked
+                                    && payload.contains("\"kind\":\"onboarding.done\""))
+                                    || (behaves == Broker::DropsEndUnacked
+                                        && payload.contains("\"kind\":\"update.ended\"")));
                             if behaves == Broker::StaleFirstLateAck
                                 && payload.contains("\"kind\":\"wifi.joined\"")
                             {
@@ -2963,5 +3017,224 @@ mod tests {
             !lines.iter().any(|line| line.starts_with("onboarding.step")),
             "{lines:?}"
         );
+    }
+
+    /// The round the tests' lamp updates in (#6284).
+    const ROUND: u64 = 1_792_296_000_000;
+
+    /// `update/status`: `now`, the round under way from [`ROUND`] to 813
+    /// unless idle, and the last end `(outcome, its round)`.
+    fn update_said(now: &str, running: u64, last: Option<(&str, u64)>) -> lamp_msgs::UpdateStatus {
+        let build = |sequence| lamp_msgs::UpdateBuild {
+            sequence,
+            commit: "4a39f04".into(),
+        };
+        lamp_msgs::UpdateStatus {
+            running: Some(build(running)),
+            now: now.into(),
+            last: last.map(|(outcome, round)| lamp_msgs::UpdateResult {
+                outcome: outcome.into(),
+                sequence: Some(813),
+                at_unix_ms: round + 60_000,
+                reason: None,
+                started_at_unix_ms: Some(round),
+            }),
+            harness: None,
+            engines: None,
+            refused: None,
+            round: (now != "idle").then(|| lamp_msgs::UpdateRound {
+                started_at_unix_ms: ROUND,
+                step_started_at_unix_ms: ROUND + 1_000,
+                // A round names a newer target only once it has read one: a
+                // `checking` that finds the lamp current never does.
+                target: (now != "checking").then(|| build(813)),
+            }),
+        }
+    }
+
+    /// The earlier round, which found the lamp current.
+    const EARLIER: Option<(&str, u64)> = Some(("up-to-date", ROUND - 900_000));
+
+    /// A lamp saying `status`, with the switch on (its file in `dir`) or off.
+    fn lamp_updating(status: lamp_msgs::UpdateStatus, dir: Option<&std::path::Path>) -> Fake {
+        Fake {
+            update_events: dir.map(|dir| dir.join(crate::update_events::FILE)),
+            update_now: Some(status),
+            ..Fake::default()
+        }
+    }
+
+    /// The `kind` replies the broker saw, on `fd_channel`.
+    fn told_kind(seen: &[Seen], kind: &str) -> Vec<serde_json::Value> {
+        publishes(seen)
+            .into_iter()
+            .filter(|(topic, reply)| topic == "fd/d-42" && reply["kind"] == kind)
+            .map(|(_, reply)| reply)
+            .collect()
+    }
+
+    fn update_acked(kind: &'static str) -> impl Fn(&[String]) -> bool {
+        move |lines| {
+            lines
+                .iter()
+                .any(|line| line.starts_with(&format!("{kind}: acked by the broker")))
+        }
+    }
+
+    /// Runs a lamp saying `status` for `ms` at least, and until `enough`.
+    async fn updating_for(
+        behaves: Broker,
+        status: lamp_msgs::UpdateStatus,
+        dir: Option<&std::path::Path>,
+        ms: u64,
+        enough: impl Fn(&[String]) -> bool,
+    ) -> (Vec<Seen>, Vec<String>) {
+        let start = std::time::Instant::now();
+        lines_against(behaves, lamp_updating(status, dir), |lines| {
+            enough(lines) && start.elapsed() >= Duration::from_millis(ms)
+        })
+        .await
+    }
+
+    /// #6284: with the switch off, a round with changes tells nothing, nor
+    /// is any file kept.
+    #[tokio::test]
+    async fn without_the_switch_no_update_event_is_told() {
+        let (seen, lines) = updating_for(
+            Broker::Takes,
+            update_said("fetching", 812, EARLIER),
+            None,
+            1500,
+            |_| true,
+        )
+        .await;
+        assert!(
+            seen.iter().any(|seen| matches!(seen, Seen::Publish(..))),
+            "{seen:?}"
+        );
+        assert!(told_kind(&seen, "update.started").is_empty(), "{seen:?}");
+        assert!(
+            !lines.iter().any(|line| line.starts_with("update.")),
+            "{lines:?}"
+        );
+    }
+
+    /// #6284: a round that only checks and finds the lamp current tells
+    /// the app nothing.
+    #[tokio::test]
+    async fn an_up_to_date_round_tells_the_app_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        for status in [
+            update_said("checking", 812, EARLIER),
+            update_said("idle", 812, Some(("up-to-date", ROUND))),
+        ] {
+            let (seen, lines) =
+                updating_for(Broker::Takes, status, Some(dir.path()), 1500, |_| true).await;
+            assert!(told_kind(&seen, "update.started").is_empty(), "{seen:?}");
+            assert!(told_kind(&seen, "update.ended").is_empty(), "{seen:?}");
+            assert!(
+                !lines.iter().any(|line| line.starts_with("update.")),
+                "{lines:?}"
+            );
+        }
+    }
+
+    /// #6284: a round that fetches is told once, as an unasked `data` reply
+    /// with its round and builds; acked, a restart mid-round tells it no
+    /// more; its end, seen after that restart (the switch restarts
+    /// lamp-cloud), is told once, and a further restart tells nothing.
+    #[tokio::test]
+    async fn an_updates_start_is_told_once_and_its_end_after_a_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let (seen, lines) = updating_for(
+            Broker::Takes,
+            update_said("fetching", 812, EARLIER),
+            Some(dir.path()),
+            2500,
+            update_acked("update.started"),
+        )
+        .await;
+        let started = told_kind(&seen, "update.started");
+        assert_eq!(started.len(), 1, "{started:?} {lines:?}");
+        assert_eq!(
+            (&started[0]["type"], &started[0]["status"]),
+            (&serde_json::json!("data"), &serde_json::json!("success"))
+        );
+        let data = &started[0]["data"];
+        assert_eq!(
+            (&data["round"], &data["from"], &data["to"]),
+            (
+                &serde_json::json!(ROUND),
+                &serde_json::json!("812+4a39f04"),
+                &serde_json::json!("813+4a39f04")
+            )
+        );
+        // Restarted mid-round: nothing again.
+        let (seen, _) = updating_for(
+            Broker::Takes,
+            update_said("watching", 813, EARLIER),
+            Some(dir.path()),
+            1500,
+            |_| true,
+        )
+        .await;
+        assert!(told_kind(&seen, "update.started").is_empty(), "{seen:?}");
+        assert!(told_kind(&seen, "update.ended").is_empty(), "{seen:?}");
+        // The round ended: its end, once.
+        let end = update_said("idle", 813, Some(("switched", ROUND)));
+        let (seen, lines) = updating_for(
+            Broker::Takes,
+            end.clone(),
+            Some(dir.path()),
+            2500,
+            update_acked("update.ended"),
+        )
+        .await;
+        let ended = told_kind(&seen, "update.ended");
+        assert_eq!(ended.len(), 1, "{ended:?} {lines:?}");
+        assert_eq!(
+            ended[0]["data"],
+            serde_json::json!({"round": ROUND, "outcome": "switched", "build": "813+4a39f04", "at": ROUND + 60_000})
+        );
+        assert!(told_kind(&seen, "update.started").is_empty(), "{seen:?}");
+        let (seen, _) = updating_for(Broker::Takes, end, Some(dir.path()), 1500, |_| true).await;
+        assert!(told_kind(&seen, "update.ended").is_empty(), "{seen:?}");
+    }
+
+    /// #6284: an end the connection took before its ack is told again on
+    /// the next connection, the same round, and kept once that one is
+    /// acked.
+    #[tokio::test]
+    async fn an_updates_end_lost_before_its_ack_is_told_again() {
+        let dir = tempfile::tempdir().unwrap();
+        updating_for(
+            Broker::Takes,
+            update_said("fetching", 812, EARLIER),
+            Some(dir.path()),
+            0,
+            update_acked("update.started"),
+        )
+        .await;
+        let (seen, lines) = updating_for(
+            Broker::DropsEndUnacked,
+            update_said("idle", 813, Some(("rolled-back", ROUND))),
+            Some(dir.path()),
+            0,
+            update_acked("update.ended"),
+        )
+        .await;
+        let ended = told_kind(&seen, "update.ended");
+        assert!(ended.len() >= 2, "{ended:?} {lines:?}");
+        assert!(
+            ended.iter().all(|reply| reply["data"]["round"] == ROUND
+                && reply["data"]["outcome"] == "rolled-back")
+        );
+        let connects = seen
+            .iter()
+            .filter(|seen| matches!(seen, Seen::Connect { .. }))
+            .count();
+        assert_eq!(connects, 2, "{seen:?}");
+        let kept = std::fs::read_to_string(dir.path().join(crate::update_events::FILE)).unwrap();
+        assert!(kept.contains("\"rounds\":[]"), "{kept}");
     }
 }

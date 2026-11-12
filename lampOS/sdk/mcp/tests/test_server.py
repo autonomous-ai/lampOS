@@ -31,6 +31,7 @@ ALL = {
 # so is the microphone's. A linked service's read and write are a skill
 # run's alone, on lamp-control's run socket with its one-run token (#6432):
 # a paired computer is refused them, so no tool sends them.
+# The speaker's is sent by `lamp_play_audio`, through the SDK.
 NOT_A_TOOL = {
     "pair", "hello", "lease.take", "lease.renew", "lease.release", "camera.stream", "microphone.stream",
     "service.read", "service.write",
@@ -142,6 +143,7 @@ def test_every_op_of_the_schema_is_sent_by_a_tool(tmp_path):
         "notes.set": "lamp.notes_set(",
         "notes.delete": "lamp.notes_delete(",
         "notes.list": "lamp.notes_list(",
+        "speaker.stream": "lamp.speaker_stream(",
     }
     sent = set()
     for op in schema.ops():

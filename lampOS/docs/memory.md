@@ -234,6 +234,10 @@ the app (lamp-cloud's `faces.rs`) and one asked by voice
 The app's removal of a person (lamp-cloud's `face.remove` with `entirely`,
 [cloud.md](cloud.md)) forgets them entirely, not only their face. Memory
 gives the app one narrow call for it and no read access.
+The same removal can be run by hand on the lamp, as root, with no app:
+`lamp-cloud face-remove NAME` asks the main socket for each id
+([cloud.md](cloud.md), "The faces it knows"). A user who can't open that
+socket is refused before the eyes forget anything.
 
 - **The request:** `{"op":"forget_person","person":ID}`. With
   `--memory-days`, `Days::forget_person` erases the person's entries and
@@ -1049,7 +1053,13 @@ spacing and a final punctuation mark (and, in a person's own scope, a leading
 441." kept and "My gym locker code is 441." kept again; and before it the
 "They said: " a line kept as heard leads with: C81, stock 11091, 10 Nov,
 "They said: my gym locker code is 441." is "Gym locker code is 441."; never
-in the room's, where "my" is whoever said it, `days::own_text`), is answered
+in the room's, where "my" is whoever said it, `days::own_text`; and in
+either scope a whole number word from "zero" to "nine" read as its digit,
+with each run of single digits one number, so "four four one" and "4 4 1"
+are "441": C81, stock 12226, 12 Nov, "They said: my gym locker code is four
+four one." kept as heard and "My gym locker code is 441." kept again as a
+new id; "someone" or "tone" stay words, "oh" is never zero, and the kept
+text is never changed, `days::digit_text`), is answered
 `{"ok":true,"id":24,"existing":true}` with that kept thing's id, and no
 entry is written; it gains this conversation's `source_ids`, so forgetting
 it with `LAMP_MEMORY_FORGET_ALL` removes both conversations' exchanges
@@ -1122,6 +1132,19 @@ forget's own turn, so a line said, never kept and asked to be forgotten is
 not kept overnight (El's option 2 on #5333). The legacy store answers
 `unknown_op`. Rules and limits: [memory-days.md](memory-days.md), "Nightly
 pass B" and "Forget marks".
+
+### Weekly chapters
+
+With the voice's `LAMP_MEMORY_WEEKLY_CHAPTERS=on` beside
+`LAMP_MEMORY_NIGHTLY=on` (off unless set), the night thread also writes one
+short chapter (at most 600 bytes) of each known person's week, once, the first
+night after the week ends, from the items the nightly pass kept that week
+(`weekly_prepare`, `weekly_apply`). A chapter is never in the session note:
+only a known person's own recall naming a day or a span ("what did we talk
+about last week") is told at most two of their chapters (`chapters`). Never
+the room's; a forget of anything under it, forget everything and forgetting
+the person take it; it closes 90 days after its week. Rules and limits:
+[memory-days.md](memory-days.md), "Weekly chapters".
 
 ## Limits, and what happens at each
 
@@ -1851,6 +1874,24 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     `a_made_up_about_on_lamp_forget_that_is_dropped_and_the_forget_is_bare`
     and `a_bare_forget_with_nothing_just_given_never_takes_the_newest_keep`.
     With nothing heard, the model's own `about`, if it gave one, names it.
+    A spoken forget whose line is no longer held is never run as the model
+    made it (`remember::forget_unheard`, C134): every forget clears the
+    thread, the request's own line with it, so the model's retry in the
+    same request has no line. With no `source_id` and no `about` it is
+    marked bare and takes the checks above, never their newest keep
+    (`forget_last`) unasked; with either it is unclear and removes nothing.
+    After a forget removes something, nothing is "given just before" any
+    more, so a second "forget that" never takes the next newest keep, of
+    theirs or, on a room's line, the room's. A refusal that asks which
+    carries the fixed flag `ask_which` (`remember::ASK_WHICH`), kept past
+    the after-forget chat reset as `asked_which=true`, so the model asks
+    rather than calling forget again (lamp-06c1, 12 Nov, build 12226: a
+    refused "Lamp, forget that." retried in the same request removed the
+    umbrella). Tests: `remember::tests`
+    `a_second_bare_forget_after_a_refused_one_asks_never_takes_their_newest_keep`,
+    `a_second_bare_forget_after_their_keep_went_removes_nothing_else`,
+    `a_second_bare_forget_on_the_rooms_line_never_takes_the_rooms_next_keep`
+    and `a_forget_whose_line_is_let_go_is_marked_bare_or_unclear`.
   - **What is removed:** what the asker's own scope keeps and what was
     noticed of them (`kept` with `observations`) that has every one of
     those words, as `forget {about}` matches below, each by `forget {id}`,
@@ -2371,7 +2412,8 @@ passed. Tests: the notes' exact texts in `remember::tests`.
   time called `remember` again with the same text (lamp-06c1, the second
   route, build 4142: kept ids 24 and 25). Now a text the person already
   keeps (the same words, ignoring case, spacing and a final punctuation
-  mark, and in their own scope a leading "They said: ", "my" or "the", C81) is that kept
+  mark, and in their own scope a leading "They said: ", "my" or "the", and
+  "four four one" as "441", C81) is that kept
   thing, no entry is written, it gains this
   conversation's exchanges as sources (so forgetting it with
   `LAMP_MEMORY_FORGET_ALL` removes both conversations'), and the model is told

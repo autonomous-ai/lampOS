@@ -907,6 +907,11 @@ pub enum ProviderInput {
         request: u64,
         privacy_generation: u64,
         on: bool,
+        /// The first update's waiting line while it holds the walk (#6284,
+        /// `onboarding::set_updating`), for the worker's process: a person's
+        /// line is answered with it, no chat. Absent otherwise.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        updating: Option<String>,
     },
     /// A whole request in writing, for a turn the lamp begins itself: it is
     /// a start and an end at once and carries no sound.

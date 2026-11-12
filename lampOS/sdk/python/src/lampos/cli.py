@@ -9,6 +9,7 @@ it all with no lamp.
     lamp skill push FOLDER [LAMP_ID]
     lamp skill list [LAMP_ID]
     lamp skill remove NAME [LAMP_ID]
+    lamp speaker FILE.wav|- [--rate 16000|24000] [LAMP_ID]
 """
 
 from __future__ import annotations
@@ -133,6 +134,39 @@ async def _skill_remove(args) -> int:
     return 0
 
 
+async def _speaker(args) -> int:
+    """Play a WAV, or raw mono S16LE from stdin (`-`, at `--rate`), through
+    the lamp's speaker in real time (the `speaker` grant)."""
+    import wave
+
+    if args.file == "-":
+        rate, pcm = args.rate or 16_000, sys.stdin.buffer.read()
+    else:
+        try:
+            with wave.open(args.file, "rb") as clip:
+                rate = clip.getframerate()
+        except (OSError, EOFError, wave.Error) as error:
+            print(f"lamp: {args.file}: not a WAV that can be read: {error}", file=sys.stderr)
+            return 2
+        pcm = b""
+        if args.rate not in (None, rate):
+            print(f"lamp: {args.file} is {rate} Hz, not {args.rate}", file=sys.stderr)
+            return 2
+    if rate not in (16_000, 24_000):
+        print(f"lamp: {rate} Hz; a speaker stream takes 16000 or 24000 (--rate for stdin)", file=sys.stderr)
+        return 2
+    async with await Lamp.connect(args.lamp) as lamp:
+        async with lamp.speaker_stream(rate) as out:
+            if args.file == "-":
+                await out.play_pcm(pcm)
+            else:
+                await out.play_wav(args.file)
+        if out.ended not in (None, "finished"):
+            print(f"lamp: the lamp ended the stream: {out.ended}", file=sys.stderr)
+            return 1
+    return 0
+
+
 async def _hello(args) -> int:
     async with await Lamp.connect(args.lamp) as lamp:
         print(f"{lamp.info.get('id')}: grants {', '.join(lamp.grants)}")
@@ -184,6 +218,13 @@ def parser() -> argparse.ArgumentParser:
     skill_remove.add_argument("name")
     skill_remove.add_argument("lamp", nargs="?")
     skill_remove.set_defaults(run=_skill_remove)
+    speaker = commands.add_parser(
+        "speaker", help="play a WAV (or raw mono S16LE on stdin, `-`) through the lamp's speaker, in real time (the speaker grant)"
+    )
+    speaker.add_argument("file", help="a WAV of 16-bit mono PCM at 16000 or 24000 Hz, or - for raw samples on stdin")
+    speaker.add_argument("lamp", nargs="?")
+    speaker.add_argument("--rate", type=int, choices=(16_000, 24_000), default=None, help="stdin's sample rate (16000)")
+    speaker.set_defaults(run=_speaker)
     return parser
 
 

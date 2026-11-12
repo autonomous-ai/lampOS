@@ -1497,6 +1497,36 @@ pub struct UpdateStatus {
     /// 12 Nov: no fixed list). An older reader passes over it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engines: Option<BTreeMap<String, EngineInstall>>,
+    /// The newest build the lamp refused (put back and not tried again) that is
+    /// newer than the one it runs (#6266), so the app can say that an update is
+    /// blocked, and why, and offer a retry. Absent when none is. An older
+    /// reader passes over it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refused: Option<UpdateRefused>,
+}
+
+/// A refused build, for the app (#6266): `reason` one of
+/// [`UpdateRefused::REASONS`], a fixed name and never the refusal's own text,
+/// which names paths and parts. The owner's retry (`update.check` with
+/// `retry` set to `sequence`) drops it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateRefused {
+    pub sequence: u64,
+    pub reason: String,
+    pub at_unix_ms: u64,
+}
+
+impl UpdateRefused {
+    /// `cut_short`: switches cut short (power lost, a reboot) three times in a
+    /// row; `held`: a part held still by a passing local state (a kept unplug
+    /// request) right after the switch; `part_unwell`: a part not well after
+    /// it; `other`: anything else (the switch's own steps, the quiet moment).
+    pub const REASONS: [&str; 4] = ["cut_short", "held", "part_unwell", "other"];
+
+    /// Whether the fields are ones lamp-update could have said.
+    pub fn check(&self) -> bool {
+        Self::REASONS.contains(&self.reason.as_str())
+    }
 }
 
 /// One agent (engine) of the lamp's Harness, for the app (#6240): `state`
@@ -1585,6 +1615,30 @@ impl EngineInstallAsk {
     /// lamp-update that starts later never takes an old ask for a new one.
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+impl UpdateStatus {
+    /// Whether the round under way goes to a build newer than the one the
+    /// lamp runs (#6284): said from the moment the round has read and
+    /// checked the channel's build, before anything is fetched, and through
+    /// every phase after. A round that only checks and finds the lamp
+    /// current never says it.
+    pub fn brings_a_build(&self) -> bool {
+        if self.now == "idle" {
+            return false;
+        }
+        if self.now != "checking" {
+            return true;
+        }
+        self.round
+            .as_ref()
+            .and_then(|round| round.target.as_ref())
+            .is_some_and(|target| {
+                self.running
+                    .as_ref()
+                    .is_none_or(|running| target.sequence > running.sequence)
+            })
     }
 }
 
@@ -1840,7 +1894,14 @@ impl UpdateStatus {
 /// that came while a round ran, and takes at most one a minute. An older
 /// lamp-update never subscribes, so it never hears one.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UpdateCheck {}
+pub struct UpdateCheck {
+    /// The owner's retry of a refused build (#6266, `update.check` with `retry`
+    /// set to its sequence): lamp-update drops that refusal, if it is one,
+    /// before the round. Absent for a plain check; an older lamp-update that
+    /// does not know it reads a plain check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry: Option<u64>,
+}
 
 impl UpdateCheck {
     pub const TYPE: &str = "lamp_msgs/UpdateCheck";
@@ -3747,7 +3808,8 @@ mod tests {
     /// field is read as before.
     #[test]
     fn an_update_check_is_an_empty_stream_and_nothing_is_kept() {
-        round_trip(&UpdateCheck {}, "{}");
+        round_trip(&UpdateCheck::default(), "{}");
+        round_trip(&UpdateCheck { retry: Some(12226) }, "{\"retry\":12226}");
         let declared = UpdateCheck::declaration();
         assert_eq!(
             (declared.type_name.as_str(), declared.kind),
@@ -3771,6 +3833,7 @@ mod tests {
             harness: None,
             round: None,
             engines: None,
+            refused: None,
         };
         round_trip(&idle, r#"{"running":null,"now":"idle","last":null}"#);
         let fetching = UpdateStatus {
@@ -3819,6 +3882,7 @@ mod tests {
             harness: None,
             round: None,
             engines: None,
+            refused: None,
         };
         round_trip(&without, r#"{"running":null,"now":"idle","last":null}"#);
         let installed = EngineInstall {
@@ -3830,6 +3894,7 @@ mod tests {
         round_trip(
             &UpdateStatus {
                 engines: Some(BTreeMap::from([("hermes".into(), installed.clone())])),
+                refused: None,
                 ..without.clone()
             },
             r#"{"running":null,"now":"idle","last":null,"engines":{"hermes":{"state":"installed","version":"0.22.2","at_unix_ms":7}}}"#,
@@ -3938,6 +4003,7 @@ mod tests {
             harness: None,
             round: None,
             engines: None,
+            refused: None,
         };
         round_trip(&without, r#"{"running":null,"now":"idle","last":null}"#);
         let installed = HarnessInstall {
@@ -4188,6 +4254,42 @@ mod tests {
             assert_eq!(declaration.type_name, type_name);
             assert_eq!(declaration.version, version);
             assert!(type_name.starts_with("lamp_msgs/"));
+        }
+    }
+}
+
+#[cfg(test)]
+mod update_status_tests {
+    use super::*;
+
+    fn status(now: &str, running: u64, target: Option<u64>) -> UpdateStatus {
+        let build = |sequence| UpdateBuild {
+            sequence,
+            commit: "4a39f04".into(),
+        };
+        UpdateStatus {
+            running: Some(build(running)),
+            now: now.into(),
+            last: None,
+            harness: None,
+            engines: None,
+            refused: None,
+            round: (now != "idle").then(|| UpdateRound {
+                started_at_unix_ms: 1,
+                step_started_at_unix_ms: 1,
+                target: target.map(build),
+            }),
+        }
+    }
+
+    #[test]
+    fn a_round_brings_a_build_once_its_newer_target_is_read() {
+        assert!(!status("idle", 812, None).brings_a_build());
+        assert!(!status("checking", 812, None).brings_a_build());
+        assert!(!status("checking", 812, Some(812)).brings_a_build());
+        assert!(status("checking", 812, Some(813)).brings_a_build());
+        for now in ["fetching", "switching", "watching", "restoring"] {
+            assert!(status(now, 812, None).brings_a_build(), "{now}");
         }
     }
 }

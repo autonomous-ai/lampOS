@@ -253,6 +253,11 @@ mod tests {
                 "the developer's --microphone-device is in no product unit: {}",
                 path.display()
             );
+            assert!(
+                !text.contains("speaker-device"),
+                "the developer's --speaker-device is in no product unit: {}",
+                path.display()
+            );
         }
     }
 

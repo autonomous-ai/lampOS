@@ -243,6 +243,16 @@ pub fn yes_not_here(spoken: &str) -> String {
     )
 }
 
+/// What the model is told of a task skill read back to a line not the
+/// owner's (`Asking::owner_hears` false): its name only.
+pub fn unsaid(spoken: &str) -> String {
+    format!(
+        "Say only this, in the conversation's language: \"{spoken} hands a task to the lamp's \
+         agent; only its owner can hear what it uses.\" Never what the task is or what it uses. \
+         Ask nothing, call nothing."
+    )
+}
+
 /// What the model is told when the skill's task can't be read now.
 pub fn unread(spoken: &str) -> String {
     format!(
@@ -254,7 +264,13 @@ pub fn unread(spoken: &str) -> String {
 /// A skill on the lamp with a `do.task`, read back by voice by `name`,
 /// asked by `asking`, at `now`, from `asks` (the manage helper's
 /// `task_asks`, [`asks_by`]): none when no skill of that name has a task,
-/// so the made skills' read-back goes on. Agreed already, it is said with
+/// so the made skills' read-back goes on. A name the helper doesn't know
+/// is looked for among the skills pushed from a computer, in `pushed`
+/// ([`pushed_named`]: "skill two" is `skill-2`), and that one asked for
+/// (lamp-52e6, 12 Nov, row-6413b3: "desk check" found nothing); a miss
+/// journals the name asked ([`missed`]), only that. To a line not the
+/// owner's (`owner_hears` false) its name only ([`unsaid`]), and no wait
+/// starts. Agreed already, it is said with
 /// [`approved_line`] and nothing is asked. Otherwise it is said back
 /// ([`line`]) and its yes awaited through the write yes's own wait
 /// ([`skill_write_yes::wait_for_yes`]), with every guard of it; on a route
@@ -263,7 +279,8 @@ pub fn unread(spoken: &str) -> String {
 pub fn read_back(
     name: &str,
     asking: Asking,
-    asks: impl FnOnce(&str) -> Result<Option<TaskAsks>, String>,
+    pushed: &Path,
+    mut asks: impl FnMut(&str) -> Result<Option<TaskAsks>, String>,
     now: Instant,
 ) -> Option<Value> {
     let request = asking.request;
@@ -271,9 +288,19 @@ pub fn read_back(
         return Some(json!({ "error": READ_BACK_NOT_ASKED }));
     }
     let asked = crate::made_skill::name_asked(name);
-    let task = match asks(&asked) {
+    let found = match asks(&asked) {
+        Ok(None) => match pushed_named(pushed, &asked) {
+            Some(named) if named != asked => asks(&named),
+            _ => Ok(None),
+        },
+        found => found,
+    };
+    let task = match found {
         Ok(Some(task)) => task,
-        Ok(None) => return None,
+        Ok(None) => {
+            eprintln!("{}", missed(request, &asked));
+            return None;
+        }
         Err(why) => {
             // The helper's words name no script, only why.
             eprintln!("lamp-voice: request {request}: a skill's task wasn't read back: {why}");
@@ -285,6 +312,19 @@ pub fn read_back(
         }
     };
     let spoken = crate::made_skill::spoken_name(&task.name);
+    // What it uses is the owner's to hear, as a made skill's sends are
+    // (SubDarren's P3 on #6619): to anyone else its name only, and no
+    // wait starts.
+    if !asking.owner_hears {
+        eprintln!(
+            "lamp-voice: request {request}: a skill's task read back by name only: the owner wasn't seen asking"
+        );
+        return Some(json!({
+            "skill": task.name,
+            "task": true,
+            "next": unsaid(&spoken),
+        }));
+    }
     if task.approved {
         eprintln!("lamp-voice: request {request}: a skill's task read back: agreed already");
         return Some(json!({
@@ -320,6 +360,47 @@ pub fn read_back(
         skill_write_yes::APPROVE_ID: id,
         "next": format!("{} {}", skill_write_yes::say_whole(&line(&task)), then_wait(&id)),
     }))
+}
+
+/// The journal's line of a task read-back that found no skill: the name
+/// asked as [`crate::made_skill::name_asked`] writes it, nothing else of
+/// the line (Seventh on #6071: the next row shows a mismatch).
+pub fn missed(request: u64, asked: &str) -> String {
+    format!("lamp-voice: request {request}: no skill with a task by the name asked: {asked}")
+}
+
+/// The skill pushed from a computer, in `pushed` (lamp-skills' developer
+/// folder, [`crate::made_skill::pushed`]), that `asked` names, as
+/// [`crate::made_skill::name_asked`] writes it: the exact name first, else
+/// the one alone whose name matches with number words as digits
+/// ([`crate::made_skill::name_digits`]) and the dashes left out ("skill
+/// two" is `skill-2`, "deskcheck" `desk-check`). None for none, or for two
+/// that match only so. Only folders with a `skill.toml` count; dot files
+/// (`.pushed.json`, `.yes.json`) never do.
+pub fn pushed_named(pushed: &Path, asked: &str) -> Option<String> {
+    let loose = |name: &str| crate::made_skill::name_digits(name).replace('-', "");
+    let names = pushed_names(pushed);
+    if names.iter().any(|name| name == asked) {
+        return Some(asked.to_owned());
+    }
+    let wanted = loose(asked);
+    let mut alike = names.into_iter().filter(|name| loose(name) == wanted);
+    let first = alike.next()?;
+    alike.next().is_none().then_some(first)
+}
+
+/// The names of the skills pushed from a computer, in `pushed`
+/// ([`pushed_named`]): folders with a `skill.toml`, never a dot file.
+pub fn pushed_names(pushed: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(pushed) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| !name.starts_with('.'))
+        .filter(|name| pushed.join(name).join("skill.toml").is_file())
+        .collect()
 }
 
 /// How long the manage helper, or lamp-control, is waited for.
@@ -460,6 +541,111 @@ mod tests {
         }
     }
 
+    /// No developer folder: only the helper's own lookup.
+    fn nowhere() -> &'static Path {
+        Path::new("/nonexistent/skills-dev")
+    }
+
+    /// A developer folder as a push lays it out (`skills-dev/<name>/`, a
+    /// dot file beside them), fresh for `test`.
+    fn pushed_folder(test: &str, names: &[&str]) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("task-pushed-{test}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        for name in names {
+            std::fs::create_dir_all(dir.join(name)).unwrap();
+            std::fs::write(dir.join(name).join("skill.toml"), "").unwrap();
+        }
+        std::fs::write(dir.join(".yes.json"), "{}").unwrap();
+        // A folder with no skill.toml is no skill.
+        std::fs::create_dir_all(dir.join("half-pushed")).unwrap();
+        dir
+    }
+
+    /// The helper as it answers: a task only for a name exactly a pushed
+    /// skill's (`package::task_asks`), each name asked kept.
+    fn helper<'a>(
+        known: &'static [&'static str],
+        asked: &'a mut Vec<String>,
+    ) -> impl FnMut(&str) -> Result<Option<TaskAsks>, String> + 'a {
+        move |name| {
+            asked.push(name.to_owned());
+            Ok(known.contains(&name).then(|| TaskAsks {
+                name: name.to_owned(),
+                from: "your computer a computer".into(),
+                ..booth(false)
+            }))
+        }
+    }
+
+    /// Row-6413b3 (lamp-52e6, 12 Nov): a skill pushed from a computer with
+    /// a `do.task` is found by its spoken name, as the helper doesn't know
+    /// it ("skill two" for `skill-2`, "deskcheck" for `desk-check`), and
+    /// its task is read back and waits for the yes.
+    #[test]
+    fn a_pushed_skill_with_a_task_is_found_by_its_spoken_name() {
+        let now = Instant::now();
+        let dev = pushed_folder("found", &["desk-check", "skill-2"]);
+        for (request, said, name) in [
+            (40, "desk check", "desk-check"),
+            (41, "my desk check skill", "desk-check"),
+            (42, "deskcheck", "desk-check"),
+            (43, "skill two", "skill-2"),
+        ] {
+            let mut asked = Vec::new();
+            let told = read_back(
+                said,
+                asking(request),
+                &dev,
+                helper(&["desk-check", "skill-2"], &mut asked),
+                now,
+            )
+            .unwrap_or_else(|| panic!("{said} not found"));
+            assert_eq!(told["skill"], name, "{said}: {told}");
+            assert_eq!(told["task_waits_for_yes"], true, "{said}: {told}");
+            assert!(
+                told["next"]
+                    .as_str()
+                    .unwrap()
+                    .contains("from your computer"),
+                "{told}"
+            );
+            assert_eq!(asked.last().map(String::as_str), Some(name), "{said}");
+        }
+        assert_eq!(pushed_named(&dev, "half-pushed"), None);
+        assert_eq!(pushed_named(&dev, ".yes.json"), None);
+        let _ = std::fs::remove_dir_all(&dev);
+    }
+
+    /// Two pushed skills alike but for number words or dashes, neither
+    /// named exactly, find neither; the exact name wins over one alike; and
+    /// a miss journals the name asked as written, nothing else.
+    #[test]
+    fn two_pushed_alike_find_neither_and_a_miss_journals_the_name_asked() {
+        let now = Instant::now();
+        let dev = pushed_folder("alike", &["skill-2", "skill-two", "room-1"]);
+        assert_eq!(pushed_named(&dev, "skill2"), None);
+        assert_eq!(
+            pushed_named(&dev, "skill-two").as_deref(),
+            Some("skill-two")
+        );
+        assert_eq!(pushed_named(&dev, "room-one").as_deref(), Some("room-1"));
+        let mut asked = Vec::new();
+        let told = read_back(
+            "skill2",
+            asking(44),
+            &dev,
+            helper(&["skill-2", "skill-two"], &mut asked),
+            now,
+        );
+        assert!(told.is_none(), "{told:?}");
+        assert_eq!(asked, ["skill2"]);
+        assert_eq!(
+            missed(44, &crate::made_skill::name_asked("My Desk Check skill")),
+            "lamp-voice: request 44: no skill with a task by the name asked: desk-check"
+        );
+        let _ = std::fs::remove_dir_all(&dev);
+    }
+
     /// Every grant is said in plain words, in order, and none is left out.
     #[test]
     fn the_say_back_names_each_grant_in_plain_words() {
@@ -494,6 +680,7 @@ mod tests {
         let told = read_back(
             "my photo booth skill",
             asking(4),
+            nowhere(),
             |name| {
                 assert_eq!(name, "photo-booth");
                 Ok(Some(booth(false)))
@@ -534,35 +721,77 @@ mod tests {
     #[test]
     fn an_agreed_task_asks_nothing_and_a_changed_one_asks_again() {
         let now = Instant::now();
-        let told = read_back("photo booth", asking(8), |_| Ok(Some(booth(true))), now).unwrap();
+        let told = read_back(
+            "photo booth",
+            asking(8),
+            nowhere(),
+            |_| Ok(Some(booth(true))),
+            now,
+        )
+        .unwrap();
         assert_eq!(told["approved"], true);
         assert!(told.get(skill_write_yes::APPROVE_ID).is_none());
         let mut changed = booth(false);
         changed.sha256 = "cd".repeat(32);
-        let told = read_back("photo booth", asking(9), |_| Ok(Some(changed.clone())), now).unwrap();
+        let told = read_back(
+            "photo booth",
+            asking(9),
+            nowhere(),
+            |_| Ok(Some(changed.clone())),
+            now,
+        )
+        .unwrap();
         assert_eq!(told["task_waits_for_yes"], true);
     }
 
-    /// Unheard, or on a route with no echo judge, nothing waits; a name with
-    /// no task falls through to the made skills' read-back.
+    /// Unheard, on a route with no echo judge, or not the owner's line,
+    /// nothing waits; a name with no task falls through to the made
+    /// skills' read-back.
     #[test]
     fn unheard_or_live_or_no_task_starts_no_wait() {
         let now = Instant::now();
         let mut unheard = asking(10);
         unheard.heard = false;
-        let told = read_back("photo booth", unheard, |_| panic!("asked"), now).unwrap();
+        let told = read_back("photo booth", unheard, nowhere(), |_| panic!("asked"), now).unwrap();
         assert_eq!(told["error"], READ_BACK_NOT_ASKED);
         let mut live = asking(11);
         live.sends_here = false;
-        let told = read_back("photo booth", live, |_| Ok(Some(booth(false))), now).unwrap();
+        let told = read_back(
+            "photo booth",
+            live,
+            nowhere(),
+            |_| Ok(Some(booth(false))),
+            now,
+        )
+        .unwrap();
         assert!(
             told["next"]
                 .as_str()
                 .unwrap()
                 .contains("can't take that yes")
         );
-        assert!(read_back("evening dim", asking(12), |_| Ok(None), now).is_none());
-        let told = read_back("photo booth", asking(13), |_| Err("busy".into()), now).unwrap();
+        assert!(read_back("evening dim", asking(12), nowhere(), |_| Ok(None), now).is_none());
+        // Not the owner's line: its name only, and no wait.
+        let mut visitor = asking(14);
+        visitor.owner_hears = false;
+        let told = read_back(
+            "photo booth",
+            visitor,
+            nowhere(),
+            |_| Ok(Some(booth(false))),
+            now,
+        )
+        .unwrap();
+        assert_eq!(told["next"], unsaid("photo booth"), "{told}");
+        assert!(told.get(skill_write_yes::APPROVE_ID).is_none(), "{told}");
+        let told = read_back(
+            "photo booth",
+            asking(13),
+            nowhere(),
+            |_| Err("busy".into()),
+            now,
+        )
+        .unwrap();
         assert!(told["next"].as_str().unwrap().contains("can't read back"));
     }
 

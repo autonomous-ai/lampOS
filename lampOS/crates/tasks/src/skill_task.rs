@@ -8,8 +8,10 @@
 //! - **Off unless [`SWITCH`] is `on`** (the same switch lamp-skills reads):
 //!   off, every line is refused `off` and nothing is minted or run.
 //! - **The line is checked whole** ([`HandOver::parse`]): a field more or
-//!   less, a skill folder outside the lamp's skills, a `run` outside its
-//!   `scripts/`, a grant written twice or `skills` is refused.
+//!   less, a skill folder that is not its own under the lamp's skills
+//!   ([`SKILLS`]) or the skills its owner's computer pushed ([`PUSHED`]), a
+//!   `run` outside its `scripts/`, a grant written twice or `skills` is
+//!   refused.
 //! - **A one-run token** ([`Tokens`]): minted by lamp-control (#6304,
 //!   PR #6408) on its admin socket ([`ControlTokens`]) for this skill and a
 //!   run id of lamp-tasks' own ([`run_id`]). lamp-control reads the owner's
@@ -43,6 +45,13 @@ pub const SWITCH: &str = "LAMP_SKILL_TASKS";
 /// (`lamp_update::hermes_install::SKILLS`): a skill's folder is one of its
 /// folders, never another place.
 pub const SKILLS: &str = "/var/lib/lampOS/skills";
+/// The skills the owner's own paired computer pushed (`lamp_skills::PUSHED_DIR`),
+/// beside [`SKILLS`] under the same parent: the one other place a skill's
+/// folder may be, shown read-only to a skill's run alone
+/// (`lamp_update::hermes_install::PUSHED`).
+pub const PUSHED: &str = "/var/lib/lampOS/skills-dev";
+/// [`PUSHED`]'s folder name, beside the skills root a check is given.
+pub const PUSHED_NAME: &str = "skills-dev";
 /// lamp-control's local door (#6304, the first builder's 12:45 conditions
 /// on #6071): the one way a run reaches the lamp's hardware.
 pub const CONTROL_SOCKET: &str = "/run/lampos-control/control.sock";
@@ -77,6 +86,103 @@ pub const ADMIN_WAIT: Duration = Duration::from_secs(5);
 /// answer (`RUN_MOST`, #6346), so a run never holds the one place after
 /// nobody waits for it.
 pub const RUN_LIFETIME: Duration = Duration::from_secs(14 * 60);
+
+// lamp-tasks.service's caps (#6306; the first builder's 09:32 on #6306,
+// 12 Nov: `MemoryHigh` and `CPUQuota` on the product unit, from measured
+// numbers, never below Hermes's install floor). A skill's run is started by
+// lamp-tasks itself ([`HermesRunner`]), and Hermes's wrapper only unshares
+// namespaces, so the run stays in lamp-tasks.service's cgroup beside the
+// part's Harness children (`harness wait` and up to
+// `crate::follow::MOST_FOLLOWED` `harness watch`es). Harness's own panes
+// run under harnessd's user unit, not here. The caps are written in
+// `deploy/product/lamp-tasks.service` as [`MEMORY_HIGH`], [`CPU_QUOTA`]
+// and [`TASKS_MAX`]; a test holds the unit to these constants.
+//
+// The measures are Fourteen's of a real Hermes voice task (a packing list,
+// 80 s) on lamp-9adf (a 6 GB lamp, build 12255), read from
+// lamp-tasks.service's cgroup with `systemctl show` (12 Nov, #6059; the
+// CPU through the first builder, 13:14 on #6059). A skill task may run
+// beside a spoken one (the first builder, 13:14), so the memory and tasks
+// caps are the cgroup at rest plus two task deltas, each delta with half
+// again: `rest + 2 × delta × 1.5`, rounded up ([`two_tasks_cap`]). The
+// peaks were sampled every 2 s, so they are a floor; the half again covers
+// what fell between samples. After the task closed, the cgroup held
+// 727 MiB and 89 tasks.
+
+/// How many tasks the cgroup is sized to hold at once: a skill task beside
+/// a spoken one (the first builder, 13:14 on #6059).
+pub const TASKS_AT_ONCE: u64 = 2;
+/// lamp-tasks.service's cgroup `MemoryCurrent` at rest, in MB (MiB as
+/// `systemctl show` gives it): 632 on lamp-9adf (#6059).
+pub const MEASURED_REST_MEMORY_MB: u64 = 632;
+/// The cgroup's peak `MemoryCurrent` through one Hermes task, in MB: 1120
+/// on lamp-9adf (#6059), +488 over rest, sampled every 2 s, so a floor.
+pub const MEASURED_PEAK_MEMORY_MB: u64 = 1120;
+/// The cgroup's `TasksCurrent` (processes and their threads) at rest: 91
+/// on lamp-9adf (#6059).
+pub const MEASURED_REST_TASKS: u64 = 91;
+/// The cgroup's peak `TasksCurrent` through the task: 126 on lamp-9adf
+/// (#6059), +35 over rest, sampled every 2 s, so a floor.
+pub const MEASURED_TASKS: u64 = 126;
+/// The task's CPU, in percent of one core: about 1.2 cores on lamp-9adf
+/// (Fourteen through the first builder, 13:14 on #6059). An average over
+/// the 80 s run from the cgroup's `CPUUsageNSec`, not a peak, and an upper
+/// bound: the cgroup's other work in that time is counted too.
+pub const MEASURED_CPU_PERCENT: u64 = 120;
+/// The least MemAvailable on the lamp through the task, in MB: 3,285,476
+/// kB on lamp-9adf (#6059).
+pub const MEASURED_MIN_AVAILABLE_MB: u64 = 3208;
+/// The task's run time, `new` to close, in seconds, on lamp-9adf (#6059).
+pub const MEASURED_RUN_SECS: u64 = 75;
+/// The lamp's work folder's size after the task, in MB, rounded up: 36K
+/// before and 40K after on lamp-9adf (#6059). Recorded only: no cap is set
+/// on the folder.
+pub const MEASURED_WORK_FOLDER_MB: u64 = 1;
+
+/// Hermes's install floor: at least this much available through a task
+/// (#6306's body; the first builder on #6226, 11 Nov).
+pub const HERMES_FLOOR_MB: u64 = 1350;
+/// A measure and half again, rounded up to `step`.
+pub const fn half_again(measured: u64, step: u64) -> u64 {
+    (measured * 3).div_ceil(2).div_ceil(step) * step
+}
+/// A cap for [`TASKS_AT_ONCE`] tasks in one cgroup: `rest` plus each task's
+/// delta (`peak - rest`) and half again, rounded up to `step`.
+pub const fn two_tasks_cap(rest: u64, peak: u64, step: u64) -> u64 {
+    let delta = (peak - rest) * 3;
+    (rest + TASKS_AT_ONCE * delta.div_ceil(2)).div_ceil(step) * step
+}
+/// `MemoryHigh`, in MB: [`MEASURED_REST_MEMORY_MB`] plus two deltas to
+/// [`MEASURED_PEAK_MEMORY_MB`], each with half again, rounded up to 100 MB:
+/// 632 + 2 × 732 = 2096, so 2100. Past it the kernel throttles and reclaims
+/// the part's own memory, never kills it (no `MemoryMax`), so the voice's
+/// hand-overs never lose lamp-tasks to the cap. The lamp has no swap, so
+/// (inferred, not measured) past it every process in lamp-tasks.service,
+/// serve included, stalls in reclaim until the cgroup is back under it.
+pub const MEMORY_HIGH_MB: u64 = 2100;
+/// [`MEMORY_HIGH_MB`] as the unit's line.
+pub const MEMORY_HIGH: &str = "MemoryHigh=2100M";
+/// The lamp's cores: the Allwinner A733 has all eight, two Cortex-A76 and
+/// six Cortex-A55 (`crates/turn-end/src/cores.rs`).
+pub const LAMP_CORES: u64 = 8;
+/// `CPUQuota`, in percent of one core: two tasks' [`MEASURED_CPU_PERCENT`]
+/// and half again, rounded up to 10%: 2 × 120 × 1.5 = 360%, which leaves
+/// over 4 of the lamp's [`LAMP_CORES`] to the voice.
+pub const CPU_QUOTA_PERCENT: u64 = 360;
+/// [`CPU_QUOTA_PERCENT`] as the unit's line.
+pub const CPU_QUOTA: &str = "CPUQuota=360%";
+/// The least `TasksMax` (Heron on #6566): past the cap a fork or a new
+/// thread in the part fails, lamp-tasks' own included, and a tool-heavy run
+/// (Python, Node, a browser's threads) can pass 100 at once, more than the
+/// measured spoken task showed. 512 still stops a fork bomb.
+pub const TASKS_MAX_LEAST: u64 = 512;
+/// `TasksMax`: [`MEASURED_REST_TASKS`] plus two deltas to [`MEASURED_TASKS`],
+/// each with half again, rounded up to 10 (91 + 2 × 53 = 197, so 200), and
+/// never below [`TASKS_MAX_LEAST`]: 512. Past it a fork or a new thread in
+/// the part fails; nothing running is killed.
+pub const TASKS_MAX: u64 = 512;
+/// [`TASKS_MAX`] as the unit's line.
+pub const TASKS_MAX_LINE: &str = "TasksMax=512";
 /// The folder a skill's script is in (#6305, `lamp_skills::task::SCRIPTS`).
 pub const SCRIPTS: &str = "scripts";
 /// The most bytes of a task's words (#6305, `MOST_TASK_BYTES`).
@@ -160,8 +266,9 @@ pub enum Op {
 }
 
 impl HandOver {
-    /// The line, checked whole against `skills` (on a lamp, [`SKILLS`]):
-    /// the refusal's code and words otherwise.
+    /// The line, checked whole against `skills` (on a lamp, [`SKILLS`]) and
+    /// the pushed skills beside it ([`pushed_beside`], on a lamp
+    /// [`PUSHED`]): the refusal's code and words otherwise.
     pub fn parse(line: &[u8], skills: &Path) -> Result<Self, (&'static str, String)> {
         if line.len() > crate::protocol::MAX_LINE_BYTES {
             return Err(("too_long", "the line is too long".into()));
@@ -192,8 +299,20 @@ impl HandOver {
         if self.task.chars().any(char::is_control) {
             return Err("the task's words have a control character");
         }
+        // Exactly one of the two roots, joined with the skill's own name
+        // (checked plain above: no `/`, no `..`), compared as written; the
+        // pushed one only while nothing of that name is under `skills`
+        // ([`lamp_has_skill_named`]), the folder lamp-control hashes at the
+        // mint (SubDarren's P2 on #6608).
         if self.folder != skills.join(&self.skill) {
-            return Err("the skill's folder is not its own among the lamp's skills");
+            if self.folder != pushed_beside(skills).join(&self.skill) {
+                return Err("the skill's folder is not its own among the lamp's skills");
+            }
+            if lamp_has_skill_named(skills, &self.skill) {
+                return Err(
+                    "a skill of that name is on the lamp: a pushed one never runs in its place",
+                );
+            }
         }
         let run = Path::new(&self.run);
         let mut parts = run.components();
@@ -241,6 +360,23 @@ impl HandOver {
         }
         Ok(())
     }
+}
+
+/// The pushed skills' root beside the lamp's `skills` root: [`PUSHED`] for
+/// [`SKILLS`].
+pub fn pushed_beside(skills: &Path) -> PathBuf {
+    skills.with_file_name(PUSHED_NAME)
+}
+
+/// Whether anything named `name` (a plain name) is under `skills`: a
+/// folder, a file or a link, never followed (`symlink_metadata`). While one
+/// is, the pushed skill of that name is neither handed over nor run, and
+/// lamp-control hashes `skills/<name>` at the mint. The same rule as
+/// `lamp_skills::task::lamp_has_skill_named`, which lamp-skills and
+/// lamp-control use; lamp-tasks does not depend on lamp-skills, so it is
+/// written here again.
+pub fn lamp_has_skill_named(skills: &Path, name: &str) -> bool {
+    std::fs::symlink_metadata(skills.join(name)).is_ok()
 }
 
 /// A one-run token from lamp-control (#6304). Its text is never shown in a
@@ -1069,6 +1205,67 @@ mod tests {
         assert_eq!(*tokens.ended.borrow(), vec![run_id.clone()]);
     }
 
+    /// A skill the owner's computer pushed (`skills-dev/<name>`, the first
+    /// builder's ruling on #6305's pushed skills): handed over and run as
+    /// one under the lamp's skills, with its own token, ended with it.
+    #[test]
+    fn a_pushed_skills_task_is_handed_over_and_runs() {
+        assert_eq!(pushed_beside(skills()), Path::new(PUSHED));
+        let tokens = FakeTokens::default();
+        let runner = runner(&tokens, Ok(9));
+        let pushed = line(|v| v["folder"] = json!("/var/lib/lampOS/skills-dev/photo-booth"));
+        let answer = answer(&pushed, true, skills(), &tokens, &runner);
+        assert_eq!(answer, json!({"ok": true, "id": 9}));
+        assert_eq!(tokens.minted.borrow()[0].0, "photo-booth");
+        let seen = runner.seen.borrow();
+        let (prompt, _, live) = &seen[0];
+        assert!(*live);
+        assert!(
+            prompt.contains("`/var/lib/lampOS/skills-dev/photo-booth`"),
+            "{prompt}"
+        );
+        assert!(tokens.live.borrow().is_empty());
+        assert_eq!(tokens.ended.borrow().len(), 1);
+    }
+
+    /// A pushed skill whose name is on the lamp under `skills` (a folder, a
+    /// file or a link) is refused before any token: lamp-control would hash
+    /// `skills/<name>`, so a yes for that one never runs the pushed one
+    /// (SubDarren's P2 on #6608). With nothing there, it is handed over.
+    #[test]
+    fn a_pushed_skill_is_refused_while_its_name_is_under_the_lamps_skills() {
+        let dir = tempfile::tempdir().unwrap();
+        let skills = dir.path().join("skills");
+        std::fs::create_dir_all(&skills).unwrap();
+        let pushed = pushed_beside(&skills).join("photo-booth");
+        std::fs::create_dir_all(&pushed).unwrap();
+        let folder = pushed.to_string_lossy().into_owned();
+        let pushed_line = || line(|v| v["folder"] = json!(folder));
+        let own = skills.join("photo-booth");
+        for what in ["a folder", "a file", "a link"] {
+            match what {
+                "a folder" => std::fs::create_dir(&own).unwrap(),
+                "a file" => std::fs::write(&own, "x").unwrap(),
+                _ => std::os::unix::fs::symlink(&pushed, &own).unwrap(),
+            }
+            let tokens = FakeTokens::default();
+            let runner = runner(&tokens, Ok(1));
+            let answer = answer(&pushed_line(), true, &skills, &tokens, &runner);
+            assert_eq!(answer["error"], "bad_request", "{what}: {answer}");
+            assert!(tokens.minted.borrow().is_empty(), "{what}");
+            assert!(runner.seen.borrow().is_empty(), "{what}");
+            if std::fs::symlink_metadata(&own).unwrap().is_dir() {
+                std::fs::remove_dir(&own).unwrap();
+            } else {
+                std::fs::remove_file(&own).unwrap();
+            }
+        }
+        let tokens = FakeTokens::default();
+        let runner = runner(&tokens, Ok(4));
+        let answer = answer(&pushed_line(), true, &skills, &tokens, &runner);
+        assert_eq!(answer, json!({"ok": true, "id": 4}));
+    }
+
     #[test]
     fn a_failed_run_still_ends_its_token() {
         let tokens = FakeTokens::default();
@@ -1110,6 +1307,20 @@ mod tests {
             Box::new(|v| v["task"] = json!("x".repeat(MOST_TASK_BYTES + 1))),
             Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills/other")),
             Box::new(|v| v["folder"] = json!("/home/lampos/photo-booth")),
+            // Pushed: its own name in the pushed root, never another's or
+            // a path that leaves it.
+            Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills-dev/other")),
+            Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills-dev")),
+            Box::new(|v| {
+                v["folder"] = json!("/var/lib/lampOS/skills-dev/../skills-dev/photo-booth")
+            }),
+            Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills-devx/photo-booth")),
+            Box::new(|v| v["folder"] = json!("/var/lib/skills-dev/photo-booth")),
+            Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills-dev/photo-booth/scripts")),
+            Box::new(|v| {
+                v["folder"] = json!("/var/lib/lampOS/skills-dev/photo-booth");
+                v["sha256"] = json!("abc");
+            }),
             Box::new(|v| v["run"] = json!("main.py")),
             Box::new(|v| v["run"] = json!("scripts")),
             Box::new(|v| v["run"] = json!("scripts/../SKILL.md")),
@@ -1740,5 +1951,95 @@ mod tests {
             "{shown}"
         );
         assert!(shown.contains(CONTROL_SOCKET), "{shown}");
+    }
+
+    /// The product unit's `[Service]` lines.
+    fn product_service_lines() -> Vec<&'static str> {
+        let unit = include_str!("../../../deploy/product/lamp-tasks.service");
+        let start = unit.find("\n[Service]\n").expect("a [Service] section");
+        let service = &unit[start + "\n[Service]\n".len()..];
+        let end = service.find("\n[").unwrap_or(service.len());
+        service[..end].lines().collect()
+    }
+
+    /// #6306: the product's lamp-tasks.service carries every cap, once
+    /// each, in its `[Service]` section, as these constants say them.
+    #[test]
+    fn the_product_unit_carries_the_caps() {
+        let lines = product_service_lines();
+        for (name, cap) in [
+            ("MemoryHigh=", MEMORY_HIGH),
+            ("CPUQuota=", CPU_QUOTA),
+            ("TasksMax=", TASKS_MAX_LINE),
+        ] {
+            let found: Vec<_> = lines.iter().filter(|line| line.starts_with(name)).collect();
+            assert_eq!(found, [&cap], "{name} once in [Service]");
+        }
+        assert_eq!(MEMORY_HIGH, format!("MemoryHigh={MEMORY_HIGH_MB}M"));
+        assert_eq!(CPU_QUOTA, format!("CPUQuota={CPU_QUOTA_PERCENT}%"));
+        assert_eq!(TASKS_MAX_LINE, format!("TasksMax={TASKS_MAX}"));
+    }
+
+    /// #6306: past the memory cap lamp-tasks is throttled, never killed:
+    /// no hard memory line, so the voice's hand-overs never lose the part.
+    #[test]
+    fn the_memory_cap_throttles_and_never_kills() {
+        let lines = product_service_lines();
+        for hard in [
+            "MemoryMax=",
+            "MemorySwapMax=",
+            "MemoryLimit=",
+            "OOMPolicy=kill",
+        ] {
+            assert!(
+                !lines.iter().any(|line| line.starts_with(hard)),
+                "{hard} in lamp-tasks.service"
+            );
+        }
+    }
+
+    /// #6306: the memory and tasks caps are rest plus two task deltas,
+    /// each with half again (`rest + 2 × delta × 1.5`, rounded up), and
+    /// CPU two tasks' measure and half again, so
+    /// changing a measure (#6059) without its cap fails.
+    #[test]
+    fn each_cap_holds_two_tasks_with_half_again() {
+        assert_eq!(TASKS_AT_ONCE, 2);
+        assert_eq!(two_tasks_cap(632, 1120, 100), 2100);
+        assert_eq!(two_tasks_cap(91, 126, 10), 200);
+        assert_eq!(
+            MEMORY_HIGH_MB,
+            two_tasks_cap(MEASURED_REST_MEMORY_MB, MEASURED_PEAK_MEMORY_MB, 100)
+        );
+        assert_eq!(
+            TASKS_MAX,
+            two_tasks_cap(MEASURED_REST_TASKS, MEASURED_TASKS, 10).max(TASKS_MAX_LEAST)
+        );
+        assert_eq!(half_again(2 * 120, 10), 360);
+        assert_eq!(
+            CPU_QUOTA_PERCENT,
+            half_again(TASKS_AT_ONCE * MEASURED_CPU_PERCENT, 10)
+        );
+        // The first builder's bound: at or under 2200M.
+        const { assert!(MEMORY_HIGH_MB <= 2200) };
+        // Both tasks' measured CPU still fits under the quota.
+        const { assert!(CPU_QUOTA_PERCENT >= TASKS_AT_ONCE * MEASURED_CPU_PERCENT) };
+    }
+
+    /// #6306: with a second task's delta on top of the measured least
+    /// MemAvailable, the lamp stays at or over Hermes's install floor, and
+    /// the measured run fits its life with half again to spare.
+    #[test]
+    fn the_measured_task_keeps_the_floor_and_fits_its_life() {
+        const {
+            assert!(
+                MEASURED_MIN_AVAILABLE_MB - (MEASURED_PEAK_MEMORY_MB - MEASURED_REST_MEMORY_MB)
+                    >= HERMES_FLOOR_MB
+            )
+        };
+        assert!(half_again(MEASURED_RUN_SECS, 1) <= RUN_LIFETIME.as_secs());
+        // The quota leaves the voice at least one of the lamp's cores.
+        assert_eq!(LAMP_CORES, 8);
+        const { assert!(CPU_QUOTA_PERCENT < (LAMP_CORES - 1) * 100) };
     }
 }

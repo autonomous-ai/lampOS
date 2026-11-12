@@ -271,6 +271,27 @@ a run, and nobody can test a guess against it), and a pushed skill part's
 are: a registered phrase, events' fields and a refusal's `why`. A field the SDK
 doesn't know, such as one from a newer lamp, is printed as `<not shown>`.
 
+## Speaker
+
+With the `speaker` grant (never pre-ticked: the owner ticks it at pairing, and it lets a program
+sound like a person) a program plays sound of its own through the lamp's speaker. The lamp must
+serve it (`lamp-control --speaker on`), is never private or muted, and shows its ring's mark while
+it plays:
+
+```python
+async with lamp.speaker_stream() as out:        # 16 kHz mono S16LE; sample_rate=24000 for 24 kHz
+    await out.play_wav("hello.wav")             # in real time; returns when played
+    await out.speaker_write(pcm_bytes)          # your own PCM, framed in 100 ms binary messages
+    await out.drain()                           # wait until what was written has played
+    print(out.ended, out.stats)                 # the lamp's why if it ended the stream; newest speaker.stats
+```
+
+`lamp speaker hello.wav` does the same from a shell (`-` reads raw mono S16LE from stdin, at `--rate`).
+One stream plays on the lamp: opening one replaces another, which is told `speaker.ended` `replaced`
+(`out.ended` of the old one, matched by `turn`). It also ends after 2 s with no frame, 10 minutes, or
+when the lamp or the person speaks. On the fake, `fake.played_samples()` is what was played,
+`await fake.end_speaker("limit")` ends the stream, and `set_private()` ends it as it does a microphone's.
+
 ## Check a skill folder
 
 A skill is a folder the lamp runs without code: its rules in `skill.toml`
@@ -510,6 +531,8 @@ its `done` instead (`gesture`, `move` and `play` too, where hello's `limits` say
 | `await lamp.camera_snapshot()` | none; returns the camera's newest picture, JPEG bytes about 320 across. Refused while the lamp is private, or with the camera closed. On the fake, `fake.picture = jpeg_bytes` sets the picture it carries; the default is the smallest whole JPEG, which no image library opens. | `camera` | no |
 | `await lamp.camera_stream(on=True, fps=None, size=None)` | `fps`: 1 to 30 a second at most (2); `size`: `640x480` (the default) or `1280x720`. Where the eyes serve every frame (the answer's `fast: true`; not on customer lamps, stable 11450: merged, off by default), each `camera.frame` comes as the camera made it, with the JPEG as `data` (bytes); otherwise the eyes' newest frame, about 1 to 2 a second, with `jpeg` in base64. `fps_now` is the rate lately; each new frame once, until `camera_stream(False)`, `stop` or a `camera.ended` event. Ends with `camera.ended` when the lamp turns private, or after 10 s with the camera closed | `camera` | no |
 | `await lamp.microphone_stream(on=True)` | none but `on`. The room's sound as `microphone.audio` events, one each 20 ms block as the lamp's ears hear it: mono, 16 kHz, signed 16-bit little-endian samples as `data` (bytes, 640 a block), with `sequence`, `lost` (blocks lost since the last one sent: on the way, or because this computer read too slowly), `sample_rate`, `channels`, `format` (`s16le`) and `bytes`. The answer says the same shape and `source` (`mic1`). On again replaces it; until `microphone_stream(False)`, `stop` or a `microphone.ended` event: at once when the lamp turns private, at once when more than one person is in view ("someone else is here": the lamp can't tell its owner from anyone else), within 2 s when the lamp's eyes stop saying who is in view ("the room isn't seen"), within 1 s when the ring doesn't say it drew its mark ("the ring is not showing the microphone's mark"), or within 2 s when no sound comes (a lamp that doesn't share its microphone, `LAMP_BUS_AUDIO` off). A re-pairing without `microphone` ends it. Refused while private, with more than one person in view or the room unseen, from beyond the lamp's own network, where the ring can't show its mark, and unless the owner switched it on (`LAMP_CONTROL_MICROPHONE=on`, off by default) | `microphone` | no |
+| `await lamp.speaker_stream_request(on=True, sample_rate=None)` | the plain `speaker.stream` request, as `microphone_stream` is. `sample_rate`: 16000 (the default) or 24000. Answers `sample_rate`, `format` (`s16le`), `frame_ms`, `buffer_ms`, `source` (`speaker`) and `turn`. On again, from any computer, replaces the stream that runs. Refused while private or muted, from beyond the lamp's own network, and unless the owner switched it on (`--speaker on`) | `speaker` | no |
+| `async with lamp.speaker_stream(sample_rate=16_000) as out` | opens the stream and ends it on leaving: `await out.speaker_write(pcm)` (mono S16LE, framed in binary messages of 100 ms, each with its `sequence`; no pacing of its own), `await out.drain()`, `await out.play_wav(path)` (16 or 24 kHz mono 16-bit, in real time), `out.ended` (the lamp's why from a `speaker.ended` of this stream's `turn`), `out.stats` (newest `speaker.stats`: `buffered_ms`, `lost`, `underruns`, `limited`, `stray`, every 2 s). Frames of the wrong size or without a stream are dropped by the lamp and counted `stray` | `speaker` | no |
 | `await lamp.sound(name)` | `name`: `hum`, the lamp's own short hum, or one of your clips (`upload_sound`), a clip plays once the person isn't talking, as an exact `say` does; the hum is rarer: its `done` says `dropped` within 15 s of the lamp's last turn ("the lamp spoke a moment ago"), or with another sound in the last 30 s | `speak` | no |
 | `await lamp.upload_sound(name, wav)` | `name`: a lowercase letter, then lowercase letters, digits, `_` or `-`, up to 64, never `hum`. `wav`: bytes or a path, a WAV of 16-bit mono PCM at 24 kHz, up to 30 s, no sample past −12 dBFS and no 10 ms past −30 dBFS RMS (the lamp's speaker cap: a steady tone peaks near −27 dBFS at most, so a clip at −14 dBFS is refused). Sent in 36 KiB parts and checked whole on the lamp, over a clip of the same name. Returns `{name, bytes, ms}`. Each computer keeps up to 64 clips and 20 MB (`limits["sounds"]`); revoking it deletes them | `speak` | no |
 | `await lamp.sounds()` | your clips on the lamp, each `{name, bytes, ms}` | `speak` | no |
@@ -578,6 +601,7 @@ and send it again. Without `retry_ms`, it is a held part, as above.
 | `lamp pair CODE --pin PIN [--host HOST] [--port 7731] [--name NAME]` | `CODE`: the 8-digit code. `--pin`: the 64-hex pin the app shows (required). `--host`: the address, `lamp-xxxx.local` or an IP; give it, as no lamp announces itself by mDNS yet (stable 11450). `--port`: 7731. `--name`: this computer's name in the app |
 | `lamp hello [LAMP_ID]` | a paired lamp's id, or the only one: connects and shows its grants |
 | `lamp fake [--every 10] [--cycles N] [--everything] [--hands]` | `--every`: seconds between arrivals (10). `--cycles`: stop after N (default: until Ctrl-C). `--everything`: answer every op, without refusing what lamp-control doesn't route yet. `--hands`: a hand waves for 3 s after each arrival, and looks are answered, as on a lamp with the body's lease socket |
+| `lamp speaker FILE [LAMP_ID] [--rate 16000]` | `FILE`: a WAV of 16-bit mono PCM at 16000 or 24000 Hz, or `-` for raw mono S16LE on stdin at `--rate` (16000 or 24000, default 16000); played in real time through the lamp's speaker (`speaker` grant) |
 | `lamp skill push FOLDER [LAMP_ID]` | a skill folder: checked first, then put on the paired lamp (`skills` grant). Push, list and remove work on customer lamps from stable 11091 on |
 | `lamp skill list [LAMP_ID]` | this computer's own pushed skills |
 | `lamp skill remove NAME [LAMP_ID]` | takes one of them off the lamp |

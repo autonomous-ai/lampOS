@@ -23,6 +23,14 @@ pub const MAX_ANSWER_BYTES: usize = 16_384;
 pub const MAX_ASK_BYTES: usize = 4096;
 pub const MAX_SPEECH_BYTES: usize = 1000;
 pub const CONFIRM_MS: u64 = 120_000;
+/// A `prepare` (or the app's default) naming an engine with no name: empty
+/// or blank (#6492). Any other name is Harness's to know.
+pub const ENGINE_UNKNOWN: &str = "engine_unknown";
+/// A `prepare` for the lamp naming an engine not among its engines now
+/// (#6492, [`crate::runtime::lamp_order`]): Harness doesn't report it
+/// installed on the lamp, it takes no task, its switch is off, or it is
+/// known missing there. Refused, never moved to another engine.
+pub const ENGINE_NOT_HERE: &str = "engine_not_here";
 pub const SPEECH_AGE_MS: u64 = 600_000;
 /// A close that failed is tried again this long after, at most
 /// [`CLOSE_TRIES`] times in all, each time after reading the agent again.
@@ -1285,8 +1293,43 @@ pub struct Engine<P: Persistence> {
     /// lamp has no Hermes target yet (Hermes still installing), the
     /// targets answer says `"lamp":"installing"`.
     hermes_on_lamp: bool,
+    /// The lamp's own engines, the default first, then the others in
+    /// Harness's order (#6492, [`crate::runtime::lamp_order`]): a `prepare`
+    /// naming an engine for the lamp runs on it only while it is here, and
+    /// the targets answer lists them. Empty without the lamp.
+    lamp_order: Vec<EngineKind>,
+    /// The lamp's default engine (#6492, [`crate::runtime::lamp_default`]),
+    /// while it is in [`Self::lamp_order`]: work for the lamp naming no
+    /// engine runs on it, and the targets answer says it. None: the
+    /// targets file's engine.
+    lamp_default: Option<EngineKind>,
 }
 impl<P: Persistence> Engine<P> {
+    /// The lamp's own engines now and its default (#6492), set by the part
+    /// before each request: the default is kept only while it is in the
+    /// order.
+    pub fn set_lamp_engines(&mut self, order: Vec<EngineKind>, default: Option<EngineKind>) {
+        self.lamp_default = default.filter(|engine| order.contains(engine));
+        self.lamp_order = order;
+    }
+
+    /// The engine the lamp's own target runs work naming none on (#6492):
+    /// the lamp's default, unless its machine is known not to have it,
+    /// else the targets file's.
+    fn lamp_engine(&self, alias: &str, target: &Target) -> EngineKind {
+        if alias != crate::runtime::LAMP_TARGET {
+            return target.engine;
+        }
+        self.lamp_default
+            .filter(|engine| {
+                !self
+                    .readiness
+                    .get(alias)
+                    .is_some_and(|known| known.missing(*engine))
+            })
+            .unwrap_or(target.engine)
+    }
+
     /// Whether the lamp's own Hermes may become a target
     /// (`LAMP_HERMES_ON_LAMP`, #5978).
     pub fn hermes_on_lamp(&mut self, on: bool) {
@@ -1470,6 +1513,8 @@ impl<P: Persistence> Engine<P> {
             last_handover: None,
             close_told: false,
             hermes_on_lamp: false,
+            lamp_order: Vec::new(),
+            lamp_default: None,
             kept_aside,
             set_aside,
             targets_newer: None,
@@ -1671,11 +1716,23 @@ impl<P: Persistence> Engine<P> {
             Request::Targets {} => {
                 let mut told = json!({"targets":self.targets.iter()
                 .map(|(alias, target)| {
+                    // The lamp's own: the app's choice (#6492).
+                    let engine = self.lamp_engine(alias, target);
                     let mut told = match self.names.get(alias) {
-                        Some(name) => json!({"alias":alias,"engine":target.engine,"name":name}),
-                        None => json!({"alias":alias,"engine":target.engine}),
+                        Some(name) => json!({"alias":alias,"engine":engine,"name":name}),
+                        None => json!({"alias":alias,"engine":engine}),
                     };
-                    if self.readiness.get(alias).is_some_and(|known| known.missing(target.engine)) {
+                    // And every engine of the lamp's, the default first
+                    // (#6492), so the voice can name any of them.
+                    if alias == crate::runtime::LAMP_TARGET && !self.lamp_order.is_empty() {
+                        told["engines"] = self
+                            .lamp_order
+                            .iter()
+                            .map(|engine| engine.argument())
+                            .collect::<Vec<_>>()
+                            .into();
+                    }
+                    if self.readiness.get(alias).is_some_and(|known| known.missing(engine)) {
                         told["installed"] = false.into();
                     }
                     told
@@ -1817,6 +1874,7 @@ impl<P: Persistence> Engine<P> {
                 text,
                 target,
                 session,
+                engine: named,
                 ..
             } => {
                 // Targets written for a newer build: nothing is handed over
@@ -1850,10 +1908,40 @@ impl<P: Persistence> Engine<P> {
                         "That preparation request ID was already used.",
                     ));
                 }
-                let target_value = self
+                let mut target_value = self
                     .targets
                     .get(target)
-                    .ok_or_else(|| err("target", "Choose a provisioned target alias."))?;
+                    .ok_or_else(|| err("target", "Choose a provisioned target alias."))?
+                    .clone();
+                // The lamp's own target (#6492): an engine named runs on
+                // exactly that one or is refused, never moved to the other;
+                // none named, the lamp's default. Another target ignores it.
+                let lamp = target == crate::runtime::LAMP_TARGET;
+                let named = named.as_deref().filter(|_| lamp);
+                if let Some(named) = named {
+                    if named.trim().is_empty() {
+                        return Err(err(ENGINE_UNKNOWN, "No engine was named."));
+                    }
+                    // Any name Harness gives an engine: one of the lamp's
+                    // now, or refused. None is the lamp's by name here.
+                    let engine = crate::runtime::engine_named(named)
+                        .filter(|engine| self.lamp_order.contains(engine))
+                        .filter(|engine| {
+                            !self
+                                .readiness
+                                .get(target)
+                                .is_some_and(|known| known.missing(*engine))
+                        })
+                        .ok_or_else(|| {
+                            err(
+                                ENGINE_NOT_HERE,
+                                "The engine named is not installed on this lamp, or is switched off.",
+                            )
+                        })?;
+                    target_value.engine = engine;
+                } else {
+                    target_value.engine = self.lamp_engine(target, &target_value);
+                }
                 // Known to fail on that computer (#5199): refused now, with
                 // why, rather than after the person's yes. A session the
                 // person named is already running there (#5535): its
@@ -1870,7 +1958,7 @@ impl<P: Persistence> Engine<P> {
                 let launch = Launch {
                     name: task_label(&next.store_id, id),
                     prompt: text.clone(),
-                    target: target_value.clone(),
+                    target: target_value,
                     session: session.clone(),
                 };
                 if launch
@@ -3041,6 +3129,7 @@ mod tests {
             text: text.into(),
             target: "desk".into(),
             session: None,
+            engine: None,
         }
     }
     fn prepare(engine: &mut Engine<Memory>, at: u64) -> u64 {
@@ -4711,6 +4800,177 @@ mod tests {
         // A read: nothing is written.
         assert_eq!(engine.revision(), before);
         assert!(reply.get("lamp").is_none(), "switch off: no lamp field");
+    }
+
+    /// #6492: the lamp's own target with both engines in its order and the
+    /// targets file saying OpenClaw.
+    fn lamp_engine_rig(order: Vec<EngineKind>, app: Option<EngineKind>) -> Engine<Memory> {
+        let targets = BTreeMap::from([
+            (
+                crate::runtime::LAMP_TARGET.to_owned(),
+                Target {
+                    machine_id: "cccccccccccccccccccccccccccccccc".into(),
+                    project: crate::runtime::LAMP_PROJECT.into(),
+                    engine: EngineKind::Openclaw,
+                },
+            ),
+            (
+                "desk".to_owned(),
+                Target {
+                    machine_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                    project: "review-project".into(),
+                    engine: EngineKind::Codex,
+                },
+            ),
+        ]);
+        let mut engine =
+            Engine::open(Memory::default(), targets, STORE, SESSION, &clock(0)).unwrap();
+        engine.set_lamp_engines(order, app);
+        engine
+    }
+
+    fn lamp_prepare(engine: &Engine<Memory>, target: &str, named: Option<&str>) -> Request {
+        Request::Prepare {
+            guard: guard(engine, "prepare"),
+            text: "Sort the photos from yesterday.".into(),
+            target: target.into(),
+            session: None,
+            engine: named.map(str::to_owned),
+        }
+    }
+
+    fn launched_engine(engine: &Engine<Memory>) -> EngineKind {
+        engine.state.tasks.last().unwrap().launch.target.engine
+    }
+
+    #[test]
+    fn a_named_engine_runs_the_lamps_work_on_it_even_when_not_first() {
+        use EngineKind::{Hermes, Openclaw};
+        let mut engine = lamp_engine_rig(vec![Openclaw, Hermes], None);
+        let request = lamp_prepare(&engine, "lamp", Some("hermes"));
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Hermes);
+    }
+
+    #[test]
+    fn a_named_engine_not_in_the_lamps_order_is_refused_never_moved() {
+        use EngineKind::Openclaw;
+        let mut engine = lamp_engine_rig(vec![Openclaw], None);
+        let before = engine.revision();
+        let request = lamp_prepare(&engine, "lamp", Some("hermes"));
+        let refused = engine.handle(&request, &clock(0), false).unwrap_err();
+        assert_eq!(refused.code, ENGINE_NOT_HERE);
+        assert!(engine.state.tasks.is_empty());
+        assert_eq!(engine.revision(), before);
+        // Any other name not among the lamp's engines (#6492): one Harness
+        // has but doesn't report here, or one it starts with no task.
+        for named in ["codex", "claude", "pi", "cursor"] {
+            let request = lamp_prepare(&engine, "lamp", Some(named));
+            let refused = engine.handle(&request, &clock(0), false).unwrap_err();
+            assert_eq!(refused.code, ENGINE_NOT_HERE, "{named}");
+        }
+        // No name at all.
+        for named in ["", "  "] {
+            let request = lamp_prepare(&engine, "lamp", Some(named));
+            let refused = engine.handle(&request, &clock(0), false).unwrap_err();
+            assert_eq!(refused.code, ENGINE_UNKNOWN, "{named:?}");
+        }
+        assert!(engine.state.tasks.is_empty());
+        assert_eq!(engine.revision(), before);
+        // No lamp engines known at all: refused too.
+        let mut none = lamp_engine_rig(Vec::new(), None);
+        let request = lamp_prepare(&none, "lamp", Some("openclaw"));
+        assert_eq!(
+            none.handle(&request, &clock(0), false).unwrap_err().code,
+            ENGINE_NOT_HERE
+        );
+    }
+
+    #[test]
+    fn no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it() {
+        use EngineKind::{Codex, Hermes, Openclaw};
+        // No app choice: the targets file's engine.
+        let mut engine = lamp_engine_rig(vec![Openclaw, Hermes], None);
+        let request = lamp_prepare(&engine, "lamp", None);
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Openclaw);
+        // The default is Hermes: work naming none runs on it, and the
+        // targets answer says it, with every engine of the lamp's.
+        let mut engine = lamp_engine_rig(vec![Hermes, Openclaw], Some(Hermes));
+        let request = lamp_prepare(&engine, "lamp", None);
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Hermes);
+        let told = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(
+            told["targets"].as_array().unwrap().contains(
+                &json!({"alias":"lamp","engine":"hermes","engines":["hermes","openclaw"]})
+            ),
+            "{told}"
+        );
+        // The app's choice not in the order: the file's.
+        let mut engine = lamp_engine_rig(vec![Openclaw], Some(Hermes));
+        let request = lamp_prepare(&engine, "lamp", None);
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Openclaw);
+        // Another target: an engine named is ignored, and lists no engines.
+        let mut engine = lamp_engine_rig(vec![Openclaw], None);
+        let request = lamp_prepare(&engine, "desk", Some("hermes"));
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Codex);
+        let told = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(
+            told["targets"]
+                .as_array()
+                .unwrap()
+                .contains(&json!({"alias":"desk","engine":"codex"})),
+            "{told}"
+        );
+        // No lamp engines: no `engines` on the lamp's entry.
+        let mut engine = lamp_engine_rig(Vec::new(), None);
+        let told = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(
+            told["targets"]
+                .as_array()
+                .unwrap()
+                .contains(&json!({"alias":"lamp","engine":"openclaw"})),
+            "{told}"
+        );
+    }
+
+    /// #6492: an engine Harness reports on the lamp that is neither Hermes
+    /// nor OpenClaw (Claude) can be named, and is the default when it is
+    /// first; the targets answer lists the lamp's engines in that order.
+    #[test]
+    fn a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default() {
+        use EngineKind::{Claude, Hermes, Openclaw};
+        let mut engine = lamp_engine_rig(vec![Hermes, Claude, Openclaw], None);
+        let request = lamp_prepare(&engine, "lamp", Some("claude"));
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Claude);
+        assert_eq!(
+            engine.state.tasks.last().unwrap().launch.target.project,
+            crate::runtime::LAMP_PROJECT
+        );
+        // Claude the default: work naming none runs on it.
+        let mut engine = lamp_engine_rig(vec![Claude, Hermes, Openclaw], Some(Claude));
+        let request = lamp_prepare(&engine, "lamp", None);
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Claude);
+        let told = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(
+            told["targets"].as_array().unwrap().contains(&json!({
+                "alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]
+            })),
+            "{told}"
+        );
     }
 
     #[test]

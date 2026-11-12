@@ -1247,9 +1247,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never rewrites `lamp-update.service`, so a pin or switch written there
      would reach only a lamp installed after it. Instead the pinned Harness
      manifest itself is compiled into lamp-update (`product::MANIFEST`, from
-     `deploy/harness/cli-0.6.16.metadata.json`, a byte-for-byte copy of
+     `deploy/harness/cli-0.6.41.metadata.json`, a byte-for-byte copy of
      Harness's CDN manifest `https://storage.googleapis.com/s3-autonomous-upgrade-3/harness/cli/metadata.json`
-     when it named 0.6.16; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
+     when it named 0.6.41; 0.5.98 or newer is needed for Hermes on the lamp, openharness#3807, #5978). The signed manifest names lamp-update by its
      SHA-256, so the build's Ed25519 signature covers the pin (#3693's
      decision (a): a sha256 pin in our signed manifest is enough, as Harness
      signs nothing). Nothing is fetched or hosted for it: the one-shot checks
@@ -1264,7 +1264,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      never reads it again from its server.
      After the install, `harness
      version` is compared with the manifest's `cli.version` and journaled:
-     `Harness 0.6.16 is the pinned version`, or `Harness says version …, not
+     `Harness 0.6.41 is the pinned version`, or `Harness says version …, not
      the pinned …`. Another version, or none, is recorded `failed` with
      `version`, not `installed`, so the app can tell it apart. Harness is
      still there and lamp-tasks is still started again. While Harness is
@@ -1275,7 +1275,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        (`HARNESS_TMUX_METADATA_URL`), grid (`HARNESS_GRID_METADATA_URL`) and
        hn (`HARNESS_TUI_MANIFEST_URL`). Byte-for-byte copies of them and of
        the installer itself (`https://cdn.autonomous.ai/harness/cli/install.sh`)
-       are under `deploy/harness/`, copied on 11 Nov 2026, and compiled in
+       are under `deploy/harness/`, copied on 12 Nov 2026, and compiled in
        (`product::INSTALLER`, `product::MANIFESTS`), each with its
        SHA-256. Every pinned install, the build's own pin or the env pair,
        checks all five against their SHA-256s before anything runs
@@ -1702,6 +1702,29 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      scripts are still to be shown there. The relay key never goes into
      Hermes's environment or its folder; only the forwarder's token does
      (Hermes keeps snapshots of its shell's environment under its home).
+   - **Harness's hooks inside the agent namespace** (#6530; the shared
+     agent namespace piece, `crates/update/src/agent_ns.rs`, #6510's "one
+     namespace for every engine", used today by Hermes's and OpenClaw's
+     namespaces). Harness writes an engine's hooks as bare commands
+     (`harness hook hermes session-start`, `harness hook hermes tool`),
+     found by `PATH`. Inside the namespace `/var/lib` is an empty tmpfs, so
+     `/usr/local/bin/harness` (a link into `/var/lib/lampos-tasks/.local/bin`)
+     leads nowhere, and Harness's state is never shown there. Until Harness
+     ships a hook mode for a sandbox (openharness#4194), lamp-update writes a
+     stand-in, `/usr/local/lib/lampos/ns-bin/harness` (root's, 0755, in its
+     own root's 0755 folder), with each engine's namespace script and takes
+     it out with the last of them. It answers `harness hook …` with nothing
+     and exit 0 and refuses anything else with one line; it reads nothing,
+     so it shows no Harness state. The namespace scripts (`hermes-ns`,
+     `openclaw-ns`, and OpenClaw's wrapper before it joins the running
+     gateway's namespaces) put `/usr/local/lib/lampos/ns-bin` first on the
+     `PATH` right before the line that runs the engine. Each start of an
+     engine's wrapper writes one journal line, outside the namespace, with
+     the engine's tag: `Harness hooks aren't available inside the lamp's
+     agent namespace yet (openharness#4194)`; no `logger`, or one failing,
+     never fails the start. A missing or changed stand-in is the engine
+     missing, written again. The stand-in is removed once a sandbox hook
+     mode ships in the pinned Harness.
    - **The lamp's skills, behind their own switch** (#6128;
      `LAMP_HERMES_SKILLS` in `lamp-update.service`'s environment, read as
      `LAMP_HERMES_ON_LAMP` is: set, on only when `on` exactly, so `off`
@@ -1794,10 +1817,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (`TASKS_EDITS`) then, only with `LAMP_NS_NET=run`:
 
      ```sh
-     … L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S=/tmp/.lampos-ns
+     … L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns
      if [ "${LAMP_NS_NET-}" = run ]; then [ -S "$B" ] && touch "$S/b" && mount --bind "$B" "$S/b" || fail "no $B"; fi
+     if [ "${LAMP_NS_NET-}" = run ] && [ -d "$P" ]; then mkdir -m 0700 "$S/p" && mount --bind "$P" "$S/p" || fail "no $P"; else P=; fi
      if [ "${LAMP_NS_NET-}" = run ]; then mkdir -p "${B%/*}" && touch "$B" && mount --move "$S/b" "$B" && ro "$B" || fail "$B not shown"; fi
-     rm -f "$S/r" "$S/l" "$S/b" && …
+     if [ -n "$P" ]; then mkdir -p "$P" && mount --move "$S/p" "$P" && ro "$P" || fail "$P not shown"; fi
+     rm -f "$S/r" "$S/l" "$S/b" && { [ -z "$P" ] || rmdir "$S/p"; } && …
      …
      if [ "${LAMP_NS_NET-}" = run ]; then
        I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x "$p" ]; then I=$p; break; fi; done
@@ -1810,7 +1835,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      unset LAMP_NS_NET
      ```
 
-     It shows lamp-tasks' bridge socket `/run/lampos-tasks/model.sock`, the
+     It shows the skills the owner's computer pushed,
+     `/var/lib/lampOS/skills-dev`, read-only as the skills are (skipped when
+     the folder is not there), so a pushed skill's script is there for its
+     run; Hermes started any other way never sees them. It shows lamp-tasks'
+     bridge socket `/run/lampos-tasks/model.sock`, the
      file alone, read-only, as the control socket is (missing, the run
      ends: the bridge is served only with the switch on); brings `lo` up
      (no `ip`, the run ends) and checks `lo` is its only link with a way out: a link besides `lo` ends
@@ -2248,6 +2277,116 @@ Bedtime and Morning stores come as `LAMP_SKILLS_DAILY_FILE` and
 `product_units_pass_only_options_an_older_binary_takes` holds both units'
 `ExecStart` to the options their binaries took before; a new option joins
 that list only once every channel carries a binary that takes it.
+
+## One agent namespace for every engine (#6510)
+
+#6510 Part 1, step 1 (`crates/update/src/agent_ns/wrapper.rs`, beside the
+shared hook stand-in in `agent_ns.rs`): one wrapper and one namespace
+script for any engine Harness reports on the lamp, with no engine named in
+the code. Written by a round only with `LAMP_AGENT_NS=on` (below); not
+yet on a lamp.
+
+- **Engine names** are data and must be plain: `a-z`, `0-9` and `-`, 1 to
+  32 bytes (`engine_ok`). Anything else is refused before a path or a text
+  is made.
+- **The wrapper**, `/usr/local/bin/<engine>` (root's, 0755), carries
+  `Written by lamp-update.` in its first 512 bytes, the mark lamp-tasks'
+  `LAMP_WRAPPER_MARK` (#6506) looks for. It:
+  - finds the engine's own program on the caller's `PATH` (`lampos`'s, as
+    Harness starts it): the first `<engine>` there that is not the wrapper
+    itself (by `readlink -f`) and carries no mark (so never another
+    lamp-update wrapper or the hook stand-in); only full folders of `PATH`
+    count. None, and it ends. No path to the program is written in any
+    text;
+  - for a skill's run, `LAMP_RUN_ID` set (**provisional name**: Harness
+    passes an engine only a fixed list of variables today, so Harness has
+    to pass it, or the run be found another way, before step 2), checks the
+    id is plain (`a-z`, `0-9`, `-`, at most 64), reads
+    `/run/lampos-tasks/runs/<run-id>` (lamp-tasks' token file, 0600 in
+    `lampos`'s 0700 folder; a link there is never read through) into a
+    shell variable once, deletes the file whatever it held, and ends if
+    there was no token. The token goes on as `LAMP_CONTROL_TOKEN` in the
+    environment only, never in an argument; the run gets `--net` and
+    `LAMP_NS_NET=run`, as Hermes's skill runs do. Without a run, a
+    `LAMP_CONTROL_TOKEN` or `LAMP_NS_NET` from the caller is unset;
+  - writes the hook stand-in's journal line with the engine as its tag;
+  - runs `/usr/local/lib/lampos/agent-ns` through `unshare
+    --map-root-user [--net] --mount --pid --kill-child --mount-proc
+    --propagation private`, with the engine's name and the program's path
+    in `LAMP_NS_ENGINE` and `LAMP_NS_ENGINE_BIN`.
+- **The namespace script**, `/usr/local/lib/lampos/agent-ns` (root's,
+  0755), is Hermes's (`hermes-ns`, "Hermes on the lamp": the same
+  allow-list, hidden `/run`, `/var/lib` and `/etc/lampOS`, private `/tmp`,
+  hidden devices, the skills and `LAMP_SKILL_TASKS` switches, and a skill
+  run's network) with the engine made data. It checks the name again and
+  that the program is a full path to a file, sets `HOME` to the engine's
+  own folder `/var/lib/lampos-agents/<engine>` (`lampos`'s, 0700; the
+  folder above it root's, 0755), binds the program back read-only at its
+  own path, puts the hook stand-in first on `PATH`, and runs the program as
+  the caller's own ids in a nested user namespace. The lampos SDK (#6507,
+  `/usr/local/lib/lampos/sdk-python`) is under `/usr`, which the namespace
+  leaves as it is. A program that needs more than its own file (a Node or
+  Python tree under a hidden folder) is not shown more yet.
+- **Writing** (`write_engine`): the homes folder and the engine's home,
+  the namespace script, the hook stand-in, then the wrapper last, each
+  written whole beside and renamed in. A file at the wrapper's place
+  without the mark (the engine's own program, or anyone else's) or a link
+  there is refused, never replaced. `present` says the wrapper and the
+  script hold this build's text, the home is there, and the wrapper is the
+  `<engine>` `lampos`'s login shell finds (`login_finds`: `timeout 5
+  runuser -l lampos -c 'command -v <engine>'`, as Harness looks, nothing
+  found past 5 s: its installer puts
+  `~/.local/bin` before `/usr/local/bin`, so an engine's own program there
+  would run with no namespace); anything else is the engine missing, and
+  one found before the wrapper is not offered.
+- **Names** are `a-z`, `0-9` and `-`, never starting with `-`. A run's
+  token file is read and deleted before the program is looked for, so a
+  wrapper that finds no program leaves none behind.
+- **Hermes and OpenClaw** keep their own wrappers and namespace scripts
+  ("Hermes on the lamp", "OpenClaw on the lamp") for now; they move onto
+  this one in step 2.
+- **Written by a round** (`crates/update/src/agent_ns/rounds.rs`), only
+  with `LAMP_AGENT_NS=on` exactly in lamp-update's own unit (no product
+  unit sets it; any other value or none is off), by a `serve` with
+  `--apply on`, Harness's install on, and `LAMP_APP_ENGINES=on`, whose
+  look at Harness (`harness machines engines <machine> --json`, every five
+  minutes, #6240) is the list of engines. Either missing is said once at
+  start, and nothing is written. After each round that reached the
+  channel, after Hermes's and OpenClaw's own steps, every engine that look
+  last said `installed` with a plain name, except `hermes` and `openclaw`,
+  is written with `write_engine` unless its files already hold this
+  build's text (`present` as if the login shell found the wrapper). Then
+  `login_finds` is asked: an engine whose own program the login shell
+  finds first, or none, is one line each round, not written again; one
+  `not_installed` is passed over, as a wrapper on `lampos`'s `PATH` would
+  have Harness find it installed. `lampos`'s ids are looked up once, only
+  when an engine is to be written. Each engine written or refused is one
+  line; one already there, none. The namespace shows what Hermes's does
+  (`LAMP_HERMES_SKILLS`, `LAMP_SKILL_TASKS`), so turning either changes
+  the script and every engine is written again. Off, or an engine Harness
+  no longer reports, nothing is taken out yet. The hook stand-in stays
+  while `agent-ns` is there (it is among the namespace scripts Hermes's
+  and OpenClaw's removal look for).
+
+Tests (`agent_ns::wrapper::tests`, on any computer): plain names only; the
+mark in the first 512 bytes; no path to the program in the wrapper; the
+token only assigned and exported; the wrapper run with a stand-in
+`unshare`: the token file read once and deleted, the token in the
+environment and never in argv, a second start of the same run refused, a
+link or a run id that is not plain refused, no token or `--net` without a
+run, the program found past the wrapper and another marked wrapper; the
+namespace script naming no engine, for every switch, with `HOME` per
+engine; `sh -n` on every text; the writer's modes and its refusal to
+replace a file that is not lamp-update's; no token file left when no
+program is found; an engine found before the wrapper (or none found) not
+present; the login lookup's argv. `agent_ns::rounds::tests`: the switch
+on only for `on`; only installed, plain engines other than Hermes and
+OpenClaw written, a made-up one included; a second round writing nothing
+and asking no ids, a changed wrapper or another switch written again; an
+engine whose own program the login shell finds first said, not written
+again; the engine's own program at the wrapper's place left and the rest
+written; no ids, nothing written; the hook stand-in kept past Hermes's
+removal.
 
 ## A hand install's skill folders (`deploy/sync-skills.sh`)
 

@@ -2918,6 +2918,8 @@ pub fn serve(
             crate::services::Linked::new(folder)
         });
     let has_tasks = tools.tasks.is_some();
+    // The tasks part, for a heard plain no to a task read back (#6582).
+    let tasks_declined = tools.tasks.clone();
     // Whom a line's words ask by name, with `LAMP_TASKS_NAMED_ASK=on`: its
     // forced call goes to that one, and the journal says so (#1722).
     let named_ask = tools
@@ -2925,6 +2927,9 @@ pub fn serve(
         .clone()
         .filter(|_| crate::agent_tasks::named_ask_on());
     let declines = tools.decline;
+    // A skill the heard words ask what it uses, by name, read back in code
+    // with the voice's own `make_skill` (V2 on #6413).
+    let reads_back_by_words = tools.make_skill;
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
     // (#1712).
@@ -3622,6 +3627,9 @@ pub fn serve(
         }
         engine = engine.undoing_doubted_keeps(by_id);
     }
+    if reads_back_by_words {
+        engine = engine.reading_back_by_words(Arc::new(crate::make_skill_local::read_back_heard));
+    }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {
             crate::agent_tasks::named_ask(&place, words)
@@ -3639,6 +3647,13 @@ pub fn serve(
     if has_tasks {
         engine = engine.noting_a_task_waiting(Arc::new(move |request| {
             crate::agent_tasks::pending_note(request, Instant::now())
+        }));
+    }
+    // A heard plain no to a task read back drops it, in the tasks part too
+    // (#6582).
+    if let Some(place) = tasks_declined {
+        engine = engine.declining_a_task_waiting(Arc::new(move |request, words: &str| {
+            crate::agent_tasks::declined(&place, request, words)
         }));
     }
     // A look reads the eyes' look file with the Live route's bounds: a full

@@ -53,6 +53,15 @@ pub enum Request {
         /// new one ([`crate::harness::Launch::session`]). Absent, as before.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         session: Option<String>,
+        /// The engine the person named for the work (#6492), by any name
+        /// Harness gives an engine (`hermes`, `openclaw`, `claude`, …), read
+        /// only for the lamp's own target ([`crate::runtime::LAMP_TARGET`]):
+        /// the work runs on exactly that one while it is among the lamp's
+        /// engines, else the prepare is refused (`engine_not_here`,
+        /// `engine_unknown`), never moved to another.
+        /// Another target ignores it. Absent: the lamp's default.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        engine: Option<String>,
     },
     Confirm {
         guard: Guard,
@@ -162,6 +171,16 @@ pub enum Request {
         id: u64,
         delivered: bool,
     },
+    /// The owner's choice in the app of the lamp's default engine (#6492),
+    /// by any engine's name among the lamp's engines, on the app's route
+    /// only: kept in
+    /// [`crate::runtime::ENGINE_DEFAULT_FILE`] and used at once.
+    AppEngineDefault {
+        engine: String,
+    },
+    /// The lamp's default engine as it is now, and whether the app chose
+    /// it (#6492), on the app's route only.
+    AppEngineDefaultState {},
 }
 
 /// A spoken yes or no.
@@ -223,6 +242,8 @@ impl Request {
                 | Self::AppSignInState {}
                 | Self::AppSignInAnswer { .. }
                 | Self::AppSignInRelay { .. }
+                | Self::AppEngineDefault { .. }
+                | Self::AppEngineDefaultState {}
         )
     }
 
@@ -263,6 +284,8 @@ impl Request {
             Self::AppSignInState {} => "app_sign_in_state",
             Self::AppSignInAnswer { .. } => "app_sign_in_answer",
             Self::AppSignInRelay { .. } => "app_sign_in_relay",
+            Self::AppEngineDefault { .. } => "app_engine_default",
+            Self::AppEngineDefaultState {} => "app_engine_default_state",
         }
     }
 }
@@ -366,6 +389,43 @@ mod tests {
         }
     }
 
+    /// #6492: a prepare may name an engine; absent it is None and not
+    /// written back. The app's engine-default operations are the app's.
+    #[test]
+    fn a_prepare_may_name_an_engine_and_the_app_sets_the_default() {
+        let guard = r#""guard":{"store_id":"s","revision":0,"request_id":"r"}"#;
+        let named =
+            format!(r#"{{"op":"prepare",{guard},"text":"t","target":"lamp","engine":"hermes"}}"#);
+        match Request::parse(named.as_bytes()).unwrap() {
+            Request::Prepare { engine, .. } => assert_eq!(engine.as_deref(), Some("hermes")),
+            other => panic!("{other:?}"),
+        }
+        let unnamed = format!(r#"{{"op":"prepare",{guard},"text":"t","target":"lamp"}}"#);
+        let request = Request::parse(unnamed.as_bytes()).unwrap();
+        assert!(matches!(request, Request::Prepare { engine: None, .. }));
+        assert!(!serde_json::to_string(&request).unwrap().contains("engine"));
+        let set = Request::parse(br#"{"op":"app_engine_default","engine":"openclaw"}"#).unwrap();
+        assert_eq!(
+            set,
+            Request::AppEngineDefault {
+                engine: "openclaw".into()
+            }
+        );
+        assert!(set.app() && !set.trusted() && set.guard().is_none());
+        assert_eq!(set.name(), "app_engine_default");
+        let state = Request::parse(br#"{"op":"app_engine_default_state"}"#).unwrap();
+        assert_eq!(state, Request::AppEngineDefaultState {});
+        assert!(state.app() && !state.trusted());
+        assert_eq!(state.name(), "app_engine_default_state");
+        for bytes in [
+            br#"{"op":"app_engine_default"}"#.as_slice(),
+            br#"{"op":"app_engine_default","engine":1}"#,
+            br#"{"op":"app_engine_default_state","engine":"hermes"}"#,
+        ] {
+            assert_eq!(Request::parse(bytes), Err("bad_request"));
+        }
+    }
+
     /// #5198: the app's sign-in operations are the app's route's alone,
     /// never the voice's; they carry a method (`code` or `qr`), an id
     /// and a yes or a no, never a code or an email.
@@ -405,6 +465,9 @@ mod tests {
         assert!(!Request::parse(br#"{"op":"sign_in_start"}"#).unwrap().app());
         for bytes in [
             br#"{"op":"app_sign_in_start","method":"email"}"#.as_slice(),
+            br#"{"op":"app_sign_in_start","method":"sms"}"#,
+            br#"{"op":"app_sign_in_start","method":"QR"}"#,
+            br#"{"op":"app_sign_in_start","url":"https://a"}"#,
             br#"{"op":"app_sign_in_start","code":"12345678"}"#,
             br#"{"op":"app_sign_in_state","email":"someone@example.com"}"#,
             br#"{"op":"app_sign_in_answer","answer":"yes"}"#,

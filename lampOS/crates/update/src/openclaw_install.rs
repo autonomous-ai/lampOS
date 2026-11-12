@@ -64,7 +64,7 @@
 //! scripts: OpenClaw finishes its own package step at its first run (the
 //! install's `openclaw --version`, in the namespace too).
 use crate::{
-    harness_install,
+    agent_ns, harness_install,
     hermes_install::{
         self, NEEDS_AVAILABLE_KB, RETRY_IN_NEXT_WINDOW, available_kb, free_kb, gid_of, holds,
         lock_named, on, owner, userns_argv,
@@ -342,6 +342,15 @@ pub fn ns_text(skills: bool) -> String {
     text.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1)
 }
 
+/// [`WRAPPER`]'s text: [`WRAPPER_TEXT`] with the shared namespace piece's
+/// journal line ([`agent_ns::with_hook_note`], #6530) and its `PATH`
+/// before the `nsenter` into the running gateway's namespaces
+/// ([`agent_ns::with_ns_path`]), which a pane's OpenClaw runs by without
+/// [`NS`]; the gateway's own start gets it from [`ns_text`].
+pub fn wrapper_text() -> String {
+    agent_ns::with_ns_path(&agent_ns::with_hook_note(WRAPPER_TEXT, "openclaw"))
+}
+
 /// [`UNIT`], written by a round (whose sandbox writes
 /// `/etc/systemd/system`; Harness's one-shot's cannot). The gateway runs
 /// through [`WRAPPER`] as `lampos`, so in OpenClaw's namespace, with
@@ -613,8 +622,9 @@ pub fn present(root: &Path, skills: bool) -> bool {
         && package_version(root).as_deref() == Some(VERSION)
         && holds(root, LOCKFILE_AT, LOCKFILE)
         && node_version(root).as_deref() == Some(NODE_VERSION)
-        && holds(root, WRAPPER, WRAPPER_TEXT)
+        && holds(root, WRAPPER, &wrapper_text())
         && holds(root, NS, &ns_text(skills))
+        && agent_ns::hook_shim_there(root)
         && fs::read(unit_path(root)).is_ok_and(|bytes| bytes == UNIT_TEXT.as_bytes())
 }
 
@@ -998,6 +1008,7 @@ fn remove_entry_points(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str))
             Err(error) => say(&format!("{path} not taken out: {error}")),
         }
     }
+    agent_ns::remove_hook_shim(root, &hermes_install::NS_SCRIPTS, say);
 }
 
 /// The install, in order: `lampos` and its ids looked up; `curl`, `tar`
@@ -1448,14 +1459,13 @@ fn write_root_file(root: &Path, path: &str, text: &str, mode: u32) -> Result<(),
     write_whole(&place, text.as_bytes(), mode).map_err(|error| format!("{path}: {error}"))
 }
 
-/// The namespace script, then the wrapper: root's, 0755, each written
-/// whole beside and renamed in.
+/// The namespace script, the shared hook stand-in
+/// ([`agent_ns::write_hook_shim`]), then the wrapper: root's, 0755, each
+/// written whole beside and renamed in.
 fn write_entry_points(root: &Path, skills: bool) -> Result<(), String> {
-    let ns = ns_text(skills);
-    for (path, text) in [(NS, ns.as_str()), (WRAPPER, WRAPPER_TEXT)] {
-        write_root_file(root, path, text, 0o755)?;
-    }
-    Ok(())
+    write_root_file(root, NS, &ns_text(skills), 0o755)?;
+    agent_ns::write_hook_shim(root)?;
+    write_root_file(root, WRAPPER, &wrapper_text(), 0o755)
 }
 
 /// An OpenClaw in [`PLACE`] that is not this build's moved out of the

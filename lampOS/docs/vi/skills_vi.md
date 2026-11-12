@@ -529,7 +529,19 @@ sau:
      đồng ý gắn với package đã cài), nội dung chính xác các lần ghi của nó,
      giữ cạnh nó trong index (`made_skill::writes_of`), chờ trong bộ nhớ
      120 s với một `approve_id` được đưa cho mô hình, không bao giờ chính
-     việc đồng ý. Nếu lời tiếp theo của người dùng đồng ý, bằng bất kỳ lời
+     việc đồng ý. Lịch sử của route thứ hai không giữ câu trả lời của lời
+     gọi nào, nên mỗi dòng nghe được sau đó được báo id ấy trong một ghi
+     chú khi nó còn chờ (`skill_write_yes::waiting_note`, mọi lần chờ: của
+     một lần tạo bằng giọng nói, một lần đọc lại, một task và code của một
+     lần tạo từ app như nhau; hàng 4 của #6223 trên 9adf thấy lời đồng ý
+     "found nothing waiting" khi thiếu nó). Lời đồng ý của mọi lần chờ chỉ
+     là của chủ nhân, như lần gửi của một lần chạy kỹ năng: ngoài phòng
+     riêng, chủ nhân được thấy nói ra hoặc bằng giọng của chủ nhân ở mức
+     `same_voice::SERVICES_SAME_FROM` (`services::owners_yes_now`); của bất
+     kỳ ai khác là `services::OTHER_VOICE`, lần chờ bị bỏ và không có gì
+     được duyệt (`make_skill_local::not_owners_yes_refused`, P1 của Heron
+     trên #6558). Khi bật `LAMP_PRIVATE_ROOM` (sản phẩm), mọi dòng nghe
+     được là của chủ nhân, nên ở đó mọi lời đồng ý nghe được đều tính. Nếu lời tiếp theo của người dùng đồng ý, bằng bất kỳ lời
      nào (mô hình phán đoán, như #6009 để mô hình phán đoán lệnh gửi một
      thư đang chờ), mô hình gọi `make_skill` chỉ với id đó; khi đó chính
      giọng nói gọi `skill_write_approve` (`services::skill_write_approve`,
@@ -707,7 +719,7 @@ sau:
      thấy nói ra hoặc bằng giọng của chủ nhân ở mức
      `same_voice::SERVICES_SAME_FROM` (`services::owners_yes`); của bất kỳ
      ai khác là `services::OTHER_VOICE`, cơ chế chờ bị bỏ và kỹ năng vẫn
-     tắt (`make_skill_local::app_code_yes_refused`). Khi bật, mọi dòng
+     tắt (`make_skill_local::not_owners_yes_refused`). Khi bật, mọi dòng
      nghe được là của chủ nhân, như trước.
      Bằng giọng nói, lần tạo chờ lời đồng ý qua đúng cơ chế chờ của lần ghi
      (`crate::skill_write_yes`, `Asks::code`), với mọi chốt chặn của nó:
@@ -1138,6 +1150,106 @@ sau:
     giữ lâu như vậy: first builder trên #6174), một lần cắt không lời
     của câu sau không bao giờ được đáp "Um, excuse me, did anyone say
     something?" (`Shared::quiet_for_a_make`).
+11. **Một lời nhờ chỉ tạo một kỹ năng** (lamp-9adf, 15:13 ngày 12/11:
+    "make me a skill: when I come back to my desk, blink the light green
+    twice" bị cắt khi đang tạo, chữ của nó được mang sang câu sau, và mô
+    hình gọi `make_skill` lần nữa ở đó, nên `green-blink-on-return` và
+    `blink-green-twice` cùng được bật với một trigger và cùng các bước, cái
+    này lấn ánh sáng của cái kia). Một lời gọi `make_skill` bằng giọng nói
+    được so với các lời nhờ trước nó trong cùng thư mục
+    (`make_skill_local::OneAsk`): câu nghe được hoặc request của nó là cùng
+    một lời nhờ với một lời nhờ trước khi câu có ít nhất 5 từ (chữ thường,
+    chữ cái và chữ số) nằm trọn, đúng thứ tự, trong câu kia: cùng các từ,
+    hoặc câu được mang sang có tên đèn hoặc một mảnh trước đó ở đầu, hoặc
+    không có. Hai câu giống nhau dưới 5 từ không phải một lời nhờ, nên hai
+    lần tạo cùng kết thúc bằng một câu trả lời ngắn giống nhau cho câu hỏi
+    của đèn ("green", "yes", "do it") đều được tạo. Khi lần tạo trước còn đang chạy, lời gọi không tạo
+    gì và được báo là đang tạo (`"making": true`), câu của nó vẫn do lần
+    tạo trước nói. Khi lần tạo đó đã được giữ và bật (hoặc đang chờ lời
+    "có"), trong 3 phút (`make_skill_local::ONE_ASK_WITHIN`) và khi kỹ năng
+    vẫn còn được giữ, lời gọi không tạo gì và nhận lại câu trả lời trước,
+    đánh dấu `"already_made": true`: "You already have that skill: <tên>.
+    It's on." (`made_skill::already_have_line`), hoặc, với kỹ năng chờ lời
+    "có" của người dùng, câu đọc lại và `approve_id` của nó lần nữa, để lời
+    "có" mà lượt bị cắt chưa từng hỏi vẫn có thể được hỏi. Một lần tạo bị
+    từ chối hoặc không bật được thì không giữ gì, nên nhờ lại là thử lại.
+    MAKE IT của ứng dụng không bị giữ. Kiểm thử:
+    `a_cut_ask_carried_into_the_next_line_makes_one_skill`,
+    `only_the_same_ask_is_held_as_made`.
+12. **Một xung đột được nói ra, không bao giờ nạp cả hai trong im lặng**
+    (#6593, phán quyết của first builder: trên lamp-9adf sáu kỹ năng
+    `glow-*-on-return` cùng chạy trên một lần đến, cái này lấn ánh sáng của
+    cái kia, nên "glow green when I'm present" chỉ thỉnh thoảng hiện). Một
+    lần tạo bằng giọng nói, sau khi được giữ và trước khi bật, được so với
+    mọi kỹ năng trên đèn (`made_clash::found`): thư mục kỹ năng và thư mục
+    pushed bên cạnh, mỗi cái theo `skill.toml` của nó, rồi các kỹ năng đã
+    tạo, đang giữ và đang bật, theo `"clash"` giữ cùng mỗi cái trong
+    `made.json` (`made_clash::signature`). Xung đột là cùng một trigger
+    (topic của nó, và `field`, `when`, `equals`, `above`, `below`,
+    `present`, `changes`; không tính nhịp hay khung giờ, nên hai kỹ năng
+    trên một lần đến xung đột dù cooldown khác nhau) và cả hai dùng ánh
+    sáng, hoặc cả hai cử động đầu (một bước `[[do]]` có `light`, hoặc có
+    `body`). Trigger khác, hoặc cùng trigger mà không chung đầu ra, thì
+    không xung đột. Khi xung đột, không bật gì: mô hình được báo tên nói
+    của kỹ năng kia (`clashes_with`), thứ cả hai dùng (`shares`), một
+    `clash_id`, và được dặn nói nguyên văn "NEW would start at the same
+    moment as OTHER, which is on the lamp, and both use the light. Shall I
+    replace OTHER, keep both (they may take turns), or cancel?". "Giữ"
+    không hứa cái nào thắng (P2 của Heron trên #6614): vòng đèn hiện yêu
+    cầu mới nhất trong cùng mức ưu tiên (`ring_requests`), và lamp-skills
+    chạy các lượt của một sự kiện theo thứ tự tên thư mục, mỗi lượt một
+    luồng riêng, nên không có gì bảo đảm yêu cầu của cái mới đến sau cùng.
+    Lượt bị cắt trước đó thì nói "I made NAME, but didn't put it on: OTHER
+    starts at the same moment and uses the light. Ask me again to replace
+    it or to keep both." (`made_clash::cut_line`). Câu trả lời quay lại là
+    `make_skill` chỉ với `clash_id` và `choice` (`replace`, `keep` hoặc
+    `cancel`), nên `request` không còn bắt buộc (`made_clash::chosen`);
+    một lần tạo không có `request`, hoặc một `choice` không có
+    `clash_id`, không tạo gì và được báo "nothing was made: a new skill
+    needs request, what it should do and when"
+    (`make_skill_local::NO_REQUEST`). Lịch sử của đường thứ hai giữ
+    lời của các lượt trước, không giữ các lần gọi, nên `clash_id` báo
+    trong chính câu trả lời của lần tạo đã mất ở câu kế tiếp của người
+    dùng (P1 của Reviewer-lead trên #6614): mỗi câu nghe được sau đó trên
+    đường này, khi xung đột còn chờ và trong 5 phút, được kèm một ghi chú
+    có `clash_id` và nguyên văn câu hỏi, dặn gọi `make_skill` chỉ với
+    `clash_id` đó và `choice` (`made_clash::waiting_note`, cạnh
+    `skill_write_yes::waiting_note`); không có ở chính câu tạo, khi không
+    có gì chờ, quá 5 phút hoặc khi đã được trả lời. Lựa chọn chỉ được nhận
+    trong một câu nghe được sau câu tạo, trong 5 phút (`made_clash::CLASH_WITHIN`), và
+    chỉ của chủ đèn, kiểm như một lời "có" (`services::owners_yes_now`:
+    với `LAMP_PRIVATE_ROOM` bật, bất kỳ câu nghe được nào). "Thay" gỡ một
+    kỹ năng, nên lựa chọn được canh như lời "có" của kỹ năng đã tạo (P2
+    của Heron trên #6614): khi một xung đột đang chờ
+    (`made_clash::awaited`) thì bật giữ tiếng vọng, nên một câu chỉ gồm lời
+    của chính đèn trong đuôi tiếng vọng bị giữ lại, kể cả trong phòng riêng,
+    và không lựa chọn nào trong đó được nhận (`made_clash::echo_held`);
+    "thay" hay "giữ" chỉ đến trên đường có bộ xét tiếng vọng
+    (`services::sends_here`), và chỉ sau khi một câu trả lời của đèn, như
+    đã phát và không bị cắt (`made_clash::lamp_said`,
+    `made_clash::lamp_cut`), chứa trọn câu hỏi; trước đó mô hình được dặn
+    hỏi lại trọn câu và xung đột tiếp tục chờ. **Thay** bật cái mới trước
+    theo SHA-256 (`made_skill::put_on_within`), rồi nhờ manage helper bằng
+    chính `{"remove": NAME}` của nó, như nút gỡ của ứng dụng, và bỏ kỹ
+    năng đã tạo khỏi `made.json`. Nếu bật thất bại thì không gỡ gì ("OTHER
+    stays as it was"); nếu gỡ thất bại (kỹ năng lõi bị từ chối ở đó) thì
+    cả hai đều bật và đèn nói "NEW is on, but OTHER wasn't removed: … Both
+    are on." **Giữ** bật cái mới bên cạnh và nói "Both are on." **Hủy**
+    không bật gì, và kỹ năng đã tạo bị bỏ khỏi `made.json` cùng gói của nó
+    (`made_skill::forget_unput`), cũng như một kỹ năng mà xung đột không
+    nhận được lựa chọn trong 5 phút (bỏ ở câu nghe được kế tiếp) hoặc bị
+    một xung đột mới hơn thay chỗ. Một lần tạo có mã riêng vẫn chờ lời
+    "có" như trước và không bị so xung đột; MAKE IT của ứng dụng cũng vậy.
+    Kiểm thử: `a_clash_is_found_and_nothing_is_put_on`,
+    `no_clash_on_another_trigger_or_no_shared_output`,
+    `replace_keep_and_cancel_each_do_what_they_say`,
+    `an_echoed_unsaid_or_live_replace_is_refused`,
+    `replace_never_leaves_both_off`,
+    `cancel_and_expiry_forget_the_made_one`,
+    `a_make_with_no_request_is_refused_plainly`,
+    `the_waiting_note_shows_only_while_a_clash_waits`,
+    `keep_both_on_the_next_line_goes_on_with_the_clash_id`,
+    `no_clash_note_when_nothing_waits`.
 
 Một câu "đã tạo" mà không có lần tạo nào đứng sau thì không bao giờ được nói
 (`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): câu trả lời mở đầu
@@ -1188,6 +1300,25 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 `a_wordless_cut_while_another_call_runs_still_asks`),
 `app_make::tests::a_voice_make_line_is_asked_on_the_say_socket`, và
 `crates/skills/tests/it/made.rs` với `lamp-skills` thật.
+
+### Dịch vụ đã liên kết thành task cho agent của đèn (`LAMP_AGENT_SERVICES=on`, tắt)
+
+Yêu cầu của chủ, 12/11. Với `LAMP_AGENT_SERVICES=on` trong `lamp-voice`
+(đặt giống nhau trong lamp-tasks và lamp-skills-manage@,
+[services_vi.md](services_vi.md); đúng `on`; `made_skill::AGENT_SERVICES_ENVIRONMENT`) và
+`LAMP_MADE_SCRIPTS=on` bên cạnh (bước `task` của skill tự làm chịu giới hạn
+đó), một skill làm bằng giọng nói mà đọc hoặc ghi một dịch vụ đã liên kết
+(Gmail, Calendar, GitHub, ...) được làm thành một `do.task` cho agent của
+đèn (Hermes, với MCP connectors `lamp-services`: `services_connected`,
+`service_read`, `service_write`; thư gửi đi quay về giọng nói để chủ nói
+đồng ý), không còn là bước `do.read` hay `do.write`: `[permissions]` chỉ
+có topic của trigger, không `services`; `grants` đúng các dịch vụ nó dùng,
+`<code>-read` để đọc và `<code>-write` để gửi (phán quyết trên #6432; chỉ
+gửi thì chỉ `-write`), chỉ được giữ khi bật công tắc; đúng một bước
+`[[do]]` `task = { task = "...", run = "scripts/main.py" }` và một
+`scripts/main.py` chỉ in một dòng. Tắt (hoặc `LAMP_MADE_SCRIPTS` tắt),
+prompt và brief giữ nguyên như trước. Các skill đã làm với
+`do.read`/`do.write` vẫn tải và chạy như hôm nay, không được chuyển đổi.
 
 ### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, tắt, đề xuất trên #6059)
 
@@ -1346,14 +1477,97 @@ thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguy
    `room/…`, `…/heard`): chúng luôn được nêu đúng tên, và phần không nêu đúng
    được thì bị từ chối như trước. Điều đèn chưa làm được và một lần đọc vẫn
    bị từ chối hay được nói trọn.
+5. **Kỹ năng im lặng và lặp lại theo yêu cầu** (`made_skill::say_paced_with`,
+   phán quyết của người xây dựng đầu tiên về các lần tạo trên lamp-9adf
+   ngày 12/11, 15:13-15:16). Kỹ năng không nói và không ngân (chỉ đèn, cử
+   động và nhìn) có cooldown ít nhất một phút (`LEAST_LOOSE_COOLDOWN_SECS`),
+   không bao giờ một giờ: `"1h"` trên "when I come back to my desk, blink
+   the light green twice" đến từ mô hình, vốn chép ví dụ trong system prompt
+   (`for = "5s"`, `cooldown = "1h"`, `rearm = "ends"`), không phải từ
+   `paced`. `paced` đặt `"1m"` khi thiếu hay ngắn hơn, và không bao giờ hạ
+   cooldown dài hơn mà mô hình đã viết ("the first time I come in each
+   morning, glow green" giữ `"12h"`). Không khí ngột ngạt giữ một giờ, giờ
+   trong ngày, vốn chạy một lần đúng phút đó, không đổi, và chạm vào đèn
+   (mọi topic `controls/…`, cả xoa đầu) cũng vậy, vì mỗi lần chạm có chủ ý
+   đều được đáp lại. Trạng thái kéo dài không có `rearm` và không có lặp
+   lại được yêu cầu ("glow green when I'm at my desk", `room/presence`
+   someone true) được thêm `rearm = "ends"`, để chạy một lần mỗi lần trạng
+   thái đúng, không bao giờ theo từng tin nhắn hiện diện hay mỗi phút người
+   còn ngồi (phán quyết của người xây dựng đầu tiên cho "when I'm present");
+   không bao giờ với giờ trong ngày, khuôn mặt, đứng dậy hay không khí. Lặp
+   lại mà lời yêu cầu tự nói (`made_skill::repeat_asked`: "every five
+   minutes", "every 2 hours", "every minute", "every half hour", "mỗi 10
+   phút", "once an hour while I'm at my desk") chạy trong lúc trigger còn
+   đúng: bỏ `rearm` và `cooldown` là khoảng được yêu cầu, ít nhất một phút
+   (không khí: một giờ); không bao giờ với giờ trong ngày hay khuôn mặt xuất
+   hiện, vốn chạy một lần mỗi lần. Đơn vị chỉ được đọc sau một số hay chữ
+   số, hoặc đứng một mình ở cuối cụm hay trước "while" hoặc "when": "every
+   second time", "every other time", "every second" đứng một mình, "every
+   few minutes" và "once an hour" không có "while" hay "when" (một giới
+   hạn) không phải lặp lại. `rearm = "ends"` được giữ trên kỹ
+   năng "when I come back", `[rest] after_ignored = 2` được giữ trên mọi kỹ
+   năng tự tạo, cả khi lặp lại, và `[quiet]` được giữ cho kỹ năng có nói.
+   Lời thuật lại nói cooldown như trước ("at most once every 5 minutes").
+
+6. **Kỹ năng tạo trước công tắc bỏ các giới hạn cũ của đèn khi nạp**
+   (`lamp_skills::shed_made_manners`, vòng kiểm trên 9adf của chủ sở hữu,
+   12/11 15:06: một kỹ năng tự tạo "tắt đèn khi tôi rời bàn" chạy, và một
+   phút sau bốn kỹ năng tự tạo khác bị từ chối, "its wellbeing group ran
+   lately"). Kỹ năng tạo trước công tắc mang các giới hạn đèn khi đó viết
+   cho mọi lần tạo; `lamp-skills` (chương trình đang chạy, mỗi lần nạp thư
+   mục kỹ năng) bỏ qua hai giới hạn khi nạp, không bao giờ ghi lên đĩa, nên
+   các tệp, SHA-256 của gói trong `.package.json` và lời đồng ý cho task
+   theo SHA-256 của thư mục (`task::folder_sha256`) giữ như lúc cài:
+   - `[budget] group = "wellbeing"` với `per_hour = 1`
+     (`made_skill::MANNERS_GROUP`, `MANNERS_PER_HOUR`), không có `gap`,
+     `give_back_unsaid` hay `[stop]`: không còn chung giờ và khoảng cách
+     với các lời nhắc;
+   - `most_a_day = 3` (`made_skill::MANNERS_MOST_A_DAY`).
+
+   Giá trị khác (`per_hour = 2`, `most_a_day = 5`, một `gap`) được giữ, là
+   yêu cầu của người dùng. `[rest]`, `[quiet]`, `cooldown` và `rearm` của
+   trigger giữ nguyên (quyết định của người xây dựng đầu tiên, 12/11 15:15).
+   Tạo tại đây nghĩa là (`lamp_skills::made_by_ask`): kỹ năng installable
+   trong thư mục kỹ năng, không phải được đẩy lên, front matter của
+   `SKILL.md` có `made: here` (dòng của chính đèn, nằm trong gói mà SHA-256
+   ràng buộc; dòng mô hình viết bị bỏ, và kỹ năng được chia sẻ bị gỡ dòng
+   này) và không có `added: file`, `written: app` hay `limits: asked`, và
+   `.package.json` không phải của Store. Kỹ năng core, Store, add-on, được
+   đẩy, thêm từ tệp hay đặt từ thư mục giữ mọi giới hạn. Mỗi kỹ năng một
+   dòng, một lần mỗi lần chạy: `lamp-skills: light-off: made here,
+   LAMP_MADE_SKILL_LOOSE=on: the lamp's old [budget] group "wellbeing"
+   per_hour = 1 and most_a_day = 3 ignored, its files as they are`.
+
+   Lần tạo mà yêu cầu có xin giới hạn (`made_skill::limits_asked`, "not
+   too often", "at most three times a day") được ghi, dù công tắc bật hay
+   tắt, với dòng `limits: asked` sau `made_by` trên thẻ
+   (`made_skill::LIMITS_ASKED`, P2 của Reviewer-lead trên #6600); dòng
+   `limits` do mô hình viết bị bỏ, như dòng `made`. Khi công tắc bật, giới
+   hạn của nó là giá trị mặc định của đèn nếu yêu cầu không nêu số, nên
+   `lamp-skills` giữ tất cả khi nạp: kỹ năng tạo với "not too often" vẫn
+   chạy tối đa một lần mỗi giờ và 3 lần mỗi ngày. Việc chia sẻ của
+   `lamp-cloud` giữ dòng này: trên đèn khác kỹ năng không có `made: here`
+   nên không bỏ gì. Giới hạn xin đúng bằng các giá trị đó của kỹ năng tạo
+   trước khi có dòng này cũng bị bỏ: tệp không phân biệt được với giá trị
+   của đèn. Tắt thì không bỏ gì. Test:
+   `tests::loosened_a_made_skill_sheds_the_lamps_old_limits_as_it_loads`
+   (lamp-skills) và
+   `made_skill::tests::loosened_a_make_with_limits_asked_is_marked_limits_asked`
+   (lamp-voice).
 
 Không đổi khi bật: lời đọc lại của một lần ghi và lời đồng ý nói ra cho
 SHA-256 nội dung của nó; việc gửi, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng
 một ngày (`lamp-services`, không đọc công tắc này); các từ chối vì riêng tư;
 quyền mã và lời đồng ý của #6071.
 
-Test: `made_skill::tests::loosened_*` (bốn thay đổi, bật và tắt, và
-`loosened_never_takes_a_triggers_key_or_a_camera_steps_key_alone`), và với
+Test: `made_skill::tests::loosened_*` (bốn thay đổi, bật và tắt,
+`loosened_never_takes_a_triggers_key_or_a_camera_steps_key_alone`, và ba
+lần tạo trên lamp-9adf: `loosened_a_silent_made_skill_keeps_the_cooldown_it_wrote`,
+`loosened_an_asked_repeat_runs_while_its_trigger_holds`,
+`loosened_a_moving_made_skill_keeps_its_minute_and_rest`, cùng
+`a_repeat_is_read_from_the_requests_words`,
+`loosened_a_held_state_with_no_rearm_runs_once_each_time_it_holds` và
+`loosened_a_silent_touch_skill_has_no_minute_floor`), và với
 `lamp-skills` thật `made::loosened_a_key_the_check_refuses_is_left_out_and_told`,
 `made::loosened_a_step_the_check_refuses_is_left_out_and_nothing_left_is_refused`
 và `made::loosened_a_trigger_the_check_refuses_is_never_loosened`.
@@ -1827,8 +2041,9 @@ Phần 2 của #6071 (theo các điều kiện của first builder ở đó): m�
 phản ứng ngay bằng các bước của chính nó và giao phần chậm hơn cho agent của
 đèn, một script trong thư mục `scripts/` của chính kỹ năng. Tắt trừ khi
 `LAMP_SKILL_TASKS=on`, trong `lamp-skills`, manage helper của nó,
-`lamp-voice` (truyền cho cả hai route) và `lamp-control` (bản thân nó cũng
-bật, `LAMP_CONTROL=on`), nơi giữ cái "có"; các unit sản phẩm đặt nó ở cả bốn
+`lamp-voice` (truyền cho cả hai route) và `lamp-control` (có cửa developer, hoặc
+không có khi bật công tắc này; control.md, "A skill's tasks without the door"),
+nơi giữ cái "có"; các unit sản phẩm đặt nó ở cả bốn
 nơi đó (12/11), và ở lamp-services, lamp-tasks và lamp-update, những nơi phục
 vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 [skills.md](../skills.md), "A skill's task".
@@ -1848,7 +2063,57 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   việc của #6307.
 - **Nói lại và cái "có":** hỏi "kỹ năng photo booth của tôi dùng gì?", đèn
   nói tác vụ, nguồn của script và từng grant bằng lời thường ("it uses the
-  camera"). Cái "có" được nhận như cái "có" cho việc ghi của kỹ năng tự tạo
+  camera"). Trên tuyến thứ hai, việc đọc lại (lệnh `make_skill` chỉ có
+  `read_back`) chạy **trong code từ lời nghe được**, không để model chọn
+  (V2 trên #6413: trên lamp-52e6 ở 12337, "what does desk check use?" bị
+  gọi `use_skill`, chạy luôn kỹ năng, còn "Hey Lamp, what does desk check
+  use?" không gọi gì). Câu nói có, trong cùng một vế (ngắt ở `,` `;` `.`
+  `?` `!`, "and" và "then"): "what" hoặc "which", nhiều nhất một từ
+  ("which files"), rồi "does", "do", "can" hoặc "will" (bắt buộc nếu có
+  từ đó), rồi "the", "my", "your", "this" hoặc "that" nếu có, rồi tên một
+  kỹ năng tự tạo đang bật hoặc một kỹ năng đẩy lên (khớp lỏng như dưới
+  đây), rồi "skill" nếu có, và ngay từ kế tiếp là một trong use, need,
+  access, reach, touch, send (cả dạng -s, "using"), hoặc "do" sau "does",
+  "can" hay "will" (`make_skill_local::read_back_asked`) thì kỹ năng đó
+  được đọc lại trước vòng 1, qua bộ chạy của lượt; vòng 1 được cho kết
+  quả và nói theo `next` (`read_back_note`). Vậy "what does desk check
+  use" và "what does the news skill need" được đọc lại, còn "what time
+  does the news start, do you know?", "what music does she like" và
+  "which mail do I need to answer" không đọc lại kỹ năng `news`, `music`
+  hay `mail` nào (HOLD của SubDarren và Reviewer-lead trên #6619). Lệnh
+  `use_skill` hay `make_skill` `read_back` cho cùng kỹ năng mà model gọi
+  trong lượt đó không chạy; nó nhận kết quả đọc lại (`same_skill_again`).
+  Câu vừa hỏi vừa chạy kỹ năng đó ("run", "start", "use" hoặc "turn on"
+  trước tên nó hoặc trước "it", "that", "this", "them": "what does desk
+  check use, and run it", "what does desk check need? ok run it") không
+  đọc lại gì, nên `use_skill` của model chạy nó như được nhờ. "Use desk
+  check", "run desk check" và "what time is it" cũng không đọc lại gì. Hai
+  tên khớp như nhau (`desk-check` và `deskcheck`) thì không đọc lại tên
+  nào và câu để cho model: không hỏi "cái nào?". Thư mục kỹ năng chỉ được
+  đọc cho câu có từ hỏi và từ hỏi-dùng. Test:
+  `the_heard_words_ask_what_a_skill_uses_by_its_name`,
+  `ordinary_questions_and_mixed_lines_ask_no_read_back`,
+  `second_provider::tests::read_back_words`. Tuyến Live không đổi: ở đó
+  model vẫn tự gọi `make_skill` với `read_back`. Tên mà helper không biết
+  thì được tìm trong các kỹ năng đẩy
+  lên từ máy tính (`skills-dev/<name>/` có `skill.toml`,
+  `skill_task_yes::pushed_named`): đúng tên trước, nếu không thì một kỹ
+  năng duy nhất có tên khớp khi số đọc bằng chữ thành chữ số và bỏ dấu
+  gạch ngang ("skill two" là `skill-2`, "deskcheck" là `desk-check`;
+  `made_skill::name_digits`); hai kỹ năng chỉ khớp kiểu đó thì không tìm
+  ra cái nào. Kỹ năng đó rồi được hỏi helper (lamp-52e6, 12/11,
+  row-6413b3). Không tìm thấy thì journal ghi tên được hỏi, viết như tên
+  kỹ năng và không gì khác ("no skill with a task by the name asked:
+  desk-check"; với kỹ năng tự tạo cũng vậy). Test:
+  `a_pushed_skill_with_a_task_is_found_by_its_spoken_name`,
+  `two_pushed_alike_find_neither_and_a_miss_journals_the_name_asked`.
+  Tác vụ dùng gì là điều chỉ chủ đèn được nghe, như việc gửi của kỹ năng
+  tự tạo: với câu không phải của chủ đèn (`owner_hears` false, như trên)
+  đèn chỉ nói "Photo booth hands a task to the lamp's agent; only its
+  owner can hear what it uses." và không bắt đầu chờ
+  (`skill_task_yes::unsaid`; P3 của SubDarren trên #6619). Test:
+  `unheard_or_live_or_no_task_starts_no_wait`.
+  Cái "có" được nhận như cái "có" cho việc ghi của kỹ năng tự tạo
   (`skill_write_yes`). Giọng nói đọc lại kỹ năng qua manage helper, và chỉ
   khi thư mục vẫn đúng SHA-256 và các grant đã nói lại thì mới nhờ
   lamp-control ghi nhận (`task_yes_record` trên socket chủ đèn
@@ -1876,7 +2141,14 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   kỹ năng, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng trong 24 giờ.
 - **Giao cho lamp-tasks** (#6306 xây): một dòng `{"op": "skill_task", ...}`
   trên `--tasks-socket` (hoặc `LAMP_SKILLS_TASKS_SOCKET`; unit lamp-skills
-  của sản phẩm truyền `/run/lampos-tasks/skill-task.sock`). Token một lần
+  của sản phẩm truyền `/run/lampos-tasks/skill-task.sock`). `folder` là thư
+  mục của chính kỹ năng: `/var/lib/lampOS/skills/<name>`, hoặc với kỹ năng
+  được đẩy lên, `/var/lib/lampOS/skills-dev/<name>` (`task::folder_of`);
+  lamp-tasks chỉ nhận đúng hai chỗ đó, lamp-control băm cùng thư mục đó khi
+  đúc token (của kỹ năng trên đèn nếu cả hai cùng tên: bất cứ thứ gì mang
+  tên đó trong `skills/`, kể cả tệp hay liên kết,
+  `task::lamp_has_skill_named`, chặn kỹ năng được đẩy lên ở cả ba dịch vụ), với cùng các kiểm
+  tra SHA-256 và grant. Token một lần
   (#6304, lamp-control đúc từ cái "có" nó giữ,
   `lamp_control::task_yes::yes_for_token`) và kết quả qua Task news là của
   #6304 và #6306.

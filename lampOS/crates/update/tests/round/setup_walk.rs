@@ -7,6 +7,10 @@ use lamp_update::walk;
 /// A 7071 walk two steps in, as its voice keeps it.
 const TWO_STEPS_IN: &str = r#"{"steps":{"where_you_sit":{"outcome":"done","at_unix_s":1761450000},"who_you_are":{"outcome":"done","at_unix_s":1761450010}},"privacy_invitation_tries":0,"privacy_discard_pending":false}"#;
 
+/// A walk not yet begun: its file there, no step kept.
+const NOT_BEGUN: &str =
+    r#"{"steps":{},"privacy_invitation_tries":0,"privacy_discard_pending":false}"#;
+
 fn put(lamp: &Lamp, path: &str, text: &str) {
     let path = lamp.root.join(path.trim_start_matches('/'));
     fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -212,4 +216,106 @@ fn the_walks_end_is_its_done_line_once_it_is_not_under_way() {
     );
     put(&lamp, walk::PROGRESS, "not json");
     assert_eq!(walk::ended_at_unix_ms(&lamp.config), None);
+}
+
+/// #6284: while the first update after setup is owed, with
+/// `LAMP_FIRST_UPDATE=on`, and the walk has not begun (no step kept), the
+/// walk holds no round; switch off, the file past its 20 minutes, or a walk
+/// begun, even at the switch's wait (V2's P2 on #6299), it holds as before.
+#[test]
+fn the_first_update_owed_is_not_held_by_the_walk() {
+    let first = |at_unix_ms: u64| format!(r#"{{"at_unix_ms":{at_unix_ms}}}"#);
+    let now = lamp_update::records::unix_ms();
+
+    let mut off = Lamp::new();
+    build_two(&mut off);
+    set_up(&off);
+    put(&off, walk::PROGRESS, TWO_STEPS_IN);
+    put(&off, lamp_msgs::FIRST_UPDATE_FILE, &first(now));
+    assert_eq!(off.round(), held(1));
+
+    let mut on = Lamp::new();
+    build_two(&mut on);
+    set_up(&on);
+    on.config.first_update = true;
+    put(&on, walk::PROGRESS, NOT_BEGUN);
+    put(&on, lamp_msgs::FIRST_UPDATE_FILE, &first(now));
+    assert_eq!(on.round(), Outcome::Switched(2));
+    assert!(!on.exists("/var/lib/lampos-update/walk-held"));
+    // The round leaves the file to `serve` (crate::first_update).
+    assert!(on.exists(lamp_msgs::FIRST_UPDATE_FILE));
+
+    // A walk begun at the switch's wait: held, the lamp never switched
+    // mid-walk.
+    let mut waited = Lamp::new();
+    build_two(&mut waited);
+    set_up(&waited);
+    waited.config.first_update = true;
+    put(&waited, lamp_msgs::FIRST_UPDATE_FILE, &first(now));
+    let progress = waited.root.join(walk::PROGRESS.trim_start_matches('/'));
+    waited.channel.on_fetch = Some((progress, TWO_STEPS_IN.to_owned()));
+    assert_eq!(waited.round(), held(1));
+
+    // Past its 10 minutes: held as before.
+    let mut stale = Lamp::new();
+    build_two(&mut stale);
+    set_up(&stale);
+    stale.config.first_update = true;
+    put(&stale, walk::PROGRESS, TWO_STEPS_IN);
+    put(
+        &stale,
+        lamp_msgs::FIRST_UPDATE_FILE,
+        &first(now - lamp_msgs::FIRST_UPDATE_WITHIN_MS),
+    );
+    assert_eq!(stale.round(), held(1));
+}
+
+/// The first update after setup is forced (#6284, the product's call on
+/// 12 Nov): it switches with someone heard all the time, where any other
+/// round never finds its quiet moment.
+#[test]
+fn the_first_update_owed_switches_without_a_quiet_moment() {
+    let first = |at_unix_ms: u64| format!(r#"{{"at_unix_ms":{at_unix_ms}}}"#);
+    let now = lamp_update::records::unix_ms();
+    let lamp = |on: bool| {
+        let mut lamp = Lamp::new();
+        build_two(&mut lamp);
+        set_up(&lamp);
+        lamp.config.first_update = on;
+        lamp.config.quiet_wait = std::time::Duration::from_secs(120);
+        lamp.talking = Some(Box::new(|_| true));
+        put(&lamp, lamp_msgs::FIRST_UPDATE_FILE, &first(now));
+        lamp
+    };
+    let mut off = lamp(false);
+    let outcome = off.round();
+    assert!(matches!(outcome, Outcome::NotQuiet(_)), "{outcome:?}");
+    let mut on = lamp(true);
+    assert_eq!(on.round(), Outcome::Switched(2), "{:?}", on.said);
+}
+
+/// V2's P2 on #6299: a first update still owed once the walk has begun (a
+/// first round that ended, then the walk, then a second owed round) is
+/// neither forced nor let past the walk: it is held as any round is, and
+/// once let go it waits for its quiet moment.
+#[test]
+fn a_first_update_owed_after_the_walk_began_keeps_every_rule_of_a_round() {
+    let first = format!(r#"{{"at_unix_ms":{}}}"#, lamp_update::records::unix_ms());
+    let mut lamp = Lamp::new();
+    build_two(&mut lamp);
+    set_up(&lamp);
+    lamp.config.first_update = true;
+    lamp.config.quiet_wait = std::time::Duration::from_secs(120);
+    lamp.talking = Some(Box::new(|_| true));
+    put(&lamp, lamp_msgs::FIRST_UPDATE_FILE, &first);
+    put(&lamp, walk::PROGRESS, TWO_STEPS_IN);
+    assert!(lamp_update::first_update::owed(
+        &lamp.config,
+        lamp_update::records::unix_ms()
+    ));
+    assert!(walk::begun(&lamp.config));
+    assert_eq!(lamp.round(), held(1), "{:?}", lamp.said);
+    put(&lamp, walk::PROGRESS, &walked());
+    let outcome = lamp.round();
+    assert!(matches!(outcome, Outcome::NotQuiet(_)), "{outcome:?}");
 }

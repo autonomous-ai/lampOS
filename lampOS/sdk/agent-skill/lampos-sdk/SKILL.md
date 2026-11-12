@@ -71,6 +71,7 @@ owner for the grants your program needs, by what it does:
 | reads the room's air, the lamp's own computer | `air`, `device` |
 | sees pictures | `camera` |
 | hears the room's sound (20 ms blocks of samples) | `microphone` |
+| plays sound of its own through the speaker | `speaker` |
 
 **A grant added later needs a new pairing code:** the owner can't widen a pairing. Then, on the computer:
 
@@ -114,7 +115,8 @@ elsewhere:
   `light`, `speak`, `look` (presence, hands, face/hand targets), `hear`
   (phrases, the name), `sound` (sound classes), `skills` (push skills),
   `air` (the air sensor), `device` (the lamp's own computer), `camera`
-  (pictures), `microphone` (the room's sound).
+  (pictures), `microphone` (the room's sound), `speaker` (sound of
+  its own, through the lamp's speaker).
   A call without its grant is refused `no_grant`. Grants are read at hello.
 - **Leases:** moving the body (`look`, `move`, `play`, `joints`) needs a
   `body` lease. Hold one with `async with lamp.lease("body"):` (JS
@@ -195,7 +197,15 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
   `microphoneStream(false)`, `stop`, or `microphone.ended`; off unless the
   owner switched it on, never while private or with someone else in view,
   never off the lamp's own network:
-  [references/api.md](references/api.md#the-microphone). `body.state` and
+  [references/api.md](references/api.md#the-microphone).
+- **The speaker** (the `speaker` grant, never ticked for you): Python
+  `async with lamp.speaker_stream() as out: await out.speaker_write(pcm)`
+  (plain call `speaker_stream_request`), JS `lamp.speakerStream()` with
+  `speakerWrite`, the command `lamp speaker FILE.wav` and the MCP tool
+  `lamp_play_audio` play sound of your own through the lamp's speaker
+  (mono S16LE, 16000 or 24000 Hz); off unless the owner switched it on,
+  never while private or muted, never off the lamp's own network:
+  [references/api.md](references/api.md#the-speaker). `body.state` and
   routed `joints` come next; this skill gains them as they land.
 
 ## Patterns

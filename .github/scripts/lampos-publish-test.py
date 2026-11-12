@@ -8,6 +8,7 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -15,6 +16,7 @@ SPEC = importlib.util.spec_from_file_location("publisher", Path(__file__).with_n
 P = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(P)
 SHA = "a" * 40
+TREE = "f" * 40
 RETAINED = {"lamp-update", "lamp-voice", "lamp-body-measure", "lamp-body-mood"}
 EXCLUDED = {"lamp-station", "schedule_check", "replay_cost"}
 
@@ -51,6 +53,7 @@ class FakeCommands:
     """A stateful GitHub release API, with failures before and after mutations."""
     def __init__(self, sequence=9):
         self.calls = []
+        self.lock = threading.Lock()
         self.release_map = {}
         self.refs = set()
         self.next_id = 1
@@ -110,10 +113,15 @@ class FakeCommands:
             raise P.ServerError("gh api failed (exit 1): HTTP 504: We couldn't respond to your request in time")
 
     def run(self, words, output=None):
+        # The publisher checks assets from several threads (#6556): one call at a time.
+        with self.lock:
+            return self.answer(words, output)
+
+    def answer(self, words, output=None):
         words = [str(word) for word in words]
         self.calls.append(words)
         if words[0] == "git":
-            return (SHA + "\n").encode()
+            return ((TREE if words[-1].endswith("^{tree}") else SHA) + "\n").encode()
         if Path(words[0]).name == "lamp-update":
             return self.updater(words)
         if words[:2] == ["gh", "release"]:
@@ -494,8 +502,9 @@ class PublicationTests(unittest.TestCase):
         self.fake = FakeCommands()
 
     def checksums(self):
-        sums = "".join(f"{P.digest(path)}  {path.name}\n" for path in sorted(self.artifact.iterdir()) if path.name != "SHA256SUMS")
+        sums = "".join(f"{P.digest(path)}  {path.name}\n" for path in sorted(self.artifact.iterdir()) if path.name not in ("SHA256SUMS", "TREE"))
         (self.artifact / "SHA256SUMS").write_text(sums)
+        (self.artifact / "TREE").write_text(TREE + "\n")
 
     def publish(self):
         publisher = P.Publisher(self.artifact, self.root, self.env, self.fake)
@@ -639,6 +648,17 @@ class PublicationTests(unittest.TestCase):
         (self.artifact / "lamp-update").write_bytes(b"changed")
         self.refused_unchanged("checksum mismatch")
         self.assertEqual(self.fake.updater_calls, [])
+
+    def test_artifact_from_another_tree_never_executes_artifact(self):
+        # The recorded HEAD^{tree} (#6556): a train's build publishes only for this commit's tree.
+        for tree, reason in (("e" * 40 + "\n", "another tree"), ("not-a-tree\n", "malformed TREE"), (None, "lacks TREE")):
+            with self.subTest(reason=reason):
+                path = self.artifact / "TREE"
+                path.unlink(missing_ok=True)
+                if tree is not None:
+                    path.write_text(tree)
+                self.refused_unchanged(reason)
+                self.assertEqual(self.fake.updater_calls, [])
 
     def test_unlisted_file_never_executes_artifact(self):
         (self.artifact / "extra").write_text("extra")

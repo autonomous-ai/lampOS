@@ -84,7 +84,7 @@
 //! package manager installs the dependencies from the checkout's
 //! hash-locked `uv.lock`.
 use crate::{
-    harness_install,
+    agent_ns, harness_install,
     install::{self, Runner, USER},
     records::write_whole,
     world::Systemd,
@@ -193,6 +193,11 @@ pub const TOKEN_ENV: &str = "LAMP_HERMES_TOKEN";
 pub const WORK: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks";
 /// The lamp's skills, which Hermes reads in place: shown read-only.
 pub const SKILLS: &str = "/var/lib/lampOS/skills";
+/// The skills the owner's own computer pushed (`lamp_skills::PUSHED_DIR`):
+/// with [`TASKS_SWITCH`] on, shown read-only to a skill's run alone
+/// ([`NET_ENV`] `run`), when it is there, so a pushed skill's task finds
+/// its script (`lamp_tasks::skill_task::PUSHED`).
+pub const PUSHED: &str = "/var/lib/lampOS/skills-dev";
 /// lamp-skills' tools folder (`tools.json` and `call.sock`), the voice's
 /// `LAMP_SKILLS_DIR`: with [`SKILLS_SWITCH`] on, the one folder under
 /// `/run` [`ns_text`] shows Hermes, read-only (a unix socket still
@@ -322,8 +327,9 @@ const WRAPPER_TASKS_EDITS: [(&str, &str); 2] = [
 ];
 
 /// [`WRAPPER`]'s text: [`WRAPPER_TEXT`], with [`WRAPPER_TASKS_EDITS`] when
-/// `tasks` ([`TASKS_SWITCH`]). Written by root beside [`ns_text`]'s, with
-/// the same switch.
+/// `tasks` ([`TASKS_SWITCH`]), and the shared namespace piece's journal
+/// line ([`agent_ns::with_hook_note`], #6530). Written by root beside
+/// [`ns_text`]'s, with the same switch.
 pub fn wrapper_text(tasks: bool) -> String {
     let mut text = WRAPPER_TEXT.to_owned();
     if tasks {
@@ -331,7 +337,7 @@ pub fn wrapper_text(tasks: bool) -> String {
             text = text.replacen(from, to, 1);
         }
     }
-    text
+    agent_ns::with_hook_note(&text, "hermes")
 }
 
 /// [`NS`]: only inside a user namespace (refused in the lamp's own, where
@@ -448,7 +454,10 @@ const SKILLS_EDITS: [(&str, &str); 6] = [
 /// nested user namespace (so it holds no capability over these mounts),
 /// waiting for its `ready` line (none, the run ends). The PID namespace
 /// ends the relay with Hermes. No other address is reachable: the
-/// namespace has only `lo`.
+/// namespace has only `lo`. And it shows [`PUSHED`] read-only, staged and
+/// moved back as the skills are (skipped when the folder is not there),
+/// so a pushed skill's script is there for its run; Hermes started any
+/// other way (Harness's panes) never sees it.
 const TASKS_EDITS: [(&str, &str); 6] = [
     (
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n",
@@ -456,25 +465,31 @@ const TASKS_EDITS: [(&str, &str); 6] = [
          # LAMP_SKILL_TASKS=on (#6306): it also shows lamp-control's socket /run/lampos-control/control.sock alone, read-only,\n\
          # so a skill's run reaches the lamp with its one-run token; nothing else of lamp-control's folder is shown.\n\
          # With LAMP_NS_NET=run (a skill's run, its own network namespace) it shows lamp-tasks' model.sock alone, read-only,\n\
-         # brings lo up and starts lamp-tasks net-relay on 127.0.0.1:7741 to it: the run's only other way out.\n",
+         # brings lo up and starts lamp-tasks net-relay on 127.0.0.1:7741 to it: the run's only other way out.\n\
+         # It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n",
     ),
     (
         " S=/tmp/.lampos-ns\n",
-        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S=/tmp/.lampos-ns\n",
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n",
     ),
     (
         "if [ -n \"$R\" ]; then touch \"$S/r\" && mount --bind \"$R\" \"$S/r\" || fail \"no $R\"; fi\n",
         "if [ -n \"$R\" ]; then touch \"$S/r\" && mount --bind \"$R\" \"$S/r\" || fail \"no $R\"; fi\n\
          if [ -S \"$L\" ]; then touch \"$S/l\" && mount --bind \"$L\" \"$S/l\" || fail \"no $L\"; else L=; fi\n\
-         if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n",
+         if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n\
+         if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]; then mkdir -m 0700 \"$S/p\" && mount --bind \"$P\" \"$S/p\" || fail \"no $P\"; else P=; fi\n",
     ),
     (
         "&& mount --move \"$S/r\" \"$R\" && ro \"$R\" || fail \"$R not shown\"; fi\n",
         "&& mount --move \"$S/r\" \"$R\" && ro \"$R\" || fail \"$R not shown\"; fi\n\
          if [ -n \"$L\" ]; then mkdir -p \"${L%/*}\" && touch \"$L\" && mount --move \"$S/l\" \"$L\" && ro \"$L\" || fail \"$L not shown\"; fi\n\
-         if [ \"${LAMP_NS_NET-}\" = run ]; then mkdir -p \"${B%/*}\" && touch \"$B\" && mount --move \"$S/b\" \"$B\" && ro \"$B\" || fail \"$B not shown\"; fi\n",
+         if [ \"${LAMP_NS_NET-}\" = run ]; then mkdir -p \"${B%/*}\" && touch \"$B\" && mount --move \"$S/b\" \"$B\" && ro \"$B\" || fail \"$B not shown\"; fi\n\
+         if [ -n \"$P\" ]; then mkdir -p \"$P\" && mount --move \"$S/p\" \"$P\" && ro \"$P\" || fail \"$P not shown\"; fi\n",
     ),
-    ("rm -f \"$S/r\" &&", "rm -f \"$S/r\" \"$S/l\" \"$S/b\" &&"),
+    (
+        "rm -f \"$S/r\" &&",
+        "rm -f \"$S/r\" \"$S/l\" \"$S/b\" && { [ -z \"$P\" ] || rmdir \"$S/p\"; } &&",
+    ),
     (
         "unset LAMP_NS_UID LAMP_NS_GID\nexport HOME\n",
         "unset LAMP_NS_UID LAMP_NS_GID\nexport HOME\n\
@@ -496,6 +511,9 @@ const TASKS_EDITS: [(&str, &str); 6] = [
 /// which also shows [`CONTROL_SOCKET`] alone, each read-only; both off,
 /// [`NS_TEXT`]. The switches live only in this text, which root writes
 /// and `lampos` cannot change: the script reads nothing to decide them.
+/// Last, the shared namespace piece's `PATH` ([`agent_ns::with_ns_path`],
+/// #6530) goes before the line that runs Hermes, so Harness's hooks find
+/// [`agent_ns::HOOK_SHIM`] as `harness`.
 pub fn ns_text(skills: bool, tasks: bool) -> String {
     let mut text = NS_TEXT.to_owned();
     for (on, edits) in [(skills, &SKILLS_EDITS[..]), (tasks, &TASKS_EDITS[..])] {
@@ -505,7 +523,7 @@ pub fn ns_text(skills: bool, tasks: bool) -> String {
             }
         }
     }
-    text
+    agent_ns::with_ns_path(&text)
 }
 
 /// Hermes's config set after its install, each with `hermes config set`
@@ -756,6 +774,7 @@ pub fn present(root: &Path, shown: Shown) -> bool {
         && holds(root, NS, &ns_text(shown.skills, shown.tasks))
         // The build's own lampos SDK, one copy for every agent (#6507).
         && crate::sdk_tree::present(root)
+        && agent_ns::hook_shim_there(root)
 }
 
 /// When `serve` starts: off, an earlier record and ask are taken away; on
@@ -1182,7 +1201,9 @@ fn install_with(
 }
 
 /// The wrapper and the namespace script taken out, the wrapper first, so
-/// `lampos` finds no `hermes`. Hermes's folder and Hermes in it stay.
+/// `lampos` finds no `hermes`, then the shared hook stand-in unless
+/// another engine's namespace script still uses it. Hermes's folder and
+/// Hermes in it stay.
 fn remove_entry_points(root: &Path, say: &mut dyn FnMut(&str)) {
     for path in [WRAPPER, NS] {
         match fs::remove_file(on(root, path)) {
@@ -1191,7 +1212,14 @@ fn remove_entry_points(root: &Path, say: &mut dyn FnMut(&str)) {
             Err(error) => say(&format!("{path} not taken out: {error}")),
         }
     }
+    agent_ns::remove_hook_shim(root, &NS_SCRIPTS, say);
 }
+
+/// Every engine's namespace script: the shared hook stand-in
+/// ([`agent_ns::HOOK_SHIM`]) stays while any of them is there, the one
+/// every other engine's wrapper runs ([`agent_ns::wrapper::NS`], #6510)
+/// included.
+pub(crate) const NS_SCRIPTS: [&str; 3] = [NS, crate::openclaw_install::NS, agent_ns::wrapper::NS];
 
 /// The install, in order: the installer's bytes checked; `lampos` and its
 /// ids looked up; `git`, `curl`, `bash` and `unshare` looked for as
@@ -1553,7 +1581,8 @@ pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
     .collect()
 }
 
-/// The namespace script ([`ns_text`] for `shown`), then the wrapper: root's,
+/// The namespace script ([`ns_text`] for `shown`), the shared hook
+/// stand-in ([`agent_ns::write_hook_shim`]), then the wrapper: root's,
 /// 0755, each written whole beside and renamed in (never through a link),
 /// so `lampos` never finds a wrapper before what it runs.
 fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
@@ -1569,6 +1598,9 @@ fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
             return Err(format!("{}: no such folder", folder.display()));
         }
         write_whole(&place, text.as_bytes(), 0o755).map_err(|error| format!("{path}: {error}"))?;
+        if path == NS {
+            agent_ns::write_hook_shim(root)?;
+        }
     }
     Ok(())
 }

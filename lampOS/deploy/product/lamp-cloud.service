@@ -51,6 +51,9 @@ Environment=LAMP_NUDGES_PRESENT=on
 # The owner's approximate place from the app (#4333): owner.place and owner.place.clear, rounded to about a
 # kilometre and kept in the person's folder through `lamp-setup change`. The lead's yes on 3 Nov.
 Environment=LAMP_OWNER_PLACE=on
+# The owner's chosen voice and character words from the app (#5394): voice.set and character.set, kept through
+# `lamp-setup change`; the same line in lamp-voice.service. On in the product on 12 Nov for the lead (#6590).
+Environment=LAMP_CHOSEN_VOICE=on
 # A skill typed in the app (#2813, fourteen-P15): `can` names skills.make only while lamp-voice's maker
 # has a computer to hand it to (make_skill::watch, asked every 60 s).
 Environment=LAMP_APP_MAKE_SKILL=on
@@ -99,6 +102,10 @@ Environment=LAMP_TASKS_SIGN_IN_APP=on
 # The app told once that setup is done (#5812, onboarding.done; system.info's onboarding_done_supported),
 # its acked date kept in the state folder below: on, the lead's call (9 Nov).
 Environment=LAMP_APP_ONBOARDING_DONE=on
+# The app told when an update starts and when it ends (#6284, update.started, update.ended; system.info's
+# update_events_supported), what is owed kept in the state folder below until the broker's ack. On after a run on
+# lamp-e82d (11 Nov: update.started 1.9 s after setup, update.ended at the round's end, both acked).
+Environment=LAMP_APP_UPDATE_EVENTS=on
 # The app's faces.add_photo (#1968, cloud.md "A face from the app's photo"; on with the eyes' --photo-dir and the
 # voice's asking, #5750): a JPEG of at most 8 MiB from the lamp's own account written as a new 0600 file in the
 # photo folder, the eyes asked, and the file removed after, answered or not; nothing of a photo leaves the lamp.

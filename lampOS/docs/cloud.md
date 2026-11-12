@@ -124,18 +124,19 @@ lamp says so.
 |---|---|
 | `info` | the identity fields above |
 | `system.info`, `system.version`, `system.network` | V1's shapes: the versions (`firmware`, which the app's About reads, and `build`, both the installed build; `lamp-cloud`); the default route's interface, its address, MAC, Wi-Fi name (asked of `iw` within 0.5 s and kept a minute, so a hung `iw` never holds the keepalive; one that outlives its kill, asleep in the Wi-Fi driver, is never waited for: it is reaped at a later ask, and no other `iw` starts while it is there) and gateway; the host's name, device id, uptime, zone and the owner's language (`host.language`, #4473: `en`, `vi`, `ja`, `zh` or `ko` from `/etc/lampOS/setup/language`, always said, `en` with no file or one it doesn't know, so the app tells English from a lamp too old to say). None of it asks the voice: it is answered while `lamp-voice` restarts after a new language, and `mic.get` too, from what the bus kept (`available: false` while the voice is down) |
-| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` with `LAMP_APP_ENGINES=on` too (#6240), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
+| `system.info`'s `can` | the kinds in this table the lamp answers now (#2864): those with no switch always, each switched kind only while its switch is on (`chat.send`, `reports.*`, `skills.list`/`skills.remove`/`skills.off`/`skills.on`/`skills.camera` with the page (#4099), `skills.install`, `skills.make`/`skills.made`, `skills.write` (with `skills.made`), `skills.share`/`skills.shared`/`skills.unshare`, `skills.upload`, `wifi.set`/`wifi.confirm`, `keys.*`, the settings changes, `faces.add_photo`, `face.*`, `schedule.*`, `guard.*`, `update.status`/`update.check`, `engines.install` and `engines.default` with `LAMP_APP_ENGINES=on` too (#6240, #6492), `system.reboot`, `system.shutdown`, `consent.get`/`consent.set` with `LAMP_APP_CONSENT=on`, `services`/`services.list` while `lamp-services`' admin socket is there too, `harness.sign_in` and `harness.sign_in.*` with `LAMP_TASKS_SIGN_IN_APP=on`, #5198, `control.code`/`control.clients`/`control.revoke` with `--control-admin-socket` while lamp-control's admin socket is there), read without asking any part of the lamp. The same rule as the answers' own (`answer::on`), so the app shows only rows the lamp takes; an app that reads no `can` (or a lamp that sends none) keeps today's behaviour |
 | `system.info`'s `developer` | `{"camera": bool, "microphone": bool, "speaker": bool}` while lamp-control's admin socket is there (developer access on), else no field: whether a camera, microphone or speaker stream is usable on this lamp (wired, and for the microphone and the speaker the owner's `--microphone on` and `--speaker on`), asked of lamp-control (`{"features": true}`, "The developer door"). `true` means a stream is allowed, not that one starts now (the ears share their sound on demand). The app offers its grants screen only when the field is there and shows the `microphone` tick disabled while it is `false` (and, once it offers the `speaker` tick, that one while `speaker` is `false`); a lamp-control too old to say reads as all `false`, and one from before the speaker reads `speaker` as `false` (App Only's C, 11 Nov 2026) |
 | `system.info`'s `recovery` | `true` while `lamp-setup recover` runs with `LAMP_WIFI_RECOVERY=on` (#3020; its file `/run/lampos-setup-recover/on`): a lamp whose saved network is gone opens setup's hotspot after 90 s, so the app may name that step. No field otherwise, read as before. The app keeps the last one it heard, for a lamp it can't ask |
 | `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_done_supported` | `true` while `LAMP_APP_ONBOARDING_DONE=on` (with a state folder): this lamp will send `onboarding.done`, so the app may wait for it (Mobile's ask on #5824). No field otherwise: an older lamp, or the switch off, never sends it, so the app doesn't wait ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_step_supported` | `true` with the same switch: this lamp sends `onboarding.step` as each walk step ends (#5979). No field otherwise ("Each setup step, told to the app" below) |
+| `system.info`'s `update_events_supported` | `true` while `LAMP_APP_UPDATE_EVENTS=on` (with a state folder): this lamp sends `update.started` and `update.ended` (#6284). No field otherwise ("An update, told to the app" below) |
 | `system.info`'s `onboarding_page_supported` | `true` with the same switch: this lamp takes `onboarding.page` and sends `onboarding.page_done` (#6076). No field otherwise, so the app keeps its Next ("The app's onboarding pages, done on the lamp" below) |
 | `system.info`'s `onboarding_page_version` | `2` with the same switch (#6366): which `onboarding.page` contract the lamp speaks. 2 is per-tap Add (`added: [id]`, one tap a message, the page done with its first installed skill's line) and the `done` page (#6353). No field means 1, #6076's: picks sent once as Add is left, done at once. A version-2 lamp still ends Add on a 1-era leave: an `added` of no ids or several. The app sends per-tap adds and `done` only when it reads `>= 2` |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
 | `system.info`'s `reset` | whether the reset button's 5 s hold takes this lamp back into setup (#2937): `hold` when `/etc/lampOS/controls/controls-pins.json` names a `reset` line (a product lamp), `none` when not (a lamp moved from V1, whose pins never carry one: its way back is the hotspot, [setup.md](setup.md)). No field when the pins can't be read; the app reads a missing field as before, the hold. The app keeps the last one it heard, for a lamp it can't ask |
 | `volume.get`, `volume.set` (`{"volume": 0..100}`) | through `lamp-actions`' socket (`volume_level`, `volume_to`, `actions.md`), its only writer: `{"volume", "raw", "max_volume"}`, a set read back |
-| `harness.sign_in.start`, `harness.sign_in.state`, `harness.sign_in.answer` | Harness signed in from the app by its 8-digit code or its QR (#5198, `LAMP_TASKS_SIGN_IN_APP=on`, `crate::harness_sign_in`): handed to lamp-tasks' app route (`/run/lampos-tasks/app.sock`, `serve --app-socket`) as `app_sign_in_start` (`{"method":"code"}` or none, or `{"method":"qr"}`; another method fails `method_not_supported`, "This lamp signs in to Harness with a code or a QR only."), `app_sign_in_state` and `app_sign_in_answer` (`{"id","answer"}`). The view on the broker (`sign_in`, `id`, `revision`, `instance_id`, `by`, `method`, `answer_here`, `expires_in`, `expires_at`, `answer_within`, `answer`, `result`, `error`, `message`, `already_signed_in`, and `signed_in`: whether Harness is signed in, `yes`, `offline` or `no`, as lamp-tasks last read it from Harness itself, right after a restart too, absent before its first read, #5524) never holds the code, the QR's link or the email: those go to the backend over HTTPS only (Backend2's `<base>/devices/harness/sign-in`, the same base and lamp key as `/devices/get-message`: `PUT` `{id, code, expires_at}` for any sign-in's code, again when `expires_at` moves; `PUT` `{id, qr_url, expires_at}` for a QR sign-in's link (`sign_in:"qr"`), the same way; `PUT` `{id, email}` for an app-started question, which replaces the code there; `DELETE ?id=N` once it ends; one call at a time, each after the last answered, in the order seen; an extension's new `expires_at` put as soon as Harness gives it; a 5xx (503 `unavailable` too) tried again once, then said in the journal without the body, and the sign-in goes on; after each put lamp-cloud tells lamp-tasks `app_sign_in_relay {id, delivered}`, so a failed put (5xx after its retry, 401, 400 (also an extension the backend finds already past), 409 `sign_in_old_id` (also after the 11 minutes)) gives the view `error:"relay_failed"` and the message "The sign-in code couldn't reach the app. Try again." with a new revision, cleared with another by the next put that works). Without the backend's base or key the kinds stay off. The sign-in's `id` only grows, across lamp-tasks restarts too (`docs/tasks.md`). It is also pushed unasked as `harness.sign_in.state` whenever its `instance_id`, `revision` or `signed_in` moves (looked at every second while a sign-in is open, every 3 s otherwise, only while connected). A failure carries `error` and a plain `message`. No journal line or error holds the code or the email |
+| `harness.sign_in.start`, `harness.sign_in.state`, `harness.sign_in.answer` | Harness signed in from the app by its 8-digit code or its QR link (#5198, `LAMP_TASKS_SIGN_IN_APP=on`, the QR with no switch of its own, `crate::harness_sign_in`): handed to lamp-tasks' app route (`/run/lampos-tasks/app.sock`, `serve --app-socket`) as `app_sign_in_start` (`{"method":"code"}` or none, or `{"method":"qr"}`, whose view is `sign_in:"qr"` with `expires_in` and `expires_at` and no code; another method, or `qr` refused by a lamp-tasks from before it, fails `method_not_supported`, "This lamp can't sign in to Harness that way. Use the code."), `app_sign_in_state` and `app_sign_in_answer` (`{"id","answer"}`). The view on the broker (`sign_in`, `id`, `revision`, `instance_id`, `by`, `method`, `answer_here`, `expires_in`, `expires_at`, `answer_within`, `answer`, `result`, `error`, `message`, `already_signed_in`, and `signed_in`: whether Harness is signed in, `yes`, `offline` or `no`, as lamp-tasks last read it from Harness itself, right after a restart too, absent before its first read, #5524) never holds the code, the QR link or the email (`SECRET_FIELDS`): those go to the backend over HTTPS only (Backend2's `<base>/devices/harness/sign-in`, the same base and lamp key as `/devices/get-message`: `PUT` `{id, code, expires_at}` for any sign-in's code, again when `expires_at` moves; `PUT` `{id, qr_url, expires_at}` for a QR sign-in's link (Backend2, live 11 Nov), in the same hand-off and the same order, each time lamp-tasks gives the link (once per telling, again on a keepalive), only when it is the Harness sign-in page (`https://harness.autonomous.ai/signin#k=` and a key of 1 to 512 letters, digits, `-`, `_`, `.` or `~`, `qr_url_ok`), which the backend requires (any other is its 400): another link is never sent, is said in the journal without the link, and is told to lamp-tasks as a failed put (`relay_failed` below); `PUT` `{id, email}` for an app-started question, which replaces the code there; `DELETE ?id=N` once it ends; one call at a time, each after the last answered, in the order seen; an extension's new `expires_at` put as soon as Harness gives it; a 5xx (503 `unavailable` too) tried again once, then said in the journal without the body, and the sign-in goes on; after each put lamp-cloud tells lamp-tasks `app_sign_in_relay {id, delivered}`, so a failed put (5xx after its retry, 401, 400 (also an extension the backend finds already past), 409 `sign_in_old_id` (also after the 11 minutes)) gives the view `error:"relay_failed"` and the message "The sign-in code couldn't reach the app. Try again." with a new revision, cleared with another by the next put that works). Without the backend's base or key the kinds stay off. The sign-in's `id` only grows, across lamp-tasks restarts too (`docs/tasks.md`). It is also pushed unasked as `harness.sign_in.state` whenever its `instance_id`, `revision` or `signed_in` moves (looked at every second while a sign-in is open, every 3 s otherwise, only while connected). A failure carries `error` and a plain `message`. No journal line or error holds the code, the QR link or the email |
 | `mic.get` | `{"muted", "hw_switch_muted", "available"}`: the voice's own mute (`voice/mute`), the privacy switch (`voice/privacy`, `null` while unknown) and whether the voice is running. While muted, `muted_by` too (#4332), from `voice/mute`'s own `muted_by`: `sleep` (a hand held on the head), `button` (the person's hold of the button or the base), `restart_guard` (the restart guard's mute after a fault, which a tap on the head clears) or `unreadable` (a mute record the voice couldn't trust, from a newer build or a cut write, read as muted). So a setup screen can tell the guard's mute from one the person chose. No field while listening, nor from a voice that doesn't say it, though a sleep's `reason` still reads as `sleep`. A paired computer's mute (`voice/mute`'s `control`, lamp-control's `listen.set false`) is not passed on yet: alone, it reads `muted` with no `muted_by`. There is no `app` value: the app can't mute (`mic.set` is refused). While asleep and still listening for its name alone (`LAMP_SLEEP_HEARS_NAME`, migrate-P2), `hears_name: true` too, from `voice/mute`'s own and only with a sleep's mute, so the app can say "asleep, wakes to its name", never "muted"; absent otherwise (test: `app_contract`'s `mic.get`). |
 | `lamp.health` | `lamp/health`'s `level` and `message`, and `stale`; with `account` too while signed out ("Signed out" below) |
 | `led.resting.get` | the person's own light (`light/state`, `docs/ring-choreography.md`), in V1's snapshot: `mode` (`off`; `default` while it is the light the lamp starts with, warm at the lowest level; else `custom`), `color` (`[r, g, b]` for `custom`, else `null`), `default` and `effective` (`{"effect", "color"}`), and `light`, the light by its own names (`on`, `colour`, `level`) |
@@ -160,9 +161,10 @@ lamp says so.
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
-| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale", "round"?: {"started_at_unix_ms", "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}}`, from lamp-update's kept `update/status`; `round` only while a round runs (#5473, "The round under way" below); `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below); with `LAMP_APP_ENGINES=on` here and in lamp-update, also `"engines": {"hermes": {"state", "version"?, "reason"?, "at_unix_ms"?}, "openclaw": {…}, ENGINE: {…}…}`, every other engine the lamp's Harness has too ("The lamp's agents" below). Without the switch, V1's "not on this lamp" |
-| `update.check` (`{}`) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
+| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale", "round"?: {"started_at_unix_ms", "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}}`, from lamp-update's kept `update/status`; `round` only while a round runs (#5473, "The round under way" below); `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below); with `LAMP_APP_ENGINES=on` here and in lamp-update, also `"engines": {"hermes": {"state", "version"?, "reason"?, "at_unix_ms"?}, "openclaw": {…}, ENGINE: {…}…, "default"?: ENGINE, "default_chosen_in_app"?: BOOL}`, every other engine the lamp's Harness has too ("The lamp's agents" below; `default` from lamp-tasks, left out when it is not reached, "The lamp's default agent" below). Without the switch, V1's "not on this lamp" |
+| `update.check` (`{}`, or `{"retry": SEQUENCE}` for a refused build, #6266) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
 | `engines.install` (`{"engine": "hermes"}` or `"openclaw"`) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on` (#6240, "The lamp's agents" below): asks `lamp-update serve` to install a missing agent at its next round. `{"install": "started"}`, or `failure` with `no such agent on this lamp` (lamp-update says no such engine), `the agent is not missing or failed` (its `state` is not `not_installed` or `failed`), `asked less than a minute ago`, `not installable from the app on this build` (an agent this build has no installer for: any but Hermes and OpenClaw), or `lamp-update is not listening for a check`. Without the switches, V1's "not on this lamp" |
+| `engines.default` (`{"engine": "<engine>"}`, any engine Harness reports on the lamp) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on`, as `engines.install` (#6492, "The lamp's default agent" below): the owner's choice of the lamp's default agent, handed to lamp-tasks (`app_engine_default`). `{"default": "<engine>", "chosen_in_app": true}`, or `failure` with lamp-tasks' code and a `message` the app shows: `engine_unknown` (an empty or missing name, refused here before lamp-tasks is asked, or a name lamp-tasks does not know; "That isn't an agent this lamp knows."), `engine_not_installed` ("That engine isn't installed on the lamp."), `engine_default_unsaved` (lamp-tasks could not keep it), or `unreachable` and other codes ("The lamp could not be reached just now. Try again in a moment."). Without the switches, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `keys.set` (`{"service": "deepseek" \| "deepgram", "key", "base_url"?, "request_id"?}`), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works", "answer"}` (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "since": {"deepseek", "deepgram"}, "deepseek_host"}`, or `failure` with `error` and `data.code`: `refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
@@ -489,6 +491,29 @@ lamp-cloud keeps nothing; both go to the eyes as the voice's own asks do.
   a remove then answers "the lamp doesn't know that face", and memory isn't
   asked. Their memories stay until "forget everything" at the lamp, or an
   ask for memory alone, which isn't built.
+- **By hand on the lamp, with no app: `lamp-cloud face-remove NAME`**
+  (`face_remove.rs`, A8). The same remove the app's "Remove" makes with
+  `entirely: true` (`faces::remove`): the eyes' forget, then memory's
+  `forget_person` for each id the eyes' answer names, and no reminders (as
+  the product, without `LAMP_APP_SCHEDULE`). No switch, no broker and no
+  socket of its own: it only connects to the eyes' socket
+  (`/run/lampos-eyes/who.sock`, or `LAMP_EYES_WHO_SOCKET`) and memory's
+  (`/run/lampos-memory/memory.sock`, 0600 to memory's user, or
+  `LAMP_MEMORY_FORGET_SOCKET`'s narrow one). So it runs as root; `lampos`
+  only where memory's narrow socket is open and named. Any other user is
+  refused before a socket is touched. Memory's socket is checked first
+  (`access(2)`, write, as the real user): one this user can't open, or
+  that isn't there, is refused before the eyes are asked anything, naming
+  the socket and saying to run as root or name the narrow one, so the face
+  never goes while memory keeps the person (Reviewer-lead's P3 on #6580).
+  Stricter than the app's: a name the
+  eyes don't list (`{"list":true,"waiting":true}`, any case) is refused
+  with the names they know, and nothing is forgotten, so a mistyped name
+  never forgets a by-name id. It prints one line, `removed: ` and the app's
+  answer with `people`, the memory ids asked, or `refused: WHY`. The exit
+  is 0 only when the face and memory both went, 1 otherwise (memory `kept`
+  included), 2 for a wrong call. `LAMP_FACES_PAGE` and the units are left
+  as they are.
 - **The waiting names are by convention:** only lamp-cloud sends
   `{"list":true,"waiting":true}`, but the eyes don't check who asks. It's
   the same trust their socket already has (anything running as `lampos`).
@@ -502,7 +527,12 @@ when both were done; both asked over the sockets, and nobody answering
 said. `tests/it/app_contract.rs` pins what the page reads of both (`memory`,
 and `reason` with `kept`), in V1's envelope, and both refused without the
 switch. `online.rs`: only the lamp's own account channel commands it
-(`commanded`).
+(`commanded`). `face_remove.rs`: root and `lampos` only, the product's
+sockets unless given absolute, an unknown name refused with nothing asked to
+forget, a known one in any case removed from the eyes (in their spelling) and
+memory with each id said, a waiting face removed, memory's refusal a failure,
+memory out of reach refused before the eyes are asked, and eyes that don't
+answer refused.
 
 ## The lamp's timers and reminders (#2195, `schedule.list`, `schedule.cancel`)
 
@@ -627,6 +657,21 @@ before any switch (nobody heard or answered for 45 s, or the lamp asleep or
 muted), and `--apply` as set, so a tap never installs in the middle of a
 conversation. The reply is `update.status`'s object with
 `"check": "started"`; the app then follows the round on `update.status`.
+
+**A refused build and the owner's retry (#6266).** `update.status` says
+`refused` when the lamp has put back a build newer than the one it runs and
+will not take it again: `{"sequence", "reason", "at_unix_ms"}`, `reason` a
+fixed name and never the refusal's text (which names paths and parts):
+`cut_short` (switches cut short by power loss or a reboot, three in a row),
+`held` (a part held still by a passing local state, a kept unplug request,
+right after the switch), `part_unwell` (a part not well after it) or `other`
+(the switch's own steps). Absent when none is. The app offers a retry:
+`update.check` with `{"retry": SEQUENCE}`, a whole number, which drops that
+build's refusal before the round, so the round takes it again. A sequence that
+is not refused is a plain check, and a build that is really unwell is refused
+again by the round itself, so a retry never loops. A `retry` that is not a
+whole number is refused, `retry must be the refused build's sequence, a whole
+number`, and nothing is sent. The same minute and the same refusals apply.
 
 It is refused, in V1's failure shape with the reason the app shows:
 
@@ -762,6 +807,51 @@ taken up once the record leaves `absent` and `failed`. Tests: lamp-msgs'
 `the_app_installs_a_missing_agent_only_when_lamp_update_says_it_is_missing`,
 `update.rs`'s tests, and `app_contract.rs`'s
 `the_lamps_agents_are_answered_and_a_missing_one_installed`.
+
+### The lamp's default agent
+
+`engines.default` (`{"engine": "<engine>"}`, #6492) is the owner's
+choice, in the app, of the agent the lamp uses by default: any engine
+Harness reports on the lamp ("hermes", "openclaw", "claude", "codex", …;
+Harness has many agents, so lamp-cloud keeps no list of them). It is answered under `engines.install`'s switches
+(`LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on`) and, like every call on
+`fd_channel`, only from the owner's app. lamp-cloud checks only that a name is
+given: an empty or missing one is refused with `engine_unknown`, and
+lamp-tasks is not asked. Any other name, trimmed, goes to lamp-tasks' route for the app
+(`/run/lampos-tasks/app.sock`, the same socket and 2 s wait as Harness's
+sign-in) as one line, `{"op":"app_engine_default","engine":"hermes"}`.
+lamp-tasks decides whether that engine is on the lamp, and keeps the
+choice; its answer is the reply:
+`{"default": "hermes", "chosen_in_app": true}`. Its refusal's code is the
+call's `error` as it is (`engine_unknown`, `engine_not_installed`,
+`engine_default_unsaved`, or `unreachable` when lamp-tasks does not answer), with a short `message` the
+app shows ("That engine isn't installed on the lamp.").
+
+`update.status`'s `engines`, when it is there, also carries the default as
+lamp-tasks says it (`{"op":"app_engine_default_state"}`): `"default":
+"hermes"` and `"default_chosen_in_app": true` (false while the default is
+lamp-tasks' own and the app has not chosen one). When lamp-tasks cannot be
+reached within its wait, or says no default (`null`), both are left out,
+and the status answers as before; it never fails for the default. With no
+`engines` (either switch off, or lamp-update saying none), lamp-tasks is
+not asked.
+
+```json
+"engines": {
+  "hermes": {"state": "installed", "version": "0.22.2", "at_unix_ms": 1762850000000},
+  "default": "hermes",
+  "default_chosen_in_app": true
+}
+```
+
+Tests: `engine_default.rs`'s
+`the_default_is_handed_to_lamp_tasks_and_its_refusals_passed_on` and
+`the_default_joins_the_engines_only_when_lamp_tasks_says_one`,
+`answer.rs`'s `the_app_chooses_the_default_agent_through_lamp_tasks`, the
+`engines` row of the `can` test, and `app_contract.rs`'s
+`the_lamps_agents_are_answered_and_a_missing_one_installed` (an empty name
+refused in the reply the app reads, and the kind not here
+without the switch).
 
 ## A skill typed in the app (#2813, `skills.make`, `skills.made`)
 
@@ -2429,6 +2519,65 @@ As each step of the setup walk ends, the app is told, once. Behind
 
 Tests: `online::tests::each_walk_step_is_told_once_beside_the_walks_end`,
 `without_the_switch_no_walk_step_is_told`, `onboarding_step::tests`,
+`answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`, and
+`app_contract.rs`'s `system.info` row.
+
+## An update, told to the app (#6284, `update.started`, `update.ended`)
+
+So the app can show "Updating" while a lamp updates (the product's call on
+#6284: "MQTT when the update starts and when it ends"), lamp-cloud pushes two
+unasked events, as `onboarding.step` is pushed. Behind its own switch,
+`LAMP_APP_UPDATE_EVENTS=on` (exactly), with `LAMP_CLOUD=on` and a state
+folder; on in the product's unit, after a run on lamp-e82d on 11 Nov. Otherwise
+nothing changes. Not gated on the reports' yes: the update alerts
+("Software update alerts") are the backend's, these are the app's own
+screen (`crate::update_events`).
+
+- **What.** One unasked `data` reply on `fd_channel` each, V1's envelope:
+  `{"type":"data","kind":"update.started","status":"success","data":{"round":<unix ms>,"from":"812+4a39f04","to":"813+4a39f04","at":<unix ms>},"device":"lamp",...}`
+  and
+  `{"type":"data","kind":"update.ended","status":"success","data":{"round":<unix ms>,"outcome":"switched","build":"813+4a39f04","at":<unix ms>},"device":"lamp",...}`.
+  `round` is the round's own start (`update/status`'s
+  `round.started_at_unix_ms`), the same in both, the app's key. `from` is the
+  build running when the round was seen to fetch, `to` the build it installs
+  (`round.target`, `null` if not said), `build` the build running at its end
+  (`null` if lamp-update says none). Builds are typed as the update alerts
+  type them: digits, hex digits and `+`, the commit cut to 7, else the
+  sequence alone. `outcome` is the round's outcome by its name as
+  `update/status` says it, one of `switched`, `held`, `self-switched`,
+  `self-confirmed`, `self-put-back`, `refused`, `rolled-back`, `failed`,
+  `not-quiet`, `unreachable`, `would`, `up-to-date`, `nothing-published`,
+  else `other`. `at` is when the start was first seen, and the end's own
+  time. Nothing personal: `data` holds these four keys only.
+- **When.** `update/status` (fresh, not stale) is read at most once a second
+  on the tick, connected or not. `update.started` as soon as a round brings a
+  newer build (`UpdateStatus::brings_a_build`: its `target` newer than the running build, read a few
+  seconds into `checking`, or `fetching` on); a round that only checks
+  and finds the lamp current sends nothing. `update.ended` when that round's
+  end is said (`last` with its `started_at_unix_ms`, or, read back from
+  lamp-update's records after it restarted itself, an end after the round
+  began), only for a round whose `update.started` is owed or sent, and always
+  after it. A round whose end was never seen (lamp-update stopped
+  mid-round) ends as `other` once a later round is said, so the app is not
+  left "Updating".
+- **Offline, restarts.** Each is sent only while connected and kept until
+  the broker's ack, as `onboarding.done` is: one the connection took before
+  its ack is sent again on the next connection. What is owed and what was
+  acked is kept in `$STATE_DIRECTORY/update-events`
+  (`{"newest", "rounds": [{"round", "from", "to", "at", "started_acked",
+  "end", "ended_acked"}]}`, at most 4 rounds owed), so a restart (a round
+  that switches lamp-cloud restarts it mid-round) neither repeats one acked
+  nor loses the end. The journal says `update.started: handed to the
+  client, round <round>` and `update.started: acked by the broker, round
+  <round> kept`, the same for `update.ended`.
+- **Will it come.** `system.info`'s `update_events_supported: true`, with
+  the switch on. No field otherwise: the app doesn't wait.
+
+Tests: `online::tests::without_the_switch_no_update_event_is_told`,
+`an_up_to_date_round_tells_the_app_nothing`,
+`an_updates_start_is_told_once_and_its_end_after_a_restart`,
+`an_updates_end_lost_before_its_ack_is_told_again`, `update_events::tests`,
+`update_alerts::tests::an_outcomes_name_is_one_this_build_knows`,
 `answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`, and
 `app_contract.rs`'s `system.info` row.
 

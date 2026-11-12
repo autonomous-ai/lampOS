@@ -1089,6 +1089,10 @@ fn worker_command(
             role,
             var(crate::service_records::redo::ENVIRONMENT).as_deref(),
         ))
+        .envs(service_read_ids_worker_environment(
+            role,
+            var(crate::service_read_ids::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_early_words_worker_environment(
             role,
             var(crate::early_words::ENVIRONMENT).as_deref(),
@@ -1278,6 +1282,10 @@ fn worker_command(
             role,
             var(crate::made_skill::SCRIPTS_ENVIRONMENT).as_deref(),
         ))
+        .envs(agent_services_worker_environment(
+            role,
+            var(crate::made_skill::AGENT_SERVICES_ENVIRONMENT).as_deref(),
+        ))
         .envs(skill_loose_worker_environment(
             role,
             var(crate::made_skill::LOOSE_ENVIRONMENT).as_deref(),
@@ -1362,6 +1370,18 @@ fn skill_writes_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::made_skill::WRITES_ENVIRONMENT, "on"))
+}
+
+// The lamp's agent's connectors (`LAMP_AGENT_SERVICES`), passed the same
+// narrow way: the exact `on`, to the two routes whose `make_skill` makes a
+// service skill as a `do.task` and says its service grants back
+// (`made_skill::agent_services_here`).
+fn agent_services_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::made_skill::AGENT_SERVICES_ENVIRONMENT, "on"))
 }
 
 // A made skill's code (#6307), passed the same narrow way: the exact `on`,
@@ -1553,6 +1573,17 @@ fn service_redo_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::service_records::redo::ENVIRONMENT, "on"))
+}
+
+// A calendar read's event ids kept for the next request (tracker row
+// C132), passed the same narrow way: the exact `on`, to the second route
+// alone, the one that prepares writes.
+fn service_read_ids_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::service_read_ids::ENVIRONMENT, "on"))
 }
 
 // A remember of what is kept already (#2176), passed the same narrow way:
@@ -2539,6 +2570,10 @@ mod tests {
                 ["provider", "second"].as_slice(),
             ),
             (
+                crate::made_skill::AGENT_SERVICES_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
                 crate::made_skill::LOOSE_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
@@ -2809,6 +2844,12 @@ mod tests {
                     (
                         service_redo_worker_environment,
                         "LAMP_SERVICE_REDO",
+                        ["second"].as_slice(),
+                    ),
+                    // A read's event ids kept: the second route alone.
+                    (
+                        service_read_ids_worker_environment,
+                        "LAMP_SERVICE_READ_IDS_KEPT",
                         ["second"].as_slice(),
                     ),
                     // So does keeping a fact as heard (#2176).
@@ -3248,6 +3289,7 @@ mod tests {
                     crate::service_records::told::ENVIRONMENT,
                     crate::service_contacts::ENVIRONMENT,
                     crate::service_records::redo::ENVIRONMENT,
+                    crate::service_read_ids::ENVIRONMENT,
                     crate::remember::heard::ENVIRONMENT,
                     crate::keep_quietly::ENVIRONMENT,
                     crate::remember::REMEMBER_ONCE_ENVIRONMENT,
@@ -3633,6 +3675,7 @@ mod tests {
                     "LAMP_SECOND_WRITTEN_WAIT=on",
                     "LAMP_SERVICES_TOLD=on",
                     "LAMP_SERVICE_CONTACTS=on",
+                    "LAMP_SERVICE_READ_IDS_KEPT=on",
                     "LAMP_SERVICE_RECORDS=on",
                     "LAMP_SERVICE_RECORDS_TOLD=on",
                     "LAMP_SERVICE_REDO=on",
