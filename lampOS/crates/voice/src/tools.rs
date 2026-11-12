@@ -1681,6 +1681,11 @@ fn run_spoken_call_inner(
     } else if let Route::Executive(directory) = route
         && is_skills(settings, route)
     {
+        // An agent skill added from a file (`LAMP_UPLOAD_TO_AGENT`) whose
+        // task's yes isn't kept: its first run asks it, and nothing runs.
+        if let Some(told) = crate::upload_agent::first_run(&call.name, request, heard, lease) {
+            return ("the agent skill's yes", ToolAnswer::plain(told), true);
+        }
         let (answer, answered) = ask_with_context(directory, call, ASK_DEADLINE, context);
         ("the executive", answer, answered)
     } else {
