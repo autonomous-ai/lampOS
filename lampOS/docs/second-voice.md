@@ -5590,7 +5590,21 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   forget, and every yes granted as them, is refused by both runners
   (`one_face_refused`, before any hold) and by the memory route
   (`ScopeLease::forgets_need_mouth`, after the late look), and
-  `forget_asker` gives such a line no asker. So are a correction
+  `forget_asker` gives such a line no asker. The one exception (the PM's
+  cost ruling on #5627): a `forget` in a chat round that names exactly one
+  kept thing of theirs is asked about once (`ask_once_forget`, before
+  `one_face_refused`): held as a forget by that id (`HeldForget::one_face`)
+  and the model told to ask "Shall I forget what you kept about …?" with
+  the subject in their words, never the kept text (the Reviewer-lead's P2
+  on #6673). Their
+  plain yes on a later line within 30 s, the same session's same person
+  (`keep_asker`), seen saying it or in the private room on a one-face line,
+  (`known_faces::plain_agreement_to_forget`: "Yes, forget it.", "Ừ, quên
+  đi.", or "Forget it." alone as that answer) runs that forget by id, in
+  their scope only; a line narrowed since forgets nothing and keeps it
+  (`remember::AGREED_FORGET_NOT_NOW`) (`OneFaceForgetYes`,
+  `ScopeLease::mark_forget_agreed`, which both runners and the memory route
+  let through); a no, another line, another face or 30 s keeps it. So are a correction
   (`remember` with `replaces`), `keep_rule`, `list_rules`, `set_role` and
   `end_role` (the privacy read on #5385, also in
   `remember::role_for_guarded`), and

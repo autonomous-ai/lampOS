@@ -469,6 +469,10 @@ struct RequestContext {
     /// back on its own doubt (`LAMP_MEMORY_DOUBT_UNDOES`, C37), 0 for none
     /// ([`ScopeLease::mark_own_keep_undone`]).
     own_keep_undone: AtomicU64,
+    /// The id of the named forget a one-face line's person agreed to on this
+    /// line, the lamp having asked them once (#5627), 0 for none
+    /// ([`ScopeLease::mark_forget_agreed`]).
+    forget_agreed: AtomicU64,
     /// Narrowed to the room, its reply still told the admitted person's
     /// name ([`ScopeLease::name_for_reply`]).
     named: AtomicBool,
@@ -717,6 +721,7 @@ impl RequestScope {
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
+                forget_agreed: AtomicU64::new(0),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -773,6 +778,7 @@ impl RequestScope {
                 narrowed: AtomicBool::new(false),
                 everything: AtomicBool::new(false),
                 own_keep_undone: AtomicU64::new(0),
+                forget_agreed: AtomicU64::new(0),
                 named: AtomicBool::new(false),
                 named_by_one_face: AtomicBool::new(false),
                 named_conversation: AtomicBool::new(false),
@@ -1395,6 +1401,31 @@ impl ScopeLease {
     /// [`Self::mark_own_keep_undone`]: its `source_id` alone.
     pub(crate) fn undoes_own_keep(&self, args: &serde_json::Value) -> bool {
         let marked = self.context.own_keep_undone.load(Ordering::Acquire);
+        marked != 0
+            && args["source_id"].as_u64() == Some(marked)
+            && args.as_object().is_some_and(|args| args.len() == 1)
+    }
+
+    /// The forget by id `id` their yes on this line agreed to, the lamp
+    /// having asked them once about it on a line theirs only by their face
+    /// alone in view (`LAMP_PERSON_SCOPE_ONE_FACE_READS`, the PM's cost
+    /// ruling on #5627): it runs on this line though it is theirs by one
+    /// face too ([`Self::forgets_need_mouth`]), where the yes was the
+    /// private room's. Only the second route makes the
+    /// [`crate::second_provider::OneFaceForgetYes`] it needs, and only for
+    /// the held call's own id. It lives with the request.
+    pub(crate) fn mark_forget_agreed(
+        &self,
+        _agreed: &crate::second_provider::OneFaceForgetYes,
+        id: u64,
+    ) {
+        self.context.forget_agreed.store(id, Ordering::Release);
+    }
+
+    /// Whether `args`, a `forget`'s, is exactly the forget marked by
+    /// [`Self::mark_forget_agreed`]: its `source_id` alone.
+    pub(crate) fn agreed_forget(&self, args: &serde_json::Value) -> bool {
+        let marked = self.context.forget_agreed.load(Ordering::Acquire);
         marked != 0
             && args["source_id"].as_u64() == Some(marked)
             && args.as_object().is_some_and(|args| args.len() == 1)

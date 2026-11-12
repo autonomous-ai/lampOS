@@ -761,7 +761,36 @@ such a line** (`ScopeLease::forgets_need_mouth`): not `forget_everything`,
 `forget` the keep's rule alone lets reach their scope
 (`ScopeLease::reached_by_one_face`); the model is told nothing was
 forgotten and to ask them to say it again looking at the lamp. It holds no
-forget for a yes and its ask is no ask just before (`forget_asker`). **Nor
+forget for a yes and its ask is no ask just before (`forget_asker`).
+**Except a named forget of one kept thing, which is asked about once** (the
+PM's cost ruling on #5627, after 9 of 9 of the owner's own forgets were
+refused on lamp-c0a4): on the second route, a `forget` whose heard line (or
+the id recall gave) names exactly one kept thing of theirs
+(`remember::one_face_forget_target`, with the Days memory and
+`LAMP_MEMORY_FORGET_ALL`) is neither refused nor run. Nothing is removed;
+it is held as a forget by that thing's id (`second_provider::ask_once_forget`,
+`HeldForget::one_face`), and the model is told to ask once, naming only the
+subject in their own words, in their language ("Shall I forget what you
+kept about your bike lock code?"). The kept text is never told to the model
+or said: the speaker was not seen (the Reviewer-lead's P2 on #6673).
+Only a plain yes on a later line within 30 s
+(`remember::ONE_FACE_FORGET_YES_FOR`), from the same session's same person,
+with their face seen saying it, or in the private room
+(`LAMP_PRIVATE_ROOM`) on a line theirs by their face alone in view, runs
+exactly that forget by id in their scope (`ScopeLease::mark_forget_agreed`,
+never `forget_last`). The yes may say the forget too
+(`known_faces::plain_agreement_to_forget`, Thirteen's P2 on #6673): "Yes,
+forget it.", "Sure, go ahead and forget it.", "Ừ, quên đi.", and the forget
+said back alone, "Forget it." or "Quên đi.", which is only ever read as the
+answer to that question, by that person, within its 30 s. Any no, keep,
+wait, "đừng" or a question is no yes. If the line is no longer theirs when
+the forget runs (another face or voice came in), nothing is forgotten and
+the model is told it is still kept; it never runs in the room's scope
+(`remember::AGREED_FORGET_NOT_NOW`, Thirteen's P3). A no, any other line,
+silence or 30 s passing keeps it; a yes from another face, or an unseen yes outside the private room,
+runs nothing. A bare forget, several or no matching kept things, two faces
+in view (the line is nobody's by one face) and the Live route are refused or
+run as before. A TV saying "forget my umbrella" is therefore asked, never run. **Nor
 anything destructive, or acting for them beyond saving and recall** (the
 privacy read on #5592): a `remember` that corrects a kept thing by id
 (`replaces`, `remember::corrects`) is refused like a forget, and without an
