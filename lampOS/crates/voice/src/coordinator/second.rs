@@ -261,13 +261,28 @@ pub(super) fn routes(
     }
 }
 
-/// [`routes`], from this process's environment; in mainland China
-/// ([`in_china`]).
-pub(super) fn routes_from_environment(serving: bool) -> io::Result<Routes> {
+/// Exactly `on`: a bounded `directed` run (Gemini's configuration) takes
+/// `LAMP_VOICE_ROUTE=second` as the service does, so a test kit records
+/// its `--diagnostics` on the product's route. Off unless set; the service
+/// and every other run are unchanged by it.
+pub(super) const DIRECTED_SECOND_ENV: &str = "LAMP_VOICE_DIRECTED_SECOND";
+
+/// What the journal says at a `directed` run's start on the second route.
+pub(super) const DIRECTED_SECOND_LINE: &str = "lamp-voice: diagnostic run (LAMP_VOICE_DIRECTED_SECOND=on): a bounded directed run on the second route, which records audio with --diagnostics; not the service";
+
+/// [`routes`], from this process's environment: the service's routes for a
+/// continuous run with Gemini's configuration, and for a bounded one asked
+/// for the second route with [`DIRECTED_SECOND_ENV`] `on`; in mainland
+/// China ([`in_china`]).
+pub(super) fn routes_from_environment(continuous: bool, gemini: bool) -> io::Result<Routes> {
+    let route = var_os(ROUTE_ENV);
+    let directed_second = !continuous
+        && var_os(DIRECTED_SECOND_ENV).as_deref() == Some("on".as_ref())
+        && route.as_deref() == Some("second".as_ref());
     routes(
-        var_os(ROUTE_ENV),
+        route,
         var_os(crate::second_config::SECOND_CONFIG_ENV),
-        serving,
+        gemini && (continuous || directed_second),
     )
     .map(|routes| {
         in_china(
@@ -1251,6 +1266,56 @@ mod tests {
         )
         .unwrap_err();
         assert!(why.contains("for the service"), "{why}");
+    }
+
+    /// `LAMP_VOICE_DIRECTED_SECOND=on` lets a bounded run with Gemini's
+    /// configuration take `LAMP_VOICE_ROUTE=second`; unset or any other
+    /// value refuses it as before, and it never adds a standby to a bounded
+    /// Gemini run, nor touches the service or a fixture's run.
+    #[test]
+    fn a_directed_run_takes_the_second_route_only_with_its_switch_on() {
+        let with = |set: &[(&'static str, &str)], continuous: bool, gemini: bool| {
+            TEST_ENVIRONMENT.with(|environment| {
+                *environment.borrow_mut() =
+                    Some(set.iter().map(|(k, v)| (*k, OsString::from(*v))).collect())
+            });
+            let routes = routes_from_environment(continuous, gemini);
+            TEST_ENVIRONMENT.with(|environment| *environment.borrow_mut() = None);
+            routes.map_err(|why| why.to_string())
+        };
+        let second = [
+            (ROUTE_ENV, "second"),
+            (crate::second_config::SECOND_CONFIG_ENV, "/etc/second.json"),
+        ];
+        let alone = Routes::SecondOnly(PathBuf::from("/etc/second.json"));
+        for switch in [None, Some(""), Some("On"), Some("1"), Some("yes")] {
+            let mut set = second.to_vec();
+            set.extend(switch.map(|value| (DIRECTED_SECOND_ENV, value)));
+            assert_eq!(
+                with(&set, false, true).unwrap_err(),
+                "LAMP_VOICE_ROUTE=second is for the service (`lamp-voice serve`) only: this run does not start"
+            );
+            assert_eq!(with(&set, true, true), Ok(alone.clone()));
+        }
+        let mut on = second.to_vec();
+        on.push((DIRECTED_SECOND_ENV, "on"));
+        assert_eq!(with(&on, false, true), Ok(alone.clone()));
+        assert_eq!(with(&on, true, true), Ok(alone));
+        // A fixture's run is never the second route.
+        assert!(
+            with(&on, false, false)
+                .unwrap_err()
+                .contains("for the service")
+        );
+        // A bounded Gemini run gets no standby from the switch.
+        let gemini = [
+            (crate::second_config::SECOND_CONFIG_ENV, "/etc/second.json"),
+            (DIRECTED_SECOND_ENV, "on"),
+        ];
+        assert_eq!(
+            with(&gemini, false, true),
+            Ok(Routes::Live { standby: None })
+        );
     }
 
     /// Gemini's worker answers with the second route as its standby, or
