@@ -354,13 +354,7 @@ pub fn missed(request: u64, asked: &str) -> String {
 /// (`.pushed.json`, `.yes.json`) never do.
 pub fn pushed_named(pushed: &Path, asked: &str) -> Option<String> {
     let loose = |name: &str| crate::made_skill::name_digits(name).replace('-', "");
-    let names: Vec<String> = std::fs::read_dir(pushed)
-        .ok()?
-        .flatten()
-        .filter_map(|entry| entry.file_name().into_string().ok())
-        .filter(|name| !name.starts_with('.'))
-        .filter(|name| pushed.join(name).join("skill.toml").is_file())
-        .collect();
+    let names = pushed_names(pushed);
     if names.iter().any(|name| name == asked) {
         return Some(asked.to_owned());
     }
@@ -368,6 +362,20 @@ pub fn pushed_named(pushed: &Path, asked: &str) -> Option<String> {
     let mut alike = names.into_iter().filter(|name| loose(name) == wanted);
     let first = alike.next()?;
     alike.next().is_none().then_some(first)
+}
+
+/// The names of the skills pushed from a computer, in `pushed`
+/// ([`pushed_named`]): folders with a `skill.toml`, never a dot file.
+pub fn pushed_names(pushed: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(pushed) else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| !name.starts_with('.'))
+        .filter(|name| pushed.join(name).join("skill.toml").is_file())
+        .collect()
 }
 
 /// How long the manage helper, or lamp-control, is waited for.
