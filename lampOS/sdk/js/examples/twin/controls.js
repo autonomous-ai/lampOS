@@ -15,6 +15,8 @@
 // that pressed, under its row and nowhere else: not in the log, not on disk, not in the checklist's export.
 // `hint` (optional, a string of at most 200 characters) is said under the row on the page, in `textContent`; `hintReal`,
 // when the page drives a real lamp (`describe('real')`), replaces it. For a row with an effect the label doesn't say.
+// `ctx.audio(what, wav)` sends a sound this app made to the page that pressed, if that page turned "Hear the lamp in this page" on, and
+// returns the bytes sent (0 when it is off; undefined with no page): a stand-in hum or a clip's own audio, never the microphone's.
 // A refusal comes back as the lamp's own words; a value outside its field is refused here, before any call.
 import { randomBytes } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -81,6 +83,25 @@ export function quietTone(ms) {
   for (let k = 0; k < frames; k += 1) wav.writeInt16LE(Math.round(1000 * Math.sin((2 * Math.PI * 440 * k) / 24_000)), 44 + k * 2);
   return wav;
 }
+// The hum the page plays for `sound` (a stand-in: the lamp's real hum is made by its voice, not a file): two low tones, about
+// 0.6 s, 16-bit mono PCM at 24 kHz, peak 1000 (-30 dBFS, as the quiet clip), faded in and out so it does not click.
+export function humWav(ms = 600) {
+  const frames = Math.round((24_000 * ms) / 1000);
+  const wav = Buffer.alloc(44 + frames * 2);
+  wav.write('RIFF', 0, 'ascii'); wav.writeUInt32LE(36 + frames * 2, 4); wav.write('WAVEfmt ', 8, 'ascii');
+  wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20); wav.writeUInt16LE(1, 22); wav.writeUInt32LE(24_000, 24);
+  wav.writeUInt32LE(48_000, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34); wav.write('data', 36, 'ascii'); wav.writeUInt32LE(frames * 2, 40);
+  const fade = 720;
+  for (let k = 0; k < frames; k += 1) {
+    const edge = Math.min(1, k / fade, (frames - 1 - k) / fade);
+    const tone = Math.sin((2 * Math.PI * 110 * k) / 24_000) + Math.sin((2 * Math.PI * 165 * k) / 24_000);
+    wav.writeInt16LE(Math.round(500 * edge * tone), 44 + k * 2);
+  }
+  return wav;
+}
+// What a row says about the sound it made for this page (`ctx.audio` is the server's: the bytes sent, 0 when this page has not
+// turned "Hear the lamp in this page" on, undefined where there is no page, as in a test of the row alone).
+const heard = (sent, kind) => (sent === undefined ? '' : sent > 0 ? `  // audio: ${sent.toLocaleString('en-US')} bytes to this page${kind ? ` (${kind})` : ''}` : "  // no sound sent: turn on 'Hear the lamp in this page'");
 // Takes this run's scratch clip off the lamp, if this run put it there (the end of a run, or the row).
 export async function cleanScratch(lamp) {
   if (!clipKept) return false;
@@ -174,10 +195,12 @@ export const CONTROLS = [
   { id: 'hold_light_stop', group: 'Light', ops: [], shows: [], label: 'Stop the held light', fields: [],
     run: async () => { const was = held !== null; held?.stop(); held = null; return `held.stop() (${was ? 'a held light ended' : 'none was held'})`; } },
   { id: 'say', group: 'Voice', ops: ['say'], shows: ['lamp.said'], label: 'Say', fields: [text('text', 200, 'Hello, I am the virtual lamp.')],
+    hint: "spoken by your browser (the lamp's real voice sounds different)", hintReal: "a real lamp says it through its own speaker",
     run: async ({ lamp }, a) => { await lamp.say(a.text); return `lamp.say(${q(a.text)})`; } },
   // The computer's own turn: the lamp's voice takes the prompt as if it were said to it; `done` follows, and
   // ending it gives the turn back (with none of this computer's, the lamp's own `busy` shows).
   { id: 'turn_start', group: 'Voice', ops: ['turn.start'], shows: [], label: 'Ask the lamp (start a turn)', fields: [text('prompt', 200, 'What can you do?')],
+    hint: 'the virtual lamp has no model, so it gives no spoken answer: the log says done; a real lamp answers aloud',
     run: async ({ lamp }, a) => { await lamp.startTurn(a.prompt); return `lamp.startTurn(${q(a.prompt)})`; } },
   { id: 'turn_end', group: 'Voice', ops: ['turn.end'], shows: [], label: 'End my turn', fields: [], run: async ({ lamp }) => { await lamp.endTurn(); return 'lamp.endTurn()'; } },
   { id: 'volume_to', group: 'Voice', ops: ['volume'], shows: ['volume.changed'], label: 'Volume to', fields: [number('to', 0, 100, 40, { integer: true })],
@@ -211,14 +234,18 @@ export const CONTROLS = [
     hintReal: "off holds the real lamp's mute: it stays deaf to the room until you press on", fields: [select('listen', ['on', 'off'], 'on')],
     run: async ({ lamp }, a) => `lamp.setListening(${a.listen === 'on'}) -> ${q(await lamp.setListening(a.listen === 'on'))}` },
   // The lamp's own clip, through the voice: no lease (`play` is the recorded move, not a sound).
-  { id: 'sound', group: 'Voice', ops: ['sound'], shows: [], label: 'Sound (hum)', fields: [], run: async ({ lamp }) => { await lamp.sound('hum'); return "lamp.sound('hum')"; } },
+  { id: 'sound', group: 'Voice', ops: ['sound'], shows: [], label: 'Sound (hum)', fields: [],
+    hint: "a stand-in for the lamp's hum: this page plays its own quiet hum (the lamp's real hum is made by its voice)", hintReal: "a real lamp plays its own hum through its own speaker",
+    run: async ({ lamp, audio }) => { await lamp.sound('hum'); return `lamp.sound('hum')${heard(audio?.('hum', humWav()), "a stand-in for the lamp's hum")}`; } },
   // Clips (grant `speak`): this computer's own, kept on the lamp. The rows touch ONLY this run's scratch clip: upload makes it,
   // the list shows this computer's clips (a read), remove takes away the one this run made and nothing else.
   { id: 'sound_upload', group: 'Voice', ops: ['sound.upload'], shows: [], label: 'Keep a quiet clip', fields: [number('ms', 100, 2000, 300, { integer: true })],
-    run: async ({ lamp }, a) => {
-      const kept = await lamp.uploadSound(SCRATCH_CLIP, quietTone(a.ms));
+    hint: 'this page plays the clip it keeps, its own audio', hintReal: 'a real lamp plays its clips through its own speaker',
+    run: async ({ lamp, audio }, a) => {
+      const clip = quietTone(a.ms);
+      const kept = await lamp.uploadSound(SCRATCH_CLIP, clip);
       clipKept = true;
-      return `lamp.uploadSound(${q(SCRATCH_CLIP)}, a ${a.ms} ms quiet tone) -> ${q(kept)}`;
+      return `lamp.uploadSound(${q(SCRATCH_CLIP)}, a ${a.ms} ms quiet tone) -> ${q(kept)}${heard(audio?.('clip', clip), 'the clip saved on the lamp')}`;
     } },
   { id: 'sound_list', group: 'Voice', ops: ['sound.list'], shows: [], label: 'List my clips', fields: [],
     hint: 'clips named try-... are this app\'s test clips; remove them from the list',

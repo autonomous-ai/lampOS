@@ -151,8 +151,96 @@ function showPicture({ id, jpeg }) {
   if (old.startsWith('blob:')) URL.revokeObjectURL(old);
 }
 
+// Hear the lamp in this page (F3): off on every load and never remembered; one click makes the page's one AudioContext (a browser
+// needs a click before any sound), plays a 100 ms test blip and tells the server. What it plays is made by this app: a hum that is a
+// stand-in, a clip's own audio, and the lamp's own words spoken by the browser's voice. A reconnect puts it back to off.
+const hearing = (() => {
+  const available = table.mode !== 'real';
+  let on = false;
+  let context = null;
+  let language = 'en';
+  const button = el('button', { id: 'hear', disabled: !available });
+  const note = el('div', { className: 'hint', textContent: available
+    ? 'Sound here is made by this page, not by the lamp. Off by default; the microphone is never played.'
+    : 'A real lamp speaks through its own speaker.' });
+  const draw = () => { button.textContent = available ? `Hear the lamp in this page: ${on ? 'on' : 'off'}` : 'Hear the lamp in this page: a real lamp speaks through its own speaker'; };
+  const set = (value) => { on = value && available; if (!on) window.speechSynthesis?.cancel(); draw(); };
+  const blip = () => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    gain.gain.value = 0.03;
+    oscillator.frequency.value = 880;
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.1);
+  };
+  button.onclick = async () => {
+    if (!available) return;
+    if (on) { set(false); send({ type: 'hear', on: false }); return; }
+    try {
+      const Context = window.AudioContext ?? window.webkitAudioContext;
+      if (!Context) throw new Error('this browser has no audio');
+      context ??= new Context();
+      await context.resume();
+      blip();
+      // A phone's browser speaks only after a gesture: one silent line, now, lets the first lamp.said be heard.
+      if (typeof window.SpeechSynthesisUtterance === 'function' && window.speechSynthesis) {
+        const unlock = new window.SpeechSynthesisUtterance(' ');
+        unlock.volume = 0;
+        window.speechSynthesis.speak(unlock);
+      }
+    } catch (error) {
+      say('no', `no sound in this page: ${error?.message ?? error}`);
+      return;
+    }
+    set(true);
+    send({ type: 'hear', on: true });
+  };
+  draw();
+  return {
+    node: el('div', { className: 'row', id: 'hear-box' }, button, note),
+    get on() { return on; },
+    off: () => set(false),
+    // The lamp's language (a code like en, vi or pt-BR), said in the server's answer to the switch.
+    language: (value) => { if (typeof value === 'string' && /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(value)) language = value; },
+    // A WAV the server made for this page, played once (the bytes stay in memory only).
+    async play({ what, wav }) {
+      if (!on || !context || typeof wav !== 'string') return;
+      try {
+        const bytes = Uint8Array.from(atob(wav), (c) => c.charCodeAt(0));
+        // Decoding takes the bytes' buffer from us: the size is read first.
+        const size = bytes.length;
+        const buffer = await context.decodeAudioData(bytes.buffer);
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        source.connect(context.destination);
+        source.start();
+        say('ev', `playing ${what} here (${size.toLocaleString('en-US')} bytes)`);
+      } catch (error) {
+        say('no', `could not play ${what} here: ${error?.message ?? error}`);
+      }
+    },
+    // The lamp's own words, in the browser's voice and the lamp's language.
+    speak(text) {
+      if (!on || typeof text !== 'string' || !text) return;
+      const synth = window.speechSynthesis;
+      if (!synth || typeof window.SpeechSynthesisUtterance !== 'function') { say('no', "this browser has no speech voice: the line is only in the log"); return; }
+      const utterance = new window.SpeechSynthesisUtterance(text);
+      utterance.lang = language;
+      synth.speak(utterance);
+    },
+  };
+})();
+// Above the log it controls (the page has one column here).
+events.before(hearing.node);
+window.addEventListener('twin-open', () => hearing.off());
+
 window.addEventListener('twin-message', ({ detail }) => {
   if (detail.type === 'picture') showPicture(detail);
+  if (detail.type === 'audio') hearing.play(detail);
+  if (detail.type === 'hear') hearing.language(detail.language);
+  if (detail.type === 'hear' && !detail.on) { hearing.off(); if (detail.why) say('no', `no sound here: ${detail.why}`); }
+  if (detail.type === 'event' && detail.event === 'lamp.said') hearing.speak(detail.frame?.text);
   if (detail.type === 'result') say(detail.ok ? 'ok' : 'no', `${detail.call} -> ${detail.answer}`);
   if (detail.type === 'event') say('ev', `event ${detail.event} ${JSON.stringify(detail.frame)}`);
 });
