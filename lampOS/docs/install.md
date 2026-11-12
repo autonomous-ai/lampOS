@@ -1046,30 +1046,45 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    V1's Jev client does (#811 point 2).
    It never writes `/etc/lampOS/body/lamp.env`, and says that the body waits
    for it.
-   **Name servers** (#6256): in `/etc/resolvconf.conf` it replaces the first
-   `name_servers*` line with
-   `name_servers_append="223.5.5.5 119.29.29.29 1.1.1.1 8.8.8.8"`, drops any
-   other, keeps every other line (one is added to a file with none, or none
-   there), then runs `resolvconf -u`; a file already so is left, nothing run.
-   openresolv puts `name_servers=` before the router's, and glibc asks the
-   first of its three first and waits 5 s on one that is dropped, as
-   1.1.1.1 is in China; appended, the router's comes first, then AliDNS and
-   DNSPod, which answer in China and elsewhere; in the hotspot, with no
-   router, these three. `scripts/imager/build-orangepi-v2.sh` writes the
-   same line, a test holding the two equal. A failed `resolvconf -u` is
-   said; the next lease lists them. Only install writes it, not a round:
-   a lamp already in a home gets it from its next `lamp-update install`.
-   **Time servers** (#6256): it writes
-   `/etc/systemd/timesyncd.conf.d/lampos.conf`, `[Time]` with
-   `FallbackNTP=0.debian.pool.ntp.org 1.debian.pool.ntp.org ntp.aliyun.com
-   ntp.tencent.com cn.pool.ntp.org`, then `systemctl try-restart
-   systemd-timesyncd`; a file already so is left, nothing run. Fallbacks
-   only, so a server the network gives still comes first; timesyncd moves
-   on in seconds from one that does not answer, so a lamp in China whose
-   Debian pool is dropped still sets its clock. `try-restart` leaves a
-   timesyncd that is not running so: on a lamp whose clock is chrony's
-   (lamp-75c9's image), the file is read by nothing. Install's alone, as the
-   name servers.
+   **Name and time servers: China's on a lamp placed in China only**
+   (#6256, #6414; `install::region_servers`, also `lamp-update region`). The
+   region is the one `lamp-cloud` keeps from the ping's reply in
+   `/var/lib/lampos-cloud/region` (`CN` or empty, [cloud.md](cloud.md)).
+   - **`CN`.** In `/etc/resolvconf.conf` the first `name_servers*` line
+     becomes `name_servers_append="223.5.5.5 119.29.29.29 1.1.1.1 8.8.8.8"`,
+     any other goes, every other line is kept (one is added to a file with
+     none), then `resolvconf -u`. openresolv puts `name_servers=` before the
+     router's, and glibc asks the first of its three first and waits 5 s on
+     one that is dropped, as 1.1.1.1 is in China; appended, the router's
+     comes first, then AliDNS and DNSPod; in the hotspot, these three. And
+     `/etc/systemd/timesyncd.conf.d/lampos.conf` is written, `[Time]` with
+     `FallbackNTP=0.debian.pool.ntp.org 1.debian.pool.ntp.org ntp.aliyun.com
+     ntp.tencent.com cn.pool.ntp.org`, then `systemctl try-restart
+     systemd-timesyncd`: fallbacks only, Debian's pool first, so a lamp in
+     China whose pool is dropped still sets its clock.
+   - **Anything else, no file, or one that cannot be read.** The lamp's
+     fallback stays the image's, `name_servers="1.1.1.1 8.8.8.8"`
+     (`scripts/imager/build-orangepi-v2.sh`, which names no Chinese server;
+     a test holds it so), and timesyncd's own. Nothing is written or run,
+     except on a lamp no longer placed in China: the `CN` line goes back to
+     the image's and the drop-in is removed, each followed by its refresh.
+     A lamp outside China never sends a lookup its router misses, or a time
+     query, to Alibaba or Tencent (the Reviewer-lead's privacy HOLD on #6386).
+
+   A file already so is left and nothing run; a failed `resolvconf -u` or
+   `try-restart` is said (the next lease lists the servers); a write that
+   fails is said and the install goes on. `try-restart` leaves a timesyncd
+   that is not running so, as on a lamp whose clock is chrony's. Install
+   does this once; after it, `lamp-region.service` (root, oneshot, enabled)
+   does it at every boot and, through `lamp-region.path` (`PathChanged=` on
+   the region file), each time `lamp-cloud` writes a new region.
+   `lamp-cloud` itself cannot: it runs as `lampos` with no capability and a
+   read-only `/etc`. The one-shot runs with `ProtectSystem=strict`, `/etc`
+   and `/run/resolvconf` its only writable paths (the files are written
+   whole, a new one renamed into place, and `resolvconf -u` rewrites
+   `/etc/resolv.conf`), `ProtectHome`, `PrivateTmp` and `NoNewPrivileges`.
+   A round that brings the two units enables them; they run from the next
+   boot.
 7. Records the build and the folders it made in
    `/var/lib/lampos-update/state.json`, as a round does, under the same
    lock, before systemd is asked anything. It reads them as a round does
@@ -1096,7 +1111,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    target (`lamp-setup.service`, `lamp-waking.service`,
    `lamp-setup-wifi-restore.service` and `lamp-setup-recover.service`,
    [setup.md](setup.md)), `lamp-records.timer`, `lamp-selftest.timer`,
-   `lamp-update-back.timer`, `lampos-setup-done.path`, and the helpers'
+   `lamp-update-back.timer`, `lampos-setup-done.path`, `lamp-region.service`
+   and `lamp-region.path` (#6256, below), and the helpers'
    sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket`,
    `lamp-setup-wifi.socket` and `lamp-eyes-camera.socket` (`install::enabled`;
    a test holds this list to it; #2853; each template is started by its socket,
