@@ -50,6 +50,12 @@ pub const CONTROL_SOCKET: &str = "/run/lampos-control/control.sock";
 pub const SOCKET_ENV: &str = "LAMP_CONTROL_SOCKET";
 /// The variable a run is given its one-run token in.
 pub const TOKEN_ENV: &str = "LAMP_CONTROL_TOKEN";
+/// The build's own lampos SDK with the `websockets` it needs, one read-only copy for every agent
+/// (`lamp_update::sdk_tree::DIR`, written by lamp-update; #6507): a run has it on `PYTHONPATH`, so
+/// `from lampos import Lamp` works in whichever Python the engine runs a script with.
+pub const SDK_PYTHONPATH: &str = "/usr/local/lib/lampos/sdk-python";
+/// The variable a run is told [`SDK_PYTHONPATH`] in.
+pub const PYTHONPATH_ENV: &str = "PYTHONPATH";
 /// The variable, [`NET_RUN`] exactly, that has Hermes's wrapper give a run
 /// a network namespace of its own (`lamp_update::hermes_install::NET_ENV`):
 /// only `lo`, out only to [`CONTROL_SOCKET`] and lamp-cloud's model
@@ -438,6 +444,7 @@ impl SkillRun {
             env: vec![
                 (SOCKET_ENV, CONTROL_SOCKET.to_owned()),
                 (TOKEN_ENV, token.secret().to_owned()),
+                (PYTHONPATH_ENV, SDK_PYTHONPATH.to_owned()),
             ],
             deadline: RUN_LIFETIME,
         }
@@ -1050,7 +1057,8 @@ mod tests {
             *env,
             vec![
                 (SOCKET_ENV, CONTROL_SOCKET.to_owned()),
-                (TOKEN_ENV, "tok-1".to_owned())
+                (TOKEN_ENV, "tok-1".to_owned()),
+                (PYTHONPATH_ENV, SDK_PYTHONPATH.to_owned())
             ]
         );
         assert!(prompt.contains("Take a photo and send it to the app."));
@@ -1673,6 +1681,7 @@ mod tests {
         let environment = std::fs::read_to_string(dir.path().join("environment")).unwrap();
         assert!(environment.contains(&format!("{TOKEN_ENV}={secret}")));
         assert!(environment.contains(&format!("{SOCKET_ENV}={CONTROL_SOCKET}")));
+        assert!(environment.contains(&format!("{PYTHONPATH_ENV}={SDK_PYTHONPATH}")));
         // Nothing of lamp-tasks' own environment is passed on.
         assert!(!environment.contains("CARGO"), "{environment}");
     }
@@ -1704,7 +1713,7 @@ mod tests {
             runner
                 .env
                 .iter()
-                .all(|(name, _)| name != TOKEN_ENV && name != SOCKET_ENV)
+                .all(|(name, _)| name != TOKEN_ENV && name != SOCKET_ENV && name != PYTHONPATH_ENV)
         );
         // Its own network namespace: the one opt-in, `run` exactly.
         assert!(

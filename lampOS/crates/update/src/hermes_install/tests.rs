@@ -149,6 +149,8 @@ impl Lamp {
         self.hermes_at(COMMIT);
         fs::write(self.at(WRAPPER), WRAPPER_TEXT).unwrap();
         fs::write(self.at(NS), NS_TEXT).unwrap();
+        // The build's own lampos SDK beside them (#6507).
+        crate::sdk_tree::write(self.root()).unwrap();
     }
     fn said(&self) -> Option<HermesInstall> {
         record(&self.records())
@@ -480,12 +482,14 @@ fn on_with_harness_there_installs_the_pinned_hermes_as_lampos() {
         assert_eq!(fs::read_to_string(&place).unwrap(), text, "{path}");
         assert_eq!(mode(&place), 0o755, "{path}");
     }
+    // The namespace script and the build's own lampos SDK (#6507, one folder, no staging left beside).
     assert_eq!(
         fs::read_dir(lamp.at("/usr/local/lib/lampos"))
             .unwrap()
             .count(),
-        1
+        2
     );
+    assert!(crate::sdk_tree::present(lamp.root()));
 }
 
 impl Ask {

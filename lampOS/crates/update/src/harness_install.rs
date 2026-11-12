@@ -128,6 +128,10 @@ After=network-online.target
 Type=oneshot
 User=root
 Group=root
+# The folder of the namespace scripts and the SDK is made before the sandbox, by \"+\" (no sandbox for this line): the
+# \"-\" of ReadWritePaths skips a folder that is missing, and a lamp that took lamp-update from the channel never
+# ran the installer that makes it (#6507).
+ExecStartPre=+/usr/bin/install -d -m 0755 -o root -g root /usr/local/lib/lampos
 ExecStart=/opt/lampOS/update/current/lamp-update harness-install
 StandardInput=null
 SyslogIdentifier=lamp-update-harness
