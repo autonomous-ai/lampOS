@@ -41,6 +41,12 @@ are read and both are required:
 - `name`: the folder's own name, 1 to 64 characters of `a-z`, `0-9` and `-`;
 - `description`: one line, what the skill does.
 
+One more is read when there: `when`, one line of at most 200 bytes saying
+only when the model calls the skill's tool and when not, and any rule on
+what the lamp says as it calls. With `LAMP_USE_SKILL_SUMMARY=on` the voice
+lists it in place of the description (#6218, skills.md, "Tools for the
+model"); a longer one is refused.
+
 Other front-matter lines and the body are for people.
 
 **`moves/NAME.json`** is a recorded move, held to the body's own check
@@ -102,7 +108,7 @@ outside ASCII can pass the schema and still be too long on the lamp.
 | `[budget]` | `{ group, per_hour 1–6, gap, give_back_unsaid }` | runs an hour shared by every skill of the group; `gap` (1 m to 1 h), the least time between two of them; `give_back_unsaid`, a run that said nothing gives its place back (#5207) |
 | `[rest]` | `{ after_ignored 1–5, within }` | rests until the next morning after runs nobody noticed |
 | `[present]` | `enabled`, `trigger`, `while`, `most_a_day`, `active`, `quiet`, `budget`, `rest`, `ask`, `do` | with `LAMP_NUDGES_PRESENT=on`, each key stands in for the file's own, whole; read, checked and ignored without it (#5207) |
-| `[stop]` | `{ tool, about }` | a function the model calls to snooze it or turn it off |
+| `[stop]` | `{ tool, about, when? }` | a function the model calls to snooze it or turn it off; `when`, at most 200 bytes, as `SKILL.md`'s (#6218) |
 | `[search]` | `{ looks 1–8, give_up, found, note, walk, looked }` | a search a person asked for, its looks and what the model is told past the last (look-for-things) |
 | `[history]` | `{ topic = "room/presence", within, words }` | the room's presence over the last hours, for the model (who-was-here) |
 | `[watch]` | `{ every, asked_within, if_heard, most, mark, words }` | a watch the skill's tool turns on and off, with a faint `mark` light while on (guard-mode). Needs `light`, `messages` and `known_faces`; no trigger and no steps |

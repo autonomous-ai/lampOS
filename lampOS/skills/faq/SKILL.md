@@ -1,6 +1,7 @@
 ---
 name: faq
 description: How to use this lamp. Call when someone asks "how do I...?", "what can you do?", "where do I link Gmail or my calendar?", "what does the button do?", "who made you?", "where can I buy you?", "what's your website?", "help". Answer only from what it tells you.
+when: When someone asks how to use the lamp, what it can do, where to link Gmail or a calendar, what the button does, who made it or where to buy it, or for help. Answer only from what it tells you.
 ---
 
 # How to use the lamp

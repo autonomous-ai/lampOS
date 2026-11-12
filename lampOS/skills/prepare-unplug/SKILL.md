@@ -1,6 +1,7 @@
 ---
 name: prepare-unplug
 description: When the person says to the lamp that they are unplugging it, will unplug it, or are turning it off (such as "I'm unplugging you now", "I'm going to unplug you", "I'll unplug you", "turning you off"), call prepare_to_unplug before saying anything else; do not answer in words instead. It requests a guarded fold; the initial answer is not permission to unplug. Tell them to wait, and never claim readiness yourself. The skill reports readiness separately only after fresh body and asleep-presentation confirmation. On a product lamp it then asks whether to turn itself off, and turns off only on the person's spoken yes; say nothing for it. Do not call for ordinary bedtime, a pause in conversation, or a quoted/example unplug sentence.
+when: When told you're being unplugged or turned off, call it before any words. Its first answer isn't permission to unplug; never claim readiness yourself. Not for bedtime, a pause or a quoted sentence.
 ---
 
 # Prepare to unplug

@@ -1536,10 +1536,36 @@ fn named_beside(settings: &Settings, key: &str) -> BTreeSet<String> {
 /// it): a search is several calls of its skill in one turn, each look's
 /// answer telling the model to call again with the next place
 /// (look-for-things' `[search]`, a reader's P2 on #5505).
-fn told_ran(settings: &Settings, skill: &str, told: &mut Value) {
+///
+/// A skill told by its `when` line ([`skill_whens`]) is given its whole
+/// words with it ([`crate::use_skill::now`], #6218).
+fn told_ran(settings: &Settings, skills: &[Tool], skill: &str, told: &mut Value) {
     if search_walk(settings, skill).is_none() {
         crate::use_skill::ran(skill, told);
     }
+    if let Some(tool) = skills.iter().find(|tool| tool.name == skill)
+        && skill_whens(settings).contains_key(skill)
+    {
+        crate::use_skill::now(tool, told);
+    }
+}
+
+/// Each skill's `when` line, by its tool, from the first skills folder
+/// whose tools file gives one (`when`, `lamp_skills::tools_file` with
+/// `LAMP_USE_SKILL_SUMMARY=on` on lamp-skills, #6218): empty from an older
+/// file, or with the switch off.
+pub fn skill_whens(settings: &Settings) -> std::collections::BTreeMap<String, String> {
+    let mut whens = std::collections::BTreeMap::new();
+    for file in tools_files(settings) {
+        if let Some(given) = file["when"].as_object() {
+            for (tool, when) in given {
+                if let Some(when) = when.as_str() {
+                    whens.entry(tool.clone()).or_insert_with(|| when.to_owned());
+                }
+            }
+        }
+    }
+    whens
 }
 
 /// Each skills folder's tools file that can be read, in order.
@@ -1619,7 +1645,7 @@ fn run_spoken_call_inner(
                         settings, &found, &skill, request, heard, context, lease,
                     );
                     if answered {
-                        told_ran(settings, &skill.name, &mut answer.told);
+                        told_ran(settings, &skills, &skill.name, &mut answer.told);
                     }
                     (whom, answer, answered)
                 }
@@ -2286,7 +2312,7 @@ fn run_call_with_scope(
                         let (whom, (mut told, answered)) =
                             run_call_with_scope(&found, &skill, request, heard, lease);
                         if answered {
-                            told_ran(settings, &skill.name, &mut told);
+                            told_ran(settings, &skills, &skill.name, &mut told);
                         }
                         (whom, (told, answered))
                     }
@@ -5193,6 +5219,80 @@ mod tests {
             )),
             "{said}"
         );
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// #6218: a skill whose tools file gives it a `when` line
+    /// (`LAMP_USE_SKILL_SUMMARY` on lamp-skills) is told that line in the
+    /// instruction, its choice and yes-or-no still named, and its whole
+    /// words come with its call's answer, after the note that it ran. A
+    /// skill with none is told and answered as before; no `when` at all
+    /// is the section as it was, byte for byte.
+    #[test]
+    fn a_skill_with_a_when_line_is_told_it_and_answered_with_its_words() {
+        let (dir, mut settings) = many_skills("when");
+        settings.use_skill = true;
+        let skills = dir.join(SKILLS_DIR);
+        let file = skills.join(CATALOG_FILE);
+        let all = skill_tools(&settings);
+        let offered = crate::use_skill::offered(&all);
+        let before = crate::use_skill::section(offered, &core_skills(&settings));
+        assert_eq!(
+            crate::use_skill::section_told(
+                offered,
+                &core_skills(&settings),
+                &skill_whens(&settings)
+            ),
+            before
+        );
+        let mut catalog: Value =
+            serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
+        catalog["when"] = json!({"dance": "When asked to dance; say one short line first."});
+        std::fs::write(&file, catalog.to_string()).unwrap();
+        let whens = skill_whens(&settings);
+        let told = crate::use_skill::section_told(offered, &core_skills(&settings), &whens);
+        assert!(
+            told.contains("\n- dance: When asked to dance; say one short line first. Its choice is style, one of "),
+            "{told}"
+        );
+        assert!(told.contains(". Its yes-or-no is long.\n"), "{told}");
+        assert!(told.len() < before.len(), "{} {}", told.len(), before.len());
+        assert!(
+            crate::session_tools::told_after(&declared(&settings), &settings)
+                .unwrap()
+                .contains("- dance: When asked to dance;")
+        );
+        let served = executive(
+            &skills,
+            b"{\"ok\":true,\"result\":{\"next\":\"Dance.\"}}\n",
+            Duration::ZERO,
+        );
+        let call = ToolCall {
+            id: "c1".into(),
+            name: crate::use_skill::NAME.into(),
+            args: json!({"skill":"dance","choice":"jazz"}),
+        };
+        let dance = all.iter().find(|tool| tool.name == "dance").unwrap();
+        let mut words = json!({});
+        crate::use_skill::now(dance, &mut words);
+        let words = words[crate::use_skill::NOW].as_str().unwrap().to_owned();
+        assert!(
+            words.starts_with("Now, as dance's own words say: dance: "),
+            "{words}"
+        );
+        assert!(words.contains(dance.description.trim()), "{words}");
+        assert_eq!(
+            answer(&settings, &call, 7, true),
+            json!({"next":"Dance.", crate::use_skill::RAN:
+                "This call has already run dance. Do not call use_skill for dance again in this turn.",
+                crate::use_skill::NOW: words})
+        );
+        served.join().unwrap();
+        std::fs::remove_file(skills.join(CALL_SOCKET)).unwrap();
+        // An error is left as it is.
+        let mut refused = json!({"error":"I'm still doing that."});
+        crate::use_skill::now(dance, &mut refused);
+        assert_eq!(refused, json!({"error":"I'm still doing that."}));
         std::fs::remove_dir_all(dir).unwrap();
     }
 

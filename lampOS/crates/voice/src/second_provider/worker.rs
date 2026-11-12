@@ -2661,9 +2661,10 @@ pub fn serve(
             // or without `go_to_sleep`, how instead (#4595).
             let offered = crate::tools::skill_tools(&skills_told);
             let mut skills = if skills_told.use_skill {
-                crate::use_skill::section(
+                crate::use_skill::section_told(
                     crate::use_skill::offered(&offered),
                     &crate::tools::core_skills(&skills_told),
+                    &crate::tools::skill_whens(&skills_told),
                 )
             } else {
                 String::new()
