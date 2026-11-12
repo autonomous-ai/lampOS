@@ -1439,18 +1439,34 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   `read_back`. On the second route it is run **in code from the heard
   words**, never left to the model (V2 on #6413: on lamp-52e6 at 12337,
   "what does desk check use?" got `use_skill`, which ran the skill, and
-  "Hey Lamp, what does desk check use?" got no call). A spoken line with
-  "what" or "which", then the name of a made skill kept on the lamp or a
-  pushed one (matched loosely, as below), then one of use, need, access,
-  reach, touch, do or send (and their -s forms, "using")
-  (`make_skill_local::read_back_asked`) has that skill read back before
-  round 1, through the turn's own runner; round 1 is told its result and
-  says what its `next` says (`read_back_note`). A `use_skill` or
-  `make_skill` read-back of that same skill the model calls in the turn
-  is not run; it is given the read-back instead (`same_skill_again`).
-  "Use desk check", "run desk check" and "what time is it" read nothing
-  back. The skills' folders are read only for a line with a question word
-  and an ask word. Tests: `the_heard_words_ask_what_a_skill_uses_by_its_name`,
+  "Hey Lamp, what does desk check use?" got no call). A spoken line
+  with, in one clause (broken at `,` `;` `.` `?` `!`, "and" and
+  "then"): "what" or "which", at most one word ("which files"), then
+  "does", "do", "can" or "will" (needed after that one word), then "the",
+  "my", "your", "this" or "that" if said, then the name of a made skill
+  kept on the lamp or a pushed one (matched loosely, as below), then
+  "skill" if said, and then, as the very next word, one of use, need,
+  access, reach, touch or send (and their -s forms, "using"), or "do"
+  after "does", "can" or "will" (`make_skill_local::read_back_asked`), has
+  that skill read back before round 1, through the turn's own runner;
+  round 1 is told its result and says what its `next` says
+  (`read_back_note`). So "what does desk check use" and "what does the
+  news skill need" read back, and "what time does the news start, do you
+  know?", "what music does she like" and "which mail do I need to answer"
+  read nothing back of a `news`, `music` or `mail` skill (SubDarren's and
+  the Reviewer-lead's HOLDs on #6619). A `use_skill` or `make_skill`
+  read-back of that same skill the model calls in the turn is not run; it
+  is given the read-back instead (`same_skill_again`). A line that also
+  runs the skill asked about ("run", "start", "use" or "turn on" before
+  its name or before "it", "that", "this" or "them": "what does desk check
+  use, and run it", "what does desk check need? ok run it") reads nothing
+  back, so the model's `use_skill` runs it as asked. "Use desk check",
+  "run desk check" and "what time is it" read nothing back either. Two
+  names said alike (`desk-check` and `deskcheck`) read neither back and
+  the line goes to the model: no "which one?" is asked. The skills'
+  folders are read only for a line with a question word and an ask word.
+  Tests: `the_heard_words_ask_what_a_skill_uses_by_its_name`,
+  `ordinary_questions_and_mixed_lines_ask_no_read_back`,
   `second_provider::tests::read_back_words`. The Live route is unchanged:
   there the model still calls `make_skill` with `read_back` itself. A name
   the helper doesn't know is looked for among the
@@ -1465,6 +1481,11 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   desk-check"; the made skills' miss likewise). Tests:
   `a_pushed_skill_with_a_task_is_found_by_its_spoken_name`,
   `two_pushed_alike_find_neither_and_a_miss_journals_the_name_asked`.
+  What a task uses is the owner's to hear, as a made skill's sends are:
+  to a line not the owner's (`owner_hears` false, as above) the lamp says
+  only "Photo booth hands a task to the lamp's agent; only its owner can
+  hear what it uses." and no wait starts (`skill_task_yes::unsaid`;
+  SubDarren's P3 on #6619). Test: `unheard_or_live_or_no_task_starts_no_wait`.
   The voice asks the manage helper (`{"task_asks": NAME}`,
   from the app's link or the voice), which reads the skill on the lamp now:
   its task, its grants, where its script came from and the SHA-256 of its
