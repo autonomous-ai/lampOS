@@ -3476,6 +3476,7 @@ pub fn serve(
     // (`LAMP_REST_THROUGH_SOUNDS=on`, #4285): the lamp's name alone is not
     // answered, so it only stirs. Read from Expression's newest state when
     // such a line would be answered.
+    let mut rest_name_in_words = false;
     if std::env::var(crate::second_provider::REST_THROUGH_SOUNDS_ENVIRONMENT)
         .ok()
         .as_deref()
@@ -3501,6 +3502,21 @@ pub fn serve(
                             })
                     })
                 }));
+                // At the night's rest, the name heard in a line's sound is
+                // answered only with the name in its words too
+                // (`LAMP_REST_NAME_IN_WORDS=on`, #5226): read only here,
+                // where the lamp can be known to rest, and held by the rule
+                // below, which reads the name in the words as it judged them.
+                rest_name_in_words =
+                    std::env::var(crate::second_provider::REST_NAME_IN_WORDS_ENVIRONMENT)
+                        .ok()
+                        .as_deref()
+                        == Some("on");
+                if rest_name_in_words {
+                    eprintln!(
+                        "lamp-voice second: asleep for the night, a line whose sound had the lamp's name but whose words have none is a near-name: it stirs at most and is not answered (LAMP_REST_NAME_IN_WORDS)"
+                    );
+                }
             }
             None => eprintln!(
                 "lamp-voice second: the lamp's name alone is answered at night as by day: no bus to read Expression's state from (LAMP_REST_THROUGH_SOUNDS)"
@@ -4176,6 +4192,17 @@ pub fn serve(
                 heeding
                     .lock()
                     .is_ok_and(|heeding| heeding.name_fired_for(request))
+            }));
+        }
+        // A near-name at the night's rest (`LAMP_REST_NAME_IN_WORDS`, read
+        // above): the words name the lamp as this rule read the name when
+        // it judged the line, "One," with `LAMP_ONE_AS_LAMP` too (#5226).
+        if rest_name_in_words {
+            let heeding = heeding.clone();
+            engine = engine.resting_with_the_name_in_words(Arc::new(move |request, words| {
+                heeding.lock().map_or(true, |heeding| {
+                    heeding.attention.names_the_lamp(request, words)
+                })
             }));
         }
         // The name heard in a wordless piece counts for the line going on from

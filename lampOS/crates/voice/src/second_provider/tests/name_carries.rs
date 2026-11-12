@@ -650,6 +650,85 @@ async fn asleep_for_the_night_the_lamps_name_alone_is_held_back() {
     assert!(asked[0].contains(&called), "{:?}", asked[0]);
 }
 
+/// `LAMP_REST_NAME_IN_WORDS=on` (#5226, row T): on night 7 `lamp-name`
+/// scored room talk 0.994 with nobody saying the name, and the line was
+/// answered for about 50 s. Asleep for the night, a line `lamp-name` heard
+/// the name in, let out by the rule, is held back when its final words
+/// have no name ("lamppost" is not the name); with "Lamp" in them, or a
+/// word written for it set off ("Lynn,"), it is asked as before. The words
+/// are read as the second route's rule reads the name
+/// ([`crate::attention::Attention::names_the_lamp`]): "One," opening a
+/// request is the name with `LAMP_ONE_AS_LAMP` (Thirteen's P2 on #6542:
+/// lamp-3e83's most frequent words for "Lamp,") and not without it.
+/// Switch off, awake, or no hearing of the name: asked, as today.
+#[tokio::test(start_paused = true)]
+async fn asleep_for_the_night_a_name_heard_with_none_in_the_words_is_held_back() {
+    use crate::attention::Attention;
+    use crate::room_told::Room;
+    const ROW_T: &str = "since August. Right. The pump. The front tire has been flat for a week.";
+    const ONE: &str = "One, what time is it?";
+    // The rule as the second route's worker keeps it, `LAMP_ONE_AS_LAMP`
+    // as given, having judged the line in a room not known to be busy.
+    let rule_reads = |one: bool| -> NamesTheLamp {
+        Arc::new(move |request, words: &str| {
+            let mut attention = Attention::default();
+            attention.count_stand_alone_ins(true);
+            attention.count_one_as_the_lamp(one);
+            attention.began_at(request, 7, NAME_READ_US);
+            attention.heard(words);
+            attention.ended(request, 2 * NAME_READ_US);
+            attention.first_output_busy(request, Room::Unknown, false, false, None);
+            attention.names_the_lamp(request, words)
+        })
+    };
+    for (words, one, on, asleep, fired, answered) in [
+        (ROW_T, false, true, true, true, false),
+        (
+            "The lamppost outside is flat.",
+            false,
+            true,
+            true,
+            true,
+            false,
+        ),
+        ("Lamp. What time is it?", false, true, true, true, true),
+        (
+            "The pump is flat, lamp, what do I do?",
+            false,
+            true,
+            true,
+            true,
+            true,
+        ),
+        ("Lynn, what time is it?", false, true, true, true, true),
+        (ONE, true, true, true, true, true),
+        (ONE, false, true, true, true, false),
+        (ROW_T, true, true, true, true, false),
+        (ROW_T, false, false, true, true, true),
+        (ROW_T, false, true, false, true, true),
+        (ROW_T, false, true, true, false, true),
+    ] {
+        let played = script(&[words]);
+        let (engine, _, _) = scripted(played.clone());
+        let mut engine = engine
+            .heeding(Arc::new(|_, _, _, _, _| None))
+            .knowing_the_name_fired(Arc::new(move |_| fired))
+            .resting_through_sounds(Arc::new(move || asleep));
+        if on {
+            engine = engine.resting_with_the_name_in_words(rule_reads(one));
+        }
+        engine.submit(start(1));
+        engine.submit(audio_at(1, NAME_READ_US));
+        engine.submit(ended(1, false));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        assert_eq!(
+            asked(&played).len(),
+            usize::from(answered),
+            "{words:?} one={one} on={on} asleep={asleep} fired={fired}"
+        );
+    }
+}
+
 /// The reviewer's P2 on #4285: "Lamp." alone, held back asleep for the
 /// night, stirs the lamp, and the person, seeing its head lift, asks "What
 /// time is it?" 3.5 s later, past [`NAME_CARRIES_FOR`]. The name's window
