@@ -1078,6 +1078,9 @@ started once its answer is told:
     text): closed with `harness close --machine <id> <agent-id> --json`, by
     the agent's own id, never `--now`. Harness saves its screen and stops it,
     and keeps its conversation, so the person can still open and resume it.
+    `Cli::close_now` (`harness close ... --now`, stopping it even while it
+    works) exists only for a skill run lamp-tasks started, at its deadline
+    or end (#6510 step 2); it is not used yet.
   - **Any other turn or state:** the person went on with it at the computer,
     so it's theirs. It's left for good (`left`), never asked again.
   - **Stopped or failed already:** nothing to close (`closed`, code `gone`).

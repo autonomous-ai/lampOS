@@ -2743,6 +2743,35 @@ impl Cli {
         agent_id: &str,
         within: Duration,
     ) -> Result<Closed, String> {
+        self.close_with(machine, agent_id, within, false)
+    }
+
+    /// Stop a skill run lamp-tasks itself started, at its deadline or its
+    /// end (#6510 step 2): `harness close --now`, which Harness carries out
+    /// even while the session is working. Never for a harness the person
+    /// asked for: those go through [`Cli::close`], which never passes
+    /// `--now`. The session's conversation is not kept by lamp-tasks: the
+    /// caller removes the run's folder. The same checks as
+    /// [`Cli::close_within`]: ids that aren't one start no process, a cloud
+    /// harness is refused, and the time is never more than one
+    /// `launch_timeout`, none left being `close_no_time`. Not used yet.
+    pub fn close_now(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        within: Duration,
+    ) -> Result<Closed, String> {
+        self.close_with(machine, agent_id, within, true)
+    }
+
+    /// `harness close`, with `--now` only when asked ([`Cli::close_now`]).
+    fn close_with(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        within: Duration,
+        now: bool,
+    ) -> Result<Closed, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -2758,18 +2787,19 @@ impl Cli {
         if within.is_zero() {
             return Err("close_no_time".into());
         }
+        let mut args: Vec<OsString> = vec![
+            "close".into(),
+            "--machine".into(),
+            machine.into(),
+            agent_id.into(),
+        ];
+        if now {
+            args.push("--now".into());
+        }
+        args.push("--json".into());
         let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
         let reply = self
-            .run(
-                &[
-                    "close".into(),
-                    "--machine".into(),
-                    machine.into(),
-                    agent_id.into(),
-                    "--json".into(),
-                ],
-                within,
-            )
+            .run(&args, within)
             .map_err(|error| error.code.to_string())?;
         closed(reply.code)
     }
