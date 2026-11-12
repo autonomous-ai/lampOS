@@ -7831,6 +7831,27 @@ light = { dim = 1 }
         set_writes_here(None);
     }
 
+    /// The service grant codes are lamp-services' catalog codes, a
+    /// service's second code (`gmail-app`, `figma-api`) folded to its
+    /// first, in the catalog's order.
+    #[test]
+    fn the_service_grant_codes_are_the_catalogs() {
+        let codes: Vec<&str> = lamp_services::catalog::SERVICES
+            .iter()
+            .map(|service| service.code)
+            .collect();
+        let firsts: Vec<&str> = codes
+            .iter()
+            .copied()
+            .filter(|code| !code.contains('-'))
+            .collect();
+        assert_eq!(firsts, SERVICE_GRANT_CODES);
+        for second in codes.iter().filter(|code| code.contains('-')) {
+            let first = second.split('-').next().unwrap();
+            assert!(SERVICE_GRANT_CODES.contains(&first), "{second}");
+        }
+    }
+
     /// #6432's ruling: a service task's grants are `<code>-read` and
     /// `<code>-write` of the catalog's codes, kept by the cap only with
     /// `LAMP_AGENT_SERVICES` on, and said back in plain words.
