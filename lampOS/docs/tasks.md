@@ -2708,14 +2708,34 @@ for each run, and is answered once the run ends
     the stop cancels the wait, the token is ended, then `close --now`,
     then the folder and token file are removed ("the run was ended as
     lamp-tasks stops"). lamp-tasks waits for this, at most 20 s
-    (`skill_task::STOP_WAIT`), before it exits. A SIGKILL skips it; that
-    is the backstop below. Test: `a_skill_run_is_ended_when_lamp_tasks_stops`.
+    (`skill_task::STOP_WAIT`), before it exits. `lamp-tasks.service` sets
+    no `TimeoutStopSec`, so systemd's default 90 s covers those 20 s; a
+    unit that shortens it below that cuts the stop short. A SIGKILL skips
+    it; the next start sweeps what it left (below). Test:
+    `a_skill_run_is_ended_when_lamp_tasks_stops`.
   - **The workers' own stop** (#6717). After the stop, lamp-tasks waits
     up to 5 s (`runtime::SHUTDOWN_WAIT`) for the store's owner and the
     Harness worker to finish the step each is in. The owner's step can
     hold a durable store write, which takes well over 300 ms on an SD card
     or a loaded disk. Only a worker still busy after that is "Tasks worker
     did not stop; exit this process before restarting".
+  - **The start's sweep** (#6691). A run a SIGKILL cut, or a `close --now`
+    that ran past `STOP_WAIT` or failed, leaves its session, folder or
+    token file behind. At its next start, once Harness is set up,
+    lamp-tasks finds each such run by any one trace: a `skill-<run-id>`
+    folder in its Harness project (never a link), a token file in
+    `/run/lampos-tasks/runs/`, or a session on the lamp's machine named
+    `skill-<run-id>` (`harness ps --json`). Each session is closed
+    `--now` (within `CLOSE_BUDGET`), then the folder and the token file
+    are removed, even when a close failed. One journal line per run says
+    what was closed and removed ("a run an earlier start left,
+    skill-<id>: closed …, folder removed, token file removed"). The sweep
+    runs on a thread of its own before the skill runs' Harness is set, so
+    a skill's run is refused ("Harness isn't set up on this lamp yet")
+    until it is done, no run of this start is ever swept, and spoken tasks
+    don't wait for it. With no lamp target yet, sessions aren't looked
+    for (said); folders and token files still go
+    (`skill_task::sweep_at_start`). Tests: `issue_6691_*`.
   - **No SIGKILL backstop yet.** The design's backstop, SIGKILL to the
     namespace's `unshare` pid when `close --now` fails, is not built:
     Harness's daemon starts Hermes in its own pane, and neither `new` nor

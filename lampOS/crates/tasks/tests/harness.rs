@@ -6860,6 +6860,12 @@ fn issue_6691_named_reads_each_sessions_id_and_name_from_one_ps() {
     );
     let calls = rig.calls();
     assert_eq!(calls.len(), 1);
-    assert_eq!(calls[0]["args"], json!(["ps", "--machine", MACHINE, "--json"]));
-    assert_eq!(rig.cli().named("not a machine"), Err("invalid_machine".into()));
+    assert_eq!(
+        calls[0]["args"],
+        json!(["ps", "--machine", MACHINE, "--json"])
+    );
+    assert_eq!(
+        rig.cli().named("not a machine"),
+        Err("invalid_machine".into())
+    );
 }

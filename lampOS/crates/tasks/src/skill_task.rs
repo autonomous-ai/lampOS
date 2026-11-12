@@ -1501,8 +1501,44 @@ pub struct Leftover {
 /// `(agent id, name)`, from `harness ps`). Read at start, before a run
 /// can begin, so each is one this process never started.
 pub fn leftovers(project: &Path, runs: &Path, named: &[(String, String)]) -> Vec<Leftover> {
-    let _ = (project, runs, named);
-    Vec::new()
+    let mut found: std::collections::BTreeMap<String, Vec<String>> = Default::default();
+    let names = |dir: &Path| -> Vec<(String, std::fs::FileType)> {
+        std::fs::read_dir(dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .filter_map(|entry| {
+                let kind = entry.file_type().ok()?;
+                Some((entry.file_name().into_string().ok()?, kind))
+            })
+            .collect()
+    };
+    // `file_type` never follows a link, so a link named as a run is no
+    // folder of one.
+    for (name, kind) in names(project) {
+        if let Some(run) = name.strip_prefix(RUN_FOLDER_PREFIX)
+            && kind.is_dir()
+            && crate::run_token_file::run_id_ok(run)
+        {
+            found.entry(run.to_owned()).or_default();
+        }
+    }
+    for (name, kind) in names(runs) {
+        if kind.is_file() && crate::run_token_file::run_id_ok(&name) {
+            found.entry(name).or_default();
+        }
+    }
+    for (agent, name) in named {
+        if let Some(run) = name.strip_prefix(RUN_FOLDER_PREFIX)
+            && crate::run_token_file::run_id_ok(run)
+        {
+            found.entry(run.to_owned()).or_default().push(agent.clone());
+        }
+    }
+    found
+        .into_iter()
+        .map(|(run, agents)| Leftover { run, agents })
+        .collect()
 }
 
 /// Each `leftover` undone, as a run's own guard does (#6691): its sessions
@@ -1515,8 +1551,85 @@ pub fn sweep(
     leftovers: &[Leftover],
     close: &dyn Fn(&str) -> Result<(), String>,
 ) -> Vec<String> {
-    let _ = (project, runs, leftovers, close);
-    Vec::new()
+    leftovers
+        .iter()
+        .map(|leftover| {
+            let mut said = Vec::new();
+            for agent in &leftover.agents {
+                said.push(match close(agent) {
+                    Ok(()) => format!("closed {agent}"),
+                    Err(why) => format!("{agent} not closed ({why})"),
+                });
+            }
+            if leftover.agents.is_empty() {
+                said.push("no session named for it".into());
+            }
+            let folder = project.join(format!("{RUN_FOLDER_PREFIX}{}", leftover.run));
+            // A link in the folder's place is only unlinked: nothing it
+            // points to is removed.
+            let folder_gone = match std::fs::symlink_metadata(&folder) {
+                Ok(meta) if meta.is_dir() => std::fs::remove_dir_all(&folder),
+                Ok(_) => std::fs::remove_file(&folder),
+                Err(error) => Err(error),
+            };
+            said.push(match folder_gone {
+                Ok(()) => "folder removed".into(),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => "no folder".into(),
+                Err(error) => format!("folder not removed ({error})"),
+            });
+            said.push(match std::fs::remove_file(runs.join(&leftover.run)) {
+                Ok(()) => "token file removed".into(),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    "no token file".into()
+                }
+                Err(error) => format!("token file not removed ({error})"),
+            });
+            format!(
+                "[lamp-tasks] skill task: a run an earlier start left, {RUN_FOLDER_PREFIX}{}: {}",
+                leftover.run,
+                said.join(", ")
+            )
+        })
+        .collect()
+}
+
+/// lamp-tasks' start (#6691, the `TODO(#6510)` backstop): the runs an
+/// earlier start left (a SIGKILL, or a `close --now` past [`STOP_WAIT`])
+/// are found ([`leftovers`]) and undone ([`sweep`]) with `harness`, before
+/// `slot` is filled. Until then a skill's run is refused ("Harness isn't
+/// set up on this lamp yet"), so no run of this start is ever swept. Run
+/// on a thread of its own, so spoken tasks never wait for it. With no
+/// lamp target yet, the sessions aren't looked for, which is said; the
+/// folders and token files still go.
+pub fn sweep_at_start(harness: SkillHarness, home: &Path, slot: SkillHarnessSlot) {
+    let runner = HarnessRunner::lamp(home, std::sync::Arc::default());
+    let machine = (harness.lamp)().map(|lamp| lamp.machine_id);
+    let cli = crate::harness::Cli::new(harness.config.clone(), harness.session.clone());
+    let named = match (&cli, &machine) {
+        (Ok(cli), Some(machine)) => cli.named(machine).unwrap_or_else(|why| {
+            eprintln!("[lamp-tasks] skill task: runs an earlier start left: Harness's list not read ({why}); only their folders and token files are swept");
+            Vec::new()
+        }),
+        (Err(error), _) => {
+            eprintln!("[lamp-tasks] skill task: runs an earlier start left: Harness can't be asked ({error}); only their folders and token files are swept");
+            Vec::new()
+        }
+        (_, None) => {
+            eprintln!("[lamp-tasks] skill task: runs an earlier start left: the lamp has no Harness target yet; only their folders and token files are swept");
+            Vec::new()
+        }
+    };
+    let found = leftovers(&runner.project, &runner.runs, &named);
+    let close = |agent: &str| match (&cli, &machine) {
+        (Ok(cli), Some(machine)) => cli
+            .close_now(machine, agent, crate::harness::CLOSE_BUDGET)
+            .map(|_| ()),
+        _ => Err("Harness can't be asked".into()),
+    };
+    for line in sweep(&runner.project, &runner.runs, &found, &close) {
+        eprintln!("{line}");
+    }
+    let _ = slot.set(harness);
 }
 
 #[cfg(test)]
@@ -2619,13 +2732,25 @@ mod tests {
         let lines = sweep(&project, &runs, &found, &close);
         assert_eq!(*closed.borrow(), ["agent-1", "agent-2"]);
         assert!(!project.join("skill-run-a").exists());
-        assert!(!project.join("skill-run-b").exists(), "removed though its close failed");
+        assert!(
+            !project.join("skill-run-b").exists(),
+            "removed though its close failed"
+        );
         assert!(!runs.join("run-a").exists());
         assert!(project.join("keep.txt").exists());
         assert_eq!(lines.len(), 2);
-        assert!(lines[0].contains("skill-run-a") && lines[0].contains("closed agent-1"), "{lines:?}");
-        assert!(lines[0].contains("folder removed") && lines[0].contains("token file removed"), "{lines:?}");
-        assert!(lines[1].contains("agent-2 not closed (timeout)"), "{lines:?}");
+        assert!(
+            lines[0].contains("skill-run-a") && lines[0].contains("closed agent-1"),
+            "{lines:?}"
+        );
+        assert!(
+            lines[0].contains("folder removed") && lines[0].contains("token file removed"),
+            "{lines:?}"
+        );
+        assert!(
+            lines[1].contains("agent-2 not closed (timeout)"),
+            "{lines:?}"
+        );
         // Swept again, nothing is left to find.
         assert!(leftovers(&project, &runs, &[]).is_empty());
     }

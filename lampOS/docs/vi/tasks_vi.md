@@ -332,7 +332,10 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     lệnh dừng huỷ lần chờ, token bị kết thúc, rồi `close --now`, rồi thư
     mục và file token bị xoá ("the run was ended as lamp-tasks stops").
     lamp-tasks chờ việc này tối đa 20 giây (`skill_task::STOP_WAIT`) rồi
-    mới thoát. SIGKILL bỏ qua bước này; đó là phần dự phòng bên dưới. Test:
+    mới thoát. `lamp-tasks.service` không đặt `TimeoutStopSec`, nên mặc
+    định 90 giây của systemd đủ cho 20 giây đó; unit nào rút ngắn xuống
+    dưới mức đó sẽ cắt ngang lần dừng. SIGKILL bỏ qua bước này; lần khởi
+    động sau dọn những gì nó để lại (bên dưới). Test:
     `a_skill_run_is_ended_when_lamp_tasks_stops`.
   - **Các worker tự dừng** (#6717). Sau lệnh dừng, lamp-tasks chờ tối đa
     5 giây (`runtime::SHUTDOWN_WAIT`) để owner của store và worker Harness
@@ -340,6 +343,22 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     vững, mất hơn 300 ms nhiều trên thẻ SD hay ổ đĩa đang tải nặng. Chỉ
     worker vẫn bận sau thời gian đó mới báo "Tasks worker did not stop;
     exit this process before restarting".
+  - **Dọn khi khởi động** (#6691). Một lần chạy bị SIGKILL cắt, hay một
+    `close --now` quá `STOP_WAIT` hoặc lỗi, để lại phiên, thư mục hay file
+    token. Ở lần khởi động sau, khi Harness đã sẵn sàng, lamp-tasks tìm mỗi
+    lần chạy như vậy qua bất kỳ một dấu vết: thư mục `skill-<run-id>` trong
+    project Harness của nó (không bao giờ là link), file token trong
+    `/run/lampos-tasks/runs/`, hay một phiên trên máy của đèn tên
+    `skill-<run-id>` (`harness ps --json`). Mỗi phiên được `close --now`
+    (trong `CLOSE_BUDGET`), rồi thư mục và file token bị xoá, kể cả khi
+    đóng lỗi. Mỗi lần chạy có một dòng nhật ký nói đã đóng gì và xoá gì
+    ("a run an earlier start left, skill-<id>: closed …, folder removed,
+    token file removed"). Việc dọn chạy trên một thread riêng trước khi
+    Harness của skill được gắn, nên lần chạy của skill bị từ chối ("Harness
+    isn't set up on this lamp yet") cho tới khi dọn xong, không lần chạy
+    nào của lần khởi động này bị dọn, và việc nói không phải chờ. Khi đèn
+    chưa có target, phiên không được tìm (có ghi lại); thư mục và file
+    token vẫn bị xoá (`skill_task::sweep_at_start`). Test: `issue_6691_*`.
   - **Chưa có SIGKILL dự phòng.** Phần dự phòng trong thiết kế, SIGKILL
     tới pid `unshare` của namespace khi `close --now` lỗi, chưa được xây:
     daemon của Harness khởi động Hermes trong pane riêng, và cả `new` lẫn

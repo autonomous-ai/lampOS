@@ -26,7 +26,7 @@ const RUN_ID_MAX: usize = 64;
 
 /// A run id is a plain name: `a-z`, `0-9` and `-`, 1 to 64 bytes, so the
 /// file is always directly in its folder.
-fn run_id_ok(run_id: &str) -> bool {
+pub(crate) fn run_id_ok(run_id: &str) -> bool {
     !run_id.is_empty()
         && run_id.len() <= RUN_ID_MAX
         && run_id
