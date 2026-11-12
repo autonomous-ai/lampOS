@@ -78,6 +78,13 @@ Environment=LAMP_BUS=on
 # privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
 # Voice and Ears together (the lead on #1711, 20 Oct 09:33: the lamps have the switch; the first builder at 09:51).
 Environment=LAMP_PRIVACY_CONTROLS=on
+# A stall of the voice itself under about 1.44 s is ridden closed, not an exit (#5611, privacy-switch.md): the privacy
+# worker rides its granting lease's lapse publishing nothing, the second worker holds closed, and the loop rides the
+# gap with the answer cut and the microphones and camera given nothing until a fresh steady reading. lamp-06c1, 12 Nov
+# 14:32:11 on 12226: a 274 ms coordinator stall as the first session after a muted wait began ended both workers with
+# exit 1 and the voice on "privacy.c.p: Connection refused; verified cleanup failed" (#5224). A longer stall ends all
+# as before.
+Environment=LAMP_PRIVACY_RIDES_STALL=on
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BUS_AUDIO=on
 Environment=LAMP_ATTENTION=busy-near
