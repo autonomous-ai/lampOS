@@ -8,6 +8,7 @@ import io
 import json
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest import mock
 
@@ -52,6 +53,7 @@ class FakeCommands:
     """A stateful GitHub release API, with failures before and after mutations."""
     def __init__(self, sequence=9):
         self.calls = []
+        self.lock = threading.Lock()
         self.release_map = {}
         self.refs = set()
         self.next_id = 1
@@ -111,6 +113,11 @@ class FakeCommands:
             raise P.ServerError("gh api failed (exit 1): HTTP 504: We couldn't respond to your request in time")
 
     def run(self, words, output=None):
+        # The publisher checks assets from several threads (#6556): one call at a time.
+        with self.lock:
+            return self.answer(words, output)
+
+    def answer(self, words, output=None):
         words = [str(word) for word in words]
         self.calls.append(words)
         if words[0] == "git":

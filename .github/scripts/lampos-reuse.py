@@ -12,8 +12,8 @@ then builds and tests as before. Never fails: any error is a refusal.
 
 The checks, in order:
   1. the pull request merged as this commit is a train's, from this repository;
-  2. its newest ARM64 run on its head commit whose build and every test
-     runner (1/N to N/N, none missing or skipped) succeeded, latest attempt;
+  2. its newest ARM64 run on its head commit whose build, release and every
+     test runner (1/N to N/N, none missing or skipped) succeeded, latest attempt;
   3. that run names the merge commit it tested (its `lampos-arm64-tested-<sha>`
      artifact), a merge of the pull request's head, whose tree equals this
      push's tree; the tree includes .github/, so the same workflow and tests ran;
@@ -39,10 +39,11 @@ BRANCH = "lamp-voice"
 TRAIN = "first/train-"
 ARM64 = "lampOS — build and test on Linux ARM64 ("
 BUILD = ARM64 + "build)"
+RELEASE = ARM64 + "release)"
 SHARD = re.compile(re.escape(ARM64) + r"([1-9][0-9]*)/([1-9][0-9]*)\)")
 TESTED = re.compile(r"lampos-arm64-tested-([0-9a-f]{40})")
 CACHED = re.compile(r"lampos-arm64-cache-key-([a-z]+)-(none|lampos-arm64-u2204-[0-9a-f]+-[0-9a-f]{40})")
-CACHING = ["build"]  # the jobs that restore a cache, each recording the key it restored
+CACHING = ["build", "release"]  # the jobs that restore a cache, each recording the key it restored
 API_TIMEOUT = 15  # s per request
 
 
@@ -84,15 +85,16 @@ def decide(get, sha, repo):
             continue
         jobs = [j for j in get(f"actions/runs/{r['id']}/attempts/{r['run_attempt']}/jobs?per_page=100")["jobs"]
                 if j["name"].startswith(ARM64)]
-        # The build and every test runner, 1/N to N/N, each once: a missing or skipped one is no pass.
+        # The build, the release and every test runner, 1/N to N/N, each once: a missing or skipped one is no pass.
         shards = sorted(m.groups() for j in jobs if (m := SHARD.fullmatch(j["name"])))
         total = len(shards)
         whole = total > 0 and shards == sorted((str(i), str(total)) for i in range(1, total + 1))
-        if whole and len(jobs) == total + 1 and any(j["name"] == BUILD for j in jobs) \
+        names = [j["name"] for j in jobs]
+        if whole and len(jobs) == total + 2 and BUILD in names and RELEASE in names \
                 and all(j["conclusion"] == "success" for j in jobs):
             run = r
             break
-    require(run is not None, f"#{pr['number']} has no ARM64 run on {head} whose build and every test runner passed")
+    require(run is not None, f"#{pr['number']} has no ARM64 run on {head} whose build, release and every test runner passed")
 
     artifacts = [a for a in get(f"actions/runs/{run['id']}/artifacts?per_page=100")["artifacts"] if not a["expired"]]
     tested = [m.group(1) for a in artifacts if (m := TESTED.fullmatch(a["name"]))]
