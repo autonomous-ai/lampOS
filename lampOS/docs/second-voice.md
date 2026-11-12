@@ -3626,6 +3626,9 @@ after a take-over, but now for every turn:
   lamp-06c1 on 28 Oct, with the product's switches, the room was judged
   busy in 1 round of 6, and desk talk was let out as going on in the quiet
   room's window all the same.
+  On in the product unit (#5223), pending desk-kit-2's rounds on
+  lamp-06c1: desk talk held 10/12 or better in each of 3 rounds, answered
+  lines no more than one below off.
 - **A reply never says it kept something with no `remember` call**
   (finding K on #3504: lamp-06c1, 27 Oct, "Kept: the meeting room is
   called Orange." with `calls=none`, 2 of 4 remembers, the model copying

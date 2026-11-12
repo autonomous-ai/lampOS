@@ -81,6 +81,12 @@ Environment=LAMP_PRIVACY_CONTROLS=on
 Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BUS_AUDIO=on
 Environment=LAMP_ATTENTION=busy-near
+# Desk talk let out only as the conversation going on is held when it turns to someone else: a role called at its
+# start ("Mom,"), an object asked for between people ("pass me"), or a line that is all errand ("I'm going
+# downstairs"), in any room, busy or not (#3882, #3959): on lamp-06c1 on 28 Oct, with the product's switches, the room
+# was judged busy in 1 round of 6, so a busy-room-only hold never acted. On pending desk-kit-2's rounds on lamp-06c1
+# (#5223): desk talk held 10/12 or better in each of 3 rounds, answered lines no more than one below off.
+Environment=LAMP_TURNED_AWAY=on
 Environment=LAMP_AIR_FACTS=on
 Environment=LAMP_RING_EYE=strong
 Environment=LAMP_SHORT_SOUNDS=quiet-room-checked
