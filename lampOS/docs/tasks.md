@@ -1615,8 +1615,8 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
       targets written before go: none can be reached signed out. Not
       installed here, a target written so before is removed; any other
       file is left as it is. The engine is the first in `lamp_order` (the
-      lamp's engines switched on, in `LAMP_LAMP_ENGINE`'s order, OpenClaw
-      first unless set, OpenClaw left out while the Harness here is too old
+      lamp's engines switched on, in `LAMP_LAMP_ENGINE`'s order, Hermes
+      first unless set (#6497), OpenClaw left out while the Harness here is too old
       for it) that is installed here; neither engine is named anywhere else.
       One journal line a change.
     - **No machines look and no `--machine`.** A target naming this
@@ -1829,13 +1829,17 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     (such as `dance`) called by `lamp-tasks skill call` from Hermes'
     own namespace.
 - **The lamp itself, with OpenClaw** (`LAMP_OPENCLAW_ON_LAMP=on`, only
-  with `--engines-from-machines`; off unless set, #6226). OpenClaw is the
-  lamp's default engine (no memory floor: the owner, #6226, every lamp has 6 GB): it takes Hermes's place as the lamp's own target
-  in exactly Hermes's role (above), and Hermes stays selectable.
+  with `--engines-from-machines`; off unless set, #6226). OpenClaw runs
+  in exactly Hermes's role (above), as the lamp's own target when the owner
+  chooses it (`LAMP_LAMP_ENGINE=openclaw`; the app's choice, #6492), or
+  while Hermes is off or not installed. **Hermes is the lamp's default
+  engine** (the owner, #6497, replacing #6226's OpenClaw default), and only
+  one engine runs the lamp's work at a time: a person naming the other
+  doesn't move the work to it.
   `lamp_order` (`crates/tasks/src/runtime.rs`) leaves OpenClaw out only
   while the Harness on the lamp is older than 0.6.11.
-  - **Which engine:** `LAMP_LAMP_ENGINE` is `openclaw` or `hermes`, unset
-    `openclaw`, the default (no memory floor, #6226). The lamp's target is still `lamp`, with that engine; when
+  - **Which engine:** `LAMP_LAMP_ENGINE` is `hermes` or `openclaw`, unset
+    `hermes`, the default (#6497). The lamp's target is still `lamp`, with that engine; when
     the one chosen is not installed but the other is, the other.
   - **Started** as Harness starts OpenClaw:
     `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
@@ -1845,7 +1849,7 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     engine from `{"op":"targets"}` and names it, so a hand-over naming no
     machine is said as "OpenClaw on the lamp" and the tool descriptions
     say "OpenClaw here on the lamp"; with `hermes` there, "Hermes" as
-    before. Until the targets are read it says OpenClaw, the default.
+    before. Until the targets are read it says Hermes, the default (#6497).
     `who` "OpenClaw" or "Hermes", while the lamp has its target, is the
     lamp's own, never a computer's. OpenClaw is also one of the agents the
     voice can name on a computer, heard as "OpenClaw", "open claw", "open

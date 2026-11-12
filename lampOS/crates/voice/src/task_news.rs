@@ -5044,8 +5044,8 @@ mod tests {
         assert_eq!(their_computer(&on("lamp", "claude")), "their computer");
     }
 
-    /// #6226: work done by OpenClaw on the lamp itself, the lamp's default
-    /// engine, is told as done here on the lamp, by OpenClaw, as Hermes's.
+    /// #6226: work done by OpenClaw on the lamp itself, the lamp's engine
+    /// when chosen, is told as done here on the lamp, by OpenClaw, as Hermes's.
     #[test]
     fn work_done_by_openclaw_on_the_lamp_is_told_as_done_here() {
         let done =
