@@ -1,12 +1,15 @@
 //! The lamp's default agent chosen in the owner's app (#6492):
-//! `engines.default` (`{"engine": "hermes"}` or `"openclaw"`), with the same
+//! `engines.default` (`{"engine": "<name>"}`, any engine Harness reports on
+//! the lamp: "hermes", "openclaw", "claude", "codex", …), with the same
 //! switches as `engines.install` (`LAMP_APP_UPDATE=on` and
-//! `LAMP_APP_ENGINES=on`, `crate::update`). lamp-cloud checks the name and
-//! hands it to lamp-tasks' route for the app ([`crate::harness_sign_in::SOCKET`])
-//! as one JSON line, `{"op":"app_engine_default","engine":…}`; lamp-tasks
-//! decides and keeps the choice, and answers `{"default":…,
-//! "chosen_in_app":true}` or a refusal's code (`engine_unknown`,
-//! `engine_not_installed`), passed on as the call's error.
+//! `LAMP_APP_ENGINES=on`, `crate::update`). lamp-cloud keeps no list of
+//! engines: it refuses only an empty or missing name, and hands any other to
+//! lamp-tasks' route for the app ([`crate::harness_sign_in::SOCKET`]) as one
+//! JSON line, `{"op":"app_engine_default","engine":…}`; lamp-tasks decides
+//! whether that engine is on the lamp and keeps the choice, and answers
+//! `{"default":…, "chosen_in_app":true}` or a refusal's code
+//! (`engine_unknown`, `engine_not_installed`, `engine_default_unsaved`),
+//! passed on as the call's error.
 //!
 //! `update.status`'s `engines` carries the default as lamp-tasks says it
 //! (`app_engine_default_state`): `default` and `default_chosen_in_app`,
@@ -18,10 +21,8 @@ use std::path::Path;
 /// The call's kind.
 pub const KIND: &str = "engines.default";
 
-/// The agents the app may choose as the default.
-pub const ENGINES: [&str; 2] = ["hermes", "openclaw"];
-
-/// Refused: no such agent (here, before lamp-tasks is asked, or by it).
+/// Refused: no agent named (here, before lamp-tasks is asked), or one
+/// lamp-tasks does not know.
 pub const ENGINE_UNKNOWN: &str = "engine_unknown";
 /// Refused by lamp-tasks: the agent is not installed on the lamp.
 pub const ENGINE_NOT_INSTALLED: &str = "engine_not_installed";
@@ -30,9 +31,11 @@ pub const ENGINE_NOT_INSTALLED: &str = "engine_not_installed";
 /// `socket`: `{"default":…,"chosen_in_app":…}`, or the refusal's code
 /// ([`ENGINE_UNKNOWN`], [`ENGINE_NOT_INSTALLED`], `unreachable`, …).
 pub fn choose(socket: &Path, data: &Value) -> Result<Value, String> {
+    // Any name: whether it is on the lamp is lamp-tasks' to say (#6492).
     let engine = data["engine"]
         .as_str()
-        .filter(|engine| ENGINES.contains(engine))
+        .map(str::trim)
+        .filter(|engine| !engine.is_empty())
         .ok_or(ENGINE_UNKNOWN)?;
     let said = crate::harness_sign_in::exchange(
         socket,
@@ -56,7 +59,7 @@ pub fn add_to(status: &mut Value, socket: &Path) {
     else {
         return;
     };
-    let Some(default) = said["default"].as_str().filter(|e| ENGINES.contains(e)) else {
+    let Some(default) = said["default"].as_str().filter(|e| !e.trim().is_empty()) else {
         return;
     };
     engines.insert("default".into(), default.into());
@@ -84,8 +87,10 @@ mod tests {
     use crate::harness_sign_in::tests::{folder, tasks};
 
     /// #6492: the engine goes to lamp-tasks as `app_engine_default`; its
-    /// answer comes back; an unknown name is refused before lamp-tasks is
-    /// asked; lamp-tasks' refusal passes through; no socket, unreachable.
+    /// answer comes back; any engine name goes, a third one ("codex") as
+    /// "hermes" (no list of engines here); an empty or missing name is
+    /// refused before lamp-tasks is asked; lamp-tasks' refusal passes
+    /// through; no socket, unreachable.
     #[test]
     fn the_default_is_handed_to_lamp_tasks_and_its_refusals_passed_on() {
         let dir = folder("ed");
@@ -93,6 +98,7 @@ mod tests {
             &dir,
             vec![
                 r#"{"ok":true,"default":"hermes","chosen_in_app":true}"#,
+                r#"{"ok":true,"default":"codex","chosen_in_app":true}"#,
                 r#"{"ok":false,"error":"engine_not_installed"}"#,
             ],
         );
@@ -105,7 +111,20 @@ mod tests {
             serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
             json!({"op": "app_engine_default", "engine": "hermes"})
         );
-        for data in [json!({"engine": "claude"}), json!({}), json!({"engine": 1})] {
+        assert_eq!(
+            choose(&socket, &json!({"engine": " codex "})),
+            Ok(json!({"default": "codex", "chosen_in_app": true}))
+        );
+        assert_eq!(
+            serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
+            json!({"op": "app_engine_default", "engine": "codex"})
+        );
+        for data in [
+            json!({"engine": ""}),
+            json!({"engine": "  "}),
+            json!({}),
+            json!({"engine": 1}),
+        ] {
             assert_eq!(
                 choose(&socket, &data),
                 Err(ENGINE_UNKNOWN.to_owned()),
@@ -120,7 +139,7 @@ mod tests {
             serde_json::from_str::<Value>(&asked.recv().unwrap()).unwrap(),
             json!({"op": "app_engine_default", "engine": "openclaw"})
         );
-        assert!(asked.try_recv().is_err(), "an unknown name was forwarded");
+        assert!(asked.try_recv().is_err(), "an empty name was forwarded");
         assert_eq!(
             message_for(ENGINE_NOT_INSTALLED),
             "That engine isn't installed on the lamp."

@@ -162,8 +162,12 @@ impl EngineKind {
         matches!(self, Self::DevinCloud)
     }
 
-    /// Whether this is an engine the lamp itself runs, for the target
-    /// [`crate::runtime::LAMP_TARGET`]: Hermes (#5978) or OpenClaw (#6226).
+    /// Whether this is an engine lamp-update installs on the lamp and
+    /// lamp-tasks writes settings for: Hermes (#5978) or OpenClaw (#6226).
+    /// Not the lamp's list of engines: the target
+    /// [`crate::runtime::LAMP_TARGET`] runs any engine Harness reports on
+    /// the lamp and starts with a task (#6492,
+    /// [`crate::runtime::lamp_order`]).
     pub fn on_lamp(self) -> bool {
         matches!(self, Self::Hermes | Self::Openclaw)
     }
@@ -282,12 +286,16 @@ pub struct SessionMachines {
 
 impl SessionMachines {
     /// From the targets: the lamp's own ([`crate::runtime::LAMP_TARGET`],
-    /// Hermes or OpenClaw) and every other on a computer (not a cloud agent), each
-    /// machine once.
+    /// with Hermes or OpenClaw, or any engine Harness runs there in the
+    /// lamp's own folder, #6492) and every other on a computer (not a
+    /// cloud agent), each machine once.
     pub fn from_targets(targets: &BTreeMap<String, Target>) -> Self {
         let lamp = targets
             .get(crate::runtime::LAMP_TARGET)
-            .filter(|target| target.engine.on_lamp())
+            .filter(|target| {
+                target.engine.on_lamp()
+                    || (!target.engine.cloud() && target.project == crate::runtime::LAMP_PROJECT)
+            })
             .map(|target| target.machine_id.clone());
         let mut computers: Vec<(String, String, EngineKind)> = Vec::new();
         for (alias, target) in targets {
@@ -1448,7 +1456,8 @@ impl Cli {
         let mut offline: BTreeSet<String> = BTreeSet::new();
         if let Some(shared) = &self.config.session_machines
             && let Ok(known) = shared.lock()
-            && target.engine.on_lamp()
+            // The lamp's own target, whatever its engine (#6492).
+            && !target.engine.cloud()
             && known.lamp.as_ref() == Some(&target.machine_id)
         {
             offline = known.offline.clone();
