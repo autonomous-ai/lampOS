@@ -2236,7 +2236,7 @@ them) (`crates/tasks/src/openclaw_config.rs`):
   `lampos`'s home), where the lamp's skills keys point and the guidance
   (`AGENTS.md`) is written, as for Hermes.
 
-## A skill's task on the lamp's Hermes (#6306, #6071's PR 3, off unless `LAMP_SKILL_TASKS=on`)
+## A skill's task on the lamp's Hermes (#6306, #6071's PR 3, off unless `LAMP_SKILL_TASKS=on`, on in the product)
 
 A made skill's `do.task` step (#6305, docs/skills.md, "A skill's task")
 hands its slower part to the lamp's own Hermes. lamp-skills sends one line
@@ -2363,14 +2363,12 @@ for each run, and is answered once the run ends
 
 **Not yet (said so the code is not read as more):** `ControlTokens` speaks
 lamp-control's admin socket (#6408, merged), but lamp-control keeps no skill
-yes yet, so every mint is refused there today. No product unit sets
-`LAMP_SKILL_TASKS=on` for lamp-tasks, and none passes lamp-skills the
-socket, so nothing on a lamp runs a skill's task. hermes-ns shows the run
-lamp-control's `control.sock` only with `LAMP_SKILL_TASKS=on` in
-lamp-update's own unit too, which no product unit sets either; its own
-network namespace is the same. `LAMP_SKILL_TASKS` stays off until
-lamp-control's grants reach mail, the calendar and the rest through
-`control.sock` (#6436). The run's result is not yet Task news, and the
+yes yet, so every mint is refused there today. The product units set
+`LAMP_SKILL_TASKS=on` for lamp-tasks and lamp-update (12 Nov), but none
+passes lamp-skills the socket, so nothing on a lamp runs a skill's task
+yet. hermes-ns shows the run lamp-control's `control.sock` only with
+`LAMP_SKILL_TASKS=on` in lamp-update's own unit too; its own network
+namespace is the same. The run's result is not yet Task news, and the
 skill's folder is named in the run's words, not in the work folder's
 `AGENTS.md`. The caps on
 lamp-tasks.service (`MemoryHigh`, `CPUQuota`) wait for measurements of
