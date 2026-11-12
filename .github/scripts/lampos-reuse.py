@@ -114,7 +114,8 @@ def decide(get, sha, repo):
         refs = [c["ref"] for c in get(f"actions/caches?key={key}&per_page=100")["actions_caches"] if c["key"] == key]
         require(refs and all(r == f"refs/heads/{BRANCH}" for r in refs),
                 f"run {run['id']}'s {job} restored {key}, which is not lamp-voice's alone ({sorted(set(refs))})")
-    return run["id"], name, f"#{pr['number']}'s run {run['id']} tested this tree ({tested[0]}); publishing its {name}"
+    return run["id"], name, (f"#{pr['number']}'s run {run['id']} tested tree {commit['tree']['sha']} ({tested[0]}), "
+                             f"this push's tree is {mine}: equal; publishing its {name}")
 
 
 def main():
