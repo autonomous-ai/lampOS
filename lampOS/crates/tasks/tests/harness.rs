@@ -455,51 +455,33 @@ fn devins_task_is_typed_in_with_reply_once_it_is_idle() {
     );
 }
 
-/// #6226, lamp-c0a4: OpenClaw's first prompt is lost when its Gateway's
-/// handshake times out. After `new`, `show` is read: asked already (`ask`
-/// set), nothing is typed. Idle with no ask (#6499, 12139 on lamp-52e6):
-/// that empty harness is closed and `new` asked once more with the same
-/// words, never `reply` first, which needs the person's `programs-reply`.
-/// Lost twice, it is typed in once, as before, and never started a third
-/// time.
+/// An OpenClaw launch on the lamp, the calls it made, as verbs.
+fn openclaw_verbs(rig: &Rig) -> Vec<String> {
+    rig.calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect()
+}
+
+/// An OpenClaw `show` reading, with this `state` and `ask`.
+fn openclaw_seen(state: &str, ask: Value) -> Value {
+    step(json!({"id":AGENT,"state":state,"ask":ask,"answer":"","truncated":false,"tools":0}))
+}
+
+/// #6499: OpenClaw's `show` on the lamp can read idle with no ask seconds
+/// after a `new` whose `--message` it did take (12139 on lamp-52e6, 9adf's
+/// runs on #6504). Idle with no ask counts as handed over: one `new`, and
+/// nothing closed, started again or replied.
 #[test]
-fn openclaws_lost_first_prompt_is_started_once_more_and_a_taken_one_is_left() {
+fn openclaw_idle_with_no_ask_after_new_is_taken_as_handed_over() {
     let mut request = launch();
     request.target.engine = EngineKind::Openclaw;
-    let seen = |state: &str, ask: Value| {
-        step(json!({"id":AGENT,"state":state,"ask":ask,"answer":"","truncated":false,"tools":0}))
-    };
-    let verbs = |rig: &Rig| -> Vec<String> {
-        rig.calls()
-            .iter()
-            .map(|call| call["args"][0].as_str().unwrap().to_owned())
-            .collect()
-    };
-    // Taken: the prompt arrived, no reply.
-    let rig = Rig::new();
-    rig.plan(json!({
-        "machines":{"default":true},"new":{"default":true},
-        "show":{"each":[seen("working", json!("Inspect the authored fixture"))]},
-        "reply":{"default":true}
-    }));
-    assert_eq!(
-        rig.cli().launch(&request),
-        LaunchOutcome::Created {
-            agent_id: AGENT.into()
-        }
-    );
-    assert_eq!(verbs(&rig), ["machines", "new", "show"]);
-    let new = rig.calls()[1]["args"].as_array().unwrap().clone();
-    assert!(new.iter().any(|arg| arg == "--task"), "{new:?}");
-    // Lost once: the empty harness is closed, `new` is asked again with
-    // the same words, and the second one is asked its prompt. No reply.
     let rig = Rig::new();
     rig.plan(json!({
         "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
         "show":{"each":[
-            seen("starting", Value::Null),
-            seen("idle", Value::Null),
-            seen("working", json!("Inspect the authored fixture"))
+            openclaw_seen("starting", Value::Null),
+            openclaw_seen("idle", Value::Null)
         ]},
         "reply":{"default":true}
     }));
@@ -509,56 +491,21 @@ fn openclaws_lost_first_prompt_is_started_once_more_and_a_taken_one_is_left() {
             agent_id: AGENT.into()
         }
     );
-    assert_eq!(
-        verbs(&rig),
-        ["machines", "new", "show", "show", "close", "new", "show"]
-    );
-    let calls = rig.calls();
-    assert_eq!(
-        calls[4]["args"],
-        json!(["close", "--machine", MACHINE, AGENT, "--json"])
-    );
-    assert_eq!(calls[5]["args"], calls[1]["args"], "the same new again");
-    // The close refused or failing: the first may still take its prompt,
-    // so nothing more is started (Heron's P2 on #6504).
-    for close in [json!({"exit":5}), json!({"exit":1})] {
-        let rig = Rig::new();
-        rig.plan(json!({
-            "machines":{"default":true},"new":{"default":true},"close":close,
-            "show":{"each":[
-                seen("idle", Value::Null),
-                seen("working", json!("Inspect the authored fixture"))
-            ]}
-        }));
-        assert_eq!(
-            rig.cli().launch(&request),
-            LaunchOutcome::Uncertain {
-                code: "openclaw_not_closed".into()
-            },
-            "{close}"
-        );
-        assert_eq!(verbs(&rig), ["machines", "new", "show", "close"]);
-    }
-    // The second `new` refused: nothing runs the task, uncertain under its
-    // own code, and no reply.
-    let rig = Rig::new();
-    rig.plan(json!({
-        "machines":{"default":true},"close":{"exit":0},
-        "new":{"each":[{"default":true},{"exit":1,"stdout":""}]},
-        "show":seen("idle", Value::Null)
-    }));
-    assert_eq!(
-        rig.cli().launch(&request),
-        LaunchOutcome::Uncertain {
-            code: "openclaw_new_again_failed".into()
-        }
-    );
-    assert_eq!(verbs(&rig), ["machines", "new", "show", "close", "new"]);
-    // Lost twice: typed in once, as before, and never a third `new`.
+    assert_eq!(openclaw_verbs(&rig), ["machines", "new", "show", "show"]);
+    let new = rig.calls()[1]["args"].as_array().unwrap().clone();
+    assert!(new.iter().any(|arg| arg == "--task"), "{new:?}");
+}
+
+/// An OpenClaw read asked (`ask` set) after `new` is under way, as
+/// Harness answered it: nothing closed, started again or replied.
+#[test]
+fn openclaw_asked_after_new_is_created_with_nothing_more_called() {
+    let mut request = launch();
+    request.target.engine = EngineKind::Openclaw;
     let rig = Rig::new();
     rig.plan(json!({
         "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
-        "show":seen("idle", Value::Null),
+        "show":{"each":[openclaw_seen("working", json!("Inspect the authored fixture"))]},
         "reply":{"default":true}
     }));
     assert_eq!(
@@ -567,22 +514,28 @@ fn openclaws_lost_first_prompt_is_started_once_more_and_a_taken_one_is_left() {
             agent_id: AGENT.into()
         }
     );
-    assert_eq!(
-        verbs(&rig),
-        ["machines", "new", "show", "close", "new", "show", "reply"]
+    assert_eq!(openclaw_verbs(&rig), ["machines", "new", "show"]);
+}
+
+/// An OpenClaw `show` that fails to run after `new` leaves the launch
+/// uncertain under its own code, with nothing closed, started again or
+/// replied.
+#[test]
+fn openclaw_whose_show_fails_after_new_is_uncertain() {
+    let mut request = launch();
+    request.target.engine = EngineKind::Openclaw;
+    let mut rig = Rig::new();
+    rig.config.read_timeout = Duration::from_millis(300);
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"delay_ms":3000,"default":true},"reply":{"default":true}
+    }));
+    let outcome = rig.cli().launch(&request);
+    assert!(
+        matches!(outcome, LaunchOutcome::Uncertain { ref code } if code != "never_idle"),
+        "{outcome:?}"
     );
-    assert_eq!(
-        rig.calls()[6]["args"],
-        json!([
-            "reply",
-            "--machine",
-            MACHINE,
-            AGENT,
-            "--json",
-            "--",
-            "Inspect the authored fixture"
-        ])
-    );
+    assert_eq!(openclaw_verbs(&rig), ["machines", "new", "show"]);
 }
 
 /// A Devin whose task couldn't be typed in was still started, so it is
@@ -6530,40 +6483,5 @@ fn the_index_lives_in_the_tasks_folder_the_reset_wipes() {
             .iter()
             .any(|path| path == "/var/lib/lampos-tasks/store"),
         "the reset plan wipes the tasks folder"
-    );
-}
-
-/// #6504 (Thirteen's P3): an OpenClaw `new` that made its folder (`--new
-/// <name>`) and lost its first prompt is asked once more in that folder,
-/// never `--new` again, which Harness refuses with the project there.
-#[test]
-fn openclaws_second_start_after_a_made_folder_names_the_folder() {
-    let rig = new_folder_rig();
-    let mut request = in_made_folder();
-    request.target.engine = EngineKind::Openclaw;
-    let seen = |state: &str, ask: Value| {
-        step(json!({"id":AGENT,"state":state,"ask":ask,"answer":"","truncated":false,"tools":0}))
-    };
-    rig.plan(json!({
-        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
-        "show":{"each":[
-            seen("idle", Value::Null),
-            seen("working", json!("Inspect the authored fixture"))
-        ]}
-    }));
-    assert_eq!(
-        rig.cli().launch(&request),
-        LaunchOutcome::Created {
-            agent_id: AGENT.into()
-        }
-    );
-    let news = new_args(&rig);
-    assert_eq!(news.len(), 2);
-    assert!(news[0].as_array().unwrap().iter().any(|arg| arg == "--new"));
-    let second = news[1].as_array().unwrap();
-    assert!(!second.iter().any(|arg| arg == "--new"), "{second:?}");
-    assert!(
-        second.iter().any(|arg| arg == "~/harnesses/lamp-tasks"),
-        "{second:?}"
     );
 }
