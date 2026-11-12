@@ -10976,6 +10976,57 @@ fn drop_carried_rounds(shared: &Shared, request: u64) {
     }
 }
 
+/// What a cut answer's finished rounds carried into a held line did
+/// ([`carried_done`]).
+#[derive(Debug, Default, PartialEq)]
+struct CarriedDone {
+    /// A call other than a `recall` ran and was not refused.
+    kept: bool,
+    /// One of those was a `remember`.
+    remembered: bool,
+    /// One of those was not a `remember`.
+    other: bool,
+}
+
+/// [`CarriedDone`] of `messages`: each call matched to its tool result by
+/// its id among its own round's results, judged as the call loop judges
+/// its own (a result neither `remembered:false` nor an error did
+/// something). A call with no result did nothing (C135).
+fn carried_done(messages: &[Message]) -> CarriedDone {
+    let mut done = CarriedDone::default();
+    for (at, asked) in messages.iter().enumerate() {
+        // A call's result is among the tool messages after its own
+        // assistant message, up to the next one: ids repeat across rounds
+        // (`call_0` made for each round's first call with none, Gemini's
+        // `function-call-1` per response), Jarvis's P2 on #6570.
+        let results = messages[at + 1..]
+            .iter()
+            .take_while(|message| message.role != "assistant")
+            .filter(|message| message.role == "tool");
+        for call in &asked.tool_calls {
+            let (Some(id), Some(name)) = (call["id"].as_str(), call["function"]["name"].as_str())
+            else {
+                continue;
+            };
+            let Some(told) = results
+                .clone()
+                .find(|message| message.tool_call_id.as_deref() == Some(id))
+                .and_then(Message::words)
+                .and_then(|told| serde_json::from_str::<Value>(told).ok())
+            else {
+                continue;
+            };
+            let did = told["remembered"] != false && told.get("error").is_none();
+            if did && name != crate::remember::RECALL {
+                done.kept = true;
+                done.remembered |= name == crate::remember::REMEMBER;
+                done.other |= name != crate::remember::REMEMBER;
+            }
+        }
+    }
+    done
+}
+
 /// The finished rounds carried in with `request`'s words: a held line's,
 /// answering words cut short (#5026). None for words of its own.
 fn carried_rounds(shared: &Shared, request: u64) -> Vec<Message> {
@@ -14779,6 +14830,11 @@ async fn answer(
                 Some((call["function"]["name"].as_str()?.to_owned(), args))
             })
             .collect();
+        // They are the turn's own for keep claims too (C135, lamp-06c1, 12
+        // Nov, build 12226: request 26 kept the umbrella, a newer line cut
+        // it before its words, and request 27's "Kept: …" was said as
+        // `NOT_KEPT_LINE`), judged as the call loop judges its own calls.
+        let carried = carried_done(&rounds);
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
         // is told one went unsaid beside other calls.
@@ -14843,12 +14899,13 @@ async fn answer(
             messages.push(Message::system(note.clone()));
         }
         let mut kept_now = held_keep_ran
+            || carried.kept
             || done_already
                 .as_ref()
                 .is_some_and(|(_, done)| *done != crate::remember::MemoryDone::Forgotten);
         // A forget invalidates earlier memory-keep evidence, while completed
         // non-memory actions may still have their content-free confirmation.
-        let mut confirmed_other_call = false;
+        let mut confirmed_other_call = carried.other;
         let mut keep_claim_asked = false;
         // Told before the round after one whose claim went unsaid beside
         // other calls, once those calls are answered: what the model is
@@ -14863,7 +14920,7 @@ async fn answer(
         // not said beside a `remember` call that keeps it (finding K2 on
         // #3504), and whether a `remember` of this request ran.
         let mut offer_hold = crate::remember::OfferHold::default();
-        let mut remember_ran = false;
+        let mut remember_ran = carried.remembered;
         // Whether a don't-know was recalled once already in this turn
         // (`LAMP_MEMORY_DONT_KNOW_RECALLS`).
         let mut dont_know_recalled = false;
