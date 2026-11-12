@@ -5,7 +5,7 @@
 //! [`SWITCH`] (`LAMP_APP_ENGINES`) `on` exactly in lamp-update's own unit;
 //! off, `engines` is absent and nothing is subscribed to.
 //!
-//! Hermes is the only engine now ([`HERMES`]), read from its install's
+//! Hermes ([`HERMES`]) is read from its install's
 //! record ([`crate::hermes_install::record`]) as [`hermes`] maps it. A tap
 //! only marks the install asked ([`Engines::pending`]): the next round's
 //! Hermes step then opens [`crate::hermes_schedule::Window::Asked`], which
@@ -24,6 +24,16 @@
 //! [`crate::hermes_schedule::Window::Asked`], which a recent failure does
 //! not hold, takes its turn after Hermes's in Harness's one-shot, and runs
 //! under the same watch, with the same freeze, stop and floors.
+//!
+//! Every other engine is Harness's own (the lead's rule of 12 Nov, V2:
+//! "Harness has more than 10 agents", so nothing here is per agent): a
+//! thread asks the lamp's Harness `harness machines engines <this machine>
+//! --json` once a [`HARNESS_LOOK_EVERY`] ([`Engines::look_at_harness_every`]),
+//! and each engine it says of the lamp's own machine is said beside Hermes
+//! and OpenClaw, `installed` (with `version` when Harness gives one) or
+//! `not_installed`. A look that fails keeps the last good one. Only Hermes
+//! and OpenClaw can be installed from the app, as only they have an
+//! installer in this build ([`INSTALLABLE`]).
 use crate::hermes_install::{self, HermesInstall};
 use lamp_bus::{Bus, Subscriber};
 use lamp_msgs::{EngineInstall, EngineInstallAsk};
@@ -32,11 +42,205 @@ use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
     sync::{
-        Arc,
+        Arc, Mutex,
         atomic::{AtomicBool, Ordering},
     },
     time::{Duration, Instant},
 };
+
+/// The engines this build's lamp-update can install when the app asks: the
+/// only ones with an installer here (`hermes_install`, `openclaw_install`).
+/// What the app is shown comes from Harness; this is only what a tap may
+/// start. lamp-cloud's `update::INSTALLABLE` is the same list.
+pub const INSTALLABLE: [&str; 2] = [HERMES, OPENCLAW];
+
+/// How often lamp-update asks the lamp's Harness for its engines (#6240):
+/// every five minutes, as lamp-tasks looks at the machines
+/// (`MACHINES_EVERY_LOOKS`). Each look has Harness probe every engine.
+pub const HARNESS_LOOK_EVERY: Duration = Duration::from_secs(300);
+/// The longest `harness machines --json` may take, to find the lamp's own
+/// machine: a cold start under `runuser` on a busy lamp.
+pub const MACHINES_WITHIN: Duration = Duration::from_secs(30);
+/// The longest `harness machines engines <machine> --json` may take:
+/// lamp-tasks' `ENGINES_LOOK_TIMEOUT` (Harness's own probe waits 30 s).
+pub const ENGINES_WITHIN: Duration = Duration::from_secs(35);
+/// The most engines one look may give (lamp-tasks' `MOST_ENGINE_ROWS`).
+pub const MOST_HARNESS_ENGINES: usize = 64;
+
+/// One Harness CLI call: its arguments (after `harness`) and its bound, to
+/// its stdout or why not. The real one is [`harness_run`]; a test's is a
+/// fake Harness.
+pub type HarnessRun<'a> = dyn FnMut(&[&str], Duration) -> Result<String, String> + 'a;
+
+/// What the last good look at Harness said: the lamp's own machine id, and
+/// each engine Harness says it has, as the app is told it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct HarnessLook {
+    pub machine: Option<String>,
+    pub engines: BTreeMap<String, EngineInstall>,
+}
+
+/// The Harness CLI as lamp-update runs it for its other Harness calls:
+/// [`crate::install::HARNESS`] as [`crate::install::USER`], `HOME`
+/// [`crate::install::HARNESS_HOME`], bounded, its group killed past it.
+pub fn harness_run() -> impl FnMut(&[&str], Duration) -> Result<String, String> + Send {
+    use crate::install::{self, HARNESS_HOME, USER};
+    let mut uid: Option<String> = None;
+    move |args, within| {
+        let uid = match &uid {
+            Some(uid) => uid.clone(),
+            None => {
+                let mut run = install::output_of;
+                let found = install::uid_of(&mut run, USER)?;
+                uid = Some(found.clone());
+                found
+            }
+        };
+        install::output_of_within(
+            &install::harness_argv(USER, HARNESS_HOME, &uid, args),
+            within,
+        )
+    }
+}
+
+/// A machine id or engine name as Harness gives one: plain, short.
+fn plain(word: &str, max: usize) -> bool {
+    !word.is_empty()
+        && word.len() <= max
+        && word
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
+/// The lamp's own machine in `harness machines --json` (one object a line):
+/// the one `current`, whose id is plain.
+pub fn lamp_machine(said: &str) -> Option<String> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Machine {
+        machine_id: String,
+        #[serde(default)]
+        current: bool,
+    }
+    said.lines()
+        .filter_map(|line| serde_json::from_str::<Machine>(line).ok())
+        .find(|machine| machine.current)
+        .map(|machine| machine.machine_id.to_lowercase())
+        .filter(|id| plain(id, 64))
+}
+
+/// What `harness machines engines <machine> --json` says of `machine` (one
+/// object a line, `{machineId, engine, installed, installable, …}`, as
+/// lamp-tasks reads it), as the app is told it: `installed: true` is
+/// `installed` (with `version` when Harness gives a plain one), `installed:
+/// false`, or `null` with `installable: true` (Harness's "not found
+/// there"), `not_installed`. Any other is unknown: kept as `before` said
+/// it, else left out. Rows of another machine are passed over. A line that
+/// is not a row, an engine twice, more than [`MOST_HARNESS_ENGINES`], or no
+/// row of `machine` is no answer.
+pub fn harness_engines(
+    said: &str,
+    machine: &str,
+    before: &BTreeMap<String, EngineInstall>,
+) -> Result<BTreeMap<String, EngineInstall>, &'static str> {
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Row {
+        machine_id: String,
+        engine: String,
+        #[serde(default)]
+        installed: Option<bool>,
+        #[serde(default)]
+        installable: Option<bool>,
+        #[serde(default)]
+        version: Option<serde_json::Value>,
+    }
+    let invalid = "engines_invalid_reply";
+    let mut rows = 0usize;
+    let mut seen = std::collections::BTreeSet::new();
+    let mut engines = BTreeMap::new();
+    for line in said.lines().filter(|line| !line.trim().is_empty()) {
+        rows += 1;
+        if rows > MOST_HARNESS_ENGINES {
+            return Err(invalid);
+        }
+        let row: Row = serde_json::from_str(line).map_err(|_| invalid)?;
+        if !row.machine_id.eq_ignore_ascii_case(machine) {
+            continue;
+        }
+        if !plain(&row.engine, 32) || !seen.insert(row.engine.clone()) {
+            return Err(invalid);
+        }
+        let state = match (row.installed, row.installable) {
+            (Some(true), _) => {
+                let installed = EngineInstall {
+                    state: "installed".to_owned(),
+                    version: row
+                        .version
+                        .as_ref()
+                        .and_then(serde_json::Value::as_str)
+                        .map(str::to_owned),
+                    reason: None,
+                    at_unix_ms: None,
+                };
+                Some(if installed.check() {
+                    installed
+                } else {
+                    EngineInstall {
+                        version: None,
+                        ..installed
+                    }
+                })
+            }
+            (Some(false), _) | (None, Some(true)) => Some(EngineInstall {
+                state: "not_installed".to_owned(),
+                version: None,
+                reason: None,
+                at_unix_ms: None,
+            }),
+            _ => before.get(&row.engine).cloned(),
+        };
+        if let Some(state) = state {
+            engines.insert(row.engine, state);
+        }
+    }
+    if seen.is_empty() {
+        return Err("engines_none");
+    }
+    Ok(engines)
+}
+
+/// One look at the lamp's Harness: the lamp's own machine (found once, with
+/// `harness machines --json`, and again after a look that failed), then its
+/// engines. A failure keeps `kept` as it was, and is said back.
+pub fn look_at_harness(kept: &Mutex<HarnessLook>, run: &mut HarnessRun) -> Result<(), String> {
+    let (machine, before) = {
+        let kept = kept.lock().unwrap_or_else(|e| e.into_inner());
+        (kept.machine.clone(), kept.engines.clone())
+    };
+    let machine = match machine {
+        Some(machine) => machine,
+        None => lamp_machine(&run(&["machines", "--json"], MACHINES_WITHIN)?)
+            .ok_or("Harness names no machine of its own (signed out?)")?,
+    };
+    let looked = run(&["machines", "engines", &machine, "--json"], ENGINES_WITHIN)
+        .and_then(|said| harness_engines(&said, &machine, &before).map_err(str::to_owned));
+    let mut kept = kept.lock().unwrap_or_else(|e| e.into_inner());
+    match looked {
+        Ok(engines) => {
+            *kept = HarnessLook {
+                machine: Some(machine),
+                engines,
+            };
+            Ok(())
+        }
+        Err(why) => {
+            // Found again next time: the lamp may have been signed in anew.
+            kept.machine = None;
+            Err(why)
+        }
+    }
+}
 
 /// The switch, in lamp-update's own unit: `on` exactly, any other value or
 /// none off.
@@ -262,10 +466,14 @@ pub struct Engines {
     pub openclaw_on: bool,
     /// The app asked for OpenClaw and no round has started its install yet.
     pub openclaw_pending: Arc<AtomicBool>,
+    /// What the lamp's Harness last said of its engines
+    /// ([`Engines::look_at_harness_every`]): none until a look is good.
+    pub harness: Arc<Mutex<HarnessLook>>,
 }
 
 impl Engines {
-    /// Each engine now, by name.
+    /// Each engine now, by name: Hermes and OpenClaw from their records,
+    /// then every other engine the lamp's Harness last said it has.
     pub fn read(&self, records: &Path) -> BTreeMap<String, EngineInstall> {
         let mut engines = BTreeMap::from([(
             HERMES.to_owned(),
@@ -285,7 +493,53 @@ impl Engines {
                 self.openclaw_pending(),
             ),
         );
+        let harness = self.harness.lock().unwrap_or_else(|e| e.into_inner());
+        for (name, engine) in &harness.engines {
+            engines
+                .entry(name.clone())
+                .or_insert_with(|| engine.clone());
+        }
         engines
+    }
+
+    /// Asks the lamp's Harness for its engines now and once every `every`
+    /// after, on a thread of its own, so the status's 2 s look never waits
+    /// on Harness ([`look_at_harness`], each call bounded). A look that
+    /// fails is said once, and the last good one kept; a good one after it
+    /// is said once too. The thread ends with the last [`Engines`].
+    pub fn look_at_harness_every(
+        &self,
+        every: Duration,
+        mut run: impl FnMut(&[&str], Duration) -> Result<String, String> + Send + 'static,
+        mut say: impl FnMut(&str) + Send + 'static,
+    ) {
+        let kept = Arc::downgrade(&self.harness);
+        let _ = std::thread::Builder::new()
+            .name("update-engines".into())
+            .spawn(move || {
+                let mut good = None;
+                loop {
+                    let Some(kept) = kept.upgrade() else {
+                        return;
+                    };
+                    let looked = look_at_harness(&kept, &mut run);
+                    drop(kept);
+                    match looked {
+                        Ok(()) if good != Some(true) => {
+                            say("the lamp's Harness said its engines");
+                            good = Some(true);
+                        }
+                        Err(why) if good != Some(false) => {
+                            say(&format!(
+                                "the lamp's Harness did not say its engines, the last kept: {why}"
+                            ));
+                            good = Some(false);
+                        }
+                        _ => {}
+                    }
+                    std::thread::sleep(every);
+                }
+            });
     }
 
     /// Whether a tap waits for a round's OpenClaw step.
@@ -409,7 +663,7 @@ impl Asks {
                 continue;
             }
             if ask.engine != HERMES {
-                say("the app asked to install an engine this lamp does not have: ignored");
+                say("the app asked to install an engine this build cannot install: ignored");
                 continue;
             }
             if !self.engines.hermes_on {
@@ -870,7 +1124,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
         assert!(!asks.take(now + EngineInstallAsk::AGAIN_AFTER, &mut say));
         assert_eq!(lines.len(), 4, "{lines:?}");
-        assert!(lines[0].contains("does not have"), "{lines:?}");
+        assert!(lines[0].contains("cannot install"), "{lines:?}");
         assert!(lines[1].contains("OpenClaw is off"), "{lines:?}");
         assert!(
             lines[2].contains("the next round may start it"),
@@ -893,5 +1147,236 @@ mod tests {
         let mut off_lines = Vec::new();
         assert!(!off.take(now, &mut |line| off_lines.push(line.to_owned())));
         assert!(off_lines[0].contains("Hermes is off"), "{off_lines:?}");
+    }
+
+    const LAMP: &str = "0f3c9a1e2b4d4c6e8a107d5e3b2a1c90";
+
+    /// A fake Harness: `machines --json` names the lamp's own machine (and a
+    /// computer), `machines engines <lamp> --json` says `engines`; every
+    /// call is kept with its bound.
+    fn fake_harness(
+        engines: &str,
+        calls: Arc<Mutex<Vec<(String, Duration)>>>,
+    ) -> impl FnMut(&[&str], Duration) -> Result<String, String> + Send + 'static {
+        let engines = engines.to_owned();
+        move |args, within| {
+            calls.lock().unwrap().push((args.join(" "), within));
+            match args {
+                ["machines", "--json"] => Ok(format!(
+                    "{{\"machineId\":\"aa11\",\"current\":false,\"name\":\"a computer\"}}\n\
+                     {{\"machineId\":\"{LAMP}\",\"current\":true}}\n"
+                )),
+                ["machines", "engines", machine, "--json"] if *machine == LAMP => {
+                    Ok(engines.replace("LAMP", LAMP))
+                }
+                _ => Err("unexpected call".into()),
+            }
+        }
+    }
+
+    const FOUR: &str = r#"{"machineId":"LAMP","engine":"hermes","installed":true,"signedIn":null}
+{"machineId":"LAMP","engine":"openclaw","installed":true}
+{"machineId":"LAMP","engine":"codex","installed":true,"version":"0.58.0","signedIn":true}
+{"machineId":"LAMP","engine":"cursor","installed":true}
+{"machineId":"LAMP","engine":"claude","installed":null,"installable":true}
+{"machineId":"LAMP","engine":"gemini","installed":null,"installable":false}
+{"machineId":"aa11","engine":"opencode","installed":true}
+"#;
+
+    fn state(state: &str, version: Option<&str>) -> EngineInstall {
+        EngineInstall {
+            state: state.to_owned(),
+            version: version.map(str::to_owned),
+            reason: None,
+            at_unix_ms: None,
+        }
+    }
+
+    /// The lead's rule of 12 Nov (#6240): `engines` lists every engine the
+    /// lamp's Harness says its own machine has, with no fixed list; Hermes
+    /// and OpenClaw stay read from their own records (their richer states),
+    /// whatever Harness says of them; a computer's engines are not the
+    /// lamp's; one Harness cannot say yet (`null`, nothing installable) is
+    /// left out, one not found there is `not_installed`.
+    #[test]
+    fn engines_lists_every_engine_harness_says_the_lamp_has() {
+        let folder = tempfile::tempdir().unwrap();
+        write_record(folder.path(), &record("installing", None));
+        let engines = Engines {
+            hermes_on: true,
+            openclaw_on: true,
+            ..Engines::default()
+        };
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let mut run = fake_harness(FOUR, calls.clone());
+        look_at_harness(&engines.harness, &mut run).unwrap();
+        let told = engines.read(folder.path());
+        assert_eq!(
+            told.keys().collect::<Vec<_>>(),
+            ["claude", "codex", "cursor", "hermes", "openclaw"]
+        );
+        // Hermes and OpenClaw as their records say, not Harness's `true`.
+        assert_eq!(told["hermes"].state, "installing");
+        assert_eq!(told["openclaw"].state, "not_installed");
+        assert_eq!(told["codex"], state("installed", Some("0.58.0")));
+        assert_eq!(told["cursor"], state("installed", None));
+        assert_eq!(told["claude"], state("not_installed", None));
+        assert!(told.values().all(EngineInstall::check), "{told:?}");
+        // Hermes off: still `off`, whatever Harness says.
+        let off = Engines {
+            hermes_on: false,
+            ..engines.clone()
+        };
+        assert_eq!(off.read(folder.path())["hermes"].state, "off");
+        // The machine is found once; the next look asks only its engines.
+        look_at_harness(&engines.harness, &mut run).unwrap();
+        let calls = calls.lock().unwrap();
+        assert_eq!(
+            calls
+                .iter()
+                .map(|(call, within)| (call.replace(LAMP, "LAMP"), *within))
+                .collect::<Vec<_>>(),
+            [
+                ("machines --json".to_owned(), MACHINES_WITHIN),
+                ("machines engines LAMP --json".to_owned(), ENGINES_WITHIN),
+                ("machines engines LAMP --json".to_owned(), ENGINES_WITHIN),
+            ]
+        );
+    }
+
+    /// Harness failing, timing out, signed out or saying nothing readable:
+    /// Hermes and OpenClaw are said as before, no other engine, no error;
+    /// after a good look, a failed one keeps it; an engine Harness cannot
+    /// say this time keeps what it last said.
+    #[test]
+    fn a_harness_that_fails_leaves_hermes_and_openclaw_as_they_are() {
+        let folder = tempfile::tempdir().unwrap();
+        let engines = Engines {
+            hermes_on: true,
+            openclaw_on: true,
+            ..Engines::default()
+        };
+        let mut failing = |_: &[&str], within: Duration| -> Result<String, String> {
+            Err(format!(
+                "harness machines engines: did not end within {} s",
+                within.as_secs()
+            ))
+        };
+        assert!(look_at_harness(&engines.harness, &mut failing).is_err());
+        let told = engines.read(folder.path());
+        assert_eq!(told.keys().collect::<Vec<_>>(), ["hermes", "openclaw"]);
+        assert_eq!(told["hermes"].state, "not_installed");
+        assert_eq!(told["openclaw"].state, "not_installed");
+        for said in [
+            "",
+            "not json\n",
+            "{\"machineId\":\"aa11\",\"engine\":\"codex\",\"installed\":true}\n",
+        ] {
+            let calls = Arc::new(Mutex::new(Vec::new()));
+            let mut run = fake_harness(said, calls);
+            assert!(
+                look_at_harness(&engines.harness, &mut run).is_err(),
+                "{said:?}"
+            );
+            assert_eq!(engines.read(folder.path()).len(), 2, "{said:?}");
+        }
+        // Signed out: no machine of its own.
+        let mut signed_out = |_: &[&str], _: Duration| Ok::<_, String>(String::new());
+        assert!(look_at_harness(&engines.harness, &mut signed_out).is_err());
+        // A good look, then a failing one: the good one is kept.
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        look_at_harness(&engines.harness, &mut fake_harness(FOUR, calls.clone())).unwrap();
+        assert!(look_at_harness(&engines.harness, &mut failing).is_err());
+        assert_eq!(engines.read(folder.path()).len(), 5);
+        // A failed look finds the machine again next time.
+        look_at_harness(&engines.harness, &mut fake_harness(FOUR, calls.clone())).unwrap();
+        assert_eq!(
+            calls
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(call, _)| call == "machines --json")
+                .count(),
+            2
+        );
+        // Codex unknown this time (`null`, nothing installable): kept as
+        // last said; cursor gone from Harness's list: gone.
+        let unknown = r#"{"machineId":"LAMP","engine":"codex","installed":null}
+"#;
+        look_at_harness(&engines.harness, &mut fake_harness(unknown, calls)).unwrap();
+        let told = engines.read(folder.path());
+        assert_eq!(
+            told.keys().collect::<Vec<_>>(),
+            ["codex", "hermes", "openclaw"]
+        );
+        assert_eq!(told["codex"], state("installed", Some("0.58.0")));
+    }
+
+    /// What Harness says is read strictly: an engine twice, a name that is
+    /// not plain, or more rows than [`MOST_HARNESS_ENGINES`] is no answer;
+    /// a version that is not plain is left out, the engine kept.
+    #[test]
+    fn harness_engines_are_read_strictly() {
+        let none = BTreeMap::new();
+        let row = |engine: &str| {
+            format!("{{\"machineId\":\"m1\",\"engine\":\"{engine}\",\"installed\":true}}\n")
+        };
+        assert!(harness_engines(&(row("codex") + &row("codex")), "m1", &none).is_err());
+        assert!(harness_engines(&row("Codex"), "m1", &none).is_err());
+        assert!(harness_engines(&row("co dex"), "m1", &none).is_err());
+        let many: String = (0..=MOST_HARNESS_ENGINES)
+            .map(|n| row(&format!("e{n}")))
+            .collect();
+        assert!(harness_engines(&many, "m1", &none).is_err());
+        let odd =
+            r#"{"machineId":"M1","engine":"codex","installed":true,"version":"1.0 beta; rm"}"#;
+        assert_eq!(
+            harness_engines(odd, "m1", &none).unwrap()["codex"],
+            state("installed", None)
+        );
+        assert_eq!(
+            lamp_machine(
+                "{\"machineId\":\"a\",\"current\":false}\n{\"machineId\":\"../x\",\"current\":true}\n"
+            ),
+            None
+        );
+    }
+
+    /// The thread looks at once, then once every `every`, and ends with
+    /// the last [`Engines`].
+    #[test]
+    fn the_harness_look_runs_on_its_own_thread_and_ends_with_the_engines() {
+        let folder = tempfile::tempdir().unwrap();
+        let engines = Engines {
+            hermes_on: true,
+            openclaw_on: true,
+            ..Engines::default()
+        };
+        let calls = Arc::new(Mutex::new(Vec::new()));
+        let lines = Arc::new(Mutex::new(Vec::new()));
+        let said = lines.clone();
+        engines.look_at_harness_every(
+            Duration::from_millis(20),
+            fake_harness(FOUR, calls.clone()),
+            move |line: &str| said.lock().unwrap().push(line.to_owned()),
+        );
+        let began = Instant::now();
+        while engines.read(folder.path()).len() < 5 && began.elapsed() < Duration::from_secs(5) {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert_eq!(engines.read(folder.path()).len(), 5);
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(lines.lock().unwrap().len(), 1, "said once: {lines:?}");
+        drop(engines);
+        std::thread::sleep(Duration::from_millis(100));
+        let after = calls.lock().unwrap().len();
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(calls.lock().unwrap().len(), after, "the thread ended");
+    }
+
+    /// Only Hermes and OpenClaw have an installer in this build.
+    #[test]
+    fn only_engines_with_an_installer_are_installable() {
+        assert_eq!(INSTALLABLE, ["hermes", "openclaw"]);
     }
 }
