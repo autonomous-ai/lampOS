@@ -422,7 +422,10 @@ def sleep_action(source: str = "button"):
     if state._sleeping:
         logger.info("%s sleep hold -- already sleeping", source)
         return
-    from hal.routes.emotion import harness_blocks_sleep
+    from hal.routes.emotion import harness_blocks_sleep, sleep_mode_blocks_sleep
+    if sleep_mode_blocks_sleep():
+        logger.info("%s sleep hold -- ignored, sleep mode is off", source)
+        return
     if harness_blocks_sleep():
         logger.info("%s sleep hold -- ignored, Harness is on or unavailable", source)
         return

@@ -71,6 +71,7 @@ func (s *Service) GetPublicConfig() domain.ConfigPublicResponse {
 		TapChime:                 s.config.TapChimeEnabled(),
 		TapLight:                 s.config.TapLight,
 		TapLightEnabled:          s.config.TapLightEnabled(),
+		SleepMode:                s.config.SleepModeEnabled(),
 		DeviceID:                 deviceID,
 		Mac:                      GetDeviceMac(),
 		NetworkSSID:              s.config.NetworkSSID,
@@ -140,6 +141,7 @@ type updateChanges struct {
 	realtime bool // realtime block sent → hal restart
 	channel  bool // messaging channel/tokens changed → re-push into gateway
 	wake     bool // owner wake phrases changed → pushed into the running hal
+	sleepOff bool // sleep mode turned off → hal wakes a sleeping device
 
 	newModel    string
 	newSSID     string
@@ -254,6 +256,11 @@ func applyUpdate(c *config.Config, data domain.UpdateConfigRequest, adminHash st
 	applyLLMFields(c, data, &ch)
 	applyVoicePipelineFields(c, data, &ch)
 
+	if data.SleepMode != nil {
+		ch.sleepOff = !*data.SleepMode
+		on := *data.SleepMode
+		c.SleepMode = &on
+	}
 	if data.DeviceID != "" {
 		c.DeviceID = data.DeviceID
 	}
@@ -671,6 +678,13 @@ func (s *Service) fireConfigSideEffects(ch updateChanges, halHandled bool) {
 	}
 	if ch.wake {
 		applyWakePhrases(s.config.WakePhrases)
+	}
+	if ch.sleepOff {
+		go func() {
+			if err := hal.SyncSleepMode(); err != nil {
+				slog.Warn("sleep mode sync to hal failed", "component", "device", "error", err)
+			}
+		}()
 	}
 	// Restart HAL only when a boot-read field changed; TTS is pushed live.
 	switch {

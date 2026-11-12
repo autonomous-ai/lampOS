@@ -228,6 +228,9 @@ type Config struct {
 	VoiceInputMode string     `json:"voice_input_mode,omitempty" yaml:"voice_input_mode"`
 	// TapChime plays the ready chime when a tap-to-talk recording starts; nil = on.
 	TapChime *bool `json:"tap_chime,omitempty" yaml:"tapChime"`
+	// SleepMode lets button holds, voice and the agent put the device to sleep;
+	// nil = off. HAL reads it live and wakes a device found asleep with it off.
+	SleepMode *bool `json:"sleep_mode,omitempty" yaml:"sleepMode"`
 	// TapLight is the listening light while a tap-to-talk recording runs; nil = on
 	// with the board look. HAL reads both live.
 	TapLight *WakeLight `json:"tap_light,omitempty" yaml:"tapLight"`
@@ -408,6 +411,11 @@ func (c *Config) WakeChimeEnabled() bool {
 // WakeLightEnabled reports whether a wake lights the strip (default on).
 func (c *Config) WakeLightEnabled() bool {
 	return c.WakeLight == nil || c.WakeLight.Enabled == nil || *c.WakeLight.Enabled
+}
+
+// SleepModeEnabled reports the owner's sleep mode toggle (default off).
+func (c *Config) SleepModeEnabled() bool {
+	return c.SleepMode != nil && *c.SleepMode
 }
 
 // TapChimeEnabled reports the tap-to-talk ready chime toggle (default on).

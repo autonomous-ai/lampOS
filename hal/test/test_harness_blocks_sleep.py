@@ -40,7 +40,8 @@ class HarnessBlocksSleepTests(unittest.TestCase):
                 {"enabled": True, "generation": 2},
         ]) as read_mode, patch.object(button_actions, "_tts_available", return_value=True), \
                 patch.object(state, "tts_service") as tts, \
-                patch.object(button_actions.time, "sleep"):
+                patch.object(button_actions.time, "sleep"), \
+                patch.object(emotion.config, "sleep_mode_enabled", return_value=True):
             button_actions.sleep_action("test")
         tts.speak_cached.assert_called_once()
         self.assertEqual(read_mode.call_count, 2)

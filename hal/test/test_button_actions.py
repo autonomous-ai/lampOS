@@ -290,6 +290,7 @@ def test_sleep_announcement_uses_configured_delay():
             mock.patch.object(state, "_sleeping", False),
             mock.patch.object(button_actions, "_tts_available", return_value=True),
             mock.patch.object(emotion, "harness_blocks_sleep", return_value=False),
+        mock.patch.object(emotion.config, "sleep_mode_enabled", return_value=True),
             mock.patch.object(state, "tts_service") as tts,
             mock.patch.object(button_actions.config, "SLEEP_ANNOUNCEMENT_DELAY_S", delay),
             mock.patch.object(button_actions.time, "sleep", side_effect=lambda seconds: calls.append(seconds)),
@@ -307,6 +308,7 @@ def test_sleep_without_tts_has_no_announcement_delay():
         mock.patch.object(state, "_sleeping", False),
         mock.patch.object(button_actions, "_tts_available", return_value=False),
         mock.patch.object(emotion, "harness_blocks_sleep", return_value=False),
+        mock.patch.object(emotion.config, "sleep_mode_enabled", return_value=True),
         mock.patch.object(button_actions.time, "sleep") as wait,
         mock.patch.object(emotion, "express_emotion") as express,
     ):

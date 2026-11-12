@@ -67,6 +67,35 @@ def harness_blocks_sleep() -> bool:
     return bool(snapshot.get("enabled") or snapshot.get("unavailable"))
 
 
+def sleep_mode_blocks_sleep() -> bool:
+    """Sleepy mode is opt-in: refuse sleep until the owner turns `sleep_mode` on."""
+    return not config.sleep_mode_enabled()
+
+
+def release_disabled_sleep(source: str = "sleep_mode_off") -> bool:
+    """Quietly wake a device that is asleep while sleep mode is off.
+
+    No stretch performance: restore the audio sleep muted, journal the wake and
+    return the body and LED to idle. Returns True when it woke the device.
+    """
+    if not state._sleeping or config.sleep_mode_enabled():
+        return False
+    state.logger.info("Sleep mode is off -- waking quietly (source=%s)", source)
+    state._sleeping = False
+    state._wake_sleepy_peripherals()
+    state._log_sleep_transition("wake", EMO_IDLE, source)
+    state.note_presence_wake()
+    try:
+        express_emotion(EmotionRequest(emotion=EMO_IDLE), source=source)
+        from hal.routes.led import restore_led
+
+        restore_led()
+    except Exception as e:
+        state.logger.warning("Sleep-mode-off wake: idle restore failed: %s", e)
+    return True
+
+
+
 def _resume_idle_after_still(svc, held: str) -> None:
     """Idle resume for a still emotion nothing replaced. A held body stays put; the
     resume is parked and replayed when the look hold releases."""
@@ -129,6 +158,11 @@ def express_emotion(req: EmotionRequest, source: str = "api"):
 
     if state._sleeping and req.emotion not in _SLEEP_GATE_ALLOWED:
         state.logger.info("POST /emotion: ignored %s while sleeping", req.emotion)
+        return {"status": "ignored", "emotion": req.emotion, "servo": None, "led": None}
+
+    # Sleep mode off (the default): nothing may put the device to sleep.
+    if req.emotion == EMO_SLEEPY and not state._sleeping and sleep_mode_blocks_sleep():
+        state.logger.info("POST /emotion: ignored sleepy, sleep mode is off (source=%s)", source)
         return {"status": "ignored", "emotion": req.emotion, "servo": None, "led": None}
 
     # Harness ON: nothing may put the device to sleep under the user.

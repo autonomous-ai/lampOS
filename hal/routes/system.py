@@ -32,3 +32,16 @@ def shutdown_os():
         name="system-api-shutdown",
     ).start()
     return {"status": "shutting down"}
+
+
+@router.post("/system/sleep-mode-sync")
+def sleep_mode_sync():
+    """Apply the owner's sleep_mode toggle: wake now if it was turned off mid-sleep.
+
+    On `system` (mounted on every device) because Intern does not mount `emotion`,
+    yet the GPIO sleep hold still reaches sleepy there.
+    """
+    from hal import config
+    from hal.routes.emotion import release_disabled_sleep
+
+    return {"sleep_mode": config.sleep_mode_enabled(), "woke": release_disabled_sleep("sleep_mode_off")}
