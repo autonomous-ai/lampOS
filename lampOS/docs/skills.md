@@ -3591,31 +3591,53 @@ gone ([switches.md](switches.md)). What happens:
     `body`). Another trigger, or the same one with no shared output, is no
     clash. On a clash nothing is put on: the model is told the other's
     spoken name (`clashes_with`), what both use (`shares`), a `clash_id`,
-    and to say the clash in a few words and ask: replace it, keep both
-    (the new one wins), or cancel. A turn cut before that is said "I made
-    NAME, but didn't put it on: OTHER starts at the same moment and uses
-    the light. Ask me again to replace it or to keep both."
-    (`made_clash::cut_line`). The answer comes back as `make_skill` with
-    `clash_id` and `choice` (`replace`, `keep` or `cancel`) alone, so
-    `request` is no longer required (`made_clash::chosen`): only a later
-    heard line than the make's, within 5 minutes
+    and to say word for word "NEW would start at the same moment as
+    OTHER, which is on the lamp, and both use the light. Shall I replace
+    OTHER, keep both (they may take turns), or cancel?". Keep promises no
+    winner (Heron's P2 on #6614): the ring shows the newest claim of equal
+    priority (`ring_requests`), and lamp-skills starts the runs of one
+    event in its folders' name order, each on a thread of its own, so
+    nothing makes the newer one's claim come last. A turn cut before that
+    is said "I made NAME, but didn't put it on: OTHER starts at the same
+    moment and uses the light. Ask me again to replace it or to keep
+    both." (`made_clash::cut_line`). The answer comes back as `make_skill`
+    with `clash_id` and `choice` (`replace`, `keep` or `cancel`) alone, so
+    `request` is no longer required (`made_clash::chosen`); a make with no
+    `request`, or a `choice` with no `clash_id`, makes nothing and is told
+    "nothing was made: a new skill needs request, what it should do and
+    when" (`make_skill_local::NO_REQUEST`). A choice is taken only in a
+    later heard line than the make's, within 5 minutes
     (`made_clash::CLASH_WITHIN`), and only the owner's, held as a yes is
     (`services::owners_yes_now`: with `LAMP_PRIVATE_ROOM` on, any heard
-    line). **Replace** asks the manage helper's own `{"remove": NAME}`, as
-    the app's remove does (a core skill is refused there, and then nothing
-    is put on), drops a made one from `made.json`, and puts the new one on
-    by its SHA-256 (`made_skill::put_on_within`). **Keep** puts the new one
-    on beside it and says "When they start together, NEW wins over OTHER."
-    **Cancel** puts nothing on; the made one stays kept and off. A make
-    with code of its own waits for its yes as before and is not held to
-    clashes; nor is the app's MAKE IT. Open: the ring shows the newest
-    claim of equal priority (`ring_requests`), and lamp-skills starts the
-    runs of one event in its folders' name order, each on a thread of its
-    own, so nothing yet makes the newer one's claim come last; keep's line
-    is the ruling's, not yet enforced. Tests:
+    line). Replace takes a skill off, so the choice is guarded as a made
+    skill's yes is (Heron's P2 on #6614): while a clash waits
+    (`made_clash::awaited`) the echo hold is on, so a line of only the
+    lamp's own words in its echo tail is held even in the private room and
+    no choice in it is taken (`made_clash::echo_held`); a replace or a keep
+    comes only on the route with the echo judge (`services::sends_here`),
+    and only once one of the lamp's answers, as played and not cut
+    (`made_clash::lamp_said`, `made_clash::lamp_cut`), held the whole
+    question; before that the model is told to ask it again whole and the
+    clash waits on. **Replace** puts the new one on first by its SHA-256
+    (`made_skill::put_on_within`), then asks the manage helper's own
+    `{"remove": NAME}`, as the app's remove does, and drops a made one
+    from `made.json`. If the put-on fails nothing is taken off ("OTHER
+    stays as it was"); if the remove fails (a core skill is refused
+    there), both are on and the lamp says "NEW is on, but OTHER wasn't
+    removed: … Both are on." **Keep** puts the new one on beside it and
+    says "Both are on." **Cancel** puts nothing on, and the made one is
+    dropped from `made.json` with its package
+    (`made_skill::forget_unput`), as is one whose clash got no choice in 5
+    minutes (dropped at the next heard line) or was followed by a newer
+    clash. A make with code of its own waits for its yes as before and is
+    not held to clashes; nor is the app's MAKE IT. Tests:
     `a_clash_is_found_and_nothing_is_put_on`,
     `no_clash_on_another_trigger_or_no_shared_output`,
-    `replace_keep_and_cancel_each_do_what_they_say`.
+    `replace_keep_and_cancel_each_do_what_they_say`,
+    `an_echoed_unsaid_or_live_replace_is_refused`,
+    `replace_never_leaves_both_off`,
+    `cancel_and_expiry_forget_the_made_one`,
+    `a_make_with_no_request_is_refused_plainly`.
 
 A made line said with no make behind it is never said
 (`LAMP_ACTION_CLAIM_CHECKED`, `action_claim::made_claim`): a reply that
