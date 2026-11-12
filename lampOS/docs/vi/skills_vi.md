@@ -1861,7 +1861,24 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   việc của #6307.
 - **Nói lại và cái "có":** hỏi "kỹ năng photo booth của tôi dùng gì?", đèn
   nói tác vụ, nguồn của script và từng grant bằng lời thường ("it uses the
-  camera"). Tên mà helper không biết thì được tìm trong các kỹ năng đẩy
+  camera"). Trên tuyến thứ hai, việc đọc lại (lệnh `make_skill` chỉ có
+  `read_back`) chạy **trong code từ lời nghe được**, không để model chọn
+  (V2 trên #6413: trên lamp-52e6 ở 12337, "what does desk check use?" bị
+  gọi `use_skill`, chạy luôn kỹ năng, còn "Hey Lamp, what does desk check
+  use?" không gọi gì). Câu nói có "what" hoặc "which", rồi tên một kỹ năng
+  tự tạo đang bật hoặc một kỹ năng đẩy lên (khớp lỏng như dưới đây), rồi
+  một trong use, need, access, reach, touch, do, send (cả dạng -s,
+  "using") (`make_skill_local::read_back_asked`) thì kỹ năng đó được đọc
+  lại trước vòng 1, qua bộ chạy của lượt; vòng 1 được cho kết quả và nói
+  theo `next` (`read_back_note`). Lệnh `use_skill` hay `make_skill`
+  `read_back` cho cùng kỹ năng mà model gọi trong lượt đó không chạy; nó
+  nhận kết quả đọc lại (`same_skill_again`). "Use desk check", "run desk
+  check" và "what time is it" không đọc lại gì. Thư mục kỹ năng chỉ được
+  đọc cho câu có từ hỏi và từ hỏi-dùng. Test:
+  `the_heard_words_ask_what_a_skill_uses_by_its_name`,
+  `second_provider::tests::read_back_words`. Tuyến Live không đổi: ở đó
+  model vẫn tự gọi `make_skill` với `read_back`. Tên mà helper không biết
+  thì được tìm trong các kỹ năng đẩy
   lên từ máy tính (`skills-dev/<name>/` có `skill.toml`,
   `skill_task_yes::pushed_named`): đúng tên trước, nếu không thì một kỹ
   năng duy nhất có tên khớp khi số đọc bằng chữ thành chữ số và bỏ dấu

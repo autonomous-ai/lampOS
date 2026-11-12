@@ -1450,6 +1450,9 @@ pub type NameNote = Arc<dyn Fn(u64) -> Option<&'static str> + Send + Sync>;
 /// the order they are asked, or none (`LAMP_TASKS_NAMED_ASK`,
 /// `crate::agent_tasks::named_ask`).
 pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
+/// The skill a heard line asks what it uses, by name, or none
+/// (`crate::make_skill_local::read_back_heard`, V2 on #6413).
+pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// The note a spoken request gets while a task this voice prepared waits
 /// for the person's yes (`crate::agent_tasks::pending_note`): with its
 /// request, to the note or nothing.
@@ -1781,6 +1784,9 @@ struct Shared {
     /// With `LAMP_TASKS_NAMED_ASK=on`: whom a line's words ask by name
     /// ([`Engine::asking_by_name`]).
     named_ask: Option<NamedAsk>,
+    /// Which skill a heard line asks what it uses: read back in code
+    /// before round 1 ([`Engine::reading_back_by_words`]).
+    read_back_asked: Option<ReadBackAsked>,
     /// A test's copy of each named-ask journal line ([`Shared::named_ask_said`]).
     #[cfg(test)]
     named_ask_journal: Option<Arc<Mutex<Vec<String>>>>,
@@ -4505,6 +4511,7 @@ impl Engine {
                 conversation_alone: None,
                 untied: None,
                 named_ask: None,
+                read_back_asked: None,
                 #[cfg(test)]
                 named_ask_journal: None,
                 busy: None,
@@ -6140,6 +6147,21 @@ impl Engine {
     pub fn asking_by_name(mut self, named: NamedAsk) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.named_ask = Some(named);
+        }
+        self
+    }
+
+    /// A heard line that asks what a skill on the lamp uses, needs, does or
+    /// reaches by its name (`asked`: "what does desk check use?") has that
+    /// skill read back in code before round 1, as a `make_skill` call with
+    /// `read_back` alone through the turn's own runner, and round 1 is told
+    /// its result to say; a `use_skill` or `make_skill` read-back of the same
+    /// skill the model calls after it is not run (V2 on #6413: on lamp-52e6
+    /// at 12337 the model ran the skill, or called nothing). Before any turn
+    /// only.
+    pub fn reading_back_by_words(mut self, asked: ReadBackAsked) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.read_back_asked = Some(asked);
         }
         self
     }
@@ -14347,6 +14369,18 @@ async fn answer(
         };
     // And, while one asked has not run, that nothing was renamed.
     let rename_note = held_rename::asked_note(shared, request, scope.as_ref(), (shared.clock)());
+    // A spoken line asking what a skill on the lamp uses, by its name
+    // ("what does desk check use?"): read back in code before round 1,
+    // never left to the model (V2 on #6413: on lamp-52e6 at 12337 the
+    // model ran the skill, or called nothing).
+    let read_back_named = heard
+        .then(|| {
+            shared
+                .read_back_asked
+                .as_ref()
+                .and_then(|asked| asked(&said))
+        })
+        .flatten();
     // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
     // once, after round 1 answers.
     let mut named_ask = shared
@@ -14454,6 +14488,7 @@ async fn answer(
                 && held_rename_runs.is_none()
                 && held_rename_dropped.is_none()
                 && rename_note.is_none()
+                && read_back_named.is_none()
         })
         .map(|prepared| (prepared, said.clone()));
     // Only a note for the model, no one's words (a wordless cut's ask to go
@@ -14798,6 +14833,48 @@ async fn answer(
         if let Some(note) = rename_told {
             messages.push(Message::system(note));
         }
+        // The skill the heard words ask what it uses, read back in code
+        // ([`Engine::reading_back_by_words`]): through the same runner as
+        // a model's `make_skill` call with `read_back` alone, and round 1 is
+        // told its result to say. Round 1's bounds run from its end, as
+        // after a held face save: the manage helper may take seconds.
+        let mut read_back_ran: Option<(String, Value)> = None;
+        if let Some(name) = read_back_named
+            .as_deref()
+            .filter(|_| !forgot_before_question)
+        {
+            let call = net::ToolCall {
+                extra: None,
+                id: "read_back_by_words".into(),
+                name: crate::made_skill::MAKE.into(),
+                args: serde_json::json!({ crate::make_skill_local::READ_BACK: name }),
+            };
+            let by_rule = shared
+                .hold
+                .as_ref()
+                .is_some_and(|hold| hold(request, &call.name));
+            if by_rule {
+                eprintln!(
+                    "lamp-voice second: request {request}: a skill asked about by name not read back: the line is held"
+                );
+            } else {
+                ran_tool.store(true, Ordering::Relaxed);
+                let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
+                saved_at = Some(tokio::time::Instant::now());
+                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                    return Err(Stop::Gone);
+                }
+                eprintln!(
+                    "lamp-voice second: request {request}: the heard words asked what a skill uses: read back in code ({})",
+                    crate::made_skill::name_asked(name)
+                );
+                messages.push(Message::system(crate::make_skill_local::read_back_note(
+                    &crate::made_skill::spoken_name(name),
+                    &result,
+                )));
+                read_back_ran = Some((name.to_owned(), result));
+            }
+        }
         // Their yes did not count (#2377): told once, beside the request.
         if let Some(told) = unseen_yes {
             messages.push(Message::system(told));
@@ -14845,6 +14922,13 @@ async fn answer(
         // it before its words, and request 27's "Kept: …" was said as
         // `NOT_KEPT_LINE`), judged as the call loop judges its own calls.
         let carried = carried_done(&rounds);
+        // The read-back the heard words ran is the turn's own call.
+        if let Some((name, _)) = &read_back_ran {
+            turn_called.push((
+                crate::made_skill::MAKE.to_owned(),
+                serde_json::json!({ crate::make_skill_local::READ_BACK: name }),
+            ));
+        }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
         // is told one went unsaid beside other calls.
@@ -16505,6 +16589,21 @@ async fn answer(
                         call.name
                     );
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
+                // The skill the heard words read back already: never run
+                // by `use_skill`, nor read back twice (V2 on #6413).
+                if let Some((asked, told)) = &read_back_ran
+                    && crate::make_skill_local::same_skill_again(&call.name, &call.args, asked)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: the heard words read that skill back already",
+                        call.name
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        crate::make_skill_local::read_back_already(told).to_string(),
+                    ));
                     continue;
                 }
                 // A face save their yes already ran ([`HeldSave`]): never a
