@@ -20,8 +20,9 @@
 //! [`made_skill::MAKE`] is the voice's own, whether or not a tasks part is
 //! there: a computer's agent is never handed a skill to make. With
 //! `LAMP_MAKE_SKILL_AGENT=on` (on in the product's lamp-voice) a voice make the
-//! lamp's model didn't make goes to the lamp's own agent, OpenClaw or
-//! Hermes, when the lamp has one ([`crate::make_skill_agent`]): DeepSeek
+//! lamp's model didn't make goes to the lamp's own agent when it is
+//! Hermes, the one engine with a namespace runner for a make today
+//! ([`crate::make_skill_agent`]): DeepSeek
 //! then gets one try and no repairs, and the agent gets them.
 use crate::made_skill::{self, Keeping, Made, Refused};
 use crate::second_provider::net::{self, Chat, ChatEvent, Message};
@@ -2150,9 +2151,12 @@ fn made_and_journaled_by(
     // With the switch and an agent on the lamp, DeepSeek gets one try and
     // no repairs; what it doesn't make goes to the agent, which gets the
     // repairs. Without either, DeepSeek's repairs stay as they are.
-    let engine = agent.and_then(|agent| agent.engine().map(|engine| (agent, engine)));
+    // Hermes alone: only it has a namespace runner for a make today.
+    let engine = agent.and_then(|agent| agent.hermes().map(|engine| (agent, engine)));
     if agent.is_some() && engine.is_none() {
-        eprintln!("lamp-voice: a skill made here: no agent on the lamp: DeepSeek makes it alone");
+        eprintln!(
+            "lamp-voice: a skill made here: no Hermes agent on the lamp: DeepSeek makes it alone"
+        );
     }
     let mut made = kept(ask(Arc::clone(&chat), brief.clone()));
     // The last refusal a repair was asked for: what the person hears when
@@ -4856,7 +4860,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
     /// DeepSeek's failure stands, said plainly, and nothing is kept.
     #[test]
     fn a_make_whose_make_run_is_refused_stays_deepseeks() {
-        for engine in ["old", "not_held_off"] {
+        for engine in ["old", "not_held_off", "no_namespace"] {
             let (root, keeping) = keeping(&format!("agent-not-held-{engine}"));
             let tasks = crate::make_skill_agent::tests::stub(
                 Some(engine),
@@ -4873,6 +4877,30 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             assert!(made_skill::entries(&keeping.directory).is_empty());
             let _ = std::fs::remove_dir_all(&root);
         }
+    }
+
+    /// #6643's 19:14 ruling: a make is handed to Hermes alone, the one
+    /// engine with a namespace runner for it today. With OpenClaw as the
+    /// lamp's agent nothing is handed over: DeepSeek keeps its repairs and
+    /// its answer stands, as with no agent.
+    #[test]
+    fn a_make_is_never_handed_to_openclaw() {
+        let (root, keeping) = keeping("agent-openclaw");
+        let openclaw = crate::make_skill_agent::tests::stub(
+            Some("openclaw"),
+            std::sync::Arc::new(|_: &str| Some(good())),
+        );
+        let (url, served) = service(vec![(200, faces()); 1 + MOST_REPAIRS]);
+        let told = made_by(&keeping, url, Some(&openclaw.agent()), NOW);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
+        );
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
+        assert_eq!(openclaw.hand_overs(), 0);
+        assert!(made_skill::entries(&keeping.directory).is_empty());
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// With the switch but no agent on the lamp, DeepSeek keeps its

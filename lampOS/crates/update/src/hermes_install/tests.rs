@@ -2210,7 +2210,7 @@ fn the_tasks_text_is_the_namespace_script_with_only_the_control_socket_added() {
     assert!(staged < hidden && hidden < shown && shown < unstaged);
     assert!(unstaged < ro_run && ro_run < hermes);
     assert_eq!(
-        on.matches("LAMP_").count() - on.matches(NET_ENV).count(),
+        on.matches("LAMP_").count() - on.matches(NET_ENV).count() - on.matches(HOME_ENV).count(),
         NS_TEXT.matches("LAMP_").count() + 1,
         "only the comment names the switch"
     );
@@ -2488,6 +2488,74 @@ fn hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once() {
     assert!(token.exists(), "off: no run, its file untouched");
 }
 
+/// The first builder's 19:14 ruling on #6643: a voice make's run gets a
+/// fresh home of its own. With [`TASKS_SWITCH`] on, the wrapper takes
+/// [`HOME_ENV`] only for a make's home ([`MAKE_HOME_GLOB`], never with
+/// `..`) and puts `HERMES_HOME` under it; the namespace script then makes
+/// it `HOME` and Hermes's lasting folder read-only. Off, neither line.
+/// Run under `sh` with a stand-in `unshare`.
+#[test]
+fn a_makes_own_home_is_taken_only_for_a_makes_folder() {
+    let on = wrapper_text(true);
+    assert_eq!(on.matches(WRAPPER_HOME_LINE).count(), 1);
+    assert!(!wrapper_text(false).contains(HOME_ENV));
+    for skills in [false, true] {
+        assert_eq!(ns_text(skills, true).matches(NS_HOME_LINE).count(), 1);
+        assert!(!ns_text(skills, false).contains(HOME_ENV));
+    }
+    assert!(WRAPPER_HOME_LINE.contains(MAKE_HOME_GLOB));
+    // The home is taken before Hermes is run, as the caller's own ids.
+    let ns = ns_text(false, true);
+    let home = ns.find(NS_HOME_LINE).unwrap();
+    assert!(home > ns.find("U=$LAMP_NS_UID").unwrap());
+    assert!(home < ns.find("exec /usr/bin/unshare --user").unwrap());
+    let folder = tempfile::tempdir().unwrap();
+    let printer = folder.path().join("unshare");
+    fs::write(
+        &printer,
+        "#!/bin/sh\necho \"home=${LAMP_NS_HOME-unset} hermes=$HERMES_HOME\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
+    let token = folder.path().join("hermes-token");
+    fs::write(&token, "tok_0123456789abcdef0123456789abcdef\n").unwrap();
+    let wrapper = folder.path().join("hermes");
+    fs::write(
+        &wrapper,
+        on.replace(TOKEN, &token.to_string_lossy())
+            .replace("/usr/bin/unshare", &printer.to_string_lossy()),
+    )
+    .unwrap();
+    let ran = |home: Option<&str>| {
+        let mut command = std::process::Command::new("/bin/sh");
+        command.arg(&wrapper).args(["chat", "-q", "a"]);
+        command.env_remove(HOME_ENV).env_remove(NET_ENV);
+        if let Some(home) = home {
+            command.env(HOME_ENV, home);
+        }
+        let out = command.output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    let make = "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-task-1-2-3/home";
+    assert_eq!(
+        ran(Some(make)),
+        format!("home={make} hermes={make}/.hermes\n")
+    );
+    let lasting = "home=unset hermes=/var/lib/lampos-hermes/.hermes\n";
+    for other in [
+        None,
+        Some(""),
+        Some("/var/lib/lampos-hermes"),
+        Some(
+            "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-x/../../../../../lampos-hermes/home",
+        ),
+        Some("/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-x/home/"),
+    ] {
+        assert_eq!(ran(other), lasting, "{other:?}");
+    }
+}
+
 /// OpenClaw shares Hermes's namespace script without the tasks edits, and
 /// its own wrapper: never `--net`, never the bridge or the relay.
 #[test]
@@ -2532,7 +2600,9 @@ fn both_switches_on_make_both_edits() {
     ));
     assert!(!both.contains("admin.sock"));
     assert_eq!(
-        both.matches("LAMP_").count() - both.matches(NET_ENV).count(),
+        both.matches("LAMP_").count()
+            - both.matches(NET_ENV).count()
+            - both.matches(HOME_ENV).count(),
         NS_TEXT.matches("LAMP_").count() + 2
     );
 }
