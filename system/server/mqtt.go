@@ -48,6 +48,12 @@ func (s *Server) startMQTT() {
 	s.mqttCancel = cancel
 	s.mqttMu.Unlock()
 
+	if s.config.MQTTTLS && !config.MQTTTLSFromEnv() {
+		safego.Go("mqtt-tls-fallback", func() {
+			s.watchTLSConnect(ctx, client.Connected, time.After(mqttTLSFallbackAfter))
+		})
+	}
+
 	safego.Go("mqtt", func() {
 		if err := client.Connect(ctx); err != nil && ctx.Err() == nil {
 			slog.Error("connect failed", "component", "mqtt", "error", err)
@@ -88,4 +94,49 @@ func (s *Server) stopMQTT() {
 	if client != nil {
 		_ = client.Close()
 	}
+}
+
+const (
+	// mqttTLSFallbackAfter is how long a TLS connection may take before the
+	// device goes back to its plain connection.
+	mqttTLSFallbackAfter = 3 * time.Minute
+	// mqttTLSRetryWait pauses TLS switches from the backend after a fallback.
+	mqttTLSRetryWait     = 24 * time.Hour
+	mqttPlainPortDefault = 1883
+)
+
+// watchTLSConnect returns the device to plain MQTT when a TLS connection never
+// comes up, so a broker or network that blocks TLS can't leave it offline.
+// Saving the config restarts MQTT through the config watcher.
+func (s *Server) watchTLSConnect(ctx context.Context, connected func() bool, deadline <-chan time.Time) {
+	select {
+	case <-ctx.Done():
+		return
+	case <-deadline:
+	}
+	if connected() || ctx.Err() != nil {
+		return
+	}
+	s.fallBackFromTLS(time.Now())
+}
+
+func (s *Server) fallBackFromTLS(now time.Time) {
+	revertTLS(s.config, now)
+	slog.Warn("TLS connection to the broker did not come up, going back to plain MQTT",
+		"component", "mqtt", "port", s.config.MQTTPort, "retry_after", mqttTLSRetryWait.String())
+	if err := s.config.Save(); err != nil {
+		slog.Error("save MQTT config failed", "component", "mqtt", "error", err)
+	}
+}
+
+// revertTLS puts c back on its plain port and pauses TLS switches.
+func revertTLS(c *config.Config, now time.Time) {
+	port := c.MQTTPlainPort
+	if port == 0 {
+		port = mqttPlainPortDefault
+	}
+	c.MQTTTLS = false
+	c.MQTTPort = port
+	c.MQTTPlainPort = 0
+	c.MQTTTLSRetryAfter = now.Add(mqttTLSRetryWait).Unix()
 }

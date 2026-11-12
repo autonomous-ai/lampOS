@@ -38,9 +38,24 @@ With TLS on, the client:
 - connects to whichever `mqtt_endpoint` and `mqtt_port` the backend returned in the ping reply, using scheme `ssl`;
 - verifies the broker certificate against the system root CAs and the broker host name;
 - requires TLS 1.2 or newer;
-- never falls back to a plain connection. If the TLS handshake fails, it retries with TLS.
+- keeps retrying with TLS if the handshake fails. When TLS was turned on through `mqtt_tls` (not `MQTT_TLS`) and no TLS connection comes up within 3 minutes, the device goes back to its previous plain port, turns `mqtt_tls` off and waits 24 hours before it accepts another TLS switch from the ping reply.
 
 While the switch is on, the ping body also carries `"mqtt_tls": true`. With the switch off the key is absent and the rest of the ping is unchanged.
+
+#### TLS switch in the ping reply
+
+Devices with this firmware add `"mqtt_tls_switch": true` to the ping body. It means the device will act on a TLS switch in the reply. During the 24-hour wait after a fallback the key is absent.
+
+The `mqtt` object of the ping reply may carry `"mqtt_tls": true` or `false` together with the matching `mqtt_port`:
+
+| Reply | Device |
+|---|---|
+| `"mqtt_tls": true` with the TLS port | saves `mqtt_tls: true`, remembers its plain port, reconnects over TLS |
+| `"mqtt_tls": false` with the plain port | saves `mqtt_tls: false`, reconnects over plain MQTT |
+| no `mqtt_tls` key | keeps its current setting; other fields apply as before |
+| `"mqtt_tls": true` during the 24-hour wait | ignores the switch and the reply's port; stays on plain MQTT |
+
+Send the switch only to devices whose ping carried `"mqtt_tls_switch": true`. Older firmware ignores the key, so it must keep getting the plain port.
 
 ## Topics
 

@@ -197,6 +197,9 @@ type PingPayload struct {
 	Skills []domain.SkillSummary `json:"skills,omitempty"`
 	// MQTTTLS is true only when the device connects to the broker over TLS.
 	MQTTTLS bool `json:"mqtt_tls,omitempty"`
+	// MQTTTLSSwitch is true when the device accepts a TLS switch in the ping
+	// reply (MQTTConfig.TLS). False while it waits after a failed TLS attempt.
+	MQTTTLSSwitch bool `json:"mqtt_tls_switch,omitempty"`
 }
 
 // MQTTConfig holds MQTT broker configuration from the backend.
@@ -207,6 +210,9 @@ type MQTTConfig struct {
 	Password  string `json:"mqtt_pwd,omitempty"`
 	FaChannel string `json:"fa_channel,omitempty"`
 	FdChannel string `json:"fd_channel,omitempty"`
+	// TLS, when present, turns the broker connection over TLS on or off. It
+	// comes with the matching port. Absent leaves the device's setting as is.
+	TLS *bool `json:"mqtt_tls,omitempty"`
 }
 
 // PingResponse is the backend response to a ping.

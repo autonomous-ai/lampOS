@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"go.autonomous.ai/os/system/lib/mqtt"
 	"go.autonomous.ai/os/system/lib/syspath"
@@ -273,6 +274,11 @@ type Config struct {
 	// MQTTTLS connects to the broker over TLS; off by default. The MQTT_TLS
 	// environment variable turns it on as well (see MQTTTLSEnabled).
 	MQTTTLS bool `json:"mqtt_tls,omitempty" yaml:"mqttTLS"`
+	// MQTTPlainPort is the port in use before a TLS switch, restored if TLS
+	// can't connect. MQTTTLSRetryAfter (unix seconds) pauses TLS switches
+	// after such a failure.
+	MQTTPlainPort     int   `json:"mqtt_plain_port,omitempty" yaml:"mqttPlainPort"`
+	MQTTTLSRetryAfter int64 `json:"mqtt_tls_retry_after,omitempty" yaml:"mqttTLSRetryAfter"`
 
 	// LocalIntent enables local keyword matching for common voice commands (default true).
 	// When false, all voice commands go through the agent (OpenClaw).
@@ -767,11 +773,22 @@ func (c *Config) GetNotifyChannel() chan bool {
 // MQTTTLSEnabled reports whether the broker connection uses TLS: the MQTT_TLS
 // environment variable (1/true/yes/on) or the mqtt_tls config.json key. Default off.
 func (c *Config) MQTTTLSEnabled() bool {
+	return MQTTTLSFromEnv() || c.MQTTTLS
+}
+
+// MQTTTLSSwitchAllowed reports whether a TLS switch from the backend is
+// accepted now: not while the device waits after a failed TLS attempt.
+func (c *Config) MQTTTLSSwitchAllowed(now time.Time) bool {
+	return now.Unix() >= c.MQTTTLSRetryAfter
+}
+
+// MQTTTLSFromEnv reports whether the MQTT_TLS environment variable forces TLS on.
+func MQTTTLSFromEnv() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("MQTT_TLS"))) {
 	case "1", "true", "yes", "on":
 		return true
 	}
-	return c.MQTTTLS
+	return false
 }
 
 func ProvideMQTTConfig(c *Config) mqtt.Config {

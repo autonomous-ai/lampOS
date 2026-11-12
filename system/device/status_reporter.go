@@ -39,6 +39,7 @@ func (s *Service) buildPingPayload(status string) beclient.PingPayload {
 		VoiceInputMode:      s.config.GetVoiceInputMode(),
 		UnsupportedChannels: s.config.ChannelsUnsupported,
 		MQTTTLS:             s.config.MQTTTLSEnabled(),
+		MQTTTLSSwitch:       s.config.MQTTTLSSwitchAllowed(time.Now()),
 	}
 	if ip, err := s.networkService.GetCurrentIP(); err == nil && ip != apSetupIP {
 		p.LocalIP = ip
@@ -114,22 +115,53 @@ func (s *Service) StartStatusReporter(ctx context.Context) {
 			}
 			// Apply when the broker, port or channels change: moving to the TLS port on
 			// the same broker changes only the port.
-			if resp.HasMQTT() && mqttConfigChanged(resp.GetMQTT(), s.config) {
-				mqttCfg := resp.GetMQTT()
-				slog.Info("received MQTT config from backend", "component", "status-reporter", "endpoint", mqttCfg.Endpoint)
-				s.config.MQTTEndpoint = mqttCfg.Endpoint
-				port, _ := strconv.Atoi(mqttCfg.Port)
-				s.config.MQTTPort = port
-				s.config.MQTTUsername = mqttCfg.Username
-				s.config.MQTTPassword = mqttCfg.Password
-				s.config.FAChannel = mqttCfg.FaChannel
-				s.config.FDChannel = mqttCfg.FdChannel
+			if resp.HasMQTT() && applyPingMQTT(resp.GetMQTT(), s.config, time.Now()) {
+				slog.Info("received MQTT config from backend", "component", "status-reporter",
+					"endpoint", s.config.MQTTEndpoint, "port", s.config.MQTTPort, "tls", s.config.MQTTTLSEnabled())
 				if err := s.config.Save(); err != nil {
 					slog.Error("save MQTT config failed", "component", "status-reporter", "error", err)
 				}
 			}
 		}
 	}
+}
+
+// applyPingMQTT copies the backend's MQTT config into c and reports whether
+// anything that needs a reconnect changed. A TLS switch is taken only while
+// the device accepts one; otherwise the reply's port is ignored too, so the
+// device never talks plain MQTT to a TLS port.
+func applyPingMQTT(m *beclient.MQTTConfig, c *config.Config, now time.Time) bool {
+	tlsChange := m.TLS != nil && *m.TLS != c.MQTTTLS
+	if tlsChange && *m.TLS && !c.MQTTTLSSwitchAllowed(now) {
+		slog.Info("TLS switch skipped while waiting after a failed TLS attempt", "component", "status-reporter")
+		m = &beclient.MQTTConfig{Endpoint: m.Endpoint, Port: strconv.Itoa(c.MQTTPort),
+			Username: m.Username, Password: m.Password, FaChannel: m.FaChannel, FdChannel: m.FdChannel}
+		tlsChange = false
+	}
+	if !tlsChange && !mqttConfigChanged(m, c) {
+		return false
+	}
+	if tlsChange {
+		if *m.TLS {
+			c.MQTTPlainPort = c.MQTTPort
+		} else {
+			c.MQTTPlainPort = 0
+		}
+		c.MQTTTLS = *m.TLS
+	}
+	c.MQTTEndpoint = m.Endpoint
+	if port, _ := strconv.Atoi(m.Port); port != 0 {
+		c.MQTTPort = port
+	}
+	c.MQTTUsername = m.Username
+	c.MQTTPassword = m.Password
+	if m.FaChannel != "" {
+		c.FAChannel = m.FaChannel
+	}
+	if m.FdChannel != "" {
+		c.FDChannel = m.FdChannel
+	}
+	return true
 }
 
 // mqttConfigChanged reports whether the backend's MQTT config differs from the

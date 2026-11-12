@@ -38,9 +38,24 @@ Khi bật TLS, client:
 - kết nối tới `mqtt_endpoint` và `mqtt_port` mà backend trả về trong phản hồi ping, dùng scheme `ssl`;
 - kiểm tra chứng chỉ của broker theo root CA của hệ thống và tên host của broker;
 - yêu cầu TLS 1.2 trở lên;
-- không bao giờ chuyển về kết nối thường. Nếu bắt tay TLS thất bại, client thử lại bằng TLS.
+- tiếp tục thử lại bằng TLS nếu bắt tay thất bại. Khi TLS được bật qua `mqtt_tls` (không phải `MQTT_TLS`) mà sau 3 phút vẫn chưa có kết nối TLS, thiết bị quay về port thường trước đó, tắt `mqtt_tls` và chờ 24 giờ trước khi nhận lệnh chuyển TLS tiếp theo từ phản hồi ping.
 
 Khi công tắc bật, body ping có thêm `"mqtt_tls": true`. Khi tắt, key này không có và phần còn lại của ping không đổi.
+
+#### Lệnh chuyển TLS trong phản hồi ping
+
+Thiết bị chạy firmware này thêm `"mqtt_tls_switch": true` vào body ping, nghĩa là thiết bị sẽ làm theo lệnh chuyển TLS trong phản hồi. Trong 24 giờ chờ sau khi quay về kết nối thường, key này không có.
+
+Object `mqtt` của phản hồi ping có thể có `"mqtt_tls": true` hoặc `false` đi cùng `mqtt_port` tương ứng:
+
+| Phản hồi | Thiết bị |
+|---|---|
+| `"mqtt_tls": true` kèm port TLS | lưu `mqtt_tls: true`, ghi nhớ port thường, kết nối lại qua TLS |
+| `"mqtt_tls": false` kèm port thường | lưu `mqtt_tls: false`, kết nối lại bằng MQTT thường |
+| không có key `mqtt_tls` | giữ nguyên thiết lập hiện tại; các trường khác áp dụng như trước |
+| `"mqtt_tls": true` trong 24 giờ chờ | bỏ qua lệnh chuyển và port trong phản hồi; vẫn dùng MQTT thường |
+
+Chỉ gửi lệnh chuyển cho thiết bị có `"mqtt_tls_switch": true` trong ping. Firmware cũ bỏ qua key này nên phải tiếp tục nhận port thường.
 
 ## Topics
 
