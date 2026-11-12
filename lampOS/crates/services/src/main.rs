@@ -17,7 +17,7 @@ use lamp_services::{
     net::Https,
     on,
     refresh::Backend,
-    serve, skill_writes, store, tools,
+    serve, skill_secrets, skill_writes, store, tools,
 };
 use std::{
     fs, io,
@@ -153,13 +153,21 @@ fn main() -> ExitCode {
             "a skill's fixed write through the lamp's agent on: its run sends it once, as the owner said yes to it",
         );
     }
+    // An uploaded skill's keys given in the app (LAMP_SKILL_SECRETS):
+    // kept here, and asked for by lamp-tasks for a run.
+    let skill_secrets =
+        skill_secrets::on(std::env::var(skill_secrets::ENVIRONMENT).ok().as_deref());
+    if skill_secrets {
+        say("a skill's keys on: kept from the app, given to its run by lamp-tasks alone");
+    }
     let services = serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
         .with_skill_reads(skill_reads)
         .with_skill_writes(skill_writes)
         .with_skill_tasks(skill_tasks)
         .with_skill_write_agent(skill_write_agent)
         .with_calendar_edits(calendar_edits)
-        .with_draft_edits(draft_edits);
+        .with_draft_edits(draft_edits)
+        .with_skill_secrets(skill_secrets);
     let tools_dir = run.join("tools");
     let edits = tools::Edits {
         calendar: calendar_edits,
