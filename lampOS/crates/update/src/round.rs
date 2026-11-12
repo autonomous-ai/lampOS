@@ -63,6 +63,11 @@ pub const VOICE_UNIT: &str = "lamp-voice.service";
 /// after a round's watch passed when [`RECOVER_SWITCH`] is on.
 pub const RECOVER_UNIT: &str = "lamp-setup-recover.service";
 pub const RECOVER_SWITCH: &str = "LAMP_WIFI_RECOVERY";
+/// lamp-control (#6699): started by a kept or up-to-date round whenever it
+/// ended cleanly with a switch on that keeps it up, changed or not.
+pub const CONTROL_UNIT: &str = "lamp-control.service";
+/// Either keeps lamp-control up: the developers' door, or a skill's tasks.
+pub const CONTROL_SWITCHES: [&str; 2] = ["LAMP_CONTROL", "LAMP_SKILL_TASKS"];
 /// The body; its unit declarations determine its restart order.
 pub const BODY_UNIT: &str = "lamp-body.service";
 /// How often the world is looked at while waiting and watching.
@@ -535,6 +540,14 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         && let Some(climbed) = run.climb(&too_old)
     {
         outcome = climbed;
+    }
+    // A lamp-control left dead under an older build (#6699) is started on
+    // an up-to-date round too: the round that switches a lamp to a build is
+    // run by the updater it had, so the first one of the new updater, after
+    // its own switch, finds the lamp up to date. A switching round starts
+    // it with the parts it added (`start_added`).
+    if let Outcome::UpToDate(sequence) = outcome {
+        run.start_added(&[], sequence);
     }
     if config.self_switch
         && let Outcome::Switched(sequence)
@@ -2828,6 +2841,23 @@ impl Run<'_, '_> {
         }
     }
 
+    /// lamp-control's switch that keeps it up (#6699), when its unit is
+    /// here, enabled into `lampos.target`, and one of [`CONTROL_SWITCHES`]
+    /// reads `on` through its drop-ins, as install reads a switch. None
+    /// otherwise: a lamp-control off by both exits 0 by design.
+    fn control_kept_up(&self) -> Option<&'static str> {
+        let path = format!("{}{CONTROL_UNIT}", crate::install::UNITS);
+        let text = fs::read_to_string(self.config.on(&path)).ok()?;
+        let link = format!("{}/{}.wants/{CONTROL_UNIT}", added::UNITS, added::LAMP);
+        fs::symlink_metadata(self.config.on(&link)).ok()?;
+        let on = |lamp: &str| self.config.on(lamp);
+        let mut sources = vec![(path.clone(), crate::switches::environment(&text))];
+        sources.extend(crate::install::kept_sources(&on, CONTROL_UNIT, &text, &[]));
+        CONTROL_SWITCHES
+            .into_iter()
+            .find(|switch| crate::switches::effective(switch, &sources) == Some("on"))
+    }
+
     /// The long-running parts of `lampos.target` this switch added and
     /// enabled (crate::added::to_start), each started once here with
     /// `--no-block`: after the watch passed and the build is kept, so a part
@@ -2837,53 +2867,96 @@ impl Run<'_, '_> {
     /// while `lampos.target` runs (the lamp is set up), and only a part
     /// that is inactive: a running one is never restarted, a failed one is
     /// left. A start that fails is said and the round stays switched.
+    ///
+    /// The same for a part the lamp had that this switch changed and that
+    /// had ended cleanly (#6699): inactive with its last run a success, as
+    /// lamp-control was after it exited 0 under a build where its switch
+    /// was off. A round restarts only what runs, so such a part stayed dead
+    /// until the lamp's next start, through any number of updates. Started
+    /// once, on the same terms; one still off by its own switch exits again.
     fn start_added(&mut self, backs: &[Back], sequence: u64) {
+        let read = |back: &Back| {
+            let path = format!("{}/{}", added::UNITS, back.unit);
+            let text = fs::read_to_string(self.config.on(&path)).ok()?;
+            Some((back.unit.clone(), text))
+        };
         let added: Vec<(String, String)> = backs
             .iter()
             .filter(|back| back.added.is_some())
-            .filter_map(|back| {
-                let path = format!("{}/{}", added::UNITS, back.unit);
-                let text = fs::read_to_string(self.config.on(&path)).ok()?;
-                Some((back.unit.clone(), text))
-            })
+            .filter_map(read)
             .collect();
-        let picked = added::to_start(&added, |unit| {
+        let ended: Vec<(String, String)> = backs
+            .iter()
+            .filter(|back| back.added.is_none() && !back.was_active)
+            .filter_map(read)
+            .collect();
+        let enabled = |unit: &str| {
             let link = format!("{}/{}.wants/{unit}", added::UNITS, added::LAMP);
             fs::symlink_metadata(self.config.on(&link)).is_ok()
-        });
-        if picked.is_empty() {
+        };
+        let picked = added::to_start(&added, enabled);
+        let ended: Vec<String> = added::to_start(&ended, enabled)
+            .into_iter()
+            .filter(|unit| !picked.contains(unit))
+            .collect();
+        let control = (!picked.iter().chain(&ended).any(|unit| unit == CONTROL_UNIT))
+            .then(|| self.control_kept_up())
+            .flatten();
+        if picked.is_empty() && ended.is_empty() && control.is_none() {
             return;
         }
         let mut asked = picked.clone();
+        asked.extend(ended.iter().cloned());
+        if control.is_some() {
+            asked.push(CONTROL_UNIT.to_owned());
+        }
         asked.push(added::LAMP.to_owned());
         let states = match self.world.systemd.states(&asked) {
             Ok(states) => states,
             Err(why) => {
                 self.say(&format!(
-                    "the parts build {sequence} added are not started: systemd cannot say how they are ({why}); they start at the next boot"
+                    "the parts build {sequence} added or changed are not started: systemd cannot say how they are ({why}); they start at the next boot"
                 ));
                 return;
             }
         };
-        let active = |unit: &str| {
-            states
-                .iter()
-                .find(|state| state.unit == unit)
-                .map(|state| state.active.clone())
-        };
-        if active(added::LAMP).as_deref() != Some("active") {
+        let state = |unit: &str| states.iter().find(|state| state.unit == unit).cloned();
+        if state(added::LAMP).is_none_or(|state| state.active != "active") {
             self.say(&format!(
-                "the parts build {sequence} added start with {}, which is not running",
+                "the parts build {sequence} added or changed start with {}, which is not running",
                 added::LAMP
             ));
             return;
         }
-        for unit in picked {
-            if active(&unit).as_deref() != Some("inactive") {
-                continue;
-            }
+        let starts = picked
+            .into_iter()
+            .filter(|unit| state(unit).is_some_and(|state| state.active == "inactive"))
+            .map(|unit| (unit, format!("added by build {sequence}")))
+            .chain(
+                ended
+                    .into_iter()
+                    .filter(|unit| state(unit).is_some_and(|state| state.ended_cleanly()))
+                    .map(|unit| {
+                        (
+                            unit,
+                            format!("ended before build {sequence}, which changed it"),
+                        )
+                    }),
+            )
+            .chain(
+                control
+                    .filter(|_| state(CONTROL_UNIT).is_some_and(|state| state.ended_cleanly()))
+                    .map(|switch| {
+                        (
+                            CONTROL_UNIT.to_owned(),
+                            format!("ended cleanly with {switch} on"),
+                        )
+                    }),
+            )
+            .collect::<Vec<_>>();
+        for (unit, why_started) in starts {
             match self.world.systemd.start_added(&unit) {
-                Ok(()) => self.say(&format!("started {unit}, added by build {sequence}")),
+                Ok(()) => self.say(&format!("started {unit}, {why_started}")),
                 Err(why) => self.say(&format!(
                     "{unit} could not be started ({why}); it starts at the next boot"
                 )),
