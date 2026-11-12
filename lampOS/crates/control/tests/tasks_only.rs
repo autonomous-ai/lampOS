@@ -121,11 +121,10 @@ fn tasks_on_and_the_door_off_serves_the_owners_side_and_nothing_on_the_network()
         "nothing listens on the network without the door"
     );
     assert!(run_socket, "the run socket is served without the door");
-    // No yes is kept on this lamp: the mint is refused in words, no token.
-    assert!(
-        mint.contains("no skill yes is kept on this lamp yet"),
-        "{mint}"
-    );
+    // No yes is kept for this skill: the mint is refused in words, no token.
+    // The words are the yes source's own (`NoYes` today, #6509's `KeptYes`
+    // next), so only the refusal's shape is held here.
+    assert!(mint.contains("\"error\""), "{mint}");
     assert!(!mint.contains("\"token\""), "{mint}");
 }
 
