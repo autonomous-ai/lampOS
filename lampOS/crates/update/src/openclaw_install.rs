@@ -691,7 +691,10 @@ pub fn after_round(
         if said.install == "installing" && since(said) < STUCK_AFTER.as_millis() as u64 {
             return None;
         }
+        // A tap from the app (#6240) is a deliberate try again: a recent
+        // failure does not hold it, as for Hermes.
         if said.install == "failed"
+            && !matches!(window, Ok(crate::hermes_schedule::Window::Asked))
             && !matches!(said.error.as_deref(), Some(error) if RETRY_IN_NEXT_WINDOW.contains(&error))
             && since(said) < RETRY_AFTER.as_millis() as u64
         {

@@ -48,10 +48,10 @@ pub const NO_ENGINE: &str = "no such agent on this lamp";
 /// being installed, waiting for a round already, or off).
 pub const NOT_MISSING: &str = "the agent is not missing or failed";
 /// `engines.install`, refused: lamp-update says the agent, but this build
-/// has no installer for it (OpenClaw, said from its own installer's record).
+/// has no installer for it (none now: Hermes and OpenClaw both have one).
 pub const NOT_INSTALLABLE: &str = "not installable on this build yet";
 /// The agents this build's lamp-update can install when asked.
-pub const INSTALLABLE: [&str; 1] = ["hermes"];
+pub const INSTALLABLE: [&str; 2] = ["hermes", "openclaw"];
 
 pub fn from_environment() -> bool {
     std::env::var(ENVIRONMENT).is_ok_and(|value| value == "on")
@@ -331,17 +331,24 @@ mod tests {
         }
         let missing = json!({"engines": {"hermes": {"state": "not_installed"}}});
         assert_eq!(installable(&missing, "hermes"), Ok(()));
-        // OpenClaw, said but with no installer in this build: refused
-        // plainly, whatever its state.
-        for state in ["not_installed", "failed", "installed"] {
+        // OpenClaw, as Hermes since its installer landed (#6226; V2's ask
+        // on #6240, 12 Nov): missing or failed may be installed.
+        for state in ["not_installed", "failed"] {
+            let told = json!({"engines": {"openclaw": {"state": state}}});
+            assert_eq!(installable(&told, "openclaw"), Ok(()), "{state}");
+        }
+        for state in ["off", "waiting", "installing", "frozen", "installed"] {
             let told = json!({"engines": {"openclaw": {"state": state}}});
             assert_eq!(
                 installable(&told, "openclaw"),
-                Err(NOT_INSTALLABLE.to_owned()),
+                Err(NOT_MISSING.to_owned()),
                 "{state}"
             );
         }
         assert_eq!(installable(&missing, "openclaw"), Err(NO_ENGINE.to_owned()));
+        // An engine said that this build cannot install: refused plainly.
+        let told = json!({"engines": {"other": {"state": "not_installed"}}});
+        assert_eq!(installable(&told, "other"), Err(NOT_INSTALLABLE.to_owned()));
         // None said: none given, with the switch on.
         says.publish_json(
             0,
