@@ -338,11 +338,36 @@ phần đó vào. hermes-ns cũng chỉ cho lần chạy thấy
 chính lamp-update; network namespace riêng của lần chạy cũng vậy. Kết quả của
 lần chạy chưa thành Task news, và thư mục của kỹ năng được
 nêu trong lời của lần chạy, chưa nằm trong `AGENTS.md` của thư mục làm việc.
-Giới hạn
-của lamp-tasks.service (`MemoryHigh`, `CPUQuota`) chờ số đo RAM và CPU của
-Hermes khi chạy một việc trên lamp-52e6 (đèn 6 GB: mọi giới hạn RAM được
-tính theo loại đèn này), so với mức sàn khi cài Hermes
-(≥1.350 MB còn trống), trong lúc giọng nói trả lời một câu. Kiểm thử:
+
+**Giới hạn của lamp-tasks.service** (#6306; bình luận 09:32 của first
+builder trên #6306, 12/11). Lần chạy của một kỹ năng do chính lamp-tasks
+khởi động, và wrapper của Hermes chỉ tách namespace, nên lần chạy vẫn nằm
+trong cgroup của lamp-tasks.service, cạnh các tiến trình con Harness của
+phần này (một `harness wait` và tối đa bốn `harness watch`, Node, mỗi cái
+khoảng 130 MB trên lamp-75c9). Các pane của chính Harness chạy dưới user
+unit của harnessd, không ở đây. Một việc của kỹ năng có thể chạy cạnh một việc nói, nên cgroup được tính
+cho hai phần tăng của việc cùng lúc (`skill_task::TASKS_AT_ONCE`): giới hạn
+bộ nhớ và task là **lúc nghỉ + 2 × phần tăng × 1,5**, làm tròn lên
+(`skill_task::two_tasks_cap`), còn giới hạn CPU là CPU của hai việc nhân
+1,5, giữ ở tối đa ba nhân. Các số đo là của Fourteen cho một việc Hermes thật
+bằng giọng nói (một danh sách đồ cần mang, 80 s) trên lamp-9adf, một đèn
+6 GB chạy build 12255, đọc từ cgroup của lamp-tasks.service bằng
+`systemctl show`; số CPU do first builder chuyển (13:14 trên #6059). Các
+đỉnh được lấy mẫu mỗi 2 s, nên chỉ là mức sàn; phần nhân 1,5 bù cho phần
+nằm giữa hai lần lấy mẫu. Sau khi việc đóng, cgroup giữ 727 MiB và 89 task.
+
+| Số đo (`skill_task::`) | Đã đo | Nguồn | Giới hạn trong unit sản phẩm |
+|---|---|---|---|
+| Bộ nhớ cgroup, `MemoryCurrent` (`MEASURED_REST_MEMORY_MB`, `MEASURED_PEAK_MEMORY_MB`) | 632 MiB lúc nghỉ, đỉnh 1120 MiB (+488; mức sàn: mẫu mỗi 2 s) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | `MemoryHigh=2100M` (`MEMORY_HIGH`): 632 + 2 × 488 × 1,5 = 2096, làm tròn lên 100 MB. Vượt mức này kernel làm chậm và thu hồi bộ nhớ của chính phần này, không bao giờ kill: không có `MemoryMax` |
+| Task của cgroup, `TasksCurrent`, tiến trình gồm cả thread (`MEASURED_REST_TASKS`, `MEASURED_TASKS`) | 91 lúc nghỉ, đỉnh 126 (+35; mức sàn: mẫu mỗi 2 s) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | `TasksMax=200` (`TASKS_MAX`): 91 + 2 × 53 = 197, làm tròn lên 10. Vượt mức này thì fork thất bại, không gì bị kill |
+| CPU (`MEASURED_PEAK_CPU_PERCENT`) | khoảng 1,2 nhân trong 80 s (120%) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059); first builder, 13:14 | `CPUQuota=300%` (`CPU_QUOTA`): 2 × 120 × 1,5 = 360%, giữ ở 300% (`CPU_QUOTA_MOST_PERCENT`), vì 360% chỉ để lại 0,4 nhân cho giọng nói khi cả hai việc đều bận; 300% giữ một trong 4 nhân của đèn cho giọng nói mà vẫn đủ 240% của hai việc |
+| MemAvailable thấp nhất (`MEASURED_MIN_AVAILABLE_MB`) | 3208 MB (3.285.476 kB) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | không có; một kiểm thử giữ nó, trừ 488 MB của việc thứ hai (2720 MB), bằng hoặc trên mức sàn khi cài Hermes (`HERMES_FLOOR_MB`, ≥1.350 MB) |
+| Thời gian chạy, từ `new` tới khi đóng (`MEASURED_RUN_SECS`) | 75 s | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | không có; một kiểm thử giữ nó, nhân 1,5, trong vòng đời một lần chạy (`RUN_LIFETIME`, 14 phút) |
+| Kích thước thư mục làm việc (`MEASURED_WORK_FOLDER_MB`) | 1 MB, làm tròn lên (36K trước, 40K sau) | lamp-9adf, 12/11, cgroup của lamp-tasks.service (#6059) | không có; chỉ ghi lại |
+
+Mỗi `MEASURED_*` và giới hạn của nó phải khớp nhau, cả trong unit: các kiểm
+thử thất bại khi một số đo đổi mà giới hạn không đổi theo.
+Kiểm thử:
 `skill_task::tests` (công tắc, vòng đời token, lần chạy lỗi, không có token,
 mọi dòng bị từ chối; socket trả lời một dòng, lần chạy thứ hai bị từ chối
 `busy`, tắt công tắc thì không mở gì, người gọi không phải lamp-skills không
@@ -352,8 +377,13 @@ trong môi trường, không bao giờ trong đối số; runner của đèn đ�
 unix sang TCP và câu trả lời quay về, đúng từng byte, qua một bộ chuyển
 tiếp giả trên cổng tạm; kết nối vượt mức tối đa bị đóng ngay và chỗ được
 trả lại; đường nối không hoạt động bị kết thúc; không gì được nối bị ghi
-nhật ký; đối số của relay; tắt công tắc thì không mở gì), chạy trên máy
-tính bất kỳ, không cần Hermes.
+nhật ký; đối số của relay; tắt công tắc thì không mở gì), và các giới hạn
+(`skill_task::tests`: mỗi giới hạn có một lần trong `[Service]` của unit sản
+phẩm, không có dòng giới hạn bộ nhớ cứng, mỗi giới hạn đủ cho hai việc với
+phần nhân 1,5, MemAvailable thấp nhất trừ phần tăng của việc thứ hai bằng
+hoặc trên mức sàn của Hermes, thời gian chạy
+nhân 1,5 nằm trong vòng đời một lần chạy), chạy trên máy tính bất kỳ, không
+cần Hermes.
 
 **Dòng kiểm tra trên đèn (chưa chạy):** trên một đèn đã cài Hermes,
 lamp-control đang phục vụ và `LAMP_SKILL_TASKS=on` trong cả hai unit, lần
