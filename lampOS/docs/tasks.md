@@ -2321,7 +2321,8 @@ for each run, and is answered once the run ends
   at most 4 connections are read or answered at once, a fifth `busy` too.
   The journal keeps each outcome's code only, never the line, the task's
   words or the token. lamp-skills names the socket with `--tasks-socket` or
-  `LAMP_SKILLS_TASKS_SOCKET` (#6346); no unit passes it yet.
+  `LAMP_SKILLS_TASKS_SOCKET` (#6346); the product's lamp-skills unit passes
+  `/run/lampos-tasks/skill-task.sock`.
 - **No other network: two ways out** (the first builder's design on
   #6443). The run is started with `LAMP_NS_NET=run` (`NET_ENV`), the only
   opt-in, which only takes access away: with `LAMP_SKILL_TASKS=on` in
@@ -2363,10 +2364,11 @@ for each run, and is answered once the run ends
 
 **Not yet (said so the code is not read as more):** `ControlTokens` speaks
 lamp-control's admin socket (#6408, merged), but lamp-control keeps no skill
-yes yet, so every mint is refused there today. The product units set
-`LAMP_SKILL_TASKS=on` for lamp-tasks and lamp-update (12 Nov), but none
-passes lamp-skills the socket, so nothing on a lamp runs a skill's task
-yet. hermes-ns shows the run lamp-control's `control.sock` only with
+yes yet (#6509 adds it), so every mint is refused there today, and with
+`LAMP_CONTROL` off lamp-control serves no run socket until (b) (#6304). The
+product units set `LAMP_SKILL_TASKS=on` and pass lamp-skills the socket
+(`LAMP_SKILLS_TASKS_SOCKET=/run/lampos-tasks/skill-task.sock`, 12 Nov), so a
+skill's task is handed over, and is refused at its mint until those two land. hermes-ns shows the run lamp-control's `control.sock` only with
 `LAMP_SKILL_TASKS=on` in lamp-update's own unit too; its own network
 namespace is the same. The run's result is not yet Task news, and the
 skill's folder is named in the run's words, not in the work folder's
