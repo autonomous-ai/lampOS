@@ -2560,3 +2560,20 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   (#6304, lamp-control đúc từ cái "có" nó giữ,
   `lamp_control::task_yes::yes_for_token`) và kết quả qua Task news là của
   #6304 và #6306.
+
+## Chủ đề người ở bàn đang làm gì (#6543, chưa có bên phát)
+
+Đã khai báo cho #6543 (nhận biết qua đám mây), chưa có phần nào phát:
+`humans/doing` (số giây từ lần cuối thấy uống, ăn hay vươn vai trong lần
+ngồi này, việc thấy cuối và độ chắc), `humans/doing_seen` (mỗi việc mới
+thấy, một sự kiện) và `humans/posture` (độ dài cửa sổ, tỉ lệ mẫu ngồi xấu
+và vùng xấu nhiều nhất) ([msgs.md](../msgs.md)). `lamp-seen` sẽ phát chúng,
+đến cùng giai đoạn 2 và 3 của #6543. Kỹ năng ghi một chủ đề này trong
+`[permissions] topics` hiện quyền dùng `seen`, riêng tư
+([cloud.md](../cloud.md)). Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
+lúc đến bàn khi chưa thấy gì, nên `[[while]] topic = "humans/doing" field =
+"drank_s_ago" above = 5399 unknown = "holds"` vẫn đúng với người đèn chưa
+thấy uống, như khi chỉ có đồng hồ; `humans/posture` luôn có `window_s` (0
+lúc cửa sổ bắt đầu). Một chủ đề có giá trị cuối đã hết hạn vẫn không làm
+`[[while]]` nào đúng: `unknown = "holds"` chỉ áp dụng cho chủ đề chưa từng
+nói gì.
