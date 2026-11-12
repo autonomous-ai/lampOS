@@ -453,8 +453,19 @@ refusal), and nothing is started new in any case:
     goes) asks lamp-tasks on the voice's socket `{"op":"forget_sessions"}`
     (`agent_tasks::forget_sessions_with_everything`), which removes the
     file and answers `{"forgotten":true|false}`; the voice's answer to the
-    person is as it was.
+    person is as it was. A hand-over or look still running when the forget
+    comes may keep its one session again after it: that is a use after
+    the forget, as any later one is.
+  - Signed out: when `harness auth status` reads signed out
+    (`Cli::signed_in_here`), the index lets the account machines' sessions
+    go, since the next sign-in may be another account's. It keeps those on
+    this computer's own id, which Harness starts work under while signed
+    out (`session_index::forget_machines`). Signed in or offline, it keeps
+    every one.
   - Tests: `tests/harness.rs`
+    `signed_out_the_account_machines_sessions_are_let_go`;
+    `tests/session_index.rs` `forgetting_machines_keeps_only_those_kept`;
+    `tests/harness.rs`
     `an_older_session_not_listed_is_found_by_its_name_through_the_index`,
     `a_listed_session_is_found_as_before_and_the_index_only_adds`,
     `an_indexed_session_that_is_gone_is_dropped`,
