@@ -109,6 +109,31 @@ pub const GRANTS: [(&str, &str); 12] = [
 /// lamp-control's grant a script never holds: putting skills on the lamp.
 pub const NEVER: &str = "skills";
 
+/// A linked service's grant on a `do.task` (`gmail-read`,
+/// `google_calendar-write`; #6432's names), its code and whether it writes,
+/// with `LAMP_AGENT_SERVICES` on in this process
+/// ([`crate::made_skill::agent_services_here`]); `None` for any other name,
+/// and for every name with the switch off.
+pub fn service_grant(name: &str) -> Option<(&str, bool)> {
+    if !crate::made_skill::agent_services_here() {
+        return None;
+    }
+    crate::made_skill::service_grant(name)
+}
+
+/// What a service grant lets the run do, in plain words: "reads your
+/// Gmail", "prepares sends with your Gmail, each sent only on your yes".
+pub fn service_words(name: &str) -> Option<String> {
+    let (code, write) = service_grant(name)?;
+    let service = lamp_services::catalog::service(code)
+        .map_or_else(|| code.replace('_', " "), |service| service.name.to_owned());
+    Some(if write {
+        format!("prepares sends with your {service}, each sent only on your yes")
+    } else {
+        format!("reads your {service}")
+    })
+}
+
 /// `name`'s plain words, for a grant of [`GRANTS`].
 pub fn grant_words(name: &str) -> Option<&'static str> {
     GRANTS
@@ -131,7 +156,12 @@ pub fn grant_named(name: &str) -> Option<&'static str> {
 pub fn uses_said(grants: &[String]) -> String {
     let words: Vec<String> = grants
         .iter()
-        .map(|grant| grant_words(grant).map_or_else(|| format!("uses {grant}"), str::to_owned))
+        .map(|grant| {
+            grant_words(grant)
+                .map(str::to_owned)
+                .or_else(|| service_words(grant))
+                .unwrap_or_else(|| format!("uses {grant}"))
+        })
         .collect();
     match words.as_slice() {
         [] => "it uses none of the lamp's parts".to_owned(),
@@ -669,6 +699,27 @@ mod tests {
         assert!(GRANTS.iter().all(|(_, words)| !words.is_empty()));
         assert!(grant_words(NEVER).is_none());
         assert_eq!(grant_named("camera"), Some("camera"));
+    }
+
+    /// LAMP_AGENT_SERVICES: a connector skill's service grants are said
+    /// back in plain words, the send's yes named, only with the switch on;
+    /// off, or an unknown service, by its name as any unknown grant.
+    #[test]
+    fn service_grants_are_said_back_plainly_only_on() {
+        let grants = ["gmail-read".to_owned(), "gmail-write".to_owned()];
+        crate::made_skill::set_agent_services_here(Some(true));
+        assert_eq!(
+            uses_said(&grants),
+            "it reads your Gmail and prepares sends with your Gmail, each sent only on your yes"
+        );
+        assert!(service_grant("myspace-read").is_none());
+        crate::made_skill::set_agent_services_here(Some(false));
+        assert!(service_grant("gmail-read").is_none());
+        assert_eq!(
+            uses_said(&grants),
+            "it uses gmail-read and uses gmail-write"
+        );
+        crate::made_skill::set_agent_services_here(None);
     }
 
     /// Read back, a task skill waits for the yes; a yes in a later heard

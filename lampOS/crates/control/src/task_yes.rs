@@ -548,6 +548,52 @@ mod tests {
         folder
     }
 
+    /// LAMP_AGENT_SERVICES (#6432): the owner's yes to a connector skill
+    /// covers its service grants as any other: kept, held to exactly the
+    /// grants declared, and named as `Grant::Service` for the token; an
+    /// unknown service's grant is never recorded.
+    #[test]
+    fn the_yes_covers_a_skills_service_grants() {
+        let dir = folder("services");
+        let state = dir.join("state");
+        std::fs::create_dir_all(&state).unwrap();
+        let sha256 = "ab".repeat(32);
+        let record = |grants: Value| {
+            answer(
+                Some(state.as_path()),
+                &asked(
+                    RECORD,
+                    json!({"name": "morning-mail", "sha256": sha256, "grants": grants}),
+                ),
+                true,
+                true,
+                5,
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            record(json!(["gmail-read", "gmail-write"])),
+            json!({"recorded": true})
+        );
+        let declared = ["gmail-write".to_owned(), "gmail-read".to_owned()];
+        let yes = yes_for_token(&state, "morning-mail", &sha256, &declared).unwrap();
+        let named: BTreeSet<Grant> = yes
+            .grants
+            .iter()
+            .map(|grant| serde_json::from_value(Value::String(grant.clone())).unwrap())
+            .collect();
+        assert_eq!(named.len(), 2);
+        assert!(named.iter().all(|grant| matches!(grant, Grant::Service(_))));
+        // A yes for the read alone names no token for a skill that also sends.
+        assert_eq!(record(json!(["gmail-read"])), json!({"recorded": true}));
+        assert!(yes_for_token(&state, "morning-mail", &sha256, &declared).is_none());
+        // An unknown service, or a second code, is never a grant.
+        for bad in ["myspace-read", "gmail-app-read"] {
+            assert!(record(json!([bad]))["error"].is_string(), "{bad}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// #6304: a mint gets exactly the yes's grants for the folder as
     /// lamp-control hashes it; no yes, a changed script, more grants
     /// declared, a folder that is a link, or the switch off: refused.
