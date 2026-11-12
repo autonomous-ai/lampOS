@@ -2099,6 +2099,34 @@ fn the_tasks_switch_is_lamp_tasks_own_and_on_in_the_product() {
     }
 }
 
+/// A made skill's code of its own (#6307, the last part of #6071) is on in
+/// the product (12 Nov, the lead's ask): `lamp-voice` (the making model's
+/// brief and the yes), `lamp-skills` (a made skill's `do.task` loads) and
+/// its manage helper (a made skill's scripts held to the cap as it is put
+/// on) each set it `on` once, and no product file sets it to anything else.
+#[test]
+fn the_made_scripts_switch_is_on_in_the_product() {
+    let name = lamp_voice::made_skill::SCRIPTS_ENVIRONMENT;
+    assert_eq!(name, "LAMP_MADE_SCRIPTS");
+    let switch = format!("Environment={name}=on");
+    let setting = format!("{name}=");
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    // Every unit whose part reads it.
+    for unit in ["lamp-skills", "lamp-skills-manage@", "lamp-voice"] {
+        let text = fs::read_to_string(product.join(format!("{unit}.service"))).unwrap();
+        let lines = text.lines().filter(|line| *line == switch).count();
+        assert_eq!(lines, 1, "{unit}");
+    }
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if let Ok(text) = fs::read_to_string(&path) {
+            for line in text.lines().filter(|line| line.contains(&setting)) {
+                assert_eq!(line, switch, "{}", path.display());
+            }
+        }
+    }
+}
+
 /// [`ns_text`] with [`TASKS_SWITCH`] on: each of [`TASKS_EDITS`] found
 /// once in [`NS_TEXT`] (and once with [`SKILLS_EDITS`] made) and made, so
 /// the text names [`CONTROL_SOCKET`], the file alone, and stages it before
