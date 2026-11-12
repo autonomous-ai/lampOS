@@ -3844,6 +3844,39 @@ today's checks.
    `[quiet]` stays on one that speaks. The say-back says the cooldown as
    it always has ("at most once every 5 minutes").
 
+6. **A skill made before it sheds the lamp's old limits as it loads**
+   (`lamp_skills::shed_made_manners`, the owner's 9adf round, 12 Nov
+   15:06: one made "light off when I leave" ran, and four other made
+   skills were refused a minute later, "its wellbeing group ran lately").
+   A skill made before the switch carries the limits the lamp then wrote
+   on every make; `lamp-skills` (the running program, every load of the
+   skills folder) ignores two of them as it loads, never on disk, so its
+   files, the package SHA-256 in its `.package.json` and a task's yes on
+   its folder's SHA-256 (`task::folder_sha256`) stay as they were put on:
+   - `[budget] group = "wellbeing"` at `per_hour = 1`
+     (`made_skill::MANNERS_GROUP`, `MANNERS_PER_HOUR`) with no `gap`, no
+     `give_back_unsaid` and no `[stop]`: it no longer shares the nudges'
+     hour and gap;
+   - `most_a_day = 3` (`made_skill::MANNERS_MOST_A_DAY`).
+
+   Any other value (`per_hour = 2`, `most_a_day = 5`, a `gap`) is kept, as
+   the person's ask. `[rest]`, `[quiet]`, a trigger's `cooldown` and
+   `rearm` are kept whole (the first builder's ruling, 12 Nov 15:15).
+   Made here means (`lamp_skills::made_by_ask`): an installable skill in
+   the skills folder, never pushed, its `SKILL.md` front matter says
+   `made: here` (the lamp's own line, inside the package its SHA-256
+   binds; one the model wrote is dropped, and a shared skill has it taken
+   out) and neither `added: file` nor `written: app`, and its
+   `.package.json` is not the Store's. A core, Store, add-on, pushed,
+   file-added or folder-put skill keeps every limit. One line a skill,
+   once a run: `lamp-skills: light-off: made here,
+   LAMP_MADE_SKILL_LOOSE=on: the lamp's old [budget] group "wellbeing"
+   per_hour = 1 and most_a_day = 3 ignored, its files as they are`. A
+   limit the person asked for at exactly those values (asked "at most
+   three times a day", made before the switch) is shed too: the file
+   can't tell it from the lamp's. Off, nothing is shed. Test:
+   `tests::loosened_a_made_skill_sheds_the_lamps_old_limits_as_it_loads`.
+
 Unchanged with it on: a write's read-back and the spoken yes on its
 content's SHA-256; the sends, at most 3 a skill and 10 across all skills
 a day (`lamp-services`, which doesn't read the switch); the privacy
