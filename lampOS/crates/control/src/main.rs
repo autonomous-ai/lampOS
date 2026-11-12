@@ -529,8 +529,8 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         option(arguments, "--agent-group").unwrap_or_else(|| lamp_control::agent::GROUP.to_owned());
     // The run socket (one-run tokens for a skill's run): only when a user is
     // named (the flag, or LAMP_CONTROL_RUN_SOCKET_USER; the flag wins; `off`
-    // is off). Nothing mints a token until the skills' part keeps the owner's
-    // yes (`runs::SkillYes`).
+    // is off). A token is minted only from the owner's yes kept here
+    // (`task_yes::KeptYes`, #6304), with LAMP_SKILL_TASKS on.
     let run_user = option(arguments, "--run-socket-user")
         .or_else(|| std::env::var("LAMP_CONTROL_RUN_SOCKET_USER").ok())
         .filter(|user| !user.is_empty() && user != "off");
@@ -586,7 +586,13 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                         "lamp-control: skill runs (uid {uid}, {user}) may use {} with a one-run token",
                         run_socket.display()
                     );
-                    shared.set_skill_yes(Arc::new(lamp_control::runs::NoYes));
+                    // The owner's yes, kept in the state folder, for the
+                    // skill's folder as lamp-control hashes it at each mint.
+                    shared.set_skill_yes(Arc::new(lamp_control::task_yes::KeptYes {
+                        state: state.clone(),
+                        skills: PathBuf::from(lamp_control::task_yes::SKILLS),
+                        on: lamp_control::task_yes::on(),
+                    }));
                     tokio::spawn(server::serve_run(listener, uid, user, shared.clone()));
                 }
                 Err(why) => eprintln!("lamp-control: the run socket for {user}: off: {why}"),
