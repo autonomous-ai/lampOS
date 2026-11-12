@@ -2791,3 +2791,24 @@ fn a_failing_logger_never_fails_the_wrapper() {
         format!("-t hermes {}\n", agent_ns::HOOK_NOTE)
     );
 }
+
+/// #6506: lamp-tasks offers an engine on the lamp only when its program
+/// in `/usr/local/bin` carries this line in its first 512 bytes
+/// (`lamp_tasks::runtime::LAMP_WRAPPER_MARK`). Hermes's and OpenClaw's
+/// wrappers, with the tasks switch on or off, all do.
+#[test]
+fn every_engine_wrapper_carries_the_mark_lamp_tasks_looks_for() {
+    const MARK: &str = "Written by lamp-update.";
+    for text in [
+        wrapper_text(false),
+        wrapper_text(true),
+        crate::openclaw_install::WRAPPER_TEXT.to_owned(),
+    ] {
+        let head = &text.as_bytes()[..text.len().min(512)];
+        assert!(
+            head.windows(MARK.len()).any(|w| w == MARK.as_bytes()),
+            "{}",
+            text.lines().nth(1).unwrap_or_default()
+        );
+    }
+}

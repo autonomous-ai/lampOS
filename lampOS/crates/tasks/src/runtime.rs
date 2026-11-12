@@ -263,6 +263,14 @@ pub struct LampSide {
     /// ([`lamp_engine_offered`], #6492). Refreshed with each look; None
     /// before one (or signed out, #6407): [`Self::order`] alone then.
     pub reported: Arc<Mutex<Option<Vec<EngineKind>>>>,
+    /// Whether the lamp offers only an engine lamp-update put in
+    /// [`Self::bin`] (#6506): its program there is a wrapper carrying
+    /// [`LAMP_WRAPPER_MARK`], which runs it in its own namespace, away
+    /// from the person's things on the lamp. Any other program by an
+    /// engine's name (a `claude` installed by hand) is not offered, nor
+    /// taken as the default, whatever Harness reports. On for a lamp
+    /// ([`lamp_side`]); off in tests that place no wrapper.
+    pub wrapped: bool,
 }
 
 impl LampSide {
@@ -281,6 +289,7 @@ impl LampSide {
             app: Default::default(),
             chosen: None,
             reported: Default::default(),
+            wrapped: false,
         }
     }
 
@@ -318,7 +327,9 @@ impl LampSide {
 /// lamp's own machine and able to take a task ([`LampSide::reported`]),
 /// less any whose switch is off ([`LampSide::switched_on`]). Before a look
 /// has reported (signed out, #6407, or not yet looked), the engines
-/// switched on ([`LampSide::order`]), as before. No engine is the lamp's by
+/// switched on ([`LampSide::order`]), as before. With [`LampSide::wrapped`]
+/// (a lamp), a reported engine is one only while its program here is a
+/// wrapper lamp-update wrote ([`installed_here`], #6506). No engine is the lamp's by
 /// name here: Harness has many, and how each starts stays Harness's.
 ///
 /// The default ([`lamp_default`]): the owner's choice in the app
@@ -326,9 +337,11 @@ impl LampSide {
 /// ([`lamp_engines`]' first), else the first of them.
 pub fn lamp_order(side: &LampSide) -> Vec<EngineKind> {
     let mut order: Vec<EngineKind> = match side.reported() {
+        // Only an engine lamp-update wrapped runs on the lamp (#6506).
         Some(reported) => reported
             .into_iter()
             .filter(|engine| side.switched_on(*engine))
+            .filter(|engine| !side.wrapped || installed_here(side, *engine))
             .collect(),
         None => side
             .order
@@ -511,10 +524,33 @@ fn lamp_engine_here(side: &LampSide) -> Option<EngineKind> {
 }
 
 /// Whether `engine`'s program is where Harness finds it on the lamp
-/// ([`LampSide::bin`]): an executable file by the engine's name (#6407).
+/// ([`LampSide::bin`]): an executable file by the engine's name (#6407),
+/// and, with [`LampSide::wrapped`], a wrapper lamp-update wrote
+/// ([`lamp_update_wrote`], #6506).
 fn installed_here(side: &LampSide, engine: EngineKind) -> bool {
-    fs::metadata(side.bin.join(engine.argument()))
+    let program = side.bin.join(engine.argument());
+    fs::metadata(&program)
         .is_ok_and(|found| found.is_file() && found.permissions().mode() & 0o111 != 0)
+        && (!side.wrapped || lamp_update_wrote(&program))
+}
+
+/// The line every wrapper lamp-update writes for an engine on the lamp
+/// carries (`lamp_update::hermes_install::WRAPPER_TEXT`,
+/// `lamp_update::openclaw_install::WRAPPER_TEXT`, #6506), in its first
+/// lines.
+pub const LAMP_WRAPPER_MARK: &str = "Written by lamp-update.";
+
+/// Whether `program` is a wrapper lamp-update wrote: [`LAMP_WRAPPER_MARK`]
+/// in its first 512 bytes (#6506). An engine's own program, or any other
+/// file put there by hand, is not.
+fn lamp_update_wrote(program: &Path) -> bool {
+    let mut head = Vec::with_capacity(512);
+    fs::File::open(program)
+        .and_then(|file| file.take(512).read_to_end(&mut head))
+        .is_ok_and(|_| {
+            head.windows(LAMP_WRAPPER_MARK.len())
+                .any(|window| window == LAMP_WRAPPER_MARK.as_bytes())
+        })
 }
 
 /// The switch for the lamp's own Hermes (#5978), in lamp-tasks' unit.
@@ -587,6 +623,7 @@ pub fn lamp_side(
         .flatten()
         .map(|home| LampSide {
             chosen: chosen.and_then(lamp_engine_offered),
+            wrapped: true,
             ..LampSide::with_order(home, order)
         })
 }
@@ -5744,6 +5781,65 @@ mod tests {
         *hermes_only.reported.lock().unwrap() = Some(Vec::new());
         assert!(lamp_order(&hermes_only).is_empty());
         assert_eq!(lamp_default(&hermes_only), None);
+    }
+
+    /// #6506: on a lamp, an engine Harness reports is offered only while
+    /// its program in the bin is a wrapper lamp-update wrote. A `claude`
+    /// put there by hand is not in the order, and the app can't make it
+    /// the default; marked as lamp-update's, it is offered.
+    #[test]
+    fn only_an_engine_lamp_update_wrapped_is_offered_on_the_lamp() {
+        use EngineKind::{Claude, Hermes};
+        use std::os::unix::fs::PermissionsExt;
+        let bin = tempfile::tempdir().unwrap();
+        let place = |name: &str, text: &str| {
+            let path = bin.path().join(name);
+            fs::write(&path, text).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        };
+        place(
+            "hermes",
+            "#!/bin/sh\n# lampOS: Hermes on the lamp (#5978). Written by lamp-update.\nexec true\n",
+        );
+        place("claude", "#!/bin/sh\nexec /opt/claude/bin/claude \"$@\"\n");
+        let side = LampSide {
+            bin: bin.path().to_path_buf(),
+            wrapped: true,
+            ..LampSide::with_order(PathBuf::new(), vec![Hermes])
+        };
+        *side.reported.lock().unwrap() = Some(vec![Claude, Hermes]);
+        assert_eq!(lamp_order(&side), [Hermes], "a plain claude: not offered");
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join(ENGINE_DEFAULT_FILE);
+        let claude = Request::AppEngineDefault {
+            engine: "claude".into(),
+        };
+        assert_eq!(
+            app_engine_default_operation(&claude, Some(&side), &file)
+                .unwrap_err()
+                .code,
+            ENGINE_NOT_INSTALLED
+        );
+        assert_eq!(read_engine_default(&file), None);
+        // Signed out, the same check (#6407): not installed here.
+        assert!(!installed_here(&side, Claude));
+        assert!(installed_here(&side, Hermes));
+        // lamp-update's wrapper for it: offered.
+        place(
+            "claude",
+            &format!("#!/bin/sh\n# lampOS: Claude on the lamp. {LAMP_WRAPPER_MARK}\nexec true\n"),
+        );
+        assert_eq!(lamp_order(&side), [Hermes, Claude]);
+        assert!(app_engine_default_operation(&claude, Some(&side), &file).is_ok());
+        assert_eq!(lamp_order(&side), [Claude, Hermes]);
+        // Replaced by a plain program between looks (Heron): read again at
+        // each use, it is dropped at once, the app's choice with it.
+        place("claude", "#!/bin/sh\nexec /opt/claude/bin/claude \"$@\"\n");
+        assert_eq!(lamp_order(&side), [Hermes]);
+        assert_eq!(lamp_default(&side), Some(Hermes));
+        // Not executable: not offered either.
+        fs::set_permissions(bin.path().join("claude"), fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(!installed_here(&side, Claude));
     }
 
     /// #6226: the lamp's own machine is the target `lamp` with OpenClaw
