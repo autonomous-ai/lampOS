@@ -5556,7 +5556,7 @@ pub fn keep_written(
 }
 
 /// Where pushed skills are, beside `installed` (lamp-skills' `PUSHED_DIR`).
-fn pushed(installed: &Path) -> PathBuf {
+pub(crate) fn pushed(installed: &Path) -> PathBuf {
     installed.with_file_name("skills-dev")
 }
 
@@ -6774,6 +6774,68 @@ pub fn name_asked(asked: &str) -> String {
         words = rest;
     }
     words.join("-")
+}
+
+/// A written name (`lamp-test-email-2`, as [`name_asked`] writes one) with
+/// each number said in words written as digits, the same on both sides of
+/// a match: speech gives "lamp test email two" for a skill named with a
+/// `2` (lamp-9adf, 12 Nov, #6223's rows). Zero to nineteen, the tens to
+/// ninety, and a tens word with a unit after it as one number ("twenty
+/// one" is `21`); any other word is left as it is.
+pub fn name_digits(name: &str) -> String {
+    const UNITS: [&str; 20] = [
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
+        "nineteen",
+    ];
+    const TENS: [&str; 8] = [
+        "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+    ];
+    let unit = |word: &str| UNITS.iter().position(|said| *said == word);
+    let tens = |word: &str| {
+        TENS.iter()
+            .position(|said| *said == word)
+            .map(|at| 20 + 10 * at)
+    };
+    let words: Vec<&str> = name.split('-').collect();
+    let mut out: Vec<String> = Vec::with_capacity(words.len());
+    let mut at = 0;
+    while at < words.len() {
+        let word = words[at];
+        if let Some(tens) = tens(word) {
+            match words.get(at + 1).and_then(|next| unit(next)) {
+                Some(one) if (1..=9).contains(&one) => {
+                    out.push((tens + one).to_string());
+                    at += 2;
+                }
+                _ => {
+                    out.push(tens.to_string());
+                    at += 1;
+                }
+            }
+        } else {
+            out.push(unit(word).map_or_else(|| word.to_owned(), |number| number.to_string()));
+            at += 1;
+        }
+    }
+    out.join("-")
 }
 
 /// Keep `made` in the index, as made from `from`, and let the oldest

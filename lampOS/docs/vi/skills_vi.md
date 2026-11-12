@@ -1861,7 +1861,19 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   việc của #6307.
 - **Nói lại và cái "có":** hỏi "kỹ năng photo booth của tôi dùng gì?", đèn
   nói tác vụ, nguồn của script và từng grant bằng lời thường ("it uses the
-  camera"). Cái "có" được nhận như cái "có" cho việc ghi của kỹ năng tự tạo
+  camera"). Tên mà helper không biết thì được tìm trong các kỹ năng đẩy
+  lên từ máy tính (`skills-dev/<name>/` có `skill.toml`,
+  `skill_task_yes::pushed_named`): đúng tên trước, nếu không thì một kỹ
+  năng duy nhất có tên khớp khi số đọc bằng chữ thành chữ số và bỏ dấu
+  gạch ngang ("skill two" là `skill-2`, "deskcheck" là `desk-check`;
+  `made_skill::name_digits`); hai kỹ năng chỉ khớp kiểu đó thì không tìm
+  ra cái nào. Kỹ năng đó rồi được hỏi helper (lamp-52e6, 12/11,
+  row-6413b3). Không tìm thấy thì journal ghi tên được hỏi, viết như tên
+  kỹ năng và không gì khác ("no skill with a task by the name asked:
+  desk-check"; với kỹ năng tự tạo cũng vậy). Test:
+  `a_pushed_skill_with_a_task_is_found_by_its_spoken_name`,
+  `two_pushed_alike_find_neither_and_a_miss_journals_the_name_asked`.
+  Cái "có" được nhận như cái "có" cho việc ghi của kỹ năng tự tạo
   (`skill_write_yes`). Giọng nói đọc lại kỹ năng qua manage helper, và chỉ
   khi thư mục vẫn đúng SHA-256 và các grant đã nói lại thì mới nhờ
   lamp-control ghi nhận (`task_yes_record` trên socket chủ đèn
