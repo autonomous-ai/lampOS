@@ -248,6 +248,16 @@ pub fn grants_of(grants: &[String]) -> Result<Vec<String>, String> {
     Ok(kept)
 }
 
+/// The task grant that keeps a run's network (`LAMP_TASK_NET`,
+/// `lamp_voice::skill_task_yes::NET`): a grant here, in the manage helper
+/// and lamp-control while [`net_on`], never one of lamp-control's own.
+pub const NET_GRANT: &str = lamp_voice::skill_task_yes::NET.0;
+
+/// Whether the `net` grant's switch is on in this process.
+pub fn net_on() -> bool {
+    lamp_voice::skill_task_yes::net_on()
+}
+
 /// A skill made by the lamp's own model with code of its own (#6307): its
 /// `do.task` loads only with this on, here and in the manage helper. `on`
 /// only.
@@ -291,13 +301,33 @@ pub fn made_with_code(folder: &Path, pushed: bool) -> bool {
         && package::installed_from(folder).is_some_and(|installed| !installed.from_store)
 }
 
+/// Whether the skill in `folder` is an agent skill added from a file in the
+/// app (`lamp_voice::upload_agent`), with `LAMP_UPLOAD_TO_AGENT` on: its
+/// card says `made: here`, `added: file` and `agent: file`, it went on as a
+/// package (the manage helper's `install_made`, held to
+/// `lamp_voice::upload_agent::capped`), not from the Store nor pushed, and
+/// its one task runs its file ([`lamp_voice::upload_agent::INSTRUCTIONS`]).
+pub fn agent_from_file(folder: &Path, pushed: bool) -> bool {
+    let card = fs::read_to_string(folder.join("SKILL.md")).unwrap_or_default();
+    let toml = fs::read_to_string(folder.join("skill.toml")).unwrap_or_default();
+    lamp_voice::upload_agent::on()
+        && !pushed
+        && card.lines().any(|line| line.trim() == "made: here")
+        && card
+            .lines()
+            .any(|line| line.trim() == lamp_voice::made_skill::ADDED_FROM_FILE)
+        && lamp_voice::upload_agent::is_agent_card(&card)
+        && lamp_voice::upload_agent::capped(&toml).is_ok()
+        && package::installed_from(folder).is_some_and(|installed| !installed.from_store)
+}
+
 /// Why the skill in `folder` may not carry a `do.task`, or none: only one
 /// from the Skills Store (its `.package.json` says `from_store`, and its
 /// card is not marked made or added here) or pushed by the owner's own
 /// paired computer (`pushed`, the developer folder's), or one the lamp's
 /// own model made with its code's switch on ([`made_with_code`], #6307).
 pub fn origin_refuses(folder: &Path, pushed: bool) -> Option<String> {
-    if made_with_code(folder, pushed) {
+    if made_with_code(folder, pushed) || agent_from_file(folder, pushed) {
         return None;
     }
     let card = fs::read_to_string(folder.join("SKILL.md")).unwrap_or_default();
@@ -1075,6 +1105,71 @@ mod tests {
         let made = origin_refuses(&folder, true).unwrap();
         assert!(made.contains("made or added on the lamp"), "{made}");
         set_made_here(None);
+    }
+
+    /// LAMP_UPLOAD_TO_AGENT: an agent skill added from a file in the app,
+    /// put on as a package, loads with its task and its grants, `net` among
+    /// them with LAMP_TASK_NET on; its script is said to come from a file
+    /// added in the app. Off, or put on from a folder, it is refused as any
+    /// added skill with a task; `net` off is no grant.
+    #[test]
+    fn an_agent_skill_from_a_file_carries_its_task_only_with_its_switch() {
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        lamp_voice::upload_agent::set_on_here(Some(true));
+        let card = "---\nname: photo-booth\ndescription: Takes three photos. Call it when the \
+                    person says 'take a photo'.\n---\n\nTake three photos and flash the light; \
+                    send them to the image API at https://images.example.invalid/ and say \
+                    cheese.\n";
+        let (files, grants) = lamp_voice::upload_agent::files(card).unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("photo-booth");
+        fs::create_dir_all(folder.join(SCRIPTS)).unwrap();
+        fs::write(folder.join("skill.toml"), &files.toml).unwrap();
+        fs::write(
+            folder.join("SKILL.md"),
+            files.card.replace(
+                "\n---\n",
+                "\nmade: here\nmade_by: app\nadded: file\nagent: file\n---\n",
+            ),
+        )
+        .unwrap();
+        fs::write(folder.join(&files.scripts[0].0), &files.scripts[0].1).unwrap();
+        let skill = crate::load(&folder).unwrap();
+        assert_eq!(skill.grants, grants);
+        assert_eq!(grants, ["light", "speak", "camera", "net"]);
+        assert_eq!(
+            skill.task_step().unwrap().run,
+            lamp_voice::upload_agent::INSTRUCTIONS
+        );
+        // Put on from a folder (no package record): refused.
+        assert!(origin_refuses(&folder, false).is_some());
+        let installed = package::Installed {
+            sha256: "ab".repeat(32),
+            manifest: package::Manifest {
+                format: 1,
+                name: "photo-booth".into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: false,
+        };
+        fs::write(
+            folder.join(package::INSTALLED_FROM),
+            serde_json::to_vec(&installed).unwrap(),
+        )
+        .unwrap();
+        assert!(agent_from_file(&folder, false));
+        assert!(origin_refuses(&folder, false).is_none());
+        assert!(origin_refuses(&folder, true).is_some());
+        lamp_voice::upload_agent::set_on_here(Some(false));
+        assert!(origin_refuses(&folder, false).is_some());
+        lamp_voice::upload_agent::set_on_here(None);
+        // LAMP_TASK_NET off: `net` is no grant.
+        lamp_voice::skill_task_yes::set_net_here(Some(false));
+        assert!(grants_of(&["net".to_owned()]).is_err());
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        assert_eq!(grants_of(&["net".to_owned()]).unwrap(), ["net"]);
+        lamp_voice::skill_task_yes::set_net_here(None);
     }
 
     /// #6307: a skill the lamp's own model made carries a task only with
