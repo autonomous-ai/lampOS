@@ -4052,6 +4052,25 @@ the same code for both writers.
   and the rest in `made_skill::BRIEFS_OWN_REFUSALS`, kept beside the brief
   and held to the prompt by a test) is said as it is and never handed to
   the agent. Any other `cannot:` goes to the agent.
+- **What a skill would have to find out goes to the agent.** The lamp has
+  no topic that carries the weather, the news or anything from the
+  internet. The system prompt says that a request needing information
+  found at run time that no step gives (the weather or a forecast, the
+  news, a web lookup, a price, a summary of mail or calendar content no
+  read gives) is answered `cannot:` with "I can't do that yet:" and what.
+  That sentence is none of the brief's own refusals, so it goes to the
+  agent. The lamp's check also refuses a say that hands the ask back as an
+  instruction (`made_skill::echoes_the_ask`): the say begins (after
+  "please" or "now") with check, look up, find, read, search, summarize or
+  get, and the request asked the lamp to do that. The make is then not
+  kept: it goes to the agent, or, with no agent, to DeepSeek's repair, and
+  the person hears "I can't do that yet: doing that itself, rather than
+  telling you to do it" (`ECHOES_THE_ASK`). A request for a reminder
+  ("remind me to", "tell me to", "ask me to", "nudge me to", "get me to")
+  and words the person gave to say are never refused this way. On
+  lamp-9adf, 12 Nov 18:10, "every morning at eight, check the weather and
+  tell me if I need an umbrella" was kept as DeepSeek's, a skill that only
+  said "Check the weather now, please."
 - **The agent's own `cannot:` is never said as it wrote it.** The lamp says
   its own line, "I couldn't make that one." (`make_skill_agent::CANNOT_LINE`).
 - **How the agent is reached.** The way the voice hands it any work

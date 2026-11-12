@@ -255,7 +255,13 @@ fn system_for(reads: bool, agent: bool) -> String {
          {cant_example}.\"), never a rule, ending with \
          what to ask instead when there is one; \
          for a reminder at a time or every so often: \"Ask me for a reminder instead, like 'remind \
-         me every hour to stand up'.\" Never stand something \
+         me every hour to stand up'.\" A skill also can't find out anything at the time it \
+         runs that no step here or below gives: the weather or a forecast, the news, a web \
+         lookup, a price, a summary of mail or calendar content no read below gives, anything \
+         from the internet. A request that needs it is answered the same way, one line and no \
+         blocks: {cannot} \"{cant_yet}\" and what, in plain words (\"{cant_yet} checking the \
+         weather for you.\"); never a say telling the person to check, look up or read it \
+         themselves. Never stand something \
          else in for it, and add no time of day the request didn't name. When a part of the \
          request can't be done with these (dimming slowly, over a minute), make the rest and \
          add one line after the blocks: {left_out} what was left out, in a few words.\n\n\
@@ -4924,6 +4930,74 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(!made_skill::briefs_own_refusal(
             "a skill can't watch the weather"
         ));
+        // What a skill can't find out at run time is asked for as a
+        // `cannot:` that is none of them, so it goes to the agent.
+        for reads in [true, false] {
+            let prompt = system_with(reads);
+            assert!(
+                prompt.contains("the weather or a forecast, the news"),
+                "{prompt}"
+            );
+        }
+        assert!(!made_skill::briefs_own_refusal(
+            "I can't do that yet: checking the weather for you."
+        ));
+    }
+
+    /// Lamp-9adf, 12 Nov 18:10: "check the weather and tell me if I need an
+    /// umbrella" was kept as DeepSeek's, a skill that only says "Check the
+    /// weather now, please." Such a say is not kept and the make goes to
+    /// the agent; a reminder the person asked to be told is still kept as
+    /// DeepSeek's.
+    #[test]
+    fn a_say_handing_the_ask_back_goes_to_the_agent_and_a_reminder_stays() {
+        const UMBRELLA: &str = "make me a skill: every morning at eight, check the weather and \
+                                tell me if I need an umbrella";
+        let umbrella = |say: &str| {
+            format!(
+                "```skill.toml\nkind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"weather\"]\n\n\
+                 [permissions]\nlight = true\nbody = true\nspeak = true\n\
+                 topics = [\"clock/local\", \"weather\"]\n\n[trigger]\ntopic = \"clock/local\"\n\
+                 field = \"known\"\nequals = true\nduring = {{ from = \"08:00\", to = \"08:01\" }}\n\
+                 cooldown = \"23h\"\nrearm = \"ends\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n\
+                 say = {{ text = \"{say}\" }}\n```\n\n```SKILL.md\n---\nname: morning-umbrella\n\
+                 description: Says a line about the weather at eight.\n---\n\n# Umbrella\n\nAt \
+                 eight it speaks.\n```\n"
+            )
+        };
+        let by = |request: &str, answer: String, name: &str, now: u64| {
+            let (root, keeping) = keeping(name);
+            let tasks = agent_answering(vec![Some(good())]);
+            let (url, served) = service(vec![(200, answer)]);
+            let told = make_with_by(
+                0,
+                None,
+                request,
+                &keeping,
+                chat_at(url),
+                now,
+                || None,
+                Some(&tasks.agent()),
+            );
+            let _ = std::fs::remove_dir_all(&root);
+            (told, served.join().unwrap(), tasks.prepares())
+        };
+        let (told, served, prepares) = by(
+            UMBRELLA,
+            umbrella("Check the weather now, please."),
+            "echo-umbrella",
+            NOW,
+        );
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!((served, prepares), (1, 1));
+        let (told, served, prepares) = by(
+            "remind me to drink water every hour",
+            umbrella("Time to drink some water."),
+            "echo-water",
+            NOW + 1,
+        );
+        assert_eq!(told["made"], "morning-umbrella", "{told}");
+        assert_eq!((served, prepares), (1, 0));
     }
 
     /// The Reviewer-lead on #6439: the agent's own `cannot:` is never said
