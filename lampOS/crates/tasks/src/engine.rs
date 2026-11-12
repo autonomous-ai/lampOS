@@ -43,10 +43,12 @@ pub const UNTOLD_CLOSE_MS: u64 = 60_000;
 /// nothing asked, no answer and no tool used before it is taken as never
 /// begun (#6577, [`never_began`]): its `--message` never reached the TUI,
 /// as when the Gateway answered the look before `new` and then did not
-/// serve it. UNMEASURED: the slowest real first prompt on a lamp with
-/// Harness 0.6.41, times two, from lamp-tasks' journal, replaces it before
-/// this trains.
-pub const OPENCLAW_BEGIN_WITHIN_MS: u64 = 180_000;
+/// serve it. The slowest real first prompt seen, times two: on lamp-fc4b
+/// (12 Nov, Harness 0.6.16, signed out) three `new`s answered in 1.8 to
+/// 2.3 s had their first `ask` 65.1 s (the first after lamp-tasks
+/// started), 24.5 s and 18.5 s later. Harness 0.6.41's own reading on a
+/// lamp is still to come (#6577).
+pub const OPENCLAW_BEGIN_WITHIN_MS: u64 = 130_000;
 /// How often a task handed over is looked at on its own (unless `serve --no-watch`):
 /// every half minute for its first ten minutes, then every two, until the
 /// agent has finished or asks something, and for at most a day. After that
