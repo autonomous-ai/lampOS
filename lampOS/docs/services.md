@@ -2395,8 +2395,10 @@ never through an open socket.
   uneven indent) is the person's and is kept byte for byte, on or off (on,
   without the lamp's entry), and never stops the rest of the merge, so the
   provider lines are still written. Set the switch alike in lamp-tasks,
-  lamp-voice and lamp-skills-manage@: lamp-voice makes a connector skill as
-  a `do.task` ([skills.md](skills.md)) and lamp-skills-manage@ puts it on.
+  lamp-skills, lamp-skills-manage@, lamp-voice and lamp-control: lamp-voice
+  makes a connector skill as a `do.task` ([skills.md](skills.md)),
+  lamp-skills and lamp-skills-manage@ take its service grants as they load
+  and put it on, and lamp-control keeps them in the yes and the token.
   No product unit sets the switch.
 - **The token and its grants.** A skill's `do.task` run (lamp-tasks,
   `skill_task`) is started with `LAMP_CONTROL_SOCKET` and a one-run token
