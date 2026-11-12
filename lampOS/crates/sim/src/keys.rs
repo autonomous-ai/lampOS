@@ -1,7 +1,7 @@
 //! A developer's own voice keys for the virtual lamp: read from one private file
 //! (`~/.config/lampos/voice-keys.toml`) or from environment variables, which win.
-//! Nothing here starts or feeds a voice yet; it only finds the keys and says,
-//! without ever saying one, which are set and from where.
+//! This module only finds the keys and says, without ever saying one, which are set and from
+//! where; `real_voice.rs` feeds them to a voice.
 //!
 //! ```toml
 //! [main]                     # the voice's main (Live) provider
@@ -10,6 +10,8 @@
 //! deepseek = "..."
 //! deepseek_url = "https://..."   # optional: the person's DeepSeek endpoint
 //! deepgram = "..."
+//! elevenlabs = "..."         # what speaks on the second route: an ElevenLabs key, or
+//! openai = "..."             # an OpenAI one (ElevenLabs when both are set)
 //! ```
 //!
 //! The rules (the first builder, 12 Nov): the file is the user's own and mode
@@ -55,11 +57,13 @@ const MOST_FILE_BYTES: u64 = 16 * 1024;
 const MOST_KEY_BYTES: usize = 4096;
 
 /// Every key: its table and name in the file, and the variable that overrides it.
-pub const KEYS: [(&str, &str, &str); 4] = [
+pub const KEYS: [(&str, &str, &str); 6] = [
     ("main", "gemini", "LAMPOS_VOICE_GEMINI_KEY"),
     ("own", "deepseek", "LAMPOS_VOICE_DEEPSEEK_KEY"),
     ("own", "deepseek_url", "LAMPOS_VOICE_DEEPSEEK_URL"),
     ("own", "deepgram", "LAMPOS_VOICE_DEEPGRAM_KEY"),
+    ("own", "elevenlabs", "LAMPOS_VOICE_ELEVENLABS_KEY"),
+    ("own", "openai", "LAMPOS_VOICE_OPENAI_KEY"),
 ];
 
 /// Where a key came from.
@@ -158,16 +162,20 @@ pub struct Keys {
     pub deepseek: Option<Key>,
     pub deepseek_url: Option<Key>,
     pub deepgram: Option<Key>,
+    pub elevenlabs: Option<Key>,
+    pub openai: Option<Key>,
 }
 
 impl Keys {
     /// Each key in [`KEYS`]' order, with its name.
-    pub fn each(&self) -> [(&'static str, &'static str, Option<&Key>); 4] {
+    pub fn each(&self) -> [(&'static str, &'static str, Option<&Key>); 6] {
         [
             (KEYS[0].0, KEYS[0].1, self.gemini.as_ref()),
             (KEYS[1].0, KEYS[1].1, self.deepseek.as_ref()),
             (KEYS[2].0, KEYS[2].1, self.deepseek_url.as_ref()),
             (KEYS[3].0, KEYS[3].1, self.deepgram.as_ref()),
+            (KEYS[4].0, KEYS[4].1, self.elevenlabs.as_ref()),
+            (KEYS[5].0, KEYS[5].1, self.openai.as_ref()),
         ]
     }
 }
@@ -421,6 +429,8 @@ pub fn load(
         deepseek: next(),
         deepseek_url: next(),
         deepgram: next(),
+        elevenlabs: next(),
+        openai: next(),
     })
 }
 
@@ -461,7 +471,7 @@ mod tests {
     const DEEPSEEK: &str = "test-key-not-real-deepseek";
     const URL: &str = "https://test-not-real.invalid/v1";
     const DEEPGRAM: &str = "test-key-not-real-deepgram";
-    const FILE: &str = "[main]\ngemini = \"test-key-not-real-gemini\"\n[own]\ndeepseek = \"test-key-not-real-deepseek\"\ndeepseek_url = \"https://test-not-real.invalid/v1\"\ndeepgram = \"test-key-not-real-deepgram\"\n";
+    const FILE: &str = "[main]\ngemini = \"test-key-not-real-gemini\"\n[own]\ndeepseek = \"test-key-not-real-deepseek\"\ndeepseek_url = \"https://test-not-real.invalid/v1\"\ndeepgram = \"test-key-not-real-deepgram\"\nelevenlabs = \"test-key-not-real-eleven\"\nopenai = \"test-key-not-real-openai\"\n";
 
     fn folder(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("lsm-keys-{name}-{}", std::process::id()));
@@ -505,6 +515,14 @@ mod tests {
         assert_eq!(keys.deepseek.as_ref().unwrap().expose(), DEEPSEEK);
         assert_eq!(keys.deepseek_url.as_ref().unwrap().expose(), URL);
         assert_eq!(keys.deepgram.as_ref().unwrap().expose(), DEEPGRAM);
+        assert_eq!(
+            keys.elevenlabs.as_ref().unwrap().expose(),
+            "test-key-not-real-eleven"
+        );
+        assert_eq!(
+            keys.openai.as_ref().unwrap().expose(),
+            "test-key-not-real-openai"
+        );
         assert!(
             keys.each()
                 .iter()
@@ -759,7 +777,7 @@ mod tests {
             dir.join("nothing").to_str().unwrap(),
         )]));
         assert_eq!(code, 0);
-        assert_eq!(none.matches("not set").count(), 4, "{none}");
+        assert_eq!(none.matches("not set").count(), 6, "{none}");
         let _ = fs::remove_dir_all(&dir);
     }
 
@@ -853,5 +871,41 @@ mod tests {
                 path.display()
             );
         }
+    }
+
+    #[test]
+    fn the_speech_keys_are_read_from_the_file_and_the_environment_and_never_said() {
+        let dir = folder("speech");
+        let path = file(
+            &dir,
+            "[own]\nelevenlabs = \"test-key-not-real-eleven\"\nopenai = \"test-key-not-real-openai\"\n",
+            0o600,
+        );
+        let keys = load(&|_| None, Some(&path)).unwrap();
+        assert_eq!(
+            keys.elevenlabs.as_ref().unwrap().expose(),
+            "test-key-not-real-eleven"
+        );
+        assert_eq!(keys.openai.as_ref().unwrap().origin(), Origin::File);
+        // The environment wins over the file.
+        let environment = |name: &str| {
+            (name == "LAMPOS_VOICE_ELEVENLABS_KEY").then(|| OsString::from("from-the-environment"))
+        };
+        let keys = load(&environment, Some(&path)).unwrap();
+        let eleven = keys.elevenlabs.as_ref().unwrap();
+        assert_eq!(
+            (eleven.expose(), eleven.origin()),
+            ("from-the-environment", Origin::Environment)
+        );
+        let (said, code) = report(&|name| {
+            (name == "LAMPOS_VOICE_KEYS_FILE").then(|| path.clone().into_os_string())
+        });
+        assert_eq!(code, 0);
+        assert!(
+            said.contains("own.elevenlabs: set (file)") && said.contains("own.openai: set (file)"),
+            "{said}"
+        );
+        assert!(!said.contains("test-key-not-real"), "{said}");
+        let _ = fs::remove_dir_all(&dir);
     }
 }
