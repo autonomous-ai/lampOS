@@ -981,6 +981,34 @@ lại hơn 7 phút trong `epoll_wait`.
   làm, hay idle chưa có câu trả lời: để mở. Xong mà chưa kể: để mở dưới một
   phút, rồi đóng. Trên máy tính: chờ kể.
 
+## Đóng harness khi tin bắt đầu được kể, nghe trọn hay không (#6530)
+
+Voice gửi `told` cho lamp-tasks (socket tin cậy) ngay khi tin của việc bắt
+đầu được kể: khi những lời đầu của mô hình tới loa (`TaskNews::begun`), và
+một lần nữa khi lượt kết thúc nghe trọn, cho các key thêm vào trong lượt.
+Mỗi key chỉ gửi một lần. Lượt bị cắt (Stop, người dùng nói chen, tắt mic)
+hay phát có khoảng trống vẫn gửi, miễn lời đã bắt đầu phát; lượt không phát
+lời nào (không có âm thanh, hoặc chỉ có thông báo lỗi) thì không gửi, và
+harness để mở.
+
+- **Nghe trọn không còn quyết định việc đóng:** trên một đèn ngày 12/11, việc
+  18 idle lúc 21:21:26, tin phát 21:21:32 đến 35 có khoảng trống
+  (`audio_written_with_playback_gaps_unscored`, "was not heard whole: its
+  harness stays open" lúc 21:21:53). Harness chỉ được đóng lúc 21:22:37,
+  71 s sau khi idle. Giờ `told` được gửi khi tin bắt đầu, và việc đóng (đọc
+  lại, rồi `harness close`) theo sau. Nghe trọn chỉ còn quyết định tin có
+  được kể lại hay không (`LAMP_TASK_NEWS_RETELL`, #4342); việc kể lại đọc
+  câu trả lời đã giữ trong store, nên không cần phiên còn mở. Journal ghi
+  "was not heard whole (…): begun, so its harness closes" hoặc "was cut
+  short (…): begun, so its harness closes".
+- **Chỉ việc đã xong mới đóng:** `close_due` chỉ đóng agent `idle` có câu
+  trả lời. Việc đang chờ người dùng, đã dừng hay lỗi vẫn để mở như trước.
+- **Test:** `news_not_heard_whole_is_never_handed_on`,
+  `news_cut_short_is_never_handed_on`,
+  `news_heard_whole_is_handed_on_as_the_turn_ends` (coordinator) và
+  `news_begun_closes_its_harness_at_once_and_is_still_told_once_more`
+  (`task_news`).
+
 ## Việc giao là toàn bộ lời nhờ (#6527)
 
 Trên 52e6 ngày 12/11 (row-6361c), câu "have your agent list five fruits that

@@ -1464,17 +1464,29 @@ impl Reply {
         }
     }
 
+    /// The news this turn tells has begun to be told: the model's words
+    /// reached the speaker (#6530). A failure notice played in place of
+    /// them tells no news.
+    fn news_begun(&self) -> bool {
+        !self.news.is_empty()
+            && self.reached_speaker()
+            && self.notice.origin() == SpeechOrigin::Provider
+    }
+
     /// The news this turn told, as it ends: all of it when the turn was
     /// heard whole ([`Self::heard_whole`], the proof a say's `spoken`
     /// takes), including a requested recording that also retired whole.
-    /// Otherwise its harness stays open. A Stop, a reply cut off or with no
-    /// audio, or a muted mic is no news heard (the
-    /// reviewer on #1425).
+    /// A Stop, a reply cut off or with no audio, or a muted mic is no news
+    /// heard (the reviewer on #1425). News not heard whole whose telling
+    /// began ([`Self::news_begun`]) still has its finished task's harness
+    /// closed ([`crate::task_news::begun`], #6530); one never begun keeps it
+    /// open.
     fn heard_news(
         &mut self,
         speaker_pending: &Option<PendingSpeaker>,
         snapshot: Snapshot,
     ) -> Vec<String> {
+        let begun = self.news_begun();
         let news = std::mem::take(&mut self.news);
         if news.is_empty()
             || self.heard_whole(speaker_pending, snapshot)
@@ -1482,10 +1494,18 @@ impl Reply {
         {
             return news;
         }
+        if begun {
+            crate::task_news::begun(self.owner.turn(), &news);
+        }
         eprintln!(
-            "lamp-voice: the news ({}) was not heard whole ({}): its harness stays open",
+            "lamp-voice: the news ({}) was not heard whole ({}): {}",
             news.join(", "),
-            self.delivery_outcome()
+            self.delivery_outcome(),
+            if begun {
+                "begun, so its harness closes"
+            } else {
+                "its harness stays open"
+            }
         );
         if let Some(not_heard) = &self.news_not_heard {
             not_heard.not_heard(news);
@@ -3904,6 +3924,12 @@ fn service_speaker_control(
                         let token = owner.playback_started(now(), pending.permit)?;
                         current.playback = Some(token);
                         current.sounded = true;
+                        // The news this turn tells has begun: its finished
+                        // task's harness is closed now, not once the turn is
+                        // heard whole (#6530).
+                        if current.news_begun() {
+                            crate::task_news::begun(current.owner.turn(), &current.news);
+                        }
                         *snapshot = owner.snapshot(now())?;
                         io.publish_speaker_snapshot(*snapshot)?;
                         *last_publish = monotonic_us();
@@ -11794,9 +11820,10 @@ fn conversation_with_gate_inner(
             }
             let told_news = current.news.clone();
             let heard = current.heard_news(&speaker_pending, snapshot);
-            // Not heard whole, played through with gaps included (its harness
-            // stays open, #4035): told once more at the next quiet pause, with
-            // `LAMP_TASK_NEWS_RETELL=on` (#4342). On lamp-c0a4 on 3 Nov a news
+            // Not heard whole, played through with gaps included (#4035):
+            // told once more at the next quiet pause, with
+            // `LAMP_TASK_NEWS_RETELL=on` (#4342). Its harness is closed all
+            // the same once its telling began (#6530). On lamp-c0a4 on 3 Nov a news
             // played through with gaps under someone's words was otherwise
             // neither told again nor closed.
             let unheard = heard.is_empty();
@@ -13748,6 +13775,16 @@ fn conversation_with_gate_inner(
             && let Some(news) = task_news.as_mut()
         {
             news.not_heard(cut);
+        }
+        // News whose telling began since the last tick: the tasks part is
+        // told so, so its finished task's harness closes (#6530).
+        let begun = crate::task_news::take_begun();
+        if !begun.is_empty()
+            && let Some(news) = task_news.as_mut()
+        {
+            for (request, key) in begun {
+                news.begun(request, vec![key]);
+            }
         }
         // News told once more waits for no conversation going on (15 s with
         // nothing said by or to the lamp), whatever the pause switch says:
@@ -17195,9 +17232,20 @@ fn record_cancelled_reply(
         say.answer(crate::say::Outcome::Dropped(why.to_owned()));
     }
     if !current.news.is_empty() {
+        // Cut short once begun, its finished task's harness is closed all
+        // the same (#6530).
+        let begun = current.news_begun();
+        if begun {
+            crate::task_news::begun(current.owner.turn(), &current.news);
+        }
         eprintln!(
-            "lamp-voice: the news ({}) was cut short ({reason}): its harness stays open",
-            current.news.join(", ")
+            "lamp-voice: the news ({}) was cut short ({reason}): {}",
+            current.news.join(", "),
+            if begun {
+                "begun, so its harness closes"
+            } else {
+                "its harness stays open"
+            }
         );
         // Told once more at the next quiet pause, with
         // `LAMP_TASK_NEWS_RETELL=on` (#4342). A sign-in's question goes by

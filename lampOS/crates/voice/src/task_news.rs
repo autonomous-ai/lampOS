@@ -157,6 +157,28 @@ pub(crate) fn take_cut_short() -> Vec<String> {
     CUT_SHORT.with(|cut| std::mem::take(&mut *cut.borrow_mut()))
 }
 
+thread_local! {
+    /// The news whose telling began ([`begun`]), for the coordinator to
+    /// hand to [`TaskNews::begun`] at its next tick. Of the coordinator's
+    /// own thread.
+    static BEGUN: std::cell::RefCell<Vec<(u64, String)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The news `keys` the voice's `request` began to tell: its words reached
+/// the speaker (#6530), heard whole or not.
+pub(crate) fn begun(request: u64, keys: &[String]) {
+    BEGUN.with(|begun| {
+        begun
+            .borrow_mut()
+            .extend(keys.iter().map(|key| (request, key.clone())));
+    });
+}
+
+/// The news begun since the last call ([`begun`]), each with its request.
+pub(crate) fn take_begun() -> Vec<(u64, String)> {
+    BEGUN.with(|begun| std::mem::take(&mut *begun.borrow_mut()))
+}
+
 /// Whether news is told at the first pause ([`AT_PAUSE_ENVIRONMENT`]):
 /// `on`, and nothing else.
 pub fn at_pause(value: Option<&str>) -> bool {
@@ -374,7 +396,14 @@ pub struct TaskNews {
     retell: bool,
     /// News not heard whole, by key ([`Self::not_heard`]).
     retelling: BTreeMap<String, Retelling>,
+    /// The newest news sent to the tasks part as begun ([`Self::begun`]),
+    /// at most [`BEGUN_KEPT`]: each is sent once.
+    begun: VecDeque<String>,
 }
+
+/// How many keys of news begun [`TaskNews`] keeps, so that one is sent to
+/// the tasks part once: more than are told in any one stretch of talk.
+const BEGUN_KEPT: usize = 64;
 
 impl Drop for TaskNews {
     fn drop(&mut self) {
@@ -868,6 +897,7 @@ impl TaskNews {
             heard,
             retell: retell_on(std::env::var(RETELL_ENVIRONMENT).ok().as_deref()),
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         })
     }
 
@@ -877,7 +907,8 @@ impl TaskNews {
     /// started is closed (#1390), and a sign-in's question may be answered
     /// in a later request (#1676). News taken to tell but cut short, or not
     /// heard, never comes here ([`Self::not_heard`]). Heard, it is never
-    /// told once more. Never waits.
+    /// told once more. One sent as begun already ([`Self::begun`]) is not
+    /// sent again. Never waits.
     pub fn heard(&mut self, request: u64, keys: Vec<String>) {
         for key in keys {
             if let Some(retelling) = self.retelling.get_mut(&key)
@@ -885,6 +916,39 @@ impl TaskNews {
             {
                 *retelling = Retelling::Spent(retelling.since());
             }
+            if crate::sign_in::asked_of(&key).is_none() && self.begun.contains(&key) {
+                continue;
+            }
+            let _ = self.heard.send((key, request));
+        }
+    }
+
+    /// News whose telling began: the turn's words reached the speaker,
+    /// heard whole or not (#6530). The tasks part is told so at once, as
+    /// for news heard ([`Self::heard`]), so that with `--close-told` the
+    /// finished task's harness is closed a few seconds after its news
+    /// begins. On a lamp on 12 Nov a news played with gaps
+    /// (`audio_written_with_playback_gaps_unscored`) kept its harness open
+    /// 71 s after the task went idle. Whether it was heard whole still
+    /// decides only whether it is told once more ([`Self::not_heard`],
+    /// [`RETELL_ENVIRONMENT`]): this leaves that as it is, and news told
+    /// once more is read from the tasks part's store, which a closed
+    /// harness leaves as it was. The tasks part closes only an agent idle
+    /// with an answer: one waiting for the person or failed stays open. A
+    /// sign-in's question is never sent here: its answer waits on it being
+    /// heard whole (#1676). Each key is sent once. Never waits.
+    pub fn begun(&mut self, request: u64, keys: Vec<String>) {
+        for key in keys {
+            if crate::sign_in::asked_of(&key).is_some()
+                || observation_of(&key).is_none()
+                || self.begun.contains(&key)
+            {
+                continue;
+            }
+            if self.begun.len() >= BEGUN_KEPT {
+                self.begun.pop_front();
+            }
+            self.begun.push_back(key.clone());
             let _ = self.heard.send((key, request));
         }
     }
@@ -1085,6 +1149,7 @@ impl TaskNews {
             heard,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         (news, heard_out)
     }
@@ -3938,6 +4003,7 @@ mod tests {
             heard: mpsc::channel().0,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         let soon = News {
             key: "s:3:progress-1".into(),
@@ -3969,6 +4035,7 @@ mod tests {
             heard: mpsc::channel().0,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         let waiting = |key: &str| News {
             key: key.into(),
@@ -4006,6 +4073,7 @@ mod tests {
             heard: mpsc::channel().0,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         assert!(news.waiting().is_none());
         let one = News {
@@ -4105,6 +4173,7 @@ mod tests {
             heard: mpsc::channel().0,
             retell: false,
             retelling: BTreeMap::new(),
+            begun: VecDeque::new(),
         };
         (news, offer, heard)
     }
@@ -4816,6 +4885,76 @@ mod tests {
         assert!(news.waiting().is_none());
         news.not_heard(vec!["s:1:1".into()]);
         assert!(wakes.try_recv().is_err());
+    }
+
+    /// #6530, on a lamp on 12 Nov: news played with gaps kept its finished
+    /// task's harness open 71 s after the task went idle. News whose telling
+    /// began is sent to the tasks part at once, heard whole or not, so its
+    /// harness closes; each key once, and never a sign-in's question,
+    /// progress or a hand-over, which close nothing. Whether it was heard
+    /// whole still decides alone whether it is told once more.
+    #[test]
+    fn news_begun_closes_its_harness_at_once_and_is_still_told_once_more() {
+        let (mut news, offer, wakes) = waiting_news();
+        let (heard, sent) = mpsc::channel();
+        news.heard = heard;
+        news.retell = true;
+        let one = plain_news("s:1:1");
+        offer.send(one.clone()).unwrap();
+        assert_eq!(news.waiting(), Some(&one));
+        assert_eq!(news.tell(), Some(one.clone()));
+        assert_eq!(wakes.try_recv().unwrap(), Wake::Told("s:1:1".into()));
+        news.told_already.lock().unwrap().insert("s:1:1".into());
+        // Its first words reach the speaker: sent at once, before the turn
+        // ends, and once only.
+        news.begun(
+            3,
+            vec![
+                "s:1:1".into(),
+                "s:1:1".into(),
+                "sign-in-1-asking".into(),
+                "s:3:progress-1-2".into(),
+                "s:4:hand-over".into(),
+            ],
+        );
+        news.begun(4, vec!["s:1:1".into()]);
+        assert_eq!(sent.try_iter().collect::<Vec<_>>(), [("s:1:1".into(), 3)]);
+        // Not heard whole: told once more all the same.
+        news.not_heard(vec!["s:1:1".into()]);
+        assert_eq!(wakes.try_recv().unwrap(), Wake::Retell("s:1:1".into()));
+        offer.send(one.clone()).unwrap();
+        assert_eq!(news.waiting(), Some(&one), "due once more");
+        assert!(news.retelling_first());
+        assert_eq!(news.tell(), Some(one.clone()));
+        // Heard whole the second time: spent, and not sent again.
+        news.heard(9, vec!["s:1:1".into()]);
+        assert!(sent.try_recv().is_err());
+        news.not_heard(vec!["s:1:1".into()]);
+        assert!(!matches!(
+            news.retelling.get("s:1:1"),
+            Some(Retelling::Due(_))
+        ));
+
+        // Heard whole the first time, without a begun before: sent as heard.
+        let (mut news, _offer, _wakes) = waiting_news();
+        let (heard, sent) = mpsc::channel();
+        news.heard = heard;
+        news.heard(7, vec!["s:2:1".into()]);
+        assert_eq!(sent.try_iter().collect::<Vec<_>>(), [("s:2:1".into(), 7)]);
+    }
+
+    /// Only the newest [`BEGUN_KEPT`] keys are kept to send each once.
+    #[test]
+    fn news_begun_keeps_a_bounded_list() {
+        let (mut news, _offer, _wakes) = waiting_news();
+        news.begun(
+            1,
+            (0..BEGUN_KEPT as u64 + 5)
+                .map(|id| format!("s:{id}:1"))
+                .collect(),
+        );
+        assert_eq!(news.begun.len(), BEGUN_KEPT);
+        assert_eq!(news.begun.front().map(String::as_str), Some("s:5:1"));
     }
 
     /// #4342 (b): without `LAMP_TASK_NEWS_RETELL=on` news not heard whole is

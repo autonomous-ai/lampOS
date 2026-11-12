@@ -395,6 +395,13 @@ fn a_say_the_model_left_silent_is_dropped() {
 /// them, put on the turn by the news branch's own `news_on` (the reviewer
 /// on #1425: with that a no-op, no harness would ever close).
 const NEWS: [&str; 2] = ["s1:147:67", "s1:148:70"];
+/// The keys of the news begun since the last call ([`crate::task_news::begun`]).
+fn begun_keys() -> Vec<String> {
+    crate::task_news::take_begun()
+        .into_iter()
+        .map(|(_, key)| key)
+        .collect()
+}
 fn telling_news(test: &mut Test) {
     let told = crate::task_news::News {
         key: NEWS[0].into(),
@@ -416,17 +423,26 @@ fn telling_news(test: &mut Test) {
 /// part (so that its harness may be closed) only as the turn ends heard
 /// whole, on the proof a say's `spoken` takes; every key told together
 /// with it too, and not a moment before.
+/// #6530: the tasks part is told the news began as its first words reach
+/// the speaker, so the harness closes then, not once the turn ends.
 #[test]
 fn news_heard_whole_is_handed_on_as_the_turn_ends() {
+    let _ = crate::task_news::take_begun();
     let mut test = Test::new();
     telling_news(&mut test);
     let chunk = test.generation(17);
     test.provider_complete();
+    assert!(
+        crate::task_news::take_begun().is_empty(),
+        "nothing played yet"
+    );
     test.accept(&chunk, 240);
+    assert_eq!(begun_keys(), NEWS, "begun as it plays");
     assert!(!test.finish_if_settled(), "accepted is not retired");
     test.retire(&chunk);
     assert!(test.finish_if_settled());
     assert_eq!(test.heard, NEWS);
+    assert!(crate::task_news::take_begun().is_empty());
 }
 
 /// #1390, the follow-up to #1425: news the person asked about
@@ -458,9 +474,12 @@ fn news_answered_to_a_question_rides_on_its_own_turn() {
 }
 
 /// A Stop or the person speaking over it cancels the turn: the news goes
-/// with it, never handed on, and its harness stays open.
+/// with it, never handed on as heard. Its telling began, so its harness
+/// is closed all the same (#6530); cut before any word played, it stays
+/// open.
 #[test]
 fn news_cut_short_is_never_handed_on() {
+    let _ = crate::task_news::take_begun();
     let mut test = Test::new();
     telling_news(&mut test);
     let chunk = test.generation(17);
@@ -474,27 +493,57 @@ fn news_cut_short_is_never_handed_on() {
     .unwrap();
     assert!(test.reply.is_none());
     assert!(test.heard.is_empty());
+    assert!(
+        crate::task_news::take_begun()
+            .iter()
+            .map(|(_, key)| key.as_str())
+            .take(2)
+            .eq(NEWS)
+    );
+
+    let mut before = Test::new();
+    telling_news(&mut before);
+    let _ = before.generation(17);
+    cancel_reply(
+        &mut before.owner,
+        &mut before.reply,
+        &mut before.trace,
+        "user_interrupted",
+    )
+    .unwrap();
+    assert!(before.heard.is_empty());
+    assert!(crate::task_news::take_begun().is_empty());
 }
 
 /// A turn that ends with no audio, or with a gap in its playback, is no news
 /// heard. (Muting the mic takes the turn from its owner: it is cut short.)
+/// #6530, on a lamp on 12 Nov: a news played with gaps
+/// (`audio_written_with_playback_gaps_unscored`) kept its harness open 71 s
+/// after the task went idle. Its telling began, so the tasks part is told
+/// at once, whatever the score; a turn that played nothing tells nothing.
 #[test]
 fn news_not_heard_whole_is_never_handed_on() {
+    let _ = crate::task_news::take_begun();
     let mut silent = Test::new();
     telling_news(&mut silent);
     silent.provider_complete();
     assert!(silent.finish_if_settled());
     assert!(silent.heard.is_empty());
+    assert!(crate::task_news::take_begun().is_empty());
 
     let mut gap = Test::new();
     telling_news(&mut gap);
     let chunk = gap.generation(17);
     gap.accept(&chunk, 240);
+    assert_eq!(begun_keys(), NEWS, "begun as it plays");
     gap.retire(&chunk);
     gap.reply.as_mut().unwrap().playback_gaps = 1;
     gap.provider_complete();
     assert!(gap.finish_if_settled());
     assert!(gap.heard.is_empty());
+    // Begun again as the turn ends: the tasks part takes each key once
+    // ([`crate::task_news::TaskNews::begun`]).
+    assert_eq!(begun_keys(), NEWS);
 }
 
 /// #939, (c): with the switch, a due reminder or news waits for a skill's
