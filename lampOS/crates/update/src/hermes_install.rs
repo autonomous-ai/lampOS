@@ -450,19 +450,24 @@ pub const ONE_RUN_LINES: &str = one_run_lines!();
 /// folder in lamp-tasks' work folder, removed after. With [`TASKS_SWITCH`]
 /// on, [`wrapper_text`] takes [`HOME_ENV`] only when it names one of these
 /// (never with `..`), and [`ns_text`] then makes it Hermes's `HOME`, with
-/// `HERMES_HOME` under it, and Hermes's lasting folder ([`PLACE`])
-/// read-only, so a make never reads or leaves memory, sessions or state
-/// there. Any other value is unset: Hermes started any other way is as
-/// before.
+/// `HERMES_HOME` under it. For a make it also hides Hermes's lasting home
+/// ([`HERMES_HOME`]) under an empty read-only tmpfs, with only the
+/// checkout ([`CHECKOUT`]) shown again in it, read-only, so the program
+/// still runs but a make never reads or leaves memory, sessions or state
+/// there (#6643's HOLDs, 12 Nov 19:58 and 20:0x); leaves [`PLACE`] and
+/// [`WORK`] read-only; and hides the rest of `WORK/lamp` under another,
+/// showing only the make's own folder there, read-write. Any other value
+/// is unset: Hermes started any other way is as before.
 pub const MAKE_HOME_GLOB: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home";
 /// The variable a voice make's run names its own home in ([`MAKE_HOME_GLOB`]).
 pub const HOME_ENV: &str = "LAMP_NS_HOME";
 /// The line [`wrapper_text`] adds for [`HOME_ENV`], after the token is
 /// exported: lamp-tasks checks it is there before it starts a make.
 pub const WRAPPER_HOME_LINE: &str = "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n";
-/// The line [`ns_text`] adds for [`HOME_ENV`], before the ids are dropped:
-/// lamp-tasks checks it is there before it starts a make.
-pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then [ -d \"$LAMP_NS_HOME\" ] || fail \"no $LAMP_NS_HOME\"; ro \"$H\"; HOME=$LAMP_NS_HOME; fi\nunset LAMP_NS_HOME\n";
+/// The lines [`ns_text`] adds for [`HOME_ENV`], before the ids are
+/// dropped (see [`MAKE_HOME_GLOB`]); any step failing ends it before
+/// Hermes runs. lamp-tasks checks they are there before it starts a make.
+pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" || fail \"no make staging\"\n  mount --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X\n";
 
 const WRAPPER_TASKS_EDITS: [(&str, &str); 3] = [
     (
@@ -725,7 +730,7 @@ const TASKS_EDITS: [(&str, &str); 7] = [
         "U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H\n",
         concat!(
             "U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H\n",
-            "if [ -n \"${LAMP_NS_HOME-}\" ]; then [ -d \"$LAMP_NS_HOME\" ] || fail \"no $LAMP_NS_HOME\"; ro \"$H\"; HOME=$LAMP_NS_HOME; fi\nunset LAMP_NS_HOME\n"
+            "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" || fail \"no make staging\"\n  mount --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X\n"
         ),
     ),
 ];
