@@ -421,6 +421,8 @@ Environment=LAMP_TASK_NEWS=skill
 # voice and from the app, each put on by a plain "Yes." (#4946). A computer's agent no longer makes one
 # (the first builder, 3 Nov, on the Queue).
 Environment=LAMP_MAKE_SKILL=on
+# A voice make the lamp's own model can't keep goes to the lamp's own agent, Hermes or OpenClaw (#6059, docs/skills.md).
+Environment=LAMP_MAKE_SKILL_AGENT=on
 Environment=LAMP_APP_MAKE_SKILL=on
 # A skill added from a file in the app, on a spoken yes (#5080): lamp-cloud hands it over the app-make socket,
 # the same line in lamp-cloud.service; it never starts on its own.
