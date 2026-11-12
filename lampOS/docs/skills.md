@@ -3163,12 +3163,14 @@ gone ([switches.md](switches.md)). What happens:
      not the lamp just says so, with no confirming; `on` only, off unless
      set, in no product unit; in `lamp-voice` passed to both routes, read
      only with `LAMP_MADE_SCRIPTS=on`, `made_skill::code_on_at_once`). The
-     first builder's ruling on #6059 (19:14) draws the line
+     first builder's ruling on #6059 (19:14, and his 19:44 line: "sound"
+     is the lamp's own sounds and voice) draws the line
      (`made_skill::code_goes_on_at_once`): code whose grants are only its
-     light, the kinds of sound it hears or its head and arm
-     (`made_skill::CODE_AT_ONCE_GRANTS`: `light`, `sound`, `body`; a timer
+     light, its voice and sounds or its head and arm
+     (`made_skill::CODE_AT_ONCE_GRANTS`: `light`, `speak`, `body`; a timer
      is a trigger and needs no grant) goes on at once; code with any other
-     grant, the camera or the microphone above all
+     grant, above all the camera, the microphone and `sound`, which is
+     hearing kinds of sound, not playing them
      (`made_skill::CODE_YES_GRANTS`), or any send (a write, messages to the
      phone) keeps its spoken yes exactly as with the switch off. Such a
      make, by voice or from the app's MAKE IT
