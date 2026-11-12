@@ -47,10 +47,14 @@ pub const NO_ENGINE: &str = "no such agent on this lamp";
 /// `engines.install`, refused: the agent is not missing or failed (there,
 /// being installed, waiting for a round already, or off).
 pub const NOT_MISSING: &str = "the agent is not missing or failed";
-/// `engines.install`, refused: lamp-update says the agent, but this build
-/// has no installer for it (none now: Hermes and OpenClaw both have one).
-pub const NOT_INSTALLABLE: &str = "not installable on this build yet";
-/// The agents this build's lamp-update can install when asked.
+/// `engines.install`, refused: lamp-update says the agent (every engine the
+/// lamp's Harness has is said, #6240), but this build has no installer for
+/// it: any but Hermes and OpenClaw.
+pub const NOT_INSTALLABLE: &str = "not installable from the app on this build";
+/// The agents this build's lamp-update can install when asked: the only
+/// ones it has an installer for (`hermes_install`, `openclaw_install`;
+/// lamp-update's `engines::INSTALLABLE`). Not a list of what is shown:
+/// `engines` lists whatever Harness has on the lamp.
 pub const INSTALLABLE: [&str; 2] = ["hermes", "openclaw"];
 
 pub fn from_environment() -> bool {
@@ -349,6 +353,19 @@ mod tests {
         // An engine said that this build cannot install: refused plainly.
         let told = json!({"engines": {"other": {"state": "not_installed"}}});
         assert_eq!(installable(&told, "other"), Err(NOT_INSTALLABLE.to_owned()));
+        // An engine Harness has on the lamp (#6240, the lead's rule of 12
+        // Nov), missing or there: listed, never installed from the app.
+        for state in ["not_installed", "installed"] {
+            let told = json!({"engines": {
+                "hermes": {"state": "installed"},
+                "codex": {"state": state},
+            }});
+            assert_eq!(
+                installable(&told, "codex"),
+                Err("not installable from the app on this build".to_owned()),
+                "{state}"
+            );
+        }
         // None said: none given, with the switch on.
         says.publish_json(
             0,

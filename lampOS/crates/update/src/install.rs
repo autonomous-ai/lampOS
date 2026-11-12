@@ -1281,7 +1281,7 @@ pub fn runs_installer(argv: &[String]) -> bool {
     }
 }
 
-fn output_of_within(argv: &[String], within: Duration) -> Result<String, String> {
+pub(crate) fn output_of_within(argv: &[String], within: Duration) -> Result<String, String> {
     let shown = argv.join(" ");
     query::output_and_stderr_within(
         Command::new(&argv[0]).args(&argv[1..]),
