@@ -199,6 +199,7 @@ pub mod sleep_worker;
 pub mod slide_wake;
 pub mod speak_up;
 pub mod speaker_check;
+pub mod speaker_stream;
 pub mod speaking_faces;
 pub mod staff_note;
 pub mod stage_cost;
