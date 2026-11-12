@@ -329,7 +329,9 @@ A skill that carries code (a `do.task` run, lamp-tasks) reaches the lamp's hardw
 
 ### The control socket, the SDKs' side (`Lamp.local`)
 
-A skill's script on the lamp connects with the SDK, not by hand. `Lamp.local(token)` (Python `await Lamp.local(token)`,
+A skill's script on the lamp connects with the SDK, not by hand. `Lamp.connect()` does it too: with no pairing and no
+`host`, a `LAMP_CONTROL_TOKEN` that is set and not empty makes it `Lamp.local(token)` (before the local agent's socket; a
+pairing, when there is one, wins). `Lamp.local(token)` (Python `await Lamp.local(token)`,
 JS `await Lamp.local(token)`) connects to `LAMP_CONTROL_SOCKET` (default `/run/lampos-control/control.sock`) with the
 token (default `LAMP_CONTROL_TOKEN`, which lamp-tasks puts in the run's environment); `lamp.run` is the run's id and
 `lamp.skill` its skill. No pairing, no certificate pin: the socket's owner check and the token are the trust. The fake
