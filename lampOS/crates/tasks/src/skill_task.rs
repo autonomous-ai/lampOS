@@ -8,8 +8,10 @@
 //! - **Off unless [`SWITCH`] is `on`** (the same switch lamp-skills reads):
 //!   off, every line is refused `off` and nothing is minted or run.
 //! - **The line is checked whole** ([`HandOver::parse`]): a field more or
-//!   less, a skill folder outside the lamp's skills, a `run` outside its
-//!   `scripts/`, a grant written twice or `skills` is refused.
+//!   less, a skill folder that is not its own under the lamp's skills
+//!   ([`SKILLS`]) or the skills its owner's computer pushed ([`PUSHED`]), a
+//!   `run` outside its `scripts/`, a grant written twice or `skills` is
+//!   refused.
 //! - **A one-run token** ([`Tokens`]): minted by lamp-control (#6304,
 //!   PR #6408) on its admin socket ([`ControlTokens`]) for this skill and a
 //!   run id of lamp-tasks' own ([`run_id`]). lamp-control reads the owner's
@@ -43,6 +45,13 @@ pub const SWITCH: &str = "LAMP_SKILL_TASKS";
 /// (`lamp_update::hermes_install::SKILLS`): a skill's folder is one of its
 /// folders, never another place.
 pub const SKILLS: &str = "/var/lib/lampOS/skills";
+/// The skills the owner's own paired computer pushed (`lamp_skills::PUSHED_DIR`),
+/// beside [`SKILLS`] under the same parent: the one other place a skill's
+/// folder may be, shown read-only to a skill's run alone
+/// (`lamp_update::hermes_install::PUSHED`).
+pub const PUSHED: &str = "/var/lib/lampOS/skills-dev";
+/// [`PUSHED`]'s folder name, beside the skills root a check is given.
+pub const PUSHED_NAME: &str = "skills-dev";
 /// lamp-control's local door (#6304, the first builder's 12:45 conditions
 /// on #6071): the one way a run reaches the lamp's hardware.
 pub const CONTROL_SOCKET: &str = "/run/lampos-control/control.sock";
@@ -160,8 +169,9 @@ pub enum Op {
 }
 
 impl HandOver {
-    /// The line, checked whole against `skills` (on a lamp, [`SKILLS`]):
-    /// the refusal's code and words otherwise.
+    /// The line, checked whole against `skills` (on a lamp, [`SKILLS`]) and
+    /// the pushed skills beside it ([`pushed_beside`], on a lamp
+    /// [`PUSHED`]): the refusal's code and words otherwise.
     pub fn parse(line: &[u8], skills: &Path) -> Result<Self, (&'static str, String)> {
         if line.len() > crate::protocol::MAX_LINE_BYTES {
             return Err(("too_long", "the line is too long".into()));
@@ -192,7 +202,11 @@ impl HandOver {
         if self.task.chars().any(char::is_control) {
             return Err("the task's words have a control character");
         }
-        if self.folder != skills.join(&self.skill) {
+        // Exactly one of the two roots, joined with the skill's own name
+        // (checked plain above: no `/`, no `..`), compared as written.
+        if self.folder != skills.join(&self.skill)
+            && self.folder != pushed_beside(skills).join(&self.skill)
+        {
             return Err("the skill's folder is not its own among the lamp's skills");
         }
         let run = Path::new(&self.run);
@@ -241,6 +255,12 @@ impl HandOver {
         }
         Ok(())
     }
+}
+
+/// The pushed skills' root beside the lamp's `skills` root: [`PUSHED`] for
+/// [`SKILLS`].
+pub fn pushed_beside(skills: &Path) -> PathBuf {
+    skills.with_file_name(PUSHED_NAME)
 }
 
 /// A one-run token from lamp-control (#6304). Its text is never shown in a
@@ -1069,6 +1089,29 @@ mod tests {
         assert_eq!(*tokens.ended.borrow(), vec![run_id.clone()]);
     }
 
+    /// A skill the owner's computer pushed (`skills-dev/<name>`, the first
+    /// builder's ruling on #6305's pushed skills): handed over and run as
+    /// one under the lamp's skills, with its own token, ended with it.
+    #[test]
+    fn a_pushed_skills_task_is_handed_over_and_runs() {
+        assert_eq!(pushed_beside(skills()), Path::new(PUSHED));
+        let tokens = FakeTokens::default();
+        let runner = runner(&tokens, Ok(9));
+        let pushed = line(|v| v["folder"] = json!("/var/lib/lampOS/skills-dev/photo-booth"));
+        let answer = answer(&pushed, true, skills(), &tokens, &runner);
+        assert_eq!(answer, json!({"ok": true, "id": 9}));
+        assert_eq!(tokens.minted.borrow()[0].0, "photo-booth");
+        let seen = runner.seen.borrow();
+        let (prompt, _, live) = &seen[0];
+        assert!(*live);
+        assert!(
+            prompt.contains("`/var/lib/lampOS/skills-dev/photo-booth`"),
+            "{prompt}"
+        );
+        assert!(tokens.live.borrow().is_empty());
+        assert_eq!(tokens.ended.borrow().len(), 1);
+    }
+
     #[test]
     fn a_failed_run_still_ends_its_token() {
         let tokens = FakeTokens::default();
@@ -1110,6 +1153,20 @@ mod tests {
             Box::new(|v| v["task"] = json!("x".repeat(MOST_TASK_BYTES + 1))),
             Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills/other")),
             Box::new(|v| v["folder"] = json!("/home/lampos/photo-booth")),
+            // Pushed: its own name in the pushed root, never another's or
+            // a path that leaves it.
+            Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills-dev/other")),
+            Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills-dev")),
+            Box::new(|v| {
+                v["folder"] = json!("/var/lib/lampOS/skills-dev/../skills-dev/photo-booth")
+            }),
+            Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills-devx/photo-booth")),
+            Box::new(|v| v["folder"] = json!("/var/lib/skills-dev/photo-booth")),
+            Box::new(|v| v["folder"] = json!("/var/lib/lampOS/skills-dev/photo-booth/scripts")),
+            Box::new(|v| {
+                v["folder"] = json!("/var/lib/lampOS/skills-dev/photo-booth");
+                v["sha256"] = json!("abc");
+            }),
             Box::new(|v| v["run"] = json!("main.py")),
             Box::new(|v| v["run"] = json!("scripts")),
             Box::new(|v| v["run"] = json!("scripts/../SKILL.md")),

@@ -1876,7 +1876,12 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   kỹ năng, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng trong 24 giờ.
 - **Giao cho lamp-tasks** (#6306 xây): một dòng `{"op": "skill_task", ...}`
   trên `--tasks-socket` (hoặc `LAMP_SKILLS_TASKS_SOCKET`; unit lamp-skills
-  của sản phẩm truyền `/run/lampos-tasks/skill-task.sock`). Token một lần
+  của sản phẩm truyền `/run/lampos-tasks/skill-task.sock`). `folder` là thư
+  mục của chính kỹ năng: `/var/lib/lampOS/skills/<name>`, hoặc với kỹ năng
+  được đẩy lên, `/var/lib/lampOS/skills-dev/<name>` (`task::folder_of`);
+  lamp-tasks chỉ nhận đúng hai chỗ đó, lamp-control băm cùng thư mục đó khi
+  đúc token (của kỹ năng trên đèn nếu cả hai cùng tên), với cùng các kiểm
+  tra SHA-256 và grant. Token một lần
   (#6304, lamp-control đúc từ cái "có" nó giữ,
   `lamp_control::task_yes::yes_for_token`) và kết quả qua Task news là của
   #6304 và #6306.

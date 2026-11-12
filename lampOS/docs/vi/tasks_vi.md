@@ -164,7 +164,11 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 - **Dòng gửi:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`.
   Cần đủ mọi trường và không nhận trường nào khác. `skill` là tên một kỹ năng
   (`a-z`, `0-9`, `-`, `_`, tối đa 64), `folder` đúng là
-  `/var/lib/lampOS/skills/<skill>` (các kỹ năng Hermes thấy ở chế độ chỉ đọc),
+  `/var/lib/lampOS/skills/<skill>` (các kỹ năng Hermes thấy ở chế độ chỉ đọc)
+  hoặc, với kỹ năng do máy tính của chủ đèn đẩy lên,
+  `/var/lib/lampOS/skills-dev/<skill>` (`skill_task::PUSHED`, chỉ lần chạy
+  của kỹ năng mới thấy, chỉ đọc), so đúng như viết (`..` hay thư mục khác bị
+  từ chối "the skill's folder is not its own among the lamp's skills"),
   `run` là một tệp trong `scripts/` của kỹ năng (mỗi phần chỉ gồm `A-Z a-z
   0-9 . _ -`, không bắt đầu bằng `.`, nên không `..`, không phần ẩn, không
   xuống dòng, dấu backtick hay khoảng trắng,
