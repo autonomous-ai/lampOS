@@ -959,11 +959,29 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới giữ
   mạng, nếu không thì `no_token` và không chạy gì. Tắt: `net` bị từ chối
   trước khi có token.
-- **Lần chạy của kỹ năng agent** (`run` = `scripts/SKILL.md`): Hermes được
+- **Lần chạy của kỹ năng agent** (`run` = `scripts/SKILL.md`) chỉ làm theo
+  tệp trong phạm vi các quyền và mạng của nó: token chỉ mang quyền của
+  lamp-control, và mạng bị giữ trừ khi lời đồng ý của lamp-control có `net`. Hermes được
   bảo đọc tệp đó và làm theo, chỉ chạm tới đèn qua `control.sock` với token
-  của lần chạy, không bao giờ hỏi khóa hay token bằng giọng nói. Nó bắt đầu
-  trong một thư mục mới `agent-<run id>` (0700), bị xóa khi kết thúc. Môi
-  trường chỉ có socket, token và đường dẫn SDK: không có khóa.
+  của lần chạy, không bao giờ hỏi khóa hay token bằng giọng nói. Nó đi qua
+  runner của lần tạo, bị giữ ngoài mạng (`skill_make::lamp_runner(home, true)`)
+  trừ khi có `net`. Môi trường chỉ có socket, token, đường dẫn SDK và home
+  mới bên dưới: không có khóa.
+- **Mọi lần chạy của kỹ năng agent, và mọi lần chạy có `net`, bắt đầu trong
+  một home mới, dữ liệu Hermes của người dùng bị ẩn**, như một lần tạo
+  (lỗi P1 mà #6643 đã đóng cho lần tạo): `make-<run id>` trong thư mục làm
+  việc, chỉ có `home/.hermes/config.yaml` (nhà cung cấp của đèn, khóa chỉ là
+  tên biến, và bốn thiết lập của lamp-update, `MAKE_CONFIG`), bị xóa dù lần
+  chạy kết thúc thế nào (`skill_make::fresh_home`). `HOME` và `HERMES_HOME`
+  là của home đó và `LAMP_NS_HOME` gọi tên nó, nên wrapper nhận nó
+  (`make-*/home`) và script namespace phủ home lâu dài của Hermes (ký ức và
+  phiên) bằng tmpfs, đặt lại bản checkout chỉ đọc, và để thư mục làm việc
+  chỉ đọc, ẩn trừ thư mục riêng của lần chạy. Runner của lần tạo kiểm tra
+  các dòng của wrapper và namespace trước mỗi lần chạy (báo
+  `NO_RUN_NAMESPACE`, home riêng của lần chạy agent); không có thư mục
+  làm việc hay runner của lần tạo thì lần chạy bị từ chối `run_failed`
+  (`NO_FRESH_HOME`) trước khi có token. Lần chạy script không có `net` giữ
+  nguyên.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 

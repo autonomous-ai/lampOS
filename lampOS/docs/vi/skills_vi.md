@@ -2173,7 +2173,7 @@ kỹ năng agent thay vì kỹ năng viết (tắt: như trước, ghi chú tố
 tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công cụ giọng nói
 (`tool = name`) mà ghi chú là mô tả và các câu kích hoạt của tệp; một bước
 `do.task` giao tệp cho Hermes của đèn (lamp-tasks, namespace của Hermes, một
-thư mục mới mỗi lần chạy, token riêng của lần chạy). Quyền được đọc thận
+thư mục và home mới mỗi lần chạy, dữ liệu Hermes của người dùng bị ẩn, token riêng của lần chạy). Quyền được đọc thận
 trọng từ tệp: `camera`, `light`, `speak`, `sound`, và `net` khi tệp nhắc một
 API web, URL hay HTTP (cần `LAMP_TASK_NET=on`). Đèn nói lại các quyền khi bật.
 Chỉ đèn, giọng (kể cả âm thanh nó phát) và thân thì bật ngay (giọng nói ghi lời đồng ý với
