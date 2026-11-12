@@ -147,6 +147,7 @@ dịch vụ.
 | `LAMP_SKILL_WRITES=on` (#6066; bật trong bốn unit của sản phẩm từ 11/11) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 | `LAMP_SKILL_TASKS=on` (#6432; bật trong các unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) và `lamp-voice` | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó và lệnh `run_write_waiting` của giọng nói, và giọng nói không đọc lại lần ghi nào của lượt chạy ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
+| `LAMP_SERVICE_READ_IDS_KEPT=on` (dòng C132 của bảng theo dõi; tắt trong mọi unit của sản phẩm) | tuyến thứ hai của `lamp-voice`, với `LAMP_SERVICES=on` | Một lần đọc lịch không giữ gì: dời hay huỷ một sự kiện từ cuộc nói chuyện trước sẽ đọc trong mỗi yêu cầu và bị quy tắc sau khi đọc từ chối ở đó ("Sau một lần đọc", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -1756,6 +1757,39 @@ bị bỏ cùng `says_send`), và nó được lưu, không bao giờ được g
   được giữ như mọi khi. Trên tuyến Live lần đọc vẫn nằm trong ngữ cảnh riêng
   của phiên Live đó, mà mô hình giữ đến hết phiên; chỉ luồng hội thoại và
   những gì dựng từ nó là không có nó.
+- **Mã sự kiện của một lần đọc lịch, giữ cho yêu cầu kế tiếp
+  (`LAMP_SERVICE_READ_IDS_KEPT`, tắt trừ khi bật; tắt trong sản phẩm cho
+  đến khi qua kiểm tra trên đèn; dòng C132 của bảng theo dõi).** Trên
+  lamp-06c1 ngày 12/11 (dòng X1) một sự kiện tạo từ cuộc nói chuyện trước
+  không huỷ được: mô hình không có `event_id`, nên đọc trước; quy tắc ở trên
+  từ chối lệnh ghi trong yêu cầu đó, và yêu cầu sau lại đọc lần nữa và lại
+  bị từ chối. Khi bật công tắc (`crate::service_read_ids`), một lần đọc
+  `events` của Google Calendar giữ, cho chủ dịch vụ có câu nói đã đọc
+  (`services::owner_of`; không biết ai, không giữ gì), chỉ mã, lịch, tiêu
+  đề, giờ bắt đầu và kết thúc của 5 sự kiện đầu (`KEPT_MOST`): không bao
+  giờ mô tả, địa điểm, khách mời hay chữ nào khác của lần đọc. Nó chỉ nằm
+  trong RAM, thay cho lần đọc trước của người đó; một lần đọc không thấy gì
+  thì bỏ nó. Các câu nói sau của họ trên tuyến thứ hai được báo những sự
+  kiện này bên cạnh lời, tối đa 1.400 byte (`NOTE_BYTES`), tiêu đề đánh dấu
+  «…» kèm `DATA_NOTE`, mỗi sự kiện với giờ như ghi chú bản ghi nói ("Fri 13 Nov 21:00–22:00") và `event_id` của nó, "Give calendar <id> with it." khi lần đọc là của một lịch khác `primary`, và quy tắc "To move or cancel one they asked for and confirmed, call service_write now with action update_event or delete_event and its event_id; don't read again. It is read back before anything changes." Vậy "huỷ lịch nha sĩ
+  thứ Sáu" đọc lịch, đèn nói nó thấy gì và hỏi; "ừ, huỷ đi" ở yêu cầu kế
+  tiếp gọi sự kiện bằng mã, và lệnh ghi được chuẩn bị (lịch được điền khi
+  lệnh gọi không cho, `service_read_ids::check_write` trong
+  `services::gate`), đọc lại và gửi khi đồng ý như mọi lần sửa lịch.
+  `lamp-services` nhận mã đó như mọi mã của Google (`writes::event_named`:
+  chỉ khoá bản ghi bị từ chối, `RECORD_KEY_NOT_EVENT`; lần đọc của chính
+  Google trước lời đọc lại quyết định, `event_read`, `EVENT_NOT_FOUND`).
+  Giữ 5 phút (`KEPT_FOR`) hoặc đến khi cuộc nói chuyện được đóng
+  (`Thread::close_conversation`): sau đó chỉ còn các mã, tiêu đề và giờ bị
+  bỏ, và một lệnh ghi nêu một mã như vậy bị từ chối với `EXPIRED`, "Not
+  done: that event_id came from a calendar read that is no longer kept …
+  Call service_read to look for the event again, say what you found, and
+  ask them again." Một lệnh ghi nêu sự kiện do lần đọc của người khác giữ
+  bị từ chối với `NOT_THEIRS`. Một lần quên hay một thay đổi quyền riêng tư
+  bỏ hết (`services::forget_waiting`). Mọi mã khác (của một sự kiện đã tạo,
+  từ bản ghi của nó) đi như trước. Quy tắc này không đổi: một lệnh ghi
+  trong chính yêu cầu đã đọc vẫn bị từ chối với `AFTER_READ`, dù công tắc
+  bật hay tắt.
 
 Một lần ghi đang chờ được dùng chung cho cả hai tuyến giọng nói. Một lệnh gọi
 dịch vụ được giữ chờ quyết định của Policy như các lệnh của executive, với

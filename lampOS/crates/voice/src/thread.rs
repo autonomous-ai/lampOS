@@ -1343,6 +1343,9 @@ impl Thread {
     /// [`Self::said_last_ago_but`]: the next room line needs a name, a turn
     /// or a tap. An exchange opened after it counts as before.
     pub fn close_conversation(&mut self, now: Instant) {
+        // The events a calendar read kept expire with it
+        // (`LAMP_SERVICE_READ_IDS_KEPT`).
+        crate::service_read_ids::conversation_ended();
         self.closed_at = Some(self.closed_at.map_or(now, |closed| closed.max(now)));
     }
 
