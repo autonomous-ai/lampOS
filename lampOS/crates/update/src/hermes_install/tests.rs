@@ -3299,6 +3299,7 @@ fn a_lamp_with_a_make(base: &Path) -> PathBuf {
         ("h/.hermes/memories/MEMORY.md", "THE OWNER'S MEMORY"),
         ("h/.hermes/state.db", "STATE"),
         ("h/.hermes/hermes-agent/run.sh", "echo ran"),
+        ("h/.hermes/tools/python-3/bin/python3", "the interpreter"),
         ("h/.local/bin/README", "the program"),
         ("w/top.md", "W"),
         ("w/lamp/AGENTS.md", "HARNESS PROJECT"),
@@ -3314,8 +3315,8 @@ fn a_lamp_with_a_make(base: &Path) -> PathBuf {
 
 /// #6643's HOLDs (the Reviewer-lead 19:58, SubDarren 20:0x, 12 Nov): for
 /// a make, which keeps the network, the script hides Hermes's lasting
-/// home under an empty tmpfs with only its checkout shown again,
-/// read-only; leaves Hermes's folder and the work folder read-only; hides
+/// home under an empty tmpfs with only its checkout and `tools` (the
+/// Python Hermes runs on) shown again, read-only; leaves Hermes's folder and the work folder read-only; hides
 /// the rest of `W/lamp` under another tmpfs, the make's own folder alone
 /// moved back, read-write; and starts Hermes there with the make's home.
 /// Each step failing ends it before Hermes runs; a home outside `W/lamp`
@@ -3380,14 +3381,18 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         ]
     };
     let mut wanted = vec![
-        format!("mkdir -m 0700 {x} {x}/f {x}/c"),
+        format!("mkdir -m 0700 {x} {x}/f {x}/c {x}/t"),
         format!("mount --bind {f} {x}/f"),
         format!("mount --bind {h}/.hermes/hermes-agent {x}/c"),
+        format!("mount --bind {h}/.hermes/tools {x}/t"),
         format!("mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
         format!("mount --move {x}/c {h}/.hermes/hermes-agent"),
     ];
     wanted.extend(ro(format!("{h}/.hermes/hermes-agent")));
+    wanted.push(format!("mkdir {h}/.hermes/tools"));
+    wanted.push(format!("mount --move {x}/t {h}/.hermes/tools"));
+    wanted.extend(ro(format!("{h}/.hermes/tools")));
     wanted.extend(ro(format!("{h}/.hermes")));
     wanted.extend(ro(h.to_string()));
     wanted.extend(ro(w.to_string()));
@@ -3397,16 +3402,20 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     wanted.push(format!("mkdir {f}"));
     wanted.push(format!("mount --move {x}/f {f}"));
     wanted.extend(ro(format!("{w}/lamp")));
-    wanted.push(format!("rmdir {x}/f {x}/c {x}"));
+    wanted.push(format!("rmdir {x}/f {x}/c {x}/t {x}"));
     assert_eq!(lines, wanted);
     for step in [
         "mkdir -m 0700".to_owned(),
         format!("--bind {f} "),
         format!("--bind {h}/.hermes/hermes-agent "),
+        format!("--bind {h}/.hermes/tools "),
         format!("none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
         format!("--move {x}/c "),
         format!("relatime {h}/.hermes/hermes-agent"),
+        format!("mkdir {h}/.hermes/tools"),
+        format!("--move {x}/t "),
+        format!("relatime {h}/.hermes/tools"),
         format!("relatime {h}/.hermes"),
         format!("relatime {h}"),
         format!("relatime {w}"),
@@ -3442,7 +3451,7 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
 /// The same lines run for real in a user and mount namespace of their own
 /// (Linux, where the kernel allows one; skipped otherwise): from inside a
 /// make's namespace, a `cat` of Hermes's lasting memories finds nothing,
-/// its lasting home shows only the checkout, read-only, `W/lamp` shows
+/// its lasting home shows only the checkout and `tools`, read-only, `W/lamp` shows
 /// only the make's folder, and nothing but the make's folder can be
 /// written.
 #[cfg(target_os = "linux")]
@@ -3468,6 +3477,7 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
         cat \"$H/.hermes/state.db\" 2>/dev/null && echo SEEN-STATE\n\
         echo \"lasting: $(ls -A \"$H/.hermes\" | tr '\\n' ' ')\"\n\
         cat \"$H/.hermes/hermes-agent/run.sh\" >/dev/null && echo CHECKOUT\n\
+        cat \"$H/.hermes/tools/python-3/bin/python3\" >/dev/null && echo TOOLS\n\
         cat \"$H/.local/bin/README\" >/dev/null && echo PROGRAM\n\
         echo \"lamp: $(ls -A \"$W/lamp\" | tr '\\n' ' ')\"\n\
         cat \"$W/lamp/AGENTS.md\" 2>/dev/null && echo SEEN-PROJECT\n\
@@ -3476,6 +3486,7 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
         touch \"$H/x\" 2>/dev/null && echo WROTE-H\n\
         touch \"$H/.hermes/x\" 2>/dev/null && echo WROTE-LASTING\n\
         touch \"$H/.hermes/hermes-agent/x\" 2>/dev/null && echo WROTE-CHECKOUT\n\
+        touch \"$H/.hermes/tools/x\" 2>/dev/null && echo WROTE-TOOLS\n\
         touch answer.md && touch \"$HOME/.hermes/memory.md\" && echo ANSWERED\n";
     let script = base.join("make-lines");
     fs::write(&script, make_lines(&base, checks)).unwrap();
@@ -3495,7 +3506,7 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
     assert!(out.status.success(), "{out:?}");
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
-        "lasting: hermes-agent \nCHECKOUT\nPROGRAM\nlamp: make-task-1 \nANSWERED\n"
+        "lasting: hermes-agent tools \nCHECKOUT\nTOOLS\nPROGRAM\nlamp: make-task-1 \nANSWERED\n"
     );
     // Outside, the make's answer is there and nothing else was touched.
     assert!(make.join("answer.md").exists());

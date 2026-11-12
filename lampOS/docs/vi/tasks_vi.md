@@ -695,7 +695,7 @@ agent (`lamp_tasks::skill_make`).
   `..` (`WRAPPER_HOME_LINE`), rồi script namespace đặt `HOME` thành nó,
   che home lâu dài của Hermes (`/var/lib/lampos-hermes/.hermes`: bộ nhớ,
   phiên, trạng thái) dưới một tmpfs trống chỉ đọc, chỉ cho thấy lại bản
-  checkout, chỉ đọc, để thư mục của Hermes và thư mục làm việc ở chế độ
+  checkout và `tools` (Python mà Hermes chạy trên đó), chỉ đọc, để thư mục của Hermes và thư mục làm việc ở chế độ
   chỉ đọc, và che phần còn lại của `lamp` trong thư mục làm việc dưới một
   tmpfs khác, chỉ thư mục của lần tạo được đưa lại, đọc-ghi
   (`NS_HOME_LINE`; docs/install.md).

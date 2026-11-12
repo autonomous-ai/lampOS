@@ -3101,7 +3101,7 @@ as a Harness task with the agent's own tools
   `..` (`WRAPPER_HOME_LINE`), and its namespace script then sets `HOME` to
   it, hides Hermes's lasting home (`/var/lib/lampos-hermes/.hermes`:
   memories, sessions, state) under an empty read-only tmpfs with only its
-  checkout shown again, read-only, leaves Hermes's folder and the work
+  checkout and `tools` (the Python Hermes runs on) shown again, read-only, leaves Hermes's folder and the work
   folder read-only, and hides the rest of the work folder's `lamp` under
   another tmpfs, the make's own folder alone moved back, read-write
   (`NS_HOME_LINE`; docs/install.md). The home goes with the make's folder
