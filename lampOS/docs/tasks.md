@@ -3052,6 +3052,87 @@ whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
 
+### A voice make in a skill run's namespace (`skill_make`, #6643)
+
+The first builder's guard on #6643 (12 Nov 18:15): a voice make that
+DeepSeek couldn't keep, handed to the lamp's agent
+(`LAMP_MAKE_SKILL_AGENT`, [skills.md](skills.md), "Handed to the lamp's
+agent when DeepSeek fails"), runs in a skill run's namespace and never
+as a Harness task with the agent's own tools
+(`lamp_tasks::skill_make`).
+
+- **The socket:** with `LAMP_SKILL_TASKS=on` (the switch lamp-update's
+  namespace edits are written with), `serve` binds
+  `/run/lampos-tasks/skill-make.sock` (`MAKE_SOCKET`) beside
+  `skill-task.sock`, made as its other sockets are. It takes lines only
+  from `lamp-voice.service` run as root, as the kernel names the caller; any
+  other caller is closed with no answer. One make runs at a time; a second
+  is refused `busy`.
+- **The line:** `{"op":"skill_make","rules","within_ms"}`, checked whole
+  (`MakeLine::parse`): no other field, the rules (the system prompt and the
+  brief) at most 48 KiB with no NUL, `within_ms` from 1 to 120 s.
+- **The run:** the lamp's Hermes started exactly as a skill's `do.task`
+  run is (`skill_task::HermesRunner`, row-6443's path), through its
+  namespace wrapper: only its own folder, its work folder and the skills,
+  and lamp-control's `control.sock` alone, never `admin.sock`. No token is
+  minted and the run's environment has nothing of its own: a make has no
+  grants. The run is killed at `within_ms`, its whole process group with
+  it.
+- **Its network (`LAMP_MAKE_AGENT_NET`, set in no unit):** kept by default,
+  as V1's agent had it (the owner's ask, 12 Nov; the first builder's ruling
+  pending on Queue #6059). The model is then reached at lamp-cloud's
+  forwarder on `127.0.0.1:7741`, the one `model.sock` pipes to. Exactly
+  `held` gives the strict run, `LAMP_NS_NET=run`: only `lo` and the
+  kernel's `@NONE` tunnels, the model only through `model.sock`. Held, a
+  wrapper without the network lines (`WRAPPER_NET_LINES`) is refused
+  `not_held_off` before anything is made (`Runner::ready`). lamp-tasks
+  journals which mode it serves as it starts.
+- **The make's folder:** `make-<run id>` in the lamp's work folder (the one
+  a skill's run starts in, which Hermes's namespace shows), 0700, with the
+  rules in `rules.md`, 0600. The run starts there and is told to write its
+  answer to `answer.md` there and nothing else. Once the run has ended,
+  `answer.md` is read (a regular file, never followed as a link, at most
+  20 KiB). The folder is removed however the make ends.
+- **The answers:** `{"ok":true,"started":true}` once the run is about to
+  start (the voice says its waiting line only then), then
+  `{"ok":true,"answer"}`. Otherwise one refusal: `off`, `bad_request`,
+  `too_long`, `busy`, `not_held_off`, `run_failed` or `no_answer`. The
+  voice hands nothing over on `off`, `not_held_off` or no socket (an older
+  build). The journal says only the outcome's code, never the rules or the
+  answer.
+- **Tests:** `skill_make::tests`: a make runs in its own folder, its rules
+  there and its answer read back, no environment of its own, the folder
+  removed; a run not held off starts nothing and makes no folder; no
+  answer, an answer that is a link, the switch off and every bad line are
+  refused; the make started as a held-off skill run, through a wrapper
+  that must carry the network lines, with `LAMP_NS_NET=run`, no token and
+  no admin socket in its environment, in its make's folder; lamp-update's
+  namespace text shows `control.sock` alone and never names `admin.sock`;
+  only lamp-voice as root may hand a make over; the socket says `started`,
+  then the answer; the default keeps the network and still shows no admin
+  socket, and `held` gives `LAMP_NS_NET=run`.
+
+**The lamp rows (not yet run):** on lamp-9adf with this build, ask "Hey
+Lamp, make me a skill that checks the weather every morning". DeepSeek's
+answer is not kept, and the journal says "handed to the agent". While the
+make runs, find its Hermes and look from inside its namespace:
+
+```sh
+P=$(pgrep -u lampos -f 'hermes chat -q Everything you need' | head -1)
+sudo nsenter -t "$P" -m ls /run/lampos-control                # control.sock alone, no admin.sock
+sudo nsenter -t "$P" -n ip -o link show                       # the network's links
+sudo nsenter -t "$P" -n curl -sS -m 5 -o /dev/null -w '%{http_code}\n' https://example.com; echo "exit $?"
+```
+
+- **Default (network kept):** `curl` answers 200 (exit 0), and
+  `/run/lampos-control` holds `control.sock` alone.
+- **Held** (`sudo systemctl edit lamp-tasks` with
+  `Environment=LAMP_MAKE_AGENT_NET=held`, then a restart; the journal says
+  "is held off the network"): `ip` shows `lo` and `@NONE` tunnels only,
+  `curl` fails (exit 6 or 7), `/run/lampos-control` still holds
+  `control.sock` alone, and the make still ends with its answer through the
+  model relay. Remove the drop-in afterwards.
+
 **Every engine's wrapper (#6510 Part 1, step 1, off unless
 `LAMP_AGENT_NS=on`):** lamp-update's one wrapper for every engine
 (docs/install.md, "One agent namespace for every engine") carries the same

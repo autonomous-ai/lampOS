@@ -2296,6 +2296,16 @@ fn handed_to_agent(
     };
     let first = match write(brief) {
         Ok(text) => text,
+        // The first builder's guard on #6643: the agent writes only in a
+        // skill run's namespace, never as a Harness task with its own tools.
+        Err(why) if why == crate::make_skill_agent::NotWritten::NoMakeRun.to_string() => {
+            eprintln!(
+                "lamp-voice: a skill made here: the agent ({engine}) can't be run in a skill \
+                 run's namespace here (lamp-tasks gives no make run): not handed over: DeepSeek's \
+                 one answer, given no repairs, stands as not made"
+            );
+            return deepseek;
+        }
         Err(why) => {
             eprintln!(
                 "lamp-voice: a skill made here: the agent ({engine}) made none ({why}): \
@@ -4817,7 +4827,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
         assert_eq!(told["made"], "evening-dim", "{told}");
         assert_eq!(served.join().unwrap(), 1);
-        assert_eq!(tasks.prepares(), 0);
+        assert_eq!(tasks.hand_overs(), 0);
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -4835,9 +4845,34 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         // DeepSeek asked once, no repair; the agent's first answer refused
         // and repaired by the agent itself.
         assert_eq!(served.join().unwrap(), 1);
-        assert_eq!(tasks.prepares(), 2);
+        assert_eq!(tasks.hand_overs(), 2);
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The first builder's guard on #6643: when lamp-tasks can't run the
+    /// agent in a skill run's namespace (an older build with no make
+    /// socket, or held, a wrapper that can't hold it off), never handed over:
+    /// DeepSeek's failure stands, said plainly, and nothing is kept.
+    #[test]
+    fn a_make_whose_make_run_is_refused_stays_deepseeks() {
+        for engine in ["old", "not_held_off"] {
+            let (root, keeping) = keeping(&format!("agent-not-held-{engine}"));
+            let tasks = crate::make_skill_agent::tests::stub(
+                Some(engine),
+                std::sync::Arc::new(|_: &str| Some(good())),
+            );
+            let (url, served) = service(vec![(200, faces())]);
+            let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
+            assert!(told.get("made").is_none(), "{told}");
+            assert_eq!(
+                told["error"],
+                format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
+            );
+            assert_eq!(served.join().unwrap(), 1);
+            assert!(made_skill::entries(&keeping.directory).is_empty());
+            let _ = std::fs::remove_dir_all(&root);
+        }
     }
 
     /// With the switch but no agent on the lamp, DeepSeek keeps its
@@ -4856,7 +4891,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
         );
         assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
-        assert_eq!(none.prepares(), 0);
+        assert_eq!(none.hand_overs(), 0);
         let silent = agent_answering(vec![None]);
         let (url, served) = service(vec![(200, faces())]);
         let told = made_by(&keeping, url, Some(&silent.agent()), NOW + 1);
@@ -4865,7 +4900,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
         );
         assert_eq!(served.join().unwrap(), 1);
-        assert_eq!(silent.prepares(), 1);
+        assert_eq!(silent.hand_overs(), 1);
         assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
     }
@@ -4890,13 +4925,13 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             "{told}"
         );
         assert_eq!(served.join().unwrap(), 1);
-        assert_eq!(tasks.prepares(), 0);
+        assert_eq!(tasks.hand_overs(), 0);
         let other = "cannot: a skill can't watch the weather.";
         let (url, served) = service(vec![(200, other.to_owned())]);
         let told = made_by(&keeping, url, Some(&tasks.agent()), NOW + 1);
         assert_eq!(told["made"], "evening-dim", "{told}");
         assert_eq!(served.join().unwrap(), 1);
-        assert_eq!(tasks.prepares(), 1);
+        assert_eq!(tasks.hand_overs(), 1);
         let _ = std::fs::remove_dir_all(&root);
     }
 
@@ -4980,7 +5015,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
                 Some(&tasks.agent()),
             );
             let _ = std::fs::remove_dir_all(&root);
-            (told, served.join().unwrap(), tasks.prepares())
+            (told, served.join().unwrap(), tasks.hand_overs())
         };
         let (told, served, prepares) = by(
             UMBRELLA,
@@ -5011,7 +5046,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         let (url, served) = service(vec![(200, faces())]);
         let told = made_by(&keeping, url, Some(&tasks.agent()), NOW);
         assert_eq!(served.join().unwrap(), 1);
-        assert_eq!(tasks.prepares(), 1);
+        assert_eq!(tasks.hand_overs(), 1);
         let said = told.to_string();
         assert!(!said.contains("AGENT-WORDS-9"), "{said}");
         assert!(
