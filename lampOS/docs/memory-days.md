@@ -1507,7 +1507,9 @@ runs, so with the switch off nothing changes.
 unlike an observation. `maintain` closes it after its `expires` day: an
 `ahead` item after its `until`, or 14 days after its newest source without
 one; a `plan` fact 14 days after its newest source; a fact with
-`valid_until` after that day; an item citing one that closes goes with it.
+`valid_until` after that day; an item citing one that closes goes with it,
+except a weekly chapter, which keeps its own day (a source's expiry is no
+correction; a forget still takes it).
 Facts and profile lines otherwise live until forgotten or superseded.
 Episodes, feelings and patterns fade (`nightly::FADING`, the
 Reviewer-lead's P2 on #5097: without it a person reached 512 within months
@@ -1557,6 +1559,77 @@ later leaving the day alone, `forget_last` with nothing kept);
 `tests/voice_forget_about.rs`
 (`a_topic_forget_that_matched_nothing_keeps_the_night_off_that_days_lines`,
 through the voice's client and the real store).
+
+## Weekly chapters (B2, `LAMP_MEMORY_WEEKLY_CHAPTERS`, C109)
+
+The memory owner's extraction plan, B2, after nightly pass B: once a week,
+one short chapter of a known person's local week (Monday to Sunday), written
+by the same night thread from what pass B already checked and kept of that
+week. A chapter never reads an exchange; it cites the items it rests on
+(`crates/memory/src/chapters.rs`, the voice's `nightly.rs`).
+
+- **When:** the voice's `LAMP_MEMORY_WEEKLY_CHAPTERS=on`, beside
+  `LAMP_MEMORY_NIGHTLY=on` (off unless set). Each known person heard in a
+  week is queued for it (held in memory only, like the days); after that
+  night's days are done, a week that is over gets one call, in the same
+  hours, quiet, slide and night budget as a day. A week is let go after its
+  call, or 7 days after its Sunday.
+- **`weekly_prepare`** `{"person","week"}` (`week` a Monday, `YYYY-MM-DD`,
+  of a week over; `bad_day` otherwise): the person's current episodes,
+  facts, ahead items, patterns and feelings whose day is in the week, in day
+  order, at most 48 and 24 KiB, as `{"job":"w<n>","person","from","to",
+  "items":[{"id","kind","day","text",…}]}`; fewer than 2 is
+  `"reason":"nothing"`. A week with its chapter is `done`. The job keeps
+  ids only (`nightly_weeks`), never text, and goes a day after.
+- **`weekly_apply`** `{"person","job","proposal"}`: the proposal's
+  `{"chapter":{"text","cites"}}`, unknown fields ignored, checked:
+  `shape` (blank, over 600 bytes, a control character, cites empty, over
+  16, repeated or not whole numbers), `unknown_source` (a cite not in the
+  job), `forgotten` (an item the job gave, cited or not, gone since the
+  prepare), `grounded`
+  (fewer than a third of its content words in the cited items' words: the
+  model sums up, it adds nothing), `private_kind` (the nightly pass's
+  health and money word check, unless every cited item rests on a kept
+  thing), `full` (the person's 512 live items or 2,048 observations),
+  `done` (the week has its chapter). Answer
+  `{"ok":true,"accepted":0|1,"reasons":{…},"id"}`; a repeated apply gives
+  the same answer.
+- **Stored** as an `entries` observation (`category='chapter'`, day the
+  week's Sunday) with its `nightly_items` row (`kind='chapter'`, `night` the
+  Monday, `expires` 90 days after the Sunday, detail `{"from","to"}`) and
+  `sources` edges to every item the job gave, cited or not (the model read
+  them all, so its text may tell one it does not cite). It does not fade or
+  give way, and an item under it that expires leaves it: it closes on its
+  day, or with a forget. An episode under an active chapter does not fade
+  while the chapter lives, so a source can outlive its own fade by up to
+  the chapter's age.
+- **`chapters`** `{"person","day_from","day_to"}`: the person's chapters
+  whose week meets the span (the newest without one), newest first, at most
+  2 and 1,200 bytes. The voice asks it only for a known person's own recall
+  naming a day or a span, and tells the chapters first, each as
+  `{"week_from","week_to","chapter","about","theirs":true}`. A chapter is
+  never in the session note, so no turn's prompt grows by it; a plain
+  `search` can list one as a nightly observation (`nightly.kind` `chapter`).
+- **Privacy:** a known person's own scope only: the room, a rules scope and
+  an unknown speaker are `bad_person` on all three ops. A forget of anything
+  a chapter was given takes it (an exchange, its episode, the chapter),
+  whether the chapter cites it or not;
+  `forget_all` and `forget_person` take every chapter and weekly job of the
+  person. Nothing is spoken or shown; the voice's journal has counts only.
+- **Off:** no weekly op and no `chapters` op are sent; with no chapter rows,
+  every answer is byte for byte as before. An older lamp-memory answers
+  `unknown_op`.
+
+Tests: `chapters::tests` (a week's items make one chapter found for that
+week; each person's own and never the room's; a forget under it and forget
+everything take it, and so does a forget of an item given but not cited,
+before or after the apply; it outlives a plan it cites; each drop reason;
+only a week over with two items; never in the session note and closed after
+90 days; input and answers bounded;
+grounding); the voice's `nightly::tests` (one call for a week over, after the
+days, counts only in the journal; the switch off asks nothing; a week not
+over waits; only known drop reasons logged) and `remember::chapter_tests`
+(asked only for a known person's dated recall; told as their own summary).
 
 ## The benchmark's probe (#4748)
 
