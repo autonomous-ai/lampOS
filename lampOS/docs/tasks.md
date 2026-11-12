@@ -4601,7 +4601,10 @@ Codex.
 
 **Not shown.** No task was started anywhere for this; no Harness session,
 receipt or answer from Codex or OpenCode was seen. Nothing was run on a lamp.
-How often the model names the right one from speech is not measured.
+How often the model names the right one from speech is not measured on a
+lamp; from written requests, `provider-check --hand-overs` scores each
+hand-over's place and engine, not only that it started (#6547,
+`docs/tools.md`).
 
 ### A named ask is a hand-over (off unless `LAMP_TASKS_NAMED_ASK=on`, #1722)
 
