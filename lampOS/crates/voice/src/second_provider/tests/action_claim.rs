@@ -1504,3 +1504,168 @@ fn a_snooze_claimed_beside_only_a_list_is_held_and_asked_again() {
         "{went:?}"
     );
 }
+
+/// One turn on `heard` after the lamp's last words `last` (none: no
+/// exchange before it), the claim switch on, as the product runs. A
+/// `use_skill` that names no skill is answered as lamp-skills refuses one;
+/// the unplug tools answer as having run.
+fn unplug_turn(
+    last: Option<&'static str>,
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new(std::iter::once(first).chain(later).collect()),
+        ..Script::default()
+    });
+    let ran: Calls = Arc::default();
+    let seen = ran.clone();
+    let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
+        let answer = if name == crate::use_skill::NAME && args.get("skill").is_none() {
+            json!({"error": "There is no skill named that."})
+        } else {
+            json!({"ok": true})
+        };
+        seen.lock().unwrap().push((name, args, heard));
+        Box::pin(async move { answer })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(move || Told {
+            text: "SYSTEM".into(),
+            after: None,
+            history: last
+                .map(|last| {
+                    vec![
+                        Message::user("Lamp, I'm unplugging you now."),
+                        Message::assistant(last),
+                    ]
+                })
+                .unwrap_or_default(),
+        }),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .answering_short(true)
+    .saying_at_once(true)
+    .checking_action_claims(true);
+    let labels = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            turn(&mut engine).await
+        });
+    let asked = script.asked.lock().unwrap();
+    let notes = asked
+        .iter()
+        .flatten()
+        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .filter(|content| content.starts_with("(For you to know"))
+        .map(str::to_owned)
+        .collect();
+    Went {
+        said: labels
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect(),
+        asked: asked.len(),
+        ran: ran
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(name, ..)| name.clone())
+            .collect(),
+        notes,
+    }
+}
+
+const PREPARING: &str = "I'm preparing to fold \u{2014} please wait before you pull the plug.";
+
+/// #6515 case B on lamp-52e6 at 12200 (12 Nov): "No." to the turn-off ask
+/// got a `use_skill` that ran no skill and "Staying on, then \u{2014}
+/// standing back up.". With the ask open the words are not said and the
+/// model is not asked again: the skill says its own line.
+#[test]
+fn an_unplug_claim_beside_a_use_skill_that_ran_nothing_is_dropped_while_asked() {
+    let went = unplug_turn(
+        Some(crate::language::UNPLUG_ASK_OFF),
+        "No.",
+        calling_with(crate::use_skill::NAME, json!({})),
+        vec![saying("Staying on, then \u{2014} standing back up.")],
+    );
+    assert!(went.said.is_empty(), "{went:?}");
+    assert_eq!(went.ran, [crate::use_skill::NAME], "{went:?}");
+    assert_eq!(went.asked, 2, "{went:?}");
+    assert!(!told_claim(&went), "{went:?}");
+}
+
+/// #6515 case D on lamp-52e6 at 12200: "Yes." to the turn-off ask got
+/// `calls=none` and "Still preparing \u{2014} give it a moment, it isn't
+/// confirmed safe to unplug yet.". With the ask open it is not said, and
+/// nothing is asked again.
+#[test]
+fn an_unplug_claim_with_no_call_is_dropped_while_the_ask_is_open() {
+    let went = unplug_turn(
+        Some(crate::language::UNPLUG_ASK_OFF),
+        "Yes.",
+        saying("Still preparing \u{2014} give it a moment, it isn't confirmed safe to unplug yet."),
+        vec![],
+    );
+    assert!(went.said.is_empty(), "{went:?}");
+    assert_eq!((went.asked, went.ran.len()), (1, 0), "{went:?}");
+    assert!(!told_claim(&went), "{went:?}");
+}
+
+/// Case D on 12104 (lamp-52e6, 12 Nov 02:18): "I'm unplugging you now."
+/// got "I'm preparing to fold \u{2014} please wait before you pull the
+/// plug." with `calls=none`. With no ask open the model is asked again; the
+/// retry calls `prepare_to_unplug`, and the same words after it stand. A
+/// second claim with no call is the line that it wasn't done.
+#[test]
+fn an_unplug_claim_with_no_call_is_asked_again_and_stands_after_its_call() {
+    let heard = "Lamp, I'm unplugging you now.";
+    let went = unplug_turn(
+        None,
+        heard,
+        saying(PREPARING),
+        vec![calling("prepare_to_unplug"), saying(PREPARING)],
+    );
+    assert!(told_claim(&went), "{went:?}");
+    assert_eq!(went.ran, ["prepare_to_unplug"], "{went:?}");
+    assert_eq!(went.said, said(&[PREPARING]), "{went:?}");
+    let went = unplug_turn(None, heard, saying(PREPARING), vec![saying(PREPARING)]);
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+}
+
+/// A real `stay_plugged_in`, by its name or through `use_skill`, backs the
+/// words after it while the ask is open.
+#[test]
+fn an_unplug_claim_after_a_stay_that_ran_stands() {
+    for first in [
+        calling(crate::action_claim::STAY_TOOL),
+        calling_with(
+            crate::use_skill::NAME,
+            json!({"skill": crate::action_claim::STAY_TOOL}),
+        ),
+    ] {
+        let went = unplug_turn(
+            Some(crate::language::UNPLUG_ASK_OFF),
+            "Never mind.",
+            first,
+            vec![saying("Okay, staying on.")],
+        );
+        assert_eq!(went.said, said(&["Okay, staying on."]), "{went:?}");
+        assert!(!told_claim(&went), "{went:?}");
+    }
+}

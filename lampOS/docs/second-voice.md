@@ -3829,6 +3829,28 @@ after a take-over, but now for every turn:
   function. Only English replies can match: in another language the
   model's words are never the acting part's English lines. Tests:
   `second_provider::tests::action_claim::*` and `action_claim::tests::*`.
+  **The unplug's acts** (#6457, `Claim::Unplug`): a reply opening with the
+  unplug's own acts in the model's words (`action_claim::UNPLUGGED`:
+  "I'm preparing to fold — please wait …", "Still preparing …",
+  "Staying on, then — standing back up.", "I'm turning myself off.", "Safe
+  to unplug me now.") stands only when a `prepare_to_unplug` or
+  `stay_plugged_in` ran in the turn, by its name or through `use_skill`
+  naming it, with an answer that is no error (`action_claim::unplug_in`, by
+  the outcomes the turn keeps of its calls; a `use_skill` that ran no skill
+  backs nothing). While the skill's turn-off ask is open (the lamp's last
+  words in the exchanges end with `language::UNPLUG_ASK_OFF`, in English or
+  the owner's language) such words are dropped, never asked again and never
+  the not-done line: the skill says its own exact line for that answer
+  (journal: `its reply claims an unplug action while the skill's ask is
+  open: not said, its N call(s) run (LAMP_ACTION_CLAIM_CHECKED)`). Said in
+  the round that calls an unplug tool, the words ran ahead of it: not said,
+  no note, and the next round speaks from its answer. Otherwise the path
+  above: asked once with `action_claim::NOTE`, then the not-done line. The
+  check is in-process string and list work: no network call and no wait is
+  added; a dropped claim makes the turn shorter, and only a caught claim
+  outside the ask costs one more chat round. Not judged: "It's safe to
+  unplug me." (a reply opening "It's" is decided at its first word), claims
+  in a later sentence, other languages.
 - **With `LAMP_ACTION_CLAIM_WORDED=on` too, a claim the model words its own
   way is held the same way** (off; #5215's open shape: on 10441, 5 Nov
   04:24, "Hey Lamp, keep the light on until ten." got `calls=none` and
