@@ -3660,16 +3660,18 @@ fn stay_call((name, args, _, reply, admission): ToolAsk, engine: &Engine, runner
 }
 
 /// A spoken "never mind": the person is there and asked, so the cancel is
-/// published even if the line never begins (lamp-52e6, build 12130). It
-/// needs no run under way, only the kept request (`may_stay`).
+/// published before the line, which may never begin (lamp-52e6, builds
+/// 12130 and 12200). It needs no run under way, only the kept request
+/// (`may_stay`).
 fn never_mind(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
-    stay_even_unsaid(sockets, bus, request, line, true)
+    stay_even_unsaid(sockets, bus, request, line, Cancel::First)
 }
 
 /// No yes to the turn-off ask: the stay line, then it stands. A heard
-/// refusal (words that aren't a yes) stands even if the line never begins:
-/// the person is there and said no (lamp-52e6, build 12130). Silence, or a
-/// yes not taken, keeps the line-first rule of [`stay`].
+/// refusal (words that aren't a yes) stands first, the line after, even if
+/// it never begins: the person is there and said no (lamp-52e6, builds
+/// 12130 and 12200). Silence, or a yes not taken, keeps the line-first rule
+/// of [`stay`].
 fn not_turned_off(sockets: &Sockets, bus: &Bus, request: &str, why: &str) -> String {
     let line = sockets
         .may
@@ -3679,7 +3681,17 @@ fn not_turned_off(sockets: &Sockets, bus: &Bus, request: &str, why: &str) -> Str
         .unwrap_or_default();
     format!(
         "unplug: not turned off: {why}; {}",
-        stay_even_unsaid(sockets, bus, request, &line, why == NOT_A_YES)
+        stay_even_unsaid(
+            sockets,
+            bus,
+            request,
+            &line,
+            if why == NOT_A_YES {
+                Cancel::First
+            } else {
+                Cancel::AfterLine
+            }
+        )
     )
 }
 
@@ -3687,33 +3699,67 @@ fn not_turned_off(sockets: &Sockets, bus: &Bus, request: &str, why: &str) -> Str
 /// body waits a further 3 s before any motion. A line never begun cancels
 /// nothing: a person mid-unplug must hear it before the arm moves.
 fn stay(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
-    stay_even_unsaid(sockets, bus, request, line, false)
+    stay_even_unsaid(sockets, bus, request, line, Cancel::AfterLine)
 }
 
-/// [`stay`], and with `unsaid_too` the cancel is published even when the
-/// line never began (refused, expired, the voice not reached): a turn-off
-/// that failed, a heard "no" and a spoken "never mind" never leave the lamp
-/// kept folded.
+/// When [`stay_even_unsaid`] publishes the cancel that stands the lamp up.
+#[derive(Clone, Copy, PartialEq)]
+enum Cancel {
+    /// Once the line has begun; a line never begun cancels nothing.
+    AfterLine,
+    /// Once the line has begun, or after it if it never began: a turn-off
+    /// that failed never leaves the lamp kept folded.
+    EvenUnsaid,
+    /// Before the line: the person is there and asked to stay (a heard "no",
+    /// a spoken "never mind"), so the lamp stands at once and the line plays
+    /// when the voice is free. When the voice model opened its own turn, the
+    /// exact line waits until it expires (30 s), and a cancel after it held
+    /// the arm down that long (lamp-52e6, build 12200, #6515).
+    First,
+}
+
+/// One cancel at a time, so a heard "no" and a "never mind" racing for the
+/// same request say the stay line once.
+static CANCEL_LOCK: Mutex<()> = Mutex::new(());
+
+/// [`stay`], with the cancel published as `when` says.
 fn stay_even_unsaid(
     sockets: &Sockets,
     bus: &Bus,
     request: &str,
     line: &str,
-    unsaid_too: bool,
+    when: Cancel,
 ) -> String {
     let mut cancelled = None;
+    if when == Cancel::First {
+        let _one = CANCEL_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let kept = lamp_body::unplug::Request {
+            request: request.to_owned(),
+        };
+        // Already cancelled, by the other of the two: its line is the one said.
+        if lamp_body::unplug::cancelled(bus, &kept) {
+            return format!("{request} was already cancelled; its stay line is said once");
+        }
+        cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
+    }
     let outcome = match sockets.may.refuses(&Call::Say(String::new())) {
-        Some(refused) if unsaid_too => refused,
+        Some(refused) if when != Cancel::AfterLine => refused,
         _ => say(
             &sockets.say,
             "staying plugged in",
             &sockets.may.skill,
             exact(line, 8),
             &[],
-            || cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us())),
+            || {
+                if cancelled.is_none() {
+                    cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
+                }
+            },
         ),
     };
-    if unsaid_too && cancelled.is_none() {
+    if when == Cancel::EvenUnsaid && cancelled.is_none() {
         cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
     }
     match cancelled {
@@ -4004,7 +4050,7 @@ fn turn_off(sockets: &Sockets, bus: &Bus, request: &str, since: u64, socket: &Pa
         .unwrap_or_default();
     format!(
         "unplug: not turned off: {why}; {}",
-        stay_even_unsaid(sockets, bus, request, &note, true)
+        stay_even_unsaid(sockets, bus, request, &note, Cancel::EvenUnsaid)
     )
 }
 
@@ -6312,6 +6358,75 @@ mod tests {
         assert!(outcome.contains("expired"), "{outcome}");
         assert!(outcome.contains("cancel published for r1"), "{outcome}");
         assert!(cancels(&bus).is_some());
+    }
+
+    /// lamp-52e6, build 12200 (#6515): the model answered "No." with its own
+    /// turn, the exact stay line waited 30 s to expire, and the arm stayed
+    /// down that long. A heard "no" cancels before its line; the model's
+    /// `stay_plugged_in` on the same "No." then finds it cancelled and does
+    /// not say the line again.
+    #[test]
+    fn a_heard_no_cancels_before_its_line_and_says_it_once() {
+        let dir = tempfile::Builder::new()
+            .prefix("uf")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = not_turned_off(&sockets, &bus, "r1", NOT_A_YES);
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        let again = never_mind(&sockets, &bus, "r1", &unplug_lines().stay);
+        assert!(again.contains("already cancelled"), "{again}");
+        assert_eq!(
+            heard.join().unwrap(),
+            [(unplug_lines().stay, true)],
+            "the cancel was out before the line reached the voice, and the line came once"
+        );
+        assert_eq!(cancels(&bus), Some(1));
+    }
+
+    /// A spoken "never mind" cancels before its line too.
+    #[test]
+    fn a_never_mind_cancels_before_its_line() {
+        let dir = tempfile::Builder::new()
+            .prefix("ug")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = never_mind(&sockets, &bus, "r1", &unplug_lines().stay);
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert_eq!(heard.join().unwrap(), [(unplug_lines().stay, true)]);
+    }
+
+    /// Silence at the turn-off ask keeps the line first: nobody asked to
+    /// stay, and someone may be unplugging it, hands at the arm.
+    #[test]
+    fn silence_at_the_ask_says_its_line_before_the_cancel() {
+        let dir = tempfile::Builder::new()
+            .prefix("ui")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = not_turned_off(&sockets, &bus, "r1", "no spoken yes within 30 s");
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert_eq!(heard.join().unwrap(), [(unplug_lines().stay, false)]);
     }
 
     /// The same lamp: "never mind" 75 s after the ask had ended. No run is
