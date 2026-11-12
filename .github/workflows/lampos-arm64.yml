@@ -360,7 +360,12 @@ jobs:
       # cache save, so the shards start once it is up (#6556).
       - name: build the test binaries into a nextest archive
         working-directory: lampOS
-        run: cargo nextest archive --locked --release --workspace --archive-file "$RUNNER_TEMP/lampos-tests.tar.zst"
+        run: cargo nextest archive --locked --release --workspace --timings --archive-file "$RUNNER_TEMP/lampos-tests.tar.zst"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cargo-timings-build
+          path: lampOS/target/cargo-timings/
       - uses: actions/upload-artifact@v4
         timeout-minutes: 10
         with:
@@ -510,7 +515,12 @@ jobs:
       - name: build (release, the lamps' binaries)
         working-directory: lampOS
         # Keep Cargo's current-target records outside the restored target cache.
-        run: cargo build --locked --release --workspace --bins --examples --message-format=json-render-diagnostics > arm64-build.jsonl
+        run: cargo build --locked --release --workspace --bins --examples --timings --message-format=json-render-diagnostics > arm64-build.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cargo-timings-release
+          path: lampOS/target/cargo-timings/
       - name: every built lamp-* binary is classified for the lamp-os package
         working-directory: lampOS
         run: bash tools/package-binaries-test.sh && bash tools/package-binaries.sh deploy/package-binaries.json target/release
