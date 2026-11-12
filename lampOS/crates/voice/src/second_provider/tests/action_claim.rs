@@ -1504,3 +1504,266 @@ fn a_snooze_claimed_beside_only_a_list_is_held_and_asked_again() {
         "{went:?}"
     );
 }
+
+/// B's words (row-5747n, lamp-52e6 at 12200, #6457).
+const STAYING: &str = "Staying on, then \u{2014} standing back up.";
+/// D's words.
+const PREPARING: &str =
+    "Still preparing \u{2014} give it a moment, it isn't confirmed safe to unplug yet.";
+
+/// One unplug turn: `heard` after the lamp last said `last_lamp` (the
+/// thread's history), with the claim check as `checked` and
+/// `LAMP_ACTION_CLAIM_UNPLUG` as `unplug`, the worded claims on, as the
+/// product runs. A call whose arguments say `"error": true` is refused as
+/// lamp-skills refuses one; any other is answered `ok`.
+fn unplug_turn(
+    (checked, unplug): (bool, bool),
+    heard: &str,
+    last_lamp: Option<&str>,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+) -> Went {
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(heard.to_owned())].into()),
+        chats: Mutex::new(std::iter::once(first).chain(later).collect()),
+        ..Script::default()
+    });
+    let ran: Calls = Arc::default();
+    let seen = ran.clone();
+    let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
+        let answer = if args["error"] == true {
+            json!({"error": "There is no unplug under way."})
+        } else {
+            json!({"ok": true})
+        };
+        seen.lock().unwrap().push((name, args, heard));
+        Box::pin(async move { answer })
+    });
+    let history: Vec<Message> = last_lamp
+        .map(|last| {
+            vec![
+                Message::user("Lamp, I'm unplugging you now."),
+                Message::assistant(last),
+            ]
+        })
+        .unwrap_or_default();
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(move || crate::second_provider::Told {
+            text: "SYSTEM".to_owned(),
+            after: None,
+            history: history.clone(),
+        }),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .answering_short(true)
+    .saying_at_once(true)
+    .checking_action_claims(checked)
+    .checking_worded_claims(checked)
+    .checking_unplug_claims(checked && unplug);
+    let labels = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap()
+        .block_on(async {
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            turn(&mut engine).await
+        });
+    let asked = script.asked.lock().unwrap();
+    let notes = asked
+        .iter()
+        .flatten()
+        .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
+        .filter(|content| content.starts_with("(For you to know"))
+        .map(str::to_owned)
+        .collect();
+    Went {
+        said: labels
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .collect(),
+        asked: asked.len(),
+        ran: ran
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(name, ..)| name.clone())
+            .collect(),
+        notes,
+    }
+}
+
+/// What a turn said, its pieces joined, labels off.
+fn spoken(went: &Went) -> String {
+    went.said
+        .iter()
+        .map(|said| said.trim_start_matches("said:"))
+        .collect()
+}
+
+fn skill_call(args: Value) -> Vec<net::Result<ChatEvent>> {
+    vec![
+        Ok(ChatEvent::ToolCalls(vec![call("c0", "use_skill", args)])),
+        Ok(ChatEvent::Done),
+    ]
+}
+
+/// Row-5747n case B (lamp-52e6, 12200): "No." to the skill's ask got a
+/// `use_skill` that ran no stay, and "Staying on, then — standing back up."
+/// was said while the arm stayed folded. With the switch the words are held
+/// beside that call, the model asked once more, and a second time said as
+/// the line that it wasn't done; a retry that runs the stay lets them stand.
+#[test]
+fn staying_on_said_with_no_stay_run_is_held_and_asked_again() {
+    let ask = Some(crate::language::UNPLUG_ASK_OFF);
+    for first in [
+        skill_call(json!({"skill": "prepare_to_unplug"})),
+        skill_call(json!({"skill": crate::action_claim::STAY_TOOL, "error": true})),
+    ] {
+        let went = unplug_turn(
+            (true, true),
+            "No.",
+            ask,
+            first.clone(),
+            vec![saying(STAYING), saying(STAYING)],
+        );
+        assert_eq!(
+            went.said,
+            said(&[crate::action_claim::NOT_DONE_LINE]),
+            "{went:?}"
+        );
+        assert_eq!((went.asked, went.ran.len()), (3, 1), "{went:?}");
+        assert!(told_claim(&went), "{went:?}");
+        // The retry runs the stay: its words stand.
+        let went = unplug_turn(
+            (true, true),
+            "No.",
+            ask,
+            first,
+            vec![
+                saying(STAYING),
+                calling(crate::action_claim::STAY_TOOL),
+                saying(STAYING),
+            ],
+        );
+        assert_eq!(spoken(&went), STAYING, "{went:?}");
+        assert_eq!(went.ran[1], crate::action_claim::STAY_TOOL, "{went:?}");
+        assert!(told_claim(&went), "{went:?}");
+    }
+    // With no call at all, the same: asked again once, then not done.
+    let went = unplug_turn(
+        (true, true),
+        "No.",
+        ask,
+        saying(STAYING),
+        vec![saying(STAYING)],
+    );
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
+    assert_eq!((went.asked, went.ran.len()), (2, 0), "{went:?}");
+}
+
+/// A real refusal stands: the stay run (through `use_skill` or by its own
+/// name) backs "Staying on", and the skill's own "Okay, I'll stay." and a
+/// plain "I can't turn myself off." claim nothing.
+#[test]
+fn a_real_refusal_stands() {
+    let ask = Some(crate::language::UNPLUG_ASK_OFF);
+    for first in [
+        skill_call(json!({"skill": crate::action_claim::STAY_TOOL})),
+        calling(crate::action_claim::STAY_TOOL),
+    ] {
+        let went = unplug_turn((true, true), "No.", ask, first, vec![saying(STAYING)]);
+        assert_eq!(spoken(&went), STAYING, "{went:?}");
+        assert_eq!((went.asked, went.ran.len()), (2, 1), "{went:?}");
+        assert!(went.notes.is_empty(), "{went:?}");
+    }
+    for reply in [crate::language::UNPLUG_STAY, "I can't turn myself off."] {
+        let on = unplug_turn((true, true), "No.", ask, saying(reply), vec![]);
+        assert_eq!(spoken(&on), reply, "{on:?}");
+        assert_eq!(on.asked, 1, "{on:?}");
+    }
+}
+
+/// Row-5747n case D (lamp-52e6, 12200): "Yes." to the skill's ask got
+/// `calls=none` and "Still preparing — give it a moment, it isn't confirmed
+/// safe to unplug yet." while the lamp was folded and ready; the update
+/// line never came. With the switch the words are not said, nothing is
+/// asked again, and the skill's update line is said in their place; after
+/// its ready line, that line.
+#[test]
+fn not_ready_said_at_a_proven_fold_is_the_skills_line() {
+    for (last, instead) in [
+        (
+            crate::language::UNPLUG_ASK_OFF,
+            crate::language::UNPLUG_UPDATING,
+        ),
+        (crate::language::UNPLUG_READY, crate::language::UNPLUG_READY),
+    ] {
+        let went = unplug_turn(
+            (true, true),
+            "Yes.",
+            Some(last),
+            saying(PREPARING),
+            vec![saying(PREPARING)],
+        );
+        assert_eq!(went.said, said(&[instead]), "{went:?}");
+        assert_eq!((went.asked, went.ran.len()), (1, 0), "{went:?}");
+        assert!(went.notes.is_empty(), "{went:?}");
+    }
+}
+
+/// A real "not ready" stands: with no fold said (the lamp's last line not
+/// the skill's ask or ready line), "Still preparing …" is said as it came,
+/// beside a `prepare_to_unplug` or alone, as with the switch off.
+#[test]
+fn a_real_not_ready_stands() {
+    let heard = "Lamp, I'm unplugging you now.";
+    for (last, first, later) in [
+        (None, saying(PREPARING), vec![]),
+        (
+            Some("Hi there."),
+            calling(crate::without_a_tool::UNPLUG_TOOL),
+            vec![saying(PREPARING)],
+        ),
+        (
+            Some(crate::language::UNPLUG_FAILED),
+            saying(PREPARING),
+            vec![],
+        ),
+    ] {
+        let on = unplug_turn((true, true), heard, last, first.clone(), later.clone());
+        assert_eq!(spoken(&on), PREPARING, "{on:?}");
+        assert!(on.notes.is_empty(), "{on:?}");
+        assert_eq!(on, unplug_turn((true, false), heard, last, first, later));
+    }
+}
+
+/// The switch off (or the claim check off): B and D go as they did on
+/// 12200, said as they came, byte for byte.
+#[test]
+fn unplug_claims_off_change_nothing() {
+    let ask = Some(crate::language::UNPLUG_ASK_OFF);
+    let b = || {
+        (
+            skill_call(json!({"skill": "prepare_to_unplug"})),
+            vec![saying(STAYING)],
+        )
+    };
+    for switches in [(true, false), (false, true), (false, false)] {
+        let (first, later) = b();
+        let went = unplug_turn(switches, "No.", ask, first, later);
+        assert_eq!(spoken(&went), STAYING, "{went:?}");
+        assert_eq!((went.asked, went.ran.len()), (2, 1), "{went:?}");
+        let went = unplug_turn(switches, "Yes.", ask, saying(PREPARING), vec![]);
+        assert_eq!(spoken(&went), PREPARING, "{went:?}");
+        assert_eq!(went.asked, 1, "{went:?}");
+    }
+}

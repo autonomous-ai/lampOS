@@ -3799,6 +3799,22 @@ pub fn serve(
         );
     }
     engine = engine.checking_worded_claims(action_claims && worded_claims);
+    // An unplug act said that the fold and stay records don't back
+    // ("Staying on, then — standing back up." with no stay run; "Still
+    // preparing …" at a proven fold; `LAMP_ACTION_CLAIM_UNPLUG=on`, #6457),
+    // only beside the check above.
+    let unplug_claims = crate::action_claim::unplug_on();
+    if unplug_claims {
+        eprintln!(
+            "{}",
+            if action_claims {
+                "lamp-voice second: a reply saying the lamp stays on with no stay run is held the same way, and one saying the unplug isn't ready at a proven fold is said as the skill's line (LAMP_ACTION_CLAIM_UNPLUG)"
+            } else {
+                "lamp-voice second: LAMP_ACTION_CLAIM_UNPLUG does nothing without LAMP_ACTION_CLAIM_CHECKED"
+            }
+        );
+    }
+    engine = engine.checking_unplug_claims(action_claims && unplug_claims);
     // A line said to the lamp by name never ends in silence from an empty
     // answer (`LAMP_NO_WORDS_AGAIN=on`, #3704).
     let no_words_again = std::env::var(crate::second_provider::NO_WORDS_AGAIN_ENVIRONMENT)
