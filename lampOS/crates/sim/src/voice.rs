@@ -7,7 +7,7 @@
 //! `voice/line` as it begins, as the real voice does, so `lamp.said` reaches
 //! a computer holding `speech`.
 use lamp_bus::{Bus, Publisher};
-use lamp_msgs::{LineBy, LineSource, SaidLine};
+use lamp_msgs::{LineBy, LineSource, SaidLine, SpeakerVolume};
 use serde_json::{Value, json};
 use std::{
     io::{BufRead, BufReader, Write},
@@ -16,7 +16,7 @@ use std::{
     process::{Command, Stdio},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
     },
     thread,
     time::Duration,
@@ -261,37 +261,134 @@ fn cut_off(program: &str) {
     }
 }
 
-/// Serves lamp-actions' call socket at `path`, forever: `volume_to` only.
-pub fn serve_actions(path: &Path) -> std::io::Result<()> {
+/// The speaker's volume as lamp-actions keeps it (actions/src/sound.rs): a level of 0 to 100, a step of 20 with a floor of 10
+/// that a "quieter" does not go under, a mute that is a level of 0 and remembers where it was, and an unmute that goes back there
+/// (the middle when it was never muted here). No hardware: the level is the whole of it.
+pub struct Speaker {
+    level: u8,
+    before_mute: Option<u8>,
+}
+
+const STEP: u8 = 20;
+const FLOOR: u8 = 10;
+
+impl Speaker {
+    /// Half way, as a lamp comes up with no memory of its last level.
+    pub fn new() -> Self {
+        Self {
+            level: 50,
+            before_mute: None,
+        }
+    }
+
+    pub fn level(&self) -> u8 {
+        self.level
+    }
+
+    /// One app call (`volume_level`, `volume_to`, `volume_step`, `volume_muted`); whether the level changed. An unknown call or
+    /// argument changes nothing and is answered with the level, as the stand-in always did.
+    pub fn call(&mut self, name: &str, args: &Value) -> bool {
+        let before = self.level;
+        match name {
+            "volume_to" => {
+                if let Some(to) = args["volume"].as_u64() {
+                    self.level = u8::try_from(to.min(100)).unwrap_or(100);
+                    self.before_mute = None;
+                }
+            }
+            "volume_step" => match args["step"].as_str() {
+                Some("up") => {
+                    self.level = self.level.saturating_add(STEP).min(100);
+                    self.before_mute = None;
+                }
+                Some("down") if self.level > FLOOR => {
+                    self.level = FLOOR.max(self.level.saturating_sub(STEP))
+                }
+                _ => {}
+            },
+            "volume_muted" => match args["muted"].as_bool() {
+                Some(true) if self.level > 0 => {
+                    self.before_mute = Some(self.level);
+                    self.level = 0;
+                }
+                Some(false) if self.level == 0 => {
+                    self.level = self.before_mute.take().unwrap_or(50).clamp(1, 100);
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+        self.level != before
+    }
+
+    /// lamp-actions' answer to an app call.
+    pub fn answer(&self) -> Value {
+        json!({"ok": true, "level": {"volume": self.level, "raw": self.level, "max_volume": 100}})
+    }
+}
+
+impl Default for Speaker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Serves lamp-actions' call socket at `path`, forever: the four app calls of the volume, and `speaker/volume` said on `bus` once
+/// at the start and after every change, as lamp-actions says it, so lamp-control's `get volume` and `volume.changed` work.
+pub fn serve_actions(path: &Path, bus: &Bus) -> std::io::Result<()> {
+    let mut publisher = bus.publisher_declared(
+        SpeakerVolume::TOPIC,
+        &SpeakerVolume::declaration(),
+        SpeakerVolume::SOURCE,
+    )?;
+    let speaker = Arc::new(Mutex::new(Speaker::new()));
+    let _ = publisher.publish_json(
+        lamp_ipc::monotonic_us(),
+        &SpeakerVolume {
+            volume: Speaker::new().level(),
+            muted: false,
+        },
+    );
     let _ = std::fs::remove_file(path);
     let listener = UnixListener::bind(path)?;
-    let level = Arc::new(AtomicU64::new(50));
+    let publisher = Arc::new(Mutex::new(publisher));
     for stream in listener.incoming().flatten() {
-        let level = Arc::clone(&level);
+        let speaker = Arc::clone(&speaker);
+        let publisher = Arc::clone(&publisher);
         thread::spawn(move || {
-            let _ = action(stream, &level);
+            let _ = action(stream, &speaker, &publisher);
         });
     }
     Ok(())
 }
 
-fn action(mut stream: UnixStream, level: &AtomicU64) -> std::io::Result<()> {
+fn action(
+    mut stream: UnixStream,
+    speaker: &Mutex<Speaker>,
+    publisher: &Mutex<Publisher>,
+) -> std::io::Result<()> {
     let mut line = String::new();
     BufReader::new(stream.try_clone()?).read_line(&mut line)?;
     let Ok(asked) = serde_json::from_str::<Value>(&line) else {
         return Ok(());
     };
-    if asked["name"] == "volume_to"
-        && let Some(to) = asked["args"]["volume"].as_u64()
+    let (answer, news) = {
+        let mut speaker = speaker.lock().unwrap_or_else(|e| e.into_inner());
+        let changed = speaker.call(asked["name"].as_str().unwrap_or(""), &asked["args"]);
+        (speaker.answer(), changed.then(|| speaker.level()))
+    };
+    if let Some(level) = news
+        && let Ok(mut publisher) = publisher.lock()
     {
-        level.store(to.min(100), Ordering::Relaxed);
+        let _ = publisher.publish_json(
+            lamp_ipc::monotonic_us(),
+            &SpeakerVolume {
+                volume: level,
+                muted: level == 0,
+            },
+        );
     }
-    let now = level.load(Ordering::Relaxed);
-    writeln!(
-        stream,
-        "{}",
-        json!({"ok": true, "level": {"volume": now, "raw": now, "max_volume": 100}})
-    )
+    writeln!(stream, "{answer}")
 }
 
 #[cfg(test)]
@@ -544,6 +641,137 @@ mod tests {
         // A path that starts with a dash is no clip for a player.
         assert!(playable("/clips/a.wav"));
         assert!(!playable("-f/etc/hostname") && !playable("clips/a.wav"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_speaker_steps_by_twenty_with_a_floor_of_ten_and_mutes_and_unmutes_as_lamp_actions_do() {
+        let mut speaker = Speaker::new();
+        assert_eq!(speaker.level(), 50);
+        assert!(speaker.call("volume_step", &json!({"step": "down"})));
+        assert_eq!(speaker.level(), 30);
+        assert!(speaker.call("volume_step", &json!({"step": "down"})));
+        assert_eq!(speaker.level(), 10);
+        assert!(
+            !speaker.call("volume_step", &json!({"step": "down"})),
+            "the floor: quieter does not go under it"
+        );
+        assert!(speaker.call("volume_step", &json!({"step": "up"})));
+        assert_eq!(speaker.level(), 30);
+        assert!(speaker.call("volume_to", &json!({"volume": 90})));
+        assert!(speaker.call("volume_step", &json!({"step": "up"})));
+        assert_eq!(speaker.level(), 100, "the ceiling");
+        assert!(!speaker.call("volume_step", &json!({"step": "up"})));
+        // Mute remembers where it was; unmute goes back; a second of either changes nothing.
+        assert!(speaker.call("volume_to", &json!({"volume": 70})));
+        assert!(speaker.call("volume_muted", &json!({"muted": true})));
+        assert_eq!(speaker.level(), 0);
+        assert_eq!(
+            speaker.answer()["level"]["raw"],
+            0,
+            "lamp-control reads muted as a raw level of nothing"
+        );
+        assert!(!speaker.call("volume_muted", &json!({"muted": true})));
+        assert!(
+            !speaker.call("volume_step", &json!({"step": "down"})),
+            "a muted speaker is not stepped down"
+        );
+        assert!(speaker.call("volume_muted", &json!({"muted": false})));
+        assert_eq!(speaker.level(), 70);
+        assert!(!speaker.call("volume_muted", &json!({"muted": false})));
+        // Never muted here: an unmute of a speaker brought to 0 by volume_to goes to the middle.
+        assert!(speaker.call("volume_to", &json!({"volume": 0})));
+        assert!(speaker.call("volume_muted", &json!({"muted": false})));
+        assert_eq!(speaker.level(), 50);
+        // A call it does not know, or a bad argument, changes nothing and is answered.
+        assert!(!speaker.call("volume_level", &json!({})));
+        assert!(!speaker.call("volume_step", &json!({"step": "sideways"})));
+        assert!(!speaker.call("volume_to", &json!({"volume": "loud"})));
+        assert_eq!(
+            speaker.answer(),
+            json!({"ok": true, "level": {"volume": 50, "raw": 50, "max_volume": 100}})
+        );
+    }
+
+    #[test]
+    fn a_change_is_told_on_speaker_volume_and_the_socket_answers_each_call() {
+        let dir = std::env::temp_dir().join(format!("lamp-sim-volume-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let bus = Bus::new(dir.join("bus")).unwrap();
+        let mut told = bus
+            .subscribe_typed(SpeakerVolume::TOPIC, "volume_test", SpeakerVolume::TYPE)
+            .unwrap();
+        let socket = dir.join("act.sock");
+        let (path, served) = (socket.clone(), bus.clone());
+        thread::spawn(move || {
+            let _ = serve_actions(&path, &served);
+        });
+        for _ in 0..100 {
+            if socket.exists() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(20));
+        }
+        let call = |name: &str, args: Value| -> Value {
+            let mut stream = UnixStream::connect(&socket).unwrap();
+            writeln!(stream, "{}", json!({"name": name, "args": args})).unwrap();
+            let mut line = String::new();
+            BufReader::new(stream).read_line(&mut line).unwrap();
+            serde_json::from_str(&line).unwrap()
+        };
+        let said = |told: &mut lamp_bus::Subscriber| -> Option<SpeakerVolume> {
+            told.recv(Duration::from_millis(500))
+                .unwrap()
+                .map(|m| serde_json::from_slice(&m.payload).unwrap())
+        };
+        // Said once at the start (the middle), then after each change and only then.
+        assert_eq!(
+            said(&mut told),
+            Some(SpeakerVolume {
+                volume: 50,
+                muted: false
+            })
+        );
+        assert_eq!(
+            call("volume_step", json!({"step": "down"}))["level"]["volume"],
+            30
+        );
+        assert_eq!(
+            said(&mut told),
+            Some(SpeakerVolume {
+                volume: 30,
+                muted: false
+            })
+        );
+        assert_eq!(
+            call("volume_muted", json!({"muted": true}))["level"]["raw"],
+            0
+        );
+        assert_eq!(
+            said(&mut told),
+            Some(SpeakerVolume {
+                volume: 0,
+                muted: true
+            })
+        );
+        assert_eq!(call("volume_level", json!({}))["level"]["volume"], 0);
+        assert_eq!(
+            said(&mut told),
+            None,
+            "a read changes nothing and says nothing"
+        );
+        assert_eq!(
+            call("volume_muted", json!({"muted": false}))["level"]["volume"],
+            30
+        );
+        assert_eq!(
+            said(&mut told),
+            Some(SpeakerVolume {
+                volume: 30,
+                muted: false
+            })
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
