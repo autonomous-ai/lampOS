@@ -186,6 +186,53 @@ fn a_requested_frame_arrives_whole_with_its_original_identity_and_grant() {
 }
 
 #[test]
+fn a_peer_the_check_refuses_never_reaches_its_hello_and_one_it_takes_does() {
+    let dir = Dir::new();
+    let asked = std::sync::Arc::new(AtomicU64::new(0));
+    let let_in = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let (counted, allowed) = (asked.clone(), let_in.clone());
+    let mut server = server(&dir, &[(Role::Perception, PERCEPTION)]).with_peer_check(Box::new(
+        move |stream: &UnixStream| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            // The peer is the kernel's: on Linux this process's own creds.
+            #[cfg(target_os = "linux")]
+            assert!(rustix::net::sockopt::socket_peercred(stream).is_ok());
+            let _ = stream;
+            allowed.load(Ordering::SeqCst)
+        },
+    ));
+    // The right boots, the wrong peer: closed before its hello is read.
+    let mut refused = client(&dir, Role::Perception, PERCEPTION);
+    assert!(refused.connect().unwrap());
+    let mut out = Vec::new();
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let result = loop {
+        server.service(10);
+        match refused.poll(&mut out) {
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(1)),
+            other => break other,
+        }
+    };
+    assert!(result.is_err(), "the refused peer sees the link close");
+    assert!(!server.connected(Role::Perception));
+    assert_eq!(server.counts().rejected, 1);
+    assert_eq!(asked.load(Ordering::SeqCst), 1);
+    assert!(matches!(
+        server.take_event(),
+        Some(LinkEvent::Closed {
+            role: None,
+            reason: CloseReason::PeerRefused,
+            ..
+        })
+    ));
+    // The peer the check takes goes on to its hello and is accepted.
+    let_in.store(true, Ordering::SeqCst);
+    let mut good = client(&dir, Role::Perception, PERCEPTION);
+    connect(&mut server, &mut good, Role::Perception);
+    assert_eq!(server.counts().accepted, 1);
+}
+
+#[test]
 fn only_the_permitted_consumer_identity_is_accepted_once() {
     let dir = Dir::new();
     let mut server = server(&dir, &[(Role::Perception, PERCEPTION)]);
