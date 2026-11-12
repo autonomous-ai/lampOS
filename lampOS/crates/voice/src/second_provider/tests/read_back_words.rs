@@ -201,10 +201,17 @@ fn a_model_read_back_after_the_words_read_it_runs_once() {
 
 /// "use desk check", "run desk check" and "what time is it" read nothing
 /// back: a `use_skill` the model calls runs as it did, and round 1 is told
-/// nothing of a read-back.
+/// nothing of a read-back. A line that asks and runs it runs it (the
+/// Reviewer-lead's P1 on #6619): its `use_skill` is never replaced.
 #[test]
 fn asking_to_run_it_or_another_question_reads_nothing_back() {
-    for heard in ["use desk check", "run desk check"] {
+    for heard in [
+        "use desk check",
+        "run desk check",
+        "what does desk check use, and run it",
+        "what does desk check need? ok run it",
+        "what time is it? then run desk check, I need it",
+    ] {
         let went = went(
             heard,
             vec![
