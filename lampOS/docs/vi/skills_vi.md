@@ -750,11 +750,13 @@ sau:
      không có trong unit sản phẩm nào; trong `lamp-voice` được truyền cho
      cả hai route, chỉ được đọc khi `LAMP_MADE_SCRIPTS=on`,
      `made_skill::code_on_at_once`). Phán quyết của first builder trên
-     #6059 (19:14) vạch ranh giới (`made_skill::code_goes_on_at_once`): mã
-     chỉ có các quyền ánh sáng của đèn, loại âm thanh nó nghe thấy hoặc
-     đầu và tay của nó (`made_skill::CODE_AT_ONCE_GRANTS`: `light`,
-     `sound`, `body`; hẹn giờ là một trigger và không cần quyền) được bật
-     ngay; mã có bất kỳ quyền nào khác, trước hết là camera hay micro
+     #6059 (19:14, và dòng 19:44 của anh ấy: "sound" là âm thanh và giọng
+     nói của chính đèn) vạch ranh giới (`made_skill::code_goes_on_at_once`):
+     mã chỉ có các quyền ánh sáng của đèn, giọng nói và âm thanh của nó
+     hoặc đầu và tay của nó (`made_skill::CODE_AT_ONCE_GRANTS`: `light`,
+     `speak`, `body`; hẹn giờ là một trigger và không cần quyền) được bật
+     ngay; mã có bất kỳ quyền nào khác, trước hết là camera, micro và
+     `sound`, là quyền nghe các loại âm thanh chứ không phải phát chúng
      (`made_skill::CODE_YES_GRANTS`), hoặc bất kỳ lần gửi nào (một lần ghi,
      tin nhắn tới điện thoại) vẫn giữ lời đồng ý bằng giọng nói đúng như khi
      công tắc tắt. Một lần tạo như vậy, bằng giọng nói hay từ MAKE IT của

@@ -536,7 +536,7 @@ pub fn make_here_with(
 /// grants and its wait), kept as asked ([`made_skill::code_asked`]), so
 /// the person's later spoken yes to it is taken as a voice make's is
 /// (`make_skill_local::app_code_asked`). With `LAMP_MADE_CODE_ON_AT_ONCE`,
-/// code granted only light, sound or the body
+/// code granted only its light, voice and sounds or its body
 /// ([`made_skill::code_goes_on_at_once`]) goes on at once instead, by its
 /// yes's own path (`make_skill_local::code_on_at_once`), and is said as on,
 /// what its code may use, or why not; nothing waits.
