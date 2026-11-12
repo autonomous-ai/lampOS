@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
 import { Keyring, Lamp, LampError, SPEAKER_EVENTS, model, schema } from 'lampos';
 import { FakeLamp } from 'lampos/testing';
-import { checked, describe, findControl, findStimulus, logIt } from './controls.js';
+import { checked, cleanScratch, cleanScratchNotes, describe, findControl, findStimulus, logIt } from './controls.js';
 import { chooseLan, hostOk, newToken, originOk, parseUrl, tokenOk } from './guard.js';
 
 const here = (path) => fileURLToPath(new URL(path, import.meta.url));
@@ -38,6 +38,14 @@ const token = newToken();
 // through this SDK connection, stimuli buttons that run `lamp-sim <verb> ... DIR`, and a log of the lamp's events.
 const lan = Boolean(options.lan);
 const stimDir = options['stim-dir'];
+// `--real`: a real lamp, paired in the keyring that `LAMP_TRY_KEYRING` names (set by try.js, read once here, never printed):
+// the same panel with no stimuli (they are lamp-sim verbs), a banner, and rows that say why they cannot run. `--camera` /
+// `--microphone` are the person's yes to those rows, as in try.js.
+const real = Boolean(options.real);
+const tryPanel = Boolean(stimDir || real);
+const mode = real ? 'real' : options.fake ? 'fake' : 'lamp-sim';
+const realKeyring = real ? new Keyring(process.env.LAMP_TRY_KEYRING) : undefined;
+delete process.env.LAMP_TRY_KEYRING;
 const lampSimBin = options['lamp-sim'] ?? 'lamp-sim';
 const glbPath = options.glb ?? here('../../../../../robots/lamp/hardware/cad/glb/lamp.glb');
 if (!existsSync(glbPath) || readFileSync(glbPath).toString('latin1', 0, 4) !== 'glTF') {
@@ -47,8 +55,9 @@ if (!existsSync(glbPath) || readFileSync(glbPath).toString('latin1', 0, 4) !== '
 const NAMES = model.joints.map((joint) => joint.name);
 const DEG_A_COUNT = 360 / 4096;
 
-const mode = options.fake ? 'fake' : 'lamp-sim';
-const { lamp, sim, fakeLamp } = options.fake ? await fakeBody() : { lamp: await Lamp.connect() };
+const { lamp, sim, fakeLamp } = options.fake ? await fakeBody() : real ? { lamp: await Lamp.connect(undefined, { keyring: realKeyring }) } : { lamp: await Lamp.connect() };
+const runFlags = real ? { camera: Boolean(options.camera), microphone: Boolean(options.microphone) } : undefined;
+const realHost = real ? realKeyring.pairing()?.host ?? '' : '';
 const pages = new Set();
 const tell = (message) => {
   const text = JSON.stringify(message);
@@ -160,16 +169,18 @@ async function press(message, page) {
     if (message.type === 'call') {
       const control = findControl(name);
       if (!control) throw refuse(`no button ${name}`);
-      // A row the page draws off (the lamp did not grant what it takes, or lamp-sim cannot do it) is refused here too, on a raw call.
-      const off = describe(mode, { grants: lamp.grants }).controls.find((c) => c.id === control.id)?.disabled;
+      // A row the page draws off (not granted, or without --camera/--microphone on a real lamp) is refused here too, on a raw call;
+      // and a row that moves the real lamp waits for this page's yes to "this moves the real lamp".
+      const off = describe(mode, { grants: lamp.grants, flags: runFlags }).controls.find((c) => c.id === control.id)?.disabled;
       if (off) throw refuse(`n/a: ${off}`);
+      if (real && control.moves && !page?.movesOk) throw refuse('this moves the real lamp: say yes to "this moves the real lamp" on the page first');
       // A picture goes to the page that pressed, as one message to it: not through `tell`, never logged, never kept.
       const show = (jpeg) => page?.send(JSON.stringify({ type: 'picture', id, jpeg: Buffer.from(jpeg).toString('base64') }));
-      const call = await control.run({ lamp, release, listenFor, show, audio: audioTo(page, id) }, checked(control.fields, args));
+      const call = await control.run({ lamp, release, listenFor, show, mode, audio: audioTo(page, id) }, checked(control.fields, args, mode));
       said(id, call, true, 'taken');
     } else {
-      const stimulus = findStimulus(name);
-      if (!stimulus) throw refuse(`no stimulus ${name}`);
+      const stimulus = real ? undefined : findStimulus(name);
+      if (!stimulus) throw refuse(real ? 'no stimuli on a real lamp: they are lamp-sim verbs' : `no stimulus ${name}`);
       const values = checked(stimulus.fields, args);
       const argv = [...stimulus.argv(values), stimDir];
       // The same stroke (a held hand, a repeated press) is one touch: nothing is forked for the repeats.
@@ -204,8 +215,8 @@ async function listenFor(phrase) {
   await lamp.on('phrase.heard', (frame) => tell({ type: 'event', event: 'phrase.heard', frame: { phrase: frame.phrase, ...(frame.confidence === undefined ? {} : { confidence: frame.confidence }) } }), { phrases: [phrase] });
   listening.add(key);
 }
-if (stimDir) {
-  listenFor('good night lamp').catch((error) => console.log(`not listening for a phrase: ${error.message}`));
+if (tryPanel) {
+  if (stimDir) listenFor('good night lamp').catch((error) => console.log(`not listening for a phrase: ${error.message}`));
   for (const event of [...schema.events.filter((e) => e !== 'body.state' && e !== 'time' && e !== 'phrase.heard'), 'lease', 'done', ...SPEAKER_EVENTS]) {
     lamp.on(event, (frame) => {
       if (!logIt(event, Date.now(), quiet)) return;
@@ -219,11 +230,16 @@ const files = {
   '/': ['text/html; charset=utf-8', () => readFileSync(here('./index.html'))],
   '/lamp.glb': ['model/gltf-binary', () => readFileSync(glbPath)],
   '/model.json': ['application/json', () => JSON.stringify(model)],
-  // `lamp` and `mode` name the checklist's key: the lamp's own id and name from hello, and what this page is driving.
-  // `grants` are hello's: each row says if it is `disabled` (describe). `camera`/`microphone` say the picture or the sound may show.
-  ...(stimDir ? { '/try.json': ['application/json', () => JSON.stringify({ ...describe(mode, { grants: lamp.grants }), camera: lamp.grants.includes('camera'), microphone: lamp.grants.includes('microphone'), lamp: { id: String(lamp.info?.id ?? 'lamp'), name: String(lamp.info?.name ?? '') }, mode })] } : {}),
-  ...(stimDir ? { '/panel.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./panel.js'))] } : {}),
-  ...(stimDir ? { '/checklist.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./checklist.js'))] } : {}),
+  // `lamp` and `mode` name the checklist's key: the lamp's own id and name from hello, and what this page is driving; `grants`
+  // are hello's; each row says if it is `disabled` (describe). `camera`/`microphone` say the picture or the sound may show.
+  ...(tryPanel ? { '/try.json': ['application/json', () => JSON.stringify({
+    ...describe(mode, { grants: lamp.grants, flags: runFlags }),
+    camera: lamp.grants.includes('camera') && (!real || Boolean(options.camera)),
+    microphone: lamp.grants.includes('microphone') && (!real || Boolean(options.microphone)),
+    lamp: { id: String(lamp.info?.id ?? 'lamp'), name: String(lamp.info?.name ?? '') }, mode, grants: [...lamp.grants], host: realHost,
+  })] } : {}),
+  ...(tryPanel ? { '/panel.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./panel.js'))] } : {}),
+  ...(tryPanel ? { '/checklist.js': ['text/javascript; charset=utf-8', () => readFileSync(here('./checklist.js'))] } : {}),
 };
 // three.js, vendored (examples/twin/vendor/three, three@0.160.0, MIT), so the page works with no internet.
 // A page's import map cannot carry the `?t=` token, so exactly these files are served without it, from this
@@ -279,6 +295,10 @@ const server = createServer((request, response) => {
     response.writeHead(403).end('the twin needs the URL it printed, with its token\n');
     return;
   }
+  if (pathname === '/camera.jpg' && real && !options.camera) {
+    response.writeHead(403, { 'x-reason': encodeURIComponent('start the run with --camera') }).end();
+    return;
+  }
   if (pathname === '/camera.jpg') {
     // On the network the room's picture is given only while a page that has the camera on says so (a token alone,
     // with no page showing the camera, gets none).
@@ -327,14 +347,43 @@ wss.on('connection', (page) => {
     } catch {
       return;
     }
-    if (message.type === 'drag') drag(message.joint, Number(message.deg));
+    // On a real lamp the sliders move the real body only after the page said yes to "this moves the real lamp", and with the grant.
+    if (message.type === 'moves_ok' && real) page.movesOk = true;
+    if (message.type === 'drag' && (!real || (page.movesOk && lamp.grants.includes('body')))) drag(message.joint, Number(message.deg));
     if (message.type === 'let_go') release();
     if (message.type === 'camera_on') cameraAskedAt = Date.now();
     if (message.type === 'hear') hearing(page, message);
-    if (stimDir && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message, page);
+    if (tryPanel && (message.type === 'call' || message.type === 'stim') && typeof message.name === 'string') press(message, page);
   });
   page.on('close', () => pages.delete(page));
 });
+// The end of a real run: this run's scratch clip and notes come off the lamp (nothing else is touched), then the connection
+// closes. try.js sends SIGTERM; a second signal ends it at once.
+if (real) {
+  let signals = 0;
+  let ending = false;
+  const bounded = (work) => Promise.race([work.catch((error) => console.error(`try: could not clean up on the lamp: ${error?.message ?? error}`)), new Promise((resolve) => setTimeout(resolve, 3000))]);
+  const end = async () => {
+    signals += 1;
+    // A repeat signal (a second Ctrl-C, a parent's SIGTERM after a terminal's SIGINT) must not cut the cleanup short: only a
+    // third one ends at once, and the cleanup itself is bounded (about 12 s).
+    if (signals >= 3) process.exit(1);
+    if (ending) return;
+    ending = true;
+    setTimeout(() => process.exit(1), 15_000).unref();
+    await bounded(release());
+    await bounded(cleanScratch(lamp));
+    await bounded(cleanScratchNotes(lamp));
+    await bounded(lamp.close());
+    process.exit(0);
+  };
+  process.on('SIGTERM', end);
+  process.on('SIGINT', end);
+  // try.js started this process in a group of its own, so a terminal's Ctrl-C reaches try.js alone; if try.js dies without a
+  // word (SIGKILL), this one cleans up and ends too, rather than keeping the lamp connected.
+  const parent = process.ppid;
+  setInterval(() => { if (process.ppid !== parent) end(); }, 2000).unref();
+}
 // Always on 127.0.0.1. With --lan also on the one address it prints (a second server that hands its requests and
 // upgrades to the first), never on every interface: a second network card or a VPN address does not get the twin.
 // No network address found: loopback only, said.
@@ -353,6 +402,8 @@ server.listen(port, '127.0.0.1', () => {
 });
 for (const signal of ['SIGINT', 'SIGTERM']) {
   process.on(signal, async () => {
+    // A real run has its own end (above): this lamp's scratch is cleaned first.
+    if (real) return;
     await release();
     await lamp.close();
     await fakeLamp?.stop();
@@ -364,7 +415,7 @@ function parse(args) {
   const out = {};
   for (let i = 0; i < args.length; i++) {
     const key = args[i].replace(/^--/, '');
-    if (key === 'fake' || key === 'lan') out[key] = true;
+    if (['fake', 'lan', 'real', 'camera', 'microphone'].includes(key)) out[key] = true;
     else out[key] = args[++i];
   }
   return out;

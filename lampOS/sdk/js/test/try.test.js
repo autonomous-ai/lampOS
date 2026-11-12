@@ -72,7 +72,7 @@ test('without --stim-dir there is no panel; with it the token is still needed', 
   const tried = await started(t, (folder, stub) => ['--stim-dir', folder, '--lamp-sim', stub]);
   assert.equal((await fetch(`http://127.0.0.1:${tried.port}/panel.js`)).status, 403);
   assert.equal((await fetch(`http://127.0.0.1:${tried.port}/panel.js?t=${tried.token}`)).status, 200);
-  assert.deepEqual(Object.keys(await (await fetch(`http://127.0.0.1:${tried.port}/try.json?t=${tried.token}`)).json()), ['controls', 'stimuli', 'camera', 'microphone', 'lamp', 'mode']);
+  assert.deepEqual(Object.keys(await (await fetch(`http://127.0.0.1:${tried.port}/try.json?t=${tried.token}`)).json()), ['controls', 'stimuli', 'camera', 'microphone', 'lamp', 'mode', 'grants', 'host']);
 });
 
 test('a stimulus runs lamp-sim with an argument array and the lamp folder last; a call is one SDK call', async (t) => {

@@ -19,7 +19,7 @@ test('panel.js parses as a module', (t) => {
 });
 
 test('panel.js still builds the panel, shows a picture and listens for the server, and ends with that listener', () => {
-  for (const part of ['function row(', 'function section(', 'function showPicture(', "id: 'panel'", "addEventListener('twin-message'"]) {
+  for (const part of ['function row(', 'function section(', 'function showPicture(', "id: 'panel'", "addEventListener('twin-message'", 'const hearing = ', "detail.type === 'audio'", "detail.type === 'hear'"]) {
     assert.ok(source.includes(part), `panel.js lost ${part}`);
   }
   assert.match(source.trimEnd(), /addEventListener\('twin-message'[\s\S]*\}\);$/, 'the twin-message listener is the last statement');
