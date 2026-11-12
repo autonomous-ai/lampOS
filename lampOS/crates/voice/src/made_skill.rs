@@ -2146,6 +2146,9 @@ pub const MANNERS_QUIET: (&str, &str) = ("22:00", "08:00");
 pub const MANNERS_GROUP: &str = "wellbeing";
 /// Ignored this many runs in a row, a made skill rests until morning.
 pub const MANNERS_RESTS_AFTER: u32 = 2;
+/// The runs an hour a made skill's [`MANNERS_GROUP`] `[budget]` gives it
+/// when it names none: one, the nudges' own.
+pub const MANNERS_PER_HOUR: u32 = 1;
 
 /// A made skill that starts itself (a `[trigger]` table, no `tool`) with the
 /// runtime's manners set where it has none of its own (#6066 (a)):
@@ -2195,7 +2198,7 @@ pub fn mannered_with(text: &str, asked: &[(u32, u32)], limits: bool) -> String {
         .unwrap_or(MANNERS_MOST_A_DAY.into())
         .clamp(1, MANNERS_MOST_A_DAY_AT_MOST.into());
     let per_hour = integer("per_hour", table.get("budget"))
-        .unwrap_or(1)
+        .unwrap_or(MANNERS_PER_HOUR.into())
         .clamp(1, MANNERS_PER_HOUR_AT_MOST.into());
     let after_ignored = integer("after_ignored", table.get("rest"))
         .unwrap_or(MANNERS_RESTS_AFTER.into())
