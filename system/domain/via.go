@@ -31,3 +31,14 @@ func AppendVia(msg, source string) string {
 	}
 	return msg + "\n" + ViaMarker(source)
 }
+
+// HasVia reports whether msg ends with the ViaMarker line for source, the form
+// AppendVia stamps. Runtimes use it to tell turns whose reply goes to a different
+// place than the speaker apart without a side channel.
+func HasVia(msg, source string) bool {
+	if msg == "" || source == "" {
+		return false
+	}
+	msg = strings.TrimRight(msg, " \t\r\n")
+	return msg == ViaMarker(source) || strings.HasSuffix(msg, "\n"+ViaMarker(source))
+}

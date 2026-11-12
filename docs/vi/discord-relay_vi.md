@@ -59,6 +59,23 @@ Tin nhắn được nhận trở thành một lượt chat bình thường trên
 Tin chờ (tối đa 2 phút) cho agent xong lượt hiện tại rồi mới gửi. Run được đánh dấu silent nên câu
 trả lời **không** được đọc thành tiếng. Tối đa 8 tin có thể đang chờ cùng lúc.
 
+Một lượt Discord không bao giờ bị gộp với tin nhắn khác. Các runtime có thể gộp tin mới vào lượt
+đang chạy (Hermes native steering, Codex `turn/steer`) trả cùng một câu trả lời cuối cho mọi tin
+được gộp, nên gộp sẽ đưa cuộc trò chuyện trong phòng vào kênh Discord, hoặc đưa câu trả lời Discord
+ra loa. Vì vậy:
+
+- Giọng nói, giọng nói ambient và chat web/điện thoại đến trong lúc một lượt Discord đang chạy sẽ
+  đợi lượt đó kết thúc, rồi chạy theo thứ tự thành lượt riêng.
+- Tin Discord đến trong lúc một lượt khác đang chạy cũng đợi như vậy, rồi chạy thành lượt riêng.
+- Hai tin Discord không bao giờ dùng chung một lượt, dù đến từ kênh nào, nên câu trả lời không bao
+  giờ sang kênh khác.
+- Tin cùng đích đến vẫn được gộp như trước: giọng nói vào lượt giọng nói được steer, không thêm
+  độ trễ.
+
+Lượt Discord lỗi hoặc bị huỷ kết thúc như mọi lượt khác: tín hiệu typing dừng và các tin đang đợi
+phía sau được chạy. Không tin nào đang đợi bị bỏ âm thầm: tin mà runtime không thể giữ đợi (Codex
+giữ tối đa 8 tin, không giữ lâu hơn thời gian tối đa của một lượt) bị từ chối và kết thúc với lỗi.
+
 Không có message xác nhận cho `discord_event`.
 
 ## Tin nhắn lên: `discord_reply`, `discord_typing`
@@ -112,7 +129,10 @@ Khi khởi động, thiết bị tự chuyển sang chế độ relay:
    chạy mỗi lần boot, không làm gì khi đã sạch):
    - OpenClaw: gỡ `channels.discord` khỏi `openclaw.json`, tắt entry plugin discord.
    - Hermes: gỡ mọi dòng `DISCORD_*` khỏi `~/.hermes/.env`, và xoá các file trạng thái Discord
-     (`gateway/discord_command_sync_state.json`, `cache/discord_capabilities.json`).
+     (`gateway/discord_command_sync_state.json`, `cache/discord_capabilities.json`), và gỡ các
+     entry Discord cũ khỏi `~/.hermes/channel_directory.json`. Mọi nền tảng khác trong file được
+     giữ nguyên; file được thay nguyên tử, giữ mode và owner, và file thiếu hoặc không đọc được thì
+     để nguyên. Bước này chạy bất kể runtime nào đang hoạt động.
    - PicoClaw: tắt `channel_list.discord` trong `config.json`, gỡ settings khỏi `.security.yml`.
    - Claude Code, Codex, OpenCode không giữ gì ngoài `config.json`.
 3. **Bản sao config của runtime** được dọn tương tự, ở bất cứ đâu cạnh file chính:

@@ -322,3 +322,27 @@ func TestAcceptRules(t *testing.T) {
 		t.Error("a server message without a mention must be refused")
 	}
 }
+
+func TestRejectReasonMatchesAccept(t *testing.T) {
+	cases := []struct {
+		in   Inbound
+		want string
+	}{
+		{Inbound{AuthorID: "x", Content: "hi"}, "not from the owner"},
+		{Inbound{AuthorID: "o", BotUserID: "o", Content: "hi"}, "from the bot itself"},
+		{Inbound{AuthorID: "o", GuildID: "other", MentionsBot: true, Content: "hi"}, "from another server"},
+		{Inbound{AuthorID: "o", GuildID: "g", Content: "hi"}, "server message without an @mention of the bot"},
+		{Inbound{AuthorID: "o", BotUserID: "b", GuildID: "g", MentionsBot: true, Content: "<@b>"}, "empty message"},
+		{Inbound{AuthorID: "o", GuildID: "g", MentionsBot: true, Content: "hi"}, ""},
+	}
+	for _, c := range cases {
+		_, ok := Accept(c.in, "o", "g")
+		got := RejectReason(c.in, "o", "g")
+		if got != c.want {
+			t.Errorf("RejectReason(%+v) = %q, want %q", c.in, got, c.want)
+		}
+		if ok != (got == "") {
+			t.Errorf("Accept and RejectReason disagree for %+v: ok=%v reason=%q", c.in, ok, got)
+		}
+	}
+}

@@ -47,7 +47,11 @@ turn active. Khi turn đã terminal, input kế tiếp đi theo đường start 
 resume bình thường. Điều này bỏ độ trễ FIFO do runtime tạo ra cho hội thoại
 đang chạy, nhưng không vượt qua chính sách an toàn OS: sensing thụ động, cổng
 an toàn speaker/TTS, giao nhận offline và input không thể ghép an toàn vào
-thread active vẫn có thể bị os-server queue.
+thread active vẫn có thể bị os-server queue. Lượt Discord (`[via:discord]`) là ngoại lệ do chính
+gateway thực thi: nó không bao giờ dùng chung một lượt, vì một câu trả lời trả lời mọi input đã
+steer. Giọng nói hoặc chat đến trong lúc lượt Discord chạy, và tin Discord đến trong lúc lượt
+khác chạy, sẽ đợi (tối đa 8 tin cùng lúc, kiểm tra mỗi 200 ms) đến khi turn active kết thúc rồi
+bắt đầu turn riêng; steering giữa các input khác không đổi.
 
 `agent_runtime` trong `config.json` chọn backend; việc phân giải nằm ở
 `system/agent/factory.go` `ProvideGateway()` — `"codex"` →
