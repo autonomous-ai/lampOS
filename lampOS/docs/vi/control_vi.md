@@ -9,6 +9,12 @@ khác nhau, bản tiếng Anh đúng. Các thông điệp nằm trong
 `lamp-control` là phần sẽ làm việc đó, tắt cho đến khi chủ đèn bật quyền truy
 cập cho nhà phát triển trong ứng dụng.
 
+Khi `LAMP_CONTROL` không bật mà `LAMP_SKILL_TASKS=on`, `lamp-control` vẫn
+chạy nhưng không có cửa: không lắng nghe TCP, không TLS, không ghép đôi. Nó
+chỉ phục vụ phía chủ đèn (`--admin-socket`: lời đồng ý của voice, việc cấp
+token của lamp-tasks) và socket cho skill run. Cả hai đều tắt thì nó báo vậy
+và thoát với mã 0.
+
 ## Bốn quyết định
 
 1. **Nhà phát triển trước.** API trực tiếp, SDK Python và JavaScript và một
