@@ -1416,6 +1416,39 @@ thêm từ tệp, viết trong ứng dụng, từ Store hay đã cài giữ nguy
    năng tự tạo, cả khi lặp lại, và `[quiet]` được giữ cho kỹ năng có nói.
    Lời thuật lại nói cooldown như trước ("at most once every 5 minutes").
 
+6. **Kỹ năng tạo trước công tắc bỏ các giới hạn cũ của đèn khi nạp**
+   (`lamp_skills::shed_made_manners`, vòng kiểm trên 9adf của chủ sở hữu,
+   12/11 15:06: một kỹ năng tự tạo "tắt đèn khi tôi rời bàn" chạy, và một
+   phút sau bốn kỹ năng tự tạo khác bị từ chối, "its wellbeing group ran
+   lately"). Kỹ năng tạo trước công tắc mang các giới hạn đèn khi đó viết
+   cho mọi lần tạo; `lamp-skills` (chương trình đang chạy, mỗi lần nạp thư
+   mục kỹ năng) bỏ qua hai giới hạn khi nạp, không bao giờ ghi lên đĩa, nên
+   các tệp, SHA-256 của gói trong `.package.json` và lời đồng ý cho task
+   theo SHA-256 của thư mục (`task::folder_sha256`) giữ như lúc cài:
+   - `[budget] group = "wellbeing"` với `per_hour = 1`
+     (`made_skill::MANNERS_GROUP`, `MANNERS_PER_HOUR`), không có `gap`,
+     `give_back_unsaid` hay `[stop]`: không còn chung giờ và khoảng cách
+     với các lời nhắc;
+   - `most_a_day = 3` (`made_skill::MANNERS_MOST_A_DAY`).
+
+   Giá trị khác (`per_hour = 2`, `most_a_day = 5`, một `gap`) được giữ, là
+   yêu cầu của người dùng. `[rest]`, `[quiet]`, `cooldown` và `rearm` của
+   trigger giữ nguyên (quyết định của người xây dựng đầu tiên, 12/11 15:15).
+   Tạo tại đây nghĩa là (`lamp_skills::made_by_ask`): kỹ năng installable
+   trong thư mục kỹ năng, không phải được đẩy lên, front matter của
+   `SKILL.md` có `made: here` (dòng của chính đèn, nằm trong gói mà SHA-256
+   ràng buộc; dòng mô hình viết bị bỏ, và kỹ năng được chia sẻ bị gỡ dòng
+   này) và không có `added: file` hay `written: app`, và `.package.json`
+   không phải của Store. Kỹ năng core, Store, add-on, được đẩy, thêm từ tệp
+   hay đặt từ thư mục giữ mọi giới hạn. Mỗi kỹ năng một dòng, một lần mỗi
+   lần chạy: `lamp-skills: light-off: made here, LAMP_MADE_SKILL_LOOSE=on:
+   the lamp's old [budget] group "wellbeing" per_hour = 1 and most_a_day =
+   3 ignored, its files as they are`. Giới hạn người dùng yêu cầu đúng bằng
+   các giá trị đó (nói "at most three times a day", tạo trước công tắc)
+   cũng bị bỏ: tệp không phân biệt được với giá trị của đèn. Tắt thì không
+   bỏ gì. Test:
+   `tests::loosened_a_made_skill_sheds_the_lamps_old_limits_as_it_loads`.
+
 Không đổi khi bật: lời đọc lại của một lần ghi và lời đồng ý nói ra cho
 SHA-256 nội dung của nó; việc gửi, tối đa 3 mỗi kỹ năng và 10 cho mọi kỹ năng
 một ngày (`lamp-services`, không đọc công tắc này); các từ chối vì riêng tư;
