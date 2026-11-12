@@ -2437,8 +2437,23 @@ fn hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once() {
         assert!(!out.contains("HERMES_YOLO_MODE"), "{cwd}: {out}");
     }
     assert!(top.join("runs/Run-2").exists());
-    // Off: no run lines; a run's folder is any folder.
-    assert!(!wrapper_text(false).contains(RUN_LINES));
+    // Off: no run lines; a run's folder is any folder, and an inherited
+    // HERMES_YOLO_MODE is dropped all the same (Heron's P3 on #6718).
+    let off = wrapper_text(false);
+    assert!(!off.contains(RUN_LINES));
+    fs::write(
+        &wrapper,
+        off.replace(TOKEN, &forwarder.to_string_lossy())
+            .replace("/usr/bin/unshare", &printer.to_string_lossy()),
+    )
+    .unwrap();
+    fs::write(&token, secret).unwrap();
+    for cwd in ["project/skill-run-1", "project/lamp"] {
+        let (ok, out, err) = run(cwd, &[("HERMES_YOLO_MODE", "1")]);
+        assert!(ok, "{cwd}: {err}");
+        assert!(!out.contains("HERMES_YOLO_MODE"), "{cwd}: {out}");
+    }
+    assert!(token.exists(), "off: no run, its file untouched");
 }
 
 /// OpenClaw shares Hermes's namespace script without the tasks edits, and
