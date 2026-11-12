@@ -1388,10 +1388,12 @@ fn serve(
                     .iter()
                     .filter(|skill| skill.task_step().is_some())
                     .filter_map(|skill| {
-                        let folder = match &skill.pushed_by {
-                            Some(_) => options.dev_dir.as_deref()?.join(&skill.name),
-                            None => dir.join(&skill.name),
-                        };
+                        let folder = lamp_skills::task::folder_of(
+                            dir,
+                            options.dev_dir.as_deref(),
+                            &skill.name,
+                            skill.pushed_by.is_some(),
+                        )?;
                         Some((skill.name.clone(), (folder, skill.grants.clone())))
                     })
                     .collect();

@@ -1817,10 +1817,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (`TASKS_EDITS`) then, only with `LAMP_NS_NET=run`:
 
      ```sh
-     … L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S=/tmp/.lampos-ns
+     … L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns
      if [ "${LAMP_NS_NET-}" = run ]; then [ -S "$B" ] && touch "$S/b" && mount --bind "$B" "$S/b" || fail "no $B"; fi
+     if [ "${LAMP_NS_NET-}" = run ] && [ -d "$P" ]; then mkdir -m 0700 "$S/p" && mount --bind "$P" "$S/p" || fail "no $P"; else P=; fi
      if [ "${LAMP_NS_NET-}" = run ]; then mkdir -p "${B%/*}" && touch "$B" && mount --move "$S/b" "$B" && ro "$B" || fail "$B not shown"; fi
-     rm -f "$S/r" "$S/l" "$S/b" && …
+     if [ -n "$P" ]; then mkdir -p "$P" && mount --move "$S/p" "$P" && ro "$P" || fail "$P not shown"; fi
+     rm -f "$S/r" "$S/l" "$S/b" && { [ -z "$P" ] || rmdir "$S/p"; } && …
      …
      if [ "${LAMP_NS_NET-}" = run ]; then
        I=; for p in /usr/sbin/ip /sbin/ip; do if [ -x "$p" ]; then I=$p; break; fi; done
@@ -1833,7 +1835,11 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      unset LAMP_NS_NET
      ```
 
-     It shows lamp-tasks' bridge socket `/run/lampos-tasks/model.sock`, the
+     It shows the skills the owner's computer pushed,
+     `/var/lib/lampOS/skills-dev`, read-only as the skills are (skipped when
+     the folder is not there), so a pushed skill's script is there for its
+     run; Hermes started any other way never sees them. It shows lamp-tasks'
+     bridge socket `/run/lampos-tasks/model.sock`, the
      file alone, read-only, as the control socket is (missing, the run
      ends: the bridge is served only with the switch on); brings `lo` up
      (no `ip`, the run ends) and checks `lo` is its only link with a way out: a link besides `lo` ends

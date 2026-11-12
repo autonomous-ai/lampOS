@@ -193,6 +193,11 @@ pub const TOKEN_ENV: &str = "LAMP_HERMES_TOKEN";
 pub const WORK: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks";
 /// The lamp's skills, which Hermes reads in place: shown read-only.
 pub const SKILLS: &str = "/var/lib/lampOS/skills";
+/// The skills the owner's own computer pushed (`lamp_skills::PUSHED_DIR`):
+/// with [`TASKS_SWITCH`] on, shown read-only to a skill's run alone
+/// ([`NET_ENV`] `run`), when it is there, so a pushed skill's task finds
+/// its script (`lamp_tasks::skill_task::PUSHED`).
+pub const PUSHED: &str = "/var/lib/lampOS/skills-dev";
 /// lamp-skills' tools folder (`tools.json` and `call.sock`), the voice's
 /// `LAMP_SKILLS_DIR`: with [`SKILLS_SWITCH`] on, the one folder under
 /// `/run` [`ns_text`] shows Hermes, read-only (a unix socket still
@@ -449,7 +454,10 @@ const SKILLS_EDITS: [(&str, &str); 6] = [
 /// nested user namespace (so it holds no capability over these mounts),
 /// waiting for its `ready` line (none, the run ends). The PID namespace
 /// ends the relay with Hermes. No other address is reachable: the
-/// namespace has only `lo`.
+/// namespace has only `lo`. And it shows [`PUSHED`] read-only, staged and
+/// moved back as the skills are (skipped when the folder is not there),
+/// so a pushed skill's script is there for its run; Hermes started any
+/// other way (Harness's panes) never sees it.
 const TASKS_EDITS: [(&str, &str); 6] = [
     (
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n",
@@ -457,25 +465,31 @@ const TASKS_EDITS: [(&str, &str); 6] = [
          # LAMP_SKILL_TASKS=on (#6306): it also shows lamp-control's socket /run/lampos-control/control.sock alone, read-only,\n\
          # so a skill's run reaches the lamp with its one-run token; nothing else of lamp-control's folder is shown.\n\
          # With LAMP_NS_NET=run (a skill's run, its own network namespace) it shows lamp-tasks' model.sock alone, read-only,\n\
-         # brings lo up and starts lamp-tasks net-relay on 127.0.0.1:7741 to it: the run's only other way out.\n",
+         # brings lo up and starts lamp-tasks net-relay on 127.0.0.1:7741 to it: the run's only other way out.\n\
+         # It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n",
     ),
     (
         " S=/tmp/.lampos-ns\n",
-        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock S=/tmp/.lampos-ns\n",
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n",
     ),
     (
         "if [ -n \"$R\" ]; then touch \"$S/r\" && mount --bind \"$R\" \"$S/r\" || fail \"no $R\"; fi\n",
         "if [ -n \"$R\" ]; then touch \"$S/r\" && mount --bind \"$R\" \"$S/r\" || fail \"no $R\"; fi\n\
          if [ -S \"$L\" ]; then touch \"$S/l\" && mount --bind \"$L\" \"$S/l\" || fail \"no $L\"; else L=; fi\n\
-         if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n",
+         if [ \"${LAMP_NS_NET-}\" = run ]; then [ -S \"$B\" ] && touch \"$S/b\" && mount --bind \"$B\" \"$S/b\" || fail \"no $B\"; fi\n\
+         if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]; then mkdir -m 0700 \"$S/p\" && mount --bind \"$P\" \"$S/p\" || fail \"no $P\"; else P=; fi\n",
     ),
     (
         "&& mount --move \"$S/r\" \"$R\" && ro \"$R\" || fail \"$R not shown\"; fi\n",
         "&& mount --move \"$S/r\" \"$R\" && ro \"$R\" || fail \"$R not shown\"; fi\n\
          if [ -n \"$L\" ]; then mkdir -p \"${L%/*}\" && touch \"$L\" && mount --move \"$S/l\" \"$L\" && ro \"$L\" || fail \"$L not shown\"; fi\n\
-         if [ \"${LAMP_NS_NET-}\" = run ]; then mkdir -p \"${B%/*}\" && touch \"$B\" && mount --move \"$S/b\" \"$B\" && ro \"$B\" || fail \"$B not shown\"; fi\n",
+         if [ \"${LAMP_NS_NET-}\" = run ]; then mkdir -p \"${B%/*}\" && touch \"$B\" && mount --move \"$S/b\" \"$B\" && ro \"$B\" || fail \"$B not shown\"; fi\n\
+         if [ -n \"$P\" ]; then mkdir -p \"$P\" && mount --move \"$S/p\" \"$P\" && ro \"$P\" || fail \"$P not shown\"; fi\n",
     ),
-    ("rm -f \"$S/r\" &&", "rm -f \"$S/r\" \"$S/l\" \"$S/b\" &&"),
+    (
+        "rm -f \"$S/r\" &&",
+        "rm -f \"$S/r\" \"$S/l\" \"$S/b\" && { [ -z \"$P\" ] || rmdir \"$S/p\"; } &&",
+    ),
     (
         "unset LAMP_NS_UID LAMP_NS_GID\nexport HOME\n",
         "unset LAMP_NS_UID LAMP_NS_GID\nexport HOME\n\
