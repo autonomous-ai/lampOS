@@ -1048,7 +1048,10 @@
           "$ref": "#/$defs/duration"
         },
         "unknown": {
-          "const": "holds"
+          "enum": [
+            "holds",
+            "holds_stale"
+          ]
         },
         "through": {
           "type": "array"
