@@ -2020,16 +2020,18 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      if [ -n "${LAMP_NS_HOME-}" ]; then
        F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk
        [ -d "$LAMP_NS_HOME" ] && [ -n "$W" ] && [ "${F%/*}" = "$W/lamp" ] || fail "no $LAMP_NS_HOME"
-       mkdir -m 0700 "$X" "$X/f" "$X/c" || fail "no make staging"
+       mkdir -m 0700 "$X" "$X/f" "$X/c" "$X/t" || fail "no make staging"
        mount --bind "$F" "$X/f" || fail "no $F"
        mount --bind "$H/.hermes/hermes-agent" "$X/c" || fail "no Hermes checkout"
+       mount --bind "$H/.hermes/tools" "$X/t" || fail "no Hermes tools"
        mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$H/.hermes" || fail "$H/.hermes not hidden"
        mkdir "$H/.hermes/hermes-agent" && mount --move "$X/c" "$H/.hermes/hermes-agent" && ro "$H/.hermes/hermes-agent" || fail "Hermes checkout not shown"
+       mkdir "$H/.hermes/tools" && mount --move "$X/t" "$H/.hermes/tools" && ro "$H/.hermes/tools" || fail "Hermes tools not shown"
        ro "$H/.hermes"; ro "$H"; ro "$W"
        mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$W/lamp" || fail "$W/lamp not hidden"
        mkdir "$F" && mount --move "$X/f" "$F" || fail "$F not shown"
        ro "$W/lamp"
-       rmdir "$X/f" "$X/c" "$X" || fail "make staging left"
+       rmdir "$X/f" "$X/c" "$X/t" "$X" || fail "make staging left"
        cd "$F" || fail "$F not visible"
        HOME=$LAMP_NS_HOME
      fi
