@@ -4029,9 +4029,13 @@ lamp-control's `the_yes_covers_a_skills_service_grants`, the voice's
 
 A proposal on #6059 (the owner's OK, 11 Nov), with the first builder's
 yes (Queue #6059, 11 Nov 22:44 +07). With the switch, a voice make the
-lamp's own model didn't make goes to the lamp's own agent, OpenClaw or
+lamp's own model didn't make goes to the lamp's own agent when it is
 Hermes, as V1's skill-creator handed a make to its agent
-(`crate::make_skill_agent`). Only the writer changes; the tidies,
+(`crate::make_skill_agent`). Hermes only (the first builder's ruling,
+12 Nov 19:14): only Hermes has a namespace runner for a make today, so on
+a lamp whose `lamp` target is another engine (OpenClaw) nothing is handed
+over, the journal names that engine, and DeepSeek makes it alone with its
+repairs, as with no agent. Only the writer changes; the tidies,
 `lamp-skills pack`, the say-back, the repairs' briefs and the keeping are
 the same code for both writers.
 
@@ -4093,6 +4097,15 @@ the same code for both writers.
   the kernel's `@NONE` tunnels, and the model only through `model.sock`.
   Held, a Hermes wrapper without the network lines is refused
   (`not_held_off`).
+- **A fresh home, and the wrapper's mark either way.** Each make's run
+  gets a new, empty home of its own (`make-<run id>/home`, 0700) as `HOME`
+  and `HERMES_HOME`, holding only the provider config (its key named by
+  `LAMP_HERMES_TOKEN`, never a key), never Hermes's memory, sessions or
+  state, with Hermes's lasting folder read-only; it is removed with the
+  make however it ends. Held or not, lamp-tasks checks first that
+  Hermes's wrapper and namespace script carry the make-home lines; a lamp
+  whose lamp-update round hasn't rewritten them is refused (`no_namespace`)
+  and the make stays DeepSeek's.
 - **Its answer.** The run starts in a make's
   folder of its own (`make-<run id>` in the lamp's work folder, 0700, the
   rules in `rules.md`, 0600) and writes its answer to `answer.md` there.

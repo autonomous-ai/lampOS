@@ -1476,9 +1476,13 @@ grant" như trước.
 
 Đề xuất trên #6059 (chủ sở hữu đồng ý, 11/11), first builder đã đồng ý
 (Queue #6059, 11/11 22:44 +07). Khi bật công tắc, một lần tạo bằng giọng
-nói mà mô hình của đèn không tạo được sẽ được giao cho agent riêng của đèn,
-OpenClaw hoặc Hermes, như skill-creator của V1 từng giao cho agent của nó
-(`crate::make_skill_agent`). Chỉ người viết thay đổi; phần dọn,
+nói mà mô hình của đèn không tạo được sẽ được giao cho agent riêng của đèn
+khi đó là Hermes, như skill-creator của V1 từng giao cho agent của nó
+(`crate::make_skill_agent`). Chỉ Hermes (quyết định của first builder,
+12/11 19:14): hiện chỉ Hermes có trình chạy namespace cho một lần tạo, nên
+trên đèn mà target `lamp` là engine khác (OpenClaw) thì không giao gì,
+nhật ký ghi tên engine đó, và DeepSeek tự tạo với các lần sửa của nó, như
+khi không có agent. Chỉ người viết thay đổi; phần dọn,
 `lamp-skills pack`, phần nói lại, brief sửa và việc giữ là cùng một mã cho
 cả hai người viết.
 
@@ -1539,6 +1543,15 @@ cả hai người viết.
   `LAMP_NS_NET=run`: chỉ `lo` và các tunnel `@NONE` của kernel, và mô hình
   chỉ qua `model.sock`. Khi `held`, wrapper của Hermes không có các dòng
   mạng bị từ chối (`not_held_off`).
+- **Một home mới, và dấu của wrapper trong cả hai chế độ.** Lần chạy của
+  mỗi lần tạo có một home mới, trống, của riêng nó (`make-<run id>/home`,
+  0700) làm `HOME` và `HERMES_HOME`, chỉ chứa cấu hình nhà cung cấp (khóa
+  được gọi bằng `LAMP_HERMES_TOKEN`, không bao giờ là một khóa), không bao
+  giờ có bộ nhớ, phiên hay trạng thái của Hermes, còn thư mục lâu dài của
+  Hermes chỉ đọc; nó bị xóa cùng lần tạo dù kết thúc thế nào. Cách ly hay
+  không, lamp-tasks kiểm tra trước rằng wrapper và script namespace của
+  Hermes có các dòng make-home; đèn mà vòng lamp-update chưa viết lại
+  chúng thì bị từ chối (`no_namespace`) và lần tạo vẫn là của DeepSeek.
 - **Câu trả lời của nó.** Lần chạy bắt đầu
   trong một thư mục tạo riêng (`make-<run id>` trong thư mục làm việc của
   đèn, 0700, luật trong `rules.md`, 0600) và ghi câu trả lời vào

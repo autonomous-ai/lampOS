@@ -3,8 +3,10 @@
 //! yes, 11 Nov): with `LAMP_MAKE_SKILL_AGENT=on` ([`ENVIRONMENT`], off
 //! unless set; on in the product's lamp-voice).
 //!
-//! The order: DeepSeek writes first ([`crate::make_skill_local`]). With an
-//! agent on the lamp (the tasks part's `lamp` target) it gets one try and
+//! The order: DeepSeek writes first ([`crate::make_skill_local`]). With
+//! Hermes as the lamp's agent (the tasks part's `lamp` target; only Hermes
+//! has a namespace runner for a make today, so another engine, OpenClaw,
+//! is never handed one and DeepSeek makes it alone) it gets one try and
 //! no repairs: an answer not kept (the tidies, the check, the say-back, its
 //! own `cannot:`, or no answer) goes at once, with the same system prompt
 //! and request, to the agent, which writes the blocks again and gets the
@@ -24,7 +26,8 @@
 //! make's folder of its own, which lamp-tasks reads back. Never through a
 //! Harness task with the agent's own tools: when lamp-tasks can't give that
 //! run (an older build with no make socket, the switch off, a wrapper that
-//! can't hold it off when held), the make is not handed over and DeepSeek's
+//! can't hold it off when held, or a wrapper or namespace script with no
+//! make-home line, `no_namespace`), the make is not handed over and DeepSeek's
 //! failure stands ([`NotWritten::NoMakeRun`]).
 use crate::agent_tasks;
 use serde_json::{Value, json};
@@ -60,7 +63,12 @@ const SEND_WITHIN: Duration = Duration::from_secs(5);
 /// The most of an answer taken, as the lamp's own model's.
 const MOST_ANSWER_BYTES: usize = 20 * 1024;
 /// lamp-tasks' refusals that mean no make run can be had here.
-const NOT_HELD_OFF_CODES: [&str; 2] = ["off", "not_held_off"];
+/// `no_namespace`: the wrapper or the namespace script has no make-home
+/// line yet (an older lamp-update round).
+const NOT_HELD_OFF_CODES: [&str; 3] = ["off", "not_held_off", "no_namespace"];
+/// The one engine a make is handed to: only Hermes has a namespace runner
+/// for a make today (lamp-tasks' `MakeHermes`, #6643's 19:14 ruling).
+pub const MAKE_ENGINE: &str = "Hermes";
 
 /// Whether the switch is on.
 pub fn on() -> bool {
@@ -145,6 +153,21 @@ impl Agent {
             Duration::from_millis(1_500),
         )?;
         agent_tasks::lamp_target_in(&answer)
+    }
+
+    /// The lamp's agent when it is Hermes, the one engine a make is handed
+    /// to ([`MAKE_ENGINE`]); any other (OpenClaw has no namespace runner for
+    /// a make) is journaled with its name and not handed over, so
+    /// DeepSeek's answer stands.
+    pub fn hermes(&self) -> Option<&'static str> {
+        let engine = self.engine()?;
+        if engine == MAKE_ENGINE {
+            return Some(engine);
+        }
+        eprintln!(
+            "lamp-voice: a skill made here: the lamp's agent is {engine}: only Hermes has a namespace runner for a make today: not handed over, DeepSeek makes it alone"
+        );
+        None
     }
 
     /// Say [`WAITING_LINE`] on a thread of its own; nothing waits on it.
@@ -241,7 +264,8 @@ pub(crate) mod tests {
 
     /// A stub tasks part in a folder of its own: its `lamp` target runs
     /// `engine` (none for no target; "old" for a build with no make
-    /// socket; "not_held_off" for one whose run can't be held off), and
+    /// socket; "not_held_off" for one whose run can't be held off;
+    /// "no_namespace" for one whose wrapper has no make-home line), and
     /// its make run answers each make's rules with `answer(rules)`, or
     /// never with `None`. The lines it was sent are kept.
     pub(crate) struct StubTasks {
@@ -318,15 +342,15 @@ pub(crate) mod tests {
                         "targets" => match engine {
                             Some(engine) => {
                                 let engine = match engine {
-                                    "old" | "not_held_off" => "hermes",
+                                    "old" | "not_held_off" | "no_namespace" => "hermes",
                                     engine => engine,
                                 };
                                 json!({"ok":true,"targets":[{"alias":"lamp","engine":engine}]})
                             }
                             None => json!({"ok":true,"targets":[]}),
                         },
-                        "skill_make" if engine == Some("not_held_off") => {
-                            json!({"ok":false,"error":"not_held_off","message":"no"})
+                        "skill_make" if matches!(engine, Some("not_held_off" | "no_namespace")) => {
+                            json!({"ok":false,"error":engine.unwrap(),"message":"no"})
                         }
                         "skill_make" => {
                             let _ = writeln!(stream, "{}", json!({"ok":true,"started":true}));
@@ -380,7 +404,7 @@ pub(crate) mod tests {
     /// held off, is [`NotWritten::NoMakeRun`]; nothing is prepared.
     #[test]
     fn no_make_run_is_never_handed_over() {
-        for engine in ["old", "not_held_off"] {
+        for engine in ["old", "not_held_off", "no_namespace"] {
             let tasks = stub(Some(engine), Arc::new(|_: &str| Some("x".into())));
             assert_eq!(tasks.agent().engine(), Some("Hermes"));
             assert_eq!(
@@ -403,6 +427,13 @@ pub(crate) mod tests {
     fn no_lamp_target_is_no_agent_and_an_agent_that_never_answers_times_out() {
         let none = stub(None, Arc::new(|_: &str| None));
         assert_eq!(none.agent().engine(), None);
+        assert_eq!(none.agent().hermes(), None);
+        // OpenClaw is the lamp's agent, but a make is Hermes's alone.
+        let openclaw = stub(Some("openclaw"), Arc::new(|_: &str| Some("A".into())));
+        assert_eq!(openclaw.agent().engine(), Some("OpenClaw"));
+        assert_eq!(openclaw.agent().hermes(), None);
+        let hermes = stub(Some("hermes"), Arc::new(|_: &str| Some("A".into())));
+        assert_eq!(hermes.agent().hermes(), Some("Hermes"));
         let silent = stub(Some("openclaw"), Arc::new(|_: &str| None));
         let began = Instant::now();
         assert_eq!(
