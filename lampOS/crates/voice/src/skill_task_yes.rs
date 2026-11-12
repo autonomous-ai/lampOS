@@ -243,6 +243,16 @@ pub fn yes_not_here(spoken: &str) -> String {
     )
 }
 
+/// What the model is told of a task skill read back to a line not the
+/// owner's (`Asking::owner_hears` false): its name only.
+pub fn unsaid(spoken: &str) -> String {
+    format!(
+        "Say only this, in the conversation's language: \"{spoken} hands a task to the lamp's \
+         agent; only its owner can hear what it uses.\" Never what the task is or what it uses. \
+         Ask nothing, call nothing."
+    )
+}
+
 /// What the model is told when the skill's task can't be read now.
 pub fn unread(spoken: &str) -> String {
     format!(
@@ -258,7 +268,9 @@ pub fn unread(spoken: &str) -> String {
 /// is looked for among the skills pushed from a computer, in `pushed`
 /// ([`pushed_named`]: "skill two" is `skill-2`), and that one asked for
 /// (lamp-52e6, 12 Nov, row-6413b3: "desk check" found nothing); a miss
-/// journals the name asked ([`missed`]), only that. Agreed already, it is said with
+/// journals the name asked ([`missed`]), only that. To a line not the
+/// owner's (`owner_hears` false) its name only ([`unsaid`]), and no wait
+/// starts. Agreed already, it is said with
 /// [`approved_line`] and nothing is asked. Otherwise it is said back
 /// ([`line`]) and its yes awaited through the write yes's own wait
 /// ([`skill_write_yes::wait_for_yes`]), with every guard of it; on a route
@@ -300,6 +312,19 @@ pub fn read_back(
         }
     };
     let spoken = crate::made_skill::spoken_name(&task.name);
+    // What it uses is the owner's to hear, as a made skill's sends are
+    // (SubDarren's P3 on #6619): to anyone else its name only, and no
+    // wait starts.
+    if !asking.owner_hears {
+        eprintln!(
+            "lamp-voice: request {request}: a skill's task read back by name only: the owner wasn't seen asking"
+        );
+        return Some(json!({
+            "skill": task.name,
+            "task": true,
+            "next": unsaid(&spoken),
+        }));
+    }
     if task.approved {
         eprintln!("lamp-voice: request {request}: a skill's task read back: agreed already");
         return Some(json!({
@@ -719,8 +744,9 @@ mod tests {
         assert_eq!(told["task_waits_for_yes"], true);
     }
 
-    /// Unheard, or on a route with no echo judge, nothing waits; a name with
-    /// no task falls through to the made skills' read-back.
+    /// Unheard, on a route with no echo judge, or not the owner's line,
+    /// nothing waits; a name with no task falls through to the made
+    /// skills' read-back.
     #[test]
     fn unheard_or_live_or_no_task_starts_no_wait() {
         let now = Instant::now();
@@ -745,6 +771,19 @@ mod tests {
                 .contains("can't take that yes")
         );
         assert!(read_back("evening dim", asking(12), nowhere(), |_| Ok(None), now).is_none());
+        // Not the owner's line: its name only, and no wait.
+        let mut visitor = asking(14);
+        visitor.owner_hears = false;
+        let told = read_back(
+            "photo booth",
+            visitor,
+            nowhere(),
+            |_| Ok(Some(booth(false))),
+            now,
+        )
+        .unwrap();
+        assert_eq!(told["next"], unsaid("photo booth"), "{told}");
+        assert!(told.get(skill_write_yes::APPROVE_ID).is_none(), "{told}");
         let told = read_back(
             "photo booth",
             asking(13),

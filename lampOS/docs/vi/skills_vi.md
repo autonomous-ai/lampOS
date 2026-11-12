@@ -1865,17 +1865,32 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   `read_back`) chạy **trong code từ lời nghe được**, không để model chọn
   (V2 trên #6413: trên lamp-52e6 ở 12337, "what does desk check use?" bị
   gọi `use_skill`, chạy luôn kỹ năng, còn "Hey Lamp, what does desk check
-  use?" không gọi gì). Câu nói có "what" hoặc "which", rồi tên một kỹ năng
-  tự tạo đang bật hoặc một kỹ năng đẩy lên (khớp lỏng như dưới đây), rồi
-  một trong use, need, access, reach, touch, do, send (cả dạng -s,
-  "using") (`make_skill_local::read_back_asked`) thì kỹ năng đó được đọc
-  lại trước vòng 1, qua bộ chạy của lượt; vòng 1 được cho kết quả và nói
-  theo `next` (`read_back_note`). Lệnh `use_skill` hay `make_skill`
-  `read_back` cho cùng kỹ năng mà model gọi trong lượt đó không chạy; nó
-  nhận kết quả đọc lại (`same_skill_again`). "Use desk check", "run desk
-  check" và "what time is it" không đọc lại gì. Thư mục kỹ năng chỉ được
+  use?" không gọi gì). Câu nói có, trong cùng một vế (ngắt ở `,` `;` `.`
+  `?` `!`, "and" và "then"): "what" hoặc "which", nhiều nhất một từ
+  ("which files"), rồi "does", "do", "can" hoặc "will" (bắt buộc nếu có
+  từ đó), rồi "the", "my", "your", "this" hoặc "that" nếu có, rồi tên một
+  kỹ năng tự tạo đang bật hoặc một kỹ năng đẩy lên (khớp lỏng như dưới
+  đây), rồi "skill" nếu có, và ngay từ kế tiếp là một trong use, need,
+  access, reach, touch, send (cả dạng -s, "using"), hoặc "do" sau "does",
+  "can" hay "will" (`make_skill_local::read_back_asked`) thì kỹ năng đó
+  được đọc lại trước vòng 1, qua bộ chạy của lượt; vòng 1 được cho kết
+  quả và nói theo `next` (`read_back_note`). Vậy "what does desk check
+  use" và "what does the news skill need" được đọc lại, còn "what time
+  does the news start, do you know?", "what music does she like" và
+  "which mail do I need to answer" không đọc lại kỹ năng `news`, `music`
+  hay `mail` nào (HOLD của SubDarren và Reviewer-lead trên #6619). Lệnh
+  `use_skill` hay `make_skill` `read_back` cho cùng kỹ năng mà model gọi
+  trong lượt đó không chạy; nó nhận kết quả đọc lại (`same_skill_again`).
+  Câu vừa hỏi vừa chạy kỹ năng đó ("run", "start", "use" hoặc "turn on"
+  trước tên nó hoặc trước "it", "that", "this", "them": "what does desk
+  check use, and run it", "what does desk check need? ok run it") không
+  đọc lại gì, nên `use_skill` của model chạy nó như được nhờ. "Use desk
+  check", "run desk check" và "what time is it" cũng không đọc lại gì. Hai
+  tên khớp như nhau (`desk-check` và `deskcheck`) thì không đọc lại tên
+  nào và câu để cho model: không hỏi "cái nào?". Thư mục kỹ năng chỉ được
   đọc cho câu có từ hỏi và từ hỏi-dùng. Test:
   `the_heard_words_ask_what_a_skill_uses_by_its_name`,
+  `ordinary_questions_and_mixed_lines_ask_no_read_back`,
   `second_provider::tests::read_back_words`. Tuyến Live không đổi: ở đó
   model vẫn tự gọi `make_skill` với `read_back`. Tên mà helper không biết
   thì được tìm trong các kỹ năng đẩy
@@ -1890,6 +1905,12 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   desk-check"; với kỹ năng tự tạo cũng vậy). Test:
   `a_pushed_skill_with_a_task_is_found_by_its_spoken_name`,
   `two_pushed_alike_find_neither_and_a_miss_journals_the_name_asked`.
+  Tác vụ dùng gì là điều chỉ chủ đèn được nghe, như việc gửi của kỹ năng
+  tự tạo: với câu không phải của chủ đèn (`owner_hears` false, như trên)
+  đèn chỉ nói "Photo booth hands a task to the lamp's agent; only its
+  owner can hear what it uses." và không bắt đầu chờ
+  (`skill_task_yes::unsaid`; P3 của SubDarren trên #6619). Test:
+  `unheard_or_live_or_no_task_starts_no_wait`.
   Cái "có" được nhận như cái "có" cho việc ghi của kỹ năng tự tạo
   (`skill_write_yes`). Giọng nói đọc lại kỹ năng qua manage helper, và chỉ
   khi thư mục vẫn đúng SHA-256 và các grant đã nói lại thì mới nhờ

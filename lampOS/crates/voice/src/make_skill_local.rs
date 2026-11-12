@@ -1253,18 +1253,39 @@ pub fn read_back(
     }
 }
 
-/// The words before a skill's name that make a line a question about it
-/// ([`read_back_asked`]).
+/// The words that start a question about a skill ([`read_back_asked`]).
 const READ_BACK_QUESTIONS: [&str; 2] = ["what", "which"];
 
-/// The words after a skill's name that ask what it reaches
-/// ([`read_back_asked`]): "what does desk check use?", "what can it reach",
-/// "what does it do with my mail". Never "say": what a skill says is not
-/// what it reaches.
-const READ_BACK_ASKS: [&str; 15] = [
+/// The words that may come between the question word and a skill's name
+/// ([`read_back_asked`]): "what does desk check use", "what can it reach".
+const READ_BACK_AUX: [&str; 4] = ["does", "do", "can", "will"];
+
+/// The words that may come right before a skill's name
+/// ([`read_back_asked`]): "what does my desk check skill need".
+const READ_BACK_DETERMINERS: [&str; 5] = ["the", "my", "your", "this", "that"];
+
+/// The words right after a skill's name (or after "skill") that ask what
+/// it reaches ([`read_back_asked`]): "what does desk check use?", "what
+/// can desk check reach". Never "say": what a skill says is not what it
+/// reaches. Never "do" or "does" either, which most questions carry; "do"
+/// counts only right after the name, with "does", "can" or "will" before
+/// it ("what does desk check do with my mail", [`READ_BACK_DO`]).
+const READ_BACK_ASKS: [&str; 13] = [
     "use", "uses", "using", "need", "needs", "access", "accesses", "reach", "reaches", "touch",
-    "touches", "do", "does", "send", "sends",
+    "touches", "send", "sends",
 ];
+
+/// The ask word only right after a skill's name, with an auxiliary before
+/// it ([`READ_BACK_ASKS`]).
+const READ_BACK_DO: &str = "do";
+
+/// The words that run a skill ([`read_back_asked`]): a line that also runs
+/// the skill asked about runs it, never read back in its place.
+const READ_BACK_RUNS: [&str; 4] = ["run", "start", "use", "turn"];
+
+/// The words a run verb may aim at the skill asked about by
+/// ([`read_back_asked`]): "what does desk check use, and run it".
+const READ_BACK_IT: [&str; 4] = ["it", "that", "this", "them"];
 
 /// The most words a skill's name is said in ([`read_back_asked`]).
 const READ_BACK_NAME_WORDS: usize = 6;
@@ -1279,51 +1300,153 @@ fn heard_words(heard: &str) -> Vec<String> {
         .collect()
 }
 
+/// A heard line's clauses, each its words ([`heard_words`]): broken at
+/// `,` `;` `.` `?` `!` and at "and" and "then", so an ask word in one
+/// clause is never another's ("what time is it? then run desk check, I
+/// need it").
+fn heard_clauses(heard: &str) -> Vec<Vec<String>> {
+    let mut clauses = Vec::new();
+    for part in heard.split([',', ';', '.', '?', '!']) {
+        let mut clause = Vec::new();
+        for word in heard_words(part) {
+            if word == "and" || word == "then" {
+                clauses.push(std::mem::take(&mut clause));
+            } else {
+                clause.push(word);
+            }
+        }
+        clauses.push(clause);
+    }
+    clauses.retain(|clause| !clause.is_empty());
+    clauses
+}
+
 /// The skill among `names` (kept made skills and pushed ones, as written:
 /// `desk-check`) that a heard line asks what it uses, needs, does,
 /// reaches or sends (V2 on #6413, lamp-52e6 at 12337: "what does desk
 /// check use?" was answered by running the skill, "Hey Lamp, what does
-/// desk check use?" by nothing): "what" or "which", then the name, then
-/// one of [`READ_BACK_ASKS`]. The name is matched loosely, number words as
-/// digits and the dashes left out ([`made_skill::name_digits`]: "desk
-/// check", "deskcheck", "skill two"). The longest name said wins; two
-/// different names said as long, none. "Use desk check", "run desk check"
-/// and "what time is it" ask none. The name as written.
+/// desk check use?" by nothing). Within one clause ([`heard_clauses`]):
+/// "what" or "which", at most one word ("which files"), then "does",
+/// "do", "can" or "will" (needed after that one word), then "the", "my",
+/// "your", "this" or "that" if said, then the name, then "skill" if said,
+/// and then, as the very next word, one of [`READ_BACK_ASKS`], or "do"
+/// after "does", "can" or "will" (SubDarren's and the Reviewer-lead's
+/// HOLDs on #6619: "what music does she like" asks nothing of a `music`
+/// skill). The name is matched loosely, number words as digits and the
+/// dashes left out ([`made_skill::name_digits`]: "desk check",
+/// "deskcheck", "skill two"). The longest name said wins; two different
+/// names said as long, none, and the model is left the line (it never
+/// picks one; no "which one?" is asked). A line that also runs the skill
+/// asked about ([`READ_BACK_RUNS`] before its name, or before "it",
+/// "that", "this" or "them", in any clause but the ask word itself: "what
+/// does desk check use, and run it") asks none, so the run asked for
+/// happens. "Use desk check", "run desk check" and "what time is it" ask
+/// none. The name as written.
 pub fn read_back_asked(heard: &str, names: &[String]) -> Option<String> {
-    let words = heard_words(heard);
-    let question = words
-        .iter()
-        .position(|word| READ_BACK_QUESTIONS.contains(&word.as_str()))?;
     let loose = |name: &str| made_skill::name_digits(name).replace('-', "");
+    let wanted: Vec<(String, &String)> = names
+        .iter()
+        .map(|name| (loose(name), name))
+        .filter(|(wanted, _)| !wanted.is_empty())
+        .collect();
+    let clauses = heard_clauses(heard);
+    // The name said at `words[start..]`, with its length.
+    let named_at = |words: &[String], start: usize| -> Vec<(usize, &String)> {
+        let mut found = Vec::new();
+        for length in 1..=READ_BACK_NAME_WORDS.min(words.len().saturating_sub(start)) {
+            let said = loose(&words[start..start + length].join("-"));
+            for (wanted, name) in &wanted {
+                if *wanted == said {
+                    found.push((length, *name));
+                }
+            }
+        }
+        found
+    };
     let mut best: Option<(usize, &String)> = None;
     let mut tied = false;
-    for name in names {
-        let wanted = loose(name);
-        if wanted.is_empty() {
-            continue;
-        }
-        for start in question + 1..words.len() {
-            for length in 1..=READ_BACK_NAME_WORDS.min(words.len() - start) {
-                let end = start + length;
-                if loose(&words[start..end].join("-")) != wanted
-                    || !words[end..]
-                        .iter()
-                        .any(|word| READ_BACK_ASKS.contains(&word.as_str()))
-                {
-                    continue;
+    // Each ask word matched, by clause and word, so a run check skips it.
+    let mut ask_at: Vec<(usize, usize)> = Vec::new();
+    for (index, words) in clauses.iter().enumerate() {
+        let word = |at: usize| words.get(at).map(String::as_str);
+        for question in 0..words.len() {
+            if !READ_BACK_QUESTIONS.contains(&words[question].as_str()) {
+                continue;
+            }
+            // Where the name may start: after the auxiliary (needed after
+            // one word between), and after a determiner.
+            let mut starts: Vec<(usize, bool)> = Vec::new();
+            let after = question + 1;
+            if word(after).is_some_and(|aux| READ_BACK_AUX.contains(&aux)) {
+                starts.push((after + 1, word(after) != Some("do")));
+            } else {
+                starts.push((after, false));
+                if word(after + 1).is_some_and(|aux| READ_BACK_AUX.contains(&aux)) {
+                    starts.push((after + 2, word(after + 1) != Some("do")));
                 }
-                match best {
-                    Some((longest, _)) if longest > length => {}
-                    Some((longest, kept)) if longest == length => tied |= kept != name,
-                    _ => {
-                        best = Some((length, name));
-                        tied = false;
+            }
+            for (start, may_do) in starts {
+                let mut at = vec![start];
+                if word(start).is_some_and(|det| READ_BACK_DETERMINERS.contains(&det)) {
+                    at.push(start + 1);
+                }
+                for start in at {
+                    for (length, name) in named_at(words, start) {
+                        let mut next = start + length;
+                        if word(next) == Some("skill") {
+                            next += 1;
+                        }
+                        let asks = word(next).is_some_and(|ask| {
+                            READ_BACK_ASKS.contains(&ask) || (may_do && ask == READ_BACK_DO)
+                        });
+                        if !asks {
+                            continue;
+                        }
+                        ask_at.push((index, next));
+                        match best {
+                            Some((longest, _)) if longest > length => {}
+                            Some((longest, kept)) if longest == length => tied |= kept != name,
+                            _ => {
+                                best = Some((length, name));
+                                tied = false;
+                            }
+                        }
                     }
                 }
             }
         }
     }
-    best.filter(|_| !tied).map(|(_, name)| name.clone())
+    let (_, name) = best.filter(|_| !tied)?;
+    let asked = loose(name);
+    let runs_it = clauses.iter().enumerate().any(|(index, words)| {
+        (0..words.len()).any(|at| {
+            if !READ_BACK_RUNS.contains(&words[at].as_str()) || ask_at.contains(&(index, at)) {
+                return false;
+            }
+            let mut target = at + 1;
+            if words[at] == "turn" {
+                if words.get(target).map(String::as_str) != Some("on") {
+                    return false;
+                }
+                target += 1;
+            }
+            if words
+                .get(target)
+                .is_some_and(|it| READ_BACK_IT.contains(&it.as_str()))
+            {
+                return true;
+            }
+            if words
+                .get(target)
+                .is_some_and(|det| READ_BACK_DETERMINERS.contains(&det.as_str()))
+            {
+                target += 1;
+            }
+            (1..=READ_BACK_NAME_WORDS.min(words.len().saturating_sub(target)))
+                .any(|length| loose(&words[target..target + length].join("-")) == asked)
+        })
+    });
+    (!runs_it).then(|| name.clone())
 }
 
 /// The skill a heard line asks what it uses ([`read_back_asked`]), among
@@ -1343,7 +1466,7 @@ pub fn read_back_heard(heard: &str) -> Option<String> {
         .any(|word| READ_BACK_QUESTIONS.contains(&word.as_str()))
         && words
             .iter()
-            .any(|word| READ_BACK_ASKS.contains(&word.as_str()));
+            .any(|word| READ_BACK_ASKS.contains(&word.as_str()) || word == READ_BACK_DO);
     if !shaped {
         return None;
     }
@@ -2082,9 +2205,54 @@ pub(crate) mod tests {
             ("what do you think of desk check", None),
             ("run desk check and tell me what it uses", None),
             ("what does the weather skill use", None),
+            ("what does desk check use, and run it", None),
+            ("what does desk check use? then use it", None),
+            ("what time is it? then run desk check, I need it", None),
+            ("what does desk check use and turn on desk check", None),
+            ("which song should I play, desk check needs me", None),
         ] {
             assert_eq!(read_back_asked(heard, &names).as_deref(), asked, "{heard}");
         }
+    }
+
+    /// SubDarren's and the Reviewer-lead's HOLDs on #6619: the ask word
+    /// comes right after the name, in the same clause, so a one-word name
+    /// in an ordinary question, an ask word in another clause and a line
+    /// that runs a skill ask none.
+    #[test]
+    fn ordinary_questions_and_mixed_lines_ask_no_read_back() {
+        let names: Vec<String> = ["desk-check", "timer", "focus", "news", "music", "mail"]
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect();
+        for heard in [
+            "what does desk check use, and run it",
+            "what time is it? then run desk check, I need it",
+            "what's the weather, and start the timer so I do my homework",
+            "which song should I play, start focus, I need to concentrate",
+            "what time does the news start, do you know?",
+            "what music does she like",
+            "which mail do I need to answer",
+            "what mail do you need",
+            "what does she do with the mail",
+        ] {
+            assert_eq!(read_back_asked(heard, &names), None, "{heard}");
+        }
+        for (heard, asked) in [
+            ("what does desk check use", "desk-check"),
+            ("what does the news skill need", "news"),
+            ("what does the timer do with my mail", "timer"),
+            ("which mail does my music skill send", "music"),
+        ] {
+            assert_eq!(
+                read_back_asked(heard, &names).as_deref(),
+                Some(asked),
+                "{heard}"
+            );
+        }
+        // Two names alike give none: the model is left the line.
+        let alike: Vec<String> = vec!["desk-check".into(), "deskcheck".into()];
+        assert_eq!(read_back_asked("what does desk check use", &alike), None);
     }
 
     /// The model's `use_skill` or `make_skill` read-back of the skill the
