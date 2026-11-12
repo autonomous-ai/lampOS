@@ -2401,14 +2401,40 @@ yet on a lamp.
   is written with `write_engine` unless its files already hold this
   build's text (`present` as if the login shell found the wrapper). Then
   `login_finds` is asked: an engine whose own program the login shell
-  finds first, or none, is one line each round, not written again; one
+  finds first, or none, is said, not written again; one
   `not_installed` is passed over, as a wrapper on `lampos`'s `PATH` would
   have Harness find it installed. `lampos`'s ids are looked up once, only
-  when an engine is to be written. Each engine written or refused is one
-  line; one already there, none. The namespace shows what Hermes's does
-  (`LAMP_HERMES_SKILLS`, `LAMP_SKILL_TASKS`), so turning either changes
-  the script and every engine is written again. Off, or an engine Harness
-  no longer reports, nothing is taken out yet. The hook stand-in stays
+  when an engine is to be written. Each engine written is one line; one
+  already there, none. A line that stays true round after round (a
+  refusal, a program found before the wrapper or none, no ids for
+  `lampos`) is said once (`rounds::Said`, kept by `serve` between rounds,
+  as the look at Harness says a failed look once), and again only when it
+  changes, or after it stopped being true. The namespace shows what
+  Hermes's does (`LAMP_HERMES_SKILLS`, `LAMP_SKILL_TASKS`), so turning
+  either changes the script and every engine is written again.
+- **Taken out by a round**, before writing, with the same switch on: a
+  wrapper lamp-update wrote (`wrapper::ours`: a regular file holding
+  exactly this build's wrapper text for that name; the engine's own
+  program, a link, an edited wrapper or an older build's text are never
+  touched) is removed (`remove_ours`), one line each, when (a) Harness's
+  last good look (its machine known; none before the first look or after
+  a failed one) no longer says its engine is `installed`
+  (`engines_to_remove`), or (b) no program of the engine's own is left on
+  `lampos`'s login `PATH`. Harness may find an engine by `command -v`, so
+  the wrapper alone would keep it `installed` forever; (b) is the real
+  signal. It is `login_programs`: `timeout 5 runuser -l lampos -c 'E=<engine>;
+  …'`, a fixed text with only the plain name put in, that walks the full
+  folders of `$PATH` and prints each executable `<dir>/<engine>`, skipping
+  `/usr/local/bin/<engine>` and any file with the lamp-update mark (as the
+  wrapper itself skips them). Only a look that ends 0 and lists nothing
+  takes a wrapper out; one that fails, runs past 5 s, or cannot be run (no
+  `timeout` or `runuser`) keeps it, said once. It is asked at most once an
+  engine a round. An engine with no program of its own is not written
+  either (said once), so a removed wrapper is not written back the next
+  round; it is written again once a program is there. `hermes` and
+  `openclaw` are never taken out here. The engine's home (it may hold the
+  engine's own data) and the shared `agent-ns` script stay. Off, nothing
+  is written or taken out: what an earlier round wrote stays. The hook stand-in stays
   while `agent-ns` is there (it is among the namespace scripts Hermes's
   and OpenClaw's removal look for).
 
@@ -2425,14 +2451,25 @@ namespace script naming no engine, for every switch, with `HOME` per
 engine; `sh -n` on every text; the writer's modes and its refusal to
 replace a file that is not lamp-update's; no token file left when no
 program is found; an engine found before the wrapper (or none found) not
-present; the login lookup's argv. `agent_ns::rounds::tests`: the switch
+present; the login lookup's argv; the programs look's argv (bounded,
+fixed text, plain names only), run with a stand-in `PATH` listing only
+the engine's own program, and its output read strictly.
+`agent_ns::rounds::tests`: the switch
 on only for `on`; only installed, plain engines other than Hermes and
 OpenClaw written, a made-up one included; a second round writing nothing
 and asking no ids, a changed wrapper or another switch written again; an
 engine whose own program the login shell finds first said, not written
 again; the engine's own program at the wrapper's place left and the rest
 written; no ids, nothing written; the hook stand-in kept past Hermes's
-removal.
+removal; a line that stays the same said once, a changed one again, and a
+refusal and no ids said once; a wrapper whose engine Harness no longer
+says installed taken out once, its home and `agent-ns` kept; one with no
+program of its own left taken out while Harness still says installed, and
+not written back until one is there; one with a program in
+`~/.local/bin` kept; a failed look keeping it, said once; only exactly
+lamp-update's wrappers taken out (not the engine's own program, an edited
+wrapper, a link, Hermes's or OpenClaw's), none before Harness was reached;
+off, nothing taken out.
 
 ## A hand install's skill folders (`deploy/sync-skills.sh`)
 

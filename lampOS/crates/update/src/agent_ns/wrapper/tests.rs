@@ -538,3 +538,85 @@ fn write_engine_never_replaces_a_file_that_is_not_lamp_updates() {
     symlink("/bin/sh", &place).unwrap();
     assert!(write_engine(root.path(), "eng", me(), SHOWN[0]).is_err());
 }
+
+/// The look for an engine's own programs: `lampos`'s login shell, bounded,
+/// the engine the only word put in a fixed text; refused unless plain.
+#[test]
+fn the_programs_look_is_bounded_fixed_and_refuses_unplain_names() {
+    let argv = login_programs_argv("codex").unwrap();
+    assert_eq!(
+        argv[..6],
+        ["timeout", LOOKUP_SECS, "runuser", "-l", "lampos", "-c"]
+    );
+    assert_eq!(argv.len(), 7);
+    assert!(argv[6].starts_with("E=codex; "));
+    assert_eq!(
+        argv[6].replacen("codex", "other", 1),
+        login_programs_argv("other").unwrap()[6]
+    );
+    sh_n(&argv[6]);
+    for engine in ["", "-x", "a b", "$(id)", "a;b"] {
+        assert!(login_programs_argv(engine).is_err(), "{engine:?}");
+    }
+}
+
+/// Run where `PATH` holds a lamp-update wrapper, a folder that is not
+/// full, a file that is not executable and the engine's own program: the
+/// look prints the program alone. With none, nothing, and it ends 0.
+#[test]
+fn the_programs_look_lists_only_the_engines_own_programs() {
+    let folder = tempfile::tempdir().unwrap();
+    let dir = |name: &str| {
+        let dir = folder.path().join(name);
+        fs::create_dir_all(&dir).unwrap();
+        dir
+    };
+    let put = |dir: &PathBuf, text: &str, mode: u32| {
+        let file = dir.join("codex");
+        fs::write(&file, text).unwrap();
+        fs::set_permissions(&file, fs::Permissions::from_mode(mode)).unwrap();
+    };
+    let wrapper = dir("wrap");
+    put(&wrapper, &wrapper_text("codex").unwrap(), 0o755);
+    let plain_file = dir("plain");
+    put(&plain_file, "#!/bin/sh\n", 0o644);
+    let own = dir("own");
+    put(&own, "#!/bin/sh\necho codex\n", 0o755);
+    let look = |path: String| {
+        let argv = login_programs_argv("codex").unwrap();
+        let out = Command::new("/bin/sh")
+            .arg("-c")
+            .arg(&argv[6])
+            .env("PATH", path)
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{out:?}");
+        programs_in("codex", &String::from_utf8_lossy(&out.stdout))
+    };
+    let path = |dirs: &[&PathBuf]| {
+        dirs.iter()
+            .map(|dir| dir.display().to_string())
+            .chain([
+                "relative".to_owned(),
+                "/usr/bin".to_owned(),
+                "/bin".to_owned(),
+            ])
+            .collect::<Vec<_>>()
+            .join(":")
+    };
+    let own_codex = own.join("codex").display().to_string();
+    assert_eq!(look(path(&[&wrapper, &plain_file, &own])), [own_codex]);
+    assert!(look(path(&[&wrapper, &plain_file])).is_empty());
+}
+
+/// Only full paths ending in the engine's name are its programs: a login
+/// shell's rc files may print anything else.
+#[test]
+fn programs_in_passes_over_other_lines() {
+    let said = "welcome to the lamp\n/home/lampos/.local/bin/codex\n codex\n/usr/bin/codex-x\n/opt/x/codex\n";
+    assert_eq!(
+        programs_in("codex", said),
+        ["/home/lampos/.local/bin/codex", "/opt/x/codex"]
+    );
+    assert!(programs_in("codex", "").is_empty());
+}
