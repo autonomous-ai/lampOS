@@ -806,6 +806,32 @@ impl Thread {
             .then(|| heard.to_owned())
     }
 
+    /// The words of `request`'s own line only: the line held for it
+    /// ([`Self::line_of`]) or its exchange's, never the newest words heard
+    /// since the last answer, which may be another utterance's. `None`
+    /// when neither is known. For a check that refuses a call on what was
+    /// heard (#6527's `whole_ask`): a false refusal from another person's
+    /// line is worse than no check (#6537, the Reviewer-lead's P3).
+    pub fn heard_in_own_line(&self, request: u64) -> Option<String> {
+        let held = self
+            .lines
+            .iter()
+            .rev()
+            .find(|(held, _)| *held == request)
+            .map(|(_, line)| line.trim());
+        let heard = held.or_else(|| {
+            self.exchanges
+                .iter()
+                .rev()
+                .find(|e| e.request == request)
+                .map(|exchange| exchange.person.trim())
+        })?;
+        heard
+            .chars()
+            .any(char::is_alphanumeric)
+            .then(|| heard.to_owned())
+    }
+
     /// `request`'s own line is `words` (#3113), held for [`Self::heard_for`]
     /// whatever is heard next; the first held for a request stays.
     pub fn line_of(&mut self, request: u64, words: &str) {
@@ -2495,6 +2521,22 @@ impl Connect for Recalling {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// #6537, the Reviewer-lead's P3: a check on what was heard reads only
+    /// the request's own line, never the newest words of another utterance.
+    #[test]
+    fn heard_in_own_line_never_takes_another_utterance() {
+        let mut thread = Thread::new();
+        let now = Instant::now();
+        thread.person("someone else talking nearby", true, now);
+        assert!(thread.heard_for(9_001, now).is_some());
+        assert_eq!(thread.heard_in_own_line(9_001), None);
+        thread.line_of(9_002, "have Hermes write a poem");
+        assert_eq!(
+            thread.heard_in_own_line(9_002).as_deref(),
+            Some("have Hermes write a poem")
+        );
+    }
 
     /// A connected service's read (`crate::services`): none of what the
     /// lamp said of it is saved, told again, journalled or summarised,
