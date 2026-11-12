@@ -638,22 +638,28 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   tiếng yes khởi động việc cũ. Giờ ghi chú đọc chính lời của câu: câu không
   phải yes đơn thuần (`plain_yes`), không phải no đơn thuần
   (`services::plain_no`) và có ít nhất `WHOLE_ASK_FEWEST` (4) từ nhờ việc
-  (`ask_words`, như của #6527) là một lời nhờ mới. Ghi chú của nó nói một
-  lần gọi `start_agent_task` với lời nhờ đó sẽ thay việc đang chờ, việc cũ
-  sẽ không chạy, và việc đang chờ được đánh dấu là đã bị thay
-  (`SUPERSEDED`; journal `lamp-voice: tasks: request N: a new ask while
-  task <id> waits: …`). Có hay không có `LAMP_TASKS_CORRECT`,
-  `start_agent_task` của lời nhờ mới sẽ thay và hủy việc cũ bằng op
-  `cancel` của phần tasks, như khi sửa lời nhờ, và tiếng yes chỉ khởi động
-  việc mới. Một `confirm_agent_task` sau lời nhờ mới mà chưa có việc mới
-  nào được chuẩn bị cũng hủy việc cũ và không khởi động gì (journal `…: a
-  yes after a new ask: task <id> is cancelled, not started`). Yes, no hay
-  câu ngắn ("What was that?") giữ ghi chú như trước. Mọi câu như vậy đều
-  tính, kể cả một câu hỏi không phải việc gì ("What's the weather in Paris
-  tomorrow?"): sau câu đó, không tiếng yes nào khởi động việc đang chờ nữa.
-  Test:
+  (`ask_words`, như của #6527) ngoài các từ đồng ý (`CONSENT_WORDS`: yes,
+  yeah, yep, yup, sure, ok, okay, go, ahead, do, it, start, begin, send,
+  hand, over, sounds, good, great, fine, please, now, right, away) là một
+  lời nhờ mới. "Yes, go ahead and start it now.", "Yeah sure, go ahead and
+  do it.", "Yes, sounds good, start it.", "Okay, yes, please start that."
+  và "Yes please, hand it over." không phải: mỗi câu đều khởi động việc
+  đang chờ, dù `LAMP_TASKS_ONE_YES` bật hay tắt (P2 của Heron trên #6572).
+  Ghi chú của lời nhờ mới nói một lần gọi `start_agent_task` với lời nhờ đó
+  sẽ thay việc đang chờ, việc cũ sẽ không chạy. Không có gì được đánh dấu
+  khi dựng ghi chú, trước khi model đọc câu: chỉ một `start_agent_task`
+  trong chính request của lời nhờ mới mới thay việc đang chờ, có hay không
+  có `LAMP_TASKS_CORRECT`, và hủy nó lúc đó bằng op `cancel` của phần
+  tasks, như khi sửa lời nhờ (journal `lamp-voice: tasks: request N: a
+  corrected or new ask replaces task <id>, which this voice no longer
+  confirms`); tiếng yes sau đó chỉ khởi động việc mới. Trước khi có lần gọi
+  đó, việc đang chờ vẫn giữ tiếng yes của nó: một câu hỏi không phải việc gì
+  ("What's the weather going to be like in Hanoi today?"), được trả lời mà
+  không gọi hàm, rồi "yes" vẫn khởi động việc đó (P3 của Heron trên #6572).
+  Yes, no hay câu ngắn ("What was that?") giữ ghi chú như trước. Test:
   `agent_tasks::tests::a_new_ask_while_a_task_waits_replaces_it_and_the_yes_starts_the_new_one`,
-  `agent_tasks::tests::a_yes_after_a_new_ask_never_starts_the_old_task`.
+  `agent_tasks::tests::a_question_while_a_task_waits_leaves_its_yes`,
+  `agent_tasks::tests::a_yes_said_at_length_starts_the_waiting_task`.
 - **Một tiếng yes cho lời đọc lại chỉ bằng lời (#6547 A, bật trong sản
   phẩm, không có công tắc tắt).** Một tiếng yes đáp lại lời đọc lại chỉ
   bằng lời của đèn, ngay trong lượt trao đổi đó và trong `CONFIRM_WITHIN`
