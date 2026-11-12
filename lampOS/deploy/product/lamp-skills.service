@@ -56,6 +56,9 @@ Environment=LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language
 # lamp-services only after the owner's yes to its content, at most three a day, never a public post. On in the
 # product (owner, 11 Nov).
 Environment=LAMP_SKILL_WRITES=on
+# A made skill's code of its own (#6307, docs/skills.md "Made by voice"): a `made: here` skill put on as a package
+# loads its `do.task`, its script said to come from the lamp's own model (task::made_with_code).
+Environment=LAMP_MADE_SCRIPTS=on
 # The owner's typed setup name, for a made skill's read (#5288). A blank fallback when there is none, so the read
 # is skipped ("no owner's face enrolled"), never the unit refused (SetCredential= is LoadCredential='s default,
 # systemd 252). One newline, never empty: an empty SetCredential= in a unit file fails the start at CREDENTIALS
