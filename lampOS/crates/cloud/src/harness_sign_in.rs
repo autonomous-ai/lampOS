@@ -537,7 +537,7 @@ pub fn ask(place: &Place, kind: &str, data: &Value) -> Result<Option<Value>, Str
 
 /// One line to lamp-tasks and its whole view, or the refusal's code (a
 /// lowercase code only, never text). Nothing journalled here.
-fn exchange(socket: &Path, line: &Value) -> Result<Value, String> {
+pub(crate) fn exchange(socket: &Path, line: &Value) -> Result<Value, String> {
     let asked = || -> std::io::Result<String> {
         let mut stream = UnixStream::connect(socket)?;
         stream.set_read_timeout(Some(WAIT))?;
@@ -677,7 +677,7 @@ pub(crate) mod tests {
     }
 
     /// A short folder of its own: a socket's whole path fits in 103 bytes.
-    fn folder(tag: &str) -> PathBuf {
+    pub(crate) fn folder(tag: &str) -> PathBuf {
         let dir = Path::new("/tmp").join(format!("hs-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
@@ -686,7 +686,7 @@ pub(crate) mod tests {
 
     /// A stand-in for lamp-tasks' app socket: each line asked, and its
     /// answers in turn.
-    fn tasks(dir: &Path, answers: Vec<&'static str>) -> mpsc::Receiver<String> {
+    pub(crate) fn tasks(dir: &Path, answers: Vec<&'static str>) -> mpsc::Receiver<String> {
         let listener = UnixListener::bind(dir.join("app.sock")).unwrap();
         let (sent, asked) = mpsc::channel();
         std::thread::spawn(move || {
