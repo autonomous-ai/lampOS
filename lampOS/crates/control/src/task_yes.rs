@@ -126,7 +126,17 @@ fn sha256_ok(text: &str) -> bool {
 /// once each, never `skills`.
 fn grants_ok(grants: &[String]) -> Result<(), String> {
     let mut seen = BTreeSet::new();
+    let mut net = false;
     for grant in grants {
+        // The task grant that keeps a run's network (`LAMP_TASK_NET`): kept
+        // in the yes as any grant, never one of this part's own, so never
+        // in a token ([`KeptYes`]).
+        if grant == lamp_skills::task::NET_GRANT && lamp_skills::task::net_on() {
+            if std::mem::replace(&mut net, true) {
+                return Err(format!("grants: {grant} is listed twice"));
+            }
+            continue;
+        }
         match serde_json::from_value::<Grant>(Value::String(grant.clone())) {
             Ok(Grant::Skills) => return Err("grants: skills is never a script's".into()),
             Ok(known) if seen.insert(known) => {}
@@ -306,8 +316,10 @@ impl crate::runs::SkillYes for KeptYes {
         let yes = yes_for_token(&self.state, skill, &sha256, &declared)
             .ok_or_else(|| CHANGED.to_owned())?;
         grants_ok(&yes.grants)?;
+        // `net` is lamp-tasks' (its run keeps the network), never a token's.
         yes.grants
             .iter()
+            .filter(|grant| *grant != lamp_skills::task::NET_GRANT)
             .map(|grant| {
                 serde_json::from_value::<Grant>(Value::String(grant.clone()))
                     .map_err(|_| format!("grants: {grant:?} is not a grant"))
@@ -584,6 +596,61 @@ mod tests {
     }
 
     /// A skill folder with a `do.task` and `grants`, as lamp-skills loads one.
+    /// LAMP_TASK_NET: `net` is kept in the owner's yes as any grant and
+    /// checked with the folder's declared grants, but never names a token's
+    /// grant (lamp-tasks keeps the run's network). Off, it is no grant.
+    #[test]
+    fn a_net_grant_is_kept_in_the_yes_and_never_in_the_token() {
+        use crate::runs::SkillYes as _;
+        let dir = folder("net");
+        let state = dir.join("state");
+        let skills = dir.join("skills");
+        std::fs::create_dir_all(&state).unwrap();
+        let record = |grants: Value, sha256: &str| {
+            answer(
+                Some(state.as_path()),
+                &asked(
+                    RECORD,
+                    json!({"name": "photo-booth", "sha256": sha256, "grants": grants}),
+                ),
+                true,
+                true,
+                5,
+            )
+            .unwrap()
+        };
+        lamp_voice::skill_task_yes::set_net_here(Some(false));
+        assert!(record(json!(["camera", "net"]), &"a".repeat(64))["error"].is_string());
+        lamp_voice::skill_task_yes::set_net_here(Some(true));
+        let booth = task_skill(&skills, "photo-booth", r#"["camera", "light", "net"]"#);
+        let sha256 = lamp_skills::task::folder_sha256(&booth).unwrap();
+        assert_eq!(
+            record(json!(["net", "net"]), &sha256)["error"],
+            "grants: net is listed twice"
+        );
+        assert_eq!(
+            record(json!(["camera", "light", "net"]), &sha256),
+            json!({"recorded": true})
+        );
+        let kept = KeptYes {
+            state: state.clone(),
+            skills: skills.clone(),
+            on: true,
+            write_agent: false,
+        };
+        assert_eq!(
+            kept.grants("photo-booth").unwrap(),
+            BTreeSet::from([Grant::Camera, Grant::Light])
+        );
+        // A yes without `net` for a folder that declares it asks again.
+        assert_eq!(
+            record(json!(["camera", "light"]), &sha256),
+            json!({"recorded": true})
+        );
+        assert_eq!(kept.grants("photo-booth").unwrap_err(), CHANGED);
+        lamp_voice::skill_task_yes::set_net_here(None);
+    }
+
     fn task_skill(skills: &Path, name: &str, grants: &str) -> std::path::PathBuf {
         let folder = skills.join(name);
         std::fs::create_dir_all(folder.join("scripts")).unwrap();
