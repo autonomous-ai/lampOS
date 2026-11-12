@@ -42,7 +42,7 @@ fn lamp_name(dir: &Path) -> String {
     format!("virtual-{:06x}", hash & 0xff_ffff)
 }
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -56,6 +56,16 @@ fn main() {
     if args.iter().skip(1).any(|a| a == "--help" || a == "-h") || args.len() == 1 {
         println!("{USAGE}");
         return;
+    }
+    // `voice-keys`: which of the developer's voice keys are set, and from where; no lamp folder, never a value.
+    if args.get(1).map(String::as_str) == Some("voice-keys") && args.len() == 2 {
+        let (text, code) = lamp_sim::keys::report(&|name| std::env::var_os(name));
+        if code == 0 {
+            print!("{text}");
+        } else {
+            eprint!("{text}");
+        }
+        std::process::exit(code);
     }
     if let Some(done) = stimulus(&args) {
         if let Err(error) = done {
