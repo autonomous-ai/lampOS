@@ -76,10 +76,15 @@ pub const TOKEN_ENV: &str = "LAMP_CONTROL_TOKEN";
 pub const ENGINE_MAX: usize = 32;
 
 /// An engine name is plain: `a-z`, `0-9` and `-`, 1 to [`ENGINE_MAX`]
-/// bytes, so it is one file name and one word in a script.
+/// bytes, never starting with `-`, so it is one file name and one word in
+/// a script, never an option.
 pub fn engine_ok(engine: &str) -> bool {
     !engine.is_empty()
         && engine.len() <= ENGINE_MAX
+        && engine
+            .bytes()
+            .next()
+            .is_some_and(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
         && engine
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
@@ -109,7 +114,9 @@ pub fn home_of(engine: &str) -> Result<String, String> {
 
 /// [`wrapper_text`]'s text, `@E@` the engine. The engine's program is
 /// looked for by name on `PATH`, never by a path. The token is read into a
-/// shell variable (never a command's argument) and exported alone.
+/// shell variable (never a command's argument) and exported alone. The
+/// run's token file is read and deleted first, so a wrapper that fails
+/// later (no engine program found) leaves none behind.
 const WRAPPER_TEMPLATE: &str = r#"#!/bin/sh
 # lampOS: @E@ on the lamp, in the one agent namespace (#6510). Written by lamp-update.
 # lampOS/docs/install.md, "One agent namespace for every engine". It runs @E@'s own program, the first `@E@` on the
@@ -119,24 +126,6 @@ const WRAPPER_TEMPLATE: &str = r#"#!/bin/sh
 # one-run token from /run/lampos-tasks/runs/<run-id>, read once and deleted, in its environment only.
 E=@E@
 fail() { echo "$E: $1" >&2; exit 1; }
-I=$(readlink -f "$0") || fail "this wrapper is not found"
-X=
-o=$IFS
-set -f
-IFS=:
-for d in ${PATH-}; do
-  IFS=$o
-  case $d in /*) ;; *) continue ;; esac
-  [ -f "$d/$E" ] && [ -x "$d/$E" ] || continue
-  r=$(readlink -f "$d/$E") || continue
-  [ "$r" != "$I" ] || continue
-  head -c 512 "$r" | grep -qF "Written by lamp-update." && continue
-  X=$r
-  break
-done
-IFS=$o
-set +f
-[ -n "$X" ] || fail "no $E on PATH besides lamp-update's wrappers"
 N=
 unset LAMP_CONTROL_TOKEN
 if [ -n "${LAMP_RUN_ID+set}" ]; then
@@ -157,6 +146,24 @@ else
   unset LAMP_NS_NET
 fi
 unset LAMP_RUN_ID
+I=$(readlink -f "$0") || fail "this wrapper is not found"
+X=
+o=$IFS
+set -f
+IFS=:
+for d in ${PATH-}; do
+  IFS=$o
+  case $d in /*) ;; *) continue ;; esac
+  [ -f "$d/$E" ] && [ -x "$d/$E" ] || continue
+  r=$(readlink -f "$d/$E") || continue
+  [ "$r" != "$I" ] || continue
+  head -c 512 "$r" | grep -qF "Written by lamp-update." && continue
+  X=$r
+  break
+done
+IFS=$o
+set +f
+[ -n "$X" ] || fail "no $E on PATH besides lamp-update's wrappers"
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
 LAMP_NS_ENGINE=$E LAMP_NS_ENGINE_BIN=$X
 export LAMP_NS_UID LAMP_NS_GID LAMP_NS_ENGINE LAMP_NS_ENGINE_BIN
@@ -324,17 +331,61 @@ pub fn write_engine(
         .map_err(|error| format!("{wrapper}: {error}"))
 }
 
+/// How Harness finds `engine`: `command -v` in `lampos`'s login shell
+/// (`runuser -l`, which reads the same rc files Harness's installer
+/// writes, `~/.local/bin` before `/usr/local/bin`). Refused unless
+/// `engine` is plain, so it is one word in the command.
+pub fn login_lookup_argv(engine: &str) -> Result<Vec<String>, String> {
+    plain(engine)?;
+    Ok(["runuser", "-l", crate::install::USER, "-c"]
+        .map(str::to_owned)
+        .into_iter()
+        .chain([format!("command -v {engine}")])
+        .collect())
+}
+
+/// The program `lampos`'s login shell finds for `engine`
+/// ([`login_lookup_argv`]), or `None` when it finds none or cannot be
+/// asked.
+pub fn login_finds(engine: &str) -> Option<String> {
+    let argv = login_lookup_argv(engine).ok()?;
+    let out = std::process::Command::new(&argv[0])
+        .args(&argv[1..])
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let found = String::from_utf8(out.stdout).ok()?;
+    let found = found.trim();
+    (!found.is_empty()).then(|| found.to_owned())
+}
+
+/// Whether what `lampos`'s login shell finds for `engine` (`found`, from
+/// [`login_finds`]) is the wrapper itself. An engine's own program earlier
+/// on that `PATH` (`~/.local/bin/<engine>` from a native installer or a
+/// user-prefix npm or pip) would run with no namespace, so the wrapper
+/// there is not enough (Heron's read of #6596).
+pub fn found_first(engine: &str, found: Option<&str>) -> bool {
+    wrapper_path(engine).is_ok_and(|wrapper| found == Some(wrapper.as_str()))
+}
+
 /// `engine`'s entry points there as this build writes them for `shown`:
 /// the wrapper and [`NS`] with this build's text, the hook stand-in, and
-/// the engine's home a folder. Anything else is the engine missing,
-/// written again.
-pub fn present(root: &Path, engine: &str, shown: Shown) -> bool {
+/// the engine's home a folder, and the wrapper the `engine` `lampos`'s
+/// login shell finds (`found`, [`found_first`]). Anything else is the
+/// engine missing: written again, and not offered while something else
+/// is found first.
+pub fn present(root: &Path, engine: &str, shown: Shown, found: Option<&str>) -> bool {
     let (Ok(wrapper), Ok(text), Ok(home)) =
         (wrapper_path(engine), wrapper_text(engine), home_of(engine))
     else {
         return false;
     };
-    holds(root, &wrapper, &text)
+    found_first(engine, found)
+        && holds(root, &wrapper, &text)
         && holds(root, NS, &ns_text(shown))
         && super::hook_shim_there(root)
         && fs::symlink_metadata(on(root, &home)).is_ok_and(|meta| meta.is_dir())

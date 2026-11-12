@@ -2443,8 +2443,9 @@ picks up the run's token: with `LAMP_RUN_ID` (a provisional name) set, it
 reads `/run/lampos-tasks/runs/<run-id>` once, deletes it, and gives the
 engine the token as `LAMP_CONTROL_TOKEN` in its environment only, with
 `LAMP_NS_NET=run`; the engine's `HOME` is its own
-`/var/lib/lampos-agents/<engine>`. Hermes's runner above is unchanged
-until step 2.
+`/var/lib/lampos-agents/<engine>`. An engine counts as present only when
+`lampos`'s login shell finds the wrapper first (not its own program in
+`~/.local/bin`). Hermes's runner above is unchanged until step 2.
 
 ## Devin (#1854)
 
