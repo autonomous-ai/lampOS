@@ -2878,7 +2878,21 @@ impl Cli {
         if !reply.success {
             return Err("auth_status_failed".into());
         }
-        parse_auth_here(&reply.stdout).map_err(str::to_string)
+        let read = parse_auth_here(&reply.stdout).map_err(str::to_string)?;
+        if read.0 == SignIn::Out {
+            self.index_signed_out();
+        }
+        Ok(read)
+    }
+
+    /// Harness read as signed out (the Reviewer-lead's P3 on #6447): the
+    /// index lets the account machines' sessions go, as the next sign-in
+    /// may be another account's, and keeps those on this computer's own
+    /// id, which Harness starts work under signed out (#6407).
+    fn index_signed_out(&self) {
+        if let Some(file) = &self.config.session_index {
+            crate::session_index::forget_machines(file, this_computer);
+        }
     }
 
     /// The machines on the person's account (`harness machines --json`,
