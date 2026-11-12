@@ -863,6 +863,10 @@ lại hơn 7 phút trong `epoll_wait`.
   ngay sau khi kể.
 - **Harness trên máy tính** vẫn chờ kể tin xong mới đóng, vì người đó có thể
   đang ngồi ở màn hình.
+- **`Cli::close_now`** (`harness close ... --now`, dừng phiên kể cả khi đang
+  làm) chỉ dành cho lần chạy skill do lamp-tasks mở, lúc hết hạn hay khi
+  xong (#6510 bước 2); chưa được dùng. Việc đóng ở trên không bao giờ dùng
+  `--now`.
 - **Test:** `the_lamps_own_agent_is_closed_once_done_its_news_untold`. Đang
   làm, hay idle chưa có câu trả lời: để mở. Xong mà chưa kể: để mở dưới một
   phút, rồi đóng. Trên máy tính: chờ kể.
