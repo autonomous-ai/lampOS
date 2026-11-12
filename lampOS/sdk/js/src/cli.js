@@ -11,14 +11,36 @@ import { find } from './discovery.js';
 import { PORT } from './schema.js';
 import { fake } from './fake.js';
 
-const { values, positionals } = parseArgs({
-  allowPositionals: true,
-  options: { host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, hands: { type: 'boolean' } },
-});
+const USAGE = `usage: lamp find
+       lamp pair CODE --pin PIN [--host HOST] [--port PORT] [--name NAME]
+       lamp hello [LAMP_ID]
+       lamp fake [--every S] [--cycles N] [--everything] [--hands]
+       lamp skill push FOLDER [LAMP_ID] | list [LAMP_ID] | remove NAME [LAMP_ID]
+
+  find    lamps on this network
+  pair    pair this computer with a lamp, with the owner's code
+  hello   connect to a paired lamp and show its grants
+  fake    a fake lamp here, paired at once, saying an arrival now and then
+  skill   this computer's pushed skills (the skills grant): push, list, remove`;
+
+let parsed;
+try {
+  parsed = parseArgs({
+    allowPositionals: true,
+    options: { help: { type: 'boolean', short: 'h' }, host: { type: 'string' }, port: { type: 'string' }, name: { type: 'string' }, pin: { type: 'string' }, every: { type: 'string' }, cycles: { type: 'string' }, everything: { type: 'boolean' }, hands: { type: 'boolean' } },
+  });
+} catch (error) {
+  // A misspelt option is one line and the usage, not a stack trace.
+  console.error(`lamp: ${error.message.split('. To specify')[0]}\n${USAGE}`);
+  process.exit(2);
+}
+const { values, positionals } = parsed;
 const [command, arg, third, fourth] = positionals;
 
 async function main() {
-  if (command === 'find') {
+  if (values.help || command === 'help') {
+    console.log(USAGE);
+  } else if (command === 'find') {
     for (const lamp of await find()) console.log(`${lamp.id}\t${lamp.name}\t${lamp.host}:${lamp.port}\tpin starts ${lamp.fp}`);
   } else if (command === 'pair' && arg && values.pin) {
     const pin = values.pin.replaceAll(' ', '').replaceAll(':', '').toLowerCase();
@@ -65,7 +87,7 @@ async function main() {
     console.log(`${lamp.info.id}: grants ${lamp.grants.join(', ')}`);
     await lamp.close();
   } else {
-    console.error('usage: lamp find | lamp pair CODE --pin PIN [--host HOST] [--name NAME] | lamp hello [LAMP_ID] | lamp fake [--every S] [--cycles N] [--everything] [--hands] | lamp skill push FOLDER | list | remove NAME [LAMP_ID]');
+    console.error(USAGE);
     return 2;
   }
   return 0;
