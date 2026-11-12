@@ -6207,6 +6207,27 @@ fn signed_out_the_account_machines_sessions_are_let_go() {
     assert_eq!(kept[COMPUTER][0].id, OTHER);
 }
 
+/// Thirteen's P3 on #6447: a read of the account's machines lets a
+/// machine no longer listed (unpaired in the app) go from the index; the
+/// listed ones and this computer's own id stay.
+#[test]
+fn an_unpaired_machines_sessions_are_let_go() {
+    const UNPAIRED: &str = "fedcba9876543210fedcba9876543210";
+    let mut rig = Rig::new();
+    let file = indexed(&mut rig);
+    session_index::record(&file, MACHINE, AGENT, Some("Christmas dates"), 1_000);
+    session_index::record(&file, UNPAIRED, OTHER, Some("Old work"), 2_000);
+    session_index::record(&file, COMPUTER, OTHER, Some("Login fix"), 3_000);
+    rig.plan(json!({"machines":{"default":true}}));
+    assert_eq!(rig.cli().machines().unwrap().len(), 1);
+    let kept = session_index::read(&file);
+    assert!(!kept.contains_key(UNPAIRED), "{kept:?}");
+    assert!(
+        kept.contains_key(MACHINE) && kept.contains_key(COMPUTER),
+        "{kept:?}"
+    );
+}
+
 /// What `harness show --json` gives of a session by its id, as Harness
 /// 0.6.12 answers it: its name and state among the rest.
 fn shown_as(id: &str, name: &str, state: &str) -> Value {
