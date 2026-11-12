@@ -4760,6 +4760,11 @@ fn spawn_rig(
         },
     )?;
     let mut last = 0;
+    // A developer's named devices: the audio workers get the sound session's names (process.rs).
+    crate::process::name_devices(
+        options.speaker_device.is_some()
+            || options.microphone_device != crate::options::MicrophoneDevice::Board,
+    );
     let capture_arguments = options.capture_arguments(
         diagnostic_directory.map(|p| p.join("capture-audio")),
         // Only for stop words that are listened for (#1047).
