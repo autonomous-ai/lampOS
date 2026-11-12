@@ -754,6 +754,8 @@ pub fn present(root: &Path, shown: Shown) -> bool {
         && head(root).as_deref() == Some(COMMIT)
         && holds(root, WRAPPER, &wrapper_text(shown.tasks))
         && holds(root, NS, &ns_text(shown.skills, shown.tasks))
+        // The build's own lampos SDK, one copy for every agent (#6507).
+        && crate::sdk_tree::present(root)
 }
 
 /// When `serve` starts: off, an earlier record and ask are taken away; on
@@ -1555,6 +1557,8 @@ pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
 /// 0755, each written whole beside and renamed in (never through a link),
 /// so `lampos` never finds a wrapper before what it runs.
 fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
+    // The build's own lampos SDK first (#6507): the one read-only copy a skill's script imports.
+    crate::sdk_tree::write(root)?;
     let ns = ns_text(shown.skills, shown.tasks);
     let wrapper = wrapper_text(shown.tasks);
     for (path, text) in [(NS, ns.as_str()), (WRAPPER, wrapper.as_str())] {

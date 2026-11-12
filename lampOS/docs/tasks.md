@@ -2301,7 +2301,9 @@ for each run, and is answered once the run ends
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; that folder not there
   is `run_failed` with nothing started. Its environment is only `PATH`,
   `HOME`, `HERMES_HOME` and `SHELL` (as lamp-tasks.service gives them),
-  `LAMP_NS_NET=run` (below), and the run's `LAMP_CONTROL_SOCKET` and `LAMP_CONTROL_TOKEN`; nothing else of
+  `LAMP_NS_NET=run` (below), and the run's `LAMP_CONTROL_SOCKET`, `LAMP_CONTROL_TOKEN` and `PYTHONPATH`
+  (`/usr/local/lib/lampos/sdk-python`, the build's own lampos SDK with the `websockets` it needs, one read-only copy for
+  every agent, written by lamp-update: `from lampos import Lamp` works in whichever Python runs the script, #6507); nothing else of
   lamp-tasks' own. The token is never an argument, and the run's output
   goes nowhere, not into the journal. The run is its own process group,
   killed whole at its deadline (14 minutes); exit status 0 is
