@@ -253,8 +253,15 @@ class Publisher:
             require(name not in sums and name != "SHA256SUMS", "duplicate or self-referential checksum")
             require(BINARY.fullmatch(name) or name in ("schedule_check", "replay_cost"), "unexpected artifact file")
             sums[name] = hashed
-        require(set(sums) == set(found) - {"SHA256SUMS"}, "artifact checksum inventory differs")
+        require(set(sums) == set(found) - {"SHA256SUMS", "TREE"}, "artifact checksum inventory differs")
         require(all(found[name]["sha256"] == hashed for name, hashed in sums.items()), "artifact checksum mismatch")
+        # The tree the build job built and tested (`HEAD^{tree}`, #6556): this
+        # push's own, or a train pull request's whose merge has this commit's tree.
+        require("TREE" in found, "artifact lacks TREE")
+        tree = (self.artifact / "TREE").read_text()
+        require(re.fullmatch(r"[0-9a-f]{40}\n", tree), "malformed TREE")
+        mine = self.command("git", "-C", self.source, "rev-parse", f"{self.sha}^{{tree}}").decode().strip()
+        require(tree.strip() == mine, "artifact was built from another tree")
         return found
 
     def release_binaries(self, original):

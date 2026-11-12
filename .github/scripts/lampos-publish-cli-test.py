@@ -74,6 +74,7 @@ class CliTests(unittest.TestCase):
         for name in sorted((T.RETAINED | T.EXCLUDED) - {"lamp-update"}):
             (self.artifact / name).write_bytes(b"test-only payload, never executed\n")
         (self.artifact / "SHA256SUMS").write_text("".join(f"{P.digest(path)}  {path.name}\n" for path in sorted(self.artifact.iterdir())))
+        (self.artifact / "TREE").write_text(T.TREE + "\n")  # what the fake git answers for SHA^{tree}
         self.env = {P.ENABLE: "on", P.BOOTSTRAP: "on", P.SECRET: self.private.read_text(), "GH_TOKEN": "simulated-release-authorization", "GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": P.REPO, "GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/lamp-voice", "GITHUB_SHA": T.SHA, "GITHUB_RUN_NUMBER": "10", "GITHUB_RUN_ID": "1234", "GITHUB_RUN_ATTEMPT": "1"}
         self.fake = LocalCommands()
 
