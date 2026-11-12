@@ -1,6 +1,6 @@
 ---
 name: light-scenes
-description: Call when someone asks for a light by what it is for or by a scene's name - "reading light", "light for focus", "relaxing light", "movie light", "night light", "energise me", "something bright to wake me up". The lamp sets its light for that scene and keeps it, and for reading or focus brings its head down over the desk for a minute. Give the scene they mean. Only when asked.
+description: When asked for a light by its use ("reading light", "movie light", "energise me"); it stays.
 ---
 
 # Light scenes
