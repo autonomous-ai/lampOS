@@ -1007,6 +1007,37 @@ impl Drop for Worker {
     }
 }
 
+// The sound session's names, to the two workers that open a sound device, only on a computer that named its devices
+// (`--speaker-device`, `--microphone-device`: a developer's, never a product unit's, which names neither): the
+// workers start with an empty environment, so ALSA's `default` on a desktop's PipeWire or PulseAudio cannot find the sound
+// server's socket without `XDG_RUNTIME_DIR` (and `PULSE_*`, `PIPEWIRE_*`). `environment` is the voice's own.
+fn sound_session_worker_environment(
+    role: &str,
+    devices_named: bool,
+    environment: impl Iterator<Item = (std::ffi::OsString, std::ffi::OsString)>,
+) -> Vec<(std::ffi::OsString, std::ffi::OsString)> {
+    use std::os::unix::ffi::OsStrExt;
+    if !devices_named || !matches!(role, "capture" | "speaker") {
+        return Vec::new();
+    }
+    environment
+        .filter(|(name, _)| {
+            let name = name.as_bytes();
+            name == b"XDG_RUNTIME_DIR"
+                || name.starts_with(b"PULSE_")
+                || name.starts_with(b"PIPEWIRE_")
+        })
+        .collect()
+}
+
+static DEVICES_NAMED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Said once at start by the coordinator: the options named a speaker or a microphone device, so the audio workers are
+/// given the sound session's names ([`sound_session_worker_environment`]).
+pub fn name_devices(named: bool) {
+    DEVICES_NAMED.store(named, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// The command a worker starts with: its arguments, and a cleared
 /// environment with only what its role is given, the switches read with
 /// `var` from the voice's own.
@@ -1027,6 +1058,11 @@ fn worker_command(
         .arg(boot_text(boot))
         .args(extra)
         .env_clear()
+        .envs(sound_session_worker_environment(
+            role,
+            DEVICES_NAMED.load(std::sync::atomic::Ordering::Relaxed),
+            std::env::vars_os(),
+        ))
         .envs(crate::stalls::passed_on())
         .envs(crate::code_lock::passed_on())
         .envs(memory_days_worker_environment(
@@ -2312,6 +2348,47 @@ fn rest_through_sounds_worker_environment(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_audio_workers_get_the_sound_session_only_when_devices_are_named() {
+        use std::ffi::OsString;
+        let voice_environment = || {
+            [
+                ("XDG_RUNTIME_DIR", "/run/user/1000"),
+                ("PULSE_SERVER", "unix:/run/user/1000/pulse/native"),
+                ("PIPEWIRE_RUNTIME_DIR", "/run/user/1000"),
+                ("FOO_TOKEN", "not-for-a-worker"),
+                ("LAMP_BUS", "on"),
+            ]
+            .into_iter()
+            .map(|(name, value)| (OsString::from(name), OsString::from(value)))
+        };
+        for role in ["capture", "speaker"] {
+            // Named devices: the three sound-session names reach the worker, nothing else of the voice's.
+            let given = sound_session_worker_environment(role, true, voice_environment());
+            let names: Vec<_> = given
+                .iter()
+                .map(|(name, _)| name.to_str().unwrap())
+                .collect();
+            assert_eq!(
+                names,
+                ["XDG_RUNTIME_DIR", "PULSE_SERVER", "PIPEWIRE_RUNTIME_DIR"],
+                "{role}"
+            );
+            // A product unit names none: its workers stay exactly as they were.
+            assert!(
+                sound_session_worker_environment(role, false, voice_environment()).is_empty(),
+                "{role}"
+            );
+        }
+        // And only the two workers that open a sound device.
+        for role in ["provider", "second", "controls"] {
+            assert!(
+                sound_session_worker_environment(role, true, voice_environment()).is_empty(),
+                "{role}"
+            );
+        }
+    }
 
     /// The ledger's re-fence (#5560) reaches both routes, the switch only as
     /// the exact `on`, with the delivery directory; no other worker gets

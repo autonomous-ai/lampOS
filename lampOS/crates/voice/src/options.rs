@@ -123,7 +123,9 @@ impl FromStr for MicrophoneDevice {
 /// board's `plug:device_speaker` (on a laptop `default` or `pulse` plays through PulseAudio or PipeWire's ALSA plugin).
 /// Absent, which is every product unit's, the worker is named exactly as before. A name starts with an ASCII letter or
 /// digit and is 1 to 64 of ASCII letters, digits and `: , . _ = -` (what an ALSA device name is made of; never a leading
-/// `-`, which would read as an option), kept in place so the options stay `Copy`.
+/// `-`, which would read as an option), kept in place so the options stay `Copy`. A named speaker (or microphone) device
+/// also gives the two audio workers the sound session's names, `XDG_RUNTIME_DIR`, `PULSE_*` and `PIPEWIRE_*`, from the
+/// voice's own environment (`process.rs`), which a device-less product unit's workers do not get.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct SpeakerDevice {
     bytes: [u8; Self::LONGEST],
