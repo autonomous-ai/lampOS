@@ -3348,9 +3348,12 @@ tasks flags; it needs only the tasks part):
   one short sentence, and ask whether to start it." With the staff, it says
   ", with who will do it," as before. Every description still fits in 1,024
   bytes, with the switch on too (`every_description_fits_the_service_whatever_the_switches`).
-- `start_agent_task`'s `task` parameter reads "The work, in the person's
-  own words. A short ask is enough: the agent works out the details." in
-  place of "… complete enough to do without asking." (folded in from #5119).
+- `start_agent_task`'s `task` parameter reads "Every part of what the
+  person asked, in their own words: what to do, and any count, list, topic,
+  file name or place they said. Never shorten it; the agent works out the
+  rest." in place of "… complete enough to do without asking." (folded in
+  from #5119; reworded by #6527, below: "A short ask is enough: the agent
+  works out the details" was read as leave to shorten the ask).
   With the old words the model asked what a short ask should have instead
   of calling: on lamp-c0a4 on 3 November, "ask Claude Code to build a
   website that promotes tourism in Vietnam" called it 1 time in 3, and the
@@ -3453,6 +3456,46 @@ every description, answer and line is byte-for-byte as before
 `the_one_yes_switch_is_on_only_with_the_tasks_part`. Not yet played: a
 count of 10 spoken hand-overs with a real yes on each side of the switch,
 counting those that needed only one yes (#5169).
+
+### The task is the whole ask (#6527)
+
+On 52e6 on 12 November (row-6361c) "have your agent list five fruits that
+are good when you're sick and write them to fruits dot md" reached Hermes as
+"Create a file called fruits.md": the list and the count were lost, and the
+file held no fruit. The `task` words above now ask for every part of the
+ask, and `start_agent_task` checks it in code (`agent_tasks::whole_ask`),
+with or without any switch, before the tasks part is asked anything:
+
+- **The heard words.** The request's words as the thread holds them
+  (`thread::heard_for`: the line held at the Live route's first call, or the
+  second route's line). A typed text (`messages::is_text`), a line the lamp
+  wrote itself, or a request with nothing heard is not checked. Neither is a
+  plain yes (the task then comes from the read-back), nor a line where more
+  than a quarter of the content words are not plain ASCII (a Vietnamese ask
+  handed over in English can't be compared word for word).
+- **Content words** (`ask_words`): lower-case runs of letters and digits,
+  without a small set of asking and joining words (`NOT_ASK`: "the", "to",
+  "your", "agent", "have", "please", …, and the spoken separators "dot",
+  "slash", "underscore", "dash"), the place words "lamp", "computer",
+  "mac", "macbook", "laptop", and every form of an agent's name the voice
+  knows (`KINDS`), matched as a whole run so "open" in "open the file"
+  stays. A number word is its digits ("five" is "5", `NUMBER_WORDS`), so
+  "fruits dot md" and "fruits.md" are the same words; others compare by
+  stem.
+- **The rule.** With at least `WHOLE_ASK_FEWEST` (4) content words heard, a
+  task that keeps under `WHOLE_ASK_SHARE` (half) of them is refused:
+  "Nothing was prepared: the task dropped part of what the person asked
+  (list, five, good, sick, write). Call start_agent_task again now with the
+  whole ask in their own words: …". Once per request: a second call in the
+  same request goes through whatever it keeps, so a person is never stuck.
+
+Tests: `a_task_that_drops_most_of_the_ask_is_refused_then_the_whole_ask_goes`,
+`start_refuses_a_cut_task_before_preparing_it`,
+`a_paraphrase_that_keeps_the_ask_passes`,
+`a_short_heard_ask_is_never_refused`, `no_heard_text_is_never_checked`,
+`number_words_and_spoken_file_names_match`. Not yet played: row-6361c's ask
+on 52e6 reaching Hermes whole, and a voice-eval of 10 spoken asks with a
+list, a count or a file name.
 
 ### A lead-in before a call (#799, `LAMP_TOOL_LEAD_IN=on`, on in the product)
 

@@ -836,8 +836,11 @@ const TASK_COMPLETE: &str =
 /// `start_agent_task`'s `task` parameter with [`ONE_YES_FLAG`] (#5169, from
 /// #5119): "complete enough to do without asking" let the model ask what a
 /// short ask should have instead of calling. The read-back still guards it.
-const TASK_SHORT: &str =
-    "The work, in the person's own words. A short ask is enough: the agent works out the details.";
+/// "A short ask is enough" was read as leave to shorten it (#6527: "list
+/// five fruits … and write them to fruits dot md" went as "Create a file
+/// called fruits.md"), so it asks for every part of the ask; the call is
+/// checked in code too ([`whole_ask`]).
+const TASK_SHORT: &str = "Every part of what the person asked, in their own words: what to do, and any count, list, topic, file name or place they said. Never shorten it; the agent works out the rest.";
 
 /// The tools as declared without the lamp's own target, as tests compare.
 #[cfg(test)]
@@ -855,8 +858,8 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
     } else {
         CLAUDE_CODE
     };
-    // With LAMP_TASKS_ONE_YES (#5169, folding in #5119), a short ask is
-    // enough, so the model calls rather than asking what the work should have.
+    // With LAMP_TASKS_ONE_YES (#5169, folding in #5119), the model calls
+    // rather than asking what the work should have, with the whole ask (#6527).
     let task = json!({
         "type": "string",
         "description": if place.one_yes { TASK_SHORT } else { TASK_COMPLETE }
@@ -982,7 +985,7 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
         });
         // Measured with tools/task-pick-eval.sh (#5978): the lamp does the
         // work by default, so the description says what is handed over and
-        // what is not, a short ask is enough, and `who` is for a name said.
+        // what is not, the whole ask goes (#6527), and `who` is for a name said.
         start_parameters["properties"]["task"]["description"] = json!(TASK_SHORT);
         if let Some(who) = start_parameters["properties"]
             .get_mut(WHO)
@@ -2466,6 +2469,281 @@ fn stands_for(said: &str, word: &str) -> bool {
     stem(said) == stem(word)
 }
 
+/// The share of the heard request's content words ([`ask_words`]) a
+/// `start_agent_task` task must keep, or it is refused once (#6527): under
+/// half, the model cut the ask short. On 52e6 on 12 Nov "have your agent
+/// list five fruits that are good when you're sick and write them to
+/// fruits dot md" reached Hermes as "Create a file called fruits.md", 2 of
+/// its 7 content words, and the file held no fruit. Kept at a half so a
+/// paraphrase passes; only a task that loses most of the ask is refused.
+const WHOLE_ASK_SHARE: f32 = 0.5;
+
+/// The fewest content words a heard request has before its task is
+/// checked ([`whole_ask`]): a short ask ("fix the tests") is said back
+/// in other words too often to judge, and cutting it loses little.
+const WHOLE_ASK_FEWEST: usize = 4;
+
+/// The words that say nothing of the work in a heard request or its task
+/// ([`ask_words`]): the asking, the addressing, the person and the agent,
+/// joining words, and the spoken separators of a file name ("fruits dot
+/// md" is "fruits.md"; "dot" and the '.' both split it in two). The pieces
+/// of a contraction ("you're", "don't") are here too. The agents' names
+/// and the places are left out by [`ask_words`] from [`KINDS`] and
+/// [`WHOLE_ASK_PLACES`].
+const NOT_ASK: [&str; 71] = [
+    "a",
+    "an",
+    "the",
+    "to",
+    "and",
+    "or",
+    "of",
+    "for",
+    "in",
+    "on",
+    "at",
+    "with",
+    "by",
+    "from",
+    "into",
+    "as",
+    "is",
+    "are",
+    "be",
+    "was",
+    "it",
+    "its",
+    "them",
+    "they",
+    "that",
+    "this",
+    "these",
+    "those",
+    "when",
+    "what",
+    "me",
+    "my",
+    "i",
+    "you",
+    "your",
+    "we",
+    "our",
+    "us",
+    "he",
+    "she",
+    "please",
+    "can",
+    "could",
+    "would",
+    "will",
+    "shall",
+    "do",
+    "does",
+    "did",
+    "have",
+    "has",
+    "get",
+    "ask",
+    "tell",
+    "let",
+    "agent",
+    "hey",
+    "ok",
+    "okay",
+    "so",
+    "just",
+    "dot",
+    "slash",
+    "underscore",
+    "dash",
+    "re",
+    "s",
+    "t",
+    "ll",
+    "ve",
+    "m",
+];
+
+/// The place words a heard request may say where the work is done:
+/// never part of the work ([`ask_words`]).
+const WHOLE_ASK_PLACES: [&str; 5] = ["lamp", "computer", "mac", "macbook", "laptop"];
+
+/// The number words a person says for a count, each with the digits a
+/// model writes for it ("five" and "5" are one word, [`ask_words`]).
+const NUMBER_WORDS: [(&str, &str); 24] = [
+    ("zero", "0"),
+    ("one", "1"),
+    ("two", "2"),
+    ("three", "3"),
+    ("four", "4"),
+    ("five", "5"),
+    ("six", "6"),
+    ("seven", "7"),
+    ("eight", "8"),
+    ("nine", "9"),
+    ("ten", "10"),
+    ("eleven", "11"),
+    ("twelve", "12"),
+    ("thirteen", "13"),
+    ("fourteen", "14"),
+    ("fifteen", "15"),
+    ("sixteen", "16"),
+    ("seventeen", "17"),
+    ("eighteen", "18"),
+    ("nineteen", "19"),
+    ("twenty", "20"),
+    ("thirty", "30"),
+    ("fifty", "50"),
+    ("hundred", "100"),
+];
+
+/// The content words of a heard request or a task (#6527), once each, as
+/// `(compared, said)`: lower-case runs of letters and digits, without
+/// [`NOT_ASK`], the place words ([`WHOLE_ASK_PLACES`]) and every form of
+/// an agent's name the voice knows ([`KINDS`]: its name, the forms heard
+/// and the close forms, each matched as a whole run of words, so "open"
+/// in "open the file" stays while "open claw" goes). `compared` is a
+/// number word's digits ([`NUMBER_WORDS`]) or the word's [`stem`]; `said`
+/// is the word as it came, to name it back.
+fn ask_words(text: &str) -> Vec<(String, String)> {
+    let words: Vec<String> = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let mut names: Vec<Vec<String>> = KINDS
+        .iter()
+        .flat_map(|kind| {
+            std::iter::once(kind.name)
+                .chain(kind.heard.iter().copied())
+                .chain(kind.close.iter().copied())
+        })
+        .map(|form| {
+            form.split(|c: char| !c.is_alphanumeric())
+                .filter(|word| !word.is_empty())
+                .map(str::to_lowercase)
+                .collect::<Vec<String>>()
+        })
+        .filter(|form| !form.is_empty())
+        .collect();
+    // The longest first, so "claude code" goes whole before "claude".
+    names.sort_by_key(|form| std::cmp::Reverse(form.len()));
+    let mut found: Vec<(String, String)> = Vec::new();
+    let mut at = 0;
+    while at < words.len() {
+        if let Some(form) = names.iter().find(|form| words[at..].starts_with(form)) {
+            at += form.len();
+            continue;
+        }
+        let word = &words[at];
+        at += 1;
+        if NOT_ASK.contains(&word.as_str()) || WHOLE_ASK_PLACES.contains(&word.as_str()) {
+            continue;
+        }
+        let compared = NUMBER_WORDS
+            .iter()
+            .find(|(said, _)| said == word)
+            .map_or_else(|| stem(word).to_owned(), |(_, digits)| (*digits).to_owned());
+        if !found.iter().any(|(seen, _)| *seen == compared) {
+            found.push((compared, word.clone()));
+        }
+    }
+    found
+}
+
+/// The heard request's content words its `task` left out, as they were
+/// said, when the task keeps under [`WHOLE_ASK_SHARE`] of them and the
+/// request has at least [`WHOLE_ASK_FEWEST`] (#6527); `None` when the task
+/// keeps enough. A plain yes ("yeah sure, go ahead") is never checked: the
+/// task then comes from the read-back before it, not from these words. Nor
+/// is a line in another script than the task's (a Vietnamese ask the
+/// model hands over in English): its words can't be compared.
+fn dropped_from_ask(heard: &str, task: &str) -> Option<Vec<String>> {
+    if plain_yes(heard) {
+        return None;
+    }
+    let asked = ask_words(heard);
+    if asked.len() < WHOLE_ASK_FEWEST
+        || asked.iter().filter(|(_, said)| !said.is_ascii()).count() * 4 > asked.len()
+    {
+        return None;
+    }
+    let kept = ask_words(task);
+    let dropped: Vec<String> = asked
+        .iter()
+        .filter(|(compared, _)| !kept.iter().any(|(word, _)| word == compared))
+        .map(|(_, said)| said.clone())
+        .collect();
+    let keeps = (asked.len() - dropped.len()) as f32;
+    (keeps < WHOLE_ASK_SHARE * asked.len() as f32).then_some(dropped)
+}
+
+/// The requests whose task [`whole_ask`] refused, the last
+/// [`WHOLE_ASK_KEPT`] of them: each refused once only, so a second short
+/// call in the same request goes through and a person is never stuck.
+static WHOLE_ASK_REFUSED: Mutex<Vec<u64>> = Mutex::new(Vec::new());
+/// How many refused requests [`WHOLE_ASK_REFUSED`] keeps: one is in hand at
+/// a time; a few more cost nothing.
+const WHOLE_ASK_KEPT: usize = 8;
+
+/// What `start_agent_task` answers instead of preparing `task` when it
+/// dropped most of the person's ask (#6527): the dropped words named, and
+/// to call again with the whole ask in their words. `heard` is the
+/// request's words as heard; `None` (a typed text, or nothing heard)
+/// checks nothing. Once per request: a second call in the same request is
+/// let through, whatever it keeps.
+fn whole_ask(request: u64, heard: Option<&str>, task: &str) -> Option<Value> {
+    let dropped = dropped_from_ask(heard?, task)?;
+    let mut refused = WHOLE_ASK_REFUSED.lock().ok()?;
+    if refused.contains(&request) {
+        return None;
+    }
+    if refused.len() == WHOLE_ASK_KEPT {
+        refused.remove(0);
+    }
+    refused.push(request);
+    drop(refused);
+    eprintln!(
+        "lamp-voice provider: request {request}: the task dropped {} of the ask's words; the model is asked again",
+        dropped.len()
+    );
+    Some(json!({
+        "error": format!(
+            "Nothing was prepared: the task dropped part of what the person asked ({}). Call {START} again now with the whole ask in their own words: what to do, and every count, list, topic, file name or place they said.",
+            dropped.join(", ")
+        )
+    }))
+}
+
+/// The words heard in `request` for [`whole_ask`]: none for a request
+/// nobody said (the lamp's own, or a typed text, `crate::messages`).
+/// Tests set them per test thread ([`HEARD_IN_TEST`]), never from the
+/// process's shared thread, which other tests fill.
+fn heard_ask(request: u64, heard: bool) -> Option<String> {
+    if !heard || crate::messages::is_text(request) {
+        return None;
+    }
+    #[cfg(test)]
+    {
+        HEARD_IN_TEST.with(|words| words.borrow().clone())
+    }
+    #[cfg(not(test))]
+    {
+        crate::thread::THREAD
+            .lock()
+            .ok()?
+            .heard_for(request, Instant::now())
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// What [`heard_ask`] gives in a test on this thread: nothing unless
+    /// the test sets it.
+    static HEARD_IN_TEST: std::cell::RefCell<Option<String>> =
+        const { std::cell::RefCell::new(None) };
+}
+
 /// The forms of the name the task was prepared for, each as its plain
 /// words: the name and the forms the voice hears for it, the same ones the
 /// `named` check of [`reads_back`] looks for.
@@ -2914,6 +3192,11 @@ fn run_for_asked(
                     json!({"error": "That task is too long to send as it is: say it more shortly."}),
                     true,
                 );
+            }
+            // The task carries the person's whole ask (#6527): one that
+            // dropped most of the heard request's words is refused once.
+            if let Some(told) = whole_ask(request, heard_ask(request, heard).as_deref(), task) {
+                return (told, true);
             }
             // Who is settled before the tasks part is asked anything. The
             // lamp's own engine, OpenClaw or Hermes (#5978, #6226): asked for on the lamp, by name, or
@@ -5072,9 +5355,158 @@ pub(crate) mod tests {
             );
             assert_eq!(
                 task(&on),
-                "The work, in the person's own words. A short ask is enough: the agent works out the details."
+                "Every part of what the person asked, in their own words: what to do, and any count, list, topic, file name or place they said. Never shorten it; the agent works out the rest."
             );
         }
+    }
+
+    /// #6527, row-6361c on 52e6: the heard ask and the task it went as.
+    const FRUITS_HEARD: &str = "have your agent list five fruits that are good when you're sick and write them to fruits dot md";
+
+    /// #6527: a task that keeps under half of the heard ask is refused
+    /// once, naming what it dropped; the whole ask then goes through.
+    #[test]
+    fn a_task_that_drops_most_of_the_ask_is_refused_then_the_whole_ask_goes() {
+        let request = 6_527_001;
+        let told = whole_ask(
+            request,
+            Some(FRUITS_HEARD),
+            "Create a file called fruits.md",
+        )
+        .expect("the cut task is refused");
+        let error = told["error"].as_str().unwrap();
+        for dropped in ["list", "five", "good", "sick", "write"] {
+            assert!(error.contains(dropped), "{error}");
+        }
+        assert!(error.contains(START), "{error}");
+        let whole = "List five fruits that are good when you're sick and write them to fruits.md";
+        assert_eq!(whole_ask(request, Some(FRUITS_HEARD), whole), None);
+        // A new request with the whole ask is never refused either.
+        assert_eq!(whole_ask(6_527_002, Some(FRUITS_HEARD), whole), None);
+    }
+
+    /// #6527: the refusal comes from `start_agent_task` itself, before the
+    /// tasks part is asked anything, and only for a heard request.
+    #[test]
+    fn start_refuses_a_cut_task_before_preparing_it() {
+        let call = ToolCall {
+            id: "c".into(),
+            name: START.into(),
+            args: json!({"task": "Create a file called fruits.md"}),
+        };
+        let directory = Path::new("/nonexistent/tasks-6527");
+        let start = |request: u64, heard: bool| {
+            run_for(
+                &one_yes_place(directory, true),
+                &[],
+                &call,
+                request,
+                heard,
+                Duration::from_millis(200),
+            )
+        };
+        HEARD_IN_TEST.with(|words| *words.borrow_mut() = Some(FRUITS_HEARD.to_owned()));
+        let (told, answered) = start(6_527_010, true);
+        assert!(answered);
+        assert!(
+            told["error"]
+                .as_str()
+                .is_some_and(|error| error.contains("dropped part of what the person asked")),
+            "{told}"
+        );
+        // The second call in the same request goes on to the tasks part.
+        let (told, _) = start(6_527_010, true);
+        assert!(!told.to_string().contains("dropped part of what"), "{told}");
+        // A line the lamp wrote itself is never checked.
+        let (told, _) = start(6_527_011, false);
+        assert!(!told.to_string().contains("dropped part of what"), "{told}");
+        HEARD_IN_TEST.with(|words| *words.borrow_mut() = None);
+        // Nothing heard: nothing checked.
+        let (told, _) = start(6_527_012, true);
+        assert!(!told.to_string().contains("dropped part of what"), "{told}");
+    }
+
+    /// #6527: a task in other words that keeps the ask's content passes.
+    #[test]
+    fn a_paraphrase_that_keeps_the_ask_passes() {
+        for task in [
+            "Write a list of 5 fruits that are good for being sick into fruits.md",
+            "List five fruits good when sick; write them to fruits.md",
+        ] {
+            assert_eq!(dropped_from_ask(FRUITS_HEARD, task), None, "{task}");
+        }
+        assert_eq!(
+            dropped_from_ask(
+                "ask Claude Code to fix the failing login tests in the web app",
+                "Fix the failing login tests in the web app"
+            ),
+            None
+        );
+    }
+
+    /// #6527: a short heard ask, or a plain yes, is never refused.
+    #[test]
+    fn a_short_heard_ask_is_never_refused() {
+        for heard in [
+            "ask Codex to fix the tests",
+            "have your agent write a poem",
+            "yeah sure, go ahead",
+        ] {
+            assert_eq!(
+                whole_ask(6_527_020, Some(heard), "Do something else entirely"),
+                None,
+                "{heard}"
+            );
+        }
+    }
+
+    /// #6527: with no heard text (a typed text, or no transcript) nothing
+    /// is checked.
+    #[test]
+    fn no_heard_text_is_never_checked() {
+        assert_eq!(whole_ask(6_527_030, None, "Create a file"), None);
+        assert_eq!(heard_ask(crate::messages::REQUESTS_FROM + 1, true), None);
+    }
+
+    /// #6527: "five" is "5", "fruits dot md" is "fruits.md", and an
+    /// agent's name or the place is not part of the ask.
+    #[test]
+    fn number_words_and_spoken_file_names_match() {
+        let words = |text: &str| -> Vec<String> {
+            ask_words(text)
+                .into_iter()
+                .map(|(compared, _)| compared)
+                .collect()
+        };
+        assert_eq!(words("five fruits dot md"), words("5 fruits.md"));
+        assert_eq!(
+            words("twelve notes underscore list dot txt"),
+            words("12 notes_list.txt")
+        );
+        assert_eq!(
+            words("ask Claude Code on my computer to open the file"),
+            words("open the file")
+        );
+        assert!(
+            words("open claw, sort the files")
+                .iter()
+                .all(|word| word != "open")
+        );
+        assert_eq!(
+            dropped_from_ask(
+                "have Hermes write three jokes about cats to jokes dot txt",
+                "Write 3 jokes about cats to jokes.txt"
+            ),
+            None
+        );
+        // Spoken in Vietnamese and handed over in English: not compared.
+        assert_eq!(
+            dropped_from_ask(
+                "nhờ Hermes viết năm câu đùa về mèo vào tệp jokes",
+                "Write jokes"
+            ),
+            None
+        );
     }
 
     #[test]
@@ -7271,7 +7703,7 @@ pub(crate) mod tests {
     }
     /// #5978, measured with tools/task-pick-eval.sh: while the lamp has
     /// its own target, start_agent_task says the lamp's Hermes does work by
-    /// default and what is never handed over, a short ask is enough, and
+    /// default and what is never handed over, the whole ask goes, and
     /// `who` is only for a name said; the session note hands written work
     /// over. Without the target, all of it is as before.
     #[test]

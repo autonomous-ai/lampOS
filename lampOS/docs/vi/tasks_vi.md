@@ -647,3 +647,34 @@ lại hơn 7 phút trong `epoll_wait`.
 - **Test:** `the_lamps_own_agent_is_closed_once_done_its_news_untold`. Đang
   làm, hay idle chưa có câu trả lời: để mở. Xong mà chưa kể: để mở dưới một
   phút, rồi đóng. Trên máy tính: chờ kể.
+
+## Việc giao là toàn bộ lời nhờ (#6527)
+
+Trên 52e6 ngày 12/11 (row-6361c), câu "have your agent list five fruits that
+are good when you're sick and write them to fruits dot md" tới Hermes chỉ còn
+"Create a file called fruits.md": mất danh sách và con số, tệp không có loại
+quả nào. Với `LAMP_TASKS_ONE_YES`, tham số `task` của `start_agent_task` giờ
+đọc "Every part of what the person asked, in their own words: what to do, and
+any count, list, topic, file name or place they said. Never shorten it; the
+agent works out the rest." (thay cho "A short ask is enough: the agent works
+out the details", câu mô hình hiểu là được rút gọn). `start_agent_task` còn
+kiểm tra bằng mã (`agent_tasks::whole_ask`), có hay không có công tắc, trước
+khi hỏi phần tasks:
+
+- **Lời đã nghe.** Lời của request như thread giữ (`thread::heard_for`). Tin
+  nhắn gõ, câu do đèn tự viết, hay request không nghe được gì thì không kiểm
+  tra; một câu "yes" đơn thuần cũng không, và một câu có hơn một phần tư từ
+  nội dung không phải ASCII thuần (lời nhờ tiếng Việt được giao bằng tiếng
+  Anh) cũng không.
+- **Từ nội dung** (`ask_words`): các chuỗi chữ và số viết thường, bỏ một tập
+  nhỏ từ nhờ và từ nối (`NOT_ASK`: "the", "to", "your", "agent", "have",
+  "please", …, và các dấu nói "dot", "slash", "underscore", "dash"), các từ
+  nơi chốn "lamp", "computer", "mac", "macbook", "laptop", và mọi dạng tên
+  agent giọng nói biết (`KINDS`), so cả cụm nên "open" trong "open the file"
+  vẫn giữ. Số đọc bằng chữ là chữ số ("five" là "5", `NUMBER_WORDS`), nên
+  "fruits dot md" và "fruits.md" là cùng từ; các từ khác so theo gốc.
+- **Quy tắc.** Khi nghe được ít nhất `WHOLE_ASK_FEWEST` (4) từ nội dung, một
+  task giữ dưới `WHOLE_ASK_SHARE` (một nửa) số từ đó bị từ chối, nêu các từ
+  bị bỏ và bảo gọi lại với toàn bộ lời nhờ. Mỗi request chỉ từ chối một lần:
+  lần gọi thứ hai trong cùng request được cho qua, nên người dùng không bao
+  giờ bị kẹt.
