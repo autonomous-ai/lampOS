@@ -8,7 +8,7 @@ use lamp_msgs::Audio;
 use std::{
     io::{self, Read},
     os::unix::process::CommandExt,
-    process::{Command, Stdio},
+    process::Stdio,
 };
 
 /// Samples in a block (20 ms at 16 kHz), and its bytes.
@@ -28,7 +28,7 @@ pub fn run(bus: &Bus) -> io::Result<()> {
     let script = "ffmpeg -loglevel error -nostdin -f \"$FORMAT\" -i \"$DEVICE\" -ac 1 -ar 16000 -f s16le - & F=$!; \
          while kill -0 \"$OWNER\" 2>/dev/null && kill -0 $F 2>/dev/null; do sleep 1; done; \
          kill $F 2>/dev/null";
-    let mut child = Command::new("sh")
+    let mut child = crate::keys::command("sh")
         .args(["-c", script])
         .env("FORMAT", format)
         .env("DEVICE", &device)

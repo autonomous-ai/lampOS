@@ -42,7 +42,7 @@ fn lamp_name(dir: &Path) -> String {
     format!("virtual-{:06x}", hash & 0xff_ffff)
 }
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] [--real-voice (the real lamp-voice on its Live route with your Gemini key; needs --microphone)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -200,6 +200,8 @@ fn private_dir(dir: &Path) -> std::io::Result<()> {
 
 fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     private_dir(dir)?;
+    // One absolute folder for the whole lamp: the real voice's files and bus root must be absolute paths.
+    let dir = &dir.canonicalize()?;
     // Say it here, not as five silent body restarts: the real lamp-body refuses
     // a lock folder under a folder others can write to.
     if let Some((folder, mode, why)) = writable_ancestor(dir) {
@@ -231,6 +233,61 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     }
     let bus_root = dir.join("bus");
     let _ = std::fs::remove_dir_all(&bus_root);
+    // `--real-voice`: the real lamp-voice on the Live route with the developer's Gemini key (real_voice.rs). Said
+    // before anything starts when it cannot be; with no key, one line and the stand-in voice as always. The key
+    // is read into its file here and dropped (zeroed) at once.
+    let real_voice = if lamp_sim::real_voice::wanted(args) {
+        lamp_sim::real_voice::check(args, &bin).map_err(std::io::Error::other)?;
+        let environment = |name: &str| std::env::var_os(name);
+        let file = lamp_sim::keys::path_from(&environment);
+        let keys =
+            lamp_sim::keys::load(&environment, file.as_deref()).map_err(std::io::Error::other)?;
+        match keys.gemini {
+            Some(key) => {
+                lamp_sim::controls::present(&bin).map_err(std::io::Error::other)?;
+                let model = std::env::var(lamp_sim::real_voice::MODEL_ENVIRONMENT)
+                    .unwrap_or_else(|_| lamp_sim::real_voice::DEFAULT_MODEL.to_owned());
+                let speaker = std::env::var(lamp_sim::real_voice::SPEAKER_ENVIRONMENT)
+                    .unwrap_or_else(|_| "default".to_owned());
+                let unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_millis());
+                // The key's one copy: in memory-backed storage when there is any, and said when not.
+                let home = lamp_sim::real_voice::key_home(
+                    dir,
+                    std::env::var_os("XDG_RUNTIME_DIR").as_deref(),
+                );
+                if !home.in_memory {
+                    eprintln!("lamp-sim: {}", lamp_sim::real_voice::on_disk_line(&home));
+                }
+                Some(lamp_sim::real_voice::prepare(
+                    &lamp_sim::real_voice::Setup {
+                        dir,
+                        bin: &bin,
+                        bus_root: &bus_root,
+                        model: &model,
+                        speaker: &speaker,
+                        unix_ms,
+                        home: &home,
+                    },
+                    &key,
+                )?)
+            }
+            None => {
+                eprintln!(
+                    "lamp-sim: {}",
+                    lamp_sim::real_voice::no_key_line(file.as_deref())
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+    // The key's copy goes on every way out of this function (an error below, a signal's end, the normal end).
+    let _key_guard = real_voice
+        .as_ref()
+        .map(|launch| lamp_sim::real_voice::KeyGuard::new(&launch.key_home));
     // The servo bus, on its own thread.
     let mut port = Port::open()?;
     let link = dir.join("servo");
@@ -361,7 +418,7 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     thread::sleep(Duration::from_secs(1));
     // `--controls`: the real lamp-controls, which publishes `controls/state` for a real voice (controls.rs);
     // off unless asked. It ends with the lamp, as the others do.
-    let mut controls: Option<Child> = if lamp_sim::controls::wanted(args) {
+    let mut controls: Option<Child> = if lamp_sim::controls::wanted(args) || real_voice.is_some() {
         let launch =
             lamp_sim::controls::launch(&bin, &bus_root, &boot_id).map_err(std::io::Error::other)?;
         let mut command = watched(launch.program);
@@ -422,6 +479,21 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
         "lamp-sim: up on {listen}; pair with: lamp-sim code {}",
         dir.display()
     );
+    // The real voice, last (it asks the bus and the door's parts): under the same watcher, with the environment
+    // real_voice.rs names and none of the switches a desktop must not pass. If it ends, one line and the lamp stays up.
+    let mut voice: Option<Child> = match &real_voice {
+        Some(launch) => {
+            let given = lamp_sim::real_voice::environment(launch, std::env::vars_os());
+            let child =
+                lamp_sim::real_voice::watched_command(launch, std::process::id(), given).spawn()?;
+            eprintln!(
+                "lamp-sim: real voice started (the Live route, not a customer lamp's; session {})",
+                launch.session.display()
+            );
+            Some(child)
+        }
+        None => None,
+    };
     // The body is restarted when it ends (a busy laptop can make it miss a
     // servo reply and the real body then stops, as it should), with its why
     // said; more than five times in ten minutes, or the door or a part of lamp-sim
@@ -467,6 +539,18 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             eprintln!("lamp-sim: lamp-control ended");
             ended = true;
         }
+        if let Some(child) = voice.as_mut()
+            && let Ok(Some(status)) = child.try_wait()
+        {
+            eprintln!(
+                "lamp-sim: the real voice ended ({status}); the lamp stays up, its say and volume stand-ins still serve"
+            );
+            // Its watcher has removed the key's copy; this makes sure.
+            if let Some(launch) = &real_voice {
+                lamp_sim::real_voice::remove_key_home(&launch.key_home);
+            }
+            voice = None;
+        }
         if let Some(child) = controls.as_mut()
             && matches!(child.try_wait(), Ok(Some(_)))
         {
@@ -478,6 +562,10 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             // end each group, not only the shell.
             children.push(body);
             children.extend(controls);
+            children.extend(voice);
+            if let Some(launch) = &real_voice {
+                lamp_sim::real_voice::remove_key_home(&launch.key_home);
+            }
             for child in &mut children {
                 if let Some(group) = rustix::process::Pid::from_raw(child.id() as i32) {
                     let _ =
@@ -612,7 +700,7 @@ fn spawn_named(name: &str, work: impl FnOnce() + Send + 'static) -> thread::Join
 /// A part of the lamp (`lamp-body`, `lamp-control`) under a shell that stops it
 /// when lamp-sim ends, even killed: the parts never outlive their lamp.
 fn watched(program: PathBuf) -> Command {
-    let mut command = Command::new("sh");
+    let mut command = lamp_sim::keys::command("sh");
     command
         .args([
             "-c",
