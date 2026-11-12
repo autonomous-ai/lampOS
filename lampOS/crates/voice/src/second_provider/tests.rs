@@ -7148,6 +7148,98 @@ async fn a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is() {
     assert!(heard_for.lock().unwrap().contains(&1));
 }
 
+/// #6543 (`LAMP_SECOND_DOING`): a spoken request from a known person in view
+/// is told what they were last seen doing; one in the room's scope (two
+/// faces, none known) is not, and is never asked of the note. Without the
+/// switch no note is ever asked.
+#[tokio::test]
+async fn a_known_person_speaking_is_told_what_they_were_seen_doing_and_no_one_else_is() {
+    use crate::memory_scope::{FaceCache, GAP, ScopeLease};
+    let path = std::env::temp_dir().join(format!("doing-known-{}", std::process::id()));
+    std::fs::write(&path, "Maya").unwrap();
+    for switched_on in [true, false] {
+        let cache = Arc::new(FaceCache::holding_gaps(Some(GAP)));
+        let script = Arc::new(Script {
+            heard: Mutex::new(
+                [
+                    Ok("Should I have a coffee?".to_owned()),
+                    Ok("And now?".to_owned()),
+                ]
+                .into(),
+            ),
+            chats: Mutex::new(
+                [
+                    vec![text("Maybe later."), Ok(ChatEvent::Done)],
+                    vec![text("Still here."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let runner: ScopedToolRunner =
+            Arc::new(|_, _, _, _, _: ScopeLease| Box::pin(async { json!({"ok":true}) }));
+        let asked_for = Arc::new(Mutex::new(Vec::new()));
+        let noted = asked_for.clone();
+        let heard_for = Arc::new(Mutex::new(Vec::new()));
+        let heard = heard_for.clone();
+        let mut engine = engine.with_memory_scope(
+            lamp_turn_owner::BootId::new([9; 16]).unwrap(),
+            cache.clone(),
+            runner,
+            None,
+        );
+        if switched_on {
+            engine = engine.noting_what_they_did(
+                Arc::new(move |request| {
+                    noted.lock().unwrap().push(request);
+                    Some("DOING NOTE".to_owned())
+                }),
+                Arc::new(move |request| heard.lock().unwrap().push(request)),
+            );
+        }
+        engine.memory_camera(true, 1);
+        let seen = crate::known_faces::FaceObservation::read(&path).unwrap();
+        cache.replace_seen(cache.begin_refresh(), Some(seen), Some(1));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        engine.memory_answered(1, Instant::now());
+        // Two faces, none known: the room's scope.
+        cache.replace_seen(cache.begin_refresh(), None, Some(2));
+        engine.submit(start(2));
+        assert_eq!(
+            engine.memory_lease().unwrap().scope().unwrap().person(),
+            None
+        );
+        engine.submit(audio(2, 1));
+        engine.submit(end(2));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        let told = |messages: &Vec<Message>| {
+            messages.iter().any(|message| {
+                message.role == "system"
+                    && message
+                        .content
+                        .as_ref()
+                        .and_then(Value::as_str)
+                        .is_some_and(|note| note == "DOING NOTE")
+            })
+        };
+        let asked = script.asked.lock().unwrap();
+        assert_eq!(asked.len(), 2);
+        assert_eq!(told(&asked[0]), switched_on, "{:?}", asked[0]);
+        assert!(!told(&asked[1]), "{:?}", asked[1]);
+        if switched_on {
+            assert_eq!(*asked_for.lock().unwrap(), [1], "the known person's only");
+            assert!(heard_for.lock().unwrap().contains(&1));
+        } else {
+            assert!(asked_for.lock().unwrap().is_empty(), "off: never asked");
+        }
+    }
+    std::fs::remove_file(&path).unwrap();
+}
+
 /// #1712: what the lamp did is told to the rule, as the Live worker tells its
 /// own: a task, timer or reminder asked of its parts is its work, and its
 /// own written turn heard is news someone may reply to. A lookup is

@@ -2155,6 +2155,35 @@ async fn seems_task(bus: lamp_bus::Bus, seems: Arc<Mutex<crate::seems_told::Seem
     }
 }
 
+/// `humans/doing` as lamp-seen says it, read every two seconds while the
+/// voice runs (`LAMP_SECOND_DOING=on`, #6543): a fresh value (within
+/// `HumanDoing::LASTS`) with the time it was said, kept only with exactly
+/// one face in view (`crate::doing_told`).
+async fn doing_task(bus: lamp_bus::Bus, doing: Arc<Mutex<crate::doing_told::DoingTold>>) {
+    let mut every = tokio::time::interval(crate::doing_told::POLL);
+    every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    loop {
+        every.tick().await;
+        let fresh_ms = lamp_msgs::HumanDoing::LASTS.as_millis() as u64;
+        let now_ms = SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| since.as_millis() as u64);
+        let read = bus
+            .latest(lamp_msgs::HumanDoing::TOPIC)
+            .ok()
+            .flatten()
+            .filter(|message| now_ms.saturating_sub(message.header.at_unix_ms) < fresh_ms)
+            .and_then(|message| {
+                let said_ms = message.header.at_unix_ms;
+                Some((message.parse::<lamp_msgs::HumanDoing>().ok()?, said_ms))
+            });
+        let faces = crate::known_faces::faces_in_view(&bus);
+        if let Ok(mut doing) = doing.lock() {
+            doing.seen_in_view(read, faces, now_ms, monotonic_us());
+        }
+    }
+}
+
 /// The most requests remembered as given the air's note and not yet heard.
 const AIR_GIVEN_MOST: usize = 4;
 
@@ -2207,6 +2236,34 @@ fn seems_noting(
             if let Ok(mut seems) = spent.lock() {
                 seems.told(now);
                 eprintln!("lamp-voice second: request {request} is told how the person seems");
+            }
+        },
+        busy,
+        clock,
+    )
+}
+
+/// What a known person was last seen doing, as context only
+/// (`LAMP_SECOND_DOING=on`, `crate::doing_told`, #6543): given and spent as
+/// the air's note is ([`air_noting`]), not in a busy room. Which requests
+/// may be given it (a known person in view, spoken) is the engine's to say.
+fn doing_noting(
+    doing: Arc<Mutex<crate::doing_told::DoingTold>>,
+    busy: impl Fn(u64) -> bool + Send + Sync + 'static,
+    clock: fn() -> u64,
+) -> (
+    crate::second_provider::TaskNote,
+    crate::second_provider::AirHeard,
+) {
+    let spent = doing.clone();
+    noting_once(
+        move |now| doing.lock().ok()?.due(now),
+        move |request, now| {
+            if let Ok(mut doing) = spent.lock() {
+                doing.told(now);
+                eprintln!(
+                    "lamp-voice second: request {request} is told what the person was last seen doing"
+                );
             }
         },
         busy,
@@ -3363,6 +3420,32 @@ pub fn serve(
         };
         let (note, heard) = seems_noting(told.clone(), busy, monotonic_us);
         engine = engine.noting_how_they_seem(note, heard);
+    }
+    // What a known person was last seen doing, with `LAMP_SECOND_DOING=on`
+    // and the bus (#6543): context only, never raised by the lamp.
+    let doing = files
+        .second_doing
+        .then(|| {
+            files
+                .bus_root
+                .as_deref()
+                .and_then(|root| lamp_bus::Bus::new(root).ok())
+        })
+        .flatten()
+        .map(|bus| {
+            (
+                bus,
+                Arc::new(Mutex::new(crate::doing_told::DoingTold::default())),
+            )
+        });
+    if let Some((_, told)) = &doing {
+        let busy = |now| {
+            crate::room_told::room()
+                .lock()
+                .is_ok_and(|mut room| room.at(now) == crate::room_told::Room::Busy)
+        };
+        let (note, heard) = doing_noting(told.clone(), busy, monotonic_us);
+        engine = engine.noting_what_they_did(note, heard);
     }
     if let Some(runner) = audio_runner {
         engine = engine.requesting_audio(boots.own, runner);
@@ -5209,6 +5292,12 @@ pub fn serve(
             "lamp-voice second: how a known person seems is told beside what they say (LAMP_SECOND_SEEMS)"
         );
         runtime.spawn(seems_task(bus, told));
+    }
+    if let Some((bus, told)) = doing {
+        eprintln!(
+            "lamp-voice second: what a known person was last seen doing is told beside what they say, as context only (LAMP_SECOND_DOING)"
+        );
+        runtime.spawn(doing_task(bus, told));
     }
     // One bus reader fans out each forget to notes and the exact cache used
     // by this Engine. Confirmation cleanup does not depend on summaries.
@@ -14324,6 +14413,70 @@ mod tests {
         assert!(note(7).is_some() && note(8).is_some(), "due for both");
         heard(7);
         assert_eq!(note(9), None, "the earlier one's answer spent it");
+    }
+
+    /// #6543 (`LAMP_SECOND_DOING`): what the person was last seen doing is
+    /// given as context only, never in a busy room, spent only once its
+    /// request's answer is heard, and told once for each sighting.
+    #[test]
+    fn what_they_were_seen_doing_is_given_once_and_spent_when_heard() {
+        let doing = Arc::new(Mutex::new(crate::doing_told::DoingTold::default()));
+        let busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let room_busy = busy.clone();
+        let (note, heard) = super::doing_noting(
+            doing.clone(),
+            move |_| room_busy.load(std::sync::atomic::Ordering::Relaxed),
+            monotonic_us,
+        );
+        assert_eq!(note(1), None, "nothing read yet");
+        let now_ms = 1_800_000_000_000;
+        let drank = lamp_msgs::HumanDoing {
+            drank_s_ago: 120,
+            ate_s_ago: 3000,
+            break_s_ago: 3000,
+            last: lamp_msgs::Doing::Drinking,
+            confidence: 0.8,
+        };
+        doing
+            .lock()
+            .unwrap()
+            .seen_in_view(Some((drank, now_ms)), Some(1), now_ms, monotonic_us());
+        // Due, but the room is busy: neither said nor counted.
+        busy.store(true, std::sync::atomic::Ordering::Relaxed);
+        assert_eq!(note(2), None, "never in a busy room");
+        busy.store(false, std::sync::atomic::Ordering::Relaxed);
+        let said = note(3).expect("due once the room is not busy");
+        assert!(said.contains("seen drinking about 2 minutes ago"), "{said}");
+        assert!(said.contains("Don't mention it unless they bring it up"));
+        // Request 3 cut short before any word: not spent.
+        heard(99);
+        assert!(note(4).is_some(), "not heard: still due for the next");
+        heard(4);
+        assert_eq!(note(5), None, "heard once: told");
+        // The next message of the same sighting: not told again.
+        let later = lamp_msgs::HumanDoing {
+            drank_s_ago: 150,
+            ..drank
+        };
+        doing.lock().unwrap().seen_in_view(
+            Some((later, now_ms + 30_000)),
+            Some(1),
+            now_ms + 30_000,
+            monotonic_us(),
+        );
+        assert_eq!(note(6), None, "one sighting, told once");
+        // Two faces in view: the drink may be the other's.
+        let again = lamp_msgs::HumanDoing {
+            drank_s_ago: 10,
+            ..drank
+        };
+        doing.lock().unwrap().seen_in_view(
+            Some((again, now_ms + 900_000)),
+            Some(2),
+            now_ms + 900_000,
+            monotonic_us(),
+        );
+        assert_eq!(note(7), None, "two faces in view");
     }
 
     /// migrate-P2, the product's route: with the coordinator's mark, a line
