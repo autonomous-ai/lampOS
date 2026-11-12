@@ -2539,6 +2539,14 @@ for each run, and is answered once the run ends
     ("no token for run <run-id>"). Nothing the run printed is kept by
     lamp-tasks; Harness's own record of the session and Hermes's session
     under its `HERMES_HOME` are as for any Harness session.
+  - **When lamp-tasks stops** (SIGTERM: a restart, an update), a run
+    still waited on is ended the same way, since Harness's daemon, not
+    lamp-tasks, holds its Hermes and would keep it going past lamp-tasks:
+    the stop cancels the wait, the token is ended, then `close --now`,
+    then the folder and token file are removed ("the run was ended as
+    lamp-tasks stops"). lamp-tasks waits for this, at most 20 s
+    (`skill_task::STOP_WAIT`), before it exits. A SIGKILL skips it; that
+    is the backstop below. Test: `a_skill_run_is_ended_when_lamp_tasks_stops`.
   - **No SIGKILL backstop yet.** The design's backstop, SIGKILL to the
     namespace's `unshare` pid when `close --now` fails, is not built:
     Harness's daemon starts Hermes in its own pane, and neither `new` nor
