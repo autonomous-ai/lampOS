@@ -571,6 +571,54 @@ pub fn tools_on_the_lamp(place: &Place, engine: Option<&str>) -> (Vec<Tool>, &'s
     (declared_on(place, &staff, true), default)
 }
 
+/// `start_agent_task`'s `engine` while the lamp has its own target (#6492):
+/// the lamp's engine the person named, else the lamp's default.
+const ENGINE: &str =
+    "Only when they name Hermes or OpenClaw for work on the lamp; else leave it out.";
+
+/// The lamp's own engine a hand-over to the lamp names (#6492): `engine`
+/// when it is `"hermes"` or `"openclaw"`, else `who` naming Hermes or
+/// OpenClaw (any case, "the " left off, as [`on_the_lamp_now`] reads it);
+/// `None` when neither does, and the lamp's default does the work.
+fn named_lamp_engine(args: &Value) -> Option<&'static str> {
+    let said = |key: &str| {
+        args.get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|said| !said.is_empty())
+    };
+    let of = |name: &str| {
+        if name.eq_ignore_ascii_case("hermes") {
+            Some("hermes")
+        } else if name.eq_ignore_ascii_case("openclaw") {
+            Some("openclaw")
+        } else {
+            None
+        }
+    };
+    said("engine")
+        .and_then(of)
+        .or_else(|| said("who").and_then(|who| of(who.trim_start_matches("the ").trim())))
+}
+
+/// The name the person calls the lamp's engine `engine` by (#6492).
+fn lamp_engine_name(engine: &str) -> &'static str {
+    if engine == "hermes" { HERMES } else { OPENCLAW }
+}
+
+/// What the model is told when the tasks part refuses a hand-over to the
+/// lamp naming an engine (#6492): `engine_not_here`, that engine is off or
+/// not installed on the lamp, or else `engine_unknown`. Never retried on the
+/// other engine.
+fn engine_refused(code: &str, name: &str) -> String {
+    let line = if code == "engine_not_here" {
+        format!("{name} isn't set up on me, so I didn't start that.")
+    } else {
+        format!("I don't know {name} here, so I didn't start that.")
+    };
+    format!("{line} Nothing was handed over. Say so plainly in a few words.")
+}
+
 /// `start_agent_task`'s `where` while the lamp has its own target (#5978),
 /// naming the lamp's own engine (`name`, #6226).
 fn where_description(name: &str) -> String {
@@ -1020,6 +1068,12 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
             "type": "string",
             "enum": [LAMP_TARGET, "computer"],
             "description": where_description(lamp_name())
+        });
+        // The lamp's engine, only when one is named (#6492).
+        start_parameters["properties"]["engine"] = json!({
+            "type": "string",
+            "enum": ["hermes", "openclaw"],
+            "description": ENGINE
         });
         // Scored by `provider-check --hand-overs` (#6547). #5978: the lamp does the
         // work by default, so the description says what is handed over and
@@ -3166,11 +3220,21 @@ fn unreached(place: &Place) -> Value {
 
 /// The tasks part's `prepare` request: with a session only when the
 /// person named one ([`REPLY_NAMED_FLAG`], #5535), so without it the
-/// request is as it always was.
-fn preparation(guard: Value, task: &str, target: &str, session: Option<&str>) -> Value {
+/// request is as it always was; with an `engine` only when the person named
+/// the lamp's Hermes or OpenClaw for work on the lamp (#6492).
+fn preparation(
+    guard: Value,
+    task: &str,
+    target: &str,
+    session: Option<&str>,
+    engine: Option<&str>,
+) -> Value {
     let mut request = json!({"op":"prepare","guard":guard,"text":task,"target":target});
     if let Some(session) = session {
         request["session"] = json!(session);
+    }
+    if let Some(engine) = engine {
+        request["engine"] = json!(engine);
     }
     request
 }
@@ -3265,8 +3329,11 @@ fn run_for_asked(
                     Err(told) => return (told, true),
                 }
             };
+            // The lamp's engine named (#6492): sent with the prepare and said
+            // as who does it; an engine given for a computer is ignored.
+            let engine = on_the_lamp.then(|| named_lamp_engine(&call.args)).flatten();
             let (target, who) = if on_the_lamp {
-                (LAMP_TARGET, lamp_name())
+                (LAMP_TARGET, engine.map_or_else(lamp_name, lamp_engine_name))
             } else {
                 member.map_or((place.target.as_str(), CLAUDE_CODE), |member| {
                     (member.alias.as_str(), member.kind.name)
@@ -3310,7 +3377,7 @@ fn run_for_asked(
             };
             let mut prepared = ask_until_sure(
                 &place.directory.join("request.sock"),
-                &preparation(guard, task, target, session),
+                &preparation(guard, task, target, session, engine),
                 left,
             );
             // The target the work was prepared for, for the read-back.
@@ -3336,7 +3403,7 @@ fn run_for_asked(
                         };
                         prepared = ask_until_sure(
                             &place.directory.join("request.sock"),
-                            &preparation(again, task, &other, session),
+                            &preparation(again, task, &other, session, None),
                             left,
                         );
                         sent_to = other;
@@ -3466,6 +3533,12 @@ fn run_for_asked(
                     let told = match code {
                         Some("no_harness") => NO_HARNESS.to_owned(),
                         Some("targets_newer") => TARGETS_NEWER.to_owned(),
+                        // The lamp's engine named is off or not installed
+                        // there (#6492): said plainly, never retried on the
+                        // other engine.
+                        Some(code @ ("engine_not_here" | "engine_unknown")) => {
+                            engine_refused(code, who)
+                        }
                         // Refused early from what the tasks part knows of
                         // that computer (#5199): said plainly, naming who
                         // and where, with nothing handed over.
@@ -11065,6 +11138,139 @@ pub(crate) mod tests {
         );
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #6492: a hand-over to the lamp naming Hermes or OpenClaw, by
+    /// `engine` or by `who`, sends that engine with the prepare and says it
+    /// as who does the work; naming none sends no `engine` and says the
+    /// lamp's default; an `engine` for a computer is ignored; and
+    /// `engine_not_here` is said plainly, never retried on the other engine.
+    #[test]
+    fn a_named_lamp_engine_goes_with_the_prepare_and_is_said() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let directory = std::env::temp_dir().join(format!("agent-engine-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let prepared = json!({"ok":true,"id":7,"prepared_digest":"abc","revision":1});
+        let mut answers = Vec::new();
+        for _ in 0..4 {
+            answers.push(("request.sock", status.clone()));
+            answers.push(("request.sock", prepared.clone()));
+        }
+        answers.push(("request.sock", status.clone()));
+        answers.push((
+            "request.sock",
+            json!({"ok":false,"error":"engine_not_here"}),
+        ));
+        // Answers a retry would get, if one were ever sent.
+        answers.push(("request.sock", status));
+        answers.push(("request.sock", prepared));
+        let seen = tasks_part(&directory, answers);
+        let at = place(&directory, false);
+        let run_with = |default: &'static str, args: Value, request: u64| {
+            LAMP_THERE_HERE.with(|here| here.set(Some(true)));
+            LAMP_NAME_HERE.with(|here| here.set(Some(default)));
+            let call = ToolCall {
+                id: "c".into(),
+                name: START.into(),
+                args,
+            };
+            let told = run(&at, &call, request, true, PEER_WAIT).0;
+            LAMP_NAME_HERE.with(|here| here.set(None));
+            LAMP_THERE_HERE.with(|here| here.set(None));
+            told
+        };
+        let prepare = || loop {
+            let line = seen.recv_timeout(PEER_WAIT).unwrap();
+            if line["op"] == "prepare" {
+                return line;
+            }
+        };
+        let by_engine = run_with(
+            HERMES,
+            json!({"task":"Write a poem","engine":"openclaw"}),
+            3,
+        );
+        assert_eq!(by_engine["where"], "OpenClaw on the lamp", "{by_engine}");
+        let sent = prepare();
+        assert_eq!(
+            (&sent["target"], &sent["engine"]),
+            (&json!("lamp"), &json!("openclaw"))
+        );
+        let by_who = run_with(
+            OPENCLAW,
+            json!({"task":"Write a poem","who":"the hermes"}),
+            4,
+        );
+        assert_eq!(by_who["where"], "Hermes on the lamp", "{by_who}");
+        assert_eq!(prepare()["engine"], "hermes");
+        let unnamed = run_with(HERMES, json!({"task":"Write a poem"}), 5);
+        assert_eq!(unnamed["where"], "Hermes on the lamp", "{unnamed}");
+        let sent = prepare();
+        assert_eq!(sent["target"], "lamp");
+        assert_eq!(sent.get("engine"), None, "{sent}");
+        let computer = run_with(
+            HERMES,
+            json!({"task":"Write a poem","where":"computer","engine":"hermes"}),
+            6,
+        );
+        assert_eq!(
+            computer["where"], "Claude Code on the office computer",
+            "{computer}"
+        );
+        let sent = prepare();
+        assert_eq!(sent["target"], "office");
+        assert_eq!(sent.get("engine"), None, "{sent}");
+        let refused = run_with(
+            HERMES,
+            json!({"task":"Write a poem","engine":"openclaw"}),
+            7,
+        );
+        assert_eq!(
+            refused,
+            json!({"error": "OpenClaw isn't set up on me, so I didn't start that. Nothing was handed over. Say so plainly in a few words."})
+        );
+        assert_eq!(prepare()["engine"], "openclaw");
+        assert!(
+            seen.recv_timeout(Duration::from_millis(200)).is_err(),
+            "never retried on the other engine"
+        );
+        assert_eq!(
+            engine_refused("engine_unknown", OPENCLAW),
+            "I don't know OpenClaw here, so I didn't start that. Nothing was handed over. Say so plainly in a few words."
+        );
+        assert_eq!(named_lamp_engine(&json!({"engine":"claude"})), None);
+        assert_eq!(
+            named_lamp_engine(&json!({"who":"OpenClaw"})),
+            Some("openclaw")
+        );
+        *PENDING.lock().unwrap() = None;
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #6492: `engine` is declared only while the lamp has its own target.
+    #[test]
+    fn the_lamp_engine_is_declared_only_with_the_lamp() {
+        let off = place(Path::new("/run/t"), false);
+        let start = |lamp: bool| {
+            declared_on(&off, &[], lamp)
+                .into_iter()
+                .find(|tool| tool.name == START)
+                .unwrap()
+        };
+        assert_eq!(
+            start(false).parameters.unwrap()["properties"].get("engine"),
+            None
+        );
+        let on = start(true);
+        assert!(on.validate().is_ok());
+        let engine = on.parameters.unwrap()["properties"]["engine"].clone();
+        assert_eq!(engine["enum"], json!(["hermes", "openclaw"]));
+        assert_eq!(engine["description"], ENGINE);
     }
 
     /// #5978, the Reviewer-lead's P3 on #6094: declared with the lamp's
