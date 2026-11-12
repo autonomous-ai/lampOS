@@ -332,11 +332,122 @@ fn only_a_refusal_newer_than_the_running_build_is_said() {
         commit: format!("c{sequence}"),
     };
     state.installed = Some(build(5));
-    state.refuse_as(&build(3), "old", Some("other"));
+    state.refuse_as(&build(3), "old", Some("other"), None);
     assert!(lamp_update::status::refused(&state).is_none());
-    state.refuse_as(&build(6), "a part", Some("part_unwell"));
-    state.refuse_as(&build(7), "lamp-body held, nothing moves: unplug", None);
+    state.refuse_as(&build(6), "a part", Some("part_unwell"), None);
+    state.refuse_as(
+        &build(7),
+        "lamp-body held, nothing moves: unplug",
+        None,
+        None,
+    );
     let said = lamp_update::status::refused(&state).unwrap();
     // The newest, by its fixed name (read from the text for an entry with none).
     assert_eq!((said.sequence, said.reason.as_str()), (7, "held"));
+}
+
+/// A state with build 2 refused as `kind`, at `at_unix_ms`, on boot `boot`.
+fn refused_state(lamp: &Lamp, kind: &str, at_unix_ms: u64, boot: Option<&str>, retried: bool) {
+    let state = lamp.root.join("var/lib/lampos-update/state.json");
+    fs::create_dir_all(state.parent().unwrap()).unwrap();
+    let mut refusal = serde_json::json!({
+        "sequence": 2, "commit": "c2", "why": "lamp-body held, nothing moves: kept unplug request present, and was not before the switch",
+        "at_unix_ms": at_unix_ms, "kind": kind,
+    });
+    if let Some(boot) = boot {
+        refusal["boot_id"] = boot.into();
+    }
+    if retried {
+        refusal["retried"] = true.into();
+    }
+    let state_json = serde_json::json!({
+        "installed": null, "previous": null, "refused": [refusal], "made": [],
+    });
+    fs::write(&state, state_json.to_string()).unwrap();
+}
+
+fn this_boot(lamp: &Lamp, id: &str) {
+    let path = lamp.root.join("proc/sys/kernel/random/boot_id");
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, format!("{id}\n")).unwrap();
+}
+
+/// A build refused because a part was held by a passing local state (a kept
+/// unplug request) is no fault of its own (#6266, 5a): it is tried once more on
+/// another boot or after 24 hours, and stays refused before, whatever else.
+#[test]
+fn a_held_refusal_gets_one_more_try_after_a_reboot_or_24_hours() {
+    let hour_ms = 60 * 60 * 1000;
+    let long_ago = records_now() - 25 * hour_ms;
+    let just_now = records_now() - hour_ms;
+    // Made now, on this boot: refused still.
+    let mut lamp = Lamp::new();
+    publish_voice(&mut lamp, 2);
+    this_boot(&lamp, "boot-b");
+    refused_state(&lamp, "held", just_now, Some("boot-b"), false);
+    assert!(matches!(lamp.round(), Outcome::Refused(why) if why.contains("was put back")));
+    // On another boot: once more, and taken.
+    let mut lamp = Lamp::new();
+    publish_voice(&mut lamp, 2);
+    this_boot(&lamp, "boot-b");
+    refused_state(&lamp, "held", just_now, Some("boot-a"), false);
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    assert_eq!(refused(&lamp), Vec::<u64>::new());
+    // 24 hours on the same boot: once more.
+    let mut lamp = Lamp::new();
+    publish_voice(&mut lamp, 2);
+    this_boot(&lamp, "boot-b");
+    refused_state(&lamp, "held", long_ago, Some("boot-b"), false);
+    assert_eq!(lamp.round(), Outcome::Switched(2));
+    // A boot that is not known (no id, or none noted) is never "another boot".
+    let mut lamp = Lamp::new();
+    publish_voice(&mut lamp, 2);
+    refused_state(&lamp, "held", just_now, Some("boot-a"), false);
+    assert!(matches!(lamp.round(), Outcome::Refused(_)));
+    // Already tried once more: final, however old.
+    let mut lamp = Lamp::new();
+    publish_voice(&mut lamp, 2);
+    this_boot(&lamp, "boot-b");
+    refused_state(&lamp, "held", long_ago, Some("boot-a"), true);
+    assert!(matches!(lamp.round(), Outcome::Refused(_)));
+    // A real fault is refused for good, however old and on any boot.
+    for kind in ["part_unwell", "cut_short", "other"] {
+        let mut lamp = Lamp::new();
+        publish_voice(&mut lamp, 2);
+        this_boot(&lamp, "boot-b");
+        refused_state(&lamp, kind, long_ago, Some("boot-a"), false);
+        assert!(matches!(lamp.round(), Outcome::Refused(_)), "{kind}");
+    }
+}
+
+/// The one more try is only one: a build whose held refusal was lapsed and is
+/// refused again is final; and a try that is cut short does not use it up.
+#[test]
+fn the_one_more_try_of_a_held_refusal_is_only_one() {
+    let build = lamp_update::records::Build {
+        sequence: 2,
+        commit: "c2".into(),
+    };
+    let hours = |h: u64| h * 60 * 60 * 1000;
+    let mut state = lamp_update::records::State::default();
+    let held = "lamp-body held, nothing moves: unplug";
+    state.refuse_as(&build, held, Some("held"), Some("boot-a"));
+    let at = state.refused[0].at_unix_ms;
+    // Not yet: same boot, within the day.
+    assert_eq!(state.lapse_held(2, at + hours(1), Some("boot-a")), None);
+    assert_eq!(state.refused.len(), 1);
+    // Another boot: lapsed, the refusal dropped and the try noted.
+    assert_eq!(
+        state.lapse_held(2, at + hours(1), Some("boot-b")),
+        Some("a reboot")
+    );
+    assert!(state.refused.is_empty());
+    assert_eq!(state.held_retried, vec![2]);
+    // The try is cut short (nothing refused): still no refusal, the next round tries it again.
+    assert_eq!(state.lapse_held(2, at + hours(2), Some("boot-b")), None);
+    // The try is refused as held again: final, whatever the clock and the boot.
+    state.refuse_as(&build, held, Some("held"), Some("boot-b"));
+    assert!(state.refused[0].retried);
+    assert_eq!(state.lapse_held(2, at + hours(100), Some("boot-c")), None);
+    assert_eq!(state.refused.len(), 1);
 }
