@@ -533,6 +533,44 @@ fn on_the_lamp_now(args: &Value, there: bool) -> bool {
     }
 }
 
+/// Where a [`START`] call's work goes and who does it, as the voice maps
+/// its arguments while the lamp has its own target ([`on_the_lamp_now`]):
+/// `("lamp", the lamp's engine)`, or `("computer", who was named, else
+/// default)`. For `provider-check --hand-overs` (#6547).
+pub fn route_of(args: &Value, default: &str) -> (&'static str, String) {
+    let who = args
+        .get(WHO)
+        .and_then(Value::as_str)
+        .map(|who| who.trim().trim_start_matches("the ").trim())
+        .filter(|who| !who.is_empty());
+    if on_the_lamp_now(args, true) {
+        let engine = who
+            .filter(|who| who.eq_ignore_ascii_case(HERMES) || who.eq_ignore_ascii_case(OPENCLAW))
+            .unwrap_or(lamp_name());
+        (LAMP_TARGET, engine.to_owned())
+    } else {
+        ("computer", who.unwrap_or(default).to_owned())
+    }
+}
+
+/// The functions as a lamp with its own target declares them (#5978),
+/// with one computer paired whose agent runs `engine` (`claude`, `codex`),
+/// or none: for `provider-check --hand-overs` (#6547), which reads no
+/// tasks part. The agent's name, the one a computer route defaults to, is
+/// returned with them.
+pub fn tools_on_the_lamp(place: &Place, engine: Option<&str>) -> (Vec<Tool>, &'static str) {
+    let staff: Vec<Member> = engine
+        .and_then(|engine| KINDS.iter().find(|kind| kind.engine == engine))
+        .map(|kind| Member {
+            alias: DEFAULT_TARGET.into(),
+            kind,
+        })
+        .into_iter()
+        .collect();
+    let default = staff.first().map_or(CLAUDE_CODE, |member| member.kind.name);
+    (declared_on(place, &staff, true), default)
+}
+
 /// `start_agent_task`'s `where` while the lamp has its own target (#5978),
 /// naming the lamp's own engine (`name`, #6226).
 fn where_description(name: &str) -> String {
@@ -980,7 +1018,7 @@ fn declared_on(place: &Place, staff: &[Member], lamp: bool) -> Vec<Tool> {
             "enum": [LAMP_TARGET, "computer"],
             "description": where_description(lamp_name())
         });
-        // Measured with tools/task-pick-eval.sh (#5978): the lamp does the
+        // Scored by `provider-check --hand-overs` (#6547). #5978: the lamp does the
         // work by default, so the description says what is handed over and
         // what is not, a short ask is enough, and `who` is for a name said.
         start_parameters["properties"]["task"]["description"] = json!(TASK_SHORT);
@@ -1111,8 +1149,8 @@ const WHO_ON_THE_LAMP: &str = " Only a name they said: never for work done here 
 /// [`START`]'s description while the tasks part has the lamp's own target
 /// (#5978): work that takes more than a quick answer is handed over, here
 /// to the lamp's own engine, OpenClaw or Hermes (#6226), unless a computer or an agent on it is named, and
-/// what the lamp answers or does itself never is. Measured with
-/// `tools/task-pick-eval.sh` (`docs/tasks.md`).
+/// what the lamp answers or does itself never is. Scored by
+/// `provider-check --hand-overs`, route and all (#6547, `docs/tools.md`).
 fn on_the_lamp_description(place: &Place, staff: &[Member]) -> String {
     let with_who = if choosing(place, staff) {
         ", with who will do it,"
@@ -7269,7 +7307,7 @@ pub(crate) mod tests {
             member("office-codex", "codex"),
         ]
     }
-    /// #5978, measured with tools/task-pick-eval.sh: while the lamp has
+    /// #5978, scored by `provider-check --hand-overs` (#6547): while the lamp has
     /// its own target, start_agent_task says the lamp's Hermes does work by
     /// default and what is never handed over, a short ask is enough, and
     /// `who` is only for a name said; the session note hands written work
