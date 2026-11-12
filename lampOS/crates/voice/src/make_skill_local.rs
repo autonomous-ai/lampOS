@@ -2701,8 +2701,12 @@ pub fn answer(
             owner_hears: crate::services::owner_hears(request, heard, lease),
             sends_here: crate::services::sends_here(),
         };
+        // A made skill's read-back, but an agent skill added from a file
+        // (`LAMP_UPLOAD_TO_AGENT`), whose task is read back as any skill's.
         if tasks
-            && made_skill::kept_on_named(&keeping.directory, name).is_none()
+            && made_skill::kept_on_named(&keeping.directory, name).is_none_or(|made| {
+                made_skill::agent_grants(&keeping.directory, &made.sha256).is_some()
+            })
             && let Some(told) = crate::skill_task_yes::read_back(
                 name,
                 asking,

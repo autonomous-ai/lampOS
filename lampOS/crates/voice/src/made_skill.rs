@@ -682,7 +682,7 @@ pub fn repair_brief(request: &str, lines: &str) -> Result<String, &'static str> 
 pub struct Refused(pub String, pub Option<String>);
 
 impl Refused {
-    fn new(why: impl Into<String>) -> Self {
+    pub(crate) fn new(why: impl Into<String>) -> Self {
         Self(why.into(), None)
     }
 }
@@ -7231,6 +7231,80 @@ pub fn keep_added(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
         Ok(does),
         true,
     )
+}
+
+/// An agent skill added from a file (`crate::upload_agent`,
+/// `LAMP_UPLOAD_TO_AGENT`): its `skill.toml` held to
+/// [`crate::upload_agent::capped`], its card (the lamp's own words, its
+/// description the tool's note) marked `made: here`, [`ADDED_FROM_FILE`]
+/// and [`crate::upload_agent::MARK`], the file kept whole as its
+/// instructions beside them, checked and packed by `lamp-skills pack` and
+/// kept from `from` as an added skill, its index entry marked `agent`.
+pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, Refused> {
+    let unkept = |why: io::Error| {
+        eprintln!("lamp-voice: an agent skill added from a file was not kept: {why}");
+        Refused::new(NOT_KEPT_HERE)
+    };
+    ensure_private(&keeping.directory).map_err(unkept)?;
+    drop_unfinished(&keeping.directory);
+    if let Some(made) = kept(&keeping.directory, from) {
+        return Ok(made);
+    }
+    let (version, uses) = crate::upload_agent::capped(&files.toml)?;
+    let grants = crate::upload_agent::grants_of_toml(&files.toml);
+    let does = format!(
+        "Only when you ask for it, the lamp's agent follows the file you added, and {}, and never \
+         on its own.",
+        crate::skill_task_yes::uses_said(&grants)
+    );
+    let (name, marked) = card_marked(
+        &files.card,
+        &written_description(&files.card).unwrap_or_default(),
+        &format!(
+            "made: here\n{MADE_BY}: {}\n{ADDED_FROM_FILE}\n{}",
+            Maker::App.key(),
+            crate::upload_agent::MARK
+        ),
+    )?;
+    let made = packed_and_kept(
+        keeping,
+        from,
+        Card {
+            toml: &files.toml,
+            name,
+            marked,
+            version,
+            uses,
+            scripts: &files.scripts,
+        },
+        Ok(does),
+        true,
+    )?;
+    let mut entries = index(&keeping.directory);
+    for entry in &mut entries {
+        if entry["sha256"] == made.sha256.as_str() {
+            entry["agent"] = json!(true);
+            entry["grants"] = json!(grants);
+        }
+    }
+    write_index(&keeping.directory, &entries).map_err(unkept)?;
+    Ok(made)
+}
+
+/// The grants of the kept agent skill `sha256` in `directory`, as
+/// [`keep_agent`] marked its index entry; none for another skill.
+pub fn agent_grants(directory: &Path, sha256: &str) -> Option<Vec<String>> {
+    index(directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == sha256 && entry["agent"] == true)
+        .map(|entry| {
+            entry["grants"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|grant| grant.as_str().map(str::to_owned))
+                .collect()
+        })
 }
 
 /// The most of an added skill's card description: a tool's is at most

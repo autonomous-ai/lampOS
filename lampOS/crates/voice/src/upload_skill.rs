@@ -188,6 +188,12 @@ pub fn take(
     if let Some(why) = taken(&name, &place.skills, &place.pushed, &keeping.directory) {
         return Err(Refused(why, None));
     }
+    // An agent skill (`LAMP_UPLOAD_TO_AGENT`): the file whole, run by the
+    // lamp's agent ([`crate::upload_agent`]).
+    if skill_toml.is_none() && crate::upload_agent::on() {
+        let (files, _) = crate::upload_agent::files(skill_md)?;
+        return made_skill::keep_agent(&files, &format!("{FROM}{at_unix_ms}"), keeping);
+    }
     let files = match skill_toml {
         Some(toml) => Files {
             toml: toml.to_owned(),
@@ -211,6 +217,26 @@ pub fn on_line(made: &Made) -> String {
         .strip_prefix(&format!("I made {said}, and it's on"))
         .unwrap_or(".");
     format!("I added {said} from a file, not from the Skills Store, and it's on{rest}")
+}
+
+/// A kept skill added from a file put on at once ([`made_skill::put_on`]),
+/// and what the lamp says then: [`on_line`], or for an agent skill
+/// [`crate::upload_agent::went_on`] (its task's yes recorded at once when
+/// its grants allow), or [`not_on_line`] with why it isn't on.
+pub fn put_on_said(keeping: &Keeping, made: &Made) -> String {
+    match made_skill::put_on(keeping, made) {
+        Ok(()) => match made_skill::agent_grants(&keeping.directory, &made.sha256) {
+            Some(grants) => crate::upload_agent::went_on(made, &grants, |name| {
+                crate::upload_agent::record_by(
+                    &keeping.manage,
+                    Path::new(crate::skill_task_yes::CONTROL_SOCKET),
+                    name,
+                )
+            }),
+            None => on_line(made),
+        },
+        Err(why) => not_on_line(&why),
+    }
 }
 
 /// What the lamp says aloud when a skill added from a file couldn't be put
@@ -289,6 +315,8 @@ pub fn line(
                         "version": made.version,
                         "sha256": made.sha256,
                         "uses": {"light": made.uses.light, "body": made.uses.body, "topics": made.uses.topics},
+                        // An agent skill's grants, said back in the app.
+                        "grants": made_skill::agent_grants(&keeping.directory, &made.sha256),
                     }}),
                     Some(made),
                 )
