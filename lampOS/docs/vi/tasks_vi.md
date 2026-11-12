@@ -349,12 +349,17 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     lần chạy như vậy qua bất kỳ một dấu vết: thư mục `skill-<run-id>` trong
     project Harness của nó (không bao giờ là link), file token trong
     `/run/lampos-tasks/runs/`, hay một phiên trên máy của đèn tên
-    `skill-<run-id>` (`harness ps --json`). Token của lần chạy bị kết thúc
+    `skill-<run-id>` làm việc trong chính thư mục của lần chạy đó,
+    `<project>/skill-<run-id>` (`harness ps --json`, trường `folder`). Chỉ
+    run id đúng dạng lamp-tasks tạo mới được tính, `task-<millis>-<pid>-<n>`
+    (`made_run_id`), nên một pane, thư mục hay file người dùng đặt tên
+    `skill-…` (ví dụ `skill-writer`) không bao giờ bị đóng hay xoá, và một
+    phiên không có thư mục hoặc ở thư mục khác được để yên (review #6713). Token của lần chạy bị kết thúc
     với lamp-control trước (lần chạy giữ token trong bộ nhớ, nên xoá file
     không thu hồi gì), rồi mỗi phiên được `close --now` (trong
     `CLOSE_BUDGET`), rồi thư mục và file token bị xoá, kể cả khi đóng lỗi.
     Mỗi lần chạy có một dòng nhật ký nói đã kết thúc, đóng và xoá gì ("a
-    run an earlier start left, skill-<id>: token ended, closed …, folder
+    run an earlier start left, skill-<id>: token end asked, closed …, folder
     removed, token file removed"). Việc dọn chạy trên một thread riêng trước khi
     Harness của skill được gắn, nên lần chạy của skill bị từ chối ("Harness
     isn't set up on this lamp yet") cho tới khi dọn xong, không lần chạy

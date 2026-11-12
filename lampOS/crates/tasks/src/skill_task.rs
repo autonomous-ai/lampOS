@@ -520,6 +520,21 @@ impl Tokens for ControlTokens {
     }
 }
 
+/// Whether `run` has the one shape [`run_id`] makes,
+/// `task-<millis>-<pid>-<n>`, each part plain digits (#6713 review): the
+/// start's sweep ([`leftovers`]) takes nothing else for a run of its own,
+/// so a folder, file or session a person named `skill-…` is never swept.
+pub fn made_run_id(run: &str) -> bool {
+    crate::run_token_file::run_id_ok(run)
+        && run.strip_prefix("task-").is_some_and(|rest| {
+            let parts: Vec<&str> = rest.split('-').collect();
+            parts.len() == 3
+                && parts
+                    .iter()
+                    .all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+        })
+}
+
 /// A run id of lamp-tasks' own, new for each hand-over: plain characters,
 /// under lamp-control's 64. A second mint for the same id would replace the
 /// first run's token, so two hand-overs never share one.
@@ -1497,10 +1512,17 @@ pub struct Leftover {
 
 /// The runs an earlier lamp-tasks left behind (#6691), by any one trace:
 /// a `skill-<id>` folder in `project` (a real folder, never a link), a
-/// token file `<runs>/<id>`, or a session `named` `skill-<id>` (each row
-/// `(agent id, name)`, from `harness ps`). Read at start, before a run
-/// can begin, so each is one this process never started.
-pub fn leftovers(project: &Path, runs: &Path, named: &[(String, String)]) -> Vec<Leftover> {
+/// token file `<runs>/<id>`, or a session `named` `skill-<id>` that works
+/// in that run's own folder, `<project>/skill-<id>` (from `harness ps`).
+/// Only an id of the shape lamp-tasks makes counts ([`made_run_id`]), and a
+/// session with no folder, or another, is left alone: a person's own pane
+/// is never closed (#6713 review). Read at start, before a run can begin,
+/// so each is one this process never started.
+pub fn leftovers(
+    project: &Path,
+    runs: &Path,
+    named: &[crate::harness::PsSession],
+) -> Vec<Leftover> {
     let mut found: std::collections::BTreeMap<String, Vec<String>> = Default::default();
     let names = |dir: &Path| -> Vec<(String, std::fs::FileType)> {
         std::fs::read_dir(dir)
@@ -1518,21 +1540,29 @@ pub fn leftovers(project: &Path, runs: &Path, named: &[(String, String)]) -> Vec
     for (name, kind) in names(project) {
         if let Some(run) = name.strip_prefix(RUN_FOLDER_PREFIX)
             && kind.is_dir()
-            && crate::run_token_file::run_id_ok(run)
+            && made_run_id(run)
         {
             found.entry(run.to_owned()).or_default();
         }
     }
     for (name, kind) in names(runs) {
-        if kind.is_file() && crate::run_token_file::run_id_ok(&name) {
+        if kind.is_file() && made_run_id(&name) {
             found.entry(name).or_default();
         }
     }
-    for (agent, name) in named {
-        if let Some(run) = name.strip_prefix(RUN_FOLDER_PREFIX)
-            && crate::run_token_file::run_id_ok(run)
+    for session in named {
+        if let Some(run) = session.name.strip_prefix(RUN_FOLDER_PREFIX)
+            && made_run_id(run)
+            && session
+                .folder
+                .as_deref()
+                .map(|folder| folder.trim_end_matches('/'))
+                == project.join(&session.name).to_str()
         {
-            found.entry(run.to_owned()).or_default().push(agent.clone());
+            found
+                .entry(run.to_owned())
+                .or_default()
+                .push(session.id.clone());
         }
     }
     found
@@ -1559,7 +1589,7 @@ pub fn sweep(
         .iter()
         .map(|leftover| {
             end(&leftover.run);
-            let mut said = vec!["token ended".to_owned()];
+            let mut said = vec!["token end asked".to_owned()];
             for agent in &leftover.agents {
                 said.push(match close(agent) {
                     Ok(()) => format!("closed {agent}"),
@@ -2663,28 +2693,83 @@ mod tests {
         const { assert!(CPU_QUOTA_PERCENT < (LAMP_CORES - 1) * 100) };
     }
 
-    /// #6691: a run left by an earlier start is found by any one trace (its
-    /// folder, its token file, or a session named for it), each run once;
-    /// anything else in those places is left alone.
+    const RUN_A: &str = "task-1762981200000-4242-0";
+    const RUN_B: &str = "task-1762981200000-4242-1";
+    const RUN_C: &str = "task-1762981200000-4242-2";
+    const RUN_D: &str = "task-1762981200000-4242-3";
+
+    /// A `harness ps` row as [`crate::harness::Cli::named`] reads it.
+    fn ps(id: &str, name: &str, folder: Option<&Path>) -> crate::harness::PsSession {
+        crate::harness::PsSession {
+            id: id.into(),
+            name: name.into(),
+            folder: folder.map(|folder| folder.to_string_lossy().into_owned()),
+        }
+    }
+
+    /// #6713 review: only [`run_id`]'s own shape is a run of lamp-tasks'.
+    #[test]
+    fn issue_6691_only_the_shape_run_id_makes_is_a_run() {
+        assert!(made_run_id(&run_id()));
+        assert!(made_run_id(RUN_A));
+        for other in [
+            "writer",
+            "run-a",
+            "task-1-2",
+            "task-1-2-3-4",
+            "task-1--3",
+            "task-a-2-3",
+            "Task-1-2-3",
+            "task-1-2-3 ",
+            "",
+        ] {
+            assert!(!made_run_id(other), "{other:?}");
+        }
+        assert!(!made_run_id(&format!("task-{}-1-2", "9".repeat(60))));
+    }
+
+    /// #6691: a run an earlier start left is found by its folder, its token
+    /// file, or a session named for it in its own folder (#6713 review);
+    /// anything else in those places is left alone, a person's own
+    /// `skill-writer` pane above all.
     #[test]
     fn issue_6691_leftovers_are_found_by_folder_token_file_or_session_name() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path().join("lamp-tasks");
         let runs = dir.path().join("runs");
-        std::fs::create_dir_all(project.join("skill-run-a")).unwrap();
-        std::fs::create_dir_all(project.join("skill-run-b")).unwrap();
+        std::fs::create_dir_all(project.join(format!("skill-{RUN_A}"))).unwrap();
+        std::fs::create_dir_all(project.join(format!("skill-{RUN_B}"))).unwrap();
         std::fs::create_dir_all(project.join("someone-else")).unwrap();
+        std::fs::create_dir_all(project.join("skill-writer")).unwrap();
         std::fs::create_dir_all(project.join("skill-Bad_Id")).unwrap();
-        std::fs::write(project.join("skill-a-file"), "").unwrap();
-        std::os::unix::fs::symlink(dir.path(), project.join("skill-a-link")).unwrap();
+        std::fs::write(project.join(format!("skill-{RUN_C}x")), "").unwrap();
+        std::fs::write(project.join(format!("skill-{RUN_D}")), "").unwrap();
+        std::os::unix::fs::symlink(dir.path(), project.join("skill-task-1-2-9")).unwrap();
         std::fs::create_dir_all(&runs).unwrap();
-        std::fs::write(runs.join("run-b"), "").unwrap();
-        std::fs::write(runs.join("run-c"), "").unwrap();
+        std::fs::write(runs.join(RUN_B), "").unwrap();
+        std::fs::write(runs.join(RUN_C), "").unwrap();
+        std::fs::write(runs.join("notes"), "").unwrap();
+        let own = |run: &str| project.join(format!("skill-{run}"));
         let named = [
-            ("agent-1".to_owned(), "skill-run-a".to_owned()),
-            ("agent-2".to_owned(), "skill-run-d".to_owned()),
-            ("agent-3".to_owned(), "lamp-task-001".to_owned()),
-            ("agent-4".to_owned(), "skill-run-a".to_owned()),
+            ps("agent-1", &format!("skill-{RUN_A}"), Some(&own(RUN_A))),
+            ps("agent-2", &format!("skill-{RUN_D}"), Some(&own(RUN_D))),
+            ps("agent-3", "lamp-task-001", Some(&project)),
+            ps(
+                "agent-4",
+                &format!("skill-{RUN_A}"),
+                Some(&project.join(format!("skill-{RUN_A}/"))),
+            ),
+            // A person's own panes, never swept: a name they chose, in a
+            // run's folder or their own; a run's name in another folder;
+            // a run's name with no folder said.
+            ps(
+                "person-1",
+                "skill-writer",
+                Some(&project.join("skill-writer")),
+            ),
+            ps("person-2", "skill-writer", Some(dir.path())),
+            ps("person-3", &format!("skill-{RUN_B}"), Some(dir.path())),
+            ps("person-4", &format!("skill-{RUN_B}"), None),
         ];
         let found = leftovers(&project, &runs, &named);
         let leftover = |run: &str, agents: &[&str]| Leftover {
@@ -2694,10 +2779,10 @@ mod tests {
         assert_eq!(
             found,
             [
-                leftover("run-a", &["agent-1", "agent-4"]),
-                leftover("run-b", &[]),
-                leftover("run-c", &[]),
-                leftover("run-d", &["agent-2"]),
+                leftover(RUN_A, &["agent-1", "agent-4"]),
+                leftover(RUN_B, &[]),
+                leftover(RUN_C, &[]),
+                leftover(RUN_D, &["agent-2"]),
             ]
         );
         // Nothing there at all, as on a lamp's first start: none.
@@ -2705,25 +2790,33 @@ mod tests {
         assert!(leftovers(&none.join("p"), &none.join("r"), &[]).is_empty());
     }
 
-    /// #6691: the sweep closes each session first, then removes the folder
-    /// and the token file, even when a close failed (the hung `close --now`
-    /// Thirteen's P3 on #6684 left open); its journal line names each part.
+    /// #6691: the sweep ends each run's token, closes its sessions, then
+    /// removes the folder and the token file, even when a close failed (the
+    /// hung `close --now` Thirteen's P3 on #6684 left open); its journal
+    /// line names each part. A person's `skill-writer` folder stays.
     #[test]
     fn issue_6691_the_sweep_closes_then_removes_and_says_what_it_did() {
         let dir = tempfile::tempdir().unwrap();
         let project = dir.path().join("lamp-tasks");
         let runs = dir.path().join("runs");
-        std::fs::create_dir_all(project.join("skill-run-a/deep")).unwrap();
-        std::fs::create_dir_all(project.join("skill-run-b")).unwrap();
+        let own = |run: &str| project.join(format!("skill-{run}"));
+        std::fs::create_dir_all(own(RUN_A).join("deep")).unwrap();
+        std::fs::create_dir_all(own(RUN_B)).unwrap();
+        std::fs::create_dir_all(project.join("skill-writer")).unwrap();
         std::fs::create_dir_all(&runs).unwrap();
-        std::fs::write(runs.join("run-a"), "").unwrap();
+        std::fs::write(runs.join(RUN_A), "").unwrap();
         std::fs::write(project.join("keep.txt"), "").unwrap();
         let found = leftovers(
             &project,
             &runs,
             &[
-                ("agent-1".into(), "skill-run-a".into()),
-                ("agent-2".into(), "skill-run-b".into()),
+                ps("agent-1", &format!("skill-{RUN_A}"), Some(&own(RUN_A))),
+                ps("agent-2", &format!("skill-{RUN_B}"), Some(&own(RUN_B))),
+                ps(
+                    "person-1",
+                    "skill-writer",
+                    Some(&project.join("skill-writer")),
+                ),
             ],
         );
         assert_eq!(found.len(), 2);
@@ -2741,18 +2834,22 @@ mod tests {
         let lines = sweep(&project, &runs, &found, &end, &close);
         assert_eq!(
             *closed.borrow(),
-            ["end run-a", "agent-1", "end run-b", "agent-2"]
+            [
+                format!("end {RUN_A}"),
+                "agent-1".to_owned(),
+                format!("end {RUN_B}"),
+                "agent-2".to_owned()
+            ]
         );
-        assert!(!project.join("skill-run-a").exists());
-        assert!(
-            !project.join("skill-run-b").exists(),
-            "removed though its close failed"
-        );
-        assert!(!runs.join("run-a").exists());
+        assert!(!own(RUN_A).exists());
+        assert!(!own(RUN_B).exists(), "removed though its close failed");
+        assert!(!runs.join(RUN_A).exists());
         assert!(project.join("keep.txt").exists());
+        assert!(project.join("skill-writer").exists());
         assert_eq!(lines.len(), 2);
         assert!(
-            lines[0].contains("skill-run-a") && lines[0].contains("token ended, closed agent-1"),
+            lines[0].contains(&format!("skill-{RUN_A}"))
+                && lines[0].contains("token end asked, closed agent-1"),
             "{lines:?}"
         );
         assert!(

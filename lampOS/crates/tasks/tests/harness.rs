@@ -3,9 +3,9 @@
 use lamp_tasks::harness::{
     AccountMachine, CLOSE_BUDGET, CLOSE_READ_TIMEOUT, Cli, CliConfig, Closed, Ended, EngineKind,
     EngineRow, JoinedOn, Launch, LaunchOutcome, Listed, MOST_ABOUT_BYTES, MOST_LISTED, MOST_WAITED,
-    PS_STDOUT_LIMIT, SessionMachines, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd, WatchEvent,
-    WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_engines, parse_machines,
-    parse_ps, parse_wait, parse_watch_line, this_computer,
+    PS_STDOUT_LIMIT, PsSession, SessionMachines, SignIn, Target, WATCH_LINE_LIMIT, WatchEnd,
+    WatchEvent, WatchLine, iso_unix_ms, parse_auth_here, parse_auth_status, parse_engines,
+    parse_machines, parse_ps, parse_wait, parse_watch_line, this_computer,
 };
 use lamp_tasks::runtime::{
     HarnessSwitches, NEW_FOLDER_FILE, SESSION_INDEX_FILE, targets_from_machines,
@@ -6847,16 +6847,30 @@ fn a_skill_run_is_refused_with_no_harness_or_an_old_wrapper() {
 /// #6691: lamp-tasks' start reads each session's id and name from one `ps`
 /// of the lamp's machine; a row with no name or no agent id is left out.
 #[test]
-fn issue_6691_named_reads_each_sessions_id_and_name_from_one_ps() {
+fn issue_6691_named_reads_each_sessions_id_name_and_folder_from_one_ps() {
     let rig = Rig::new();
     rig.plan(json!({"ps":step(json!({"ok":true,"harnesses":[
-        {"id":AGENT,"name":"skill-run-a","state":"idle"},
+        {"id":AGENT,"name":"skill-task-1-2-3","state":"idle","folder":"/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-task-1-2-3"},
+        {"id":"33333333-3333-4333-8333-333333333333","name":"skill-writer","state":"idle","folder":null},
         {"id":"22222222-2222-4222-8222-222222222222","state":"idle"},
-        {"id":"not-an-agent","name":"skill-run-b","state":"idle"},
+        {"id":"not-an-agent","name":"skill-task-1-2-4","state":"idle"},
     ]}))}));
     assert_eq!(
         rig.cli().named(MACHINE).unwrap(),
-        [(AGENT.to_owned(), "skill-run-a".to_owned())]
+        [
+            PsSession {
+                id: AGENT.to_owned(),
+                name: "skill-task-1-2-3".to_owned(),
+                folder: Some(
+                    "/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-task-1-2-3".to_owned()
+                ),
+            },
+            PsSession {
+                id: "33333333-3333-4333-8333-333333333333".to_owned(),
+                name: "skill-writer".to_owned(),
+                folder: None,
+            },
+        ]
     );
     let calls = rig.calls();
     assert_eq!(calls.len(), 1);

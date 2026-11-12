@@ -2831,11 +2831,11 @@ impl Cli {
         parse_ps(&reply.stdout).map_err(str::to_string)
     }
 
-    /// Each harness on one machine as `(agent id, name)`, from one `ps`
+    /// Each harness on one machine with its name and folder, from one `ps`
     /// (#6691: lamp-tasks' start finds the skill runs an earlier start
-    /// left by their `skill-<run-id>` names). A read only; a row with no
-    /// name is left out.
-    pub fn named(&self, machine: &str) -> Result<Vec<(String, String)>, String> {
+    /// left by their `skill-<run-id>` names in their own folders). A read
+    /// only; a row with no name is left out.
+    pub fn named(&self, machine: &str) -> Result<Vec<PsSession>, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -5537,7 +5537,7 @@ pub fn parse_ps(bytes: &[u8]) -> Result<Vec<Listed>, &'static str> {
 /// `harness ps --json`'s rows as `(agent id, name)` (#6691): a row with no
 /// agent id or no name is left out, and the reply is bounded as
 /// [`parse_ps`]'s.
-pub fn parse_ps_names(bytes: &[u8]) -> Result<Vec<(String, String)>, &'static str> {
+pub fn parse_ps_names(bytes: &[u8]) -> Result<Vec<PsSession>, &'static str> {
     if bytes.len() > PS_STDOUT_LIMIT {
         return Err("status_invalid_reply");
     }
@@ -5556,9 +5556,22 @@ pub fn parse_ps_names(bytes: &[u8]) -> Result<Vec<(String, String)>, &'static st
                 .as_str()
                 .map(str::trim)
                 .filter(|name| !name.is_empty())?;
-            Some((id.to_owned(), name.to_owned()))
+            Some(PsSession {
+                id: id.to_owned(),
+                name: name.to_owned(),
+                folder: row["folder"].as_str().map(str::to_owned),
+            })
         })
         .collect())
+}
+
+/// One harness `harness ps` lists ([`Cli::named`], #6691): its agent id,
+/// its name and the folder it works in, when Harness says one.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PsSession {
+    pub id: String,
+    pub name: String,
+    pub folder: Option<String>,
 }
 
 #[derive(Deserialize)]
