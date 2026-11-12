@@ -130,6 +130,7 @@ lamp says so.
 | `system.info`'s `onboarding_done_at` | when the lamp's setup walk ended, in Unix ms (#5812): the voice's `onboarding/pending` heartbeat's `done_at_unix_ms`, said whenever it is known, so an app that missed `onboarding.done` opens Skills on its page's open if it hasn't for that `at`. No field while unknown: a walk not ended, a lamp set up before it was dated, or the voice not running ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_done_supported` | `true` while `LAMP_APP_ONBOARDING_DONE=on` (with a state folder): this lamp will send `onboarding.done`, so the app may wait for it (Mobile's ask on #5824). No field otherwise: an older lamp, or the switch off, never sends it, so the app doesn't wait ("Setup done, told to the app" below) |
 | `system.info`'s `onboarding_step_supported` | `true` with the same switch: this lamp sends `onboarding.step` as each walk step ends (#5979). No field otherwise ("Each setup step, told to the app" below) |
+| `system.info`'s `update_events_supported` | `true` while `LAMP_APP_UPDATE_EVENTS=on` (with a state folder): this lamp sends `update.started` and `update.ended` (#6284). No field otherwise ("An update, told to the app" below) |
 | `system.info`'s `onboarding_page_supported` | `true` with the same switch: this lamp takes `onboarding.page` and sends `onboarding.page_done` (#6076). No field otherwise, so the app keeps its Next ("The app's onboarding pages, done on the lamp" below) |
 | `system.info`'s `onboarding_page_version` | `2` with the same switch (#6366): which `onboarding.page` contract the lamp speaks. 2 is per-tap Add (`added: [id]`, one tap a message, the page done with its first installed skill's line) and the `done` page (#6353). No field means 1, #6076's: picks sent once as Add is left, done at once. A version-2 lamp still ends Add on a 1-era leave: an `added` of no ids or several. The app sends per-tap adds and `done` only when it reads `>= 2` |
 | `system.info`'s `account` | `signed_out` while this lamp's login is no longer accepted (`LAMP_SIGNED_OUT=on`, "Signed out" below). No field otherwise, read as before: an older lamp, the switch off, and a lamp signed in all say none |
@@ -2444,6 +2445,65 @@ As each step of the setup walk ends, the app is told, once. Behind
 
 Tests: `online::tests::each_walk_step_is_told_once_beside_the_walks_end`,
 `without_the_switch_no_walk_step_is_told`, `onboarding_step::tests`,
+`answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`, and
+`app_contract.rs`'s `system.info` row.
+
+## An update, told to the app (#6284, `update.started`, `update.ended`)
+
+So the app can show "Updating" while a lamp updates (the product's call on
+#6284: "MQTT when the update starts and when it ends"), lamp-cloud pushes two
+unasked events, as `onboarding.step` is pushed. Behind its own switch,
+`LAMP_APP_UPDATE_EVENTS=on` (exactly), with `LAMP_CLOUD=on` and a state
+folder; on in the product's unit, after a run on lamp-e82d on 11 Nov. Otherwise
+nothing changes. Not gated on the reports' yes: the update alerts
+("Software update alerts") are the backend's, these are the app's own
+screen (`crate::update_events`).
+
+- **What.** One unasked `data` reply on `fd_channel` each, V1's envelope:
+  `{"type":"data","kind":"update.started","status":"success","data":{"round":<unix ms>,"from":"812+4a39f04","to":"813+4a39f04","at":<unix ms>},"device":"lamp",...}`
+  and
+  `{"type":"data","kind":"update.ended","status":"success","data":{"round":<unix ms>,"outcome":"switched","build":"813+4a39f04","at":<unix ms>},"device":"lamp",...}`.
+  `round` is the round's own start (`update/status`'s
+  `round.started_at_unix_ms`), the same in both, the app's key. `from` is the
+  build running when the round was seen to fetch, `to` the build it installs
+  (`round.target`, `null` if not said), `build` the build running at its end
+  (`null` if lamp-update says none). Builds are typed as the update alerts
+  type them: digits, hex digits and `+`, the commit cut to 7, else the
+  sequence alone. `outcome` is the round's outcome by its name as
+  `update/status` says it, one of `switched`, `held`, `self-switched`,
+  `self-confirmed`, `self-put-back`, `refused`, `rolled-back`, `failed`,
+  `not-quiet`, `unreachable`, `would`, `up-to-date`, `nothing-published`,
+  else `other`. `at` is when the start was first seen, and the end's own
+  time. Nothing personal: `data` holds these four keys only.
+- **When.** `update/status` (fresh, not stale) is read at most once a second
+  on the tick, connected or not. `update.started` as soon as a round brings a
+  newer build (`UpdateStatus::brings_a_build`: its `target` newer than the running build, read a few
+  seconds into `checking`, or `fetching` on); a round that only checks
+  and finds the lamp current sends nothing. `update.ended` when that round's
+  end is said (`last` with its `started_at_unix_ms`, or, read back from
+  lamp-update's records after it restarted itself, an end after the round
+  began), only for a round whose `update.started` is owed or sent, and always
+  after it. A round whose end was never seen (lamp-update stopped
+  mid-round) ends as `other` once a later round is said, so the app is not
+  left "Updating".
+- **Offline, restarts.** Each is sent only while connected and kept until
+  the broker's ack, as `onboarding.done` is: one the connection took before
+  its ack is sent again on the next connection. What is owed and what was
+  acked is kept in `$STATE_DIRECTORY/update-events`
+  (`{"newest", "rounds": [{"round", "from", "to", "at", "started_acked",
+  "end", "ended_acked"}]}`, at most 4 rounds owed), so a restart (a round
+  that switches lamp-cloud restarts it mid-round) neither repeats one acked
+  nor loses the end. The journal says `update.started: handed to the
+  client, round <round>` and `update.started: acked by the broker, round
+  <round> kept`, the same for `update.ended`.
+- **Will it come.** `system.info`'s `update_events_supported: true`, with
+  the switch on. No field otherwise: the app doesn't wait.
+
+Tests: `online::tests::without_the_switch_no_update_event_is_told`,
+`an_up_to_date_round_tells_the_app_nothing`,
+`an_updates_start_is_told_once_and_its_end_after_a_restart`,
+`an_updates_end_lost_before_its_ack_is_told_again`, `update_events::tests`,
+`update_alerts::tests::an_outcomes_name_is_one_this_build_knows`,
 `answer::tests::the_kinds_this_lamp_has_are_answered_by_its_parts`, and
 `app_contract.rs`'s `system.info` row.
 

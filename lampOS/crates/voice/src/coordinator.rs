@@ -16619,13 +16619,18 @@ fn tell_walk(
     let Some(current) = reply.filter(|current| current.local_only.is_none()) else {
         return;
     };
-    let now = (current.owner.turn(), crate::onboarding::under_way_now());
+    // The first update's hold (#6284) is told as the walk is: with each
+    // turn while it holds, and once as it ends.
+    let on = crate::onboarding::under_way_now();
+    let updating = crate::onboarding::updating_line();
+    let now = (current.owner.turn(), on || updating.is_some());
     if walk_to_tell(*told, now) {
         *told = Some(now);
         queue.push_back(ProviderInput::WalkUnderWay {
             request: now.0,
             privacy_generation,
-            on: now.1,
+            on,
+            updating,
         });
     }
 }

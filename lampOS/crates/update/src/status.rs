@@ -334,6 +334,17 @@ impl Telling {
         self.tell(status);
     }
 
+    /// The round under way ends with nothing kept: `idle` again with the
+    /// last end as it was (#6284, a round before setup that couldn't reach
+    /// the channel, [`crate::first_update::kept`]).
+    pub fn let_go(&mut self) {
+        self.phase = None;
+        self.began_unix_ms = None;
+        self.target = None;
+        let status = status(&self.records, "idle", self.last.as_ref(), None);
+        self.tell(status);
+    }
+
     fn tell(&mut self, status: UpdateStatus) {
         if let Some(said) = &self.said
             && let Ok(mut said) = said.lock()

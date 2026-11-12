@@ -13,6 +13,9 @@ ConditionPathExists=/etc/lampOS/setup/reset-plan.json
 After=local-fs.target
 
 [Service]
+# The first update after setup (#6284, docs/setup.md "The first update after setup"): the first-update file written
+# just before the marker. With lamp-update's and the voice's.
+Environment=LAMP_FIRST_UPDATE=on
 Type=simple
 # Root: the radio scripts, wpa_supplicant's file, /etc/localtime, nginx.
 User=root

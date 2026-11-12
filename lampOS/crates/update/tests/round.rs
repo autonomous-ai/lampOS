@@ -701,6 +701,7 @@ impl Lamp {
             product_settings: false,
             writer_from: None,
             image: false,
+            first_update: false,
         };
         Self {
             _folder: folder,

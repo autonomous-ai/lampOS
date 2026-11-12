@@ -7006,7 +7006,11 @@ impl Engine {
             }
             // The walk under way or not (#5931): this process's own, read
             // as the model's words are said ([`crate::onboarding::model_words`]).
-            ProviderInput::WalkUnderWay { on, .. } => crate::onboarding::set_under_way(on),
+            ProviderInput::WalkUnderWay { on, updating, .. } => {
+                crate::onboarding::set_under_way(on);
+                // The first update's waiting line (#6284): this process's own.
+                crate::onboarding::set_updating(updating);
+            }
             // Begun in a computer's turn: the rule takes its line as a call,
             // as a tap's, whenever its words are judged.
             ProviderInput::TurnOpened { request, .. } => {
@@ -14379,7 +14383,14 @@ async fn answer(
     // and no chat at all.
     let own = written
         .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
-        .flatten();
+        .flatten()
+        // A person who talks to the lamp while the first update after setup
+        // holds the walk (#6284) hears that it is updating, and no chat.
+        .or_else(|| {
+            (heard && !said.trim().is_empty())
+                .then(crate::onboarding::updating_words)
+                .flatten()
+        });
     // A chat begun on the early words was asked without the held forget's
     // result, or that its yes did not count, so it does not stand for
     // round 1.

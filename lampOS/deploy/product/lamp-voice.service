@@ -73,6 +73,9 @@ Environment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json
 # setup. Row 10 passed whole on lamp-52e6 on 22 Oct (#2843). Its functions reach every chat request on the
 # second route since #3430.
 Environment=LAMP_ONBOARDING=on
+# The walk waits for the first update after setup (#6284, docs/onboarding.md "Held for the first update"): one line
+# when a newer build is read, one when it has switched. With setup's and lamp-update's.
+Environment=LAMP_FIRST_UPDATE=on
 Environment=LAMP_BUS=on
 # The privacy route (docs/privacy-switch.md): Controls reads the lamp's privacy switch (chip 1 line 9, the pins file's
 # privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,

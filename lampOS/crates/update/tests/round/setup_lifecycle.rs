@@ -447,3 +447,38 @@ fn recovery_rechecks_effective_aliases_after_restoring_the_old_unit() {
         PathBuf::from(sha("setup 1"))
     );
 }
+
+/// #6284: the first update after setup runs inside setup's phone grace
+/// period, and setup's unit may differ between the lamp's build and the
+/// newest (lamp-e82d, 12 Nov: put back as `lamp-setup.service stopped`).
+/// Owed, a setup done is not restarted while its new unit still skips once
+/// setup is done; without the first update, the same change keeps the
+/// normal watch rules.
+#[test]
+fn the_first_update_leaves_a_done_setup_whose_unit_changed() {
+    let changed = format!("{PRODUCT}\n[Service]\nEnvironment=LAMP_SOMETHING_NEW=on\n");
+    for owed in [true, false] {
+        let mut lamp = Lamp::new();
+        setup(&mut lamp, true);
+        if owed {
+            lamp.config.first_update = true;
+            let file = lamp
+                .root
+                .join(lamp_msgs::FIRST_UPDATE_FILE.trim_start_matches('/'));
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(
+                file,
+                format!(r#"{{"at_unix_ms":{}}}"#, lamp_update::records::unix_ms()),
+            )
+            .unwrap();
+        }
+        lamp.publish(2, &[("lamp-setup", "setup 2")], &[(SETUP, &changed)]);
+        let outcome = lamp.round();
+        if owed {
+            assert_eq!(outcome, Outcome::Switched(2), "{:?}", lamp.said);
+            assert_eq!(setup_restarts(&lamp), 0);
+        } else {
+            assert!(matches!(outcome, Outcome::RolledBack { .. }), "{outcome:?}");
+        }
+    }
+}

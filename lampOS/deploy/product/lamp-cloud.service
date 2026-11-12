@@ -99,6 +99,10 @@ Environment=LAMP_TASKS_SIGN_IN_APP=on
 # The app told once that setup is done (#5812, onboarding.done; system.info's onboarding_done_supported),
 # its acked date kept in the state folder below: on, the lead's call (9 Nov).
 Environment=LAMP_APP_ONBOARDING_DONE=on
+# The app told when an update starts and when it ends (#6284, update.started, update.ended; system.info's
+# update_events_supported), what is owed kept in the state folder below until the broker's ack. On after a run on
+# lamp-e82d (11 Nov: update.started 1.9 s after setup, update.ended at the round's end, both acked).
+Environment=LAMP_APP_UPDATE_EVENTS=on
 # The app's faces.add_photo (#1968, cloud.md "A face from the app's photo"; on with the eyes' --photo-dir and the
 # voice's asking, #5750): a JPEG of at most 8 MiB from the lamp's own account written as a new 0600 file in the
 # photo folder, the eyes asked, and the file removed after, answered or not; nothing of a photo leaves the lamp.

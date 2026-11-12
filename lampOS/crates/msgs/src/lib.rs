@@ -1618,6 +1618,30 @@ impl EngineInstallAsk {
     }
 }
 
+impl UpdateStatus {
+    /// Whether the round under way goes to a build newer than the one the
+    /// lamp runs (#6284): said from the moment the round has read and
+    /// checked the channel's build, before anything is fetched, and through
+    /// every phase after. A round that only checks and finds the lamp
+    /// current never says it.
+    pub fn brings_a_build(&self) -> bool {
+        if self.now == "idle" {
+            return false;
+        }
+        if self.now != "checking" {
+            return true;
+        }
+        self.round
+            .as_ref()
+            .and_then(|round| round.target.as_ref())
+            .is_some_and(|target| {
+                self.running
+                    .as_ref()
+                    .is_none_or(|running| target.sequence > running.sequence)
+            })
+    }
+}
+
 /// A round under way (#5473): when it began (its `checking`), when the step
 /// `now` names began, and the build it is going to, once the round has read
 /// it from the channel and found it newer (absent before, and in a round
@@ -4230,6 +4254,42 @@ mod tests {
             assert_eq!(declaration.type_name, type_name);
             assert_eq!(declaration.version, version);
             assert!(type_name.starts_with("lamp_msgs/"));
+        }
+    }
+}
+
+#[cfg(test)]
+mod update_status_tests {
+    use super::*;
+
+    fn status(now: &str, running: u64, target: Option<u64>) -> UpdateStatus {
+        let build = |sequence| UpdateBuild {
+            sequence,
+            commit: "4a39f04".into(),
+        };
+        UpdateStatus {
+            running: Some(build(running)),
+            now: now.into(),
+            last: None,
+            harness: None,
+            engines: None,
+            refused: None,
+            round: (now != "idle").then(|| UpdateRound {
+                started_at_unix_ms: 1,
+                step_started_at_unix_ms: 1,
+                target: target.map(build),
+            }),
+        }
+    }
+
+    #[test]
+    fn a_round_brings_a_build_once_its_newer_target_is_read() {
+        assert!(!status("idle", 812, None).brings_a_build());
+        assert!(!status("checking", 812, None).brings_a_build());
+        assert!(!status("checking", 812, Some(812)).brings_a_build());
+        assert!(status("checking", 812, Some(813)).brings_a_build());
+        for now in ["fetching", "switching", "watching", "restoring"] {
+            assert!(status(now, 812, None).brings_a_build(), "{now}");
         }
     }
 }

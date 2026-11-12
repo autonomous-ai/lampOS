@@ -24,6 +24,17 @@ use std::{
 /// round within about this, plus the bus's own wake.
 pub const LOOK_EVERY: Duration = Duration::from_secs(1);
 
+/// What ended [`AppCheck::wait_or`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Woken {
+    /// The whole wait.
+    Waited,
+    /// The app's check.
+    Asked,
+    /// The first update after setup is owed (#6284).
+    Due,
+}
+
 /// `serve`'s side of the check: its subscription, and when a check last
 /// started a round.
 pub struct AppCheck {
@@ -38,6 +49,9 @@ pub struct AppCheck {
     /// heard with the checks that started the round and not yet taken.
     retries: Vec<u64>,
 }
+
+/// Whether the first update is due, saying what it does (#6284).
+pub type Due<'a> = dyn FnMut(&mut dyn FnMut(&str)) -> bool + 'a;
 
 impl AppCheck {
     /// Subscribed to `update/check` on the bus at `root`. A bus or topic
@@ -132,6 +146,42 @@ impl AppCheck {
             }
         }
         any
+    }
+
+    /// The wait between rounds with the first update after setup on
+    /// (#6284, crate::first_update): as [`AppCheck::wait`], and `due`
+    /// looked at first and then after each look, every [`LOOK_EVERY`] even
+    /// without a subscription. A check or a tap to install an agent taken
+    /// ends it as [`Woken::Asked`], `due` as [`Woken::Due`].
+    pub fn wait_or(
+        &mut self,
+        ears: &mut dyn Ears,
+        every: Duration,
+        say: &mut dyn FnMut(&str),
+        due: &mut Due<'_>,
+    ) -> Woken {
+        if due(say) {
+            return Woken::Due;
+        }
+        let until = Instant::now() + every;
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            if left.is_zero() {
+                return Woken::Waited;
+            }
+            let _ = ears.listen(left.min(self.look));
+            let now = Instant::now();
+            let installs = self
+                .engines
+                .as_mut()
+                .is_some_and(|engines| engines.take(now, say));
+            if self.asked(now) || installs {
+                return Woken::Asked;
+            }
+            if due(say) {
+                return Woken::Due;
+            }
+        }
     }
 
     /// The wait between rounds: `ears` listen for `every`, as before, and
@@ -315,6 +365,45 @@ mod tests {
         let mut check = AppCheck::new(root.path(), &mut |_| {});
         std::thread::sleep(Duration::from_millis(250));
         assert!(!check.asked(Instant::now()));
+    }
+
+    /// #6284: an owed first update ends the wait at the next look, a bus
+    /// or not; nothing owed, the whole wait.
+    #[test]
+    fn the_first_update_owed_ends_the_wait_at_its_next_look() {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("not-a-folder");
+        std::fs::write(&file, "").unwrap();
+        let mut check = AppCheck::new(&file, &mut |_| {}).looking_every(LOOK);
+        let mut ears = Waits::default();
+        // Owed already: no listen at all.
+        assert_eq!(
+            check.wait_or(&mut ears, Duration::from_secs(60), &mut |_| {}, &mut |_| {
+                true
+            }),
+            Woken::Due
+        );
+        assert!(ears.0.is_empty());
+        // Owed from the third look on.
+        let mut looks = 0;
+        let started = Instant::now();
+        let woken = check.wait_or(&mut ears, Duration::from_secs(60), &mut |_| {}, &mut |_| {
+            looks += 1;
+            looks > 3
+        });
+        assert_eq!(woken, Woken::Due);
+        assert!(started.elapsed() < Duration::from_secs(1));
+        assert_eq!(ears.0.len(), 3);
+        // Never owed: the whole wait.
+        assert_eq!(
+            check.wait_or(
+                &mut ears,
+                Duration::from_millis(120),
+                &mut |_| {},
+                &mut |_| false
+            ),
+            Woken::Waited
+        );
     }
 
     #[test]

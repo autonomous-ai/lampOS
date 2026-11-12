@@ -717,7 +717,7 @@ fn config(
     let self_switch = own::on(std::env::var(own::SWITCH).ok().as_deref());
     let settings_env = std::env::var_os(lamp_update::apply::SWITCH);
     let (settings, product_settings) = settings_switches(settings_env.as_deref(), self_switch);
-    let config = Config {
+    let mut config = Config {
         root,
         units: "/etc/systemd/system/".into(),
         records: lamp_update::install::RECORDS.into(),
@@ -738,10 +738,27 @@ fn config(
         settings,
         product_settings,
         image: lamp_update::image::on(std::env::var(lamp_update::image::SWITCH).ok().as_deref()),
+        // Set below: the product default needs the config's root and units.
+        first_update: false,
         writer_from: lamp_update::fixed_copy::own_bytes()
             .ok()
             .map(lamp_update::writer_swap::Running::new),
     };
+    // The first update after setup (#6284): on by this build's default on a
+    // product lamp, since lamp-update's own unit is never carried by a round
+    // (own_unit_line_tests) and so can't be given the switch on a lamp in a
+    // home; LAMP_FIRST_UPDATE=off turns it off, and another lamp needs `on`.
+    config.first_update = lamp_update::hermes_install::wanted(
+        std::env::var(lamp_update::first_update::SWITCH)
+            .ok()
+            .as_deref(),
+        config.apply
+            && lamp_update::harness_install::product::product_lamp(
+                &config.root,
+                &config.on(&config.units),
+            ),
+        lamp_update::first_update::PRODUCT_DEFAULT,
+    );
     Ok((
         config,
         seconds(options, "every-s", 900)?,
@@ -870,6 +887,12 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // `serve` that acts, the one that says `update/status`.
     let mut app_check = (config.apply && command == "serve")
         .then(|| lamp_update::app_check::AppCheck::new(&bus_root, &mut say));
+    // The first update after setup (#6284, LAMP_FIRST_UPDATE=on): only
+    // the `serve` that acts, the one the app's check is read by.
+    let mut first = app_check
+        .is_some()
+        .then(|| lamp_update::first_update::First::new(&config))
+        .flatten();
     // Harness before the sign-in (#5197): only a `serve` that acts, with
     // its switch on.
     let harness = {
@@ -1035,6 +1058,10 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         )
     }));
     loop {
+        let before_setup = lamp_update::first_update::before_setup(&config);
+        if let Some(first) = &mut first {
+            first.begin(lamp_update::records::unix_ms(), &mut say);
+        }
         let outcome = {
             let mut phase = |now: &'static str| {
                 if let Some(telling) = telling.borrow_mut().as_mut() {
@@ -1171,11 +1198,30 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 &mut say,
             );
         }
+        let kept = lamp_update::first_update::kept(before_setup, &outcome);
         if let Some(telling) = telling.borrow_mut().as_mut() {
-            let at_unix_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |since| since.as_millis() as u64);
-            telling.ended(&outcome, at_unix_ms);
+            if kept {
+                let at_unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_millis() as u64);
+                telling.ended(&outcome, at_unix_ms);
+            } else {
+                telling.let_go();
+            }
+        }
+        // Before setup, a channel out of reach is asked again soon, not
+        // after the whole interval: the lamp has no internet yet.
+        let every = if kept {
+            every
+        } else {
+            say(&format!(
+                "setup is not done: the channel is out of reach, not told, asked again in {} s",
+                lamp_update::first_update::BEFORE_SETUP_AGAIN.as_secs()
+            ));
+            every.min(lamp_update::first_update::BEFORE_SETUP_AGAIN)
+        };
+        if let Some(first) = &mut first {
+            first.ended(&outcome, &mut say);
         }
         let text = outcome.to_string();
         if let Outcome::SelfSwitched { .. } | Outcome::Climbs { .. } = outcome {
@@ -1209,8 +1255,20 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // Between rounds the bus is still read, so that what the voice said
         // meanwhile does not wait in the sockets. A check from the app ends
         // the wait (#4153); one that came during the round is dropped.
-        match &mut app_check {
-            Some(app_check) => {
+        match (&mut app_check, &mut first) {
+            (Some(app_check), Some(first)) => {
+                use lamp_update::app_check::Woken;
+                app_check.forget(&mut say);
+                let mut due =
+                    |say: &mut dyn FnMut(&str)| first.due(lamp_update::records::unix_ms(), say);
+                match app_check.wait_or(ears.as_mut(), every, &mut say, &mut due) {
+                    Woken::Asked => {
+                        eprintln!("lamp-update: the app asked for a check: a round now")
+                    }
+                    Woken::Due | Woken::Waited => {}
+                }
+            }
+            (Some(app_check), None) => {
                 app_check.forget(&mut say);
                 if app_check.wait(ears.as_mut(), every, &mut say) {
                     eprintln!("lamp-update: the app asked for a check: a round now");
@@ -1224,7 +1282,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     );
                 }
             }
-            None => {
+            (None, _) => {
                 let _ = ears.listen(every);
             }
         }

@@ -746,6 +746,39 @@ setup. The C-Media hardware level and `--volume-ceiling` are unchanged.
 Not shown on a lamp: the hello at 70 % after a reset and setup, and the
 person's level after a reboot and after a power cut.
 
+## The first update after setup (#6284, on for the product)
+
+With `LAMP_FIRST_UPDATE=on` in `lamp-setup`'s unit, setup writes
+`/var/lib/lampos-setup/first-update` (`lamp_msgs::FIRST_UPDATE_FILE`, 0644,
+`{"at_unix_ms": <ms>, "boot": {"id", "ms"}}`) just before its marker, after the first volume
+(`crates/setup/src/first_update.rs`). The marker starts the lamp as before;
+the file asks for one thing more: the lamp's first update, before the setup
+walk begins.
+
+- lamp-update, with the same switch, starts a round at once while the file
+  is there and removes it when that round ends, whatever its outcome
+  ([updates.md](updates.md), "The first update after setup").
+- The voice, with the same switch, holds the walk's beginning while it is
+  there, and says one line in the owner's language once a build with changes
+  is being fetched ([onboarding.md](onboarding.md), "Held for the first
+  update").
+- lamp-cloud tells the app when an update starts and ends
+  ([cloud.md](cloud.md), `update.started`, `update.ended`).
+- The file counts as gone for every reader twenty minutes after `at_unix_ms`
+  (`FIRST_UPDATE_WITHIN_MS`, the product's call on #6284: 10 min, raised to 20
+  after a 0.17 MB/s office network on lamp-e82d), so a lamp-update
+  that never ran or died never holds the walk longer. Within the boot that
+  wrote it, the twenty minutes are counted on that boot's own clock (`boot`:
+  `/proc/sys/kernel/random/boot_id` and `/proc/uptime` in ms), since a new
+  lamp joins Wi-Fi on its last saved wall clock, often hours behind, and
+  timesyncd sets it a minute later; that jump would otherwise end the hold
+  at once.
+
+Best effort: a write that fails is a journal line (`the first update's file
+was not written`), never a failed setup, and the lamp starts as before.
+Recovery's network-only run never writes it. A lamp already current loses a
+few seconds: one round that finds nothing to change.
+
 ## Changed after setup (#1959, on for the product)
 
 The person changes their name, the lamp's name in the app, the time zone or

@@ -50,6 +50,9 @@ const READ: &[(&str, &str, Type)] = &[
     // This lamp takes `onboarding.page` and sends `onboarding.page_done`
     // (#6076), with the same switch.
     ("system.info", "onboarding_page_supported", Type::Flag),
+    // This lamp sends `update.started` and `update.ended` (#6284): said only
+    // with LAMP_APP_UPDATE_EVENTS on.
+    ("system.info", "update_events_supported", Type::Flag),
     // Which page contract (#6366): 2 is per-tap Add and the `done` page.
     ("system.info", "onboarding_page_version", Type::Whole),
     ("volume.get", "volume", Type::Percent),
@@ -171,6 +174,8 @@ fn each_field_the_apps_page_reads_is_there_with_the_type_it_takes() {
         .unwrap();
     // The switch on, with a state folder (#5812); no other test here reads it.
     lamp_cloud::onboarding_done::switch(Some(root.join(lamp_cloud::onboarding_done::FILE)));
+    // And the update's events' switch (#6284).
+    lamp_cloud::update_events::switch(Some(root.join(lamp_cloud::update_events::FILE)));
     // The voice's heartbeat, its walk ended (#5812).
     let mut walk = ring
         .publisher_declared(
