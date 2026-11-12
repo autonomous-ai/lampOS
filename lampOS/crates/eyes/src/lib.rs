@@ -32,6 +32,7 @@ pub mod change;
 pub mod face_repair;
 pub mod faces;
 pub mod facing;
+pub mod frame_link;
 pub mod full_look;
 pub mod glance_log;
 pub mod kept;

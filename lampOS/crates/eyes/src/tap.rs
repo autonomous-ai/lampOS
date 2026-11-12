@@ -70,11 +70,8 @@ type Who = Box<dyn Fn(Option<&Caller>) -> bool + Send>;
 /// lease door does, #3504 phase 0), not any other process running as
 /// `lampos` (banana's P3 on #5894).
 pub fn reader_may(caller: Option<&Caller>, lampos: Option<u32>) -> bool {
-    caller.is_some_and(|caller| {
-        caller.uid == 0
-            || (Some(caller.uid) == lampos
-                && caller.unit.as_deref() == Some("lamp-control.service"))
-    })
+    caller.is_some_and(|caller| caller.uid == 0)
+        || lamp_ipc::caller::is_unit_as(caller, lampos, "lamp-control.service")
 }
 
 impl Tap {
