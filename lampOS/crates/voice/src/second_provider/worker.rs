@@ -3648,8 +3648,8 @@ pub fn serve(
     // skill waits for nothing: it goes on as soon as it is kept (the owner,
     // 10 Nov), so it is never noted.
     if has_tasks {
-        engine = engine.noting_a_task_waiting(Arc::new(move |request| {
-            crate::agent_tasks::pending_note(request, Instant::now())
+        engine = engine.noting_a_task_waiting(Arc::new(move |request, words: &str| {
+            crate::agent_tasks::pending_note(request, words, Instant::now())
         }));
     }
     // A heard plain no to a task read back drops it, in the tasks part too
