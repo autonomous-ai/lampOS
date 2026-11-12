@@ -12890,6 +12890,18 @@ fn messages_marked(
 pub const HISTORY_EXCHANGES: usize = 12;
 pub const HISTORY_WITHIN: Duration = Duration::from_secs(600);
 
+/// A piece of the lamp's words of `request` that skips the thread
+/// (`guard`), journalled while a skill's yes waits (#6715): such words
+/// never count toward its say-back. The empty last piece says nothing.
+fn skipped(request: u64, guard: &str, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    if let Some(line) = crate::skill_write_yes::skipped_line(request, guard) {
+        eprintln!("{line}");
+    }
+}
+
 /// Keep what a turn's output says in the thread, as the Live route keeps
 /// its transcripts: the person's words, the lamp's (not the announcement),
 /// and at the turn's end the exchange to the memory's journal and the
@@ -12967,6 +12979,7 @@ fn keep_scoped(
             // A done forget's answer may name what went: said, but never
             // the thread's ([`crate::remember::forgetting_reply`]).
             if crate::remember::forgetting_reply(*request) {
+                skipped(*request, "a forget's answer", text);
                 return;
             }
             // Sentences come trimmed, those after the first with a space
@@ -12979,9 +12992,11 @@ fn keep_scoped(
                 match lease {
                     Some(lease) => {
                         if lease.key().request != *request {
+                            skipped(*request, "the lease is another request's", &text);
                             return;
                         }
                         let Some(scope) = lease.scope() else {
+                            skipped(*request, "the lease has no scope", &text);
                             return;
                         };
                         // A room's line `named_alone` named (no face seen
