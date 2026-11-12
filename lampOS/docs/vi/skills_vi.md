@@ -576,8 +576,14 @@ sau:
      giọng nói tìm kỹ năng đã giữ đang bật trên đèn có tên đó, một con số
      nói bằng chữ khớp với chữ số của nó theo cả hai chiều ("lamp test
      email two" tìm thấy `lamp-test-email-2`, từ không đến chín mươi chín,
-     `made_skill::name_digits`; task của một kỹ năng được hỏi lại theo chữ
-     số khi tên như đã nói không có task nào). Nếu chưa
+     `made_skill::name_digits`; tên khớp đúng được ưu tiên, nên "skill two"
+     khi `skill-2` và `skill-two` cùng bật thì đọc lại `skill-two`; hai kỹ
+     năng đang bật chỉ khớp theo cách đó, không cái nào là tên đã nói
+     (`room-1-light-two` và `room-one-light-2` cho "room one light two"),
+     nghe giống nhau khi đọc lại, nên giọng nói nói mỗi tên được viết thế nào và hỏi
+     là cái nào, `SKILLS_ALIKE`, không nêu tên nào với một câu mà chủ có
+     thể không nghe, `made_skill::kept_on_alike`; task của một kỹ năng được
+     hỏi lại theo chữ số khi tên như đã nói không có task nào). Nếu chưa
      được đồng ý cho những gì nó gửi bây giờ, theo `lamp-services`
      (`skill_writes_approved`, lệnh gọi riêng của giọng nói, không đồng ý
      gì; không biết được thì tính là chưa đồng ý), câu của chính lần tạo

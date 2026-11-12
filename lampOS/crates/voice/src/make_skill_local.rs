@@ -1058,6 +1058,10 @@ pub const READ_BACK: &str = "read_back";
 /// What the model is told when no made skill on the lamp has the name asked.
 pub const NO_SKILL_BY_THAT_NAME: &str = "no skill made on this lamp is on by that name";
 
+/// Told when two or more made skills on the lamp match the name read back
+/// only with number words as digits ([`made_skill::kept_on_alike`]).
+pub const SKILLS_ALIKE: &str = "more than one skill made on this lamp has a name like that";
+
 /// What the model is told when a read-back comes in a turn nobody spoke.
 pub const READ_BACK_NOT_ASKED: &str =
     "a skill is read back only when the person asks for it out loud";
@@ -1148,6 +1152,34 @@ pub fn read_back(
             "lamp-voice: request {request}: a made skill wasn't read back: no one asked aloud"
         );
         return json!({ "error": READ_BACK_NOT_ASKED });
+    }
+    let alike = made_skill::kept_on_alike(directory, name);
+    if !alike.is_empty() {
+        // Two that sound the same said back, neither the name said:
+        // asked which, never one picked (Fourteen's P2 on #6573).
+        eprintln!(
+            "lamp-voice: request {request}: {} made skills match the name read back: asked which",
+            alike.len()
+        );
+        if !asking.owner_hears {
+            return json!({
+                "error": SKILLS_ALIKE,
+                "alike": [],
+                "next": "Say plainly, in a few words, that more than one skill has a name like \
+                         that, and ask them to say it another way. Name no skill. Call nothing."
+            });
+        }
+        let alike: Vec<String> = alike
+            .iter()
+            .map(|name| made_skill::spoken_name(name))
+            .collect();
+        return json!({
+            "error": SKILLS_ALIKE,
+            "alike": alike,
+            "next": "Say plainly, in a few words, that more than one skill they made has a name \
+                     like that; they sound the same, so say how each is written (its number as \
+                     a digit, or as a word), and ask which one they mean. Call nothing."
+        });
     }
     let Some(made) = made_skill::kept_on_named(directory, name) else {
         eprintln!("lamp-voice: request {request}: a made skill to read back was not found");
@@ -1807,6 +1839,7 @@ pub fn answer(
         };
         if tasks
             && made_skill::kept_on_named(&keeping.directory, name).is_none()
+            && made_skill::kept_on_alike(&keeping.directory, name).is_empty()
             && let Some(told) = crate::skill_task_yes::read_back(
                 name,
                 asking,
@@ -2880,6 +2913,66 @@ light = { dim = 1 }
         assert!(!next.contains("approve_id"), "{next}");
         made_skill::set_writes_here(None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Fourteen's P2 on #6573: two made skills on whose names sound the
+    /// same said back, neither the name said ("room one light two" for
+    /// `room-1-light-two` and `room-one-light-2`), are asked which, never
+    /// one picked.
+    #[test]
+    fn two_skills_whose_names_sound_alike_are_asked_which() {
+        let dir = std::env::temp_dir().join(format!("read-back-alike-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join(made_skill::INDEX),
+            serde_json::to_vec(&json!([
+                {"name": "skill-2", "package": "a.zip", "on": true},
+                {"name": "skill-two", "package": "b.zip", "on": true},
+            ]))
+            .unwrap(),
+        )
+        .unwrap();
+        let now = std::time::Instant::now();
+        let unasked =
+            |_: &crate::skill_write_yes::Asks| -> Option<(bool, bool)> { panic!("asked") };
+        let told = read_back("skill twenty", asking(20), &dir, unasked, now);
+        assert_eq!(told["error"], NO_SKILL_BY_THAT_NAME, "{told}");
+        std::fs::write(
+            dir.join(made_skill::INDEX),
+            serde_json::to_vec(&json!([
+                {"name": "room-1-light-two", "package": "a.zip", "on": true},
+                {"name": "room-one-light-2", "package": "b.zip", "on": true},
+            ]))
+            .unwrap(),
+        )
+        .unwrap();
+        let told = read_back("room one light two", asking(20), &dir, unasked, now);
+        assert_eq!(told["error"], SKILLS_ALIKE, "{told}");
+        assert_eq!(
+            told["alike"],
+            json!(["room 1 light two", "room one light 2"]),
+            "{told}"
+        );
+        assert!(
+            told["next"].as_str().unwrap().contains("ask which one"),
+            "{told}"
+        );
+        // To a line the owner may not hear: no name said.
+        let told = read_back(
+            "room one light two",
+            Asking {
+                owner_hears: false,
+                ..asking(20)
+            },
+            &dir,
+            unasked,
+            now,
+        );
+        assert_eq!(told["error"], SKILLS_ALIKE, "{told}");
+        assert_eq!(told["alike"], json!([]), "{told}");
+        assert!(!told.to_string().contains("room"), "{told}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// One that sends nothing, none of that name, one not the package on

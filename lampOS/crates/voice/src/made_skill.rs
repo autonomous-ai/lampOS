@@ -6733,16 +6733,46 @@ fn made_of(directory: &Path, entry: &Value) -> Option<Made> {
 /// read it back (`make_skill_local::read_back`); none when no skill kept
 /// here and put on has that name.
 pub fn kept_on_named(directory: &Path, asked: &str) -> Option<Made> {
-    let asked = name_digits(&name_asked(asked));
-    index(directory)
-        .into_iter()
+    let on = index(directory);
+    let entry = named_among(&on, asked)?;
+    made_of(directory, entry)
+}
+
+/// The kept skills on the lamp that `asked` names only once number words
+/// are digits, when two or more do and none is named exactly ("room one
+/// light two" with `room-1-light-two` and `room-one-light-2` both on): they
+/// sound the same said back, so the person is asked which (Fourteen's P2
+/// on #6573, the first builder's ruling; "skill two" with `skill-2` and
+/// `skill-two` takes the exact one). Empty when one alone or none matches.
+pub fn kept_on_alike(directory: &Path, asked: &str) -> Vec<String> {
+    let on = index(directory);
+    if named_among(&on, asked).is_some() {
+        return Vec::new();
+    }
+    let digits = name_digits(&name_asked(asked));
+    let alike: Vec<String> = on
+        .iter()
         .filter(|entry| entry["on"] == true)
-        .find(|entry| {
-            entry["name"]
-                .as_str()
-                .is_some_and(|name| name_digits(name) == asked)
-        })
-        .and_then(|entry| made_of(directory, &entry))
+        .filter_map(|entry| entry["name"].as_str())
+        .filter(|name| name_digits(name) == digits)
+        .map(str::to_owned)
+        .collect();
+    if alike.len() > 1 { alike } else { Vec::new() }
+}
+
+/// The on entry of `index` that `asked` names: the exact name first, else
+/// the one alone whose name matches with number words as digits
+/// ([`name_digits`]). None for two that match only so ([`kept_on_alike`]).
+fn named_among<'a>(index: &'a [Value], asked: &str) -> Option<&'a Value> {
+    let asked = name_asked(asked);
+    let digits = name_digits(&asked);
+    let on = || index.iter().filter(|entry| entry["on"] == true);
+    let named = |entry: &Value| entry["name"].as_str().unwrap_or_default().to_owned();
+    on().find(|entry| named(entry) == asked).or_else(|| {
+        let mut by_digits = on().filter(|entry| name_digits(&named(entry)) == digits);
+        let first = by_digits.next()?;
+        by_digits.next().is_none().then_some(first)
+    })
 }
 
 /// The names of the kept skills on the lamp.
@@ -7477,6 +7507,45 @@ mod tests {
         assert_eq!(found("one more mail").as_deref(), Some("one-more-mail"));
         assert_eq!(found("lamp test email three"), None, "off");
         assert_eq!(found("lamp test email four"), None);
+        // Two on that match only by digits: the exact name, else neither.
+        for package in ["d.zip", "e.zip"] {
+            fs::write(dir.join(package), b"").unwrap();
+        }
+        fs::write(
+            dir.join(INDEX),
+            serde_json::to_vec(&json!([
+                {"name": "skill-2", "package": "d.zip", "on": true},
+                {"name": "skill-two", "package": "e.zip", "on": true},
+            ]))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(found("skill two").as_deref(), Some("skill-two"));
+        assert_eq!(found("skill 2").as_deref(), Some("skill-2"));
+        assert_eq!(found("skill-2").as_deref(), Some("skill-2"));
+        fs::write(
+            dir.join(INDEX),
+            serde_json::to_vec(&json!([
+                {"name": "skill-2", "package": "d.zip", "on": true},
+                {"name": "skill-two", "package": "e.zip", "on": true},
+                {"name": "room-1-light-two", "package": "a.zip", "on": true},
+                {"name": "room-one-light-2", "package": "b.zip", "on": true},
+            ]))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(found("room one light two"), None, "two by digits alone");
+        assert_eq!(
+            kept_on_alike(&dir, "room one light two"),
+            ["room-1-light-two", "room-one-light-2"]
+        );
+        assert_eq!(
+            found("room 1 light two").as_deref(),
+            Some("room-1-light-two")
+        );
+        assert!(kept_on_alike(&dir, "room 1 light two").is_empty(), "exact");
+        assert!(kept_on_alike(&dir, "skill two").is_empty(), "exact");
+        assert!(kept_on_alike(&dir, "skill three").is_empty());
         let _ = fs::remove_dir_all(&dir);
     }
 
