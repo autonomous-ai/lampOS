@@ -42,7 +42,7 @@ fn lamp_name(dir: &Path) -> String {
     format!("virtual-{:06x}", hash & 0xff_ffff)
 }
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] [--real-voice (the real lamp-voice on its Live route with your Gemini key; needs --microphone)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] [--real-voice[=second] (the real lamp-voice: the Live route with your Gemini key, or =second its second route with your DeepSeek, Deepgram and ElevenLabs/OpenAI keys; needs --microphone)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -242,44 +242,58 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
         let file = lamp_sim::keys::path_from(&environment);
         let keys =
             lamp_sim::keys::load(&environment, file.as_deref()).map_err(std::io::Error::other)?;
-        match keys.gemini {
-            Some(key) => {
-                lamp_sim::controls::present(&bin).map_err(std::io::Error::other)?;
-                let model = std::env::var(lamp_sim::real_voice::MODEL_ENVIRONMENT)
-                    .unwrap_or_else(|_| lamp_sim::real_voice::DEFAULT_MODEL.to_owned());
-                let speaker = std::env::var(lamp_sim::real_voice::SPEAKER_ENVIRONMENT)
-                    .unwrap_or_else(|_| "default".to_owned());
-                let unix_ms = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map_or(0, |since| since.as_millis());
-                // The key's one copy: in memory-backed storage when there is any, and said when not.
-                let home = lamp_sim::real_voice::key_home(
-                    dir,
-                    std::env::var_os("XDG_RUNTIME_DIR").as_deref(),
-                );
-                if !home.in_memory {
-                    eprintln!("lamp-sim: {}", lamp_sim::real_voice::on_disk_line(&home));
-                }
-                Some(lamp_sim::real_voice::prepare(
-                    &lamp_sim::real_voice::Setup {
-                        dir,
-                        bin: &bin,
-                        bus_root: &bus_root,
-                        model: &model,
-                        speaker: &speaker,
-                        unix_ms,
-                        home: &home,
-                    },
-                    &key,
-                )?)
+        // The Live route needs the Gemini key; the second route (`--real-voice=second`) needs the three own keys.
+        let second = lamp_sim::real_voice::second_wanted(args);
+        let second_keys = if second {
+            Some(lamp_sim::real_voice::second_keys(&keys))
+        } else {
+            None
+        };
+        let ready = match &second_keys {
+            Some(Ok(_)) => true,
+            Some(Err(line)) => {
+                eprintln!("lamp-sim: {line}; using the stand-in voice");
+                false
             }
-            None => {
+            None => keys.gemini.is_some(),
+        };
+        if ready {
+            lamp_sim::controls::present(&bin).map_err(std::io::Error::other)?;
+            let model = std::env::var(lamp_sim::real_voice::MODEL_ENVIRONMENT)
+                .unwrap_or_else(|_| lamp_sim::real_voice::DEFAULT_MODEL.to_owned());
+            let speaker = std::env::var(lamp_sim::real_voice::SPEAKER_ENVIRONMENT)
+                .unwrap_or_else(|_| "default".to_owned());
+            let unix_ms = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |since| since.as_millis());
+            // The keys' one folder: in memory-backed storage when there is any, and said when not.
+            let home =
+                lamp_sim::real_voice::key_home(dir, std::env::var_os("XDG_RUNTIME_DIR").as_deref());
+            if !home.in_memory {
+                eprintln!("lamp-sim: {}", lamp_sim::real_voice::on_disk_line(&home));
+            }
+            let setup = lamp_sim::real_voice::Setup {
+                dir,
+                bin: &bin,
+                bus_root: &bus_root,
+                model: &model,
+                speaker: &speaker,
+                unix_ms,
+                home: &home,
+            };
+            Some(match (&second_keys, &keys.gemini) {
+                (Some(Ok(own)), _) => lamp_sim::real_voice::prepare_second(&setup, own)?,
+                (_, Some(key)) => lamp_sim::real_voice::prepare(&setup, key)?,
+                _ => unreachable!("ready means a key set for the route"),
+            })
+        } else {
+            if second_keys.is_none() {
                 eprintln!(
                     "lamp-sim: {}",
                     lamp_sim::real_voice::no_key_line(file.as_deref())
                 );
-                None
             }
+            None
         }
     } else {
         None
