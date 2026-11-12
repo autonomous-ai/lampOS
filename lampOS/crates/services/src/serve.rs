@@ -11,7 +11,7 @@ use crate::reads::{self, ANSWER_MOST, Asker, Plan};
 use crate::refresh::Backend;
 use crate::store::{Entry, Store};
 use crate::writes::{self, Action, Desk};
-use crate::{skill_writes, spoken, tools};
+use crate::{skill_secrets, skill_writes, spoken, tools};
 use serde_json::{Value, json};
 use std::{
     fmt,
@@ -165,6 +165,10 @@ pub enum Admin {
     /// The owner's yes to a made skill's writes, from the app (#6066):
     /// `{"skill", "writes": [...]}`, as [`Services::skill_write_approve`].
     ApproveSkillWrites(Value),
+    /// An uploaded skill's keys, from the app (`LAMP_SKILL_SECRETS`):
+    /// listed, one set or unset, or all dropped as it is removed
+    /// ([`skill_secrets::Ask`], its value hidden).
+    SkillSecrets(skill_secrets::Ask),
 }
 
 impl fmt::Debug for Admin {
@@ -182,6 +186,7 @@ impl fmt::Debug for Admin {
                 .debug_tuple("ApproveSkillWrites")
                 .field(&"<hidden>")
                 .finish(),
+            Self::SkillSecrets(ask) => f.debug_tuple("SkillSecrets").field(ask).finish(),
         }
     }
 }
@@ -226,6 +231,14 @@ pub fn parse_admin(line: &str) -> Result<Admin, String> {
             }
             Ok(Admin::ApproveSkillWrites(args))
         }
+        Some(
+            op @ (skill_secrets::LIST_OP
+            | skill_secrets::SET_OP
+            | skill_secrets::UNSET_OP
+            | skill_secrets::DROP_OP),
+        ) => skill_secrets::Ask::parse(op, object)
+            .map(Admin::SkillSecrets)
+            .map_err(str::to_owned),
         Some("set" | "remove" | "wipe" | "list" | skill_writes::APPROVE) => {
             Err("the request has fields it doesn't take".into())
         }
@@ -258,6 +271,7 @@ pub fn parse_tool(line: &str) -> Result<(String, Value), String> {
                 skill_writes::SENT,
                 skill_writes::APPROVED,
                 RUN_WAITING,
+                skill_secrets::NAMES_CALL,
             ]
             .contains(name)
         })
@@ -327,6 +341,10 @@ pub struct Services<H, M> {
     /// calls on other threads never write a list older than one already
     /// written, nor share the temporary file (Jarvis's P3 on #6476).
     linked_tools_write: Mutex<()>,
+    /// `LAMP_SKILL_SECRETS=on`: an uploaded skill's keys, in the store's
+    /// `skill-secrets` folder, set from the app and asked for by
+    /// lamp-tasks for a run ([`skill_secrets`]); none off.
+    pub skill_secrets: Option<skill_secrets::Secrets>,
 }
 
 /// What a call to a service not linked is told, after its name: and where
@@ -438,6 +456,40 @@ impl<H: Http, M: Mail> Services<H, M> {
             linked_tools: None,
             linked_tools_write: Mutex::new(()),
             desk: Desk::default(),
+            skill_secrets: None,
+        }
+    }
+
+    /// With `LAMP_SKILL_SECRETS` as `on` gives it: the keys kept in the
+    /// store's own folder, for the skills in [`Self::skills_dir`] (set
+    /// first), and those of a skill no longer there dropped now.
+    pub fn with_skill_secrets(mut self, on: bool) -> Self {
+        self.skill_secrets =
+            on.then(|| skill_secrets::Secrets::new(&self.store.0, &self.skills_dir));
+        if let Some(secrets) = &self.skill_secrets {
+            secrets.sweep();
+        }
+        self
+    }
+
+    /// Whether a peer in `cgroup` is `lamp-tasks` on the tools' door with
+    /// `LAMP_SKILL_SECRETS=on`: then [`skill_secrets::Secrets::run`]
+    /// answers it, and nothing else.
+    pub fn secrets_caller(&self, door: Door, cgroup: &str) -> bool {
+        door == Door::Tools
+            && self.skill_secrets.is_some()
+            && from_asker(cgroup, skill_secrets::RUN_ASKER_CGROUP)
+    }
+
+    /// lamp-tasks' ask for a run's keys, and the journal's line (counts
+    /// only).
+    pub fn run_secrets(&self, line: &str) -> (Value, String) {
+        match &self.skill_secrets {
+            Some(secrets) => secrets.run(line),
+            None => (
+                json!({"ok": false, "error": skill_secrets::OFF}),
+                "a skill's run asked for keys with LAMP_SKILL_SECRETS off".into(),
+            ),
         }
     }
 
@@ -794,6 +846,16 @@ impl<H: Http, M: Mail> Services<H, M> {
             Err(why) => return (refused(&why), format!("a request refused: {why}")),
         };
         match asked {
+            Admin::SkillSecrets(ask) => match &self.skill_secrets {
+                Some(secrets) => match secrets.answer(&ask) {
+                    (Ok(view), said) => (json!({"ok": true, "result": view}), said),
+                    (Err(why), said) => (refused(why), said),
+                },
+                None => (
+                    refused(skill_secrets::OFF),
+                    "a skill's keys asked with LAMP_SKILL_SECRETS off".into(),
+                ),
+            },
             Admin::List => (
                 json!({"ok": true, "connected": self.store.list(crate::now_secs())}),
                 "listed".into(),
@@ -916,6 +978,22 @@ impl<H: Http, M: Mail> Services<H, M> {
                 // The voice's own: a skill run's write waiting for its yes.
                 RUN_WAITING if asker == Asker::Owner && self.skill_tasks => {
                     Ok(self.run_waiting(Instant::now()))
+                }
+                // The voice's own: which keys an agent skill needs and has,
+                // names only, before its tool runs (`LAMP_SKILL_SECRETS`).
+                skill_secrets::NAMES_CALL if asker == Asker::Owner => {
+                    let skill = args
+                        .get("skill")
+                        .and_then(Value::as_str)
+                        .filter(|skill| skill_writes::skill_name_ok(skill));
+                    match (&self.skill_secrets, skill) {
+                        (None, _) => Err(skill_secrets::OFF.to_owned()),
+                        (Some(_), None) => Err(skill_secrets::BAD_SKILL.to_owned()),
+                        (Some(secrets), Some(skill)) => secrets
+                            .answer(&skill_secrets::Ask::List(skill.to_owned()))
+                            .0
+                            .map_err(str::to_owned),
+                    }
                 }
                 // A made skill's write is `lamp-skills`' alone.
                 _ => Err("no such function".into()),
@@ -2465,7 +2543,9 @@ fn answer_one<H: Http, M: Mail>(
     let skill = !asker && services.skill_caller(door, &cgroup);
     // A skill's run (#6432): `lamp-control`, only with LAMP_SKILL_TASKS=on.
     let run = !asker && !skill && services.run_caller(door, &cgroup);
-    if !asker && !skill && !run {
+    // A run's keys (`LAMP_SKILL_SECRETS`): `lamp-tasks`, for that alone.
+    let keys = !asker && !skill && !run && services.secrets_caller(door, &cgroup);
+    if !asker && !skill && !run && !keys {
         return writeln!(&*stream, "{}", door.refusal());
     }
     let mut line = String::new();
@@ -2482,6 +2562,11 @@ fn answer_one<H: Http, M: Mail>(
         }
         Door::Tools if skill => runtime.block_on(services.skill_tool(&line)),
         Door::Tools if run => runtime.block_on(services.run_tool(&line)),
+        Door::Tools if keys => {
+            let (answer, said) = services.run_secrets(&line);
+            eprintln!("lamp-services: {said}");
+            answer
+        }
         Door::Tools => runtime.block_on(services.tool(&line)),
     };
     writeln!(&*stream, "{answer}")
@@ -2746,6 +2831,59 @@ mod tests {
         }
         // Nor does it make lamp-control a made skill's caller.
         assert!(!on.with_skill_reads(true).skill_caller(Door::Tools, control));
+    }
+
+    /// `LAMP_SKILL_SECRETS`: a skill's keys set and listed on the admin
+    /// door (names back, the value never in the answer, its journal line
+    /// or the request's `Debug`), refused with the switch off; and the run
+    /// door is lamp-tasks' alone, with the switch on.
+    #[test]
+    fn a_skills_keys_go_in_from_the_app_and_out_to_lamp_tasks_alone() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("skills").join("photo-booth");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(
+            folder.join("skill.toml"),
+            "secrets = [\"GEMINI_API_KEY\"]\n",
+        )
+        .unwrap();
+        let set = json!({"op": "skill_secret_set", "skill": "photo-booth",
+            "name": "GEMINI_API_KEY", "value": "test-value-123"})
+        .to_string();
+        assert!(!format!("{:?}", parse_admin(&set).unwrap()).contains("test-value-123"));
+        let off = services(dir.path(), "[]", true);
+        let (answer, _) = run(off.admin(&set));
+        assert_eq!(answer["error"], skill_secrets::OFF);
+        let on = services(dir.path(), "[]", true).with_skill_secrets(true);
+        let (answer, said) = run(on.admin(&set));
+        assert_eq!(answer["ok"], true, "{answer}");
+        assert_eq!(answer["result"]["set"], json!(["GEMINI_API_KEY"]));
+        assert!(!answer.to_string().contains("test-value-123"));
+        assert!(!said.contains("test-value-123"), "{said}");
+        let (listed, _) = run(on.admin(r#"{"op":"skill_secrets","skill":"photo-booth"}"#));
+        assert_eq!(
+            listed["result"],
+            json!({"skill": "photo-booth", "needed": ["GEMINI_API_KEY"], "set": ["GEMINI_API_KEY"]})
+        );
+        let tasks = "0::/lampos.slice/lampos-parts.slice/lamp-tasks.service\n";
+        assert!(!off.secrets_caller(Door::Tools, tasks));
+        assert!(on.secrets_caller(Door::Tools, tasks));
+        assert!(!on.secrets_caller(Door::Admin, tasks));
+        for other in [
+            "0::/lampos.slice/lampos-parts.slice/lamp-skills.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-control.service\n",
+            "0::/lampos.slice/lampos-parts.slice/lamp-tasks.service-evil\n",
+            "0::/lampos.slice/lampos-voice.slice/lamp-voice.service\n",
+        ] {
+            assert!(!on.secrets_caller(Door::Tools, other), "{other}");
+        }
+        let (given, said) = on.run_secrets(r#"{"op":"run_secrets","skill":"photo-booth"}"#);
+        assert_eq!(given["values"]["GEMINI_API_KEY"], "test-value-123");
+        assert!(!said.contains("test-value-123"));
+        // A wipe (a sign-out, an unpairing) takes them with the rest.
+        run(on.admin(r#"{"op":"wipe"}"#));
+        let (given, _) = on.run_secrets(r#"{"op":"run_secrets","skill":"photo-booth"}"#);
+        assert_eq!(given["missing"], json!(["GEMINI_API_KEY"]));
     }
 
     fn run_line(name: &str, args: Value) -> String {
