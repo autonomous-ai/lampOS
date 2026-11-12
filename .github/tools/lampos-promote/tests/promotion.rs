@@ -94,6 +94,9 @@ impl Fake {
                 "lampOS — sign and publish the tested lamp-voice artifact",
                 "lampOS — build and test on Linux ARM64 (2/3)",
                 "lampOS — build and test on Linux ARM64 (3/3)",
+                // Since #6556 the build and the release are two jobs beside the shards.
+                "lampOS — build and test on Linux ARM64 (build)",
+                "lampOS — build and test on Linux ARM64 (release)",
             ]
             .map(|name| Job {
                 name: name.into(),
@@ -555,7 +558,7 @@ fn a_reused_build_promotes_only_with_its_reuse_job() {
     let mut fake = Fake::new(Some(9));
     reuse(&mut fake, "success");
     promote(&mut fake, &context(10)).unwrap();
-    for change in 0..3 {
+    for change in 0..4 {
         let mut fake = Fake::new(Some(9));
         match change {
             0 => reuse(&mut fake, "failure"),
@@ -567,6 +570,16 @@ fn a_reused_build_promotes_only_with_its_reuse_job() {
                 for job in fake.jobs.iter_mut().filter(|j| j.name.contains("ARM64")) {
                     job.conclusion = Some("skipped".into());
                 }
+            }
+            // The release job failed while the reuse job passed.
+            3 => {
+                reuse(&mut fake, "success");
+                let release = fake
+                    .jobs
+                    .iter_mut()
+                    .find(|j| j.name.ends_with("(release)"))
+                    .unwrap();
+                release.conclusion = Some("failure".into());
             }
             _ => unreachable!(),
         }

@@ -291,15 +291,18 @@ These tests do not establish a real stable promotion or lamp acceptance.
   tests every crate with the push's profile. When lamp-voice's push is that
   pull request's merge and its tree is the tree that run built and tested,
   the `reuse` job (`.github/scripts/lampos-reuse.py`) names the run, whose
-  build and every test runner passed; the push skips `arm64` and `arm64-test`
+  build, release and every test runner passed; the push skips `arm64`,
+  `arm64-release` and `arm64-test`
   and `publish` downloads `lampos-arm64-<pull request head>` from that run.
   Every artifact carries `TREE`, its build's `HEAD^{tree}`, and publish
-  refuses one whose `TREE` is not `github.sha`'s tree. The train's build
-  restores no cache but one lamp-voice's push saved, by its exact key (the
-  newest under its `Cargo.lock`, from `actions/caches?ref=refs/heads/lamp-voice`),
-  with no prefix fallback, or builds cold; it records the key it restored
-  (`lampos-arm64-cache-key-<job>-<key>`, `none` when cold), and reuse refuses
-  unless every cache entry under that key is lamp-voice's, so nothing an
+  refuses one whose `TREE` is not `github.sha`'s tree. The train's `arm64`
+  and `arm64-release` jobs restore no cache but one lamp-voice's push saved,
+  by its exact key (the newest under its `Cargo.lock`, from
+  `actions/caches?ref=refs/heads/lamp-voice`), with no prefix fallback, or
+  build cold; each records the key it restored
+  (`lampos-arm64-cache-key-<build|release>-<key>`, `none` when cold), and reuse
+  refuses unless both are recorded and every cache entry under each key is
+  lamp-voice's, so nothing an
   earlier head saved in the pull request's own scope reaches a signed build.
   Anything else (not a train's merge, lamp-voice moved under the train, a run
   not green, an expired artifact, no recorded key, an API error) builds and
