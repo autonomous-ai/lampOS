@@ -601,6 +601,12 @@ fn declared_with_the_lamp() -> bool {
 /// declaration goes to the lamp even when the target went away since, and
 /// is then said not set up, never sent to a computer.
 fn on_the_lamp_now(args: &Value, there: bool) -> bool {
+    on_the_lamp_with(args, there, &lamp_engines())
+}
+
+/// [`on_the_lamp_now`] with the lamp's `engines` given: a name said in
+/// `who` is the lamp's own engine when it is one of them.
+fn on_the_lamp_with(args: &Value, there: bool, engines: &[String]) -> bool {
     let said = |key: &str| {
         args.get(key)
             .and_then(Value::as_str)
@@ -615,7 +621,7 @@ fn on_the_lamp_now(args: &Value, there: bool) -> bool {
             Some(who) => {
                 let bare = who.trim_start_matches("the ").trim();
                 bare.eq_ignore_ascii_case(LAMP_TARGET)
-                    || (there && lamp_engine_called(&lamp_engines(), who).is_some())
+                    || (there && lamp_engine_called(engines, who).is_some())
             }
         },
     }
@@ -631,10 +637,16 @@ pub fn route_of(args: &Value, default: &str) -> (&'static str, String) {
         .and_then(Value::as_str)
         .map(|who| who.trim().trim_start_matches("the ").trim())
         .filter(|who| !who.is_empty());
-    if on_the_lamp_now(args, true) {
+    // provider-check reads no tasks part: with no engines read, the lamp's
+    // two installed by lamp-update stand for them (#6506).
+    let mut engines = lamp_engines();
+    if engines.is_empty() {
+        engines = vec!["hermes".to_owned(), "openclaw".to_owned()];
+    }
+    if on_the_lamp_with(args, true, &engines) {
         let engine = who
-            .filter(|who| who.eq_ignore_ascii_case(HERMES) || who.eq_ignore_ascii_case(OPENCLAW))
-            .unwrap_or(lamp_name());
+            .and_then(|who| lamp_engine_called(&engines, who))
+            .map_or(lamp_name(), |engine| display_name(engine));
         (LAMP_TARGET, engine.to_owned())
     } else {
         ("computer", who.unwrap_or(default).to_owned())
