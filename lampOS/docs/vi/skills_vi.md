@@ -1839,8 +1839,9 @@ Phần 2 của #6071 (theo các điều kiện của first builder ở đó): m�
 phản ứng ngay bằng các bước của chính nó và giao phần chậm hơn cho agent của
 đèn, một script trong thư mục `scripts/` của chính kỹ năng. Tắt trừ khi
 `LAMP_SKILL_TASKS=on`, trong `lamp-skills`, manage helper của nó,
-`lamp-voice` (truyền cho cả hai route) và `lamp-control` (bản thân nó cũng
-bật, `LAMP_CONTROL=on`), nơi giữ cái "có"; các unit sản phẩm đặt nó ở cả bốn
+`lamp-voice` (truyền cho cả hai route) và `lamp-control` (có cửa developer, hoặc
+không có khi bật công tắc này; control.md, "A skill's tasks without the door"),
+nơi giữ cái "có"; các unit sản phẩm đặt nó ở cả bốn
 nơi đó (12/11), và ở lamp-services, lamp-tasks và lamp-update, những nơi phục
 vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
 [skills.md](../skills.md), "A skill's task".
