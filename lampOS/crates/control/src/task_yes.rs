@@ -24,7 +24,7 @@
 //!   of that name) or changed (a yes for other bytes or other grants).
 //! - **Taken back** ([`FORGET`]): by a remove of the skill (its manage
 //!   helper). Taking a yes back grants nothing, so any peer may.
-//! - **The one-run token** (#6304, not built here): lamp-control mints it
+//! - **The one-run token** (#6304, [`KeptYes`]): lamp-control mints it
 //!   from [`yes_for_token`] alone, for the folder hashed at that run.
 use crate::protocol::Grant;
 use serde::{Deserialize, Serialize};
@@ -193,6 +193,62 @@ pub fn yes_for_token(state: &Path, name: &str, sha256: &str, grants: &[String]) 
     match verdict(state, name, sha256, grants) {
         Verdict::Agreed(yes) => Some(yes),
         Verdict::Waiting | Verdict::Changed => None,
+    }
+}
+
+/// The lamp's skills, one folder per name (`lamp_tasks::skill_task::SKILLS`):
+/// where a skill's run is hashed at its mint, never another place.
+pub const SKILLS: &str = "/var/lib/lampOS/skills";
+
+/// What a mint for a skill with no yes is told.
+pub const NO_YES: &str = "the owner hasn't said yes to this skill's task";
+/// What a mint for a skill whose folder or grants changed since the yes is
+/// told.
+pub const CHANGED: &str =
+    "this skill's script or grants changed since the owner's yes, so it asks again";
+
+/// The owner's yes as the one-run token reads it (#6304, `runs::SkillYes`):
+/// at each mint lamp-control hashes the skill's folder in `skills` itself
+/// (`lamp_skills::task::folder_sha256`, never through a link), reads the
+/// grants it declares now, and names them only if [`yes_for_token`] holds a
+/// yes in `state` for exactly that hash and those grants. With `on` false
+/// ([`ENVIRONMENT`] not on in lamp-control), nothing is minted ([`OFF`]).
+pub struct KeptYes {
+    pub state: std::path::PathBuf,
+    pub skills: std::path::PathBuf,
+    pub on: bool,
+}
+
+impl crate::runs::SkillYes for KeptYes {
+    fn grants(&self, skill: &str) -> Result<BTreeSet<Grant>, String> {
+        if !self.on {
+            return Err(OFF.into());
+        }
+        if !name_ok(skill) {
+            return Err(format!("{skill:?} is not a skill's name"));
+        }
+        if !yeses(&self.state).iter().any(|yes| yes.name == skill) {
+            return Err(NO_YES.into());
+        }
+        let folder = self.skills.join(skill);
+        if !std::fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir()) {
+            return Err("this skill is not on the lamp".into());
+        }
+        let sha256 = lamp_skills::task::folder_sha256(&folder)
+            .map_err(|why| format!("this skill's folder can't be read: {why}"))?;
+        let declared = lamp_skills::load_with(&folder, false)
+            .map_err(|why| format!("this skill doesn't load: {why}"))?
+            .grants;
+        let yes = yes_for_token(&self.state, skill, &sha256, &declared)
+            .ok_or_else(|| CHANGED.to_owned())?;
+        grants_ok(&yes.grants)?;
+        yes.grants
+            .iter()
+            .map(|grant| {
+                serde_json::from_value::<Grant>(Value::String(grant.clone()))
+                    .map_err(|_| format!("grants: {grant:?} is not a grant"))
+            })
+            .collect()
     }
 }
 
@@ -452,6 +508,101 @@ mod tests {
             check(booth(&sha256, grants)),
             json!({"agreed": false, "why": "waiting"})
         );
+    }
+
+    /// A skill folder with a `do.task` and `grants`, as lamp-skills loads one.
+    fn task_skill(skills: &Path, name: &str, grants: &str) -> std::path::PathBuf {
+        let folder = skills.join(name);
+        std::fs::create_dir_all(folder.join("scripts")).unwrap();
+        std::fs::write(
+            folder.join("SKILL.md"),
+            format!("---\nname: {name}\ndescription: Takes a photo for me.\n---\n"),
+        )
+        .unwrap();
+        std::fs::write(
+            folder.join("skill.toml"),
+            format!(
+                "version = \"1.0.0\"\ngrants = {grants}\ntool = \"photo_booth\"\n\
+                 [[do]]\ntask = {{ task = \"Take a photo\", run = \"scripts/main.py\" }}\n"
+            ),
+        )
+        .unwrap();
+        std::fs::write(folder.join("scripts/main.py"), "print('cheese')\n").unwrap();
+        folder
+    }
+
+    /// #6304: a mint gets exactly the yes's grants for the folder as
+    /// lamp-control hashes it; no yes, a changed script, more grants
+    /// declared, a folder that is a link, or the switch off: refused.
+    #[test]
+    fn a_token_is_minted_only_from_the_yes_for_the_folder_as_it_is() {
+        use crate::runs::SkillYes as _;
+        let dir = folder("kept");
+        let state = dir.join("state");
+        let skills = dir.join("skills");
+        std::fs::create_dir_all(&state).unwrap();
+        let booth = task_skill(&skills, "photo-booth", r#"["camera", "light"]"#);
+        let kept = KeptYes {
+            state: state.clone(),
+            skills: skills.clone(),
+            on: true,
+        };
+        assert_eq!(kept.grants("photo-booth").unwrap_err(), NO_YES);
+        let sha256 = lamp_skills::task::folder_sha256(&booth).unwrap();
+        let said = |grants: Value| {
+            answer(
+                Some(state.as_path()),
+                &asked(
+                    RECORD,
+                    json!({"name": "photo-booth", "sha256": sha256, "grants": grants}),
+                ),
+                true,
+                true,
+                5,
+            )
+            .unwrap()
+        };
+        assert_eq!(said(json!(["light", "camera"])), json!({"recorded": true}));
+        assert_eq!(
+            kept.grants("photo-booth").unwrap(),
+            BTreeSet::from([Grant::Camera, Grant::Light])
+        );
+        // Off: nothing, whatever is kept.
+        let off = KeptYes {
+            state: state.clone(),
+            skills: skills.clone(),
+            on: false,
+        };
+        assert_eq!(off.grants("photo-booth").unwrap_err(), OFF);
+        // A yes for fewer grants than the folder declares names none of them.
+        assert_eq!(said(json!(["light"])), json!({"recorded": true}));
+        assert_eq!(kept.grants("photo-booth").unwrap_err(), CHANGED);
+        assert_eq!(said(json!(["camera", "light"])), json!({"recorded": true}));
+        // The script changed since the yes: asks again.
+        std::fs::write(booth.join("scripts/main.py"), "print('smile')\n").unwrap();
+        assert_eq!(kept.grants("photo-booth").unwrap_err(), CHANGED);
+        std::fs::write(booth.join("scripts/main.py"), "print('cheese')\n").unwrap();
+        assert!(kept.grants("photo-booth").is_ok());
+        // More grants declared since the yes: asks again.
+        task_skill(&skills, "photo-booth", r#"["camera", "light", "body"]"#);
+        assert_eq!(kept.grants("photo-booth").unwrap_err(), CHANGED);
+        task_skill(&skills, "photo-booth", r#"["camera", "light"]"#);
+        assert!(kept.grants("photo-booth").is_ok());
+        // A folder that is a link is never hashed, nor a skill not there.
+        let elsewhere = dir.join("elsewhere");
+        std::fs::rename(&booth, &elsewhere).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, &booth).unwrap();
+        assert_eq!(
+            kept.grants("photo-booth").unwrap_err(),
+            "this skill is not on the lamp"
+        );
+        std::fs::remove_file(&booth).unwrap();
+        assert_eq!(
+            kept.grants("photo-booth").unwrap_err(),
+            "this skill is not on the lamp"
+        );
+        assert!(kept.grants("../photo-booth").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A yes file that is a link is never read, and a write never follows
