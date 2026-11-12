@@ -133,7 +133,17 @@ for i in {1..90}; do
     named=$(checks named); total=0 passed=0 failed=0 running=0
     [[ -n $named ]] && read -r total passed failed running rest <<< "$named"
     if (( failed )); then echo "$(date +%T) #$P checks failed: ${named#* * * * }"; exit 2; fi
-    (( total >= 2 && passed == total )) && green=1
+    # 12 Nov 14:4x (#6556 B, the lead): every other check that ran counts too, and the first red one ends the wait. Train
+    # 831's SDK check went red 2.7 min in and the train ran on to 23.7 min; with no carried PR held, a train with a red
+    # SDK check would have merged, as only build and test and clippy were counted. Skipped and neutral jobs never ran by
+    # design and stay out (checks every).
+    every=$(checks every); etotal=0 epassed=0 efailed=0 erunning=0
+    [[ -n $every ]] && read -r etotal epassed efailed erunning erest <<< "$every"
+    if (( efailed )); then
+      red=(); for c in ${(s:, :)erest}; do [[ $c == *": COMPLETED "* && $c != *": COMPLETED SUCCESS" ]] && red+=$c; done
+      echo "$(date +%T) #$P a check failed: ${(j:, :)red}"; exit 2
+    fi
+    (( total >= 2 && passed == total && etotal >= total && epassed == etotal && erunning == 0 )) && green=1
   fi
   if (( nochecks || green )); then
     [[ $nochecks == 1 ]] && echo "$(date +%T) #$P is docs the workflows skip: no checks to wait for"

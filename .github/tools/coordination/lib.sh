@@ -110,6 +110,17 @@ coord_same_patch() {
   return 0
 }
 
+# coord_red_checks_jq: a jq filter over `gh pr view --json statusCheckRollup` printing "ok", or "red <name>, ..." for
+# every check COMPLETED with anything but SUCCESS (FAILURE, CANCELLED, TIMED_OUT, STARTUP_FAILURE, ACTION_REQUIRED,
+# ERROR, a null conclusion). SKIPPED and NEUTRAL never ran by design; a check still running is not red. A commit
+# status reads as a check (its state). 12 Nov (#6556 B): the train bot's eligible() sits out a PR whose head has any.
+coord_red_checks_jq='[(.statusCheckRollup // [])[]
+  | {n: (.name // .context // "?"),
+     s: (if .__typename == "StatusContext" then (if .state == "PENDING" or .state == "EXPECTED" then "PENDING" else "COMPLETED" end) else (.status // "") end),
+     c: (if .__typename == "StatusContext" then .state else .conclusion end)}
+  | select(.s == "COMPLETED" and .c != "SUCCESS" and .c != "SKIPPED" and .c != "NEUTRAL")]
+  | if length == 0 then "ok" else "red " + (map(.n) | join(", ")) end'
+
 # coord_head PR: prints the PR's head sha, or fails when it can't be read or its head is in another repository
 # (a fork's PR is never carried, whatever its markers say).
 coord_head() {
@@ -155,6 +166,40 @@ coord_inputs_init() {
   done
   for p in ${(f)"$(coord_wf_paths $1 lampos-sdk.yml)"}; do
     if [[ $p == '!'* ]]; then coord_sdk_pats+="-$(coord_glob_re ${p#!})"; else coord_sdk_pats+="+$(coord_glob_re $p)"; fi
+  done
+}
+# coord_wf_pats_init REF WORKFLOW: any one workflow's pull_request paths at REF into coord_wf_pats, as
+# coord_inputs_init reads the two. 12 Nov (#6556 B): the train bot reads the paths of a train's red workflow (SDK, doc
+# links, virtual lamp) to find the carried PRs that workflow takes. Empty when they can't be read.
+coord_wf_pats_init() {
+  local p; typeset -ga coord_wf_pats; coord_wf_pats=()
+  for p in ${(f)"$(coord_wf_paths $1 $2)"}; do
+    if [[ $p == '!'* ]]; then coord_wf_pats+="-$(coord_glob_re ${p#!})"; else coord_wf_pats+="+$(coord_glob_re $p)"; fi
+  done
+}
+# coord_red_jobs SHA LOG: every failed (or timed-out) job of every workflow run on SHA, one "<workflow path> <job name>"
+# a line, with each such job's own log appended to LOG. 12 Nov (#6556 B, train 833): a job's log is served as soon as
+# that job ends, while `gh run view --log-failed` serves nothing until the whole run has, and since #6513 a run's other
+# shards run on after one fails.
+coord_red_jobs() {
+  local r rid rpath j
+  for r in ${(f)"$(gh api "repos/$REPO/actions/runs?head_sha=$1&per_page=50" --jq '.workflow_runs[]|"\(.id) \(.path)"' 2>/dev/null)"}; do
+    rid=${r%% *}; rpath=${r#* }; [[ $rid == <-> ]] || continue
+    for j in ${(f)"$(gh api "repos/$REPO/actions/runs/$rid/jobs?per_page=100" --paginate --jq '.jobs[]|select(.conclusion=="failure" or .conclusion=="timed_out")|"\(.id) \(.name)"' 2>/dev/null)"}; do
+      [[ ${j%% *} == <-> ]] || continue
+      print -r -- "$rpath ${j#* }"
+      gh api "repos/$REPO/actions/jobs/${j%% *}/logs" >> $2 2>/dev/null
+    done
+  done
+  return 0
+}
+# coord_prs_taken REF WORKFLOW PR...: the PRs (of those given) with a file WORKFLOW's pull_request paths at REF take,
+# one a line. 12 Nov (#6556 B): a train red only in that workflow sits them out. Nothing when the paths can't be read.
+coord_prs_taken() {
+  local ref=$1 wf=$2 p f; shift 2
+  coord_wf_pats_init $ref $wf; (( ${#coord_wf_pats} )) || return 0
+  for p in "$@"; do
+    for f in ${(f)"$(gh pr diff $p -R $REPO --name-only 2>/dev/null)"}; do coord_takes $f coord_wf_pats && { print -r -- $p; break; }; done
   done
 }
 # coord_takes FILE ARRAY: does the workflow whose patterns are in ARRAY (coord_inputs_init) take FILE? The last
