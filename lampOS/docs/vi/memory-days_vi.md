@@ -1411,3 +1411,29 @@ mà câu này được mang theo cho (`second_provider::said_saying`), nó giữ
 vi của người đó; nếu không, nó là của phòng như trước. Câu có lời mà không
 quy tắc nào xét vẫn là của phòng, và một giọng khác xuất hiện vẫn thu hẹp về
 phòng. Chi tiết ở [memory.md](../memory.md).
+
+## Gỡ hẳn một người ngay trên lamp, không cần app
+
+Bản tiếng Việt của mục `lamp-cloud face-remove NAME` trong
+[cloud.md](../cloud.md) («The faces it knows») và
+[memory.md](../memory.md) («Forgetting a person»).
+
+`lamp-cloud face-remove TÊN` làm đúng việc nút «Remove» của app làm với
+`entirely: true` (`faces::remove`): mắt quên khuôn mặt, rồi bộ nhớ chạy
+`forget_person` cho từng id mà câu trả lời của mắt nêu, không hủy nhắc nhở
+(như bản product, không có `LAMP_APP_SCHEDULE`). Lệnh không cần công tắc,
+không qua broker và không mở socket nào mới: nó chỉ kết nối tới socket của
+mắt (`/run/lampos-eyes/who.sock`, hoặc `LAMP_EYES_WHO_SOCKET`) và của bộ nhớ
+(`/run/lampos-memory/memory.sock`, 0600 cho user của bộ nhớ, hoặc socket hẹp
+trong `LAMP_MEMORY_FORGET_SOCKET`). Vì vậy lệnh chạy bằng root; `lampos` chỉ
+chạy được khi socket hẹp của bộ nhớ đang mở và được chỉ ra. User khác bị từ
+chối trước khi chạm tới socket nào.
+
+Lệnh chặt hơn app ở một điểm: một tên mà mắt không liệt kê
+(`{"list":true,"waiting":true}`, không phân biệt hoa thường) bị từ chối, kèm
+danh sách tên mắt đang biết, và không có gì bị quên; gõ nhầm tên không bao giờ
+xóa nhầm một id theo tên. Lệnh in một dòng: `removed: ` và câu trả lời như app
+nhận, thêm `people` là các id bộ nhớ đã hỏi; hoặc `refused: LÝ DO`. Mã thoát
+là 0 chỉ khi cả khuôn mặt lẫn bộ nhớ đều đã đi; 1 trong mọi trường hợp khác
+(kể cả bộ nhớ trả `kept`); 2 khi gọi sai. `LAMP_FACES_PAGE` và các unit giữ
+nguyên.

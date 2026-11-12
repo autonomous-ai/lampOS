@@ -9,6 +9,9 @@
 //! `lamp-cloud exit-note UNIT`: run by systemd as `ExecStopPost=` of a
 //! lampOS unit (`deploy/product/exit-note.conf`), it keeps what systemd
 //! says of that stop for the reports (#1683), and nothing for a `success`.
+//!
+//! `lamp-cloud face-remove NAME`: the app's Remove of a person entirely,
+//! run by hand as root on the lamp (`lamp_cloud::face_remove`).
 use lamp_cloud::account::{self, Account};
 use lamp_cloud::lamp::{self, Places, Real, Ring, Texts, Wifi};
 use lamp_cloud::wire::Identity;
@@ -22,6 +25,7 @@ use tokio::sync::watch;
 const USAGE: &str = "usage: lamp-cloud [--bus-root ABSOLUTE_DIR] [--control-admin-socket ABSOLUTE_PATH]\n\
   | lamp-cloud exit-note UNIT\n\
   | lamp-cloud make-skill make WORDS REQUEST_ID | made REQUEST_ID (the played check, #2813)\n\
+  | lamp-cloud face-remove NAME (the app's Remove of a person entirely, by hand, as root)\n\
   With LAMP_CLOUD=on, and CREDENTIALS_DIRECTORY holding account, key and build\n\
   (the unit's LoadCredential=); a rotated login is kept in STATE_DIRECTORY.";
 
@@ -108,6 +112,15 @@ fn main() -> ExitCode {
     if std::env::args().nth(1).as_deref() == Some("make-skill") {
         let rest: Vec<String> = std::env::args().skip(2).collect();
         let (told, code) = lamp_cloud::make_skill::command(&rest);
+        println!("{told}");
+        return ExitCode::from(code);
+    }
+    // The app's Remove of a person entirely (`face.remove`), run by hand on
+    // the lamp (A8, #2192): no switch, no broker, only the eyes' and
+    // memory's sockets, as root (or lampos with memory's narrow socket).
+    if std::env::args().nth(1).as_deref() == Some("face-remove") {
+        let rest: Vec<String> = std::env::args().skip(2).collect();
+        let (told, code) = lamp_cloud::face_remove::command(&rest);
         println!("{told}");
         return ExitCode::from(code);
     }
