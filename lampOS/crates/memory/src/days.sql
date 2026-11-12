@@ -162,6 +162,20 @@ CREATE TABLE IF NOT EXISTS nightly_jobs (
     result TEXT NOT NULL DEFAULT '',
     UNIQUE(person,day,after_id)
 );
+-- Weekly chapters (B2, `chapters.rs`): a week's job, the item ids it gave,
+-- never their text. One chapter a person a week (`state` done). Kept a day
+-- past its making; goes with `forget_all` and `forget_person`. Older builds
+-- pass this table over; `user_version` stays 1.
+CREATE TABLE IF NOT EXISTS nightly_weeks (
+    job INTEGER PRIMARY KEY AUTOINCREMENT,
+    person TEXT NOT NULL,
+    week TEXT NOT NULL,
+    at_unix_ms INTEGER NOT NULL,
+    ids TEXT NOT NULL,
+    state TEXT NOT NULL CHECK(state IN ('pending','done')),
+    result TEXT NOT NULL DEFAULT '',
+    UNIQUE(person,week)
+);
 -- A forget by a known person (El's option 2 on #5333): the latest time of
 -- one local day they asked any forget. The night passes over their
 -- exchanges of that day said before it, so a line a topic forget had

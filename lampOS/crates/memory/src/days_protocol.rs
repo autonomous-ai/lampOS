@@ -264,6 +264,32 @@ enum Extra {
         #[serde(default)]
         feelings: bool,
     },
+    /// Weekly chapters (B2): a known person's items of a week over, from
+    /// its Monday `week` (`Days::weekly_prepare`).
+    WeeklyPrepare {
+        #[serde(default)]
+        person: Who,
+        week: String,
+    },
+    /// Weekly chapters (B2): the model's one chapter, checked
+    /// (`Days::weekly_apply`).
+    WeeklyApply {
+        #[serde(default)]
+        person: Who,
+        job: String,
+        #[serde(default)]
+        proposal: Value,
+    },
+    /// Weekly chapters (B2): a known person's chapters of a span, for a
+    /// recall (`Days::chapters`).
+    Chapters {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        day_from: Option<String>,
+        #[serde(default)]
+        day_to: Option<String>,
+    },
     /// A forget a known person asked that may reach nothing kept (the
     /// voice's `forget {about}`): their exchanges of today said before it
     /// are not read by the night (`Days::forget_mark`, El's option 2 on
@@ -1107,6 +1133,44 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             patterns,
             feelings,
         } => store.nightly_apply(&one(person)?, &job, &proposal, patterns, feelings)?,
+        Extra::WeeklyPrepare { person, week } => {
+            match store.weekly_prepare(&one(person)?, &week)? {
+                Some(input) => json!({"ok":true,"input":input}),
+                None => json!({"ok":true,"reason":"nothing"}),
+            }
+        }
+        Extra::WeeklyApply {
+            person,
+            job,
+            proposal,
+        } => store.weekly_apply(&one(person)?, &job, &proposal)?,
+        Extra::Chapters {
+            person,
+            day_from,
+            day_to,
+        } => {
+            let bad = || {
+                Error::new(
+                    "bad_day",
+                    "day_from and day_to are YYYY-MM-DD, oldest first, together",
+                )
+            };
+            let days = match (day_from, day_to) {
+                (None, None) => None,
+                (Some(from), Some(to)) => {
+                    let (first, last) = (
+                        Day::parse(&from).ok_or_else(bad)?,
+                        Day::parse(&to).ok_or_else(bad)?,
+                    );
+                    if first > last {
+                        return Err(bad());
+                    }
+                    Some((first.to_string(), last.to_string()))
+                }
+                _ => return Err(bad()),
+            };
+            json!({"ok":true,"chapters":store.chapters(&one(person)?, days)?})
+        }
         Extra::ForgetMark { person } => {
             store.forget_mark(&one(person)?)?;
             json!({"ok":true})
@@ -1227,6 +1291,9 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "talk_notes",
             "nightly_prepare",
             "nightly_apply",
+            "weekly_prepare",
+            "weekly_apply",
+            "chapters",
             "forget_mark",
             "role_set",
             "role_end",

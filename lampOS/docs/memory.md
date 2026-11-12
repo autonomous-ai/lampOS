@@ -1123,6 +1123,19 @@ not kept overnight (El's option 2 on #5333). The legacy store answers
 `unknown_op`. Rules and limits: [memory-days.md](memory-days.md), "Nightly
 pass B" and "Forget marks".
 
+### Weekly chapters
+
+With the voice's `LAMP_MEMORY_WEEKLY_CHAPTERS=on` beside
+`LAMP_MEMORY_NIGHTLY=on` (off unless set), the night thread also writes one
+short chapter (at most 600 bytes) of each known person's week, once, the first
+night after the week ends, from the items the nightly pass kept that week
+(`weekly_prepare`, `weekly_apply`). A chapter is never in the session note:
+only a known person's own recall naming a day or a span ("what did we talk
+about last week") is told at most two of their chapters (`chapters`). Never
+the room's; a forget of anything under it, forget everything and forgetting
+the person take it; it closes 90 days after its week. Rules and limits:
+[memory-days.md](memory-days.md), "Weekly chapters".
+
 ## Limits, and what happens at each
 
 - A request line over 64 KiB: `too_long`; the next line is read as usual.

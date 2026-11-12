@@ -10897,6 +10897,23 @@ impl DaysClient {
                 ids = all;
             }
         }
+        // Their weekly chapters of the days asked about
+        // (`LAMP_MEMORY_WEEKLY_CHAPTERS`): first, theirs only, never the
+        // room's; nothing asked without a day or span.
+        if crate::nightly::chapters_on()
+            && let Some(line) = chapters_request(request, person)
+            && let Some(left) = deadline.checked_sub(started.elapsed())
+            && let Some(answer) = bounded_exchange_scoped(&self.socket, &line, left, lease)
+        {
+            let (mut first, mut first_ids): (Vec<Value>, Vec<_>) = chapters_found(&answer)
+                .into_iter()
+                .map(|(item, id)| (item, (Some(person.to_owned()), id)))
+                .unzip();
+            first.append(&mut found);
+            found = first;
+            first_ids.append(&mut ids);
+            ids = first_ids;
+        }
         let room_asked = room.is_some();
         if let Some(mut room) = room {
             // Nothing of the room's about a person for the rest of the day
@@ -12846,6 +12863,54 @@ fn talk_request(request: &Value, max_bytes: usize) -> Value {
         _ => {}
     }
     line
+}
+
+/// How a weekly chapter is told to the model.
+pub const CHAPTER_ABOUT: &str = "Your own short summary of this person's week, made from what you kept of it: use it to answer what they asked about that time, in your words, and never read it out whole.";
+
+/// The `chapters` line for a known person's recall naming a day or a
+/// span; none without one.
+fn chapters_request(request: &Value, person: &str) -> Option<Value> {
+    if !lamp_msgs::known::is_person_id(person) {
+        return None;
+    }
+    let (from, to) = match (
+        request["day_from"].as_str(),
+        request["day_to"].as_str(),
+        request["day"].as_str(),
+    ) {
+        (Some(from), Some(to), _) => (from, to),
+        (_, _, Some(day)) => (day, day),
+        _ => return None,
+    };
+    Some(json!({"op":"chapters","person":person,"day_from":from,"day_to":to}))
+}
+
+/// The found items of a `chapters` answer, and their ids; nothing for an
+/// answer that is not one.
+fn chapters_found(answer: &Value) -> Vec<(Value, u64)> {
+    if answer["ok"] != true {
+        return vec![];
+    }
+    answer["chapters"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|chapter| {
+            let id = chapter["id"]
+                .as_u64()
+                .filter(|id| *id > 0 && *id <= i64::MAX as u64)?;
+            let item = json!({
+                "source_id":id,
+                "week_from":chapter["from"].as_str()?,
+                "week_to":chapter["to"].as_str()?,
+                "chapter":chapter["text"].as_str()?,
+                "about":CHAPTER_ABOUT,
+                "theirs":true,
+            });
+            Some((item, id))
+        })
+        .collect()
 }
 
 /// The found items of a `talk_notes` answer, `theirs` or the room's, and
@@ -30919,5 +30984,53 @@ mod tests {
         assert!(room[0].0.get("theirs").is_none());
         assert_eq!(room[0].0["about"], super::TALK_ROOM);
         assert!(super::talk_found(&json!({"ok":false}), true).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod chapter_tests {
+    use super::*;
+
+    const ANNA: &str = "p-0123456789abcdef";
+
+    #[test]
+    fn chapters_are_asked_only_for_a_known_persons_dated_recall() {
+        let span = json!({"op":"search","query":"","day":null,"day_from":"2026-10-05","day_to":"2026-10-11"});
+        assert_eq!(
+            chapters_request(&span, ANNA),
+            Some(
+                json!({"op":"chapters","person":ANNA,"day_from":"2026-10-05","day_to":"2026-10-11"})
+            )
+        );
+        let day = json!({"op":"recall","query":null,"day":"2026-10-08"});
+        assert_eq!(
+            chapters_request(&day, ANNA).unwrap()["day_to"],
+            json!("2026-10-08")
+        );
+        // No day or span: a chapter is never told unasked.
+        let plain = json!({"op":"search","query":"tea","day":null});
+        assert_eq!(chapters_request(&plain, ANNA), None);
+        // The room, a rules scope, a guest: never.
+        for scope in ["everyone", "r-0123456789abcdef", "guest"] {
+            assert_eq!(chapters_request(&span, scope), None, "{scope}");
+        }
+    }
+
+    #[test]
+    fn a_chapters_answer_is_told_as_their_own_summary() {
+        let answer = json!({"ok":true,"chapters":[
+            {"id":12,"from":"2026-10-05","to":"2026-10-11","text":"A new library job."},
+            {"id":0,"from":"2026-09-28","to":"2026-10-04","text":"no id"},
+            {"id":13,"from":"2026-09-28","text":"no end"}
+        ]});
+        let found = chapters_found(&answer);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].1, 12);
+        assert_eq!(
+            found[0].0,
+            json!({"source_id":12,"week_from":"2026-10-05","week_to":"2026-10-11",
+                "chapter":"A new library job.","about":CHAPTER_ABOUT,"theirs":true})
+        );
+        assert!(chapters_found(&json!({"ok":false,"error":"bad_person"})).is_empty());
     }
 }
