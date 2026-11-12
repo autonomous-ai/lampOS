@@ -355,10 +355,14 @@ start it scored 0.0000 to 0.04, and 0.95 at 2 s. Now a start and every
 fresh start take 1.95 s of silence as heard before them (`quiet::LEAD`, a
 window less a step): the first 80 ms of sound already gives a score, and
 the same clips score 0.88 to 0.9999 at `--step-ms 10` (four lines without
-the name, at most 0.21). It is digital zeros, never a guess at the room,
-and with no `--quiet-below` the models hear it with the first block after
-the start (about 0.1 s of one core on a Mac, once). With `--quiet-below` it
-is kept, and heard only when sound comes. `check` dates each score from
+the name, at most 0.21). It is digital zeros, never a guess at the room.
+With no `--quiet-below` the models' state after it is worked out once, at
+load (`Hearer::with_lead`), and each start and fresh start copies it back:
+no model runs for it on the loop (#6462; heard at every fresh start, it
+cost 0.3 to 0.7 s of lamp-4ace, and a lost block is a fresh start, so
+blocks waiting behind it could be lost in turn). So `longest_block_ms`
+never holds it. With `--quiet-below` it is kept, and heard only when sound
+comes, as part of the start after a rest. `check` dates each score from
 the file's start: the first is of its first 80 ms.
 
 A hearing that was open at that moment is
