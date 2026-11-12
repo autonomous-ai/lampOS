@@ -519,8 +519,8 @@ fn openclaws_lost_first_prompt_is_started_once_more_and_a_taken_one_is_left() {
         json!(["close", "--machine", MACHINE, AGENT, "--json"])
     );
     assert_eq!(calls[5]["args"], calls[1]["args"], "the same new again");
-    // The close refused or failing changes nothing: the task still gets
-    // its one more `new`.
+    // The close refused or failing: the first may still take its prompt,
+    // so nothing more is started (Heron's P2 on #6504).
     for close in [json!({"exit":5}), json!({"exit":1})] {
         let rig = Rig::new();
         rig.plan(json!({
@@ -532,15 +532,12 @@ fn openclaws_lost_first_prompt_is_started_once_more_and_a_taken_one_is_left() {
         }));
         assert_eq!(
             rig.cli().launch(&request),
-            LaunchOutcome::Created {
-                agent_id: AGENT.into()
+            LaunchOutcome::Uncertain {
+                code: "openclaw_not_closed".into()
             },
             "{close}"
         );
-        assert_eq!(
-            verbs(&rig),
-            ["machines", "new", "show", "close", "new", "show"]
-        );
+        assert_eq!(verbs(&rig), ["machines", "new", "show", "close"]);
     }
     // The second `new` refused: nothing runs the task, uncertain under its
     // own code, and no reply.
@@ -6533,5 +6530,40 @@ fn the_index_lives_in_the_tasks_folder_the_reset_wipes() {
             .iter()
             .any(|path| path == "/var/lib/lampos-tasks/store"),
         "the reset plan wipes the tasks folder"
+    );
+}
+
+/// #6504 (Thirteen's P3): an OpenClaw `new` that made its folder (`--new
+/// <name>`) and lost its first prompt is asked once more in that folder,
+/// never `--new` again, which Harness refuses with the project there.
+#[test]
+fn openclaws_second_start_after_a_made_folder_names_the_folder() {
+    let rig = new_folder_rig();
+    let mut request = in_made_folder();
+    request.target.engine = EngineKind::Openclaw;
+    let seen = |state: &str, ask: Value| {
+        step(json!({"id":AGENT,"state":state,"ask":ask,"answer":"","truncated":false,"tools":0}))
+    };
+    rig.plan(json!({
+        "machines":{"default":true},"new":{"default":true},"close":{"exit":0},
+        "show":{"each":[
+            seen("idle", Value::Null),
+            seen("working", json!("Inspect the authored fixture"))
+        ]}
+    }));
+    assert_eq!(
+        rig.cli().launch(&request),
+        LaunchOutcome::Created {
+            agent_id: AGENT.into()
+        }
+    );
+    let news = new_args(&rig);
+    assert_eq!(news.len(), 2);
+    assert!(news[0].as_array().unwrap().iter().any(|arg| arg == "--new"));
+    let second = news[1].as_array().unwrap();
+    assert!(!second.iter().any(|arg| arg == "--new"), "{second:?}");
+    assert!(
+        second.iter().any(|arg| arg == "~/harnesses/lamp-tasks"),
+        "{second:?}"
     );
 }
