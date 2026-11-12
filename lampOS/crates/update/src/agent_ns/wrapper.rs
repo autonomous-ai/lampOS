@@ -316,6 +316,48 @@ pub fn write_engine(
         .map_err(|error| format!("{wrapper}: {error}"))
 }
 
+/// Whether the file at `engine`'s [`wrapper_path`] under `root` is a
+/// regular file (not a link) holding exactly [`wrapper_text`]`(engine)`:
+/// one this build wrote, and nothing else. Refused unless `engine` is
+/// plain.
+pub fn ours(root: &Path, engine: &str) -> bool {
+    match (wrapper_path(engine), wrapper_text(engine)) {
+        (Ok(wrapper), Ok(text)) => holds(root, &wrapper, &text),
+        _ => false,
+    }
+}
+
+/// The engines whose wrapper under `root` is [`ours`]: each plain name in
+/// [`WRAPPERS`], sorted. A file of any other text there (the engine's own
+/// program, a link, an older build's wrapper) is never one of them.
+pub fn ours_written(root: &Path) -> Vec<String> {
+    let Ok(entries) = fs::read_dir(on(root, WRAPPERS)) else {
+        return Vec::new();
+    };
+    let mut found: Vec<String> = entries
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter(|name| engine_ok(name) && ours(root, name))
+        .collect();
+    found.sort();
+    found
+}
+
+/// `engine`'s wrapper under `root` taken out, only when it is [`ours`]:
+/// `Ok(true)` when taken out, `Ok(false)` when it is not ours (left as it
+/// is) or not there. Its home and [`NS`] are left: the home may hold the
+/// engine's own data, and [`NS`] is shared.
+pub fn remove_ours(root: &Path, engine: &str) -> Result<bool, String> {
+    if !ours(root, engine) {
+        return Ok(false);
+    }
+    let wrapper = wrapper_path(engine)?;
+    match fs::remove_file(on(root, &wrapper)) {
+        Ok(()) => Ok(true),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(format!("{wrapper}: {error}")),
+    }
+}
+
 /// The longest `lampos`'s login-shell lookup may take, in seconds; past
 /// it nothing is found, so the engine is not present.
 pub const LOOKUP_SECS: &str = "5";
@@ -358,6 +400,69 @@ pub fn login_finds(engine: &str) -> Option<String> {
     let found = String::from_utf8(out.stdout).ok()?;
     let found = found.trim();
     (!found.is_empty()).then(|| found.to_owned())
+}
+
+/// The fixed text of [`login_programs_argv`]'s look, after `E=<engine>;`:
+/// each full folder of `lampos`'s login `PATH` in order, every executable
+/// regular `<dir>/<engine>` printed, one a line, except
+/// [`WRAPPERS`]`/<engine>` and any file carrying [`MARK`] in its first
+/// [`MARK_WITHIN`] bytes (a lamp-update wrapper, as the wrapper itself
+/// skips them). Ends 0 when it walked the whole `PATH`.
+const PROGRAMS_LOOK: &str = r#"o=$IFS; set -f; IFS=:; for d in ${PATH-}; do IFS=$o; case $d in /*) ;; *) continue ;; esac; [ "$d/$E" = "/usr/local/bin/$E" ] && continue; [ -f "$d/$E" ] && [ -x "$d/$E" ] || continue; head -c 512 "$d/$E" | grep -qF "Written by lamp-update." && continue; printf '%s\n' "$d/$E"; done; exit 0"#;
+
+/// The engine's own programs on `lampos`'s login `PATH` ([`PROGRAMS_LOOK`]),
+/// asked as [`login_lookup_argv`] asks: `lampos`'s login shell, bounded by
+/// `timeout` ([`LOOKUP_SECS`]). Refused unless `engine` is plain, so it is
+/// one word in the command; the rest of the text is fixed.
+pub fn login_programs_argv(engine: &str) -> Result<Vec<String>, String> {
+    plain(engine)?;
+    Ok([
+        "timeout",
+        LOOKUP_SECS,
+        "runuser",
+        "-l",
+        crate::install::USER,
+        "-c",
+    ]
+    .map(str::to_owned)
+    .into_iter()
+    .chain([format!("E={engine}; {PROGRAMS_LOOK}")])
+    .collect())
+}
+
+/// The lines of [`PROGRAMS_LOOK`]'s output that are its programs: full
+/// paths ending in `/<engine>`. Anything else a login shell's rc files
+/// print is passed over.
+pub fn programs_in(engine: &str, said: &str) -> Vec<String> {
+    let tail = format!("/{engine}");
+    said.lines()
+        .map(str::trim)
+        .filter(|line| line.starts_with('/') && line.ends_with(&tail))
+        .map(str::to_owned)
+        .collect()
+}
+
+/// `engine`'s own programs on `lampos`'s login `PATH`
+/// ([`login_programs_argv`]): `Ok` with none only when the look ran to the
+/// end (exit 0) and found none. A look that cannot be run (no `timeout`
+/// or `runuser`), fails or runs past [`LOOKUP_SECS`] is `Err`: nothing is
+/// known, so nothing is taken out for it.
+pub fn login_programs(engine: &str) -> Result<Vec<String>, String> {
+    let argv = login_programs_argv(engine)?;
+    let out = std::process::Command::new(&argv[0])
+        .args(&argv[1..])
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .map_err(|error| format!("{}: {error}", argv[0]))?;
+    if !out.status.success() {
+        return Err(match out.status.code() {
+            Some(124) => format!("lampos's login shell gave no answer within {LOOKUP_SECS} s"),
+            Some(code) => format!("lampos's login shell ended {code}"),
+            None => "lampos's login shell was stopped".to_owned(),
+        });
+    }
+    Ok(programs_in(engine, &String::from_utf8_lossy(&out.stdout)))
 }
 
 /// Whether what `lampos`'s login shell finds for `engine` (`found`, from

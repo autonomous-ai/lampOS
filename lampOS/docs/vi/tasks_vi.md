@@ -512,8 +512,12 @@ engine là thư mục riêng `/var/lib/lampos-agents/<engine>`. Một engine ch�
 được coi là có khi login shell của `lampos` tìm thấy wrapper trước (không
 phải chương trình của chính nó trong `~/.local/bin`). Khi unit riêng của
 lamp-update có `LAMP_AGENT_NS=on` (và `LAMP_APP_ENGINES=on`), mỗi vòng ghi
-nó cho mọi engine mà Harness báo đã cài, trừ Hermes và OpenClaw. Lần chạy
-của kỹ năng vẫn chỉ tới Hermes (`HarnessRunner`, ở trên).
+nó cho mọi engine mà Harness báo đã cài, trừ Hermes và OpenClaw, và gỡ
+wrapper do nó ghi (đúng y văn bản của nó, không gì khác) khi Harness không
+còn báo engine đó đã cài hoặc không còn chương trình riêng nào của engine
+trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ lại); một dòng
+vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
+chỉ tới Hermes (`HarnessRunner`, ở trên).
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
