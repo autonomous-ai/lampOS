@@ -644,8 +644,9 @@ sau:
    Mã riêng của kỹ năng (#6307, PR 4 của #6071, PR cuối trong năm PR, điều
    kiện 4 của first builder lúc 12:45; `LAMP_MADE_SCRIPTS=on` trong
    `lamp-voice`, được truyền cho cả hai route, trong `lamp-skills` và trong
-   `lamp-skills-manage@`, chỉ nhận `on`, tắt nếu không đặt và trong mọi
-   unit sản phẩm; xếp chồng trên `do.task` của #6305, `LAMP_SKILL_TASKS`).
+   `lamp-skills-manage@`, chỉ nhận `on`, tắt nếu không đặt; bật trong cả ba
+   unit sản phẩm (12/11, theo yêu cầu của lead trên #6307); xếp chồng
+   trên `do.task` của #6305, `LAMP_SKILL_TASKS`).
    Khi tắt, mô hình tạo kỹ năng không bao giờ được bảo rằng một kỹ
    năng có thể mang mã (system prompt và brief giữ như cũ), và một khối
    `scripts/…` trong câu trả lời, một bước `task` hay một danh sách
