@@ -13,7 +13,7 @@ use std::{
     io::{BufRead, BufReader, Write},
     os::unix::net::{UnixListener, UnixStream},
     path::Path,
-    process::{Command, Stdio},
+    process::Stdio,
     sync::{
         Arc, Mutex,
         atomic::{AtomicBool, Ordering},
@@ -118,7 +118,7 @@ fn speaker_player() -> Option<std::process::Child> {
         ),
     ];
     for (program, args) in players {
-        if let Ok(mut child) = Command::new(program)
+        if let Ok(mut child) = crate::keys::command(program)
             .args(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
@@ -402,7 +402,7 @@ fn speak(text: &str, cancelled: &AtomicBool) {
 /// with no sound server, is passed over for the next); false if none spoke.
 fn speak_with(engines: &[(&str, &[&str])], text: &str, cancelled: &AtomicBool) -> bool {
     for (program, args) in engines {
-        let Ok(mut child) = Command::new(program)
+        let Ok(mut child) = crate::keys::command(program)
             .args(*args)
             .stdin(Stdio::piped())
             .stdout(Stdio::null())
@@ -446,7 +446,7 @@ fn cut_off(program: &str) {
         .file_name()
         .is_some_and(|name| name == "spd-say")
     {
-        let _ = Command::new(program)
+        let _ = crate::keys::command(program)
             .arg("--cancel")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
@@ -588,6 +588,7 @@ fn action(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
 
     /// A folder to run a fake engine from: under the crate, since a temporary
     /// folder may not allow running a program.
