@@ -2174,6 +2174,21 @@ fn engines_from_machines_choose_an_engine_there_and_refuse_early() {
     );
 }
 
+/// An engine's program as lamp-update writes it in the lamp's bin: a
+/// wrapper carrying its mark (#6506), which a lamp offers alone.
+const WRAPPER: &str = "#!/bin/sh\n# lampOS: an engine on the lamp. Written by lamp-update.\n";
+
+/// A bin folder with lamp-update's wrapper for each of `names` (#6506).
+fn wrapped_bin(names: &[&str]) -> tempfile::TempDir {
+    let bin = tempfile::tempdir().unwrap();
+    for name in names {
+        let program = bin.path().join(name);
+        fs::write(&program, WRAPPER).unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    bin
+}
+
 /// Asks `targets` until they are `want`, within 5 s.
 fn targets_until(s: &Running, want: Value) {
     let start = Instant::now();
@@ -2355,7 +2370,14 @@ fn the_lamps_engine_is_hermes_by_default_openclaw_when_chosen_or_the_one_install
     ] {
         let rows_names: Vec<String> = rows.iter().map(|row| row.engine.clone()).collect();
         let home = tempfile::tempdir().unwrap();
-        let side = lamp_side(Some("on"), Some("on"), chosen, Some(home.path().to_owned()));
+        let bin = wrapped_bin(&["hermes", "openclaw"]);
+        let side =
+            lamp_side(Some("on"), Some("on"), chosen, Some(home.path().to_owned())).map(|side| {
+                LampSide {
+                    bin: bin.path().to_owned(),
+                    ..side
+                }
+            });
         let (mut s, _) = engines_running(true);
         s.config.set_up_later.as_mut().unwrap().lamp = side;
         s.counts.machines.lock().unwrap().truncate(1);
@@ -2451,7 +2473,7 @@ fn a_lamp_never_signed_in_hands_work_to_its_own_engine() {
     assert_eq!(s.counts.daemon_starts.load(Ordering::SeqCst), 1);
     let install = |name: &str| {
         let program = bin.path().join(name);
-        fs::write(&program, "#!/bin/sh\n").unwrap();
+        fs::write(&program, WRAPPER).unwrap();
         fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
     };
     // Hermes alone installed: the lamp is its own target with Hermes,
