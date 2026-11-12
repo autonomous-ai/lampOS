@@ -79,7 +79,7 @@ NoNewPrivileges=yes
 # MemoryMax). TasksMax: past it a fork fails.
 MemoryHigh=2100M
 CPUQuota=300%
-TasksMax=200
+TasksMax=512
 
 [Install]
 WantedBy=lampos.target
