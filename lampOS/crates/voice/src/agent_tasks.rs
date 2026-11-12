@@ -3621,27 +3621,21 @@ fn reads_back(line: &str, pending: &Pending) -> bool {
 /// and asked about again, and never started (#1712). None when nothing is
 /// waiting, or for the request that prepared it.
 ///
-/// A new ask while it waits (#6547 B, [`new_ask`]: `words` are no plain yes
-/// or no and hold at least [`WHOLE_ASK_FEWEST`] ask words) replaces it: the
-/// note says [`START`] with the new ask replaces the one waiting, and the
-/// one waiting is marked so ([`SUPERSEDED`]) that no later yes starts it.
-/// On 52e6 on 12 Nov "do not call start_agent_task again" left a new ask
-/// read back in words only, and the yes started the old task.
+/// A new ask while it waits (#6547 B, [`new_ask`]) is told that [`START`]
+/// with it replaces the one waiting. Nothing is marked here: the note is
+/// built before the model reads the line, and a question that is no work
+/// ("what's the weather today?") must not take the waiting task's yes
+/// away (Heron's P3 on #6572). Only a [`START`] in a new ask's request
+/// replaces it, and cancels it then; until one does, a yes still starts
+/// the task waiting. On 52e6 on 12 Nov "do not call start_agent_task
+/// again" left a new ask read back in words only, and the yes started the
+/// old task.
 pub fn pending_note(request: u64, words: &str, now: Instant) -> Option<String> {
     let pending = PENDING.lock().ok()?.clone()?;
     if request <= pending.request || now.duration_since(pending.at) > CONFIRM_WITHIN {
         return None;
     }
     if new_ask(words) {
-        if let Ok(mut superseded) = SUPERSEDED.lock()
-            && superseded.is_none_or(|(id, _)| id != pending.id)
-        {
-            *superseded = Some((pending.id, request));
-            eprintln!(
-                "lamp-voice: tasks: request {request}: a new ask while task {} waits: {START} replaces it, and no yes starts it now",
-                pending.id
-            );
-        }
         return Some(format!(
             "(For you to know, not to answer: a task you prepared earlier for {} is waiting for a yes, but the person now asks something new. If this is work to hand over, call {START} now with this new ask: it replaces the one waiting, which will not start. Never only say it back in words: nothing is prepared until {START} is called.)",
             pending.who
@@ -3660,30 +3654,30 @@ pub fn pending_note(request: u64, words: &str, now: Instant) -> Option<String> {
     })
 }
 
-/// The task waiting that a new ask replaced (#6547 B, [`pending_note`]): its
-/// id, and the request of the new ask. No yes after that request starts it:
-/// [`CONFIRM`] cancels it instead, and a [`START`] then replaces it.
-static SUPERSEDED: Mutex<Option<(u64, u64)>> = Mutex::new(None);
-
-/// Whether `pending` was replaced by a new ask in a request before
-/// `request` or in it ([`SUPERSEDED`]).
-fn superseded(pending: &Pending, request: u64) -> bool {
-    SUPERSEDED
-        .lock()
-        .ok()
-        .and_then(|superseded| *superseded)
-        .is_some_and(|(id, by)| id == pending.id && by <= request)
-}
+/// The words of consent a yes may hold beside its plain yes ("Yes, go
+/// ahead and start it now.", "Yes, sounds good, start it."): never counted
+/// as a new ask's words ([`new_ask`], Heron's P2 on #6572, where such a
+/// yes cancelled the task it agreed to).
+const CONSENT_WORDS: [&str; 24] = [
+    "yes", "yeah", "yep", "yup", "sure", "ok", "okay", "go", "ahead", "do", "it", "start", "begin",
+    "send", "hand", "over", "sounds", "good", "great", "fine", "please", "now", "right", "away",
+];
 
 /// Whether the person's `words`, heard while a task waits, are a new ask
 /// (#6547 B): no plain yes ([`plain_yes`]), no plain no
 /// (`crate::services::plain_no`), and at least [`WHOLE_ASK_FEWEST`] ask
-/// words ([`ask_words`]). A short line ("yes, but later", "what was that?")
-/// is no new ask, and the task still waits.
+/// words ([`ask_words`]) beside the words of consent ([`CONSENT_WORDS`]).
+/// A short line ("yes, but later", "what was that?") or a yes said at
+/// length ("Yeah sure, go ahead and do it.") is no new ask, and the task
+/// still waits.
 pub(crate) fn new_ask(words: &str) -> bool {
     !plain_yes(words)
         && !crate::services::plain_no(words)
-        && ask_words(words, true).len() >= WHOLE_ASK_FEWEST
+        && ask_words(words, true)
+            .iter()
+            .filter(|(_, said)| !CONSENT_WORDS.contains(&said.as_str()))
+            .count()
+            >= WHOLE_ASK_FEWEST
 }
 
 /// The words of a lamp's closing question that ask to start or hand over
@@ -4294,12 +4288,15 @@ fn run_for_asked(
                         // request, reviewers' P2 on #3009), and only from one
                         // that may say yes to it ([`may_confirm`]: a line the
                         // lamp wrote itself never replaces the person's).
-                        // Switch or not, a new ask heard while it waits
-                        // replaces it too (#6547 B, [`pending_note`]).
+                        // Switch or not, a START in a new ask's own request
+                        // replaces it too (#6547 B, [`pending_note`],
+                        // [`new_ask`]): only then, never a line before it.
                         replaced = pending
                             .as_ref()
                             .filter(|waiting| {
-                                (place.correct || superseded(waiting, request))
+                                (place.correct
+                                    || heard_words(request, heard)
+                                        .is_some_and(|words| new_ask(&words)))
                                     && waiting.id != id
                                     && (waiting.text != task
                                         || waiting.who != who
@@ -4425,34 +4422,7 @@ fn run_for_asked(
             }
         }
         CONFIRM => {
-            let mut pending = PENDING.lock().ok().and_then(|pending| pending.clone());
-            // A task a new ask replaced (#6547 B): no yes starts it now. It
-            // is cancelled, and the yes goes to the new ask, prepared now.
-            if let Some(old) = pending.take_if(|old| superseded(old, request)) {
-                if let Ok(mut waiting) = PENDING.lock()
-                    && waiting.as_ref().is_some_and(|waiting| waiting.id == old.id)
-                {
-                    *waiting = None;
-                }
-                eprintln!(
-                    "lamp-voice: tasks: request {request}: a yes after a new ask: task {} is cancelled, not started",
-                    old.id
-                );
-                if let Some(status) = ask(
-                    &place.directory.join("request.sock"),
-                    &json!({"op":"status"}),
-                    left(),
-                ) {
-                    cancel_replaced(
-                        place,
-                        request,
-                        old.id,
-                        status.get("store_id").and_then(Value::as_str),
-                        status.get("revision").and_then(Value::as_u64),
-                        left(),
-                    );
-                }
-            }
+            let pending = PENDING.lock().ok().and_then(|pending| pending.clone());
             let Some(pending) = pending else {
                 // A words-only read-back the person said yes to (#6547 A):
                 // prepare it now, and confirm again.
@@ -13128,7 +13098,6 @@ pub(crate) mod tests {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         *PENDING.lock().unwrap() = None;
-        *SUPERSEDED.lock().unwrap() = None;
         let directory =
             std::env::temp_dir().join(format!("agent-tasks-new-ask-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
@@ -13181,12 +13150,13 @@ pub(crate) mod tests {
                 "{words}: {note}"
             );
         }
-        assert!(SUPERSEDED.lock().unwrap().is_none());
         let plants = "Ask Claude Code to list five plants that grow well in the shade";
         assert!(new_ask(plants));
         let note = pending_note(2, plants, Instant::now()).unwrap();
         assert!(note.contains("it replaces the one waiting"), "{note}");
         assert!(note.contains("call start_agent_task now"), "{note}");
+        // The START in the new ask's own request replaces it.
+        HEARD_HERE.with(|here| here.set(Some(plants)));
         let (told, _) = run(
             &place,
             &call(
@@ -13197,6 +13167,7 @@ pub(crate) mod tests {
             true,
             PEER_WAIT,
         );
+        HEARD_HERE.with(|here| here.set(None));
         assert!(told["prepared"] == json!(true), "{told}");
         // The yes starts the plants, never the fruits.
         let (told, _) = run(&place, &call(CONFIRM, json!({})), 3, true, PEER_WAIT);
@@ -13216,71 +13187,144 @@ pub(crate) mod tests {
         assert_eq!(sent[6]["id"], 8);
         assert_eq!(sent[6]["prepared_digest"], "plants");
         assert!(PENDING.lock().unwrap().is_none());
-        *SUPERSEDED.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
     }
 
-    /// #6547 B: a new ask said back in words only, with no START, and then
-    /// a yes: the task waiting is cancelled, never started, and nothing
-    /// else is started either.
+    /// Heron's P3 on #6572: a question while a task waits, answered with no
+    /// START, takes nothing away: the yes after it starts the task waiting.
     #[test]
-    fn a_yes_after_a_new_ask_never_starts_the_old_task() {
+    fn a_question_while_a_task_waits_leaves_its_yes() {
         let _one = ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         *PENDING.lock().unwrap() = None;
-        *SUPERSEDED.lock().unwrap() = None;
         let directory =
-            std::env::temp_dir().join(format!("agent-tasks-new-ask-yes-{}", std::process::id()));
+            std::env::temp_dir().join(format!("agent-tasks-question-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&directory);
         std::fs::create_dir_all(&directory).unwrap();
-        let status = |revision: u64| json!({"ok":true,"store_id":"s1","revision":revision,"summary":{"session_id":"sess"}});
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
         let seen = tasks_part(
             &directory,
             vec![
-                ("request.sock", status(0)),
+                ("request.sock", status.clone()),
                 (
                     "request.sock",
                     json!({"ok":true,"id":7,"prepared_digest":"fruits","revision":1}),
                 ),
-                ("request.sock", status(1)),
-                ("request.sock", json!({"ok":true,"id":7,"revision":2})),
+                ("request.sock", status),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":7,"queued":true,"revision":2}),
+                ),
             ],
         );
         let place = correcting(&directory, false);
-        let start = ToolCall {
+        let call = |name: &str, args: Value| ToolCall {
             id: "c".into(),
-            name: START.into(),
-            args: json!({"task":"List five fruits and write them to fruits.md"}),
+            name: name.into(),
+            args,
         };
-        let (told, _) = run(&place, &start, 1, true, PEER_WAIT);
-        assert!(told["prepared"] == json!(true), "{told}");
-        assert!(
-            pending_note(
-                2,
-                "Ask Claude Code to list five plants for the shade",
-                Instant::now()
-            )
-            .is_some()
+        let (told, _) = run(
+            &place,
+            &call(
+                START,
+                json!({"task":"List five fruits and write them to fruits.md"}),
+            ),
+            1,
+            true,
+            PEER_WAIT,
         );
-        let confirm = ToolCall {
-            id: "c".into(),
-            name: CONFIRM.into(),
-            args: json!({}),
-        };
-        let (told, _) = run(&place, &confirm, 3, true, PEER_WAIT);
-        assert!(told.get("handing_over").is_none(), "{told}");
-        assert!(told["error"].is_string(), "{told}");
+        assert!(told["prepared"] == json!(true), "{told}");
+        let question = "What's the weather going to be like in Hanoi today?";
+        assert!(new_ask(question));
+        assert!(pending_note(2, question, Instant::now()).is_some());
+        // Answered in words, no START; then "Yes.": the fruits start.
+        let (told, _) = run(&place, &call(CONFIRM, json!({})), 3, true, PEER_WAIT);
+        assert!(told["handing_over"] == json!(true), "{told}");
         let sent: Vec<Value> = seen.try_iter().collect();
         let ops: Vec<&str> = sent
             .iter()
             .map(|line| line["op"].as_str().unwrap())
             .collect();
-        assert_eq!(ops, ["status", "prepare", "status", "cancel"]);
+        assert_eq!(ops, ["status", "prepare", "status", "confirm"]);
         assert_eq!(sent[3]["id"], 7);
         assert!(PENDING.lock().unwrap().is_none());
-        *SUPERSEDED.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// Heron's P2 on #6572: a yes said at length is no new ask. Each line
+    /// starts the task waiting, with `LAMP_TASKS_ONE_YES` on and off, and
+    /// nothing is cancelled.
+    #[test]
+    fn a_yes_said_at_length_starts_the_waiting_task() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let lines = [
+            "Yes, go ahead and start it now.",
+            "Yeah sure, go ahead and do it.",
+            "Yes, sounds good, start it.",
+            "Okay, yes, please start that.",
+            "Yes please, hand it over.",
+        ];
+        for (at, line) in lines.into_iter().enumerate() {
+            assert!(!new_ask(line), "{line}");
+            for one_yes in [false, true] {
+                *PENDING.lock().unwrap() = None;
+                let directory = std::env::temp_dir().join(format!(
+                    "agent-tasks-consent-{}-{at}-{one_yes}",
+                    std::process::id()
+                ));
+                let _ = std::fs::remove_dir_all(&directory);
+                std::fs::create_dir_all(&directory).unwrap();
+                let status =
+                    json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+                let seen = tasks_part(
+                    &directory,
+                    vec![
+                        ("request.sock", status.clone()),
+                        (
+                            "request.sock",
+                            json!({"ok":true,"id":7,"prepared_digest":"fruits","revision":1}),
+                        ),
+                        ("request.sock", status),
+                        (
+                            "voice.sock",
+                            json!({"ok":true,"id":7,"queued":true,"revision":2}),
+                        ),
+                    ],
+                );
+                let place = Place {
+                    one_yes,
+                    ..correcting(&directory, false)
+                };
+                let call = |name: &str| ToolCall {
+                    id: "c".into(),
+                    name: name.into(),
+                    args: json!({"task":"List five fruits and write them to fruits.md"}),
+                };
+                let (told, _) = run(&place, &call(START), 1, true, PEER_WAIT);
+                assert!(told["prepared"] == json!(true), "{line}: {told}");
+                let note = pending_note(2, line, Instant::now()).unwrap();
+                assert!(note.contains("If they say yes now"), "{line}: {note}");
+                HEARD_HERE.with(|here| here.set(Some(line)));
+                let (told, _) = run(&place, &call(CONFIRM), 2, true, PEER_WAIT);
+                HEARD_HERE.with(|here| here.set(None));
+                assert!(told["handing_over"] == json!(true), "{line}: {told}");
+                let ops: Vec<String> = seen
+                    .try_iter()
+                    .map(|sent| sent["op"].as_str().unwrap().to_owned())
+                    .collect();
+                assert_eq!(
+                    ops,
+                    ["status", "prepare", "status", "confirm"],
+                    "{line} {one_yes}"
+                );
+                assert!(PENDING.lock().unwrap().is_none());
+                std::fs::remove_dir_all(directory).unwrap();
+            }
+        }
     }
 
     /// #6547 A, without `LAMP_TASKS_ONE_YES`: the lamp said the task back in
@@ -13294,7 +13338,6 @@ pub(crate) mod tests {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let _thread = crate::provider_worker::tests::one_thread();
         *PENDING.lock().unwrap() = None;
-        *SUPERSEDED.lock().unwrap() = None;
         let now = Instant::now();
         {
             let mut thread = crate::thread::THREAD.lock().unwrap();
