@@ -2174,13 +2174,16 @@ tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công 
 (`tool = name`) mà ghi chú là mô tả và các câu kích hoạt của tệp; một bước
 `do.task` giao tệp cho Hermes của đèn (lamp-tasks, namespace của Hermes, một
 thư mục và home mới mỗi lần chạy, dữ liệu Hermes của người dùng bị ẩn, token riêng của lần chạy). Quyền được đọc thận
-trọng từ tệp: `camera`, `light`, `speak`, `sound`, và `net` khi tệp nhắc một
-API web, URL hay HTTP (cần `LAMP_TASK_NET=on`). Đèn nói lại các quyền khi bật.
+trọng từ tệp: `camera`, `light`, `speak`, `sound`, và `net` khi tệp có một liên
+kết `http(s)://`, một webhook, hoặc bảo gọi, lấy hay gửi tới một API web hay URL;
+chỉ nhắc "API" hay "URL" thì chưa đủ (cần `LAMP_TASK_NET=on`). Đèn nói lại các quyền khi bật.
 Chỉ đèn, giọng (kể cả âm thanh nó phát) và thân thì bật ngay (giọng nói ghi lời đồng ý với
 lamp-control); `sound` (nghe các loại âm thanh), micro, camera, gửi đi hoặc `net` thì hỏi lời đồng ý bằng
 giọng nói một lần, ở lần chạy đầu. Khóa hay token không bao giờ được nói ra,
 hỏi bằng giọng nói hay giữ trong thư mục kỹ năng: tệp chứa giá trị giống
-khóa hay token bị từ chối (đưa bí mật qua app là việc tiếp theo).
+khóa hay token bị từ chối, kể cả khi nó nằm trong đường dẫn của một liên kết
+(mỗi phần giữa các `/` sau scheme và host, và mỗi phần quanh `:`, như khóa
+của webhook hay bot); đưa bí mật qua app là việc tiếp theo.
 `lamp_voice::upload_agent`; xem bản tiếng Anh, "Run by the lamp's agent".
 
 ## Trigger theo ngày trong tuần (`trigger.days`, #6066)

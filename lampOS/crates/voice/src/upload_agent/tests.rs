@@ -309,6 +309,18 @@ fn grants_are_read_conservatively() {
         Vec::<String>::new()
     );
     assert_eq!(grants_read("Fetch the URL and say it."), ["speak", "net"]);
+    // A bare "api" or "url" is not the internet: a reach-out word or a
+    // real link is.
+    assert_eq!(grants_read("Say the URL of this page aloud."), ["speak"]);
+    assert_eq!(grants_read("Glow like the API docs' blue."), ["light"]);
+    assert_eq!(
+        grants_read("Call the weather API and say it."),
+        ["speak", "net"]
+    );
+    assert_eq!(
+        grants_read("Glow, then see https://example.invalid/a."),
+        ["light", "net"]
+    );
     switches(false, false);
 }
 
@@ -330,5 +342,47 @@ fn a_file_carrying_a_key_or_token_is_refused_without_saying_it() {
     assert!(!carries_secret(
         "an_image_strip_generator_v2 is the strip's name"
     ));
+    switches(false, false);
+}
+
+/// Heron's P2 on #6666: a key or token in a link's path is found too,
+/// each part past the scheme and host and a bot's `<id>:<token>` checked
+/// with the same rule. Made-up probe values only.
+#[test]
+fn a_key_or_token_in_a_link_is_refused_too() {
+    switches(true, true);
+    for link in [
+        "https://hooks.slack.com/services/T0A1B2C3D/B0A1B2C3D/abcDEF1234ghiJKL5678mnoP",
+        "https://discord.com/api/webhooks/123456789012345678/AbCdEf1234567890GhIjKl1234567890",
+        "https://api.telegram.org/bot123456789:AAH1bc2DEf3GHi4JKl5MNo6PQr7STu8VWx/sendMessage",
+        "https://maker.ifttt.com/trigger/lamp/with/key/dAbC1234efGH5678ijKL9012",
+    ] {
+        assert!(
+            carries_secret(&format!("Post the photo to {link} when done.")),
+            "{link}"
+        );
+        let card = format!(
+            "{}
+Post each strip to {link}.
+",
+            photobooth()
+        );
+        let why = files(&card).unwrap_err().0;
+        assert_eq!(why, HAS_SECRET, "{link}");
+        assert!(!why.contains(link));
+    }
+    // A value outside a link is still found whole, and a link with no key
+    // in it, a chat's number or a long word still passes.
+    let fake = ["FAKE", "Key", "0000", "1111", "abcd", "2222", "efgh"].concat();
+    assert!(carries_secret(&format!("The key is {fake}.")));
+    assert!(carries_secret(&format!("Use bot123:{fake} to send.")));
+    for clean in [
+        "Post to https://bot.example.invalid/bot123456/sendPhoto for chat -1001234567890.",
+        "See https://example.invalid/docs/skills/photo-booth/strip-layout for the strip.",
+        "an_image_strip_generator_v2 is the strip's name",
+        "Read /var/lib/lampOS/skills/photo-booth/scripts/SKILL.md first.",
+    ] {
+        assert!(!carries_secret(clean), "{clean}");
+    }
     switches(false, false);
 }
