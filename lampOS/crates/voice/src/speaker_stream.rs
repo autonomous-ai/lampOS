@@ -456,6 +456,9 @@ const MOST_LINE: usize = 4096;
 /// clip past it is refused; a stream, which cannot be read ahead, is lowered.
 const LIMIT_WINDOW: usize = 240;
 
+/// The RMS the limiter aims at, a part of the cap: 2% (0.18 dB) under it.
+const RMS_MARGIN: f64 = 0.98;
+
 /// A stream's limiter: per 10 ms window (240 samples, one speaker chunk) the
 /// gain that brings its RMS to the cap, taken at once when it must go down
 /// and let up across the window when it can go back, then no sample past the
@@ -478,7 +481,9 @@ impl Limiter {
     fn limit(&mut self, block: &mut [i16]) -> u64 {
         let full = 32_767.0;
         let peak = (full * 10f64.powf(crate::say::SOUND_PEAK_DBFS / 20.0)).floor();
-        let loudest = full * 10f64.powf(crate::say::SOUND_LOUDEST_DBFS / 20.0);
+        // A little under the cap, so the rounding to whole samples never
+        // puts a window a hair over it.
+        let loudest = full * 10f64.powf(crate::say::SOUND_LOUDEST_DBFS / 20.0) * RMS_MARGIN;
         let mut limited = 0;
         for window in block.chunks_mut(LIMIT_WINDOW) {
             let power = window.iter().map(|&s| f64::from(s).powi(2)).sum::<f64>();
@@ -759,7 +764,11 @@ mod tests {
                 played.extend(block);
             }
             let (rms, peak) = loudest(&played);
-            assert!(rms <= cap_rms * 1.01, "size {size}: {rms} past {cap_rms}");
+            // Whole windows: never past the cap, rounding included. Blocks that
+            // end inside a window count it from their own start: a loud tone
+            // can pass a window counted from the stream's start by a little.
+            let slack = if size % 240 == 0 { 1.0 } else { 1.01 };
+            assert!(rms <= cap_rms * slack, "size {size}: {rms} past {cap_rms}");
             assert!(peak <= cap_peak, "size {size}: peak {peak} past {cap_peak}");
             assert!(limited >= 100, "size {size}: {limited} windows counted");
             assert_eq!(played.len(), loud.len());
