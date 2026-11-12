@@ -1491,8 +1491,10 @@ pub struct UpdateStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub round: Option<UpdateRound>,
     /// The agents (engines) the lamp's Harness has, by name (#6240): only
-    /// with lamp-update's `LAMP_APP_ENGINES=on`, else absent. `hermes` is
-    /// the only one said now. An older reader passes over it.
+    /// with lamp-update's `LAMP_APP_ENGINES=on`, else absent. `hermes` and
+    /// `openclaw` always, from their install records, and every other
+    /// engine Harness says the lamp's own machine has (the lead's rule of
+    /// 12 Nov: no fixed list). An older reader passes over it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engines: Option<BTreeMap<String, EngineInstall>>,
 }

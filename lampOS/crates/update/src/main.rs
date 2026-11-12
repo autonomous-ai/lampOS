@@ -999,8 +999,19 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // V2's ask of 12 Nov): on as its install is (its switch, Harness's).
         openclaw_on: matches!(openclaw, Some((true, _))),
         openclaw_pending: Default::default(),
+        harness: Default::default(),
     });
     if let Some(engines) = &engines {
+        // Every other engine the lamp's Harness has (the lead's rule of 12
+        // Nov: the list is Harness's, never a fixed two), looked at on a
+        // thread of its own once a minute, only by a `serve` that acts.
+        if config.apply && command == "serve" {
+            engines.look_at_harness_every(
+                lamp_update::engines::HARNESS_LOOK_EVERY,
+                lamp_update::engines::harness_run(),
+                |line: &str| eprintln!("lamp-update: {line}"),
+            );
+        }
         app_check = app_check.map(|check| {
             check.with_engines(lamp_update::engines::Asks::new(
                 &bus_root,

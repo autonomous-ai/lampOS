@@ -160,9 +160,9 @@ lamp says so.
 | `face.list` | with `LAMP_FACES_PAGE=on` (#2192, "The faces it knows" below): `{"faces": [{"name": NAME, "waiting": BOOL}, …]}`, the names the eyes keep and, `waiting`, a face from a photo still to be confirmed at the lamp. Names only. Without the switch, V1's "not on this lamp" |
 | `face.remove` (`{"name", "entirely"}`) | with `LAMP_FACES_PAGE=on`: the person off all of the lamp, the eyes' own forget and then everything memory keeps for them and their rules (`entirely` true or left out), or the face only (`"entirely": false`, `"memory": "not asked"`). `{"removed": NAME, "memory": "forgotten"}`, or `"memory": "kept"` with its `reason`; for a face already gone (a remove `entirely` after a face-only one, or a retry after `kept`), `"face": "already gone"` with `"memory": "by name only"` (memory was asked by the name's id only), or `kept`; with `"finishing": true` while set-aside records it waits for aren't searched yet. `the lamp doesn't know that face` for a name it doesn't keep. Without the switch, V1's "not on this lamp" |
 | `schedule.list` (`{"after_id"?: n}`), `schedule.cancel` (`{"id": n}`) | with `LAMP_APP_SCHEDULE=on` (#2195, "The lamp's timers and reminders" below): the list is a page of at most eight, `{"items": [{"id", "kind": "timer"\|"reminder", "text", "state", "local", "due_unix_ms", "repeat", "snoozed", "late"}], "next_after_id", "complete"}`, each as lamp-schedule keeps it; a cancel is `{"cancelled": true, "id": n}`, the timer or the whole reminder series. A refusal is the reminder client's fixed sentence: no longer active, changed meanwhile (list again), or not confirmed (it may have happened). A bad `after_id` or an `id` that isn't a whole number above 0 is refused before lamp-schedule is asked. Without the switch, V1's "not on this lamp" |
-| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale", "round"?: {"started_at_unix_ms", "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}}`, from lamp-update's kept `update/status`; `round` only while a round runs (#5473, "The round under way" below); `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below); with `LAMP_APP_ENGINES=on` here and in lamp-update, also `"engines": {"hermes": {"state", "version"?, "reason"?, "at_unix_ms"?}, "openclaw"?: {…}}` ("The lamp's agents" below). Without the switch, V1's "not on this lamp" |
+| `update.status` | with `LAMP_APP_UPDATE=on` (#2194, "The lamp's software update" below): `{"running": {"sequence", "commit"} \| null, "now": "idle"\|"checking"\|"fetching"\|"switching"\|"watching"\|"restoring"\|"unknown", "last": {"outcome", "sequence", "at_unix_ms", "reason"?, "started_at_unix_ms"?} \| null, "stale", "round"?: {"started_at_unix_ms", "step_started_at_unix_ms", "target"?: {"sequence", "commit"}}}`, from lamp-update's kept `update/status`; `round` only while a round runs (#5473, "The round under way" below); `unknown` and nulls before lamp-update has said anything; with lamp-update's `LAMP_HARNESS_AT_ONBOARDING=on`, also `"harness"` ("Harness's install" below); with `LAMP_APP_ENGINES=on` here and in lamp-update, also `"engines": {"hermes": {"state", "version"?, "reason"?, "at_unix_ms"?}, "openclaw": {…}, ENGINE: {…}…}`, every other engine the lamp's Harness has too ("The lamp's agents" below). Without the switch, V1's "not on this lamp" |
 | `update.check` (`{}`) | with `LAMP_APP_UPDATE=on` (#4153, "Check for update" below): asks `lamp-update serve` for its next round now. `update.status`'s object with `"check": "started"`, or `failure` with `a round is running` (`now` is not `idle` or `unknown`), `asked less than a minute ago`, or `lamp-update is not listening for a check`. Without the switch, V1's "not on this lamp" |
-| `engines.install` (`{"engine": "hermes"}` or `"openclaw"`) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on` (#6240, "The lamp's agents" below): asks `lamp-update serve` to install a missing agent at its next round. `{"install": "started"}`, or `failure` with `no such agent on this lamp` (lamp-update says no such engine), `the agent is not missing or failed` (its `state` is not `not_installed` or `failed`), `asked less than a minute ago`, `not installable on this build yet` (an agent this build has no installer for; none now), or `lamp-update is not listening for a check`. Without the switches, V1's "not on this lamp" |
+| `engines.install` (`{"engine": "hermes"}` or `"openclaw"`) | with `LAMP_APP_UPDATE=on` and `LAMP_APP_ENGINES=on` (#6240, "The lamp's agents" below): asks `lamp-update serve` to install a missing agent at its next round. `{"install": "started"}`, or `failure` with `no such agent on this lamp` (lamp-update says no such engine), `the agent is not missing or failed` (its `state` is not `not_installed` or `failed`), `asked less than a minute ago`, `not installable from the app on this build` (an agent this build has no installer for: any but Hermes and OpenClaw), or `lamp-update is not listening for a check`. Without the switches, V1's "not on this lamp" |
 | `mic.set` | refused: "on this lamp the microphones are muted and unmuted with the button or the switch". The person's own switch and button are the only way |
 | `device.soft_reset` | refused until the owner says otherwise: a destructive act from anywhere is the owner's call |
 | `keys.set` (`{"service": "deepseek" \| "deepgram", "key", "base_url"?, "request_id"?}`), `keys.remove` (`{"service", "request_id"?}`), `keys.get` (`{"request_id"?}`) | with `LAMP_OWN_KEYS=on` beside `LAMP_SETTINGS_CHANGE=on` (#2094, [own-keys.md](own-keys.md), the contract on #2094 at 11:13 and its additions after): `starting` at once (with `data.request_id`), then `success` with `{"service", "uses": "own", "code": "works", "answer"}` (the answer names where the person's data goes), `{"service", "uses": "lamp"}` or `{"deepseek": "own" \| "lamp", "deepgram": …, "since": {"deepseek", "deepgram"}, "deepseek_host"}`, or `failure` with `error` and `data.code`: `refused`, `unreached`, `not_kept`, `bad_field`, `busy`, `not_allowed` or `unavailable`. `request_id` is said back on every reply. The key is in no reply. Without the switch, V1's "not on this lamp" at once |
@@ -654,8 +654,10 @@ look starts none, and the app sees it on `update.status` (`now` stays
 
 With `LAMP_APP_ENGINES=on` (exactly; set in the product units since #6240) in lamp-update's own unit, the
 status carries `engines` (`lamp_msgs::EngineInstall` by name): the agents
-the lamp's Harness has, for the app's agents screen: `hermes` always, and
-`openclaw` beside it (below). Each is `{"state", "version"?, "reason"?,
+the lamp's Harness has, for the app's agents screen: `hermes` always,
+`openclaw` beside it (below), and every other engine Harness says the
+lamp's own machine has (below; no fixed list, the lead's rule of 12 Nov:
+"Harness has more than 10 agents"). The app draws one row per entry. Each is `{"state", "version"?, "reason"?,
 "at_unix_ms"?}`; Hermes's is read from its install record
 (`docs/install.md`, "Hermes on the lamp") as lamp-update keeps it:
 
@@ -685,24 +687,47 @@ are, being in the app's list already; every other (`serve`, `timeout`,
 so the app's `reason` list is the same for both agents. A record that does
 not read is `failed`.
 
-Example, Hermes installed and OpenClaw failed:
+Every other engine is Harness's own: lamp-update's `serve` (one that
+acts) asks the lamp's Harness on a thread of its own every five minutes
+(`engines::HARNESS_LOOK_EVERY`), as `lampos` with `HOME=/var/lib/lampos-tasks`
+as its other Harness calls: `harness machines --json` once for the
+lamp's own machine (the one `current`; again after a look that failed),
+then `harness machines engines <that machine> --json`, within 35 s (lamp-
+tasks' bound; 30 s for the machines list). Each engine Harness says of that
+machine is `installed` (`installed: true`, with `version` when Harness
+gives a plain one), or `not_installed` (`installed: false`, or `null` with
+`installable: true`, Harness's "not found there"); one Harness cannot say
+this time (`null`, nothing installable) keeps what the last look said, or
+is left out. A computer's engines are never the lamp's. Hermes and
+OpenClaw stay read from their own records, whatever Harness says of them.
+A look that fails, runs out or is signed out keeps the last good one
+(none before the first), said once in the journal: the status then has
+Hermes and OpenClaw as above and no error. These carry no `at_unix_ms`.
+
+Example, Hermes installed, OpenClaw failed, and Harness saying Codex and
+Cursor installed and Claude Code not found on the lamp:
 
 ```json
 "engines": {
   "hermes": {"state": "installed", "version": "0.22.2", "at_unix_ms": 1762850000000},
-  "openclaw": {"state": "failed", "reason": "failed", "at_unix_ms": 1762851000000}
+  "openclaw": {"state": "failed", "reason": "failed", "at_unix_ms": 1762851000000},
+  "codex": {"state": "installed", "version": "0.58.0"},
+  "cursor": {"state": "installed"},
+  "claude": {"state": "not_installed"}
 }
 ```
-lamp-update looks at it every 2 s and says the status again when it
-changes. lamp-cloud gives `engines` only with its own `LAMP_APP_ENGINES=on`
+lamp-update looks at it every 2 s (Harness's part as its last look kept it)
+and says the status again when it changes. lamp-cloud gives `engines` only with its own `LAMP_APP_ENGINES=on`
 too (beside `LAMP_APP_UPDATE=on`), and leaves out an entry that fails
 `EngineInstall::check`.
 
 `engines.install` (`{"engine": "hermes"}`) is the app's tap to install a
 missing one. lamp-cloud reads the kept status first: only an agent whose
 `state` is `not_installed` or `failed` is asked for, else `no such agent on
-this lamp`, `not installable on this build yet` (one with no installer in
-this build: lamp-cloud's `INSTALLABLE` is `hermes` and `openclaw`) or `the
+this lamp`, `not installable from the app on this build` (one with no
+installer in this build, as every engine but Hermes and OpenClaw: the list
+is Harness's, the installers are this build's; lamp-cloud's `INSTALLABLE`
+and lamp-update's `engines::INSTALLABLE` are `hermes` and `openclaw`) or `the
 agent is not missing or failed`. It says one
 `update/engine_install` (`lamp_msgs::EngineInstallAsk`, a stream nothing
 keeps), at most one a minute (`EngineInstallAsk::AGAIN_AFTER`, `asked less
@@ -728,6 +753,10 @@ taken up once the record leaves `absent` and `failed`. Tests: lamp-msgs'
 `an_ask_from_the_app_tries_a_recent_failure_again_but_not_an_install_under_way`,
 `an_ask_from_the_app_tries_a_recent_openclaw_failure_again`,
 `openclaw_is_said_as_hermes_is`, `a_tap_for_a_missing_openclaw_marks_it_pending`,
+`engines_lists_every_engine_harness_says_the_lamp_has`,
+`a_harness_that_fails_leaves_hermes_and_openclaw_as_they_are`,
+`harness_engines_are_read_strictly`,
+`the_harness_look_runs_on_its_own_thread_and_ends_with_the_engines`,
 `a_tap_to_install_an_agent_ends_the_wait_and_is_kept_from_a_round`,
 `answer.rs`'s
 `the_app_installs_a_missing_agent_only_when_lamp_update_says_it_is_missing`,
