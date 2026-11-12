@@ -1002,8 +1002,9 @@ const NO_BESIDE: [&str; 9] = [
 
 /// Whether `words` are a plain no and nothing else: "No.", "Don't send
 /// it.", "Cancel.", "Stop.", "Không, đừng gửi." At most six words, no
-/// question, a no word in it, and "send" or "gửi" only after "don't",
-/// "dont" or "đừng", so "no, send it" is never a no.
+/// question, a no word in it, and "send" or "gửi" (or, for a task read
+/// back, "start", "begin", "do" or "run", #6582) only after "don't", "dont"
+/// or "đừng", so "no, send it" is never a no.
 pub fn plain_no(words: &str) -> bool {
     if words.trim_end().ends_with('?') {
         return false;
@@ -1027,7 +1028,9 @@ pub fn plain_no(words: &str) -> bool {
         if NO_WORDS.contains(&word) {
             no = true;
             negated |= matches!(word, "don't" | "dont" | "đừng");
-        } else if matches!(word, "send" | "gửi") {
+        } else if matches!(word, "send" | "gửi" | "start" | "begin" | "do" | "run") {
+            // "Don't start it." to a task read back (#6582), as "Don't send
+            // it." to a write: the verb only after "don't" or "đừng".
             if !negated {
                 return false;
             }

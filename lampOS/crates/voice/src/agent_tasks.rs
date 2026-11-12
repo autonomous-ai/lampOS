@@ -11612,6 +11612,38 @@ pub(crate) mod tests {
         *PENDING.lock().unwrap() = None;
     }
 
+    /// #6582 on lamp-c0a4 (12431): "No, don't start it." is the plain no a
+    /// person says to a task read back, and it drops the task as "No." does;
+    /// the verb without "don't" is no no.
+    #[test]
+    fn dont_start_it_is_a_plain_no_to_the_task_waiting() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        for no in [
+            "No, don't start it.",
+            "Don't start it.",
+            "No, don't do it.",
+            "Don't run that, thanks.",
+            "No, don't begin it now.",
+        ] {
+            *PENDING.lock().unwrap() = Some(waiting_coffee(7));
+            let mut cancelled = None;
+            let told = declined_with(2, no, Instant::now(), |id| cancelled = Some(id));
+            assert!(told.is_some(), "{no}");
+            assert_eq!(cancelled, Some(7), "{no}");
+            assert!(PENDING.lock().unwrap().is_none(), "{no}");
+        }
+        for not_a_no in ["Start it.", "Do it now.", "Run it please."] {
+            *PENDING.lock().unwrap() = Some(waiting_coffee(7));
+            let told = declined_with(2, not_a_no, Instant::now(), |_| {
+                panic!("cancelled on {not_a_no:?}")
+            });
+            assert!(told.is_none(), "{not_a_no}");
+        }
+        *PENDING.lock().unwrap() = None;
+    }
+
     /// #6582: a plain no with nothing waiting, or one that could not have
     /// said yes to it (the request that prepared it, or past the 120 s),
     /// does nothing.
