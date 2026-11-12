@@ -2836,8 +2836,26 @@ impl Cli {
     /// left by their `skill-<run-id>` names). A read only; a row with no
     /// name is left out.
     pub fn named(&self, machine: &str) -> Result<Vec<(String, String)>, String> {
-        let _ = machine;
-        Ok(Vec::new())
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run_bounded(
+                &[
+                    "ps".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+                PS_STDOUT_LIMIT,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("status_failed".into());
+        }
+        parse_ps_names(&reply.stdout).map_err(str::to_string)
     }
 
     /// Whether Harness is signed in to the person's account (`harness auth
@@ -5514,6 +5532,33 @@ pub fn parse_ps(bytes: &[u8]) -> Result<Vec<Listed>, &'static str> {
         });
     }
     Ok(listed)
+}
+
+/// `harness ps --json`'s rows as `(agent id, name)` (#6691): a row with no
+/// agent id or no name is left out, and the reply is bounded as
+/// [`parse_ps`]'s.
+pub fn parse_ps_names(bytes: &[u8]) -> Result<Vec<(String, String)>, &'static str> {
+    if bytes.len() > PS_STDOUT_LIMIT {
+        return Err("status_invalid_reply");
+    }
+    let reply: Value = serde_json::from_slice(bytes).map_err(|_| "status_invalid_reply")?;
+    let rows = reply["harnesses"]
+        .as_array()
+        .ok_or("status_invalid_reply")?;
+    if rows.len() > MOST_LISTED {
+        return Err("status_invalid_reply");
+    }
+    Ok(rows
+        .iter()
+        .filter_map(|row| {
+            let id = row["id"].as_str().filter(|id| agent_id(id))?;
+            let name = row["name"]
+                .as_str()
+                .map(str::trim)
+                .filter(|name| !name.is_empty())?;
+            Some((id.to_owned(), name.to_owned()))
+        })
+        .collect())
 }
 
 #[derive(Deserialize)]

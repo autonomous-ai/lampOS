@@ -4178,11 +4178,26 @@ pub fn serve<C: Clock>(
         // running (#6226); lamp-tasks never starts or stops it.
         cli.openclaw_gateway = openclaw_on;
         if skill_tasks {
-            let _ = skill_harness.set(crate::skill_task::SkillHarness::new(
-                cli.clone(),
-                session.into(),
-                lamp_target,
-            ));
+            // The runs an earlier start left are swept first (#6691), on a
+            // thread of its own; the slot is filled once that is done.
+            let harness =
+                crate::skill_task::SkillHarness::new(cli.clone(), session.into(), lamp_target);
+            let slot = skill_harness.clone();
+            match std::env::var_os("HOME").map(PathBuf::from) {
+                Some(home) => {
+                    if let Err(error) = thread::Builder::new()
+                        .name("skill-sweep".into())
+                        .spawn(move || crate::skill_task::sweep_at_start(harness, &home, slot))
+                    {
+                        eprintln!(
+                            "tasks: a skill's tasks stay off: the start's sweep not started: {error}"
+                        );
+                    }
+                }
+                None => {
+                    let _ = slot.set(harness);
+                }
+            }
         }
         let cli = Cli::new(cli, session.into())?;
         // A Harness before 0.6.11 has no OpenClaw (#6226): the lamp's
