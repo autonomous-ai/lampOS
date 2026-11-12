@@ -973,6 +973,22 @@ head is on its way down over the page and the light up before the voice
 asks the eyes (#1146) (`{"next": "..."}`): with `look = true`, to say only "Let me take a
 look.", and `"look": true` beside it; with `say`, the note.
 
+With `LAMP_USE_SKILL_SUMMARY=on` (off unless set, #6218), the file has a
+`when` too: each emitted tool that has one, by name, mapped to its short
+when to call it and when not. A skill's is `SKILL.md`'s `when` front-matter
+line; a `[stop]` function's is the `[stop]` `when` of the skill whose
+`about` is told (the first in order); `stay_plugged_in`'s is
+`unplug::STAY_WHEN`. Each is at most 200 bytes (`WHEN_MOST_BYTES`), and a
+longer one refuses the skill at load. It says when to call and when not,
+and any rule on what the lamp says or doesn't say as it makes the call,
+since a realtime model often speaks in the turn it calls (the first
+builder's ruling); nothing else. The voice lists it in place of the
+description, which the call's answer carries instead. Off, or with no
+tool that has one, there is no `when` key, and the file is as before,
+byte for byte. The product's six (Dance, How to use the lamp, Pose,
+Prepare to unplug, the wellbeing skills' `wellbeing_nudges` and
+`stay_plugged_in`) each have one.
+
 Skills installs the shared `lamp_ipc::log_relay` before handling arguments
 or starting the service. A broken journal stream therefore does not make
 a diagnostic panic and lose a tool reply. The relay retains at most 64 KiB,

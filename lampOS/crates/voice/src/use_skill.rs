@@ -13,7 +13,7 @@
 //! each is given the name the skill's own parameter has.
 use lamp_gemini::{Tool, ToolCall};
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The function.
 pub const NAME: &str = "use_skill";
@@ -141,14 +141,32 @@ pub(crate) fn told_through(wrapped: bool, skill: &str, mut told: Value) -> Value
 /// whole again, in order, while there is room. Empty when there is no
 /// skill.
 pub fn section(skills: &[Tool], core: &BTreeSet<String>) -> String {
-    lines(skills, core).0
+    lines(skills, core, &BTreeMap::new()).0
+}
+
+/// [`section`], where a skill whose tools file gives it a `when` line
+/// (`lamp_skills`' `LAMP_USE_SKILL_SUMMARY`, #6218) is told that line in
+/// place of its description ([`when_line`]): when to call it, when not,
+/// and what to say or not as it does. The rest of its words come with its
+/// call's answer ([`now`]). With no `when`, the same as [`section`].
+pub fn section_told(
+    skills: &[Tool],
+    core: &BTreeSet<String>,
+    whens: &BTreeMap<String, String>,
+) -> String {
+    lines(skills, core, whens).0
 }
 
 /// Of `skills`' lines ([`section`]), past [`SECTION_MOST_BYTES`]: the
 /// skills given a short line, those named alone and those left out, for
 /// the setup line (the reviewer on #1696).
 pub fn cut(skills: &[Tool], core: &BTreeSet<String>) -> Cut {
-    lines(skills, core).1
+    lines(skills, core, &BTreeMap::new()).1
+}
+
+/// [`cut`] of [`section_told`]'s lines.
+pub fn cut_told(skills: &[Tool], core: &BTreeSet<String>, whens: &BTreeMap<String, String>) -> Cut {
+    lines(skills, core, whens).1
 }
 
 /// The skills whose lines [`section`] made less than whole.
@@ -168,21 +186,27 @@ impl Cut {
 
 const HEAD: &str = "\n\nYour skills\nEach is used through use_skill, by its name, when what someone asks is what its line says:\n";
 
-fn lines(skills: &[Tool], core: &BTreeSet<String>) -> (String, Cut) {
+fn lines(
+    skills: &[Tool],
+    core: &BTreeSet<String>,
+    whens: &BTreeMap<String, String>,
+) -> (String, Cut) {
     let mut cut = Cut::default();
     if skills.is_empty() {
         return (String::new(), cut);
     }
+    // A skill's `when` line is its whole line and its short one.
+    let when = |skill: &Tool| whens.get(&skill.name).map(|when| when_line(skill, when));
     let whole: Vec<String> = skills
         .iter()
-        .map(|skill| format!("- {}\n", line(skill)))
+        .map(|skill| format!("- {}\n", when(skill).unwrap_or_else(|| line(skill))))
         .collect();
     if HEAD.len() + whole.iter().map(String::len).sum::<usize>() <= SECTION_MOST_BYTES {
         return (HEAD.to_owned() + &whole.concat(), cut);
     }
     let short: Vec<String> = skills
         .iter()
-        .map(|skill| format!("- {}\n", short_line(skill)))
+        .map(|skill| format!("- {}\n", when(skill).unwrap_or_else(|| short_line(skill))))
         .collect();
     let named: Vec<String> = skills
         .iter()
@@ -257,6 +281,46 @@ fn short_line(skill: &Tool) -> String {
         line.push_str(&format!(" Its yes-or-no is {name}."));
     }
     line.replace('\n', " ")
+}
+
+/// A skill's line from its tools file's `when` ([`section_told`]): its name
+/// and `when`, then its choice's name and words and its yes-or-no's name,
+/// as on a short line, so a call can give them.
+fn when_line(skill: &Tool, when: &str) -> String {
+    let mut line = format!("{}: {}", skill.name, when.trim());
+    if let Some((name, words, _)) = choice(skill) {
+        line.push_str(&format!(
+            " Its choice is {name}, one of {}.",
+            words.join(", ")
+        ));
+    }
+    if let Some((name, _)) = flag(skill) {
+        line.push_str(&format!(" Its yes-or-no is {name}."));
+    }
+    line.replace('\n', " ")
+}
+
+/// The key of a skill's whole words in its answer through `use_skill`
+/// ([`now`]).
+pub const NOW: &str = "now";
+
+/// A skill told by its `when` line ([`section_told`]) has the rest of its
+/// words in its call's answer, under [`NOW`]: its whole line, as
+/// [`section`] would have told it, read on the turn it acts on them
+/// (#6218). An error, or an answer that is not an object, is left as it is.
+pub fn now(skill: &Tool, told: &mut Value) {
+    if let Some(answer) = told.as_object_mut()
+        && !answer.contains_key("error")
+    {
+        answer.insert(
+            NOW.to_owned(),
+            Value::String(format!(
+                "Now, as {}'s own words say: {}",
+                skill.name,
+                line(skill)
+            )),
+        );
+    }
 }
 
 /// `text`'s first sentence (to a '.', '!' or '?' before a space or the
