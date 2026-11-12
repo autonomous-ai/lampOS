@@ -1,7 +1,7 @@
 //! A voice make the lamp's own model couldn't make, handed to the lamp's
 //! own agent, OpenClaw or Hermes (a proposal on #6059, the owner's OK and
 //! the first builder's yes, 11 Nov): with `LAMP_MAKE_SKILL_AGENT=on`
-//! ([`ENVIRONMENT`], off unless set, in no product unit).
+//! ([`ENVIRONMENT`], off unless set; on in the product's lamp-voice).
 //!
 //! The order: DeepSeek writes first ([`crate::make_skill_local`]). With an
 //! agent on the lamp it gets one try and no repairs: an answer not kept
