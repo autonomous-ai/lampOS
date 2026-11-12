@@ -769,6 +769,10 @@ pub struct SkillRun {
     /// The folder the run starts in, when not the runner's own work
     /// folder: a make's folder (`crate::skill_make`). None for a skill's.
     pub start_in: Option<PathBuf>,
+    /// The run's environment file of its keys (`LAMP_SKILL_SECRETS`,
+    /// `crate::skill_keys`), in its own folder: read once and deleted by
+    /// [`crate::skill_keys::LAUNCH`] before Hermes starts. None: no keys.
+    pub env_file: Option<PathBuf>,
 }
 
 /// The code of a fixed write's run refused before its agent began
@@ -801,6 +805,7 @@ impl std::fmt::Debug for SkillRun {
             .field("env", &env)
             .field("deadline", &self.deadline)
             .field("start_in", &self.start_in)
+            .field("env_file", &self.env_file)
             .finish()
     }
 }
@@ -821,7 +826,30 @@ impl SkillRun {
             deadline: RUN_LIFETIME,
             started: std::sync::atomic::AtomicBool::new(false),
             start_in: None,
+            env_file: None,
         }
+    }
+
+    /// [`Self::prompt`] for a run given its keys (`names`, never a value):
+    /// they are in its environment by those names, and never said, printed,
+    /// written or sent.
+    pub fn prompt_with_keys(hand: &HandOver, names: &[String]) -> String {
+        let prompt = Self::prompt(hand);
+        if names.is_empty() {
+            return prompt;
+        }
+        let said = format!(
+            "The keys the owner added in the app for this skill are in your environment as {}. \
+             Use them only as the file says. Never print, write, send, say or repeat one, and \
+             never ask anyone for one by voice.",
+            names.join(", ")
+        );
+        // An agent skill's words say no key is given; with keys, that
+        // sentence is replaced by this one.
+        let cut = prompt
+            .find(" Never ask anyone for a key or token by voice")
+            .unwrap_or(prompt.len());
+        format!("{} {said}", &prompt[..cut])
     }
 
     /// The task's words for Hermes: the skill's task, quoted as data, the
@@ -1006,6 +1034,38 @@ pub struct Agent<'a> {
     /// reaches that service only through lamp-control under the run's
     /// token. Off: its fresh home has none, as a make's.
     pub services: bool,
+    /// With `LAMP_SKILL_SECRETS` on, where a run's keys are asked
+    /// ([`crate::skill_keys::Keys`]); none: no run is given a key.
+    pub keys: Option<&'a dyn crate::skill_keys::Keys>,
+}
+
+/// A run's keys asked for `hand` through `keys`: the set values, or the
+/// refusal (a name missing, or the keys not to be had for a skill whose
+/// `skill.toml` names some). A skill that names none runs with none when
+/// lamp-services can't be asked.
+fn run_keys(
+    hand: &HandOver,
+    keys: &dyn crate::skill_keys::Keys,
+) -> Result<Vec<(String, String)>, Value> {
+    match keys.of(&hand.skill) {
+        Ok(run) if run.missing.is_empty() => Ok(run.values),
+        Ok(run) => {
+            eprintln!(
+                "[lamp-tasks] skill task: {} not run: {} key(s) not added in the app",
+                hand.skill,
+                run.missing.len()
+            );
+            Err(refusal(
+                "missing_secret",
+                &crate::skill_keys::missing_line(&hand.skill, &run.missing),
+            ))
+        }
+        Err(_) if !crate::skill_keys::names_secrets(&hand.folder) => Ok(Vec::new()),
+        Err(why) => Err(refusal(
+            "no_secrets",
+            &format!("its keys couldn't be had from the lamp's services, so it didn't run: {why}"),
+        )),
+    }
 }
 
 /// Whether `grant` is a linked service's (`gmail-read`, [`SERVICE_GRANTS`]).
@@ -1058,11 +1118,21 @@ pub fn answer_for(
         Err((code, why)) => return refusal(code, &why),
     };
     let keeps_net = hand.grants.iter().any(|grant| grant == NET_GRANT);
+    // Its keys (`LAMP_SKILL_SECRETS`), before its runner and token: a
+    // name missing runs nothing.
+    let values = match agent.keys {
+        Some(keys) => match run_keys(&hand, keys) {
+            Ok(values) => values,
+            Err(refused) => return refused,
+        },
+        None => Vec::new(),
+    };
     // An agent skill's run and a `net` run have Hermes with the person's
     // words, and a `net` one the network too: each starts in a fresh home
     // of its own through the make's runner, which checks the wrapper takes
     // it, never in Hermes's lasting home (its memories and sessions).
-    let fresh_home = keeps_net || hand.run == AGENT_INSTRUCTIONS;
+    // A run given keys too: its keys' file is written in that fresh folder.
+    let fresh_home = keeps_net || hand.run == AGENT_INSTRUCTIONS || !values.is_empty();
     let runner = if fresh_home {
         match (agent.work, if keeps_net { agent.net } else { agent.held }) {
             (Some(_), Some(make)) => make,
@@ -1115,6 +1185,26 @@ pub fn answer_for(
             made.env.extend(crate::skill_make::home_env(&folder.path));
             made.start_in = Some(folder.path.clone());
         }
+        if !values.is_empty() {
+            let file = made
+                .start_in
+                .as_deref()
+                .ok_or_else(|| "no folder of its own for its keys".to_owned())
+                .and_then(|folder| {
+                    crate::skill_keys::write_env_file(folder, &values)
+                        .map_err(|error| format!("its keys' file was not made: {}", error.kind()))
+                })
+                .map_err(|why| refusal("run_failed", &why))?;
+            made.env_file = Some(file);
+            let names: Vec<String> = values.iter().map(|(name, _)| name.clone()).collect();
+            made.prompt = SkillRun::prompt_with_keys(&hand, &names);
+            eprintln!(
+                "[lamp-tasks] skill task: {} given {} key(s) in its environment file",
+                hand.skill,
+                names.len()
+            );
+        }
+        drop(values);
         Ok((made, fresh))
     });
     match told["message"].as_str() {
@@ -1171,6 +1261,10 @@ fn run_on_token(
     };
     let ran = runner.run(&run, &|| ending.end());
     let began = run.started.load(Ordering::Acquire);
+    // Its keys' file, whatever the runner did with it, then its folder.
+    if let Some(file) = &run.env_file {
+        let _ = std::fs::remove_file(file);
+    }
     drop(fresh);
     drop(run);
     drop(minted);
@@ -1303,7 +1397,21 @@ impl Runner for HermesRunner {
                 folder.display()
             ));
         }
-        let mut child = Command::new(&self.program)
+        // A run given keys (`LAMP_SKILL_SECRETS`): started through the
+        // shell that reads its environment file once and deletes it before
+        // Hermes's wrapper starts (`crate::skill_keys::LAUNCH`).
+        let mut command = match &run.env_file {
+            Some(file) => {
+                let mut command = Command::new(crate::skill_keys::SHELL);
+                command
+                    .args(["-c", crate::skill_keys::LAUNCH, "lamp-run"])
+                    .arg(file)
+                    .arg(&self.program);
+                command
+            }
+            None => Command::new(&self.program),
+        };
+        let mut child = command
             .args(&self.args)
             .arg(&run.prompt)
             .env_clear()
@@ -2754,6 +2862,9 @@ pub struct HandOvers {
     /// The lamp's work folder, for an agent skill's or a `net` run's fresh
     /// home ([`Agent::work`]).
     pub work: Option<PathBuf>,
+    /// With `LAMP_SKILL_SECRETS` on, where a run's keys are asked
+    /// ([`Agent::keys`]).
+    pub keys: Option<std::sync::Arc<dyn crate::skill_keys::Keys + Send + Sync>>,
 }
 
 /// What a second run is told while one runs.
@@ -2786,6 +2897,12 @@ impl HandOvers {
         );
         let mut runner = HarnessRunner::lamp(home, harness);
         runner.no_harness = no_harness;
+        let keys = crate::skill_keys::on(std::env::var(crate::skill_keys::SWITCH).ok().as_deref());
+        if keys {
+            eprintln!(
+                "[lamp-tasks] skill task: a skill's keys on (LAMP_SKILL_SECRETS=on): a run is given the ones added in the app, in an environment file read once"
+            );
+        }
         Self {
             socket: PathBuf::from(HAND_OVER_SOCKET),
             skills: PathBuf::from(SKILLS),
@@ -2802,6 +2919,10 @@ impl HandOvers {
             held: Some(std::sync::Arc::new(crate::skill_make::lamp_runner(
                 home, true,
             ))),
+            keys: keys.then(|| {
+                std::sync::Arc::new(crate::skill_keys::ServicesKeys::default())
+                    as std::sync::Arc<dyn crate::skill_keys::Keys + Send + Sync>
+            }),
         }
     }
 
@@ -2918,6 +3039,10 @@ impl HandOvers {
             held: self.held.as_deref().map(|held| held as &dyn Runner),
             work: self.work.as_deref(),
             services: crate::hermes_config::agent_services_on(),
+            keys: self
+                .keys
+                .as_deref()
+                .map(|keys| keys as &dyn crate::skill_keys::Keys),
         };
         let answered = answer_agent(
             &line,
@@ -4058,6 +4183,7 @@ mod tests {
             net: None,
             held: None,
             work: None,
+            keys: None,
         }
         .start(true, stop.clone())
         .unwrap()
@@ -4159,6 +4285,7 @@ mod tests {
             net: None,
             held: None,
             work: None,
+            keys: None,
         }
         .start(false, std::sync::Arc::default())
         .unwrap();
@@ -5398,6 +5525,7 @@ mod tests {
             held: None,
             work: Some(work.path()),
             services: false,
+            keys: None,
         };
         let told = answer_agent(&with_net, true, skills(), &no_net_yes, &held, &agent);
         assert_eq!(told["error"], "no_token", "{told}");
@@ -5414,6 +5542,7 @@ mod tests {
             held: None,
             work: Some(work.path()),
             services: false,
+            keys: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told, json!({"ok": true, "id": 0}), "{told}");
@@ -5466,6 +5595,7 @@ mod tests {
             held: None,
             work: Some(work.path()),
             services: false,
+            keys: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -5501,6 +5631,7 @@ mod tests {
             held: None,
             work: None,
             services: false,
+            keys: None,
         };
         let told = answer_agent(&with_net, true, skills(), &tokens, &held, &bare);
         assert_eq!(told["error"], "run_failed", "{told}");
@@ -5560,6 +5691,7 @@ mod tests {
             held: Some(&held),
             work: Some(work.path()),
             services: false,
+            keys: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
         assert_eq!(told["ok"], true, "{told}");
@@ -5599,6 +5731,7 @@ mod tests {
             held: None,
             work: Some(work.path()),
             services: false,
+            keys: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &bare);
         assert_eq!(told["message"], NO_FRESH_HOME, "{told}");
@@ -5621,6 +5754,7 @@ mod tests {
             held: Some(&no_lines),
             work: Some(work.path()),
             services: false,
+            keys: None,
         };
         let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &lineless);
         assert_eq!(told["message"], NO_RUN_NAMESPACE, "{told}");
@@ -5683,6 +5817,7 @@ mod tests {
                 held: Some(&held),
                 work: Some(work.path()),
                 services,
+                keys: None,
             };
             let told = answer_agent(line, true, skills(), &tokens, &runner, &agent);
             assert_eq!(told["ok"], true, "{told}");
@@ -5712,5 +5847,164 @@ mod tests {
         fn run(&self, _: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
             Err(self.0.into())
         }
+    }
+
+    /// The set values and the names missing, as a test gives them.
+    type Given = (Vec<(&'static str, &'static str)>, Vec<&'static str>);
+
+    /// lamp-services' keys for a run, as a test gives them.
+    struct FakeKeys(Result<Given, &'static str>);
+
+    impl crate::skill_keys::Keys for FakeKeys {
+        fn of(&self, _: &str) -> Result<crate::skill_keys::RunKeys, String> {
+            self.0
+                .clone()
+                .map(|(values, missing)| crate::skill_keys::RunKeys {
+                    values: values
+                        .into_iter()
+                        .map(|(name, value)| (name.into(), value.into()))
+                        .collect(),
+                    missing: missing.into_iter().map(str::to_owned).collect(),
+                })
+                .map_err(str::to_owned)
+        }
+    }
+
+    /// The keys' file a run was given, its mode, its text, and the run's words.
+    type KeysSeen = (Option<PathBuf>, u32, String, String);
+
+    /// What a run saw of its keys' file as it started.
+    #[derive(Default)]
+    struct KeysRunner {
+        seen: RefCell<Vec<KeysSeen>>,
+    }
+
+    impl Runner for KeysRunner {
+        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+            use std::os::unix::fs::MetadataExt;
+            let file = run.env_file.clone();
+            let (mode, text) = file.as_deref().map_or((0, String::new()), |file| {
+                (
+                    std::fs::metadata(file).unwrap().mode() & 0o777,
+                    std::fs::read_to_string(file).unwrap(),
+                )
+            });
+            self.seen
+                .borrow_mut()
+                .push((file, mode, text, run.prompt.clone()));
+            Ok(0)
+        }
+    }
+
+    /// LAMP_SKILL_SECRETS: a run given its keys has them in an environment
+    /// file of its own fresh folder (the make's, with its fresh home), 0400, never in its words, its token or its
+    /// environment list, and the file and folder are gone when it ends; a
+    /// key missing runs nothing and mints no token, saying which to add in
+    /// the app; lamp-services not reached refuses only a skill that names
+    /// keys.
+    #[test]
+    fn a_runs_keys_reach_it_only_in_its_environment_file_and_a_missing_one_runs_nothing() {
+        let work = tempfile::tempdir().unwrap();
+        let agent_line = line(|value| value["run"] = json!(AGENT_INSTRUCTIONS));
+        let tokens = FakeTokens::default();
+        let runner = KeysRunner::default();
+        let keys = FakeKeys(Ok((vec![("GEMINI_API_KEY", "test-value-123")], vec![])));
+        let agent = Agent {
+            net: None,
+            held: Some(&runner),
+            work: Some(work.path()),
+            services: false,
+            keys: Some(&keys),
+        };
+        let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
+        assert_eq!(told["ok"], true, "{told}");
+        let seen = runner.seen.borrow();
+        let (file, mode, text, prompt) = &seen[0];
+        let file = file.as_ref().unwrap();
+        assert_eq!(*mode, 0o400);
+        assert_eq!(text, "export GEMINI_API_KEY='test-value-123'\n");
+        assert!(file.starts_with(work.path()));
+        assert!(!file.exists() && !file.parent().unwrap().exists());
+        assert!(
+            prompt.contains("in your environment as GEMINI_API_KEY"),
+            "{prompt}"
+        );
+        assert!(!prompt.contains("test-value-123"));
+        assert!(!prompt.contains("can't hold yet"), "{prompt}");
+        drop(seen);
+        // A script's run given keys gets a fresh folder and home of its own
+        // too, through the held make's runner.
+        let lasting = KeysRunner::default();
+        let told = answer_agent(&line(|_| {}), true, skills(), &tokens, &lasting, &agent);
+        assert!(lasting.seen.borrow().is_empty());
+        assert_eq!(told["ok"], true, "{told}");
+        let script_file = runner.seen.borrow()[1].0.clone().unwrap();
+        assert!(
+            script_file
+                .parent()
+                .unwrap()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .starts_with(crate::skill_make::FOLDER_HEAD)
+        );
+        // A key missing: refused, by name, before any token.
+        let minted = tokens.minted.borrow().len();
+        let missing = FakeKeys(Ok((vec![], vec!["TELEGRAM_BOT_TOKEN"])));
+        let agent = Agent {
+            keys: Some(&missing),
+            ..agent
+        };
+        let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
+        assert_eq!(told["error"], "missing_secret", "{told}");
+        assert_eq!(
+            told["message"],
+            "photo booth didn't run: it needs TELEGRAM_BOT_TOKEN added in the app, on the skill's page"
+        );
+        assert_eq!(tokens.minted.borrow().len(), minted);
+        assert_eq!(runner.seen.borrow().len(), 2);
+        // No keys needed, or lamp-services not reached for a skill that
+        // names none (its folder is not on this computer): it runs with none.
+        let unreached = FakeKeys(Err("lamp-services is not reachable"));
+        let agent = Agent {
+            keys: Some(&unreached),
+            ..agent
+        };
+        let told = answer_agent(&agent_line, true, skills(), &tokens, &runner, &agent);
+        assert_eq!(told["ok"], true, "{told}");
+        assert!(runner.seen.borrow()[2].0.is_none());
+    }
+
+    /// The lamp's runner starts a run given keys through the shell that
+    /// reads its file once and deletes it: the program has the values in
+    /// its environment, never its arguments, and the file is gone before
+    /// it starts.
+    #[test]
+    fn the_lamps_runner_reads_the_keys_file_once_and_deletes_it_before_the_run() {
+        let work = tempfile::tempdir().unwrap();
+        let out = work.path().join("out");
+        let folder = crate::skill_make::fresh_home(work.path()).unwrap();
+        let file = crate::skill_keys::write_env_file(
+            &folder.path,
+            &[("GEMINI_API_KEY".into(), "test-value-123".into())],
+        )
+        .unwrap();
+        let runner = shell(
+            &format!(
+                "{{ [ -e '{}' ] && echo left; echo \"$GEMINI_API_KEY\"; echo \"$*\"; }} > '{}'",
+                file.display(),
+                out.display()
+            ),
+            work.path(),
+        );
+        let mut run = skill_run("tok", Duration::from_secs(10));
+        run.start_in = Some(folder.path.clone());
+        run.env_file = Some(file.clone());
+        assert_eq!(runner.run(&run, &|| {}), Ok(0));
+        let said = std::fs::read_to_string(&out).unwrap();
+        let mut lines = said.lines();
+        assert_eq!(lines.next(), Some("test-value-123"), "{said}");
+        assert!(!lines.next().unwrap_or_default().contains("test-value-123"));
+        assert!(!file.exists());
     }
 }
