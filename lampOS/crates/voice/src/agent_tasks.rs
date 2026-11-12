@@ -773,6 +773,17 @@ const COMPUTER_THINGS_THE: [&str; 3] = ["repo", "repository", "codebase"];
 /// only on the lamp with "on my computer", one only on a computer with "on
 /// the lamp"), nothing is named and the model's own args stand.
 fn named_in(heard: &str, lamp_engines: &[String], staff_names: &[&str]) -> Named {
+    named_in_with_rest(heard, lamp_engines, staff_names).0
+}
+
+/// [`named_in`], and, when its doer was only called by name first in the
+/// line ("Hermes, …"), the words after that name: what the line asks of it
+/// (#6547 hold, Thirteen's P2 on #6572).
+fn named_in_with_rest(
+    heard: &str,
+    lamp_engines: &[String],
+    staff_names: &[&str],
+) -> (Named, Option<String>) {
     // Each agent the words may name: its forms (plain), and whether it is
     // one of the lamp's engines (its id) or of the staff (its name). The
     // lamp's engine and one of the staff the person calls the same are one.
@@ -888,6 +899,10 @@ fn named_in(heard: &str, lamp_engines: &[String], staff_names: &[&str]) -> Named
     // The agents said at all, and those said as the doer, by index.
     let mut mentioned: Vec<usize> = Vec::new();
     let mut doers: Vec<usize> = Vec::new();
+    // The doers asked by a word before the name ("ask Hermes …"), and the
+    // one called by name first in the line, with where its words begin.
+    let mut asked: Vec<usize> = Vec::new();
+    let mut called: Option<(usize, usize)> = None;
     let mut places: Vec<NamedPlace> = Vec::new();
     // Whether the words need the computer's things ("in my repo").
     let mut computer_cue = false;
@@ -908,8 +923,15 @@ fn named_in(heard: &str, lamp_engines: &[String], staff_names: &[&str]) -> Named
             if !mentioned.contains(&agent) {
                 mentioned.push(agent);
             }
-            if doer(at, count) && !doers.contains(&agent) {
-                doers.push(agent);
+            if doer(at, count) {
+                if !doers.contains(&agent) {
+                    doers.push(agent);
+                }
+                if at == first {
+                    called = Some((agent, at + count));
+                } else if !asked.contains(&agent) {
+                    asked.push(agent);
+                }
             }
             at += count;
             continue;
@@ -960,12 +982,19 @@ fn named_in(heard: &str, lamp_engines: &[String], staff_names: &[&str]) -> Named
         }
         at += 1;
     }
+    // The words after a name only called, first in the line.
+    let rest = match (doers.as_slice(), called) {
+        ([doer], Some((agent, from))) if *doer == agent && !asked.contains(doer) => {
+            Some(words[from..].join(" "))
+        }
+        _ => None,
+    };
     let place = match places.as_slice() {
         [place] => Some(*place),
         [] => None,
-        _ => return Named::default(),
+        _ => return (Named::default(), rest),
     };
-    match doers.as_slice() {
+    let named = match doers.as_slice() {
         [] => Named {
             place,
             ..Named::default()
@@ -997,7 +1026,8 @@ fn named_in(heard: &str, lamp_engines: &[String], staff_names: &[&str]) -> Named
             }
         }
         _ => Named::default(),
-    }
+    };
+    (named, rest)
 }
 
 /// `args` with `where`, `engine` and `who` as the heard words name them
@@ -1124,12 +1154,73 @@ pub fn named_for_work_in(
     lamp_engines: &[String],
     staff_names: &[&str],
 ) -> Option<String> {
-    let named = named_in(heard, lamp_engines, staff_names);
+    let (named, rest) = named_in_with_rest(heard, lamp_engines, staff_names);
+    // Only called by name ("Hermes, what time is it?"): a hand-over only
+    // when the rest of the line asks for work (#6547 hold).
+    if rest.is_some_and(|rest| !asks_for_work(&rest)) {
+        return None;
+    }
     named
         .lamp_engine
         .as_deref()
         .map(|engine| display_name(engine).to_owned())
         .or(named.computer_who)
+}
+
+/// The verbs that ask for work done ([`asks_for_work`]): "Hermes, write a
+/// poem …", "Hey OpenClaw, make a file …".
+const WORK_VERBS: [&str; 34] = [
+    "write",
+    "make",
+    "create",
+    "build",
+    "fix",
+    "list",
+    "look",
+    "find",
+    "search",
+    "research",
+    "check",
+    "run",
+    "open",
+    "save",
+    "add",
+    "delete",
+    "remove",
+    "update",
+    "install",
+    "draft",
+    "summarize",
+    "summarise",
+    "plan",
+    "edit",
+    "change",
+    "rename",
+    "move",
+    "copy",
+    "generate",
+    "code",
+    "test",
+    "deploy",
+    "refactor",
+    "debug",
+];
+
+/// Whether the words said after an agent's name, called first in a line,
+/// ask it for work (#6547 hold, Thirteen's P2 on #6572): a work verb
+/// ([`WORK_VERBS`]), or a whole ask, at least [`WHOLE_ASK_FEWEST`] ask
+/// words beside the words of consent, as [`new_ask`] counts them. "what
+/// time is it?", "how are you?", "tell me a joke" and "what can you do?"
+/// are none.
+fn asks_for_work(rest: &str) -> bool {
+    plain_words(rest)
+        .iter()
+        .any(|word| WORK_VERBS.contains(&word.as_str()))
+        || ask_words(rest, false)
+            .iter()
+            .filter(|(_, said)| !CONSENT_WORDS.contains(&said.as_str()))
+            .count()
+            >= WHOLE_ASK_FEWEST
 }
 
 /// What a turn is asked again with when the person's words name `agent`
@@ -12187,6 +12278,20 @@ pub(crate) mod tests {
             ("don't ask Hermes, just tell me", None),
             ("ask Hermes, not OpenClaw", None),
             ("set a timer for five minutes", None),
+            // Only called by name: a hand-over only when the rest asks for
+            // work (#6547 hold, Thirteen's P2 on #6572).
+            ("Hermes, what time is it?", None),
+            ("Hermes, how are you?", None),
+            ("Hey Hermes, tell me a joke.", None),
+            ("Codex, what can you do?", None),
+            (
+                "Hermes, write a poem about rain into rain.md",
+                Some("Hermes"),
+            ),
+            (
+                "Hey OpenClaw, make a file called tea.md with three teas",
+                Some("OpenClaw"),
+            ),
         ] {
             assert_eq!(
                 named_for_work_in(heard, &engines, &staff).as_deref(),

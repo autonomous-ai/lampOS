@@ -206,6 +206,12 @@ fn not_named_and_a_question_about_an_agent_are_untouched() {
         "What's the weather today?",
         "What is Hermes?",
         "Is OpenClaw's update out?",
+        // Only called by name, asking no work (#6547 hold, Thirteen's P2
+        // on #6572): round 1's answer is said as normal.
+        "Hermes, what time is it?",
+        "Hermes, how are you?",
+        "Hey Hermes, tell me a joke.",
+        "Codex, what can you do?",
     ] {
         assert_eq!(named(heard), None, "{heard}");
         let went = went(heard, saying("It is sunny today."), vec![], false);
