@@ -1876,6 +1876,10 @@ struct Shared {
     /// their face, when it is due, and what is told once that request's
     /// answer begins to be heard.
     seems: Option<(TaskNote, AirHeard)>,
+    /// With `LAMP_SECOND_DOING=on`: what a known person in view was last
+    /// seen doing, as context only, when it is due, and what is told once
+    /// that request's answer begins to be heard.
+    doing: Option<(TaskNote, AirHeard)>,
     /// What the lamp did, told to the rule ([`Engine::telling_what_it_did`]).
     did: Option<LampDid>,
     /// Calls held as not said to the lamp ([`Engine::holding_calls`]).
@@ -4623,6 +4627,7 @@ impl Engine {
                 spelled_name: None,
                 air: None,
                 seems: None,
+                doing: None,
                 did: None,
                 hold: None,
                 policy: None,
@@ -6534,6 +6539,19 @@ impl Engine {
     pub fn noting_how_they_seem(mut self, note: TaskNote, heard: AirHeard) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.seems = Some((note, heard));
+        }
+        self
+    }
+
+    /// A spoken request from a known person in view, not one held only by
+    /// a gap, is told what they were last seen doing, as context only and
+    /// never to be raised, when `note` says so (`LAMP_SECOND_DOING=on`,
+    /// `crate::doing_told`, #6543), and `heard` is told the request once
+    /// its answer's first audio goes, as for the air
+    /// ([`Engine::noting_the_air`]). Before any turn only.
+    pub fn noting_what_they_did(mut self, note: TaskNote, heard: AirHeard) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.doing = Some((note, heard));
         }
         self
     }
@@ -10475,15 +10493,21 @@ async fn spoken(
     let air = shared.air.as_ref().and_then(|(note, _)| note(request));
     // How a known person in view seems, never the room's or a gap's (#1671):
     // the scope is the room's when the camera may not be used.
+    let known_in_view = scope
+        .as_ref()
+        .and_then(crate::memory_scope::ScopeLease::scope)
+        .is_some_and(|scope| scope.person().is_some() && !scope.held());
     let seems = shared
         .seems
         .as_ref()
-        .filter(|_| {
-            scope
-                .as_ref()
-                .and_then(crate::memory_scope::ScopeLease::scope)
-                .is_some_and(|scope| scope.person().is_some() && !scope.held())
-        })
+        .filter(|_| known_in_view)
+        .and_then(|(note, _)| note(request));
+    // What a known person in view was last seen doing, as context only, on
+    // the same terms (#6543): never the room's or a gap's.
+    let doing = shared
+        .doing
+        .as_ref()
+        .filter(|_| known_in_view)
         .and_then(|(note, _)| note(request));
     // `LAMP_OPENS_FURTHER` (#5194): its answer may end with one short
     // opening, as a companion's does, when the gates let it. None without
@@ -10547,6 +10571,7 @@ async fn spoken(
         .chain(called)
         .chain(air)
         .chain(seems)
+        .chain(doing)
         // `LAMP_KEEP_QUIETLY`: a known person's own plain facts kept quietly,
         // on a line they were seen saying; never in the room's scope (the
         // Reviewer-lead's P2s on #5053).
@@ -18575,6 +18600,9 @@ async fn answer(
                             heard(request);
                         }
                         if let Some((_, heard)) = &shared.seems {
+                            heard(request);
+                        }
+                        if let Some((_, heard)) = &shared.doing {
                             heard(request);
                         }
                         // An answer to someone, or the lamp's own turn or a

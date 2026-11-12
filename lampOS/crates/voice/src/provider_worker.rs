@@ -307,6 +307,10 @@ pub struct Files {
     /// Whether a known person's face read is told to the second voice
     /// beside what they say (`--second-seems`, `crate::seems_told`).
     pub second_seems: bool,
+    /// Whether what a known person was last seen doing is told to the
+    /// second voice beside what they say (`--second-doing`,
+    /// `crate::doing_told`).
+    pub second_doing: bool,
     /// Whether an unwell part is told beside what a person says
     /// (`--health-facts`, `crate::health_told`).
     pub health_facts: bool,
@@ -507,6 +511,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
     let (room_file, flags) = crate::room_told::take_file(flags)?;
     let (air_facts, flags) = crate::air_told::take(flags);
     let (second_seems, flags) = crate::seems_told::take(flags);
+    let (second_doing, flags) = crate::doing_told::take(flags);
     let (health_facts, flags) = crate::health_told::take(flags);
     let (keep_link, flags) = take_keep_link(flags);
     let (wait_for_room, flags) = take_wait_for_room(flags);
@@ -569,6 +574,7 @@ pub fn parse_flags(dir: &std::path::Path, flags: &[String]) -> io::Result<Parsed
         room_file,
         air_facts,
         second_seems,
+        second_doing,
         health_facts,
         keep_link,
         wait_for_room,
