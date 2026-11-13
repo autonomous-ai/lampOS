@@ -88,6 +88,9 @@ Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BUS_AUDIO=on
 Environment=LAMP_ATTENTION=busy-near
 Environment=LAMP_AIR_FACTS=on
+# Asked how it is, the lamp names its unwell parts and keeps quiet about them otherwise (#1681, docs/health.md).
+# On lamp-06c1 on 13 Nov (12587, #6860): three parts stopped, "How are you?" named all three, the time question none.
+Environment=LAMP_HEALTH_FACTS=on
 Environment=LAMP_RING_EYE=strong
 Environment=LAMP_SHORT_SOUNDS=quiet-room-checked
 # The end-of-turn worker lowers itself to round-robin 10 and its ONNX Runtime threads don't spin while they wait,
