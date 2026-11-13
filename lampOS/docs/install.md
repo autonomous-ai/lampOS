@@ -2022,23 +2022,39 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk
        [ -d "$LAMP_NS_HOME" ] && [ -n "$W" ] && [ "${F%/*}" = "$W/lamp" ] || fail "no $LAMP_NS_HOME"
        mkdir -m 0700 "$X" "$X/f" "$X/c" "$X/t" "$X/i" || fail "no make staging"
-       mount --bind "$F" "$X/f" || fail "no $F"
-       mount --bind "$H/.hermes/hermes-agent" "$X/c" || fail "no Hermes checkout"
-       mount --bind "$H/.hermes/tools" "$X/t" || fail "no Hermes tools"
-       mount --bind "$H/.hermes/installs" "$X/i" || fail "no Hermes installs"
-       mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$H/.hermes" || fail "$H/.hermes not hidden"
-       mkdir "$H/.hermes/hermes-agent" && mount --move "$X/c" "$H/.hermes/hermes-agent" && ro "$H/.hermes/hermes-agent" || fail "Hermes checkout not shown"
-       mkdir "$H/.hermes/tools" && mount --move "$X/t" "$H/.hermes/tools" && ro "$H/.hermes/tools" || fail "Hermes tools not shown"
-       mkdir "$H/.hermes/installs" && mount --move "$X/i" "$H/.hermes/installs" && ro "$H/.hermes/installs" || fail "Hermes installs not shown"
+       mount -n --bind "$F" "$X/f" || fail "no $F"
+       mount -n --bind "$H/.hermes/hermes-agent" "$X/c" || fail "no Hermes checkout"
+       mount -n --bind "$H/.hermes/tools" "$X/t" || fail "no Hermes tools"
+       mount -n --bind "$H/.hermes/installs" "$X/i" || fail "no Hermes installs"
+       k=
+       for p in "$H/.hermes/installs"/*/.install.lock; do
+         [ -f "$p" ] && [ ! -L "$p" ] || continue
+         mount -n --bind "$p" "$X/i/${p#"$H/.hermes/installs/"}" || fail "Hermes install lock not shown"
+         k=1
+       done
+       [ -n "$k" ] || fail "no Hermes install lock: the lasting Hermes has not run"
+       for p in "$H/.hermes/installs"/*/pm-runtime; do
+         [ -d "$p" ] || continue
+         [ -f "$p/.prepare.lock" ] && [ ! -L "$p/.prepare.lock" ] && mount -n --bind "$p/.prepare.lock" "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock" || fail "Hermes runtime lock not shown"
+       done
+       for p in "$H/.hermes/installs"/*/environments/*/.lease-managed "$H/.hermes/installs"/*/pm-runtime/generations/*/.lease-managed; do
+         [ -f "$p" ] || continue
+         g=${p%/.lease-managed}
+         { [ -d "$g/.leases" ] || mkdir "$g/.leases"; } && [ ! -L "$g/.leases" ] && mount -n --bind "$g/.leases" "$X/i/${g#"$H/.hermes/installs/"}/.leases" || fail "Hermes leases not shown"
+       done
+       mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$H/.hermes" || fail "$H/.hermes not hidden"
+       mkdir "$H/.hermes/hermes-agent" && mount -n --move "$X/c" "$H/.hermes/hermes-agent" && ro "$H/.hermes/hermes-agent" || fail "Hermes checkout not shown"
+       mkdir "$H/.hermes/tools" && mount -n --move "$X/t" "$H/.hermes/tools" && ro "$H/.hermes/tools" || fail "Hermes tools not shown"
+       mkdir "$H/.hermes/installs" && mount -n --move "$X/i" "$H/.hermes/installs" && ro "$H/.hermes/installs" || fail "Hermes installs not shown"
        ro "$H/.hermes"; ro "$H"; ro "$W"
-       mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$W/lamp" || fail "$W/lamp not hidden"
-       mkdir "$F" && mount --move "$X/f" "$F" || fail "$F not shown"
+       mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$W/lamp" || fail "$W/lamp not hidden"
+       mkdir "$F" && mount -n --move "$X/f" "$F" || fail "$F not shown"
        ro "$W/lamp"
        rmdir "$X/f" "$X/c" "$X/t" "$X/i" "$X" || fail "make staging left"
        cd "$F" || fail "$F not visible"
        HOME=$LAMP_NS_HOME
      fi
-     unset LAMP_NS_HOME F X
+     unset LAMP_NS_HOME F X k p g
      ```
 
      A make keeps the network by default, so Hermes's lasting home
@@ -2055,8 +2071,31 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      root"), which ended a make `run_failed` in under a second on lamp-c0a4
      (#6643). Links, not binds: Hermes takes a recorded environment only
      under `<HERMES_HOME>/installs/<key>/environments` once resolved, and
-     a link resolves to the lasting path its record names. Hermes's folder
-     and the work folder are left read-only, and
+     a link resolves to the lasting path its record names. Inside the
+     read-only `installs`, only what Hermes must write at every start is
+     bound back read-write, from the lasting home before it is hidden (the
+     binds move with `installs`, and its read-only remount does not reach
+     them): each `installs/<key>/.install.lock`, which
+     `hermes_cli/runtime_state.py` `runtime_lock` opens `O_CREAT|O_RDWR`
+     and flocks (read-only, `EROFS` ended a make `run_failed` in 0.4 s on
+     a lamp, "run `hermes pm repair`"), so a make shares the lasting
+     Hermes's lock; and each lease-managed generation's
+     `installs/<key>/environments/<gen>/.leases` (made first when
+     missing, as Hermes would), where `lease_directory` prunes unlocked
+     leases and creates and flocks its own, so the generation a make runs
+     on is never collected under it; and, where Hermes's PM runtime is
+     there, `installs/<key>/pm-runtime/.prepare.lock`, which
+     `pm/runtime.py` `prepare_runtime` opens `a+b` and flocks (the next
+     `EROFS` the lamp hit), with each lease-managed
+     `installs/<key>/pm-runtime/generations/<gen>/.leases` it leases.
+     `facts.json`, `publication.json`, `pm-runtime/selected.json`, the
+     environments' contents and `tools` stay read-only. No install lock at
+     all (the lasting Hermes has never started), or a `pm-runtime` with no
+     `.prepare.lock`, ends it before Hermes runs. Every mount these lines
+     make is `mount -n`: they run after `/run` is read-only, where
+     util-linux cannot write its utab, and a `--move` without `-n` ended
+     the script "Hermes checkout not shown" on a lamp.
+     Hermes's folder and the work folder are left read-only, and
      the rest of the work folder's `lamp` (the Harness project, other runs'
      folders) is hidden under another tmpfs, with the make's own folder
      alone moved back, read-write. Each step failing ends it before Hermes
@@ -2066,9 +2105,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      on Linux where a user namespace is allowed, run for real: a `cat` of
      the lasting `memories` finds nothing, the lasting home shows only the
      checkout, `lamp` only the make's folder, and only that folder can be
-     written, and `installs` is shown read-only. What only a lamp shows:
+     written, and `installs` is shown read-only but for its install lock
+     and lease folders: writing those succeeds, writing `facts.json` or an
+     environment fails. What only a lamp shows:
      Hermes running from the checkout with the lasting home hidden, on the
-     prepared runtime through the links, with no dependency sync.
+     prepared runtime through the links, with no dependency sync, taking
+     the lock and a lease beside the lasting Hermes.
    - **User namespaces checked first:** before anything is made, `lampos`
      must be able to make that namespace: `runuser -u lampos --
      /usr/bin/unshare --map-root-user --mount --pid --kill-child

@@ -798,7 +798,19 @@ agent (`lamp_tasks::skill_make`).
   phiên, trạng thái) dưới một tmpfs trống chỉ đọc, chỉ cho thấy lại bản
   checkout, `tools` (Python mà Hermes chạy trên đó) và `installs` (bản ghi
   phụ thuộc của nó), chỉ đọc, để các liên kết resolve được và không gì
-  trong đó bị thay đổi, để thư mục của Hermes và thư mục làm việc ở chế độ
+  trong đó bị thay đổi ngoài những gì Hermes phải ghi ở mỗi lần khởi động,
+  được bind lại đọc-ghi: mỗi `installs/<key>/.install.lock`
+  (`runtime_lock` trong `hermes_cli/runtime_state.py` mở nó
+  `O_CREAT|O_RDWR` và flock; khi chỉ đọc, `EROFS` làm một lần tạo kết thúc
+  `run_failed` sau 0,4 giây trên một đèn) và `.leases` của mỗi generation
+  có lease, `installs/<key>/environments/<gen>/.leases` (các lease của
+  `lease_directory`), và, khi có runtime PM của Hermes,
+  `installs/<key>/pm-runtime/.prepare.lock` (`prepare_runtime` trong
+  `pm/runtime.py`) cùng `.leases` của các generation của nó, còn
+  `facts.json`, `pm-runtime/selected.json`, các môi trường và `tools` vẫn
+  chỉ đọc; không có install lock nào (Hermes lâu dài chưa từng khởi động)
+  thì dừng trước khi Hermes chạy. Các dòng này mount bằng `mount -n`: chúng
+  chạy sau khi `/run` đã chỉ đọc, nơi util-linux không ghi được utab. Nó để thư mục của Hermes và thư mục làm việc ở chế độ
   chỉ đọc, và che phần còn lại của `lamp` trong thư mục làm việc dưới một
   tmpfs khác, chỉ thư mục của lần tạo được đưa lại, đọc-ghi
   (`NS_HOME_LINE`; docs/install.md).
@@ -835,8 +847,9 @@ agent (`lamp_tasks::skill_make`).
   một lời từ chối: `off`, `bad_request`, `too_long`, `busy`, `not_held_off`,
   `no_namespace`, `run_failed` hoặc `no_answer`. Giọng nói không giao gì
   khi gặp `off`, `not_held_off`, `no_namespace` hoặc không có socket (bản
-  cũ). Nhật ký chỉ ghi mã kết quả,
-  không bao giờ ghi luật hay câu trả lời.
+  cũ). Nhật ký chỉ ghi kết quả:
+  `[lamp-tasks] skill make: refused <code>: <why>`, lý do dạng cố định của
+  lời từ chối (`journal_line`), không bao giờ ghi luật hay câu trả lời.
 - **Kiểm thử:** `skill_make::tests`: một lần tạo chạy trong thư mục riêng,
   luật nằm ở đó và câu trả lời được đọc lại, môi trường chỉ có home riêng,
   thư mục bị xóa; home của mỗi lần tạo lúc bắt đầu chỉ có cấu hình nhà cung
