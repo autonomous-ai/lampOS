@@ -443,7 +443,7 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
 - `sound.heard`: `class` (`knock`, `music`, ...), `score`. Grant `sound`. In today's build,
   lamp run pending.
 - `touch`: `kind` (`tap`, `pet`, `hold`), `where`. No grant. A tap reaches a program from build 11372 (#5981; on 11091 it did not; 8 of 8 taps on lamp-75c9, 10 Nov 14:18). `kind` is `tap` or `pet`; `hold` and `where` are not sent yet. Example: `examples/touch.py`.
-- `button`: `press` (`press`, `long_press`). No grant. In today's build, lamp run pending.
+- `button`: `press` (`press`, `long_press`). No grant. In today's build, lamp run pending. `press` is `long_press` when lamp-control sends it; a short `press` is in the schema and nothing sends it yet.
 - `time`: the client's own schedule. No grant. Planned: nothing sends it yet.
 - `lamp.changed`: `lamp_state` (`talking`, `paused`, `private`, `asleep`, `lease`). No grant.
   In today's build, lamp run pending.
@@ -738,7 +738,7 @@ A program can play sound of its own through the lamp's speaker, not only the lam
 | stream | `await lamp.camera_stream(on=True, fps=5)`, then `lamp.on("camera.frame", fn)` | `await lamp.cameraStream(true, 5)`, `lamp.on('camera.frame', fn)` | — | `camera` | `fps` 1–30 (2 if not given), a most, not a promise; `size` `640x480` or `1280x720` only on the fast path | the answer: `stream`, `fps`, `fps_now`, and `fast: true` on the fast path. Each `camera.frame`: `jpeg` (base64), `bytes`, `age_ms`, `fps_now`; fast frames are binary, with the JPEG as `data`. Ends with `camera_stream(False)`, `stop`, a closed connection, a lost grant, or a `camera.ended` event | works today (9 Nov 2026): 6 and 5 frames in 3 s (`fast: false`) on the customer build's own lamp-control |
 
 - **Never while private.** Both calls are refused while the privacy switch is on, or while the voice's privacy signal stops. A stream ends at once when the lamp turns private.
-- **Local only.** The camera is never given beyond the lamp's own network, even with remote access on.
+- **Local only.** The camera, like the microphone and the speaker, is never given beyond the lamp's own network, even with remote access on.
 - **The person sees it.** While a stream runs, the ring shows a small steady red dot, and a snapshot blinks it. A picture goes only while the ring says it drew the dot.
 - **The fast stream is on in the product.** Every frame at 640x480 or 1280x720, up to 25 a second, is built, and the product's `lamp-eyes.service` sets `LAMP_EYES_FAST_STREAM=on` (`deploy/product/lamp-eyes.service`); a lamp whose unit is not that one still gives about 2 frames a second of the 320-across frame (asked for 5, it gave 2). What reaches an SDK is in the row "The faster camera stream" near the end of the Plan and status table.
 
@@ -777,7 +777,7 @@ You don't need this to use the SDKs; it's for anyone writing their own client or
   - A field the op doesn't know is refused `bad_request` (a typo is never silently ignored). A client ignores fields it doesn't know in what the lamp sends, so the lamp can add fields without a new version.
 - **Keepalive:** after `hello`, a connection silent for 2 minutes is closed; a WebSocket ping counts. The SDKs ping every 20 s.
 - **Errors** (`error.code`): `unpaired`, `no_hello`, `no_grant`, `no_lease`, `lease_lost`, `busy`, `refused` (with the body's or the voice's why), `quiet_hours`, `rate` (with `retry_ms`), `bad_request`, `off`, and `private` (the camera ops while the lamp is private). `paused` and `asleep` are reserved.
-- **Versioning:** the path carries the version, `/v1` (and `v: 1` in the welcome, hello and mDNS). New fields are additive and a client ignores fields it doesn't know; an op the lamp doesn't know is `bad_request`. A change that isn't additive would be `/v2`.
+- **Versioning:** the path carries the version, `/v1` (and `v: 1` in the welcome and hello; the mDNS record's `v=1` is planned, "Finding the lamp" above). New fields are additive and a client ignores fields it doesn't know; an op the lamp doesn't know is `bad_request`. A change that isn't additive would be `/v2`.
 
 **Real messages from a test lamp on the customer build, 9 Nov**, stitched from separate runs, so the ids repeat (`->` the program sent, `<-` the lamp sent):
 
