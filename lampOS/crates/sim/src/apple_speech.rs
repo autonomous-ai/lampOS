@@ -43,6 +43,9 @@ enum Piece {
 pub struct Line {
     text: String,
     out: mpsc::Sender<Piece>,
+    /// When the HTTP side stops waiting: a line still queued after it is
+    /// dropped unspoken, not spoken to nobody ahead of the lines behind it.
+    until: Instant,
 }
 
 /// The engine the HTTP side holds: it hands each line to the main thread.
@@ -59,14 +62,15 @@ pub fn resident() -> (Resident, mpsc::Receiver<Line>) {
 impl Engine for Resident {
     fn speak(&self, text: &str, out: &mut dyn FnMut(&[u8]) -> io::Result<()>) -> io::Result<()> {
         let (pieces, receiver) = mpsc::channel();
+        let until = Instant::now() + LINE_WAIT;
         self.lines
             .send(Line {
                 text: text.to_owned(),
                 out: pieces,
+                until,
             })
             .map_err(|_| io::Error::other("the synthesizer has stopped"))?;
         let mut to_route: Option<ToRoute> = None;
-        let until = Instant::now() + LINE_WAIT;
         loop {
             let left = until.saturating_duration_since(Instant::now());
             match receiver.recv_timeout(left) {
@@ -124,6 +128,10 @@ fn speak_line(
     voice: Option<&AVSpeechSynthesisVoice>,
     line: Line,
 ) {
+    // Its caller has stopped waiting: nobody would hear it.
+    if Instant::now() >= line.until {
+        return;
+    }
     // SAFETY: a class method making an utterance from a valid NSString.
     let utterance =
         unsafe { AVSpeechUtterance::speechUtteranceWithString(&NSString::from_str(&line.text)) };
@@ -175,9 +183,8 @@ fn speak_line(
     unsafe {
         synthesizer.writeUtterance_toBufferCallback(&utterance, &*block as *const _ as *mut _);
     }
-    let until = Instant::now() + LINE_WAIT;
     while finished.try_recv().is_err() {
-        if Instant::now() >= until {
+        if Instant::now() >= line.until {
             // SAFETY: stops the synthesizer this thread owns, at once.
             unsafe {
                 synthesizer.stopSpeakingAtBoundary(objc2_avf_audio::AVSpeechBoundary::Immediate);
