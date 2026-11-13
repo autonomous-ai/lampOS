@@ -482,3 +482,37 @@ fn the_first_update_leaves_a_done_setup_whose_unit_changed() {
         }
     }
 }
+
+/// #6820, a customer lamp on 12 Nov: a first update switched while setup
+/// was still running, and setup finished inside the watch minute (its
+/// marker written, its unit ended with exit 0). That is setup done, not a
+/// part stopping: the build stays. A setup that fails, or ends without its
+/// marker, is still not well.
+#[test]
+fn setup_finishing_inside_the_watch_keeps_the_build() {
+    for (result, marker, stays) in [
+        ("success", true, true),
+        ("exit-code", true, false),
+        ("success", false, false),
+    ] {
+        let mut lamp = Lamp::new();
+        setup(&mut lamp, false);
+        lamp.config.first_update = true;
+        lamp.systemd.setup_ends_in_watch = Some((result, marker));
+        publish(&mut lamp);
+        let outcome = lamp.round();
+        if stays {
+            assert_eq!(outcome, Outcome::Switched(2), "{:?}", lamp.said);
+            assert_eq!(setup_restarts(&lamp), 1);
+            assert_eq!(
+                fs::read_link(lamp.root.join("opt/lampOS/setup/current")).unwrap(),
+                PathBuf::from(sha("setup 2"))
+            );
+        } else {
+            assert!(
+                matches!(outcome, Outcome::RolledBack { .. }),
+                "{result} {marker}: {outcome:?}"
+            );
+        }
+    }
+}
