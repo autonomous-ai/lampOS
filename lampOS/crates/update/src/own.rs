@@ -569,3 +569,126 @@ pub fn back(
     held.log_round("self-put-back", &line, None);
     Ok(Back::PutBack(pending))
 }
+
+/// What a running `serve` reads of its own binary (#6898), on the lamp's
+/// root: the file this process runs, even after `update/current` moved.
+pub const SELF_EXE: &str = "/proc/self/exe";
+/// Set on a lamp-update that started `update/current`'s binary in its own
+/// place ([`reexec`]): the build it went to, so it never goes again.
+pub const REEXECED: &str = "LAMP_UPDATE_REEXECED";
+
+/// Whether a running `serve` must start `update/current`'s binary in its
+/// own place (#6898).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Reexec {
+    /// This program is `update/current`'s binary, or either is not known.
+    Same,
+    /// A switch of its own waits to be confirmed: its phases decide.
+    Waits,
+    /// This program is another build's: `program` (the resolved binary of
+    /// `update/current`, build `build`) runs in its place.
+    To { program: PathBuf, build: String },
+    /// Started in its place once already for `build` and still not it:
+    /// not again.
+    Looped(String),
+}
+
+/// Compares the binary this process runs (`self_exe`, [`SELF_EXE`] on the
+/// lamp) with `update/current`'s under `root`. `marker` is the build this
+/// process was started in place for already ([`REEXECED`]).
+pub fn reexec(root: &Path, self_exe: &Path, records: &Path, marker: Option<&str>) -> Reexec {
+    let _ = (root, self_exe, records, marker);
+    Reexec::Same
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    /// A root with builds A and B, `update/current` naming `current`, and
+    /// `proc/self/exe` a link to the build this "process" runs.
+    fn lamp(current: &str, running: &str) -> (tempfile::TempDir, PathBuf, PathBuf) {
+        let root = tempfile::tempdir().unwrap();
+        for build in [A, B] {
+            let folder = on_root(root.path(), FOLDER).join(build);
+            fs::create_dir_all(&folder).unwrap();
+            fs::write(folder.join(BINARY), build).unwrap();
+        }
+        std::os::unix::fs::symlink(current, on_root(root.path(), CURRENT)).unwrap();
+        let exe = root.path().join("proc/self/exe");
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(
+            on_root(root.path(), FOLDER).join(running).join(BINARY),
+            &exe,
+        )
+        .unwrap();
+        let records = root.path().join("records");
+        fs::create_dir_all(&records).unwrap();
+        (root, exe, records)
+    }
+
+    #[test]
+    fn a_serve_on_another_build_than_current_starts_current_in_its_place() {
+        // lamp-52e6, 13 Nov (#6898): the link moved to B, the serving
+        // process still ran A.
+        let (root, exe, records) = lamp(B, A);
+        let wanted = on_root(root.path(), FOLDER)
+            .join(B)
+            .join(BINARY)
+            .canonicalize()
+            .unwrap();
+        assert_eq!(
+            reexec(root.path(), &exe, &records, None),
+            Reexec::To {
+                program: wanted,
+                build: B.to_owned()
+            }
+        );
+        // A marker for another build does not hold it back.
+        assert!(matches!(
+            reexec(root.path(), &exe, &records, Some(A)),
+            Reexec::To { .. }
+        ));
+    }
+
+    #[test]
+    fn a_serve_on_current_s_build_stays() {
+        let (root, exe, records) = lamp(B, B);
+        assert_eq!(reexec(root.path(), &exe, &records, None), Reexec::Same);
+        assert_eq!(reexec(root.path(), &exe, &records, Some(B)), Reexec::Same);
+    }
+
+    #[test]
+    fn started_in_place_once_for_a_build_it_never_goes_again() {
+        let (root, exe, records) = lamp(B, A);
+        assert_eq!(
+            reexec(root.path(), &exe, &records, Some(B)),
+            Reexec::Looped(B.to_owned())
+        );
+    }
+
+    #[test]
+    fn a_switch_waiting_to_be_confirmed_is_left_to_its_phases() {
+        let (root, exe, records) = lamp(B, A);
+        begin(&records, A, B).unwrap();
+        assert_eq!(reexec(root.path(), &exe, &records, None), Reexec::Waits);
+    }
+
+    #[test]
+    fn an_unknown_self_or_a_link_to_no_build_is_left_alone() {
+        let (root, _, records) = lamp(B, A);
+        let nowhere = root.path().join("proc/1/exe");
+        assert_eq!(reexec(root.path(), &nowhere, &records, None), Reexec::Same);
+        let (root, exe, records) = lamp(B, A);
+        let link = on_root(root.path(), CURRENT);
+        fs::remove_file(&link).unwrap();
+        let other = on_root(root.path(), FOLDER).join("not-a-build");
+        fs::create_dir_all(&other).unwrap();
+        fs::write(other.join(BINARY), "x").unwrap();
+        std::os::unix::fs::symlink("not-a-build", &link).unwrap();
+        assert_eq!(reexec(root.path(), &exe, &records, None), Reexec::Same);
+    }
+}
