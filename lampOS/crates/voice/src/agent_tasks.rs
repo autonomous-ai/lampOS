@@ -237,6 +237,13 @@ pub const CHECK: &str = "check_agent_task";
 pub const NOW: &str = "tasks_now";
 /// How the lamp's Harness is, with [`STATUS_FLAG`] (#6061 part B).
 pub const STATUS: &str = "harness_status";
+/// Whether `name` is one of the agent-task tools ([`START`], [`CONFIRM`],
+/// [`CHECK`], [`NOW`], [`STATUS`]): a round that calls one with an agent
+/// named is about the work, never asked again to hand it over (the
+/// Reviewer-lead's P1 on #6786: "Hermes, go ahead and run it" confirms).
+pub fn is_task_tool(name: &str) -> bool {
+    [START, CONFIRM, CHECK, NOW, STATUS].contains(&name)
+}
 /// [`START`]'s parameter that names who does the work.
 pub const WHO: &str = "who";
 /// A yes counts this long after the task was prepared.
