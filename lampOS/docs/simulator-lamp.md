@@ -127,8 +127,9 @@ stream`, `microphone.stream`, privacy rules) run on them unchanged.
 
 ## 5. Packaging
 v1: Linux only: `lamp-sim run DIR` starts everything from the lampOS binaries built for the host
-(`crates/sim/README.md`). macOS after `lamp-body`'s runtime is portable; Windows and a desktop
-shell (single installer) later.
+(`crates/sim/README.md`). macOS after `lamp-body`'s runtime is portable (ten); lamp-sim's own side
+builds and is tested on macOS arm64 since sim-3-P2 (13 Nov), what is missing there is in the README's
+"Known gaps". Windows and a desktop shell (single installer) later.
 
 ## 6. v1 vs later
 v1: pair + all body/light/gesture ops with real limits, viewer with 5 joints and ring,

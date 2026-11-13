@@ -703,7 +703,7 @@ mod tests {
 
     #[test]
     fn a_computers_exact_line_is_told_on_voice_line_and_nothing_else_is() {
-        let dir = std::env::temp_dir().join(format!("lsv-{}", std::process::id()));
+        let dir = crate::test_root().join(format!("lsv-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let bus = Bus::new(dir.join("bus")).unwrap();
         let lines = Mutex::new(
@@ -892,7 +892,7 @@ mod tests {
 
     #[test]
     fn a_change_is_told_on_speaker_volume_and_the_socket_answers_each_call() {
-        let dir = std::env::temp_dir().join(format!("lamp-sim-volume-{}", std::process::id()));
+        let dir = crate::test_root().join(format!("lamp-sim-volume-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let bus = Bus::new(dir.join("bus")).unwrap();
@@ -973,7 +973,7 @@ mod tests {
     }
 
     fn scratch_bus(name: &str) -> (std::path::PathBuf, Bus) {
-        let dir = std::env::temp_dir().join(format!("lsp-{name}-{}", std::process::id()));
+        let dir = crate::test_root().join(format!("lsp-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let bus = Bus::new(dir.join("bus")).unwrap();
         (dir, bus)

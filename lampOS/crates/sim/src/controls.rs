@@ -64,7 +64,7 @@ mod tests {
     use std::process::Command;
 
     fn folder(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("lsm-controls-{name}-{}", std::process::id()));
+        let dir = crate::test_root().join(format!("lsm-controls-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
