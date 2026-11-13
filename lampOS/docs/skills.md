@@ -1731,8 +1731,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   held, `YES_WITHIN`, its `approve_id` noted on each later heard line, and
   the owner's yes only (`make_skill_local::not_owners_yes_refused`).
   The person's line right after it has its round 1 forced to `make_skill`
-  (`tool_choice`, `skill_write_yes::approve_force`, given with
-  `make_skill` declared and the switch on, before every other force),
+  (`tool_choice`, `skill_write_yes::approve_force`, given wherever
+  `make_skill` is declared, before every other force: with the switch off
+  it forces only a made skill's remove's answer, "Removed by voice"),
   whose `approve_id` form also takes `answer`: `yes`, `no` or `unclear`
   (left out: `yes` for a made skill's writes or
   code, as before; `unclear` for a skill's task, so a forced call with no
@@ -1740,7 +1741,8 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   2, the first builder's option (b) on #6811; on lamp-52e6 on 13 Nov the
   model, after a `use_skill` it started itself, answered the owner's
   "Yes." with "Want me to go ahead with that?" and called nothing). The
-  force holds only while a task's wait (never a make's writes or code) is
+  force holds only while a task's wait or a made skill's remove (never a
+  make's writes or code) is
   within `YES_WITHIN` and the lamp's newest answer kept toward it held the
   whole say-back uncut: so for that one round, never after a cut or
   partial read-back, never in the say-back's own turn, never with nothing
@@ -3895,7 +3897,7 @@ gone ([switches.md](switches.md)). What happens:
    - any other refusal: "the lamp's check didn't let it on".
    Never without `LAMP_MAKE_SKILL`, whatever the model calls: without it
    `make_skill` is nobody's. Taking a made skill off (the app's remove, or
-   `{"off": NAME}`) is unchanged.
+   `{"off": NAME}`) is unchanged; by voice, see "Removed by voice" below.
 9. **The wait** (the Reviewer-lead's P3 on #4914): the call holds the turn
    for up to 30 s an ask, with one more try after a failure; repairs after
    a refusal are begun only while one more ask still ends within
@@ -4044,7 +4046,87 @@ lamp's own answer got "I made lamp test event … It waits for you to agree"
 with `calls=none`, and no skill was made. "I made a mistake." and "I made a mistake: …" are no claims.
 Test: `action_claim::tests::a_skill_said_made_is_a_claim_only_a_make_backs`.
 
-Removing a made skill by voice is still to come.
+**Removed by voice** (#6960, Twelve's three tries on lamp-c0a4, 12843:
+"delete the skill called moon fact" went to `lamp_help`, whose notes said
+the lamp can't remove a skill by voice, and "remove the moon fact skill" to
+a read-back that found no "moon-fax", since nothing in `make_skill` named a
+remove and a read-back takes only the exact name). A skill the person made
+is removed through `make_skill` itself, its `remove` alone: the name as
+heard (`made_remove::REMOVE`). It is a parameter of the function the voice
+has, never a function of its own, as the voice is at its 48
+(`lamp_gemini::MAX_TOOLS`). Whether a line asks to remove a skill is the
+model's judgment, told in the function's description ("When asked to
+delete or remove a skill, call it with remove alone, saying nothing
+first."), never a list of words (the owner's ruling, 13 Nov). Then, in
+code (`made_remove::asked`):
+- **Only the person's own.** The name is matched to the skills they made,
+  the made skills' index (`made.json`) alone (`made_remove::found`): its
+  words as a skill's name is written (`made_skill::name_asked`, each number
+  word as digits, `made_skill::name_digits`), then the fewest letters
+  changed, put in or left out, over the whole name asked or over any run
+  of its words as many as the skill's name has, with the spaces between
+  words left out (`made_remove::apart`: "moon-fax" is 2 from `moon-fact`,
+  "the moon facts skill" 1), near enough at a quarter of the name's
+  letters or less (`made_remove::near`), the nearest one alone, the longer
+  name first on a tie. Spelling only: no word is judged by what it means.
+  A skill on the lamp they didn't make (core, from the Store, or pushed
+  from a computer: a folder in the skills folder or the pushed one that is
+  not a made skill's) is refused in words when it is named as it is
+  written, or when none of theirs is near and it is: "NAME isn't a skill
+  they made, so you can't remove it by voice." (`made_remove::NOT_MADE`);
+  nothing waits, and the manage helper refuses a core one too. Two of
+  theirs as near are asked once, short, which one ("moon fact or noon
+  fact"). None near is said so (`made_remove::NO_MADE`) naming theirs, at
+  most 3, or how many they made. A name other than the very one asked,
+  and their skills' names, are said only when the owner hears
+  (`services::owner_hears`, asked only then: in the private room always),
+  as a read-back's names are; otherwise "there is no skill they made by
+  that name", naming none.
+- **Asked once, by its name.** The one found waits for the yes as a made
+  skill's writes do (`skill_write_yes::wait_for_yes`, its `remove` set, its
+  say-back the question) and the model is told to say only, word for word,
+  "Remove moon fact?" (`made_remove::question`), and then its
+  `approve_id`: every guard of a made skill's yes holds (said whole and
+  uncut first, a later heard line, the echo held, `YES_WITHIN`, the route
+  with the echo judge, the id noted on each later heard line, and the
+  owner's yes only, `make_skill_local::not_owners_yes_refused`, told "Not
+  removed, and cancelled: …"). The Live route asks nothing ("I can remove
+  NAME only on my other voice"), nor a turn nobody spoke. The person's next
+  line has its round 1 forced to `make_skill`
+  (`skill_write_yes::approve_force`, as a skill's task's answer is), with
+  `approve_id` and `answer` (`yes`, `no` or `unclear`, left out read as
+  `unclear`): code decides when, the model what they answered.
+- **Removed only on the yes.** `yes` takes it off: one that is on through
+  the manage helper's own `{"remove": NAME}`, as the app's remove does
+  (lamp-skills drops its camera yes and asks lamp-control to forget its
+  task's yes), then it is dropped from `made.json` with its package
+  (`made_skill::forget_named`); one made and not on is only dropped
+  (`made_remove::removed`), and one the lamp no longer keeps by that name
+  and SHA-256 is said not removed. The lamp says "NAME is removed."
+  (`skill_write_yes::removed_next`). `no` keeps it and ends the wait ("NAME
+  stays", `remove_declined_next`); `unclear` asks once more, short, "remove
+  NAME, yes or no?" (`remove_unclear_next`), and a second `unclear` keeps it.
+- **No extra round trip.** The match reads two local folders and the made
+  skills' index; only the yes asks the manage helper, over its local
+  socket. The journal names what was found by kind only ("one made skill
+  by the nearest name"), never the name asked.
+- `lamp_help`'s notes say it: "Ask me to remove a skill you made and I ask
+  first: only your yes removes it." No switch of its own: it is
+  `make_skill`'s, on wherever `LAMP_MAKE_SKILL` is.
+
+Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
+`make_skill_is_offered_for_a_remove_within_the_bounds`,
+`the_yes_removes_it_through_the_helper`, `a_no_or_twice_unclear_keeps_it`,
+`a_visitors_yes_removes_nothing`,
+`a_yes_before_the_question_was_said_removes_nothing`,
+`a_core_or_store_skill_is_refused_in_words`,
+`none_near_is_said_and_names_are_told_the_owner_only`,
+`two_as_near_ask_which`, `nothing_is_asked_unheard_or_on_the_live_route`,
+`nearest_is_spelling_over_the_names_words`; and
+`second_provider::tests::remove_words`:
+`a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
+`a_no_after_remove_moon_fact_keeps_it`,
+`no_force_before_the_question_is_said_whole`.
 
 Tests:
 - `make_skill_local::tests`: `a_good_answer_is_kept_and_put_on_with_no_yes`

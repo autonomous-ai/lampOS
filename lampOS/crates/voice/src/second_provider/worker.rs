@@ -2411,14 +2411,16 @@ pub fn serve(
         );
         crate::tools::make_skill_asked::force()
     });
-    // The person's line right after a skill's task said back must call
-    // make_skill, the call that takes its approve_id and their answer
-    // (#6835 gap 2): code decides when, the model what. First of all.
-    let task_yes = (tools.make_skill && crate::skill_task_yes::on()).then(|| {
+    // The person's line right after a skill's task said back, or a made
+    // skill's remove asked (#6960), must call make_skill, the call that
+    // takes its approve_id and their answer (#6835 gap 2): code decides
+    // when, the model what. First of all. A remove is part of make_skill
+    // (`LAMP_MAKE_SKILL`), so the force is on wherever make_skill is; with
+    // a skill's tasks off it forces only a remove's answer.
+    let task_yes = tools.make_skill.then(|| {
         eprintln!(
-            "lamp-voice second: the line right after a skill's task said back whole must call {} in its first round ({})",
-            crate::made_skill::MAKE,
-            crate::skill_task_yes::ENVIRONMENT
+            "lamp-voice second: the line right after a skill's task said back whole, or a made skill's remove asked, must call {} in its first round",
+            crate::made_skill::MAKE
         );
         crate::skill_write_yes::approve_force()
     });
@@ -14004,6 +14006,7 @@ mod tests {
                         say_back: say_back.into(),
                         grants: Some(vec!["light".into()]),
                         code: true,
+                        remove: false,
                     },
                     1,
                     answered,

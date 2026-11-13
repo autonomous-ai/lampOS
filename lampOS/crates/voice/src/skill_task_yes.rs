@@ -277,6 +277,7 @@ impl TaskAsks {
             say_back: said(self),
             grants: Some(self.grants.clone()),
             code: false,
+            remove: false,
         }
     }
 }
@@ -731,6 +732,7 @@ pub fn asked_in(
             say_back,
             grants: Some(grants),
             code: false,
+            remove: false,
         },
         request,
         now,

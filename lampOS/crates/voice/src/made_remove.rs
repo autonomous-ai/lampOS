@@ -1,4 +1,441 @@
-//! A skill the person made, removed by voice (#6960).
+//! A skill the person made, removed by voice (#6960, Twelve's three tries
+//! on lamp-c0a4, 12843: "delete the skill called moon fact" went to
+//! `lamp_help`, and "remove the moon fact skill" to a read-back that found
+//! no "moon-fax", since `make_skill` named no remove and a read-back takes
+//! only the exact name).
+//!
+//! - **One plain path, the model's to choose.** `make_skill` takes
+//!   [`REMOVE`], the name as heard, given alone: whether a line asks to
+//!   remove a skill is the model's judgment, never a list of words (the
+//!   owner's ruling, 13 Nov). It is a parameter of the function the voice
+//!   has, not a function of its own: the voice is at its 48.
+//! - **Only the person's own.** The name is matched in code against the
+//!   skills they made (the made skills' index, `made.json`) alone
+//!   ([`found`]): its words as a skill's name is written, each number word
+//!   as digits, then the spelling distance over the name's own words
+//!   ([`apart`]), near enough at a quarter of its letters ([`near`]), the
+//!   nearest one alone. A skill on the lamp they didn't make (core, from
+//!   the Store, or pushed from a computer) is refused in words
+//!   ([`NOT_MADE`]); the manage helper refuses a core one too. None near is
+//!   said so, naming theirs (three at most) only to the owner, as a
+//!   read-back does: a name can carry a person's.
+//! - **Asked once, removed on the yes.** One short question by its spoken
+//!   name, "Remove moon fact?" ([`question`]), and the yes waits as a made
+//!   skill's does (`crate::skill_write_yes`, with every guard there: the
+//!   question said whole and uncut first, a later heard line, the echo
+//!   held, the route with the echo judge, the owner's yes only,
+//!   `make_skill_local::not_owners_yes_refused`). The person's next line
+//!   is made to call `make_skill` with its `approve_id` and their
+//!   `answer` (`skill_write_yes::approve_force`); yes, no or unclear is the
+//!   model's. On the yes, one that is on is taken off by the manage
+//!   helper's own `{"remove": NAME}`, as the app's remove does, then it is
+//!   dropped from the made skills with its package ([`removed`]). A no
+//!   keeps it; an unclear answer asks once more, and a second keeps it.
+//!
+//! No extra round trip: the match reads two local folders, and only the
+//! yes asks the helper, over its local socket.
+use crate::made_skill::{self, Keeping};
+use crate::skill_write_yes::{self, Asks};
+use serde_json::{Value, json};
+use std::time::Instant;
+
+/// The `make_skill` argument that asks to remove a skill: its name as
+/// heard, given alone.
+pub const REMOVE: &str = "remove";
+
+/// What the model is told of a skill on the lamp the person didn't make.
+pub const NOT_MADE: &str = "only a skill the person made is removed by voice";
+/// What the model is told when no skill they made is near the name asked.
+pub const NO_MADE: &str = "no skill the person made has a name like that";
+/// What the model is told of a remove asked in a turn nobody spoke.
+pub const NOT_ASKED_ALOUD: &str = "a skill is removed only when the person asks for it out loud";
+/// What the model is told of a remove asked where no answer can be taken
+/// (the Live route has no echo judge).
+pub const NOT_HERE: &str = "this voice can't take the answer to a remove";
+
+/// The most of their skills' names said when none is near.
+const NAMED_MOST: usize = 3;
+
+/// A remove asked by the model's `make_skill` call: the name as heard, in
+/// the voice's request `request` (`heard`: someone spoke it), on the route
+/// with the echo judge or not (`sends_here`, `services::sends_here`).
+#[derive(Clone, Copy, Debug)]
+pub struct Ask<'a> {
+    pub name: &'a str,
+    pub request: u64,
+    pub heard: bool,
+    pub sends_here: bool,
+}
+
+/// What a remove's name finds on the lamp ([`found`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Found {
+    /// One skill the person made: its name and package's SHA-256, and
+    /// whether the words asked were its own name (`exact`) or only nearest.
+    Made {
+        name: String,
+        sha256: String,
+        exact: bool,
+    },
+    /// More than one of theirs as near: their names.
+    Alike(Vec<String>),
+    /// A skill on the lamp the person didn't make: its name.
+    NotMade(String),
+    /// None near.
+    Nothing,
+}
+
+/// A name's words as a skill's name is written ([`made_skill::name_asked`]:
+/// lower case, no "my" before it or "skill" after it), each number word as
+/// digits ([`made_skill::name_digits`]).
+fn words_of(name: &str) -> Vec<String> {
+    made_skill::name_digits(&made_skill::name_asked(name))
+        .split('-')
+        .filter(|word| !word.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// The edit distance between two spellings, by letter.
+fn distance(one: &str, other: &str) -> usize {
+    let other: Vec<char> = other.chars().collect();
+    let mut row: Vec<usize> = (0..=other.len()).collect();
+    for (at, letter) in one.chars().enumerate() {
+        let mut before = row[0];
+        row[0] = at + 1;
+        for (next, theirs) in other.iter().enumerate() {
+            let here = row[next + 1];
+            row[next + 1] = if letter == *theirs {
+                before
+            } else {
+                1 + before.min(here).min(row[next])
+            };
+            before = here;
+        }
+    }
+    row[other.len()]
+}
+
+/// How far the words `asked` are from the skill `name`: the fewest letters
+/// changed, put in or left out, over the whole of what was asked, or over
+/// any run of its words as many as the name has ("the moon fact" holds
+/// "moon fact"), with the spaces between words left out. Spelling only:
+/// no word is judged by what it means.
+pub fn apart(asked: &str, name: &str) -> usize {
+    let asked = words_of(asked);
+    let name = words_of(name);
+    let wanted = name.concat();
+    let whole = distance(&asked.concat(), &wanted);
+    asked
+        .windows(name.len().max(1))
+        .map(|run| distance(&run.concat(), &wanted))
+        .fold(whole, usize::min)
+}
+
+/// Whether `apart` letters from the skill `name` is near enough: at most a
+/// quarter of its letters (a short name only as it is written).
+pub fn near(apart: usize, name: &str) -> bool {
+    apart * 4 <= words_of(name).concat().chars().count()
+}
+
+/// The person's made skills (the made skills' index), each name once with
+/// its package's SHA-256, the newest kept for a name.
+fn made(keeping: &Keeping) -> Vec<(String, String)> {
+    let mut made: Vec<(String, String)> = Vec::new();
+    for entry in made_skill::entries(&keeping.directory) {
+        let (Some(name), Some(sha256)) = (entry["name"].as_str(), entry["sha256"].as_str()) else {
+            continue;
+        };
+        made.retain(|(kept, _)| kept != name);
+        made.push((name.to_owned(), sha256.to_owned()));
+    }
+    made
+}
+
+/// The skills on the lamp the person didn't make: the skills folder's and
+/// the pushed folder's, by folder, but the made ones' names.
+fn others(keeping: &Keeping, made: &[(String, String)]) -> Vec<String> {
+    let mut others: Vec<String> = [
+        keeping.installed.clone(),
+        made_skill::pushed_folder(&keeping.installed),
+    ]
+    .iter()
+    .flat_map(|folder| std::fs::read_dir(folder).into_iter().flatten().flatten())
+    .filter(|entry| entry.path().is_dir())
+    .filter_map(|entry| entry.file_name().into_string().ok())
+    .filter(|name| !name.starts_with('.'))
+    .filter(|name| !made.iter().any(|(made, _)| made == name))
+    .collect();
+    others.sort();
+    others.dedup();
+    others
+}
+
+/// The skill the words `asked` name for a remove: the person's own made
+/// skill nearest to them ([`apart`], [`near`]), the longer name first on a
+/// tie of distance (so "moon fact" is moon-fact, not a made "moon"); one
+/// they didn't make when it is named as it is written, or when none of
+/// theirs is near and it is; else nothing.
+pub fn found(asked: &str, keeping: &Keeping) -> Found {
+    let made = made(keeping);
+    let rank = |name: &str| (apart(asked, name), std::cmp::Reverse(name.len()));
+    let mut theirs: Vec<(usize, &str, &str)> = made
+        .iter()
+        .map(|(name, sha256)| (apart(asked, name), name.as_str(), sha256.as_str()))
+        .filter(|(apart, name, _)| near(*apart, name))
+        .collect();
+    theirs.sort_by_key(|(_, name, _)| rank(name));
+    let others = others(keeping, &made);
+    let other = |exact: bool| {
+        others
+            .iter()
+            .map(|name| (apart(asked, name), name))
+            .filter(|(apart, name)| {
+                if exact {
+                    *apart == 0
+                } else {
+                    near(*apart, name)
+                }
+            })
+            .min_by_key(|(_, name)| rank(name))
+            .map(|(_, name)| Found::NotMade(name.clone()))
+    };
+    match theirs.as_slice() {
+        [] => other(false).unwrap_or(Found::Nothing),
+        [(apart, ..), ..] if *apart > 0 && other(true).is_some() => {
+            other(true).unwrap_or(Found::Nothing)
+        }
+        [(_, first, _), (_, second, _), ..] if rank(first) == rank(second) => Found::Alike(
+            theirs
+                .iter()
+                .filter(|(_, name, _)| rank(name) == rank(first))
+                .map(|(_, name, _)| (*name).to_owned())
+                .collect(),
+        ),
+        [(apart, name, sha256), ..] => Found::Made {
+            name: (*name).to_owned(),
+            sha256: (*sha256).to_owned(),
+            exact: *apart == 0,
+        },
+    }
+}
+
+/// The one question a remove asks, by the skill's spoken name.
+pub fn question(spoken: &str) -> String {
+    format!("Remove {spoken}?")
+}
+
+/// The spoken names `names` as said in a line: "a", "a or b", "a, b or c".
+fn said_or(names: &[String]) -> String {
+    let spoken: Vec<String> = names
+        .iter()
+        .map(|name| made_skill::spoken_name(name))
+        .collect();
+    match spoken.as_slice() {
+        [] => String::new(),
+        [one] => one.clone(),
+        [rest @ .., last] => format!("{} or {last}", rest.join(", ")),
+    }
+}
+
+/// What the model is told after the question: wait for the answer, whose
+/// call the person's next line makes (`skill_write_yes::approve_force`).
+pub fn then_wait(id: &str) -> String {
+    format!(
+        "End there, asking nothing else and calling nothing now: nothing is removed until they \
+         agree. When they answer, call make_skill with only approve_id \"{id}\" and answer \
+         \"yes\" if they agree, \"no\" if they decline or wait, \"unclear\" if you can't tell."
+    )
+}
+
+/// What the model is told to say first: the question, word for word.
+pub fn say_question(question: &str) -> String {
+    format!(
+        "Say only this, word for word: \"{question}\" If the conversation is in another \
+         language, say it in that language too, after it."
+    )
+}
+
+/// A remove asked in `ask` at `now`, of the skills in `keeping`: the
+/// person's own made skill [`found`] by the name asked is asked about once
+/// ([`question`]) and its yes awaited
+/// ([`skill_write_yes::wait_for_yes`]); anything else is said in words and
+/// nothing waits. A name not the very one asked, or their skills' names,
+/// are said only when the owner hears (`owner_hears`, asked only then, as
+/// a read-back's names are). Nothing is asked unheard, or on a route that
+/// can't take the answer. What the model is told.
+pub fn asked(
+    ask: Ask<'_>,
+    keeping: &Keeping,
+    owner_hears: impl FnOnce() -> bool,
+    now: Instant,
+) -> Value {
+    let Ask {
+        name,
+        request,
+        heard,
+        sends_here,
+    } = ask;
+    if !heard {
+        eprintln!("lamp-voice: request {request}: a skill wasn't removed: no one asked aloud");
+        return json!({ "error": NOT_ASKED_ALOUD });
+    }
+    let found = found(name, keeping);
+    // Only the kind found, never the name asked: the journal holds no
+    // person's words.
+    eprintln!(
+        "lamp-voice: request {request}: a remove asked by voice found {}",
+        match &found {
+            Found::Made { exact: true, .. } => "one made skill by its name",
+            Found::Made { exact: false, .. } => "one made skill by the nearest name",
+            Found::Alike(_) => "more than one made skill as near",
+            Found::NotMade(_) => "a skill the person didn't make",
+            Found::Nothing => "nothing near",
+        }
+    );
+    // Asked once at most, and only when a name would be said.
+    let mut owner_hears = Some(owner_hears);
+    let mut hears = None;
+    let mut owner = || *hears.get_or_insert_with(|| owner_hears.take().is_some_and(|ask| ask()));
+    match found {
+        Found::NotMade(other) => json!({
+            "error": NOT_MADE,
+            "next": format!(
+                "Say plainly, in a few words, that {} isn't a skill they made, so you can't \
+                 remove it by voice. Call nothing.",
+                made_skill::spoken_name(&other)
+            )
+        }),
+        Found::Made {
+            name,
+            sha256,
+            exact,
+        } if exact || owner() => {
+            let spoken = made_skill::spoken_name(&name);
+            if !sends_here {
+                return json!({
+                    "error": NOT_HERE,
+                    "next": format!(
+                        "Say plainly, in a few words, that I can remove {spoken} only on my \
+                         other voice, in a normal conversation with me. Call nothing."
+                    )
+                });
+            }
+            let question = question(&spoken);
+            let id = skill_write_yes::wait_for_yes(
+                Asks {
+                    skill: name.clone(),
+                    sha256,
+                    writes: Vec::new(),
+                    say_back: question.clone(),
+                    grants: None,
+                    code: false,
+                    remove: true,
+                },
+                request,
+                now,
+            );
+            json!({
+                REMOVE: name,
+                skill_write_yes::APPROVE_ID: id,
+                "next": format!("{} {}", say_question(&question), then_wait(&id)),
+            })
+        }
+        Found::Alike(names) if owner() => json!({
+            "error": "more than one skill they made has a name like that",
+            "next": format!(
+                "Ask them once, short, which one they mean: {}. Call nothing now.",
+                said_or(&names[..names.len().min(NAMED_MOST)])
+            )
+        }),
+        _ if owner() => {
+            let theirs: Vec<String> = made(keeping).into_iter().map(|(name, _)| name).collect();
+            let named = match theirs.len() {
+                0 => "and that they haven't made any yet".to_owned(),
+                count if count <= NAMED_MOST => format!(
+                    "and name theirs: {}",
+                    theirs
+                        .iter()
+                        .map(|name| made_skill::spoken_name(name))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+                count => format!("and that they have made {count}"),
+            };
+            json!({
+                "error": NO_MADE,
+                "next": format!(
+                    "Say plainly, in a few words, that you found no skill they made by that \
+                     name, {named}. Call nothing."
+                )
+            })
+        }
+        _ => json!({
+            "error": NO_MADE,
+            "next": "Say plainly, in a few words, that there is no skill they made by that \
+                     name. Name no other skill. Call nothing."
+        }),
+    }
+}
+
+/// [`asked`] on the lamp, by `make_skill`'s call: the made skills' own
+/// folder (`LAMP_MAKE_SKILL`), the owner's hearing as a read-back's
+/// (`services::owner_hears`), the route's echo judge.
+pub fn asked_here(
+    name: &str,
+    request: u64,
+    heard: bool,
+    lease: Option<&crate::memory_scope::ScopeLease>,
+) -> Value {
+    let Some(keeping) = Keeping::when(true) else {
+        return crate::tools::unavailable();
+    };
+    asked(
+        Ask {
+            name,
+            request,
+            heard,
+            sends_here: crate::services::sends_here(),
+        },
+        &keeping,
+        || crate::services::owner_hears(request, heard, lease),
+        Instant::now(),
+    )
+}
+
+/// The person's yes to the remove `asks` waited for: the made skill of
+/// that name and SHA-256, if the lamp still keeps it, taken off by
+/// `remove` (the manage helper's own remove) when it is on, then dropped
+/// from the made skills with its package ([`made_skill::forget_named`]).
+/// `{"removed": NAME}`, or why not.
+pub fn removed(
+    keeping: &Keeping,
+    asks: &Asks,
+    remove: impl FnOnce(&str) -> Result<(), String>,
+) -> Result<Value, String> {
+    let Some(entry) = made_skill::entries(&keeping.directory)
+        .into_iter()
+        .find(|entry| {
+            entry["name"] == asks.skill.as_str() && entry["sha256"] == asks.sha256.as_str()
+        })
+    else {
+        return Err("the lamp no longer has it".into());
+    };
+    if entry["on"] == true {
+        remove(&asks.skill)?;
+    }
+    made_skill::forget_named(&keeping.directory, &asks.skill);
+    eprintln!("lamp-voice: a made skill was removed by voice, on the person's yes");
+    Ok(json!({ "removed": asks.skill }))
+}
+
+/// [`removed`] on the lamp: through the manage helper's socket.
+pub fn removed_here(asks: &Asks) -> Result<Value, String> {
+    let keeping = Keeping::when(true).ok_or("the lamp can't make skills")?;
+    removed(&keeping, asks, |name| {
+        crate::made_clash::remove_by_helper(&keeping.manage, name)
+    })
+}
 
 #[cfg(test)]
 mod tests {
@@ -122,15 +559,18 @@ mod tests {
         crate::made_skill::set_writes_here(Some(true));
         crate::made_skill::set_scripts_here(Some(true));
         crate::skill_task_yes::set_on_here(Some(true));
-        for tool in [crate::make_skill_local::tool()] {
-            assert!(tool.description.contains("remove"), "{}", tool.description);
-            assert!(tool.description.contains("delete"), "{}", tool.description);
-            assert!(tool.description.len() <= 1_024, "{}", tool.description.len());
-            assert!(!tool.description.contains("yes"), "{}", tool.description);
-            let parameters = tool.parameters.unwrap();
-            assert!(parameters["properties"][REMOVE].is_object(), "{parameters}");
-            assert!(parameters.to_string().len() <= 4_096);
-        }
+        let tool = crate::make_skill_local::tool();
+        assert!(tool.description.contains("remove"), "{}", tool.description);
+        assert!(tool.description.contains("delete"), "{}", tool.description);
+        assert!(
+            tool.description.len() <= 1_024,
+            "{}",
+            tool.description.len()
+        );
+        assert!(!tool.description.contains("yes"), "{}", tool.description);
+        let parameters = tool.parameters.unwrap();
+        assert!(parameters["properties"][REMOVE].is_object(), "{parameters}");
+        assert!(parameters.to_string().len() <= 4_096);
         // Every switch off: still offered, as `make_skill` is.
         crate::skill_task_yes::set_on_here(Some(false));
         crate::made_skill::set_scripts_here(Some(false));
@@ -167,7 +607,10 @@ mod tests {
         });
         assert_eq!(told["approved"], true, "{told}");
         assert_eq!(told["removed"], "moon-fact", "{told}");
-        assert!(told["next"].as_str().unwrap().contains("moon fact"), "{told}");
+        assert!(
+            told["next"].as_str().unwrap().contains("moon fact"),
+            "{told}"
+        );
         assert_eq!(helper, ["moon-fact"]);
         assert_eq!(names(&keeping.directory), ["evening-dim"]);
         assert!(!yes::awaited(now));
@@ -253,7 +696,10 @@ mod tests {
             let told = asked(ask(heard, 1), &keeping, owner, now);
             assert_eq!(told["error"], NOT_MADE, "{heard}: {told}");
             let next = told["next"].as_str().unwrap();
-            assert!(next.contains(&format!("{spoken} isn't a skill they made")), "{next}");
+            assert!(
+                next.contains(&format!("{spoken} isn't a skill they made")),
+                "{next}"
+            );
             assert!(told.get(yes::APPROVE_ID).is_none(), "{told}");
             assert!(!yes::awaited(now));
         }
@@ -270,7 +716,10 @@ mod tests {
         let told = asked(ask("weather report", 1), &keeping, owner, now);
         assert_eq!(told["error"], NO_MADE, "{told}");
         let next = told["next"].as_str().unwrap();
-        assert!(next.contains("moon fact") && next.contains("evening dim"), "{next}");
+        assert!(
+            next.contains("moon fact") && next.contains("evening dim"),
+            "{next}"
+        );
         assert!(!yes::awaited(now));
         for heard in ["weather report", "moon-fax"] {
             let told = asked(ask(heard, 1), &keeping, || false, now);
@@ -320,7 +769,10 @@ mod tests {
         live.sends_here = false;
         let told = asked(live, &keeping, owner, now);
         assert!(told["error"].is_string(), "{told}");
-        assert!(told["next"].as_str().unwrap().contains("other voice"), "{told}");
+        assert!(
+            told["next"].as_str().unwrap().contains("other voice"),
+            "{told}"
+        );
         assert!(!yes::awaited(now));
         let _ = std::fs::remove_dir_all(&root);
     }
