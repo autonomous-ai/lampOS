@@ -38,6 +38,10 @@ Environment=LAMP_SKILL_TASKS=on
 # a write waits for the owner's spoken yes. The same line in lamp-skills, lamp-skills-manage@, lamp-voice and
 # lamp-control. On in the product (owner, 13 Nov).
 Environment=LAMP_AGENT_SERVICES=on
+# A made skill's fixed write run as a task on the lamp's Hermes (#6824, skill_task::WriteHandOver), its exact
+# content sent once through lamp-services' service_write. The same line in lamp-skills, lamp-control and
+# lamp-services. On in the product (owner, 13 Nov).
+Environment=LAMP_SKILL_WRITE_AGENT=on
 # The same for the lamp's own OpenClaw (#6226; no memory floor, every lamp has 6 GB): with both installed the
 # lamp's target is Hermes, the default again (#6498, the lead's decision); LAMP_LAMP_ENGINE=openclaw picks
 # OpenClaw, and either falls back to the other when it is not installed. Its Gateway runs always under

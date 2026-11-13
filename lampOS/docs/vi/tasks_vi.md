@@ -1015,11 +1015,11 @@ trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ l�
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
 
-### Lệnh ghi cố định của một kỹ năng tự tạo trên Hermes của đèn (`LAMP_SKILL_WRITE_AGENT`, tắt)
+### Lệnh ghi cố định của một kỹ năng tự tạo trên Hermes của đèn (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm)
 
 Quyết định của chủ đèn (13/11): mọi thứ chạm vào một dịch vụ đã liên kết
-đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`,
-không bật trong unit sản phẩm nào) và `LAMP_AGENT_SERVICES=on` trong
+đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`;
+bật trong các unit `lamp-skills`, `lamp-tasks`, `lamp-control` và `lamp-services` của sản phẩm, mỗi unit một lần, quyết định của chủ đèn, 13/11) và `LAMP_AGENT_SERVICES=on` trong
 lamp-tasks, socket trao việc cũng nhận lệnh ghi cố định của một kỹ năng tự
 tạo (`do.write`, docs/skills.md) như một lượt chạy
 (`skill_task::WriteHandOver`, `answer_with`):
