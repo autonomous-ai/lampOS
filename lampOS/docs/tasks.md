@@ -3200,7 +3200,19 @@ as a Harness task with the agent's own tools
   memories, sessions, state) under an empty read-only tmpfs with only its
   checkout, `tools` (the Python Hermes runs on) and `installs` (its
   dependency record) shown again, read-only, so the links resolve and
-  nothing in them can be changed, leaves Hermes's folder and the work
+  nothing in them can be changed but what Hermes must write at every
+  start, bound back read-write: each `installs/<key>/.install.lock`
+  (`hermes_cli/runtime_state.py` `runtime_lock` opens it `O_CREAT|O_RDWR`
+  and flocks it; read-only, `EROFS` ended a make `run_failed` in 0.4 s on
+  a lamp) and each lease-managed generation's
+  `installs/<key>/environments/<gen>/.leases` (`lease_directory`'s
+  leases), and, where Hermes's PM runtime is there,
+  `installs/<key>/pm-runtime/.prepare.lock` (`pm/runtime.py`
+  `prepare_runtime`) with its generations' `.leases`, while `facts.json`,
+  `pm-runtime/selected.json`, the environments and `tools` stay
+  read-only; no install lock at all (the lasting Hermes never started)
+  ends it before Hermes runs. These lines mount with `mount -n`: they run
+  after `/run` is read-only, where util-linux cannot write its utab. It leaves Hermes's folder and the work
   folder read-only, and hides the rest of the work folder's `lamp` under
   another tmpfs, the make's own folder alone moved back, read-write
   (`NS_HOME_LINE`; docs/install.md). The home goes with the make's folder
@@ -3235,8 +3247,9 @@ as a Harness task with the agent's own tools
   `{"ok":true,"answer"}`. Otherwise one refusal: `off`, `bad_request`,
   `too_long`, `busy`, `not_held_off`, `no_namespace`, `run_failed` or
   `no_answer`. The voice hands nothing over on `off`, `not_held_off`,
-  `no_namespace` or no socket (an older build). The journal says only the outcome's code, never the rules or the
-  answer.
+  `no_namespace` or no socket (an older build). The journal says only the
+  outcome: `[lamp-tasks] skill make: refused <code>: <why>`, the refusal's
+  fixed-form reason (`journal_line`), never the rules or the answer.
 - **Tests:** `skill_make::tests`: a make runs in its own folder, its rules
   there and its answer read back, only its home in its environment, the
   folder removed; each make's home holds only the provider config at its
