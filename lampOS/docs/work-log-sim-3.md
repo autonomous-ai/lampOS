@@ -3,6 +3,19 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 22:4x GMT+7: P4 step 2, latency first
+
+- Quiet check.
+- On this Mac: whisper.cpp 1.9.2 (`whisper-server`, Homebrew, the person's
+  install) with `~/.cache/whisper-cpp/ggml-base.en.bin` and
+  `ggml-large-v3-turbo-q5_0.bin`; tungstenite 0.30 already in Cargo.lock.
+- Warm `/inference`, 16 kHz `say`-made clips, 6 runs: base.en 44 ms (1.3 s
+  line) / 79 ms (6 s line); turbo-q5 302 / 339 ms; both words exact.
+  Caveat: synthetic speech, not a person through a microphone.
+- Plan posted on #6811: `lamp-sim listen`, a loopback Nova-3-subset socket;
+  at `Finalize` the held audio to the developer's whisper-server; target
+  under 150 ms `Finalize` → final with base.en. After #6954's reads.
+
 ## 2026-11-13 22:3x GMT+7: 884 merged #6939; #6955 P3
 
 - Train 884 (#6951) merged as ba5832bfd1 with **#6939** (lamp-body's clippy
