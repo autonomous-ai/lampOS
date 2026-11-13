@@ -1035,7 +1035,10 @@ impl ScopeLease {
     /// [`Self::scope`] is theirs, not held: recall, hits, the memory note and
     /// their thread; its `remember` is written in their scope at once
     /// ([`Self::kept_by_one_face`]). No forget of any kind, no correction,
-    /// rule or yes runs on it ([`Self::forgets_need_mouth`]), and it is
+    /// rule or yes runs on it ([`Self::forgets_need_mouth`]), but for the
+    /// held face rename's yes behind `LAMP_NAMES_RENAME_YES`, taken only
+    /// from its carried person (`second_provider::held_rename`, the memory
+    /// owner's OK on #6859, 13 Nov), and it is
     /// still never journalled or summarised ([`Self::reads_carried`]). Who
     /// counts as carried is unchanged: only a line already carried in full
     /// for `person`'s conversation. Any later narrow makes it the room's.
@@ -1300,7 +1303,8 @@ impl ScopeLease {
     /// lease is current and no narrow came after. Never a read, a forget or
     /// a yes: only a keep reads it. The one named exception is the held face
     /// rename behind `LAMP_NAMES_RENAME_YES`, whose yes it may take, as a
-    /// written risk accepted (`second_provider::held_rename`, docs/eyes.md).
+    /// written risk accepted (`second_provider::held_rename`, docs/eyes.md),
+    /// on a carried line read as theirs too ([`Self::read_carried`], #6859).
     pub fn kept_by_one_face(&self) -> Option<String> {
         if !self.is_current() {
             return None;

@@ -4956,7 +4956,8 @@ impl Engine {
     /// (`LAMP_CONVERSATION_CARRIED_MEMORY=on`, `ScopeLease::read_carried`):
     /// its recall, hits and note read their memory, and its `remember` is
     /// written in their scope at once, not held for a yes. No forget,
-    /// correction, rule or yes runs on it, and it is never journalled. A
+    /// correction or rule runs on it, no yes but to a face rename held for
+    /// them (`LAMP_NAMES_RENAME_YES`, #6859), and it is never journalled. A
     /// line carried for a keep only stays as before. Only with
     /// [`Self::scoping_by_one_face`]'s tracker showing no other voice, their
     /// own face the one face in view through the line, and the rule having
@@ -8816,8 +8817,10 @@ async fn spoken(
     // Carried in full, by either rule above, with
     // `LAMP_CONVERSATION_CARRIED_MEMORY` (the memory owner's decision of 9
     // Nov, after lamp-06c1's S14 run): read and kept as the carried person's,
-    // as a lone known face's line is, no forget, correction, rule or yes run
-    // on it, never journalled. Only with the one-face rule's tracker there
+    // as a lone known face's line is, no forget, correction or rule run on
+    // it, and no yes but to a face rename held for them
+    // (`LAMP_NAMES_RENAME_YES`, `held_rename::carried_one_face`, #6859),
+    // never journalled. Only with the one-face rule's tracker there
     // and no other voice it recorded in the conversation, nor
     // `past_silent`'s sign of another person: fails closed, so with no
     // tracker an off-camera guest's line just after their face stays held
@@ -8840,7 +8843,7 @@ async fn spoken(
     {
         carried_memory = true;
         eprintln!(
-            "lamp-voice second: request {request}: carried: read and kept as theirs, a keep written at once; no forget, correction, rule or yes runs on it, never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
+            "lamp-voice second: request {request}: carried: read and kept as theirs, a keep written at once; no forget, correction or rule runs on it, and no yes but to a face rename held for them (LAMP_NAMES_RENAME_YES), never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
         );
     }
     // Carried, by either rule above, with `LAMP_CONVERSATION_CARRIED_SAVES`:

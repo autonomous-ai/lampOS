@@ -1688,8 +1688,9 @@ With the switch:
     as the held setup save): when a `remember_my_face` answer asks about
     it (the eyes' `known_as`, or a `replace` refused before the yes), it
     keeps `{"name":A,"replace":true}` with the asker (the line's own known
-    person, or theirs by the one-face rule; never a gap-held or carried
-    line). The same session's next spoken turn, within 60 s, runs it with
+    person, or theirs by the one-face rule; never a gap-held line, nor a
+    carried line unless it is read as its carried person's, below). The
+    same session's next spoken turn, within 60 s, runs it with
     no model round when that turn is a yes by the guards above and either
     their face is the one seen saying it, or no face was seen saying it
     and theirs is alone in view with no other voice heard
@@ -1703,8 +1704,23 @@ With the switch:
     is off, and is to be confirmed before it is turned on. It runs through the same runner as a
     model call, so every name and owner check still applies, and the
     model is told the result. Any other turn drops it: a no, another name,
-    another face seen saying the yes (told), a carried line, another
-    session, a new save call. While a rename asked has not run, each turn
+    another face seen saying the yes (told), a carried line not read as
+    the asker's, another session, a new save call. A line carried into the
+    asker's conversation going on and read as theirs
+    (`LAMP_CONVERSATION_CARRIED_MEMORY`, `ScopeLease::read_carried`: their
+    own face the one face in view, none seen saying it, no other voice
+    shown) may ask the rename and give the yes, the carried person being
+    the asker (`ScopeLease::kept_by_one_face`,
+    `held_rename::carried_one_face`); its journal line says the yes ran
+    on a carried line read as theirs, with request ids only. This extends
+    the one-face risk above to a rename on a carried line, accepted by the
+    memory owner on 13 Nov (#6859, lamp-52e6: the yes and the second ask
+    were carried lines and were dropped). Still refused: a carry for a keep
+    only or whose keep waits for a yes (`saves_carried`), a gap-held line,
+    a carried line with `LAMP_CONVERSATION_CARRIED_MEMORY` off or narrowed
+    after (another voice), and another person's line. No forget runs on a
+    carried line (`forgets_need_mouth`), as before. While a rename asked
+    has not run, each turn
     of its session by the asker, for as long as the thread remembers the
     conversation, is told the face is still B (the asker by the same test
     as the yes: their face seen saying it, or none seen and theirs alone
