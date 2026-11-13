@@ -1263,6 +1263,7 @@ class FakeLamp:
         "phrase.heard": "hear", "name.heard": "hear", "sound.heard": "sound",
         "air.changed": "air",
         "volume.changed": "speak",
+        "body.state": "body",
         "lamp.said": "speech",
     }
     STATE_GRANT = {"presence": "look", "air": "air", "device": "device", "volume": "speak", "body": "body"}
