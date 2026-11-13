@@ -1321,6 +1321,39 @@ fn the_one_path_makes_openclaw_a_gateway_agent_and_off_changes_nothing() {
     assert!(!ns_text(sk(true)).contains("L=/run/lampos-control/control.sock"));
 }
 
+/// #6882: with the one run path on but LAMP_SKILL_GATEWAY_RUNS off,
+/// lamp-tasks refuses a gateway default agent's runs, so OpenClaw is shown
+/// exactly what it is with the one run path off: its namespace text and
+/// its wrapper byte for byte, no control socket, no pushed skills shown
+/// for every turn, no gateway mark. With both on, all three.
+#[test]
+fn gateway_runs_off_shows_openclaw_what_the_one_path_off_does() {
+    for skills in [false, true] {
+        let before = sk(skills);
+        let off = shown(skills, true, false);
+        assert_eq!(off, before);
+        assert_eq!(ns_text(off), ns_text(before));
+        assert_eq!(wrapper_text_for(off), wrapper_text_for(before));
+        assert_eq!(wrapper_text_for(off), wrapper_text());
+        // Without the one run path the runs switch alone changes nothing.
+        assert_eq!(shown(skills, false, true), before);
+        assert_eq!(shown(skills, false, false), before);
+        let ns = ns_text(off);
+        assert!(!ns.contains("/run/lampos-control/control.sock"), "{ns}");
+        assert!(!wrapper_text_for(off).contains(GATEWAY_MARK));
+
+        let on = shown(skills, true, true);
+        assert!(on.tasks && on.one_path && on.skills == skills);
+        let ns = ns_text(on);
+        assert!(ns.contains("L=/run/lampos-control/control.sock"), "{ns}");
+        assert!(ns.contains("/var/lib/lampOS/skills-dev, read-only, when there, for the\n"));
+        assert!(ns.contains("if [ -d \"$P\" ]; then mkdir -m 0700"));
+        assert!(!ns.contains("if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]"));
+        let wrapper = wrapper_text_for(on);
+        assert!(wrapper.starts_with(&format!("#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}")));
+    }
+}
+
 /// The one run path is carried through the one-shot's ask, so its
 /// install writes the wrapper the round looks for.
 #[test]
