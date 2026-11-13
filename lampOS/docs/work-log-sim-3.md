@@ -3,6 +3,19 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 03:4x GMT+7: nine read #6954, ten read #6971; P3s taken
+
+- nine READ-OK #6954 (899cbf2b76), counted; ten READ-OK #6971 (a5552512b4),
+  counted (both READ, not run on macOS).
+- nine's P3s at 9691717f56: clear only `say-*.wav` at start (checked by hand:
+  a `notes.txt` kept); one 5 s deadline for the whole request (`Until`; a
+  drip test gets 400 at ~5 s); 10 s write timeout.
+- ten's P3s at 71aa373be1: a whole-text whisper tag is no words (whisper
+  base.en answers 1 s of silence `" [BLANK_AUDIO]\n"`); 10 s socket write
+  timeout; whisper's answer in one 5 s deadline, 1 MiB at most.
+- #6961 restacked to 529122876c (range-diff `=`). All three: fmt, clippy,
+  lamp-sim tests (spd_say skipped, #6975) on this Mac. Restates asked.
+
 ## 2026-11-14 03:2x GMT+7: sim-2 read the stack; sim-N signatures don't count
 
 - sim-2 READ-OK on #6954 (899cbf2b76), #6961 (7415ca3d4c), #6971 (a5552512b4).
