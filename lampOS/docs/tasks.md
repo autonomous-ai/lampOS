@@ -2683,7 +2683,7 @@ for each run, and is answered once the run ends
       pane is under way. The script's `Lamp.connect()` / `Lamp.local()`
       (the SDK) then, with no `LAMP_CONTROL_TOKEN` and its working folder
       exactly `…/lamp-tasks/skill-<run-id>`, reads
-      `/run/lampos-tasks/runs/<run-id>` once (a regular file, never through
+      `/run/lampos-tasks/runs/gateway/<run-id>` once (a regular file, never through
       a link) and deletes it, even when the connection then fails; while
       the file isn't there yet it looks again every 0.1 s for up to 10 s.
     - **The boundary (the lead's call on #6685; the first builder rules
@@ -2692,10 +2692,12 @@ for each run, and is answered once the run ends
          first read, any other session on the same OpenClaw gateway (same
          user, same namespace) could read it. That lasts until the model
          runs the script: a model turn, not a fixed time, at most the run's
-         deadline (`RUN_LIFETIME`). The gateway sees the whole runs folder
-         read-write, so this covers a Hermes run's file too, before its
-         wrapper takes it, and a session could put a file under the next
-         run's id so that run is refused. After the read the file is gone,
+         deadline (`RUN_LIFETIME`). The gateway sees only its own
+         subfolder of the runs folder, `runs/gateway` (0700, made by
+         lamp-tasks at its start with the switch on, Heron's P2 on #6767),
+         so a Hermes run's file is never shown to it; a session could still
+         put a file under the next OpenClaw run's id so that run is
+         refused. After the read the file is gone,
          and the token is ended with the run (its end or its deadline).
       2. **The network and OpenClaw's own data.** OpenClaw's gateway has no
          network namespace of its own (no `--net`), so a run on it has the

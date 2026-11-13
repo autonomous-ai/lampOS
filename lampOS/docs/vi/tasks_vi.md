@@ -307,7 +307,7 @@ lần chạy, và được trả lời khi lần chạy kết thúc
       (0600) khi Harness báo pane đã chạy. `Lamp.connect()` /
       `Lamp.local()` của script (SDK), khi không có `LAMP_CONTROL_TOKEN`
       và thư mục làm việc đúng là `…/lamp-tasks/skill-<run-id>`, đọc
-      `/run/lampos-tasks/runs/<run-id>` một lần (file thường, không bao
+      `/run/lampos-tasks/runs/gateway/<run-id>` một lần (file thường, không bao
       giờ qua link) rồi xóa nó, kể cả khi kết nối sau đó thất bại; khi file
       chưa có, nó tìm lại mỗi 0,1 s trong tối đa 10 s.
     - **Ranh giới (quyết định của lead trên #6685; first builder quyết
@@ -316,10 +316,12 @@ lần chạy, và được trả lời khi lần chạy kết thúc
          script, một phiên khác trên cùng gateway OpenClaw (cùng user,
          cùng namespace) có thể đọc nó. Khoảng này kéo dài tới khi model
          chạy script: một lượt của model, không cố định, tối đa tới hạn
-         của lần chạy (`RUN_LIFETIME`). Gateway thấy cả thư mục runs với
-         quyền đọc-ghi, nên điều này cũng áp dụng cho file của một lần chạy
-         Hermes trước khi wrapper của nó lấy, và một phiên có thể đặt file
-         dưới id của lần chạy kế tiếp khiến lần chạy đó bị từ chối. Sau lần
+         của lần chạy (`RUN_LIFETIME`). Gateway chỉ thấy thư mục con riêng
+         của nó, `runs/gateway` (0700, lamp-tasks tạo khi khởi động với
+         switch bật, P2 của Heron trên #6767), nên file của một lần chạy
+         Hermes không bao giờ hiện ra với nó; một phiên vẫn có thể đặt file
+         dưới id của lần chạy OpenClaw kế tiếp khiến lần chạy đó bị từ
+         chối. Sau lần
          đọc file không còn, và token kết thúc cùng lần chạy.
       2. **Mạng và dữ liệu riêng của OpenClaw.** Gateway của OpenClaw không
          có network namespace riêng (không `--net`), nên một lần chạy trên
