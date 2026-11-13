@@ -743,5 +743,20 @@ class Always(unittest.TestCase):
             os.unlink(path)
 
 
+class DigitNames(unittest.TestCase):
+    """14 Nov: a builder's name may carry digits ("sim-3"), and still signs."""
+    def test_sim_3_signs(self):
+        self.assertEqual(signer("READ-OK " + HEAD + "\n\nsim-3, 22:5x GMT+7, read the diff"), "sim-3")
+        self.assertEqual(signer("sim-2, 23:10: READ-OK " + HEAD), "sim-2")
+
+    def test_two_sim_readers_on_one_login_meet_two_reads(self):
+        items = [c("writer-a", "sim-3, to ten: READ-OK " + HEAD + "\nsim-3, 22:5x GMT+7, read the diff"),
+                 c("writer-a", "READ-OK " + HEAD + "\n\nsim-2, 23:10 GMT+7")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "met 2")
+
+    def test_a_time_alone_is_still_no_name(self):
+        self.assertEqual(signer("READ-OK " + HEAD + "\n\n12, 22:50"), "")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
