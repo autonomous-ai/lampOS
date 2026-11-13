@@ -131,6 +131,15 @@ fn ask(admin: &PathBuf, asked: &serde_json::Value) -> Result<(), String> {
     Ok(())
 }
 
+/// The journal's start line: the certificate pin only by its first 8 characters (what the lamp says aloud),
+/// never whole (#5299, the App Only E2E).
+fn started_line(door: &str, paired: usize, identity: &cert::Identity) -> String {
+    format!(
+        "lamp-control: on, {door}, {paired} paired, certificate pin starts {}",
+        identity.pin_for_log()
+    )
+}
+
 fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     // The door (paired computers over TLS on `--listen`) only with
     // LAMP_CONTROL=on, the owner's developer setting. Without it, a lamp
@@ -164,10 +173,12 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let clients =
         Clients::load(&clients_path).map_err(|e| format!("{}: {e}", clients_path.display()))?;
     eprintln!(
-        "lamp-control: on, {}, {} paired, certificate pin {}",
-        if door_on { listen.as_str() } else { "no door" },
-        clients.clients.len(),
-        identity.pin
+        "{}",
+        started_line(
+            if door_on { listen.as_str() } else { "no door" },
+            clients.clients.len(),
+            &identity
+        )
     );
     // The quiet hours (#3917): the lamp's zone, `--zone`, `system` by
     // default. With a window set, one that can't be read keeps every
@@ -728,4 +739,25 @@ fn drawn_on(bus: &lamp_bus::Bus, clock_id: String) -> std::io::Result<lamp_contr
             .ok()
             .and_then(|seen| seen.get(&format!("control:{client}")).copied())
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_start_line_names_the_pin_by_its_first_eight_characters_only() {
+        let pin = "0123456789abcdef".repeat(4);
+        let identity = cert::Identity {
+            cert: Vec::new(),
+            key: Vec::new(),
+            pin: pin.clone(),
+        };
+        let line = started_line("0.0.0.0:7731", 2, &identity);
+        assert_eq!(
+            line,
+            "lamp-control: on, 0.0.0.0:7731, 2 paired, certificate pin starts 01234567"
+        );
+        assert!(!line.contains(&pin[..9]));
+    }
 }
