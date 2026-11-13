@@ -2256,3 +2256,29 @@ fn a_yes_not_the_held_persons_says_why() {
         assert!(!why.contains("p-"), "no id is said: {why}");
     }
 }
+
+/// Friday's follow-up on #6990: a late one-face yes reads "too late" from
+/// anyone on the line, another person or no one known included; only an
+/// in-time yes says whose it is not.
+#[test]
+fn a_late_one_face_yes_reads_too_late_whoever_says_it() {
+    let held: HeldAsker = (3, "p-a".to_owned());
+    let lines = [
+        None,
+        Some(held.clone()),
+        Some((4, "p-a".to_owned())),
+        Some((3, "p-b".to_owned())),
+    ];
+    for line in &lines {
+        assert_eq!(
+            late_or_not_theirs(true, line.as_ref(), &held),
+            Some("too late"),
+            "{line:?}"
+        );
+        assert_eq!(
+            late_or_not_theirs(false, line.as_ref(), &held),
+            not_theirs(line.as_ref(), &held),
+            "{line:?}"
+        );
+    }
+}
