@@ -169,6 +169,10 @@ pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
         skill: "make".into(),
         prompt: prompt(folder),
         folder: folder.to_path_buf(),
+        // A make has no skill script yet, so it is never a gateway agent's
+        // run (#6882): a gateway refuses an empty script, as a fixed write.
+        script: PathBuf::new(),
+        task: String::new(),
         env: home_env(folder).to_vec(),
         deadline: within,
         started: Default::default(),
