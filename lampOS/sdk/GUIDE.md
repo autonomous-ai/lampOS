@@ -445,8 +445,24 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
   come with nobody calling; 11048 adds `score` (0–1, how sure the listener was;
   real calls score 0.90 to 1.00), so a program that acts on its own can ask for more, e.g.
   `if event.get("score", 0) >= 0.99`.
-- `sound.heard`: `class` (`knock`, `music`, ...), `score`. Grant `sound`. In today's build,
-  lamp run pending.
+- `sound.heard`: `class` (`music`, `laughter`, `door`, `footsteps`; never speech), `score`. Grant
+  `sound`. Each class is told when its score rises past 0.5, once per rise, and again after a dip
+  under 0.5 (a knock scores into `door`: there is no `knock` class). Works today for `music`
+  (13 Nov 2026, lamp-75c9 on stable 12728, installed binaries, nothing staged; the product's
+  `lamp-ears` with `LAMP_EARS_CLASSES=on` and the model's two files, checked against their
+  hashes): a synthetic 10 s clip (a plucked arpeggio, no voice, nobody at the lamp), played from
+  the laptop's speaker at 60 % stream volume (`paplay --volume=39000`, 21:52:04 UTC+7, as are
+  the other times here), gave `sound.heard` music 0.80 1.2 s after it began, then 0.71, 0.57 and
+  0.56, each at a rise past 0.5 in the lamp's own scores (the scores tap and the watcher's file are both kept), and the music
+  score was 0.0 from 21:52:13.9, as the clip ended. A play at 40 % before it (`paplay
+  --volume=26000`, 21:51:22.6 to :32) peaked at music 0.31 and gave no event: what reaches
+  the lamp's microphone from a speaker, not a fixed volume, decides it. The watcher's file holds
+  two more `music` events with nothing played, 0.51 at 21:52:27 and 0.60 at 21:53:02, both after
+  the scores tap had ended; what the lamp heard then is not known. Not shown on a lamp:
+  `laughter`, `door`, `footsteps`, and a recording of a real instrument. The ears' scores went
+  "unavailable" for about a second, now and then (reason "privacy", then "warming up"): 12 times
+  in the 56 s of the second tap, nine of them with no clip playing, and 4 times in 24 s in the
+  first, so an onset in that second can be missed; the cause is not known.
 - `touch`: `kind` (`tap`, `pet`, `hold`), `where`. No grant. A tap reaches a program from build 11372 (#5981; on 11091 it did not; 8 of 8 taps on lamp-75c9, 10 Nov 14:18). `kind` is `tap` or `pet`; `hold` and `where` are not sent yet. Example: `examples/touch.py`.
 - `button`: `press` (`press`, `long_press`). No grant. Works today from the bus, not from the button
   itself (13 Nov 2026, lamp-75c9 on stable 12728 (lamp-update, 16:11 to 16:12 on 13 Nov),
