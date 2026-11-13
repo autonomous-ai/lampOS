@@ -4180,8 +4180,11 @@ pub fn serve<C: Clock>(
         if skill_tasks {
             // The runs an earlier start left are swept first (#6691), on a
             // thread of its own; the slot is filled once that is done.
+            // The lamp's default engine, read at each run (#6685).
+            let side = lamp_side.clone();
             let harness =
-                crate::skill_task::SkillHarness::new(cli.clone(), session.into(), lamp_target);
+                crate::skill_task::SkillHarness::new(cli.clone(), session.into(), lamp_target)
+                    .with_default_engine(Box::new(move || side.as_ref().and_then(lamp_default)));
             let slot = skill_harness.clone();
             match std::env::var_os("HOME").map(PathBuf::from) {
                 Some(home) => {

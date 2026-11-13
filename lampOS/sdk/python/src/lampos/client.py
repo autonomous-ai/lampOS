@@ -124,6 +124,74 @@ async def _open(host: str, port: int, pin: str) -> ClientConnection:
 # let in by a one-run token (docs/control.md, "The control socket"). Not the local agent's socket.
 LOCAL_SOCKET = "/run/lampos-control/control.sock"
 
+# A skill's run on the lamp (#6685): lamp-tasks starts the engine in `RUN_FOLDERS/skill-<run-id>` and writes the
+# run's one-run token to `RUN_TOKENS/<run-id>` (0600, its 0700 folder). An engine whose wrapper reads it first
+# (Hermes, agent-ns) sets `LAMP_CONTROL_TOKEN`; one that has no per-run wrapper (OpenClaw's one gateway) leaves it
+# to the script: `_run_token` reads it once and deletes it.
+RUN_FOLDERS = "/var/lib/lampos-tasks/harnesses/lamp-tasks"
+RUN_TOKENS = "/run/lampos-tasks/runs"
+_RUN_ID = re.compile(r"[a-z0-9-]{1,64}")
+# lamp-tasks writes an OpenClaw run's token file only once the run's pane is up (#6685), so a script that starts at
+# once may look before it is there: it looks again for this long, then goes on without one.
+RUN_TOKEN_WAIT_S = 10.0
+_RUN_TOKEN_TICK_S = 0.1
+
+
+def _run_id() -> str | None:
+    """The run id when this process works in a skill run's own folder: `pwd -P` exactly
+    `RUN_FOLDERS/skill-<run-id>` with a plain run id (`a-z`, `0-9`, `-`, at most 64 bytes); `None` anywhere else."""
+    try:
+        here = os.path.realpath(os.getcwd())
+    except OSError:
+        return None
+    folder, _, name = here.rpartition("/")
+    if folder != RUN_FOLDERS or not name.startswith("skill-"):
+        return None
+    run = name[len("skill-"):]
+    return run if _RUN_ID.fullmatch(run) else None
+
+
+async def _run_token_waited() -> str | None:
+    """[`_run_token`], looked for again every 0.1 s up to `RUN_TOKEN_WAIT_S` while in a run's folder and the file
+    is not there yet; at once `None` outside a run's folder."""
+    if _run_id() is None:
+        return None
+    waited = 0.0
+    while True:
+        token = _run_token()
+        if token is not None or waited >= RUN_TOKEN_WAIT_S:
+            return token
+        await asyncio.sleep(_RUN_TOKEN_TICK_S)
+        waited += _RUN_TOKEN_TICK_S
+
+
+def _run_token() -> str | None:
+    """The run's token when this process works in a skill run's own folder ([`_run_id`]). Read once from
+    `RUN_TOKENS/<run-id>`, a regular file opened without following a link, and deleted whether or not it could
+    be read, so a second reader finds nothing. `None` anywhere else, or when the file is not there."""
+    run = _run_id()
+    if run is None:
+        return None
+    place = os.path.join(RUN_TOKENS, run)
+    try:
+        fd = os.open(place, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC)
+    except OSError:
+        # Missing, or a link (ELOOP): a link is taken away, never followed.
+        with contextlib.suppress(OSError):
+            if stat.S_ISLNK(os.lstat(place).st_mode):
+                os.unlink(place)
+        return None
+    try:
+        if not stat.S_ISREG(os.fstat(fd).st_mode):
+            return None
+        with os.fdopen(fd, "rb", closefd=False) as file:
+            token = file.read(4096).decode("ascii", "replace").strip()
+    finally:
+        os.close(fd)
+        with contextlib.suppress(OSError):
+            os.unlink(place)
+    return token or None
+
 
 # The local agent's socket (docs/control.md, "The local agent"): where a
 # program of the user the owner named, on the lamp itself, reaches the door
@@ -711,14 +779,15 @@ class Lamp:
     ) -> "Lamp":
         """Connect to a paired lamp (by its id, or the only one paired) and
         say hello. With no pairing and no `host`, inside a skill's run on the
-        lamp (`LAMP_CONTROL_TOKEN` set and not empty) it is `Lamp.local(token)`:
+        lamp (`LAMP_CONTROL_TOKEN` set and not empty, or, in the run's own folder,
+        the run's token file read once, #6685) it is `Lamp.local(token)`:
         the run's own grants, not the local agent's. A pairing, when there is
         one, wins as before."""
         keyring = keyring or Keyring()
         pairing = keyring.pairing(lamp)
         local = None
         if pairing is None and not host:
-            token = (os.environ.get("LAMP_CONTROL_TOKEN") or "").strip()
+            token = (os.environ.get("LAMP_CONTROL_TOKEN") or "").strip() or await _run_token_waited()
             if token:
                 return await cls.local(token)
         if pairing is None:
@@ -759,7 +828,7 @@ class Lamp:
         `LAMP_CONTROL_SOCKET`, then `/run/lampos-control/control.sock`. No pairing and no certificate pin: the
         socket's owner check and the token are the trust. A missing, wrong or ended token is refused `no_grant`
         in the lamp's words; `lamp.run` is the run the lamp says this is."""
-        token = token or os.environ.get("LAMP_CONTROL_TOKEN")
+        token = token or os.environ.get("LAMP_CONTROL_TOKEN") or await _run_token_waited()
         if not token:
             raise BY_CODE["no_grant"]("no token for this run: pass one, or set LAMP_CONTROL_TOKEN")
         path = path or os.environ.get("LAMP_CONTROL_SOCKET") or LOCAL_SOCKET

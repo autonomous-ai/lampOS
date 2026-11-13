@@ -2667,6 +2667,31 @@ for each run, and is answered once the run ends
     refused `NOT_FOUND_BY_FOLDER` (lamp-update's `LAMP_SKILL_TASKS` off or
     its round not run): nothing is made or started, so a run never starts
     with no token on the lamp's network.
+  - **The lamp's default agent, with `LAMP_SKILL_DEFAULT_AGENT=on`
+    (#6685, off until c0a4's row and two reads).** lamp-tasks reads the
+    lamp's default engine at each run (`runtime::lamp_default`, the app's
+    choice first; before Harness has said, the lamp target's engine) and
+    sends the run there when it can take one (`skill_task::engine_for_run`):
+    Hermes as above, or OpenClaw when its namespace script
+    `/usr/local/lib/lampos/openclaw-ns` shows lamp-control's socket and the
+    runs' token folder (lamp-update writes it so with the same switch).
+    Any other default, or an OpenClaw whose script doesn't show them, goes
+    to the lamp's Hermes, with a journal line saying why. Off, every run is
+    Hermes's, as above.
+    - **OpenClaw's one gateway** is not started per run, so no wrapper
+      reads the token: the run is `harness new openclaw` in its folder, and
+      lamp-tasks writes the token file (0600) only once Harness says the
+      pane is under way. The script's `Lamp.connect()` / `Lamp.local()`
+      (the SDK) then, with no `LAMP_CONTROL_TOKEN` and its working folder
+      exactly `…/lamp-tasks/skill-<run-id>`, reads
+      `/run/lampos-tasks/runs/<run-id>` once (a regular file, never through
+      a link) and deletes it, even when the connection then fails; while
+      the file isn't there yet it looks again every 0.1 s for up to 10 s.
+    - **The boundary (the lead's call on #6685):** between the file's
+      write and the script's first read, usually seconds, any other session
+      on the same OpenClaw gateway (same user, same namespace) could read
+      it. After it, the file is gone, and the token is ended with the run
+      (its end or its deadline). Hermes keeps its per-run namespace.
   - **Its own folder.** lamp-tasks makes `skill-<run-id>` (0700,
     `RUN_FOLDER_PREFIX`) in its Harness project
     `/var/lib/lampos-tasks/harnesses/lamp-tasks` (made 0700 when missing),

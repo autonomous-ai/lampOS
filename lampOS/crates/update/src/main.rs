@@ -1010,6 +1010,16 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             product,
             openclaw::SKILLS_PRODUCT_DEFAULT,
         );
+        // A skill's runs on OpenClaw (#6685): LAMP_SKILL_DEFAULT_AGENT=on with
+        // LAMP_SKILL_TASKS on; the namespace then also shows lamp-control's socket
+        // alone and lamp-tasks' runs' token folder.
+        let tasks = switches.tasks
+            && openclaw::default_agent(
+                std::env::var(openclaw::DEFAULT_AGENT_SWITCH)
+                    .ok()
+                    .as_deref(),
+            );
+        let shown = lamp_update::hermes_install::Shown { skills, tasks };
         if acts && wanted && harness.is_none() {
             say("OpenClaw on the lamp: off, as Harness before the sign-in is off");
         }
@@ -1019,11 +1029,11 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 &config.root,
                 &records,
                 on,
-                skills,
+                shown,
                 lamp_update::records::unix_ms(),
             );
         }
-        acts.then_some((on, skills))
+        acts.then_some((on, shown))
     };
     // Hermes's schedule (#5978): each install watched while it runs, the
     // voice heard from the start, so speech freezes it and a lost privacy
@@ -1192,7 +1202,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             }
             // OpenClaw after Hermes, in its own window by its own record's
             // last try; Hermes's install under way holds it to a later round.
-            if let (Some(_), Some((true, skills))) = (&hermes_watch, openclaw) {
+            if let (Some(_), Some((true, shown))) = (&hermes_watch, openclaw) {
                 use lamp_update::{hermes_schedule, openclaw_install};
                 let now_unix_ms = lamp_update::records::unix_ms();
                 let window = hermes_schedule::window(&hermes_schedule::Moment {
@@ -1212,7 +1222,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 openclaw_install::after_round(
                     &config.root,
                     &records,
-                    skills,
+                    shown,
                     &mut systemd,
                     now_unix_ms,
                     window,

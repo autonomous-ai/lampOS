@@ -6567,6 +6567,8 @@ fn skill_runner(rig: &Rig, engine: Option<EngineKind>) -> HarnessRunner {
         held_by: None,
         retry: Duration::from_millis(20),
         stopping: std::sync::OnceLock::new(),
+        default_agent: false,
+        openclaw_ns: None,
     }
 }
 
@@ -6680,6 +6682,59 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
     );
     assert!(rig.calls().iter().all(|call| call["args"][0] != "close"));
     nothing_left(&rig);
+}
+
+/// #6685: with the switch on and OpenClaw the lamp's default, a skill's run
+/// is `harness new openclaw` in its own folder, when OpenClaw's namespace
+/// script shows the runs' token folder; otherwise, or with the switch off,
+/// it stays the lamp's Hermes. The token is in no argument, and nothing of
+/// the run is left after.
+#[test]
+fn a_skill_run_goes_to_openclaw_as_the_default_only_with_the_switch_and_its_namespace() {
+    let engine_of = |default_agent: bool, ns: Option<&str>| {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true},
+            // OpenClaw's launch reads the pane until it is under way (#6499).
+            "show":{"each":[openclaw_seen("working", json!("Run the skill's script"))]},
+            "wait":{"stdout":waited("stopped", AGENT)},
+            "close":{"exit":0},
+        }));
+        let mut runner = skill_runner(&rig, Some(EngineKind::Openclaw));
+        runner.default_agent = default_agent;
+        runner.openclaw_ns = ns.map(|text| {
+            let path = rig.root.path().join("openclaw-ns");
+            fs::write(&path, text).unwrap();
+            path
+        });
+        assert_eq!(
+            runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0)
+        );
+        let calls = rig.calls();
+        for call in &calls {
+            assert!(!call.to_string().contains(RUN_SECRET), "{call}");
+        }
+        nothing_left(&rig);
+        let new = calls
+            .iter()
+            .find(|call| call["args"][0] == "new")
+            .expect("a new");
+        new["args"][1].as_str().unwrap().to_owned()
+    };
+    let shows = format!(
+        "H=x L=/run/lampos-control/control.sock B=y P=z{}",
+        skill_task::OPENCLAW_RUNS_LINE
+    );
+    assert_eq!(engine_of(true, Some(&shows)), "openclaw");
+    assert_eq!(engine_of(false, Some(&shows)), "hermes", "the switch off");
+    assert_eq!(
+        engine_of(true, Some("H=x S=/tmp/.lampos-ns\n")),
+        "hermes",
+        "a namespace without the runs' folder"
+    );
+    assert_eq!(engine_of(true, None), "hermes", "no namespace script");
 }
 
 /// At its deadline the run's `wait` is cancelled and its session closed
