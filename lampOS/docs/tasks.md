@@ -2662,7 +2662,17 @@ for each run, and is answered once the run ends
     engine (#6506). The control socket, SDK and bridge inside other
     engines' namespaces are step 2b. No lamp target, or Harness not set
     up yet (no Harness program, or the part still starting), is refused in
-    words too. A `/usr/local/bin/hermes` that lacks the run lines
+    words too. With no lamp target, or a run Harness didn't start
+    (`harness new` not sent or uncertain), lamp-tasks reads Harness's
+    sign-in once (`harness auth status --json`); signed out, the refusal
+    says why in the person's words instead (`skill_task::SIGNED_OUT`, the
+    first builder's 10:44 on 13 Nov, until #6685's PR 3 starts a run
+    without Harness): "This skill's task can't run yet: Harness isn't
+    signed in on this lamp. Sign in to Harness from the app to let it
+    run." It is answered `run_failed` to lamp-skills, whose journal line
+    for the skill's `do.task` carries it; neither the voice nor the app
+    says it yet. Signed in, offline or a sign-in not read, the words are
+    as before. A `/usr/local/bin/hermes` that lacks the run lines
     (`WRAPPER_RUN_LINES`) or the network lines (`WRAPPER_NET_LINES`) is
     refused `NOT_FOUND_BY_FOLDER` (lamp-update's `LAMP_SKILL_TASKS` off or
     its round not run): nothing is made or started, so a run never starts
