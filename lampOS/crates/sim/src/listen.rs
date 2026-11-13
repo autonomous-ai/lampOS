@@ -51,6 +51,8 @@ const WHISPER_WAIT: Duration = Duration::from_secs(5);
 /// socket is let go, so callers that send nothing cannot hold every slot.
 const OPEN_WAIT: Duration = Duration::from_secs(5);
 const IDLE_WAIT: Duration = Duration::from_secs(30);
+/// How long one write to the caller may wait for it to read.
+const WRITE_WAIT: Duration = Duration::from_secs(10);
 
 /// What turns a line's audio into words.
 pub trait Recognizer: Send + Sync {
@@ -164,6 +166,8 @@ fn one(stream: TcpStream, token: &str, recognizer: &dyn Recognizer) -> io::Resul
     let mut socket = tungstenite::accept_hdr(stream, Admit(token))
         .map_err(|error| io::Error::other(format!("opening: {error}")))?;
     socket.get_ref().set_read_timeout(Some(IDLE_WAIT))?;
+    // A caller that stops reading cannot hold its slot either.
+    socket.get_ref().set_write_timeout(Some(WRITE_WAIT))?;
     let mut line = Line::new();
     loop {
         let message = match socket.read() {
@@ -394,7 +398,20 @@ impl Recognizer for Whisper {
         )?;
         stream.write_all(&body)?;
         let mut answer = Vec::new();
-        stream.take(1 << 20).read_to_end(&mut answer)?;
+        // The whole answer within WHISPER_WAIT from the ask, not each read.
+        let until = Instant::now() + WHISPER_WAIT;
+        let mut buffer = [0u8; 16 * 1024];
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            if left.is_zero() || answer.len() > 1 << 20 {
+                return Err(io::Error::other("whisper-server: no whole answer in time"));
+            }
+            stream.set_read_timeout(Some(left))?;
+            match stream.read(&mut buffer)? {
+                0 => break,
+                n => answer.extend_from_slice(&buffer[..n]),
+            }
+        }
         let split = answer
             .windows(4)
             .position(|w| w == b"\r\n\r\n")
@@ -408,12 +425,24 @@ impl Recognizer for Whisper {
         }
         let json: serde_json::Value = serde_json::from_slice(&answer[split + 4..])
             .map_err(|error| io::Error::other(format!("whisper-server's answer: {error}")))?;
-        Ok(json["text"]
-            .as_str()
-            .unwrap_or("")
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" "))
+        Ok(words_of(json["text"].as_str().unwrap_or("")))
+    }
+}
+
+/// whisper's text as the line's words: spaces made single, and a text that is
+/// only a tag (`[BLANK_AUDIO]`, `(music)`, as whisper answers silence and
+/// noise) made no words, so a quiet room starts no turn (ten's P3 on #6971).
+fn words_of(text: &str) -> String {
+    let words = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    let tag = |open: char, close: char| {
+        words.starts_with(open)
+            && words.ends_with(close)
+            && words[1..words.len() - 1].find([open, close]).is_none()
+    };
+    if tag('[', ']') || tag('(', ')') {
+        String::new()
+    } else {
+        words
     }
 }
 
@@ -620,6 +649,18 @@ mod tests {
         let results = next(&mut socket);
         assert_eq!(results["from_finalize"], true);
         assert_eq!(results["channel"]["alternatives"][0]["transcript"], "");
+    }
+
+    #[test]
+    fn a_text_that_is_only_whispers_tag_for_silence_or_noise_is_no_words() {
+        assert_eq!(words_of(" [BLANK_AUDIO] "), "");
+        assert_eq!(words_of("(music)"), "");
+        assert_eq!(words_of("[ Silence ]"), "");
+        assert_eq!(words_of(" Turn on\n the light. "), "Turn on the light.");
+        // A tag inside words, or two tags, stays: only a whole-text tag is dropped.
+        assert_eq!(words_of("Play (the) song"), "Play (the) song");
+        assert_eq!(words_of("[a] and [b]"), "[a] and [b]");
+        assert_eq!(words_of(""), "");
     }
 
     #[test]
