@@ -34,8 +34,11 @@ const MOST_BODY_BYTES: usize = 64 * 1024;
 const MOST_INPUT_CHARS: usize = 4_096;
 /// Requests served at once; more are answered 503 at once.
 const MOST_AT_ONCE: usize = 4;
-/// How long a caller may take to send its request.
+/// How long a caller may take to send its whole request (not each read: a
+/// caller dripping a byte at a time is cut off too).
 const READ_WAIT: Duration = Duration::from_secs(5);
+/// How long one write of the answer may wait for the caller to read.
+const WRITE_WAIT: Duration = Duration::from_secs(10);
 
 /// What speaks a line: 24 kHz mono S16LE bytes, handed to `out` piece by
 /// piece as they are made.
@@ -79,9 +82,9 @@ pub fn serve(listener: TcpListener, token: String, engine: Arc<dyn Engine>) -> i
 
 /// One request: checked, then spoken as a chunked answer.
 fn one(stream: &mut TcpStream, token: &str, engine: &dyn Engine) -> io::Result<()> {
-    stream.set_read_timeout(Some(READ_WAIT))?;
+    stream.set_write_timeout(Some(WRITE_WAIT))?;
     let asked = Instant::now();
-    let request = match read_request(stream) {
+    let request = match read_request(stream, asked + READ_WAIT) {
         Ok(request) => request,
         Err(why) => return answer(stream, 400, &why),
     };
@@ -150,9 +153,32 @@ struct Request {
     body: Vec<u8>,
 }
 
-/// A request head and its body, within the bounds above; why not, in words.
-fn read_request(stream: &mut TcpStream) -> Result<Request, String> {
-    let mut reader = BufReader::new(stream.take((MOST_HEAD_BYTES + MOST_BODY_BYTES) as u64));
+/// A stream read only until `until`: each read waits at most the time left.
+struct Until<'a> {
+    stream: &'a TcpStream,
+    until: Instant,
+}
+
+impl Read for Until<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let left = self.until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "the request took too long",
+            ));
+        }
+        self.stream.set_read_timeout(Some(left))?;
+        let mut stream = self.stream;
+        stream.read(buffer)
+    }
+}
+
+/// A request head and its body, within the bounds above and by `until`; why
+/// not, in words.
+fn read_request(stream: &TcpStream, until: Instant) -> Result<Request, String> {
+    let reader = Until { stream, until };
+    let mut reader = BufReader::new(reader.take((MOST_HEAD_BYTES + MOST_BODY_BYTES) as u64));
     let mut line = String::new();
     let mut head_bytes = 0usize;
     let mut read_line = |reader: &mut BufReader<_>, line: &mut String| -> Result<(), String> {
@@ -534,6 +560,46 @@ mod tests {
         let text = String::from_utf8_lossy(&raw);
         assert!(text.starts_with("HTTP/1.1 503"), "{text}");
         assert!(text.contains("No such file or directory"), "{text}");
+    }
+
+    #[test]
+    fn a_request_sent_a_byte_at_a_time_is_cut_off_at_the_whole_requests_wait() {
+        let engine = Arc::new(Fixed(vec![1, 2], Default::default()));
+        let address = start(engine.clone());
+        let mut stream = TcpStream::connect(address).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_millis(50)))
+            .unwrap();
+        let asked = Instant::now();
+        let mut answer = Vec::new();
+        // A byte every 0.5 s, each well inside a per-read wait, never ending the head.
+        for byte in b"POST /audio/speech HTTP/1.1\r\nX-Slow: aaaaaaaaaaaaaaaaaaaaaa".iter() {
+            if stream.write_all(&[*byte]).is_err() {
+                break;
+            }
+            let mut buffer = [0u8; 256];
+            if let Ok(n) = stream.read(&mut buffer) {
+                answer.extend_from_slice(&buffer[..n]);
+                if n == 0 || !answer.is_empty() {
+                    break;
+                }
+            }
+            std::thread::sleep(Duration::from_millis(450));
+            if asked.elapsed() > Duration::from_secs(9) {
+                break;
+            }
+        }
+        let took = asked.elapsed();
+        assert!(
+            answer.starts_with(b"HTTP/1.1 400"),
+            "{}",
+            String::from_utf8_lossy(&answer)
+        );
+        assert!(
+            took >= READ_WAIT - Duration::from_millis(600) && took < Duration::from_secs(8),
+            "{took:?}"
+        );
+        assert!(engine.1.lock().unwrap().is_empty());
     }
 
     #[test]
