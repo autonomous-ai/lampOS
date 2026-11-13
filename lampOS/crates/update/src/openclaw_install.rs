@@ -341,11 +341,14 @@ if [ \"$M\" = on ]; then
 fi
 ";
 
-/// lamp-tasks' folder of runs' token files (`lamp_tasks::run_token_file`,
-/// 0700, `lampos`'s): shown to OpenClaw's gateway, read-write, with
-/// [`Shown::tasks`], so a skill's script in a run's folder reads its run's
-/// token once and deletes it (the SDK's `_run_token`, #6685).
-pub const RUN_TOKENS: &str = "/run/lampos-tasks/runs";
+/// The gateway's own subfolder of lamp-tasks' runs' token files
+/// (`lamp_tasks::run_token_file::GATEWAY_RUNS`, 0700, `lampos`'s): shown to
+/// OpenClaw's gateway, read-write, with [`Shown::tasks`], so a skill's
+/// script in a run's folder reads its run's token once and deletes it (the
+/// SDK's `_run_token`, #6685). Only this subfolder: a Hermes run's file,
+/// in the folder above, is never shown to a gateway session (Heron's P2 on
+/// #6767).
+pub const RUN_TOKENS: &str = "/run/lampos-tasks/runs/gateway";
 
 /// What [`ns_text`] adds for [`Shown::tasks`] after Hermes's
 /// `TASKS_EDITS` (lamp-control's socket alone, read-only): [`RUN_TOKENS`]
@@ -358,7 +361,7 @@ pub const RUN_TOKENS: &str = "/run/lampos-tasks/runs";
 const RUNS_EDITS: [(&str, &str); 4] = [
     (
         " S=/tmp/.lampos-ns\n",
-        " T=/run/lampos-tasks/runs S=/tmp/.lampos-ns\n",
+        " T=/run/lampos-tasks/runs/gateway S=/tmp/.lampos-ns\n",
     ),
     (
         "else L=; fi\n",

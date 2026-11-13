@@ -125,11 +125,11 @@ async def _open(host: str, port: int, pin: str) -> ClientConnection:
 LOCAL_SOCKET = "/run/lampos-control/control.sock"
 
 # A skill's run on the lamp (#6685): lamp-tasks starts the engine in `RUN_FOLDERS/skill-<run-id>` and writes the
-# run's one-run token to `RUN_TOKENS/<run-id>` (0600, its 0700 folder). An engine whose wrapper reads it first
-# (Hermes, agent-ns) sets `LAMP_CONTROL_TOKEN`; one that has no per-run wrapper (OpenClaw's one gateway) leaves it
-# to the script: `_run_token` reads it once and deletes it.
+# run's one-run token to a file (0600, its 0700 folder). An engine whose wrapper reads it first (Hermes, agent-ns)
+# sets `LAMP_CONTROL_TOKEN`; one that has no per-run wrapper (OpenClaw's one gateway) has it in `RUN_TOKENS/<run-id>`,
+# the gateway's own subfolder, and leaves it to the script: `_run_token` reads it once and deletes it.
 RUN_FOLDERS = "/var/lib/lampos-tasks/harnesses/lamp-tasks"
-RUN_TOKENS = "/run/lampos-tasks/runs"
+RUN_TOKENS = "/run/lampos-tasks/runs/gateway"
 _RUN_ID = re.compile(r"[a-z0-9-]{1,64}")
 # lamp-tasks writes an OpenClaw run's token file only once the run's pane is up (#6685), so a script that starts at
 # once may look before it is there: it looks again for this long, then goes on without one.
