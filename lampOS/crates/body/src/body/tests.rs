@@ -6655,6 +6655,106 @@ fn an_arm_found_off_its_way_is_not_lowered_and_the_lamp_runs_folded() {
     assert!(report.woke.is_none());
 }
 
+/// #6834: a customer lamp's body ran, moved its head and never stood, and
+/// the only why was in a report nobody read. A run that will not stand says
+/// on the body's diagnostic what the owner can do, as a let-go body's ask
+/// (`crate::ask::asks`, said aloud once by the voice), and says the same
+/// line on every step of the run, so it is one ask, never a new one each
+/// report.
+#[test]
+fn a_run_that_will_not_stand_asks_the_owner_once_why() {
+    let off_way = "My arm isn't folded all the way down, so I won't stand up. Please fold it down gently, then unplug me and plug me back in.";
+    let fault = "Something in my arm isn't right, so I won't stand up. Please unplug me and plug me back in.";
+    let warm =
+        "My arm is too warm to stand up. Once it has cooled, please unplug me and plug me back in.";
+    let no_home = "I don't know where my resting place is, so I won't stand up. I need someone to set me up again.";
+    let asked = |lamp: &mut Lamp,
+                 clock: &mut Clock,
+                 limits,
+                 home,
+                 news: &mut dyn FnMut() -> Option<(Mood, u8)>| {
+        let mut asks = Vec::new();
+        let report = run_standing(
+            lamp,
+            clock,
+            limits,
+            home,
+            Some(standing(100, 60)),
+            news,
+            |glimpse| {
+                let health = crate::bus_out::health(glimpse, 0);
+                let ask = crate::ask::asks(&health).map(str::to_owned);
+                if asks.last() != Some(&ask) {
+                    asks.push(ask);
+                }
+            },
+        );
+        assert_eq!(report.standing, None, "{report:?}");
+        asks
+    };
+
+    // Its shoulder found off the way between folded and stood up.
+    let (mut lamp, mut clock) = folded(Duration::from_secs(2));
+    lamp.servos[1].position = 2_650.0;
+    lamp.servos[1].goal = 2_650;
+    let asks = asked(&mut lamp, &mut clock, waking(), Some(HOME), &mut || {
+        Some((Mood::Listening, 120))
+    });
+    assert_eq!(asks, [Some(off_way.to_owned())]);
+
+    // An elbow whose flag stays when its torque goes off and on.
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    lamp.arm_moves = true;
+    let mut news = script(&clock.time);
+    let asks = asked(&mut lamp, &mut clock, Limits::FOLDED, Some(HOME), &mut news);
+    assert_eq!(asks, [Some(fault.to_owned())]);
+
+    // A shoulder with a flag other than overload.
+    let (mut lamp, mut clock) = folded(Duration::from_secs(2));
+    lamp.servos[1].status = 0x01;
+    let asks = asked(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        &mut || None,
+    );
+    assert_eq!(asks, [Some(fault.to_owned())]);
+
+    // A shoulder already at the heat it stops at.
+    let (mut lamp, mut clock) = folded(Duration::from_secs(2));
+    lamp.servos[1].temperature = Standing::TEMPERATURE;
+    let asks = asked(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        &mut || None,
+    );
+    assert_eq!(asks, [Some(warm.to_owned())]);
+
+    // No home: no telling folded from stood up.
+    let (mut lamp, mut clock) = folded(Duration::from_secs(2));
+    let asks = asked(&mut lamp, &mut clock, Limits::FOLDED, None, &mut || None);
+    assert_eq!(asks, [Some(no_home.to_owned())]);
+
+    // A lamp that may stand asks nothing.
+    let (mut lamp, mut clock) = folded(Duration::from_secs(2));
+    lamp.servos[2].status = 0;
+    let mut asks = Vec::new();
+    let report = run_standing(
+        &mut lamp,
+        &mut clock,
+        Limits::FOLDED,
+        Some(HOME),
+        Some(standing(100, 60)),
+        || None,
+        |glimpse| asks.push(crate::ask::asks(&crate::bus_out::health(glimpse, 0)).is_some()),
+    );
+    assert!(report.standing.is_some(), "{report:?}");
+    assert!(!asks.is_empty() && asks.iter().all(|asks| !asks));
+}
+
 #[test]
 fn waking_on_a_lamp_found_as_expected_writes_exactly_what_it_did_without() {
     let writes = |limits: Limits| {
