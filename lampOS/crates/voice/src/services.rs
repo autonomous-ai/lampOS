@@ -914,6 +914,19 @@ pub fn waiting_note(request: u64, owner: Option<&str>, now: Instant) -> Option<S
     })
 }
 
+/// Whether a write waits for its yes at `now`, within [`PENDING_FOR`]: the
+/// voice's own prepared send (a mail read back, #6009) or a skill run's
+/// held write read back ([`wait_for_run_yes`], #6432), whoever asked. A line
+/// said then is never read for a skill by its name or its asks
+/// ([`crate::skill_named`], Heron's P2 on #6842): "Send it." is the write's.
+pub fn write_waits(now: Instant) -> bool {
+    kept::pending(|pending| {
+        pending
+            .as_ref()
+            .is_some_and(|kept| now.saturating_duration_since(kept.at) <= PENDING_FOR)
+    })
+}
+
 /// How [`waiting_note`] opens: a note that opens so is the waiting write's.
 const WAITING_NOTE_OPENS: &str = "(For you to know, not to answer: a write to ";
 

@@ -83,18 +83,17 @@ fn asks_out_of_bounds_are_refused() {
 }
 
 /// The probe lines of Thirteen's P1 and P2s and the Reviewer-lead's P2 on
-/// #6842: an ask that is ordinary speech said to the lamp, a held
-/// question's yes or no, a negation or a question, a stop, the lamp's own
+/// #6842 refused by shape: a negation or a question, a stop, the lamp's own
 /// words or its first-round rules' phrases, or only what is said around an
-/// ask, is refused as the skill loads; a skill's own asks load.
+/// ask, is refused as the skill loads; a skill's own asks load. A yes is
+/// judged by the model in context, never by a word list (the owner's
+/// ruling): "yes please" loads, and runs nothing while the lamp awaits an
+/// answer.
 #[test]
 fn asks_that_are_ordinary_speech_are_refused() {
     for ask in [
         "hey lamp",
-        "yes please",
         "no thanks",
-        "never mind",
-        "forget that",
         "remember that",
         "not now",
         "what time is it",
@@ -113,7 +112,7 @@ fn asks_that_are_ordinary_speech_are_refused() {
     }
     let (_root, dir) = folder(
         "photo-booth",
-        &format!("asks = [\"take a photo\", \"snap a pic\"]\n{BOOTH}"),
+        &format!("asks = [\"take a photo\", \"snap a pic\", \"yes please\"]\n{BOOTH}"),
     );
     assert!(lamp_skills::load(&dir).is_ok());
 }

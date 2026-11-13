@@ -54,17 +54,17 @@
 //!
 //! An ask never takes ordinary speech (Thirteen's P1 and P2s and the
 //! Reviewer-lead's P2 on #6842): [`ask_refused`] refuses, as lamp-skills
-//! loads a skill and again here, a phrase that is or holds a yes, a no or a
-//! consent's words ("yes please", "no thanks", "never mind", "forget that",
-//! "remember that"), a negation or a question word ("not now", "what time
-//! is it"), a stop ("stop it"), the lamp's own words for what it does
-//! itself ("turn off the light", "good night", "remind me in ten minutes",
-//! the first-round rules' phrases: `LAMP_MEMORY_KEEP_ASKED`,
-//! `LAMP_SCHEDULE_ASKED`, `LAMP_REMINDERS_ASKED`, `LAMP_SKILL_ASKED`), or
-//! only words said around an ask ("hey lamp"). And while a yes of any kind
-//! is held for the person's answer (a keep or a forget, a face save or
-//! rename, a skill's write or task yes), no line is read for a skill at
-//! all: the answer is the held question's (`second_provider`).
+//! loads a skill and again here, a phrase with a negation or a question
+//! word ("not now", "what time is it"), a stop ("stop it"), the lamp's own
+//! words for what it does itself ("turn off the light", "good night",
+//! "remind me in ten minutes", the first-round rules' phrases:
+//! `LAMP_MEMORY_KEEP_ASKED`, `LAMP_SCHEDULE_ASKED`, `LAMP_REMINDERS_ASKED`,
+//! `LAMP_SKILL_ASKED`), or only words said around an ask ("hey lamp").
+//! Whether a line means yes is never judged by a word list (the owner's
+//! ruling on #6842): while the lamp waits for an answer (its last words
+//! asked something, or a read-back, a confirm or a held yes of any kind
+//! waits), no line is read for a skill at all, and the model reads it in
+//! context (`second_provider`'s `lamp_awaits_answer`).
 use crate::known_faces::lower_words;
 use crate::tools::skill_asked::{AROUND, REQUESTS, phrase_at};
 use serde_json::{Value, json};
@@ -136,19 +136,6 @@ fn plain_word(name: &str) -> bool {
 fn loose_ask(ask: &str) -> String {
     loose(&lower_words(ask).join("-"))
 }
-
-/// Words that, anywhere in an ask, are the lamp's memory's or a held
-/// question's answer: "forget that", "remember that", "keep it", "save it".
-const MEMORY_WORDS: &[&str] = &[
-    "remember",
-    "remembered",
-    "forget",
-    "forgot",
-    "forgotten",
-    "keep",
-    "save",
-    "nevermind",
-];
 
 /// Words that, anywhere in an ask, make it a no or a refusal: what is said
 /// to refuse is the model's, never a skill's run.
@@ -298,26 +285,17 @@ fn holds(words: &[String], phrase: &[&str]) -> bool {
 /// Why `ask`, one of a skill's `asks` (#6772), is never matched, if it is
 /// refused: lamp-skills refuses such a skill as it loads
 /// (`lamp_skills`' `checked_asks`), and [`wanted`] drops the phrase all
-/// the same. An ask is a request for that skill, and nothing a person says
-/// to the lamp for anything else: never a yes, a no or a consent's words,
-/// which a held question waits for (Thirteen's P1 on #6842); never a no or
-/// a question; never a stop; never the lamp's own words for what it does
+/// the same. Its checks are of its shape, never of what a word means (the
+/// owner's ruling on #6842: whether a line is a yes is the model's to
+/// judge, and while the lamp waits for an answer no line is read for a
+/// skill at all, `second_provider`'s `lamp_awaits_answer`): never a no or a
+/// question; never a stop; never the lamp's own words for what it does
 /// itself, which its first-round rules force (Thirteen's P2s); and never
 /// only the words said around an ask (the Reviewer-lead's P2).
 pub fn ask_refused(ask: &str) -> Option<&'static str> {
     let words = lower_words(ask);
     let any = |list: &[&str]| words.iter().any(|word| list.contains(&word.as_str()));
     let holds_any = |phrases: &[&[&str]]| phrases.iter().any(|phrase| holds(&words, phrase));
-    if crate::remember::heard::only_an_answer(ask)
-        || holds_any(crate::known_faces::AGREE)
-        || any(crate::known_faces::DISAGREE)
-        || any(MEMORY_WORDS)
-        || holds_any(crate::remember::asked::WITHDRAWN)
-        || holds_any(crate::wait_words::PUT_OFFS)
-        || crate::wait_words::only_a_put_off(ask)
-    {
-        return Some("it is or holds a yes, a no or a consent's words, which a question waits for");
-    }
     if any(NEGATIONS)
         || any(QUESTION_WORDS)
         || words
@@ -978,16 +956,15 @@ mod tests {
     }
 
     /// The probe lines of Thirteen's P1 and P2s and the Reviewer-lead's P2
-    /// on #6842, each given as a stand-in camera skill's ask and then
-    /// heard: refused as an ask, and the line heard runs nothing. A held
-    /// question's "Yes, please." and "No thanks." first.
+    /// on #6842 that are refused by shape, each given as a stand-in camera
+    /// skill's ask and then heard: refused as an ask, and the line heard
+    /// runs nothing. A yes is not among them: no word list judges it (the
+    /// owner's ruling); while the lamp waits for an answer no line is read
+    /// for a skill (`second_provider::tests::skill_named_words`).
     #[test]
     fn an_ask_that_is_ordinary_speech_is_refused_and_runs_nothing() {
         for (ask, heard) in [
-            ("yes please", "Yes, please."),
             ("no thanks", "No thanks."),
-            ("never mind", "Never mind."),
-            ("forget that", "Forget that."),
             ("remember that", "Remember that."),
             ("hey lamp", "Hey lamp."),
             ("not now", "not now"),
