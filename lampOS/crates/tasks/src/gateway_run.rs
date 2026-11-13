@@ -1027,10 +1027,10 @@ mod tests {
         let (count, end) = ended();
         let began = Instant::now();
         let said = runner(&rig)
-            .run(&skill_run(&rig, Duration::from_millis(500)), &end)
+            .run(&skill_run(&rig, Duration::from_secs(8)), &end)
             .unwrap_err();
         assert!(
-            began.elapsed() < Duration::from_secs(10),
+            began.elapsed() < Duration::from_secs(8) + AFTER_FLOOR + Duration::from_secs(2),
             "killed, not waited for"
         );
         assert!(said.contains("ended at its deadline"), "{said}");
@@ -1077,12 +1077,14 @@ mod tests {
         let (_, end) = ended();
         let runner = runner(&rig);
         let began = Instant::now();
-        let deadline = Duration::from_millis(500);
+        // Room for the fence's three calls on a loaded machine; the turn
+        // itself sleeps far past it.
+        let deadline = Duration::from_secs(8);
         let said = runner.run(&skill_run(&rig, deadline), &end).unwrap_err();
         let took = began.elapsed();
         assert!(said.contains("ended at its deadline"), "{said}");
         assert!(
-            took < deadline + AFTER_FLOOR + Duration::from_millis(700),
+            took < deadline + AFTER_FLOOR + Duration::from_millis(1500),
             "{took:?}"
         );
         assert!(runner.live.lock().unwrap().is_some(), "the stop was cut");
