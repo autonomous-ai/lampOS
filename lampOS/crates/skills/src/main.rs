@@ -3667,11 +3667,12 @@ fn never_mind(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String
     stay_even_unsaid(sockets, bus, request, line, Cancel::First)
 }
 
-/// No yes to the turn-off ask: the stay line, then it stands. A heard
-/// refusal (words that aren't a yes) stands first, the line after, even if
-/// it never begins: the person is there and said no (lamp-52e6, builds
-/// 12130 and 12200). Silence, or a yes not taken, keeps the line-first rule
-/// of [`stay`].
+/// No yes to the turn-off ask: the stay line, then it stands. A heard no
+/// ([`HEARD_NO`]) stands first, the line after, even if it never begins: the
+/// person is there and said no (lamp-52e6, builds 12130 and 12200). Other
+/// words (a TV, someone else talking), silence, or a yes not taken keep the
+/// line-first rule of [`stay`]: a person mid-unplug hears it before the arm
+/// moves (the Reviewer-lead's P2 on #6519).
 fn not_turned_off(sockets: &Sockets, bus: &Bus, request: &str, why: &str) -> String {
     let line = sockets
         .may
@@ -3686,7 +3687,7 @@ fn not_turned_off(sockets: &Sockets, bus: &Bus, request: &str, why: &str) -> Str
             bus,
             request,
             &line,
-            if why == NOT_A_YES {
+            if why == HEARD_NO {
                 Cancel::First
             } else {
                 Cancel::AfterLine
@@ -3718,9 +3719,10 @@ enum Cancel {
     First,
 }
 
-/// One cancel at a time, so a heard "no" and a "never mind" racing for the
-/// same request say the stay line once.
-static CANCEL_LOCK: Mutex<()> = Mutex::new(());
+/// The stay lines being asked, by bus and request: a heard "no", a "never
+/// mind" and the timeout racing for the same request say the line once
+/// (the Reviewer-lead's P3 on #6519). A claim lasts while its line is asked.
+static SAYING: Mutex<Vec<(PathBuf, String)>> = Mutex::new(Vec::new());
 
 /// [`stay`], with the cancel published as `when` says.
 fn stay_even_unsaid(
@@ -3731,18 +3733,32 @@ fn stay_even_unsaid(
     when: Cancel,
 ) -> String {
     let mut cancelled = None;
-    if when == Cancel::First {
-        let _one = CANCEL_LOCK
+    let claim = (bus.root().to_owned(), request.to_owned());
+    if when != Cancel::EvenUnsaid {
+        let mut saying = SAYING
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let kept = lamp_body::unplug::Request {
             request: request.to_owned(),
         };
-        // Already cancelled, by the other of the two: its line is the one said.
+        // Already cancelled, by another stay: its line is the one said.
         if lamp_body::unplug::cancelled(bus, &kept) {
             return format!("{request} was already cancelled; its stay line is said once");
         }
-        cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
+        if when == Cancel::First {
+            cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
+        }
+        // Another stay's line is being asked: it is the one said.
+        if saying.contains(&claim) {
+            return match cancelled {
+                Some(Ok(())) => {
+                    format!("cancel published for {request}; its stay line is already asked")
+                }
+                Some(Err(error)) => format!("the cancel was not published: {error}"),
+                None => format!("{request}'s stay line is already asked"),
+            };
+        }
+        saying.push(claim.clone());
     }
     let outcome = match sockets.may.refuses(&Call::Say(String::new())) {
         Some(refused) if when != Cancel::AfterLine => refused,
@@ -3753,12 +3769,17 @@ fn stay_even_unsaid(
             exact(line, 8),
             &[],
             || {
-                if cancelled.is_none() {
+                // A cancel that failed before the line is tried again.
+                if !matches!(cancelled, Some(Ok(()))) {
                     cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
                 }
             },
         ),
     };
+    SAYING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .retain(|other| *other != claim);
     if when == Cancel::EvenUnsaid && cancelled.is_none() {
         cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
     }
@@ -3924,8 +3945,31 @@ const OFF_UPDATING: &str = "an update is being installed: try again once it is d
 /// finished line after the ask decides: any other words are no yes. In a
 /// language other than English nothing is asked, since the yes is heard by
 /// English words only: the lamp stays (#5774's P2).
-/// The heard refusal of the turn-off ask: it stands even unsaid.
+/// Words at the turn-off ask that are no yes and no "no" (a TV, someone
+/// else talking): the line first, as silence.
 const NOT_A_YES: &str = "words that aren't a yes were heard";
+/// A spoken no at the turn-off ask ([`says_no`]): it stands first.
+const HEARD_NO: &str = "a spoken no was heard";
+
+/// Whether `heard` is a short line opening with a no ("No.", "Nope, stay",
+/// "Don't", "Not now", "Never mind"): as short as a yes, so a TV's long line
+/// that happens to open with "no" stays [`NOT_A_YES`].
+fn says_no(heard: &str) -> bool {
+    let words: Vec<String> = heard
+        .split_whitespace()
+        .map(|word| {
+            word.replace('\u{2019}', "'")
+                .trim_matches(|c: char| !c.is_alphanumeric() && c != '\'')
+                .to_lowercase()
+        })
+        .filter(|word| !word.is_empty())
+        .collect();
+    words.len() <= 5
+        && words.first().is_some_and(|first| {
+            ["no", "nope", "nah", "not", "never"].contains(&first.as_str())
+                || first.ends_with("n't")
+        })
+}
 
 fn yes_to_turn_off(skill: &str, sockets: &Sockets, bus: &Bus) -> Result<(), String> {
     use lamp_body::first_stand;
@@ -3978,7 +4022,7 @@ fn yes_to_turn_off(skill: &str, sockets: &Sockets, bus: &Bus) -> Result<(), Stri
             continue;
         }
         if !first_stand::is_yes(&text) {
-            return Err(NOT_A_YES.into());
+            return Err(if says_no(&text) { HEARD_NO } else { NOT_A_YES }.into());
         }
         let busy = bus
             .latest(lamp_msgs::RoomState::TOPIC)
@@ -6340,7 +6384,9 @@ mod tests {
 
     /// lamp-52e6, build 12130: "No." to the turn-off ask, the stay line
     /// expired and nothing was cancelled, so the lamp stayed folded. A
-    /// heard refusal stands even unsaid; silence still cancels nothing.
+    /// heard no stands even unsaid; silence, and words that are no yes and
+    /// no "no" (a TV, someone else: the Reviewer-lead's P2 on #6519), still
+    /// cancel nothing before the line.
     #[test]
     fn a_heard_no_stands_even_when_the_stay_line_expires() {
         let dir = tempfile::Builder::new()
@@ -6353,8 +6399,10 @@ mod tests {
         let sockets = nowhere(dir.path(), unplug_grants());
         let silent = not_turned_off(&sockets, &bus, "r1", "no spoken yes within 30 s");
         assert!(silent.contains("nothing cancelled"), "{silent}");
+        let other = not_turned_off(&sockets, &bus, "r1", NOT_A_YES);
+        assert!(other.contains("nothing cancelled"), "{other}");
         assert!(cancels(&bus).is_none());
-        let outcome = not_turned_off(&sockets, &bus, "r1", NOT_A_YES);
+        let outcome = not_turned_off(&sockets, &bus, "r1", HEARD_NO);
         assert!(outcome.contains("expired"), "{outcome}");
         assert!(outcome.contains("cancel published for r1"), "{outcome}");
         assert!(cancels(&bus).is_some());
@@ -6378,7 +6426,7 @@ mod tests {
             bus.clone(),
         );
         let sockets = nowhere(dir.path(), unplug_grants());
-        let outcome = not_turned_off(&sockets, &bus, "r1", NOT_A_YES);
+        let outcome = not_turned_off(&sockets, &bus, "r1", HEARD_NO);
         assert!(outcome.contains("cancel published for r1"), "{outcome}");
         let again = never_mind(&sockets, &bus, "r1", &unplug_lines().stay);
         assert!(again.contains("already cancelled"), "{again}");
@@ -6387,6 +6435,53 @@ mod tests {
             [(unplug_lines().stay, true)],
             "the cancel was out before the line reached the voice, and the line came once"
         );
+        assert_eq!(cancels(&bus), Some(1));
+    }
+
+    /// Only a short line opening with a no is a heard no; a TV's or another
+    /// person's words are not (the Reviewer-lead's P2 on #6519).
+    #[test]
+    fn a_no_is_a_short_line_opening_with_one() {
+        for no in [
+            "No.",
+            "Nope, stay.",
+            "Don\u{2019}t.",
+            "Not now",
+            "Never mind",
+        ] {
+            assert!(says_no(no), "{no}");
+        }
+        for not in [
+            "I'm unplugging the kettle",
+            "No way he scored from there, unbelievable",
+            "Hmm",
+            "",
+        ] {
+            assert!(!says_no(not), "{not}");
+        }
+    }
+
+    /// While the timeout's line is being asked, a "never mind" stands the
+    /// lamp up but does not say the line again (the Reviewer-lead's P3 on
+    /// #6519); a second timeout says nothing either.
+    #[test]
+    fn a_stay_line_being_asked_is_said_once() {
+        let dir = tempfile::Builder::new()
+            .prefix("uk")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let claim = (bus.root().to_owned(), "r1".to_owned());
+        SAYING.lock().unwrap().push(claim.clone());
+        let timeout = stay(&sockets, &bus, "r1", &unplug_lines().stay);
+        assert!(timeout.contains("already asked"), "{timeout}");
+        assert!(cancels(&bus).is_none());
+        let outcome = never_mind(&sockets, &bus, "r1", &unplug_lines().stay);
+        SAYING.lock().unwrap().retain(|other| *other != claim);
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert!(outcome.contains("already asked"), "{outcome}");
         assert_eq!(cancels(&bus), Some(1));
     }
 
