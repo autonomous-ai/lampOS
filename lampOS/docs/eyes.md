@@ -3310,7 +3310,7 @@ server (`FrameServer`), with the same rules (`crates/eyes/src/frame_link.rs`).
 **`lamp-seen` reads from here.** Nothing is new on the wire: `lamp-seen`'s
 client (`FrameClient`) is unchanged.
 
-It is off unless given, and no unit gives it yet:
+It is off unless given; the product's unit gives it (below):
 
 ```text
 --frame-link /run/lampos-eyes-frames/camera.frames --frame-link-boots /run/lampos-seen/frame-link.env
@@ -3340,6 +3340,25 @@ LAMP_EYES_VISITS=--visits on
 
 The two boots are the ones `lamp-seen` says as its controller and own boot.
 A hello with any other boot, or a second connection, is refused.
+
+**In the product** (#6543, [seen.md](seen.md#the-product-unit)),
+`lamp-eyes.service` always passes `--frame-link
+/run/lampos-eyes-frames/camera.frames --frame-link-boots
+/run/lampos-seen/frame-link.env`. Only `lamp-seen.service` with
+`LAMP_SEEN_ACTIVITY=on` writes that file, before the eyes start, as
+`lampos`, 0600, in its own 0700 runtime folder: two boots from
+`/dev/urandom` as the voice makes its camera worker's, kept until the lamp
+restarts. With the switch off the file is removed, so the eyes serve no
+link, as before. The file is never an `EnvironmentFile=`: the boots are
+in neither the eyes' environment nor their command line. Beside it,
+`lamp-seen frame-link` keeps `/run/lampos-seen/eyes-visits.env`, only
+`LAMP_EYES_VISITS=--visits on`, which the unit loads (`EnvironmentFile=-`)
+and puts on the line: `humans/familiar` for `lamp-seen`'s stranger check
+only, a level with no name, face or picture (the first builder's yes on
+#6543); with the switch off it is removed and the eyes run without it. The
+folder `/run/lampos-eyes-frames` is made 0700 `lampos` by `lampos.conf`;
+`lamp-seen` runs as `lampos` too, so it may connect. The eyes take a new
+link only at their next start.
 
 - **Only `lamp-seen`.** The eyes run as `lampos`, as lamp-skills, lamp-cloud,
   lamp-actions and other parts do, so the socket's mode lets every one of

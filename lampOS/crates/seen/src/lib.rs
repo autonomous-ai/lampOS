@@ -10,6 +10,8 @@
 //!   and the opt-in. No frame is even asked for unless it is open.
 //! - [`opt_in`]: the owner's opt-in, off unless a kept yes says otherwise,
 //!   read every 2 s and never written, and off again after a forget.
+//! - [`link`]: the frame link's two boots, made once and shared by the
+//!   eyes' and this part's units in the product.
 //! - [`frames`]: a client of the camera's frame link
 //!   (`lamp_camera::frames`), following its rules: one request at a time,
 //!   copy before anything else, the frame's grant kept and checked, and
@@ -46,6 +48,7 @@ pub mod crypto;
 pub mod endpoint;
 pub mod frames;
 pub mod gate;
+pub mod link;
 pub mod mark;
 pub mod opt_in;
 pub mod outlet;

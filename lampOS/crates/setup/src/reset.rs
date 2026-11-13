@@ -1140,16 +1140,19 @@ pub fn cut_openclaw_config(text: &[u8]) -> Option<Vec<u8>> {
 
 /// What a part keeps in `/run` past its own stop: the tmpfiles' folders (the
 /// bus's latest messages, which can say a person's name or words, the app's
-/// photos for the eyes, and the eyes' sitting kept across a restart) and each
-/// `RuntimeDirectory=` its unit keeps
-/// (`RuntimeDirectoryPreserve=yes`: the voice's, with the thread's set-aside
-/// words and the room, and the records'). Every other `RuntimeDirectory=` is
+/// photos for the eyes, the eyes' sitting kept across a restart, and the
+/// frame link's folder for lamp-seen) and each `RuntimeDirectory=` its unit
+/// keeps (`RuntimeDirectoryPreserve=yes`: the voice's, with the thread's
+/// set-aside words and the room, the records', and lamp-seen's, with the
+/// frame link's boots). Every other `RuntimeDirectory=` is
 /// removed by systemd as its unit stops. A reboot empties `/run`; a reset
 /// that starts setup in place empties these, with every part stopped.
-pub const VOLATILE: [&str; 5] = [
+pub const VOLATILE: [&str; 7] = [
     "/run/lampos-bus",
     "/run/lampos-photos",
     "/run/lampos-eyes-kept",
+    "/run/lampos-eyes-frames",
+    "/run/lampos-seen",
     "/run/lampos-voice",
     "/run/lamp-records",
 ];

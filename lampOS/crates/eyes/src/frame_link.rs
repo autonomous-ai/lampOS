@@ -132,7 +132,8 @@ pub fn boots_in(text: &str, socket: &Path) -> Result<(BootId, BootId), &'static 
 }
 
 /// The link's two boots (controller, reader) from `file`, read at start:
-/// `None` if there is no file (the switch is off: no link). The file must
+/// `None` if there is no file or no folder for it (the switch is off, or
+/// lamp-seen has not started yet: no link). The file must
 /// be a regular file of this user's, not a link, with no group write and
 /// no other access (0600 or 0640), in a folder of this user's or root's
 /// with no group write and no other access.
@@ -143,7 +144,12 @@ pub fn boots_from(file: &Path, socket: &Path) -> io::Result<Option<(BootId, Boot
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .ok_or_else(|| denied("the boots file needs a private folder"))?;
-    let folder = fs::symlink_metadata(parent)?;
+    // No folder is no file: lamp-seen makes it (its runtime folder), and an
+    // update round can restart the eyes before a newly added lamp-seen starts.
+    let folder = match fs::symlink_metadata(parent) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        folder => folder?,
+    };
     if !folder.is_dir()
         || !(folder.uid() == euid || folder.uid() == 0)
         || folder.mode() & 0o027 != 0
