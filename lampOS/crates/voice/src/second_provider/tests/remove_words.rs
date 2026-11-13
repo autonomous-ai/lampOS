@@ -23,7 +23,17 @@ fn asked_to_remove(
         .enumerate()
         .map(|(at, name)| {
             std::fs::write(keeping.directory.join(format!("{name}.tar")), "tar").unwrap();
-            json!({"name": name, "version": "1.0.0", "sha256": format!("{at:x}").repeat(64),
+            // On the lamp as the package made, as the manage helper's
+            // install leaves it.
+            let sha256 = format!("{at:x}").repeat(64);
+            let folder = keeping.installed.join(name);
+            std::fs::create_dir_all(&folder).unwrap();
+            std::fs::write(
+                folder.join(".package.json"),
+                json!({"sha256": sha256, "manifest": {"name": name}}).to_string(),
+            )
+            .unwrap();
+            json!({"name": name, "version": "1.0.0", "sha256": sha256,
                    "package": format!("{name}.tar"), "on": true, "from": format!("local:{name}")})
         })
         .collect();
