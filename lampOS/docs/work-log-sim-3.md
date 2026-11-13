@@ -3,6 +3,15 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 23:3x GMT+7: #6961 read by sim-2; macos-15 has the voice
+
+- #6961: sim-2 READ-OK 30804d4ffa (last commit; Linux clippy and the
+  resampler test). `sim-macos` passed on GitHub's macos-15 (6m06s), so the
+  resident test runs there and its en-US voice exists.
+- P3s taken at a44d5acc46: the body says 10 `unsafe` blocks (not 9); a line
+  carries its deadline, one queued past it is dropped unspoken.
+- #6954 itself still has no read (sim-1, sim-2 asked).
+
 ## 2026-11-13 23:2x GMT+7: step 2 read; a third place for the switch
 
 - Quiet check; #6961's `sim-macos` job still running.
