@@ -583,10 +583,10 @@ mod tests {
             if let Ok(n) = stream.read(&mut buffer) {
                 answer.extend_from_slice(&buffer[..n]);
                 if n == 0 || !answer.is_empty() {
-                    // The rest of the answer, to its close (the service closes).
-                    stream
-                        .set_read_timeout(Some(Duration::from_secs(2)))
-                        .unwrap();
+                    // The rest of the answer, to its close (the service closes). The
+                    // timeout is not changed here: on macOS setting one on a socket
+                    // whose peer has closed fails with EINVAL (nine's read, CI run
+                    // 43477638713); the 50 ms set at the start is enough to reach EOF.
                     let _ = stream.read_to_end(&mut answer);
                     break;
                 }
