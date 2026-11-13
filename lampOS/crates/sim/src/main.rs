@@ -132,7 +132,7 @@ fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
     lamp_sim::speech::serve(
         listener,
         token,
-        std::sync::Arc::new(lamp_sim::speech::Say { folder }),
+        std::sync::Arc::new(lamp_sim::speech::Say::new(folder)),
     )
 }
 

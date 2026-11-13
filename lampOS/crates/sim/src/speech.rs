@@ -17,7 +17,7 @@
 use std::{
     io::{self, BufRead, BufReader, Read, Write},
     net::{SocketAddr, TcpListener, TcpStream},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -256,47 +256,99 @@ fn same(given: &str, token: &str) -> bool {
     a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-/// The host's `say` (macOS), one process a line: it renders the whole line
-/// to a WAV file at 24 kHz mono S16LE, which is then handed on.
+/// The host's `say` (macOS), one process a line, each started before its line
+/// comes: a `say` waiting on its stdin has paid its ~0.4 s start, so a line
+/// costs only its rendering (measured on macOS 26, 5 runs each, medians, line
+/// handed over to rendered: 400, 526 and 869 ms for 2, 8 and 20 words, against
+/// 700, 839 and 1,149 ms started with the line). It renders the whole line to
+/// a WAV file at 24 kHz mono S16LE, which is then handed on.
 pub struct Say {
     /// A private folder for the rendered files.
-    pub folder: PathBuf,
+    folder: PathBuf,
+    /// The `say` started for the next line, waiting on its stdin.
+    ready: std::sync::Mutex<Option<Started>>,
 }
 
-impl Engine for Say {
-    fn speak(&self, text: &str, out: &mut dyn FnMut(&[u8]) -> io::Result<()>) -> io::Result<()> {
+/// A `say` waiting for its line, and the file it will write.
+struct Started {
+    child: std::process::Child,
+    file: PathBuf,
+}
+
+impl Say {
+    /// A `say` engine writing under `folder`, with one `say` started at once.
+    pub fn new(folder: PathBuf) -> Self {
+        let say = Self {
+            folder,
+            ready: std::sync::Mutex::new(None),
+        };
+        *say.ready.lock().unwrap_or_else(|e| e.into_inner()) = say.start().ok();
+        say
+    }
+
+    fn start(&self) -> io::Result<Started> {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
         let file = self.folder.join(format!(
             "say-{}-{}.wav",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::SeqCst)
         ));
-        let result = say_to(&file, text).and_then(|()| {
+        let child = crate::keys::command("/usr/bin/say")
+            .arg("-o")
+            .arg(&file)
+            .args(["--file-format=WAVE", "--data-format=LEI16@24000", "-f", "-"])
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()?;
+        Ok(Started { child, file })
+    }
+
+    /// The ready `say` if it is still waiting, else one started now; and the
+    /// next one is started for the line after.
+    fn take(&self) -> io::Result<Started> {
+        let mut ready = self.ready.lock().unwrap_or_else(|e| e.into_inner());
+        let waiting = ready.take().and_then(|mut started| {
+            matches!(started.child.try_wait(), Ok(None)).then_some(started)
+        });
+        let this = match waiting {
+            Some(started) => started,
+            None => self.start()?,
+        };
+        *ready = self.start().ok();
+        Ok(this)
+    }
+}
+
+impl Engine for Say {
+    fn speak(&self, text: &str, out: &mut dyn FnMut(&[u8]) -> io::Result<()>) -> io::Result<()> {
+        let Started { mut child, file } = self.take()?;
+        let result = (|| {
+            if let Some(mut stdin) = child.stdin.take() {
+                stdin.write_all(text.as_bytes())?;
+            }
+            let status = child.wait()?;
+            if !status.success() {
+                return Err(io::Error::other(format!("say ended: {status}")));
+            }
             let wav = std::fs::read(&file)?;
             out(pcm_of_wav(&wav)?)
-        });
+        })();
+        let _ = child.kill();
+        let _ = child.wait();
         let _ = std::fs::remove_file(&file);
         result
     }
 }
 
-fn say_to(file: &Path, text: &str) -> io::Result<()> {
-    let mut child = crate::keys::command("/usr/bin/say")
-        .arg("-o")
-        .arg(file)
-        .args(["--file-format=WAVE", "--data-format=LEI16@24000", "-f", "-"])
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()?;
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(text.as_bytes())?;
+impl Drop for Say {
+    fn drop(&mut self) {
+        if let Some(mut started) = self.ready.lock().unwrap_or_else(|e| e.into_inner()).take() {
+            let _ = started.child.kill();
+            let _ = started.child.wait();
+            let _ = std::fs::remove_file(&started.file);
+        }
     }
-    let status = child.wait()?;
-    if !status.success() {
-        return Err(io::Error::other(format!("say ended: {status}")));
-    }
-    Ok(())
 }
 
 /// The samples of a WAV file: the bytes of its `data` chunk.
@@ -511,22 +563,27 @@ mod tests {
     fn macos_say_speaks_a_line_as_24_khz_pcm() {
         let folder = crate::test_root().join(format!("lsm-say-{}", std::process::id()));
         std::fs::create_dir_all(&folder).unwrap();
-        let mut bytes = Vec::new();
-        Say {
-            folder: folder.clone(),
+        let say = Say::new(folder.clone());
+        // Two lines: the first on the say started with the engine, the second
+        // on the one started for it.
+        for _ in 0..2 {
+            let mut bytes = Vec::new();
+            say.speak("Hi there.", &mut |piece| {
+                bytes.extend_from_slice(piece);
+                Ok(())
+            })
+            .unwrap();
+            // "Hi there." is about 0.6 s: over 0.2 s and under 3 s of 24 kHz S16LE.
+            assert_eq!(bytes.len() % 2, 0);
+            assert!(
+                bytes.len() > 2 * 4_800 && bytes.len() < 2 * 72_000,
+                "{}",
+                bytes.len()
+            );
         }
-        .speak("Hi there.", &mut |piece| {
-            bytes.extend_from_slice(piece);
-            Ok(())
-        })
-        .unwrap();
+        drop(say);
+        // Nothing is left in the folder: the spoken files and the ready one's.
+        assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 0);
         let _ = std::fs::remove_dir_all(&folder);
-        // "Hi there." is about 0.6 s: well over 0.2 s and under 3 s of 24 kHz S16LE.
-        assert_eq!(bytes.len() % 2, 0);
-        assert!(
-            bytes.len() > 2 * 4_800 && bytes.len() < 2 * 72_000,
-            "{}",
-            bytes.len()
-        );
     }
 }
