@@ -398,6 +398,10 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
     let mut words = bus
         .publisher("gemini/transcript", Kind::Event, "voice")
         .unwrap();
+    // A publisher finds a new subscriber within 200 ms: give both publishers
+    // that before the first count is asserted. Train 890 (14 Nov, ARM64 3/3)
+    // saw the first pose delivered to none at 1.0 s.
+    std::thread::sleep(Duration::from_millis(250));
     // Forty milliseconds apart by the publisher's clock, whatever the time
     // between them here.
     let at = |n: u64| 1_000_000 + n * 40_000;
