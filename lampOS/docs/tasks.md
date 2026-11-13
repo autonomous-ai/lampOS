@@ -1751,6 +1751,17 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
       reset left (`{}`, `[]`, `null`) takes the block. Anything else there
       (a nested item, an anchor, a block scalar) refuses the whole merge,
       as above, and the file is left as it is.
+    - **The SDK in a run's commands (#6684).** Hermes's launcher replaces
+      the `PYTHONPATH` it is started with, so the same merge lists
+      lamp-update's `/usr/local/lib/lampos/hermes-run-env.sh` in Hermes'
+      `terminal.shell_init_files`. Hermes's terminal sources it before its
+      session's login snapshot, and it puts the lampos SDK first on
+      `PYTHONPATH` only in a skill run (`LAMP_CONTROL_SOCKET` set). A list
+      there replaces Hermes's defaults, so when the merge makes the list it
+      puts `~/.profile`, `~/.bash_profile` and `~/.bashrc` first, as Hermes
+      would have sourced them, unless `terminal.auto_source_bashrc` is off.
+      A list a person made is kept as it is, the lamp's file added last.
+      Anything it can't merge refuses the whole merge, as above.
     - **The guidance.** Each time the part keeps the lamp as a target, it
       writes `AGENTS.md` in the lamp's work folder
       (`~/harnesses/lamp-tasks/lamp`), which Hermes reads from its working

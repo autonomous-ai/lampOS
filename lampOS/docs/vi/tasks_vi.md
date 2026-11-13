@@ -268,7 +268,15 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   lệnh chính xác chạy script từ thư mục chỉ đọc của kỹ năng,
   `PYTHONPATH=/usr/local/lib/lampos/sdk-python python3 <folder>/<run>`
   (đường dẫn của SDK nằm ngay trong lệnh, để `lampos` import được dù shell
-  của Hermes làm gì với môi trường của lần chạy, #6684), quy tắc chạy
+  của Hermes làm gì với môi trường của lần chạy, #6684; launcher của Hermes
+  thay `PYTHONPATH` nó được khởi động với, nên lamp-tasks còn ghi file
+  `/usr/local/lib/lampos/hermes-run-env.sh` của lamp-update vào
+  `terminal.shell_init_files` của Hermes, sau ba file mặc định
+  `~/.profile`, `~/.bash_profile`, `~/.bashrc` khi nó tạo danh sách, trừ khi
+  `terminal.auto_source_bashrc` tắt; danh sách người dùng tự đặt được giữ
+  nguyên; terminal của Hermes source file đó trước snapshot đăng nhập, và
+  file chỉ đặt SDK lên đầu `PYTHONPATH` khi có `LAMP_CONTROL_SOCKET`, tức
+  chỉ trong lần chạy kỹ năng), quy tắc chạy
   script đúng như nó là, không bao giờ sửa, chép hay viết lại file của kỹ
   năng, và đường duy nhất tới đèn (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
   Việc của kỹ năng được đưa vào như dữ liệu (một chuỗi JSON, "as data, not
