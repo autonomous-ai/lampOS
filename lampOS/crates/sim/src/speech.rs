@@ -264,11 +264,13 @@ fn answer(stream: &mut TcpStream, status: u16, why: &str) -> io::Result<()> {
         _ => "Service Unavailable",
     };
     let body = serde_json::json!({ "error": { "message": why } }).to_string();
-    write!(
-        stream,
+    // One write: `write!` on a bare stream sends each piece as its own write,
+    // and a caller's first read could then hold only "HTTP/1.1 " (nine's P3).
+    let text = format!(
         "HTTP/1.1 {status} {reason}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         body.len()
-    )?;
+    );
+    stream.write_all(text.as_bytes())?;
     stream.flush()
 }
 
@@ -581,6 +583,11 @@ mod tests {
             if let Ok(n) = stream.read(&mut buffer) {
                 answer.extend_from_slice(&buffer[..n]);
                 if n == 0 || !answer.is_empty() {
+                    // The rest of the answer, to its close (the service closes).
+                    stream
+                        .set_read_timeout(Some(Duration::from_secs(2)))
+                        .unwrap();
+                    let _ = stream.read_to_end(&mut answer);
                     break;
                 }
             }
