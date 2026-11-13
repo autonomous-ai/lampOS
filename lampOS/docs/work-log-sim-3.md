@@ -3,6 +3,16 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 22:3x GMT+7: 884 merged #6939; #6955 P3
+
+- Train 884 (#6951) merged as ba5832bfd1 with **#6939** (lamp-body's clippy
+  and tests in `sim-macos`).
+- #6955: sim-2 READ-OK 7001ca2954 (Linux run), P3 taken at bc92afc400
+  (boot_id moved off FAKE_PROGRAM's doc comment); restate and sim-1 asked.
+- #6938, #6954, #6955 merge clean on ba5832bfd1. #6938's second read asked of
+  sim-1 or ten. The speaker-test skips in `sim-macos` come out after #6938
+  (the same lines).
+
 ## 2026-11-13 22:2x GMT+7: #6949 merged; step 1b asked; #6954 faster
 
 - #6949 merged (nc-35, 1a42339940).
