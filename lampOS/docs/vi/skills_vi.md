@@ -2128,7 +2128,9 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   mục một lần, không bao giờ `skills`; grant lạ làm kỹ năng bị từ chối.
 - **Chỉ loại đầu tiên:** kỹ năng có `do.task` chỉ nạp khi script đến từ
   Skills Store (`.package.json` có `from_store`) hoặc được máy tính đã ghép
-  đôi của chủ đèn đẩy lên (thư mục developer). Kỹ năng đặt bằng tay, hoặc
+  đôi của chủ đèn đẩy lên (thư mục developer; đọc lại là đến từ "your
+  computer NAME", hoặc "your computer" khi `.pushed.json` không nêu tên,
+  #6715). Kỹ năng đặt bằng tay, hoặc
   đánh dấu `made: here` / `added: file`, không nạp; script do model viết là
   việc của #6307.
 - **Nói lại và cái "có":** hỏi "kỹ năng photo booth của tôi dùng gì?", đèn

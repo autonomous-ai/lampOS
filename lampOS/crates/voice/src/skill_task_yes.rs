@@ -844,6 +844,37 @@ mod tests {
         }
     }
 
+    /// #6715 (c0a4, 13 Nov, 12583): a pushed skill's say-back once said
+    /// its script came from "your computer a computer" (lamp-skills'
+    /// fallback name after "your computer"), and the model's read-back,
+    /// "from your computer, and", never held it: the first yes was always
+    /// refused at the say-back's 27th word. With "your computer" alone, as
+    /// lamp-skills now gives it, that read-back holds every word.
+    #[test]
+    fn a_read_back_from_your_computer_holds_a_pushed_skills_say_back() {
+        let pushed = TaskAsks {
+            name: "pasture".into(),
+            task: "Run python3 scripts/main.py in this folder and nothing else".into(),
+            grants: vec!["speak".into()],
+            from: "your computer".into(),
+            ..booth(false)
+        };
+        let model = "You asked what it uses, so here it is read back word for word: \"pasture hands one task to the \
+            lamp's agent: “Run python3 scripts/main.py in this folder and nothing else”. Its script comes from \
+            your computer, and it speaks and plays sounds. It runs only once you agree.\"";
+        assert!(
+            crate::services::read_back_said(&said(&pushed), model),
+            "{}",
+            said(&pushed)
+        );
+        // The old doubled name is what the model never said.
+        let doubled = TaskAsks {
+            from: "your computer a computer".into(),
+            ..pushed.clone()
+        };
+        assert!(!crate::services::read_back_said(&said(&doubled), model));
+    }
+
     fn asking(request: u64) -> Asking {
         Asking {
             request,
@@ -883,7 +914,7 @@ mod tests {
             asked.push(name.to_owned());
             Ok(known.contains(&name).then(|| TaskAsks {
                 name: name.to_owned(),
-                from: "your computer a computer".into(),
+                from: "your computer".into(),
                 ..booth(false)
             }))
         }
