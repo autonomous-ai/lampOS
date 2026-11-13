@@ -1030,7 +1030,15 @@ each under the quiet rule. A round
    "lamp-tasks.service stopped" (its Harness gone under it), and so would
    every later build. `lamp-setup.service` keeps its own rules
    (`setup_lifecycle`): a completed setup restarted and skipped by its marker
-   is still not well.
+   is still not well. But setup's own unit that ran and **ended by itself
+   inside the watch because setup finished** (inactive, `Result=success`,
+   not skipped by its condition, and `/var/lib/lampos-setup/done` there at
+   that look, `setup_lifecycle::done`, read by the round at each look and
+   told to `judge::Watch::setup_done`) is setup done, not a part stopped:
+   the build is kept. Ended without the marker, failed (`exit-code`),
+   crashed or started again is still not well. Before this, a customer lamp
+   on 12 Nov had 12587, switched by a first update while setup still ran,
+   put back and refused for good as "lamp-setup.service stopped" (#6820).
    A part **held** (#6113): lamp-body after a failed unplug fold stays up
    and still, ready to systemd, its `StatusText` `held, nothing moves: <why>`
    (#5777, [unplug.md](unplug.md)), so systemd alone would call it well. The
@@ -1589,6 +1597,11 @@ on lamp-e82d on 11 Nov.
    `setup is not done: the channel is out of reach, not told, asked again
    in 30 s`. Rounds are never stopped before setup: a lamp online without
    the marker updates as before, and every other end is kept as before.
+   Such a round can switch while setup still runs (`first_update::before_setup`),
+   restarting setup's unit, and setup can then finish inside the watch: its
+   marker written and its unit ended with exit 0 is setup done and keeps
+   the build ("One round", step 9, #6820); a setup that fails there still puts it
+   back.
 
 ### lamp-update's own build on a product lamp
 
