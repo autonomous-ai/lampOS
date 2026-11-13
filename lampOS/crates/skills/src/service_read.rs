@@ -1411,7 +1411,7 @@ mod tests {
         assert_eq!(
             lamp.said,
             [
-                "Gmail isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors."
+                "Gmail isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts."
             ]
         );
         assert_eq!(lamp.noted, Some(true));

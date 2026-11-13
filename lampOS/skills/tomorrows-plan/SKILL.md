@@ -9,7 +9,7 @@ Once an evening, when you have sat at your desk for two minutes between
 18:00 and 21:30, the lamp tells you what is on your Google Calendar
 tomorrow: how many events, then each one's time and title ("You have 2
 events tomorrow. At 10:00, Dentist. ..."). It needs Google Calendar linked
-in the app, under Skills, then Connectors.
+in the app: open this lamp, then Settings, then Linked accounts.
 
 When it reads:
 
