@@ -1186,10 +1186,26 @@ camera, so I can't take photos…" with `calls=none`.
   Mac, 45 skills: 0.65 ms a line read each time against 7 µs kept (3.9 ms
   against 34 µs in a debug build), in
   `skill_named::tests::what_reading_the_skills_costs_a_short_line`.
-- **Not yet:** "take a photo" names no skill, and a skill.toml has no
-  words of its own for what asks for it (only its name, its description
-  for the model and its `when`), so such a line is still the model's. The
-  Live route is unchanged.
+- **A skill's own ask phrases** (#6772's second part, the first builder's
+  ruling on #6059, 13 Nov): "take a photo" names no skill, so a skill may
+  list the phrases that ask for it, `asks = ["take a photo", ...]` at the
+  top of its `skill.toml` ([skill-format.md](skill-format.md)). The load
+  check (an install and a push load it) and the schema take at most 8, each 2 to
+  8 words of letters, digits and apostrophes with one space between, none
+  listed twice whatever its case, and only beside a `tool` with no
+  `[choice]` and no `[flag]`. lamp-skills writes them to the tools file
+  beside the tools (`"asks": {"photo_booth": ["take a photo"]}`, by name;
+  no skill with any, and the file is as before), and the voice reads them
+  (`tools::skill_asks`). An ask is matched as the name is, whole: its
+  words in a row, case aside, with only what may go around a name around
+  it, never "wait", and runs the same way. "take a photo" runs the photo
+  booth that asks it; "Hey Lamp, play me something to relax." and "Lamp,
+  can you play some relaxing music?" run `relaxing-music`
+  (`examples/relaxing-music` asks "relaxing music" and "play me something
+  to relax"). "is there a camera?", "don't take a photo" and "Take a
+  photo, wait." are the model's. A phrase two skills share, or one that is
+  another skill's name, runs neither. Up to 8 words are matched, a name's
+  or an ask's. The Live route is unchanged.
 - **The instructions:** the built-in one (`config::CHAT_INSTRUCTION`, and
   the camera one), which a product lamp runs (its provider setting names no
   `instruction_file`), says "never say you have no arms, legs, body or
@@ -1206,8 +1222,12 @@ camera, so I can't take photos…" with `calls=none`.
   `photo_booth_by_name_runs_once_when_the_model_calls_it_too`,
   `the_policys_hold_runs_nothing_for_a_skill_named`,
   `a_skill_named_whose_answer_asks_a_look_takes_it`,
-  `a_camera_line_naming_no_skill_goes_to_the_model` and
-  `a_wait_beside_a_skills_name_goes_to_the_model`.
+  `a_camera_line_naming_no_skill_goes_to_the_model`,
+  `a_wait_beside_a_skills_name_goes_to_the_model`,
+  `a_skills_own_ask_phrases_call_it_in_code` (Seventh's "take a photo" and
+  "photo booth" from #6413, Sixth's two lines from #5749) and
+  `a_camera_question_is_not_an_ask`; lamp-skills' `it::asks` (the bounds,
+  and the tools file's `asks`).
 
 ### The call socket tells its caller apart (#6128)
 

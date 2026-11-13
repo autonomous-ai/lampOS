@@ -2112,9 +2112,27 @@ camera, so I can't take photos…" với `calls=none`.
   chúng. Trên Mac, 45 kỹ năng: 0,65 ms một câu khi đọc mỗi lần so với 7 µs
   khi giữ (3,9 ms so với 34 µs ở bản debug), trong
   `skill_named::tests::what_reading_the_skills_costs_a_short_line`.
-- **Chưa có:** "take a photo" không nêu kỹ năng nào, và skill.toml không
-  có lời riêng cho những gì xin nó (chỉ có tên, mô tả cho model và
-  `when`), nên câu như vậy vẫn là của model. Tuyến Live không đổi.
+- **Cụm từ xin riêng của một kỹ năng** (phần hai của #6772, phán quyết
+  của builder đầu tiên trên #6059, 13/11): "take a photo" không nêu kỹ
+  năng nào, nên một kỹ năng có thể liệt kê các cụm từ xin nó,
+  `asks = ["take a photo", ...]` ở đầu `skill.toml` của nó
+  ([skill-format.md](../skill-format.md)). Bước kiểm tra khi nạp (một lần cài và một lần push đều nạp nó)
+  và schema nhận tối đa 8 cụm, mỗi cụm 2
+  đến 8 từ gồm chữ, số và dấu nháy đơn, cách nhau một dấu cách, không cụm
+  nào lặp lại dù khác hoa thường, và chỉ đi cùng một `tool` không có
+  `[choice]` và không có `[flag]`. lamp-skills ghi chúng vào tệp tools
+  bên cạnh các tool (`"asks": {"photo_booth": ["take a photo"]}`, theo
+  tên; không kỹ năng nào có, thì tệp như trước), và giọng nói đọc chúng
+  (`tools::skill_asks`). Một cụm được khớp như tên, nguyên vẹn: các từ
+  của nó liền nhau, không phân biệt hoa thường, quanh nó chỉ có những gì
+  được phép quanh một tên, không bao giờ "wait", và chạy theo cùng một
+  cách. "take a photo" chạy photo booth có cụm đó; "Hey Lamp, play me
+  something to relax." và "Lamp, can you play some relaxing music?" chạy
+  `relaxing-music` (`examples/relaxing-music` có "relaxing music" và
+  "play me something to relax"). "is there a camera?", "don't take a
+  photo" và "Take a photo, wait." là của model. Một cụm hai kỹ năng cùng
+  có, hoặc trùng tên một kỹ năng khác, không chạy kỹ năng nào. Khớp tối
+  đa 8 từ, của tên hay của cụm. Tuyến Live không đổi.
 - **Các chỉ dẫn:** chỉ dẫn có sẵn (`config::CHAT_INSTRUCTION`, và bản có
   camera), thứ đèn sản phẩm chạy (cấu hình provider của nó không nêu
   `instruction_file`), nói "never say you have no arms, legs, body or
@@ -2131,8 +2149,12 @@ camera, so I can't take photos…" với `calls=none`.
   `photo_booth_by_name_runs_once_when_the_model_calls_it_too`,
   `the_policys_hold_runs_nothing_for_a_skill_named`,
   `a_skill_named_whose_answer_asks_a_look_takes_it`,
-  `a_camera_line_naming_no_skill_goes_to_the_model` và
-  `a_wait_beside_a_skills_name_goes_to_the_model`.
+  `a_camera_line_naming_no_skill_goes_to_the_model`,
+  `a_wait_beside_a_skills_name_goes_to_the_model`,
+  `a_skills_own_ask_phrases_call_it_in_code` ("take a photo" và "photo
+  booth" của Seventh từ #6413, hai câu của Sixth từ #5749) và
+  `a_camera_question_is_not_an_ask`; `it::asks` của lamp-skills (các giới
+  hạn, và `asks` của tệp tools).
 
 ## Socket gọi kỹ năng phân biệt bên gọi (#6128)
 
