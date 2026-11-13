@@ -10,7 +10,7 @@ rows name is 12587, 13 Nov 2026). lamp-control is on every lamp and answers once
 the owner turns on developer access in the app. Four gaps below. Already in:
 skill push (from 11091; the owner says yes at the lamp), `joints` for `roll`,
 `shoulder` and `elbow` (from build 11102, the body's pose, only while the lamp
-stands), a head tap and pet as `touch` events (from 11372), a new motion that
+stands), a head tap as a `touch` event (from 11372; a pet is sent too but not shown on a lamp yet), a new motion that
 replaces the one playing (from 11048), a motion's end with `wait=True` (from
 11716) and `play` (from build 12171).
 
@@ -28,8 +28,11 @@ replaces the one playing (from 11048), a motion's end with `wait=True` (from
    "this lamp's gaze is not measured, so it cannot look at a face". It turns
    toward a face only on a lamp with a measured `--gaze`, and ends `dropped`
    "no face in view" without one in view. Never promise a face look. `look` at
-   `name` is still refused (no sound direction); `ahead`, a yaw and pitch, and
-   `hand` work.
+   `name` is still refused (no sound direction); `ahead`, and a yaw and pitch,
+   work. The lamp doesn't track hands yet either (the GUIDE's Follow a hand row:
+   in development; nothing publishes `humans/hands/tracked`, and lamp-body
+   refuses a hold that says `follow`), so don't promise `look` at `hand` or
+   `follow_hand`.
 
 What older stables did, if a lamp is behind:
 - **`wait=True` on `gesture`, `move` and `express`** returned when the lamp took
