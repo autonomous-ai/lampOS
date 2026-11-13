@@ -39,9 +39,10 @@ pub const CLOSED_AGAIN: &str = "the run started again";
 pub const NO_TOKEN: &str = "no token for this run";
 
 /// The owner's yes for a skill, read where it is kept: the grants it named for
-/// the skill's folder as it is now. An `Err` is the words the owner's app or
-/// lamp-tasks is told (no yes; the folder changed since it; the skill is not
-/// there). The skills' own part defines where the yes lives.
+/// the skill's folder as it is now, none for a yes kept with no grant (its
+/// token names none). An `Err` is the words the owner's app or lamp-tasks is
+/// told (no yes; the folder changed since it; the skill is not there). The
+/// skills' own part defines where the yes lives.
 pub trait SkillYes: Send + Sync {
     fn grants(&self, skill: &str) -> Result<BTreeSet<Grant>, String>;
 }
