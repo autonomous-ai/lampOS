@@ -2,7 +2,7 @@
 use crate::{
     engine::{
         CLOSE_TRIES, Clock as ClockSample, CloseJob, Engine, Error as EngineError, LaunchJob,
-        ObservationJob, Watched,
+        ObservationJob, Watched, background_code,
     },
     follow::{CliWatch, Follows, WatchLane},
     harness::{
@@ -1202,6 +1202,10 @@ impl Adapter for Production {
 /// and the engine tries it again a minute later, read first again, no more
 /// than [`CLOSE_TRIES`] times in all. Read and close share one
 /// [`CLOSE_BUDGET`], so the job lane is held no longer than one launch.
+/// An agent idle with background commands still running (Harness 0.6.52,
+/// #5689), found by the read or by Harness refusing the close, is not done:
+/// `observe_background_commands` or `close_background_commands`, tried
+/// again the same way without counting as a try.
 fn close_told(adapter: &impl Adapter, job: &CloseJob) -> Result<Closed, String> {
     let began = Instant::now();
     let now = adapter
@@ -1227,6 +1231,10 @@ fn close_line(job: &CloseJob, result: &Result<Closed, String>) -> String {
     let id = job.task_id;
     let tries = job.tries;
     match result {
+        Err(code) if background_code(code) => format!(
+            "tasks: closing task {id}'s harness: try {tries} not done ({code}); \
+             background commands still run, tried again in a minute, read first"
+        ),
         Err(code) if tries >= CLOSE_TRIES => format!(
             "tasks: closing task {id}'s harness: try {tries} of {CLOSE_TRIES} failed ({code}); \
              giving up, the harness is left open"

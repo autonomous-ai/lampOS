@@ -1118,6 +1118,14 @@ started once its answer is told:
     `Cli::close_now` (`harness close ... --now`, stopping it even while it
     works) is only for a skill's run lamp-tasks started itself
     (`HarnessRunner`, #6510 Part 1 step 2), at its deadline or end.
+  - **Background commands still running** (#5689, Harness 0.6.52): the
+    read finds the agent idle with `backgroundCommands` above zero
+    (`observe_background_commands`), or `close` itself refuses with `N
+    background commands running; --now closes anyway`, in its reply or on
+    stderr, whatever its exit (`close_background_commands`). Not done, so
+    not left: tried again a minute later, read first, never with `--now`,
+    and such a try isn't counted against the three, for up to a day after
+    the told answer was kept in this boot (then it counts as any failure).
   - **Any other turn or state:** the person went on with it at the computer,
     so it's theirs. It's left for good (`left`), never asked again.
   - **Stopped or failed already:** nothing to close (`closed`, code `gone`).
@@ -3913,7 +3921,13 @@ used only to say it.
   or a failure is kept on the first look. A wait longer than the second
   look still reads idle twice, and neither `show` nor Harness's own `wait`
   (two looks about 3 s apart) can tell, so after an idle answer is kept the
-  watch goes on looking every 2 minutes for 10 (`WATCH_FOLLOW_MS`). The same
+  watch goes on looking every 2 minutes for 10 (`WATCH_FOLLOW_MS`).
+  From Harness 0.6.52 (openharness#4229) `show` says it: an idle agent
+  carries `backgroundCommands`, and one idle with more than zero still
+  running is read as `working` (#5689), so it is never kept, listed
+  settled, told or closed until none runs; its news is told then, once.
+  `null` (Codex, OpenClaw, Windows: Harness can't tell) or no field at all
+  (Harness before 0.6.52) is read as before. The same
   answer is only seen again; a different one, confirmed the same way, is
   kept as a new observation, and the voice tells it as news of its own:
   Harness gives that answer with the earlier one at its front ("…once it
@@ -3982,7 +3996,11 @@ used only to say it.
   watch's order. `watch` prints one JSON line when the event or the turn
   changes (Harness looks every 3 s); only `event` and `id` are read, never
   the summary, ask or question, and a line for another id is passed over.
-  `started` and `working` read nothing. `done`, `failed`, `needs_person`,
+  `started` and `working` read nothing, nor does `background` (Harness
+  0.6.52: idle with background commands still running, sent in place of
+  `done` and again when their number changes; #5689): the watch is held
+  and its task read once, on the `done` that follows when none runs.
+  `done`, `failed`, `needs_person`,
   `idle` and `stopped` read the task at once (`Engine::push`, the same read
   as `--push-wait`'s, which keeps an idle answer on the spot: `done` comes
   after Harness's two idle looks). `watch` exits by itself only on
