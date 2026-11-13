@@ -3,6 +3,15 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 20:0x GMT+7: #6929 and #6925 in train 882; Heron reads #6933
+
+- The first builder cut train 882 (#6937) at 19:09 with #6929 and #6925
+  among others; not merged at this check. #6938 is rebased to its one
+  commit once 882 lands.
+- #6933: Heron READ-OK c01e43077f (both mutations fail the limit test on
+  his Mac). The first builder's read still asked.
+- READ ASK #6928 (role file) to sim-2 and the first builder.
+
 ## 2026-11-13 19:5x GMT+7: resident synthesizer measured
 
 - A throwaway Swift probe (scratch, not committed) of
