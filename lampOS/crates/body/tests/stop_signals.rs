@@ -17,6 +17,15 @@ use std::{
 const CHILD: &str = "LAMP_BODY_STOP_SIGNALS_CHILD";
 
 fn main() {
+    // nextest lists a binary before it runs it: name the one test, and no
+    // ignored ones, as libtest's terse list does.
+    let args: Vec<String> = std::env::args().collect();
+    if args.iter().any(|arg| arg == "--list") {
+        if !args.iter().any(|arg| arg == "--ignored") {
+            println!("stop_signals: test");
+        }
+        return;
+    }
     if std::env::var_os(CHILD).is_some() {
         let unplug = lamp_body::unplug::Adapter::held(|_| false).unwrap();
         assert!(unplug.is_some(), "the unplug adapter did not start");
