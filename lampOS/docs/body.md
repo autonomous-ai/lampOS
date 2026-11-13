@@ -919,8 +919,10 @@ rest by itself and then stands as ever:
    is, then torque on (`--torque on`).
 3. **The arm folds, together.** A drooped head (pitch past its folded window's
    edge) is lifted to the edge first. Then the shoulder and the elbow fold
-   together along one eased line, at `--recover-speed` (40) counts a second for
-   the one that travels farther, each goal a count or two from the last: V1's
+   together along one eased line, at `--recover-speed` counts a second for the
+   one that travels farther (40 unless given; the product unit gives 100, the
+   stand's own pace of 600 counts in 6 s, the hardware lead's choice after four
+   bench power-ups on 13 Nov), each goal a count or two from the last: V1's
    shape, which shortens the elbow's lever from the first tick. Where that
    would take the centre of gravity farther off the base's axis than where it
    was found or rests folded ([`cog::off_axis_mm`]), the elbow folds first, or
