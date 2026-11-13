@@ -1369,12 +1369,16 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          for …, past its 6 h bound: it is moved now (#6656)` and asks the
          move. A sign-in, hand-over or follow-up running now still waits
          every round, past the bound too. The kept time goes once a round
-         finds nothing in use, or once the one-shot stops Harness for the
-         move, so a later task starts its 6 h afresh. Before, a task on an
+         finds nothing in use, once the one-shot stops Harness for the
+         move, or once a round finds Harness `installed` with no move due
+         (the one-shot found it already at the pin and left it), so a later
+         task starts its 6 h afresh. A move asked and still waited for
+         (`installing`, or `failed` within its retry wait) keeps it. Before, a task on an
          offline laptop held a lamp on Harness 0.5.39 all evening, and
          neither the app nor the voice could clear it. Tests:
          `issue_6656_a_task_left_unknown_holds_the_move_back_six_hours_at_most`,
-         `issue_6656_the_one_shot_moves_past_the_bound_and_lets_the_time_go`.
+         `issue_6656_the_one_shot_moves_past_the_bound_and_lets_the_time_go`,
+         `issue_6656_no_move_due_lets_a_kept_hold_go`.
        - **The ask:** `harness-ask.json` gains `upgrade_from` (the
          recorded version), so the one-shot moves the Harness that is there
          instead of saying "already at …, nothing installed". The record

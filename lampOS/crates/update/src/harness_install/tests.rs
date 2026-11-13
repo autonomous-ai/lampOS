@@ -2597,6 +2597,54 @@ fn issue_6656_the_one_shot_moves_past_the_bound_and_lets_the_time_go() {
     }
 }
 
+/// #6656's lamp row: the one-shot found Harness already at the pin and left
+/// it, so no move ran to let the kept time go. The next round, with Harness
+/// `installed` and no move due, lets it go even while a task is worked on,
+/// so a later pin move holds back from then, not from a stale time. A move
+/// asked and still within its wait keeps it.
+#[test]
+fn issue_6656_no_move_due_lets_a_kept_hold_go() {
+    const H: u64 = 3_600_000;
+    let pin = Ok(Some(product::built_in()));
+    let old_hold = || format!(r#"{{"version":1,"since_unix_ms":{H}}}"#);
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    installed_at(&lamp, Some(product::VERSION), 1);
+    fs::write(lamp.records().join(DEFERRED), old_hold()).unwrap();
+    let mut lines = Vec::new();
+    let said = after_round_when(
+        lamp.root(),
+        &lamp.records(),
+        &pin,
+        &mut Fake::default(),
+        10 * H,
+        &mut || Some(busy::TASK_WORKED_ON),
+        &mut |line: &str| lines.push(line.to_owned()),
+    );
+    assert_eq!(said, None, "{lines:?}");
+    assert!(!lamp.records().join(DEFERRED).exists(), "{lines:?}");
+    assert!(
+        lines.iter().all(|line| !line.contains("at a later round")),
+        "{lines:?}"
+    );
+
+    // A move asked (`installing`) and not yet stuck: its hold is kept.
+    let lamp = Lamp::new();
+    asked_to_move(&lamp, "0.4.25");
+    fs::write(lamp.records().join(DEFERRED), old_hold()).unwrap();
+    let said = after_round_when(
+        lamp.root(),
+        &lamp.records(),
+        &pin,
+        &mut Fake::default(),
+        3,
+        &mut || Some(busy::TASK_WORKED_ON),
+        &mut |_: &str| {},
+    );
+    assert_eq!(said, None);
+    assert!(lamp.records().join(DEFERRED).exists());
+}
+
 /// #5957 (P2-3): a kept copy already there (a put-back that failed) is the
 /// only good one: KEEP refuses, and leaves it whole.
 #[test]
