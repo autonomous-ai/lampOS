@@ -26,7 +26,7 @@ for p in "$@"; do
   coord_same_patch $head $tmp/c $tmp/q > $tmp/heads
   heads=(${(f)"$(<$tmp/heads)"})
   git rev-list origin/lamp-voice..$head > $tmp/commits 2>/dev/null || { echo "#$p: its commits can't be listed"; exit 1; }
-  two=$(cat $tmp/b $tmp/c | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $tmp/q --pr $p --pr-commits $tmp/commits $heads)
+  two=$(cat $tmp/b $tmp/c | $PYTHON -I $TOOLS_DIR/reads2.py --always --writers $wf --queue $tmp/q --pr $p --pr-commits $tmp/commits $heads)
   [[ $two == none || $two == met* ]] || { echo "#$p: TWO READS ${two:-unread}"; exit 1; }
 done
 exit 0
