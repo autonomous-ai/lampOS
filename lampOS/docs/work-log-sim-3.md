@@ -3,6 +3,18 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 04:2x GMT+7: nine's two last P3s; the stack again
+
+- nine restated READ-OK on #6954 (9691717f56) and #6961 (d4cfc1270f), with a
+  P3 each. #6954: the drip test flaked on macOS CI (`answer()`'s `write!`
+  went out in a dozen writes; a first read held "HTTP/1.1 "): one `write_all`
+  now, and the test reads to close; 6/6 runs here. New head 0ef3b78377.
+- #6961: the 300 ms quiet end measured on long lines (a Rust probe): widest
+  gap between buffers 0.7 ms on 4,096-character lines (3 runs), 9.6 ms worst
+  over 6 lines of 432–864 words; kept 300 ms, numbers in its doc. Head
+  21bb2f36f8. #6971 restacked to 6ddc81f2c3 (no change of its own).
+- All three: fmt, clippy, lamp-sim tests on this Mac. Restates asked.
+
 ## 2026-11-14 04:0x GMT+7: nine read #6961; Heron's macOS 14 end buffer
 
 - nine READ-OK #6961 at 529122876c (counted; all ten `unsafe` blocks held).
