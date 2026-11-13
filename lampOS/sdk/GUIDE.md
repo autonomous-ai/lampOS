@@ -448,7 +448,18 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
 - `sound.heard`: `class` (`knock`, `music`, ...), `score`. Grant `sound`. In today's build,
   lamp run pending.
 - `touch`: `kind` (`tap`, `pet`, `hold`), `where`. No grant. A tap reaches a program from build 11372 (#5981; on 11091 it did not; 8 of 8 taps on lamp-75c9, 10 Nov 14:18). `kind` is `tap` or `pet`; `hold` and `where` are not sent yet. Example: `examples/touch.py`.
-- `button`: `press` (`press`, `long_press`). No grant. In today's build, lamp run pending. `press` is `long_press` when lamp-control sends it; a short `press` is in the schema and nothing sends it yet.
+- `button`: `press` (`press`, `long_press`). No grant. Works today from the bus, not from the button
+  itself (13 Nov 2026, lamp-75c9 on stable 12728 (lamp-update, 16:11 to 16:12 on 13 Nov),
+  installed binaries, nothing staged): root published a `controls/gesture` message with gesture
+  `long_press` at 20:17:56 (`lamp-bus pub`, delivered 3, dropped 0) and a paired computer subscribed
+  to `button` was told `{press: long_press}` in the same second. The message was a hand-made one
+  that the lamp's readers refuse or ignore (its source, gesture and intent do not form a permitted
+  action: the voice and the mood reader drop it, the expression engine ignores a long press), so
+  that it could not mute the lamp; lamp-control reads the gesture, `enabled` and an `intent` of
+  `stop` (which this was not).
+  The button was not pressed, and a reaction from the lamp itself (sound, light or motion) was not watched.
+  `press` is `long_press` when lamp-control sends it; a short `press` is in the schema and nothing
+  sends it yet.
 - `time`: the client's own schedule. No grant. Planned: nothing sends it yet.
 - `lamp.changed`: `lamp_state` (`talking`, `paused`, `private`, `asleep`, `lease`). No grant.
   In today's build, lamp run pending.
