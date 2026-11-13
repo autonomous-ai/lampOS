@@ -1,0 +1,6 @@
+# 10:00, 100 minutes at the desk, and lamp-seen saw a drink at 80 minutes
+# (#6543): at 90 drank_s_ago is 600, so the sip is held through its ten
+# minutes' wait and let go (once a sitting). The PM: a seen drink only holds
+# the timer, never a word of its own.
+clock = "10:00"
+none = true

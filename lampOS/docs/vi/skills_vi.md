@@ -2097,7 +2097,7 @@ Bảng đầy đủ các khóa trigger ở [skills.md](../skills.md).
 | Giá trị | Ý nghĩa |
 |---------|---------|
 | `unknown = "holds"` | Điều kiện giữ khi chủ đề chưa nói gì (#1677). Một giá trị đã hết hạn vẫn không giữ: `[[while]]` đóng cho tới khi có giá trị mới. Đi với phép thử của một trường, không có `for` hay `present`. Nghĩa này không đổi. |
-| `unknown = "holds_stale"` | Điều kiện giữ khi chủ đề chưa nói gì *và* khi giá trị mới nhất đã hết hạn, như một chủ đề đã im (cho `humans/doing`). Một giá trị còn hạn được xét theo chính nó như mọi khi; một giá trị còn hạn đến sau một giá trị đã hết hạn bắt đầu `for` từ chính nó, không từ giá trị cũ. Vì vậy, với `for`, điều kiện đóng trong khoảng đó khi chủ đề nói lại (ví dụ lamp-seen khởi động lại), dù nó đã giữ trong lúc chủ đề im. Đi với phép thử của một trường, không có `present` (`for` được phép). Chọn thêm: chưa kỹ năng nào dùng. Kiểm thử (`crates/skills/tests/it/skills.rs`): `an_unknown_holds_stale_condition_holds_on_a_topic_never_said_or_run_out` |
+| `unknown = "holds_stale"` | Điều kiện giữ khi chủ đề chưa nói gì *và* khi giá trị mới nhất đã hết hạn, như một chủ đề đã im (cho `humans/doing`). Một giá trị còn hạn được xét theo chính nó như mọi khi; một giá trị còn hạn đến sau một giá trị đã hết hạn bắt đầu `for` từ chính nó, không từ giá trị cũ. Vì vậy, với `for`, điều kiện đóng trong khoảng đó khi chủ đề nói lại (ví dụ lamp-seen khởi động lại), dù nó đã giữ trong lúc chủ đề im. Đi với phép thử của một trường, không có `present` (`for` được phép). Chọn thêm: chỉ các kỹ năng đọc `humans/doing` hay `humans/posture` dùng nó. Kiểm thử (`crates/skills/tests/it/skills.rs`): `an_unknown_holds_stale_condition_holds_on_a_topic_never_said_or_run_out` |
 
 Bảng đầy đủ các khóa `[[while]]` ở [skills.md](../skills.md).
 
@@ -2572,8 +2572,42 @@ và vùng xấu nhiều nhất) ([msgs.md](../msgs.md)). `lamp-seen` sẽ phát 
 `[permissions] topics` hiện quyền dùng `seen`, riêng tư
 ([cloud.md](../cloud.md)). Ba bộ đếm của `humans/doing` luôn có mặt, đếm từ
 lúc đến bàn khi chưa thấy gì, nên `[[while]] topic = "humans/doing" field =
-"drank_s_ago" above = 5399 unknown = "holds"` vẫn đúng với người đèn chưa
-thấy uống, như khi chỉ có đồng hồ; `humans/posture` luôn có `window_s` (0
-lúc cửa sổ bắt đầu). Một chủ đề có giá trị cuối đã hết hạn vẫn không làm
-`[[while]]` nào đúng: `unknown = "holds"` chỉ áp dụng cho chủ đề chưa từng
-nói gì.
+"drank_s_ago" above = 5399 unknown = "holds_stale"` vẫn đúng với người đèn
+chưa thấy uống, như khi chỉ có đồng hồ; mỗi giá trị `humans/posture` được
+nói đều có `window_s` (0 lúc cửa sổ bắt đầu), và chủ đề không được nói khi
+cửa sổ của lamp-seen chưa có mẫu nào (ảnh không được gửi đi, máy chủ bận,
+cửa sổ vừa bị xoá), nên nó hết hạn như khi không có lamp-seen. Một chủ đề có giá trị cuối đã hết hạn không làm
+`[[while]]` có `unknown = "holds"` đúng, vì nó chỉ áp dụng cho chủ đề chưa
+từng nói gì; `unknown = "holds_stale"` đúng cả khi giá trị đã hết hạn.
+
+Năm kỹ năng đi kèm đọc chúng như vậy (#6543, phần kỹ năng), mỗi điều kiện có
+`unknown = "holds_stale"`, nên khi không có `lamp-seen`, hoặc nó đã im, mỗi
+kỹ năng chạy đúng như trước: Uống ngụm nước (`drank_s_ago` trên 5399, và
+2999 trong `[present]`), Đứng dậy (`break_s_ago` trên 5999), Vươn vai
+(`break_s_ago` trên 1799: 30 phút của `sooner` theo cái ngáp, không phải 50
+phút của chính nó, nên một cái ngáp vẫn đưa lần vươn vai sớm lên), Hỏi bữa ăn
+(`ate_s_ago` trên 4499, 75 phút của các trigger; phiên bản 1.1.0) và Ngồi
+thẳng lại (`bad_share` của `humans/posture` trên 0.5: chỉ là trigger tốt hơn,
+lời nói vẫn không bao giờ nhắc tới cơ thể). Một lần thấy uống, ăn hay vươn
+vai chỉ giữ một lời nhắc lại, không bao giờ thành một lời nói riêng, và không
+lưu gì về một người (quyết định của PM). Nghỉ giải lao (comfort break) không
+đọc chủ đề nào: không việc gì thấy được cho biết lần nghỉ đỡ cần hơn (thấy
+uống nước càng không). Điều kiện của Ngồi thẳng lại cũng giữ lời cảm ơn, vì
+`[[while]]` là của cả kỹ năng: nếu lúc đó tư thế đã được đọc là tốt, lời cảm
+ơn bị bỏ qua. Các ca: `a-sip-when-lamp-seen-saw-no-drink`,
+`quiet-after-a-drink-was-seen`, `a-sip-when-lamp-seen-went-quiet`,
+`a-stand-when-lamp-seen-saw-no-stretch` của Đứng dậy,
+`acts-when-lamp-seen-saw-no-stretch` của Vươn vai,
+`quiet-after-a-stretch-was-seen` của Đứng dậy và Vươn vai,
+`lunch-when-lamp-seen-saw-no-meal` và `not-when-a-meal-was-seen` của Hỏi bữa
+ăn, `a-word-when-the-posture-reads-bad`, `let-be-when-the-posture-reads-well`
+và `a-word-when-lamp-seen-has-no-posture-sample` của Ngồi thẳng lại
+(lamp-seen đang chạy, cửa sổ chưa có mẫu tư thế nào, chủ đề chưa từng nói:
+lời nhắc như trước); kiểm thử
+`a_yawn_still_brings_the_stretch_forward_with_lamp_seen_saying_no_stretch`.
+Mọi ca ghi trước đây không có `humans/doing` hay `humans/posture`, tức chủ đề
+chưa từng nói, và vẫn qua không đổi. Ngưỡng của mỗi bộ đếm bằng đúng `for`
+của trigger, không có khoảng dư: nếu lúc đến bàn của lamp-seen (bắt đầu lại
+khi có `room/stood_up`) muộn hơn lần ngồi mà trigger đếm (lần ngồi này vẫn
+giữ qua các khoảng trống tới 2 phút), lời nhắc phải chờ bộ đếm, và chờ quá
+`wait` của trigger thì mất lời nhắc của lần ngồi đó.

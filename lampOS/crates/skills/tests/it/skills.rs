@@ -549,11 +549,12 @@ fn every_skill_folder_says_its_kind_and_version() {
             "who-was-here"
         ]
     );
-    // Meal check is 1.0.1 for its `[present.budget]` (#5207), so the Store's
-    // package reaches a lamp that has 1.0.0.
+    // Meal check is 1.0.1 for its `[present.budget]` (#5207), and 1.1.0 for
+    // its `[[while]]` on humans/doing (#6543), so the Store's package reaches
+    // a lamp that has the one before.
     for skill in &skills {
         let version = if skill.name == "meal-check" {
-            "1.0.1"
+            "1.1.0"
         } else {
             "1.0.0"
         };
@@ -2640,6 +2641,62 @@ fn a_yawn_in_the_sitting_brings_the_stretch_forward_once() {
     assert!(error.contains("give the trigger a for"), "{error}");
 }
 
+/// #6543: Stretch break's `[[while]]` on `humans/doing` waits for 30
+/// minutes of no stretch seen, its yawn sooner's, not its own 50: with
+/// lamp-seen saying nothing seen, a yawn still brings the stretch to 30
+/// minutes; a stretch seen at 25 minutes holds it, and the wait lets it go.
+#[test]
+fn a_yawn_still_brings_the_stretch_forward_with_lamp_seen_saying_no_stretch() {
+    let skill = load(&skills_root().join("stretch-break")).unwrap();
+    let yawned = r#"{"state":"at_desk","for_s":60,"sitting_s":600,"baseline":true,"yawns":1}"#;
+    let runs = |stretched_at: Option<u64>| {
+        let mut messages: Vec<(u64, &str, String)> =
+            vec![(0, "voice/state", r#"{"state":"resting"}"#.into())];
+        // lamp-seen's word first at each 30 s, before the faces of that second.
+        for at in (0..=3300).step_by(30) {
+            let stretch = stretched_at.filter(|seen| at >= *seen);
+            let break_s = stretch.map_or(at, |seen| at - seen);
+            messages.push((
+                at,
+                "humans/doing",
+                format!(
+                    r#"{{"drank_s_ago":{at},"ate_s_ago":{at},"break_s_ago":{break_s},"last":"{}","confidence":0.9}}"#,
+                    if stretch.is_some() { "break" } else { "none" }
+                ),
+            ));
+        }
+        messages.extend(
+            sitting(0, 3300, &[])
+                .into_iter()
+                .map(|(at, topic, payload)| (at, topic, payload.to_string())),
+        );
+        messages.push((600, "room/activity", yawned.into()));
+        messages.sort_by_key(|message| message.0);
+        let mut engine = Engine::new(vec![skill.clone()], true).sooner();
+        let mut at = Vec::new();
+        for (when, topic, payload) in &messages {
+            let lasting = (*topic == "humans/doing").then_some(90_000);
+            // A run that makes its calls, not a chance let go.
+            if engine
+                .observe(topic, when * 1_000_000, payload.as_bytes(), lasting)
+                .iter()
+                .any(|run| !run.calls.is_empty())
+            {
+                at.push(*when);
+            }
+        }
+        at
+    };
+    assert_eq!(
+        runs(None),
+        [1800],
+        "nothing seen: brought forward, as before"
+    );
+    // A stretch seen at 25 minutes holds the yawn's 30 through its 10
+    // minutes' wait, and the chance is let go for this sitting (`rearm`).
+    assert!(runs(Some(1500)).is_empty(), "a stretch seen at 25 minutes");
+}
+
 /// #940 item 3: a light file's pattern is loaded into its call, its kind's
 /// period when it names none and a low of 1; a kind the ring does not play,
 /// a pattern without the light's level, a low at the level or a period out
@@ -3300,10 +3357,17 @@ fn a_meal_check_names_no_food_and_takes_no_picture() {
             );
         }
     }
+    // `humans/doing` (#6543) is lamp-seen's timers, never a picture: a meal
+    // seen only holds the question.
     assert_eq!(
         toml["permissions"]["topics"].as_array().unwrap(),
-        &["humans/faces/tracked", "voice/state", "room/activity"]
-            .map(|topic| toml::Value::String(topic.to_owned()))
+        &[
+            "humans/faces/tracked",
+            "voice/state",
+            "room/activity",
+            "humans/doing"
+        ]
+        .map(|topic| toml::Value::String(topic.to_owned()))
     );
     assert_eq!(skill.kind, SkillKind::Installable);
 }
@@ -3427,10 +3491,17 @@ fn sit_back_says_nothing_of_a_body_and_takes_no_picture() {
             );
         }
     }
+    // `humans/posture` (#6543) is lamp-seen's share of bad samples, never a
+    // picture or a keypoint: a better trigger, never words of the body.
     assert_eq!(
         toml["permissions"]["topics"].as_array().unwrap(),
-        &["room/activity", "humans/faces/tracked", "voice/state"]
-            .map(|topic| toml::Value::String(topic.to_owned()))
+        &[
+            "room/activity",
+            "humans/faces/tracked",
+            "voice/state",
+            "humans/posture"
+        ]
+        .map(|topic| toml::Value::String(topic.to_owned()))
     );
     // In the wellbeing group's hour, as the other nudges: another wellbeing
     // skill's run holds it back (`a_shared_budget_gives_its_group_its_runs_an_hour_between_them`);

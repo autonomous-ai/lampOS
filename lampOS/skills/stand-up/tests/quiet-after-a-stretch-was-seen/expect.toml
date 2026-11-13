@@ -1,0 +1,5 @@
+# 10:00, 110 minutes, and lamp-seen saw a stretch at 95 minutes (#6543): at
+# 100 break_s_ago is 300, so it is held through its ten minutes' wait and
+# let go, with no word of its own for the stretch.
+clock = "10:00"
+none = true
