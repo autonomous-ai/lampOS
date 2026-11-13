@@ -527,7 +527,7 @@ grant it needs. With every grant: 27 tools. With `light` alone: 6
 listing run on 9 Nov). On a customer lamp (stable 11091) a tool is refused
 where the lamp refuses its op: `lamp_skill_push` on 11048 and older ("skill push is not on this
 lamp"), `lamp_play` (the customer build: "not routed yet: waits for client packages"; from the next build, a move recorded in a pushed skill),
-`lamp_joints` for roll, shoulder or elbow ("not routed yet" on the customer build; next build: the body's pose), `lamp_look` at a name ("not in this release"; at a face: next build).
+`lamp_joints` for roll, shoulder or elbow ("not routed yet" on the customer build; next build: the body's pose), `lamp_look` at a name ("not in this release: look at who said the lamp's name (the lamp has no sound direction)"; at a face it is taken now, merged on lamp-voice, not run on a lamp yet).
 No MCP run on a lamp by this section's writer today.
 
 ### Staying connected (every update restarts the lamp)
@@ -806,8 +806,8 @@ You don't need this to use the SDKs; it's for anyone writing their own client or
 -> {"id":3,"op":"express","feeling":"glad","strength":0.6}
 <- {"re":3,"ok":true,"to":"body","move":"glad-lift","light":"the light is off"}
 
--> {"id":5,"op":"look","at":"face"}
-<- {"re":5,"ok":false,"error":{"code":"refused","why":"not in this release: look at a face or a name"}}
+-> {"id":5,"op":"look","at":"name"}
+<- {"re":5,"ok":false,"error":{"code":"refused","why":"not in this release: look at who said the lamp's name (the lamp has no sound direction)"}}
 ```
 
 The `hello`'s `sig` and the pairing proof are left out. They are signatures, never to be shared. `limits` here shows a developer lamp with rates off, the default.
@@ -843,8 +843,8 @@ From the test lamp on the customer build. Ids and leases are this run's own.
 ```
 
 ```json
-→ {"id":5,"op":"look","at":"face"}
-← {"re":5,"ok":false,"error":{"code":"refused","why":"not in this release: look at a face or a name"}}
+→ {"id":5,"op":"look","at":"name"}
+← {"re":5,"ok":false,"error":{"code":"refused","why":"not in this release: look at who said the lamp's name (the lamp has no sound direction)"}}
 ```
 
 **Events as they came to the SDK:**
@@ -893,7 +893,7 @@ Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless
 | Arrival (`person.arrived`, `person.left`) | lamp run pending | in the customer build's code (11091); no run showed it yet. Example: `examples/greet.py` |
 | `phrase.heard` | works today (12 Nov 2026, lamp-75c9 on 12226 (tag `lampos-lamp-voice-12226` 65fcde59e3; the lead's log has it on 12226 from 16:13 on 12 Nov, and its lamp-control sha256 was fb72662f87…, as the lead read it, in `runs/ten-phrase-75c9-12226.out`); the matching is the commit 979dfd19eb, in tag `lampos-lamp-voice-11467`) | one computer, grant `hear` only, registered `good night lamp` and `good morning lamp`; the laptop's speaker played four lines 10 s apart: "Good night lamp." told the first 1.6 s after the line ended, "Goodnight, lamps." (joined, with an "s") told the first 0.9 s after, "Good morning, lamp." told the second 1.4 s after, and "Nice weather today." told nobody; 4 of 4 as expected, the lamp quiet. Before 11467 a phrase was missed when the recognizer joined its words or added an "s"; matching is on the recognizer's words, so register short phrases and their variants |
 | Follow a hand | in development: the lamp doesn't track hands yet, and its body doesn't follow one yet | the door is in; nothing on the lamp publishes `humans/hands/tracked`, and lamp-body refuses a hold that says `follow` (the lease ends `released`) |
-| Camera snapshot and stream | works today (9 Nov 2026) | about 2 frames a second at about 320 px today; the faster stream is the row near the end of this table |
+| Camera snapshot and stream | works today (9 Nov 2026; the snapshot again on lamp-75c9 at 12587, 13 Nov 2026) | the snapshot is the eyes' newest frame, a JPEG the SDK documents as about 320 across (19,832 bytes on lamp-75c9 at 09:39 on 13 Nov; the width was not read back from the picture); a stream with no fast path is that newest frame about 1 to 2 a second, as it was on 9 Nov, and where the eyes serve every frame (the product's, `fast: true`) it is 640x480 or 1280x720 as asked, at the rate in "The faster camera stream" below |
 | Volume | works today (9 Nov 2026) | set, step and read; `volume.changed` seen on lamp-75c9 (lamp-75c9 on 11913: its lamp-control sha256 f6b2bc7ed1… read by the lead at 12:1x on 12 Nov is the same as 11913's in `runs/ten-status-11913.out`; no switch known between 11 Nov 17:26 and 12 Nov 11:24; the controller pre-flight at 03:05Z: a step down answered `{"level":24,"muted":false}`, the `volume.changed` event came, and the level was put back) |
 | A new motion replaces the one playing | works today (9 Nov 2026, 11048) | no `busy`: on lamp-75c9 a nod 1.5 s into `stretching`, and a nod 1 s into a `move`, each ended the one playing ("dropped: another was asked after it") and played; 10824 refused `busy` with `retry_ms` |
 | A look on a resting lamp says `clamped` | works today (9 Nov 2026, 11048) | `finished` where the head stopped, `clamped` when a joint stopped more than half a degree off, so small looks at rest mostly say it: all 7 on lamp-75c9 stopped 1–2° short, `clamped: true`; 10824 may answer `cut_short` |
@@ -923,7 +923,7 @@ Last verified 10 Nov 2026, on a test lamp running a customer build: 10824 unless
 | A brain hearing the person and owning the turn | planned | |
 | A partner's brain installed on an edition lamp | planned | |
 | `play` a recorded move by name (from a pushed skill's `moves/`) | works today (12 Nov 2026, lamp-75c9 on 12226 (tag `lampos-lamp-voice-12226` 65fcde59e3; the lead's log has it on 12226 from 16:13 on 12 Nov, and the runs are `sim/controller-preflight-75c9-12226.md` and `runs/nextrows2-75c9-12226.out`, 16:25-16:26); merged on lamp-voice, in build 12171, tag `lampos-lamp-voice-12171` 3e98a74575, the commit 3e98a74575; #6039) | on lamp-75c9 the controller pre-flight pushed its try-wave skill and `lamp.play("small-nod", { wait: true })` ended `done` (the row's event); on 11913 (11 Nov 17:38 and 12 Nov 03:05Z) the same call was refused "not routed yet: waits for client packages", so the build before 12171 lacks it; on the customer build a `move` of the same frames works |
-| Look at a face | next build: built, in review; lamp run pending | refused "not in this release" on 11091 |
+| Look at a face | merged on lamp-voice (`crates/control/src/parts.rs`: `look` at `face` is taken and goes to the body); lamp run pending | refused "not in this release" on 11091; on the tip only `look` at `name` is still refused, "not in this release: look at who said the lamp's name (the lamp has no sound direction)". Not run on a lamp |
 | Look at who said the lamp's name | in development | the lamp has no sound direction |
 | The faster camera stream | works today (13 Nov 2026, lamp-75c9 on stable 12587 (lamp-update check 09:11, 13 Nov 2026), lamp-control 33e5bae8aef0…, installed binaries, nothing staged, lamp-eyes 282714eb70fa…; #6280; `LAMP_EYES_FAST_STREAM=on` is in the product's `lamp-eyes.service` and the lamp said `fast: true` each time); merged on lamp-voice, in build 12104 (tag `lampos-lamp-voice-12104` 75cd3763bf; the commit eb9a694461; #6280) | on lamp-75c9 at 09:39 to 09:41, one paired Python SDK over Wi-Fi with the `camera` grant, 20 s a stream: asked 25 a second at 640x480, 336 frames in 19.4 s reached it, **about 17 a second** (the usual gap 41 ms, about 24 a second while frames flow; p90 gap 86 ms, longest 330 ms); asked 30 at 640x480, 16.6 a second, no more than asking 25; asked 25 at 1280x720, 15.7 a second (frames about 98 kB against 45 kB at 640x480). The lamp's own `fps_now` said 20.7 to 21.4, so about 16 to 17 a second reached the SDK over Wi-Fi while the lamp counted about 21 (the old "about 21 reach the SDK" was the test lamp's, 10 Nov). lamp-control used 3.4% of one core idle and 4.4 to 5.7% streaming (/proc); lamp-eyes' 31 to 35% did not change beyond its idle spread. The first frame came 357 to 389 ms after the ask. The first builder's yes (11 Nov 00:43 and 12:11) turned it on, with the socket open only to lamp-control and a stream's end stopping its writer (`switches.md`, the unit's comment). **Not shown:** whether the missing frames are lost on the lamp or on the Wi-Fi (one network, no wired run, no client on the lamp), a second computer, a run longer than 20 s, a person in view |
 | The lamp announcing itself on the network | planned | then `--host` isn't needed |
