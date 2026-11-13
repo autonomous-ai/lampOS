@@ -1515,18 +1515,19 @@ fn answer(
                     let interface = config.interface.clone();
                     let hotspot = config.hotspot_address.clone();
                     let station = move || lamp_setup::serve::station_ip(&interface, &hotspot);
-                    // The internet check's TLS goes to the backend this request
-                    // names, or the product's relay (#6256).
                     let mut host = ImageHost::new();
-                    host.reach = lamp_setup::wifi::Reach::new(
-                        lamp_setup::wifi::reach_address(
-                            accepted
-                                .backend
-                                .as_ref()
-                                .map_or("", |backend| backend.llm_base_url.as_str()),
-                        ),
-                        lamp_setup::wifi::REACH_TIMEOUT,
-                    );
+                    // PARKED (#6386): the internet check's TLS to the backend this
+                    // request names, or the product's relay (#6256); re-enable when
+                    // China is scheduled and stable's lamp-update carries #6810:
+                    // host.reach = lamp_setup::wifi::Reach::new(
+                    //     lamp_setup::wifi::reach_address(
+                    //         accepted
+                    //             .backend
+                    //             .as_ref()
+                    //             .map_or("", |backend| backend.llm_base_url.as_str()),
+                    //     ),
+                    //     lamp_setup::wifi::REACH_TIMEOUT,
+                    // );
                     if recovering {
                         // A set-up lamp's: the network only, every other
                         // field ignored (El's P1 on #3024).
