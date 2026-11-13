@@ -66,7 +66,7 @@ fn asks_out_of_bounds_are_refused() {
     }
     let (_root, dir) = folder(
         "photo-booth",
-        &format!("asks = [\"let's go\", \"it's 4 o'clock\"]\n{BOOTH}"),
+        &format!("asks = [\"let's party\", \"it's 4 o'clock\"]\n{BOOTH}"),
     );
     assert!(lamp_skills::load(&dir).is_ok());
     for toml in [
@@ -80,4 +80,66 @@ fn asks_out_of_bounds_are_refused() {
         let (_root, dir) = folder("photo-booth", &toml);
         assert!(lamp_skills::load(&dir).is_err(), "{toml}");
     }
+}
+
+/// The probe lines of Thirteen's P1 and P2s and the Reviewer-lead's P2 on
+/// #6842: an ask that is ordinary speech said to the lamp, a held
+/// question's yes or no, a negation or a question, a stop, the lamp's own
+/// words or its first-round rules' phrases, or only what is said around an
+/// ask, is refused as the skill loads; a skill's own asks load.
+#[test]
+fn asks_that_are_ordinary_speech_are_refused() {
+    for ask in [
+        "hey lamp",
+        "yes please",
+        "no thanks",
+        "never mind",
+        "forget that",
+        "remember that",
+        "not now",
+        "what time is it",
+        "turn off the light",
+        "good night",
+        "light show",
+        "remind me in ten minutes",
+        "what reminders do I have",
+        "stop it",
+        "stop the music",
+        "let's go",
+    ] {
+        let (_root, dir) = folder("photo-booth", &format!("asks = [\"{ask}\"]\n{BOOTH}"));
+        let refused = lamp_skills::load(&dir).err().unwrap_or_default();
+        assert!(refused.contains(ask), "{ask}: {refused}");
+    }
+    let (_root, dir) = folder(
+        "photo-booth",
+        &format!("asks = [\"take a photo\", \"snap a pic\"]\n{BOOTH}"),
+    );
+    assert!(lamp_skills::load(&dir).is_ok());
+}
+
+/// Thirteen's P2 on #6842: an ask that holds another skill's name, here
+/// the dance skill's ("dance for me"), is left out of the tools file; the
+/// skill's other asks stay.
+#[test]
+fn an_ask_holding_another_skills_name_is_left_out_of_the_tools_file() {
+    let (_root, dir) = folder(
+        "photo-booth",
+        &format!("asks = [\"dance for me\", \"take a photo\"]\n{BOOTH}"),
+    );
+    let mut booth = lamp_skills::load(&dir).unwrap();
+    booth.enabled = true;
+    let (_dance_root, dance) = folder(
+        "dance",
+        "tool = \"dance\"\n[permissions]\nspeak = true\n[[do]]\nsay = \"Say: here I go.\"\n",
+    );
+    let mut dance = lamp_skills::load(&dance).unwrap();
+    dance.enabled = true;
+    let file = lamp_skills::tools_file(&[booth.clone(), dance]);
+    assert_eq!(file["asks"], json!({"photo_booth": ["take a photo"]}));
+    let file = lamp_skills::tools_file(&[booth]);
+    assert_eq!(
+        file["asks"],
+        json!({"photo_booth": ["dance for me", "take a photo"]})
+    );
 }

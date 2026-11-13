@@ -1494,6 +1494,9 @@ pub fn capped_with(text: &str, reads: bool) -> Result<(String, Uses), Refused> {
     })
 }
 
+/// Why a made skill with `asks` is refused ([`held`]).
+pub const MADE_ASKS: &str = "it gives asks, the phrases that call a skill, which only a skill from the Store or your computer gives; leave asks out";
+
 /// What a repair is told when [`capped`] refused.
 const CAPPED_ONLY: &str = "kind = \"installable\", version = \"1.0.0\", no [tool]; \
                            [permissions] as its steps and trigger use them: light, body, speak \
@@ -2095,6 +2098,20 @@ pub fn tidied(text: &str) -> String {
             text = tidied;
             table = expected;
         }
+    }
+    // (g) Its `asks` (#6772): the phrases that would call a skill in code
+    // are a skill's from the Store or the owner's computer, never the
+    // model's to claim for one it makes (the Reviewer-lead's P3 2 on
+    // #6842). Taken out whole; one written so it can't be is refused
+    // ([`held`]).
+    if table.contains_key("asks") {
+        tidy(
+            &mut text,
+            &mut table,
+            &|table| Some(table),
+            "asks",
+            "asks, the phrases that call a skill, which a made skill never gives".to_owned(),
+        );
     }
     text
 }
@@ -3199,6 +3216,13 @@ fn carries_task(table: &toml::Table) -> bool {
 /// skill added from a file ([`capped_added`]), or with `reads` on for one
 /// that reads a linked service.
 fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses), Refused> {
+    // A skill's own ask phrases (#6772) are never a made one's, from the
+    // voice or the app ([`tidied`] takes them out where it can): the model
+    // writing it never claims what calls a skill in code (the
+    // Reviewer-lead's P3 2 on #6842).
+    if table.contains_key("asks") {
+        return Err(Refused::new(MADE_ASKS));
+    }
     match table.get("kind").map(|kind| kind.as_str()) {
         None | Some(Some("installable")) => {}
         _ => {
@@ -12056,6 +12080,27 @@ light = { colour = "green", level = 3, for = "20s" }
                 .contains("turns to the face it sees"),
             "{paced_made}"
         );
+    }
+
+    /// The Reviewer-lead's P3 2 on #6842: a made skill (voice or app) never
+    /// carries `asks`, so the model writing it claims no phrase that calls
+    /// a skill in code. Tidied, it is taken out and the skill is as without
+    /// it; written so it can't be taken out, the cap refuses it.
+    #[test]
+    fn a_made_skills_asks_are_taken_out_or_refused() {
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        let nod = made_with(stood, "body = { gesture = \"nod\" }");
+        let asking = format!("asks = [\"take a photo\", \"yes please\"]\n{nod}");
+        assert!(capped_with(&nod, false).is_ok());
+        assert_eq!(
+            capped_with(&asking, false).unwrap_err().0,
+            MADE_ASKS,
+            "the cap refuses asks"
+        );
+        let tidy = tidied(&asking);
+        assert_eq!(tidy, nod);
+        assert!(capped_with(&tidy, false).is_ok());
+        assert!(!paced(&asking).contains("asks"), "the voice's make path");
     }
 
     /// lamp-74ff, 11 Nov 09:48-09:50: "nod when I stand up", made from the

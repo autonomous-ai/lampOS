@@ -48,8 +48,23 @@
 //! ([`crate::tools::skill_asks`]). An ask is matched as the name is, whole,
 //! with the same words around it, and runs the same way: "take a photo"
 //! runs the photo booth that asks it, and "Lamp, can you play some relaxing
-//! music?" the relaxing music. A phrase two skills give, or one that is
-//! another's name, runs neither.
+//! music?" the relaxing music. A phrase two skills give runs neither, and
+//! one that holds another installed skill's name (core and with a choice
+//! included: "light show", "dance for me") is dropped; the names still run.
+//!
+//! An ask never takes ordinary speech (Thirteen's P1 and P2s and the
+//! Reviewer-lead's P2 on #6842): [`ask_refused`] refuses, as lamp-skills
+//! loads a skill and again here, a phrase that is or holds a yes, a no or a
+//! consent's words ("yes please", "no thanks", "never mind", "forget that",
+//! "remember that"), a negation or a question word ("not now", "what time
+//! is it"), a stop ("stop it"), the lamp's own words for what it does
+//! itself ("turn off the light", "good night", "remind me in ten minutes",
+//! the first-round rules' phrases: `LAMP_MEMORY_KEEP_ASKED`,
+//! `LAMP_SCHEDULE_ASKED`, `LAMP_REMINDERS_ASKED`, `LAMP_SKILL_ASKED`), or
+//! only words said around an ask ("hey lamp"). And while a yes of any kind
+//! is held for the person's answer (a keep or a forget, a face save or
+//! rename, a skill's write or task yes), no line is read for a skill at
+//! all: the answer is the held question's (`second_provider`).
 use crate::known_faces::lower_words;
 use crate::tools::skill_asked::{AROUND, REQUESTS, phrase_at};
 use serde_json::{Value, json};
@@ -122,31 +137,303 @@ fn loose_ask(ask: &str) -> String {
     loose(&lower_words(ask).join("-"))
 }
 
+/// Words that, anywhere in an ask, are the lamp's memory's or a held
+/// question's answer: "forget that", "remember that", "keep it", "save it".
+const MEMORY_WORDS: &[&str] = &[
+    "remember",
+    "remembered",
+    "forget",
+    "forgot",
+    "forgotten",
+    "keep",
+    "save",
+    "nevermind",
+];
+
+/// Words that, anywhere in an ask, make it a no or a refusal: what is said
+/// to refuse is the model's, never a skill's run.
+const NEGATIONS: &[&str] = &[
+    "no",
+    "not",
+    "never",
+    "none",
+    "nothing",
+    "nobody",
+    "neither",
+    "nor",
+    "without",
+    "nope",
+    "nah",
+    "don't",
+    "dont",
+    "doesn't",
+    "doesnt",
+    "didn't",
+    "didnt",
+    "can't",
+    "cant",
+    "cannot",
+    "won't",
+    "wont",
+    "isn't",
+    "isnt",
+    "aren't",
+    "arent",
+    "wasn't",
+    "wasnt",
+    "shouldn't",
+    "wouldn't",
+    "couldn't",
+];
+
+/// Words that, anywhere in an ask, make it a question (as
+/// `LAMP_SKILL_ASKED` leaves "what", "who" and the rest to the model).
+const QUESTION_WORDS: &[&str] = &[
+    "what", "what's", "whats", "who", "who's", "whos", "whom", "whose", "why", "how", "how's",
+    "hows", "where", "where's", "wheres", "when", "which", "whether",
+];
+
+/// Words that, first in an ask, begin a question ("is there a camera").
+const QUESTION_FIRST: &[&str] = &[
+    "is", "are", "am", "was", "were", "does", "did", "should", "shall",
+];
+
+/// Words that, anywhere in an ask, are the lamp's own doing: its light and
+/// sound turned off or changed, its sleep, its reminders and timers, a
+/// skill taken off: "turn off the light", "remind me in ten minutes".
+const LAMPS_OWN: &[&str] = &[
+    "off",
+    "brighter",
+    "dimmer",
+    "dim",
+    "brightness",
+    "volume",
+    "louder",
+    "quieter",
+    "softer",
+    "mute",
+    "unmute",
+    "sleep",
+    "asleep",
+    "wake",
+    "awake",
+    "goodnight",
+    "goodbye",
+    "bye",
+    "cancel",
+    "delete",
+    "remove",
+    "uninstall",
+    "install",
+    "update",
+    "restart",
+    "reboot",
+    "remind",
+    "reminder",
+    "reminders",
+    "timer",
+    "timers",
+    "alarm",
+    "alarms",
+];
+
+/// Greetings and goodbyes, words in a row: "good night" is said to the
+/// lamp, never a skill's ask.
+const GREETINGS: &[&[&str]] = &[
+    &["good", "morning"],
+    &["good", "night"],
+    &["good", "evening"],
+    &["good", "afternoon"],
+    &["good", "bye"],
+    &["see", "you"],
+    &["see", "ya"],
+];
+
+/// An ask's words that say nothing of a skill of its own: with only these
+/// beside the words said around an ask, it is the lamp's own ("turn on
+/// the light", "play some music", "show me something").
+const NOTHING_OF_ITS_OWN: &[&str] = &[
+    "light",
+    "lights",
+    "lamp",
+    "music",
+    "song",
+    "songs",
+    "sound",
+    "sounds",
+    "time",
+    "date",
+    "day",
+    "today",
+    "weather",
+    "news",
+    "voice",
+    "it",
+    "this",
+    "that",
+    "these",
+    "those",
+    "there",
+    "here",
+    "me",
+    "us",
+    "you",
+    "something",
+    "anything",
+    "everything",
+    "one",
+    "more",
+    "again",
+    "go",
+];
+
+/// Whether `words` hold `phrase` as words in a row.
+fn holds(words: &[String], phrase: &[&str]) -> bool {
+    !phrase.is_empty()
+        && words
+            .windows(phrase.len())
+            .any(|window| window.iter().zip(phrase).all(|(said, word)| said == word))
+}
+
+/// Why `ask`, one of a skill's `asks` (#6772), is never matched, if it is
+/// refused: lamp-skills refuses such a skill as it loads
+/// (`lamp_skills`' `checked_asks`), and [`wanted`] drops the phrase all
+/// the same. An ask is a request for that skill, and nothing a person says
+/// to the lamp for anything else: never a yes, a no or a consent's words,
+/// which a held question waits for (Thirteen's P1 on #6842); never a no or
+/// a question; never a stop; never the lamp's own words for what it does
+/// itself, which its first-round rules force (Thirteen's P2s); and never
+/// only the words said around an ask (the Reviewer-lead's P2).
+pub fn ask_refused(ask: &str) -> Option<&'static str> {
+    let words = lower_words(ask);
+    let any = |list: &[&str]| words.iter().any(|word| list.contains(&word.as_str()));
+    let holds_any = |phrases: &[&[&str]]| phrases.iter().any(|phrase| holds(&words, phrase));
+    if crate::remember::heard::only_an_answer(ask)
+        || holds_any(crate::known_faces::AGREE)
+        || any(crate::known_faces::DISAGREE)
+        || any(MEMORY_WORDS)
+        || holds_any(crate::remember::asked::WITHDRAWN)
+        || holds_any(crate::wait_words::PUT_OFFS)
+        || crate::wait_words::only_a_put_off(ask)
+    {
+        return Some("it is or holds a yes, a no or a consent's words, which a question waits for");
+    }
+    if any(NEGATIONS)
+        || any(QUESTION_WORDS)
+        || words
+            .first()
+            .is_some_and(|word| QUESTION_FIRST.contains(&word.as_str()))
+    {
+        return Some("it holds a no or a question, which is the model's to answer");
+    }
+    if crate::stop_words::stop_phrase(ask) {
+        return Some("it is a stop, which is the lamp's own");
+    }
+    let rules = crate::tools::schedule_asked::ASKS
+        .iter()
+        .map(|(phrase, _)| *phrase)
+        .chain(
+            crate::tools::skill_asked::ASKS
+                .iter()
+                .map(|(phrase, _)| *phrase),
+        )
+        .chain(
+            crate::tools::skill_asked::QUESTIONS
+                .iter()
+                .map(|(phrase, _)| *phrase),
+        )
+        .chain(crate::tools::reminders_asked::ASKS.iter().copied())
+        .chain(crate::remember::asked::ASKS.iter().copied());
+    if any(LAMPS_OWN)
+        || holds_any(GREETINGS)
+        || rules.into_iter().any(|phrase| holds(&words, phrase))
+    {
+        return Some("it is the lamp's own words for what it does itself");
+    }
+    // What is left past the words said around an ask.
+    let mut own = Vec::new();
+    let mut at = 0;
+    while at < words.len() {
+        if let Some(taken) = phrase_at(&words, at, AROUND)
+            .or_else(|| phrase_at(&words, at, REQUESTS))
+            .or_else(|| phrase_at(&words, at, RUNS))
+        {
+            at += taken;
+        } else {
+            own.push(words[at].as_str());
+            at += 1;
+        }
+    }
+    if own.is_empty() {
+        return Some("it is only words said around an ask, a greeting or a request");
+    }
+    if own.iter().all(|word| NOTHING_OF_ITS_OWN.contains(word)) {
+        return Some("it names nothing of the skill's own, only the lamp's");
+    }
+    None
+}
+
+/// Whether `ask` holds the skill `name` (a function's or a skill's, loosely,
+/// [`loose`]) as words in a row: "dance for me" holds `dance`, "light
+/// show" `light_show`.
+pub fn ask_holds_name(ask: &str, name: &str) -> bool {
+    let name = loose(name);
+    let words = lower_words(ask);
+    !name.is_empty()
+        && (1..=words.len()).any(|length| {
+            words
+                .windows(length)
+                .any(|window| loose(&window.join("-")) == name)
+        })
+}
+
 /// `functions` as [`named`] matches them: each loosely, by its own name
-/// and by each of its `asks` (#6772), none empty or a plain word, and none
-/// that two functions share: such a line names neither.
+/// and by each of its `asks` (#6772), none empty or a plain word. A name
+/// two functions share names neither. An ask is dropped when it is refused
+/// ([`ask_refused`]), when it holds another function's name or the name of
+/// any skill in `taken` (every installed one, core and with a choice
+/// included), or when two functions give it; the names still run.
 fn wanted<'a>(
     functions: impl IntoIterator<Item = &'a str>,
     asks: &BTreeMap<String, Vec<String>>,
+    taken: &[String],
 ) -> Vec<(String, &'a str)> {
-    let mut wanted: Vec<(String, &'a str)> = Vec::new();
-    for function in functions {
-        wanted.push((loose(function), function));
-        for ask in asks.get(function).into_iter().flatten() {
-            wanted.push((loose_ask(ask), function));
+    let functions: Vec<&'a str> = functions.into_iter().collect();
+    let shared_among = |list: &mut Vec<(String, &'a str)>| {
+        let shared: Vec<String> = list
+            .iter()
+            .filter(|(name, function)| {
+                list.iter()
+                    .any(|(other, theirs)| other == name && theirs != function)
+            })
+            .map(|(name, _)| name.clone())
+            .collect();
+        list.retain(|(name, _)| !shared.contains(name));
+    };
+    let mut wanted: Vec<(String, &'a str)> = functions
+        .iter()
+        .map(|function| (loose(function), *function))
+        .filter(|(name, _)| !name.is_empty() && !plain_word(name))
+        .collect();
+    shared_among(&mut wanted);
+    let mut phrases: Vec<(String, &'a str)> = Vec::new();
+    for function in &functions {
+        for ask in asks.get(*function).into_iter().flatten() {
+            let held = functions
+                .iter()
+                .copied()
+                .chain(taken.iter().map(String::as_str))
+                .filter(|name| loose(name) != loose(function))
+                .any(|name| ask_holds_name(ask, name));
+            let phrase = loose_ask(ask);
+            if ask_refused(ask).is_none() && !held && !phrase.is_empty() && !plain_word(&phrase) {
+                phrases.push((phrase, *function));
+            }
         }
     }
-    wanted.retain(|(name, _)| !name.is_empty() && !plain_word(name));
-    let shared: Vec<String> = wanted
-        .iter()
-        .filter(|(name, function)| {
-            wanted
-                .iter()
-                .any(|(other, theirs)| other == name && theirs != function)
-        })
-        .map(|(name, _)| name.clone())
-        .collect();
-    wanted.retain(|(name, _)| !shared.contains(name));
+    shared_among(&mut phrases);
+    phrases.retain(|(phrase, _)| !wanted.iter().any(|(name, _)| name == phrase));
+    wanted.extend(phrases);
     wanted
 }
 
@@ -166,7 +453,7 @@ pub fn asked<'a>(
     functions: &[&'a str],
     asks: &BTreeMap<String, Vec<String>>,
 ) -> Option<&'a str> {
-    named_among(heard, &wanted(functions.iter().copied(), asks))
+    named_among(heard, &wanted(functions.iter().copied(), asks, &[]))
 }
 
 /// [`named`] among functions already made [`wanted`].
@@ -260,9 +547,12 @@ pub fn heard(settings: &crate::tools::Settings, heard: &str) -> Option<(String, 
     if !short(heard) {
         return None;
     }
-    let (functions, asks) = functions(settings);
-    let functions: Vec<&str> = functions.iter().map(String::as_str).collect();
-    asked(heard, &functions, &asks).map(|function| call(settings.use_skill, function))
+    let (functions, asks, taken) = functions(settings);
+    named_among(
+        heard,
+        &wanted(functions.iter().map(String::as_str), &asks, &taken),
+    )
+    .map(|function| call(settings.use_skill, function))
 }
 
 /// Whether `heard` is a line short enough to be a plain ask by a name.
@@ -271,9 +561,14 @@ fn short(heard: &str) -> bool {
     count > 0 && count <= MOST_WORDS
 }
 
+/// What [`heard`] matches a line against, read from the files.
+type Read = (Vec<String>, BTreeMap<String, Vec<String>>, Vec<String>);
+
 /// The functions [`heard`] matches a line against, read from the files,
-/// and their asks.
-fn functions(settings: &crate::tools::Settings) -> (Vec<String>, BTreeMap<String, Vec<String>>) {
+/// their asks, and every function's name an ask may never hold: each
+/// skill's, core and with a choice or a flag included, and the voice's and
+/// the executive's own (Thirteen's and the Reviewer-lead's P2 on #6842).
+fn functions(settings: &crate::tools::Settings) -> Read {
     let skills = crate::tools::skill_tools(settings);
     let reached = if settings.use_skill {
         crate::use_skill::offered(&skills)
@@ -289,7 +584,13 @@ fn functions(settings: &crate::tools::Settings) -> (Vec<String>, BTreeMap<String
         .collect();
     let mut asks = crate::tools::skill_asks(settings);
     asks.retain(|function, _| functions.contains(function));
-    (functions, asks)
+    let taken = skills
+        .iter()
+        .chain(&crate::tools::core_tools(settings))
+        .map(|tool| tool.name.clone())
+        .chain(core)
+        .collect();
+    (functions, asks, taken)
 }
 
 /// A file's time and length as last changed, or none for no file.
@@ -328,8 +629,8 @@ impl Heard {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         if kept.as_ref().is_none_or(|(at, _)| *at != stamps) {
-            let (read, asks) = functions(&self.settings);
-            let wanted = wanted(read.iter().map(String::as_str), &asks)
+            let (read, asks, taken) = functions(&self.settings);
+            let wanted = wanted(read.iter().map(String::as_str), &asks, &taken)
                 .into_iter()
                 .map(|(name, function)| (name, function.to_owned()))
                 .collect();
@@ -674,5 +975,107 @@ mod tests {
         assert_eq!(kept.heard("dance party"), Some(call(true, "dance_party")));
         assert_eq!(kept.heard("photo booth"), None);
         std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// The probe lines of Thirteen's P1 and P2s and the Reviewer-lead's P2
+    /// on #6842, each given as a stand-in camera skill's ask and then
+    /// heard: refused as an ask, and the line heard runs nothing. A held
+    /// question's "Yes, please." and "No thanks." first.
+    #[test]
+    fn an_ask_that_is_ordinary_speech_is_refused_and_runs_nothing() {
+        for (ask, heard) in [
+            ("yes please", "Yes, please."),
+            ("no thanks", "No thanks."),
+            ("never mind", "Never mind."),
+            ("forget that", "Forget that."),
+            ("remember that", "Remember that."),
+            ("hey lamp", "Hey lamp."),
+            ("not now", "not now"),
+            ("what time is it", "Lamp, what time is it?"),
+            ("turn off the light", "turn off the light please"),
+            ("good night", "good night lamp"),
+            ("light show", "light show"),
+            ("remind me in ten minutes", "Remind me in ten minutes."),
+            ("what reminders do I have", "What reminders do I have?"),
+            ("stop it", "Stop it."),
+            ("stop the music", "Stop the music."),
+            ("turn on the light", "Turn on the light."),
+            ("play some music", "Play some music."),
+            ("remember that I'm away", "Remember that I'm away."),
+        ] {
+            assert!(ask_refused(ask).is_some(), "{ask}");
+            let asks: BTreeMap<String, Vec<String>> =
+                [("camera_snap".to_owned(), vec![ask.to_owned()])].into();
+            assert_eq!(
+                asked(heard, &["camera_snap"], &asks),
+                None,
+                "{ask}: {heard}"
+            );
+        }
+        for ask in [
+            "take a photo",
+            "Take a picture",
+            "snap a pic",
+            "relaxing music",
+            "play me something to relax",
+        ] {
+            assert_eq!(ask_refused(ask), None, "{ask}");
+        }
+    }
+
+    /// Thirteen's and the Reviewer-lead's P2 on #6842: an ask that holds an
+    /// installed skill's name, a core skill's or one with a choice ("dance
+    /// for me", "white noise please"), is dropped, read from the tools file as on
+    /// the lamp; the pushed skill's own name and its other asks still run.
+    #[test]
+    fn an_ask_holding_any_installed_skills_name_is_dropped() {
+        let dir = skills_folder(
+            "clash",
+            json!({"tools":[
+                {"name":"photo_booth","description":"Take a photo."},
+                {"name":"dance","description":"Dance.",
+                 "parameters":{"type":"object","properties":{
+                    "style":{"type":"string","enum":["salsa","disco"],"description":"Which."}}}},
+                {"name":"white_noise","description":"Play a sound.",
+                 "parameters":{"type":"object","properties":{
+                    "sound":{"type":"string","enum":["rain","ocean"],"description":"Which."}}}}],
+              "core":["dance"],
+              "asks":{"photo_booth":["dance for me","white noise please","take a photo"]}}),
+        );
+        for use_skill in [true, false] {
+            let settings = crate::tools::Settings {
+                skills: Some(dir.clone()),
+                use_skill,
+                ..Default::default()
+            };
+            for line in ["dance for me", "Lamp, dance for me.", "white noise please"] {
+                assert_eq!(heard(&settings, line), None, "{line}");
+            }
+            assert_eq!(
+                heard(&settings, "take a photo"),
+                Some(call(use_skill, "photo_booth"))
+            );
+            assert_eq!(
+                heard(&settings, "photo booth"),
+                Some(call(use_skill, "photo_booth"))
+            );
+            assert_eq!(
+                Heard::new(settings.clone()).heard("dance for me"),
+                None,
+                "kept"
+            );
+        }
+        std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// The Reviewer-lead's P3 1 on #6842: an ask equal to another skill's
+    /// name drops only the ask; that skill's name still runs it.
+    #[test]
+    fn an_ask_that_is_another_skills_name_leaves_that_name_running() {
+        let asks: BTreeMap<String, Vec<String>> =
+            [("photo_booth".to_owned(), vec!["desk check".to_owned()])].into();
+        let functions = ["photo_booth", "desk_check"];
+        assert_eq!(asked("desk check", &functions, &asks), Some("desk_check"));
+        assert_eq!(asked("photo booth", &functions, &asks), Some("photo_booth"));
     }
 }

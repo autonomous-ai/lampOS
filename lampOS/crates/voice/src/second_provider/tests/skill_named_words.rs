@@ -586,3 +586,120 @@ async fn a_skills_ask_on_the_names_wait_calls_it_in_code() {
         );
     }
 }
+
+/// Thirteen's P1 on #6842: while a yes is held for the person's answer
+/// (here a keep the model asked about, [`HeldForget`]), "Yes please." is
+/// never read for a skill, even by a matcher that would take any line:
+/// nothing runs in code and no note says a skill was named. With nothing
+/// held, the same matcher runs it.
+#[test]
+fn a_held_yes_leaves_yes_please_to_the_held_question() {
+    for held in [true, false] {
+        let went = went_with(
+            "Yes please.",
+            vec![said("Okay.")],
+            booth_told(),
+            move |engine| {
+                let engine = engine.calling_skills_named(Arc::new(|_: &str| {
+                    Some(crate::skill_named::call(true, "photo_booth"))
+                }));
+                if held && let Ok(mut hold) = engine.shared.held_forget.lock() {
+                    hold.held = Some(HeldForget {
+                        call: call(
+                            "k1",
+                            crate::remember::REMEMBER,
+                            json!({"text": "The plant needs water on Fridays."}),
+                        ),
+                        request: 0,
+                        asker: (7, crate::remember::person_id("A")),
+                        at: Instant::now(),
+                        asked: true,
+                        spelling: false,
+                        carried: false,
+                        line: None,
+                        asked_again: false,
+                        one_face: false,
+                    });
+                }
+                engine
+            },
+        );
+        let named = went.notes.iter().any(|note| note.contains("by its name"));
+        if held {
+            assert_eq!(booth_runs(&went), 0, "{:?}", went.ran);
+            assert!(!named, "{:?}", went.notes);
+        } else {
+            assert_eq!(booth_runs(&went), 1, "{:?}", went.ran);
+            assert!(named, "{:?}", went.notes);
+        }
+    }
+}
+
+/// The probe lines of both reads on #6842 as a pushed skill's asks, read
+/// from its tools file as on the lamp: each line heard runs nothing in
+/// code, and the model is asked.
+#[test]
+fn ordinary_speech_given_as_asks_goes_to_the_model() {
+    let lines = [
+        "hey lamp",
+        "yes please",
+        "no thanks",
+        "not now",
+        "what time is it",
+        "turn off the light",
+        "good night",
+        "light show",
+        "remind me in ten minutes",
+        "stop it",
+    ];
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let base = if std::path::Path::new("/private/tmp").is_dir() {
+        std::path::PathBuf::from("/private/tmp")
+    } else {
+        std::env::temp_dir()
+    };
+    let dir = base.join(format!(
+        "lvs-probe-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let tools = json!({
+        "tools": [
+            {"name": "photo_booth", "description": "Take a photo."},
+            {"name": "light_show", "description": "A light show."}
+        ],
+        "core": ["light_show"],
+        "asks": {"photo_booth": lines}
+    });
+    std::fs::write(dir.join(crate::tools::CATALOG_FILE), tools.to_string()).unwrap();
+    let reads = Arc::new(crate::skill_named::Heard::new(crate::tools::Settings {
+        skills: Some(dir.clone()),
+        use_skill: true,
+        ..Default::default()
+    }));
+    for heard in [
+        "Hey lamp.",
+        "Yes, please.",
+        "No thanks.",
+        "not now",
+        "Lamp, what time is it?",
+        "turn off the light please",
+        "good night lamp",
+        "light show",
+        "Remind me in ten minutes.",
+        "Stop it.",
+    ] {
+        let reads = reads.clone();
+        let went = went_with(heard, vec![said("Okay.")], booth_told(), move |engine| {
+            engine.calling_skills_named(Arc::new(move |heard: &str| reads.heard(heard)))
+        });
+        assert_eq!(booth_runs(&went), 0, "{heard}: {:?}", went.ran);
+        assert!(
+            !went.notes.iter().any(|note| note.contains("by its name")),
+            "{heard}: {:?}",
+            went.notes
+        );
+    }
+    std::fs::remove_dir_all(dir).ok();
+}
