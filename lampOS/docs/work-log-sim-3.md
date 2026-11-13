@@ -3,6 +3,17 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 02:0x GMT+7: #6971 read by sim-2; P3s taken; a voice.rs flake
+
+- #6971: sim-2 READ-OK b07d87bf7b (Linux, 93 pass). P3s taken at ca9cabb6b4:
+  speech's doc back on `fn speech`; 5 s to open, 30 s idle before a socket is
+  let go (two tests); first line starts quiet so early speech says
+  SpeechStarted (a test). Restate and sim-1 asked.
+- Seen: `voice::tests::spd_say_…` (sim-1/sim-2's) fails 3/15 alone on macOS
+  (`--cancel` logged without the first `--wait --pipe-mode`): a fixed 400 ms
+  cancel against a fresh script's first exec. Told them on #6811 with a fix
+  (wait for the log's first line); not changed.
+
 ## 2026-11-14 01:3x GMT+7: #6972, a made sound for the microphone
 
 - Quiet check.
