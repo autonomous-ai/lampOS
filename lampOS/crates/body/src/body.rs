@@ -3853,11 +3853,6 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                     && wait.arm.is_none_or(|folded| {
                         positions[Joint::BasePitch.index()].abs_diff(folded)
                             <= Standing::FOUND_SLACK
-                            // An arm joint outside its window is never taken
-                            // hold of there (#6834).
-                            && ARM.iter().zip(bus.arm_windows).all(|(arm, (low, high))| {
-                                (low..=high).contains(&positions[arm.index()])
-                            })
                     });
                 in_range = if inside { in_range + 1 } else { 0 };
                 if in_range >= IN_RANGE_READS && !bus.runtime.recovery_inhibited() {
@@ -4649,27 +4644,6 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         if !without.is_empty() {
             found = match take_hold(bus, &mut report, &without, &found) {
                 Ok(now) => now,
-                // #6834: an arm joint found limp outside its window is never
-                // given that goal. Ending the run there stopped lamp-body at
-                // every start, silently. With `--refused-let-go` what it took
-                // hold of is let go again, as it was found, and it asks a hand
-                // to fold the arm, starting once it is folded in its window.
-                Err(Stop::Window { joint, goal, .. })
-                    if limits.refused_let_go
-                        && let Some(arm) = ARM.into_iter().find(|arm| arm.id() == joint)
-                        && let Some(up) = standing =>
-                {
-                    report.pose_wait = Some(PoseWait {
-                        ranges: [(0, 4_095); 3],
-                        joints: without,
-                        say: ARM_FOLD,
-                        arm: Some(up.folded[0]),
-                    });
-                    report.stop = refused(format!(
-                        "{arm} found without torque at {goal}, outside its window"
-                    ));
-                    return report;
-                }
                 Err(stop) => {
                     report.stop = stop;
                     return report;
