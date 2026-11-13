@@ -42,7 +42,7 @@ fn lamp_name(dir: &Path) -> String {
     format!("virtual-{:06x}", hash & 0xff_ffff)
 }
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] [--real-voice[=second] (the real lamp-voice: the Live route with your Gemini key, or =second its second route with your DeepSeek, Deepgram and ElevenLabs/OpenAI keys; needs --microphone)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] [--real-voice[=second] (the real lamp-voice: the Live route with your Gemini key, or =second its second route with your DeepSeek, Deepgram and ElevenLabs/OpenAI keys; needs --microphone)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim speech DIR [--listen 127.0.0.1:PORT] (a local OpenAI-compatible /audio/speech in the host's voice, pcm only, for the real voice's second route; its token in DIR/speech.token) | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -79,6 +79,7 @@ fn main() {
         (Some("servo"), Some(dir)) => servo(&dir),
         (Some("run"), Some(dir)) => run(&dir, &args),
         (Some("code"), Some(dir)) => code(&dir, &args),
+        (Some("speech"), Some(dir)) => speech(&dir, &args),
         _ => {
             eprintln!("{USAGE}");
             std::process::exit(2);
@@ -88,6 +89,51 @@ fn main() {
         eprintln!("lamp-sim: {error}");
         std::process::exit(1);
     }
+}
+
+/// `speech DIR [--listen ADDR]`: the local text-to-speech service (speech.rs) on
+/// loopback, its token written to `DIR/speech.token` (0600) for the route's
+/// TTS credential file. Runs until stopped.
+fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
+    use std::io::Read;
+    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+    let listen = option(args, "--listen").unwrap_or_else(|| "127.0.0.1:7732".to_owned());
+    let address = listen
+        .parse()
+        .map_err(|_| std::io::Error::other(format!("--listen {listen}: not an address")))?;
+    let listener = lamp_sim::speech::bind(address)?;
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(dir)?;
+    let mut random = [0u8; 16];
+    std::fs::File::open("/dev/urandom")?.read_exact(&mut random)?;
+    let token: String = random.iter().map(|b| format!("{b:02x}")).collect();
+    let file = dir.join("speech.token");
+    let _ = std::fs::remove_file(&file);
+    std::io::Write::write_all(
+        &mut std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&file)?,
+        format!("{token}\n").as_bytes(),
+    )?;
+    let folder = dir.join("speech");
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&folder)?;
+    eprintln!(
+        "lamp-sim speech: on http://{} (POST /audio/speech, pcm), token in {}",
+        listener.local_addr()?,
+        file.display()
+    );
+    lamp_sim::speech::serve(
+        listener,
+        token,
+        std::sync::Arc::new(lamp_sim::speech::Say { folder }),
+    )
 }
 
 /// `people N DIR`, `hear TEXT DIR`, `hand DIR`, `air KEY=VALUE... DIR`: what a

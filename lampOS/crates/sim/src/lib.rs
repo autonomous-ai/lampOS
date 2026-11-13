@@ -69,6 +69,7 @@ pub mod pty;
 pub mod real_voice;
 pub mod ring;
 pub mod servo;
+pub mod speech;
 pub mod stimuli;
 pub mod voice;
 pub mod warp;
