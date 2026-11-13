@@ -17,7 +17,7 @@ GRANTS = {
     "body": "move: gestures, feelings, looks, moves (looks and moves under a body lease)",
     "light": "light the ring",
     "speak": "say lines, play sounds",
-    "look": "hear presence and hands; look at a face or follow a hand",
+    "look": "hear presence (hands, a face look and a hand follow are not tracked on a customer lamp yet)",
     "hear": "hear registered phrases and the lamp's name",
     "sound": "hear sound classes (music, laughter, door, footsteps)",
     "skills": "push skills of your own to the lamp",

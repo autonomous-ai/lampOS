@@ -183,7 +183,7 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
 ## Reading the lamp
 
 - **Events** come by edge, when something changes: `person.arrived`,
-  `person.left`, `person.facing`, `person.stood_up`, `hand`, `phrase.heard`,
+  `person.left`, `person.facing`, `person.stood_up`, `hand` (none comes on a customer lamp yet), `phrase.heard`,
   `name.heard`, `sound.heard`, `touch`, `button`, `lamp.changed`, `time`;
   `lease` and `done` come unasked. Subscribe with `lamp.on(event, handler)`.
 - **State** with `lamp.get("presence", "light", "mood", "lamp")`; the
