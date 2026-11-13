@@ -79,8 +79,55 @@ pub struct PlaybackStatus {
     pub range: QueuedRange,
 }
 
+/// What [`Speaker`] asks of the queue it plays into: the seven calls it made on
+/// ALSA's [`PCM`], and no others. The ownership ledger, the privacy guard,
+/// the underrun budget and the echo reference all sit above this and do not
+/// know which queue is below. [`PCM`] is the board's; a developer's computer
+/// beside a simulator can give the speaker another.
+pub trait PlaybackPcm: Send {
+    /// Available frames and total queued delay, as `snd_pcm_avail_delay`.
+    fn avail_delay(&self) -> alsa::Result<(i64, i64)>;
+    /// Starts playback of what is queued.
+    fn start(&self) -> alsa::Result<()>;
+    /// Writes at most `samples.len()` frames and returns how many were taken;
+    /// never blocks (`EAGAIN` is the queue being full).
+    fn writei(&self, samples: &[i16]) -> alsa::Result<usize>;
+    /// Plays out what is queued, `EAGAIN` while it has not finished.
+    fn drain(&self) -> alsa::Result<()>;
+    /// Makes the queue ready to be written again.
+    fn prepare(&self) -> alsa::Result<()>;
+    /// The queue's state.
+    fn state(&self) -> State;
+    /// Throws away what is queued, never plays it.
+    fn discard(&self) -> alsa::Result<()>;
+}
+
+impl PlaybackPcm for PCM {
+    fn avail_delay(&self) -> alsa::Result<(i64, i64)> {
+        PCM::avail_delay(self)
+    }
+    fn start(&self) -> alsa::Result<()> {
+        PCM::start(self)
+    }
+    fn writei(&self, samples: &[i16]) -> alsa::Result<usize> {
+        self.io_i16()?.writei(samples)
+    }
+    fn drain(&self) -> alsa::Result<()> {
+        PCM::drain(self)
+    }
+    fn prepare(&self) -> alsa::Result<()> {
+        PCM::prepare(self)
+    }
+    fn state(&self) -> State {
+        PCM::state(self)
+    }
+    fn discard(&self) -> alsa::Result<()> {
+        PCM::drop(self)
+    }
+}
+
 pub struct Speaker {
-    pcm: PCM,
+    pcm: Box<dyn PlaybackPcm>,
     format: PcmFormat,
     guard: BoundaryGuard,
     pending: PlaybackOwnership,
@@ -166,7 +213,7 @@ impl Speaker {
             format
         };
         Ok(Self {
-            pcm,
+            pcm: Box::new(pcm),
             format,
             guard: BoundaryGuard::new(boot, now()),
             pending: PlaybackOwnership::new(),
@@ -502,7 +549,7 @@ impl Speaker {
         let written = if offered == 0 {
             Ok(0)
         } else {
-            self.pcm.io_i16()?.writei(&samples[..offered])
+            self.pcm.writei(&samples[..offered])
         };
         let frames = match written {
             Ok(frames) => frames,
@@ -681,7 +728,7 @@ impl Speaker {
         self.last_poll = None;
         self.finish_deadline = None;
         self.clock_started = false;
-        if let Err(error) = self.pcm.drop() {
+        if let Err(error) = self.pcm.discard() {
             // A failed discard is not confirmation that queued speech stopped.
             // Keep its authorization metadata and latch further output closed.
             self.guard.invalidate();
@@ -770,7 +817,7 @@ impl Speaker {
 
 impl Drop for Speaker {
     fn drop(&mut self) {
-        let _ = self.pcm.drop();
+        let _ = self.pcm.discard();
     }
 }
 
