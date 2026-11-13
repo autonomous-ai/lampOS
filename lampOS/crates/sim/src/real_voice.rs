@@ -81,6 +81,8 @@ pub const FLAG_SECOND: &str = "--real-voice=second";
 /// `--real-voice=local`: the second route with the developer's own LLM endpoint, and speech and listening by the host
 /// (`lamp-sim speech` and `lamp-sim listen` on loopback, started by the run): macOS, where `speech` has the host's voice.
 pub const FLAG_LOCAL: &str = "--real-voice=local";
+/// The local route's speaker: the voice publishes what it plays on the bus and lamp-sim plays it (bus_speaker.rs).
+pub const BUS_SPEAKER: &str = "bus:speaker1";
 
 /// Whether `--real-voice` (the Live route), `--real-voice=second` or `--real-voice=local` was given to `lamp-sim run`.
 pub fn wanted(args: &[String]) -> bool {

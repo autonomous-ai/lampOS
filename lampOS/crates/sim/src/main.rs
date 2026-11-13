@@ -396,8 +396,13 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             lamp_sim::controls::present(&bin).map_err(std::io::Error::other)?;
             let model = std::env::var(lamp_sim::real_voice::MODEL_ENVIRONMENT)
                 .unwrap_or_else(|_| lamp_sim::real_voice::DEFAULT_MODEL.to_owned());
-            let speaker = std::env::var(lamp_sim::real_voice::SPEAKER_ENVIRONMENT)
-                .unwrap_or_else(|_| "default".to_owned());
+            // The local route's speaker is the bus (lamp-sim plays it); the others' an ALSA device.
+            let speaker = if lamp_sim::real_voice::local_wanted(args) {
+                lamp_sim::real_voice::BUS_SPEAKER.to_owned()
+            } else {
+                std::env::var(lamp_sim::real_voice::SPEAKER_ENVIRONMENT)
+                    .unwrap_or_else(|_| "default".to_owned())
+            };
             let unix_ms = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_or(0, |since| since.as_millis());
@@ -531,6 +536,13 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             if let Err(error) = mic::run(&bus) {
                 eprintln!("lamp-sim: the microphone ended: {error}");
             }
+        }));
+    }
+    // The local route's voice plays through the bus: lamp-sim plays it on the host (bus_speaker.rs).
+    if real_voice.is_some() && lamp_sim::real_voice::local_wanted(args) {
+        let bus = lamp_bus::Bus::new(&bus_root)?;
+        threads.push(spawn_named("voice speaker", move || {
+            lamp_sim::bus_speaker::run(&bus);
         }));
     }
     threads.push(spawn_named("ring", move || {

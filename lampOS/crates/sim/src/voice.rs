@@ -85,7 +85,7 @@ const BLOCK_WAIT: Duration = Duration::from_millis(50);
 
 /// The host program that plays the stream's raw sound (24 kHz mono S16LE on its standard input), the first of the host's players
 /// that starts: `paplay`, `aplay`, `ffplay`. None (`LAMP_SIM_SPEAKER=silent`, or no player): the blocks are counted, not played.
-fn speaker_player() -> Option<std::process::Child> {
+pub(crate) fn speaker_player() -> Option<std::process::Child> {
     if std::env::var("LAMP_SIM_SPEAKER").is_ok_and(|v| v == "silent") {
         return None;
     }
@@ -137,14 +137,14 @@ fn speaker_player() -> Option<std::process::Child> {
 }
 
 /// Blocks queued for the player's writer thread at most (about a second and a quarter of 20 ms blocks).
-const PLAYER_QUEUED: usize = 64;
+pub(crate) const PLAYER_QUEUED: usize = 64;
 /// How long a player is given to play what was queued once the stream has ended; then it is killed.
 const PLAYER_GRACE: Duration = Duration::from_secs(2);
 
 /// Ends the player: what is queued is written and its stdin closed (the writer thread's end), it plays on to
 /// the end for up to [`PLAYER_GRACE`], then it is killed whatever it does, and waited for: a player that
 /// never reads does not hold the stream or leave a process behind.
-fn end_player(mut child: std::process::Child, writer: Option<thread::JoinHandle<()>>) {
+pub(crate) fn end_player(mut child: std::process::Child, writer: Option<thread::JoinHandle<()>>) {
     let until = std::time::Instant::now() + PLAYER_GRACE;
     loop {
         let written = writer.as_ref().is_none_or(thread::JoinHandle::is_finished);
