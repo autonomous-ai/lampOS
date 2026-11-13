@@ -1494,6 +1494,33 @@ cả hai người viết.
   cùng system prompt và yêu cầu, và agent được các lần sửa (tối đa 3,
   `MOST_REPAIRS`). Câu trả lời của agent đi qua đúng các kiểm tra đó. Khi đèn
   không có agent, DeepSeek giữ 3 lần sửa và thất bại của nó vẫn như hôm nay.
+- **Một lần tạo cần dịch vụ đã liên kết đi thẳng tới agent** (yêu cầu của
+  chủ sở hữu, 13/11; #6797). Khi `LAMP_AGENT_SERVICES=on` và mã riêng của
+  kỹ năng tự tạo bật (`LAMP_MADE_SCRIPTS=on`, nên mô hình tạo được bảo làm
+  kỹ năng dịch vụ thành một `do.task` cho agent;
+  `make_skill_agent::services_through_agent`), một lần tạo bằng giọng nói
+  mà lời của nó cần một dịch vụ đã liên kết được giao ngay cho agent Hermes
+  và DeepSeek không được hỏi. Cả câu của người dùng lẫn yêu cầu của mô hình
+  đều được đọc, theo nguyên từ và không phân biệt hoa thường
+  (`make_skill_agent::service_asked`): mail, mails, email, emails,
+  emailed, emailing, inbox, gmail, calendar, calendars, meeting, meetings,
+  appointment, appointments, "google drive", "drive file", "drive files",
+  "drive folder", github, "pull request" và "pull requests" luôn tính; và,
+  chỉ với dịch vụ mà `lamp-services` báo đang liên kết (chỉ hỏi khi không
+  có từ nào ở trên), event, events và agenda (lịch), drive (Drive), issue,
+  issues, repo và repository (GitHub), và tên riêng của từng dịch vụ khác
+  (figma, linear, asana, ahrefs, facebook, slack, "monday.com", hubspot,
+  amplitude, notion). "voicemail", "Monday" đứng riêng, "an issue with the
+  air" khi GitHub chưa liên kết và "when I drive home" không cần dịch vụ
+  nào. Trên lamp-9adf, 13/11 (bản 12635), DeepSeek từ chối 3 trên 3 lần tạo
+  bằng giọng nói có gửi thư ("when I leave my desk, email me that I'm out")
+  bằng một `cannot:` mà brief yêu cầu, nên chúng không bao giờ được giao.
+  Khi agent không trả lời (không có lần chạy tạo ở đây, không trả lời trong
+  45 giây, lỗi), DeepSeek khi đó được hỏi một lần, không được sửa, và câu
+  trả lời của nó là kết quả, như khi DeepSeek thất bại trước thì câu trả
+  lời duy nhất của nó giữ nguyên. Khi đèn không có agent Hermes thì không
+  đổi gì: DeepSeek tự tạo với các lần sửa của nó. Tắt một trong hai công
+  tắc thì mọi lần tạo vẫn thử DeepSeek trước, như trước.
 - **Những lời từ chối của chính brief vẫn là của DeepSeek.** Một `cannot:`
   của DeepSeek mà câu của nó là câu system prompt yêu cầu (nghe điều được
   nói, biết ai là ai, gửi tin nhắn, câu về lời nhắc, gửi điều không được nói
@@ -1501,7 +1528,12 @@ cả hai người viết.
   can ask me for it yourself any time" của phần đọc, và các câu còn lại
   trong `made_skill::BRIEFS_OWN_REFUSALS`, giữ cạnh brief và được một test
   đối chiếu với prompt) được nói nguyên như vậy và không bao giờ giao cho
-  agent. Mọi `cannot:` khác được giao cho agent.
+  agent. Mọi `cannot:` khác được giao cho agent. Khi kỹ năng dịch vụ được
+  tạo thành task cho agent (`LAMP_AGENT_SERVICES` và mã riêng của kỹ năng
+  tự tạo bật), các lời từ chối việc gửi ("sending a message", "sending or
+  writing on its own", `made_skill::BRIEFS_SEND_REFUSALS`) cũng được giao
+  cho agent, vì nó gửi qua công cụ `lamp-services` của nó; các câu khác vẫn
+  là của DeepSeek.
 - **Điều một skill phải tự tìm ra được giao cho agent.** Đèn không có topic
   nào mang thời tiết, tin tức hay bất cứ gì từ internet. System prompt nói
   rằng một yêu cầu cần thông tin chỉ có lúc chạy mà không bước nào cho (thời
@@ -1589,8 +1621,12 @@ cả hai người viết.
   little longer." qua dịch vụ nói (`app_make::say_waiting_at`, một lần,
   không bắt đầu sau 15 giây); không bao giờ khi lần giao thất bại ngay, hay
   khi lượt đã bị cắt. Câu báo đã tạo không đổi.
-- **Nhật ký.** "made by DeepSeek", "DeepSeek failed: handed to the agent
-  (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes) wasn't
+- **Nhật ký.** "made by DeepSeek", "it asks for a linked service (gmail):
+  straight to the agent (Hermes), DeepSeek not asked" (mã của dịch vụ,
+  không bao giờ là lời của người dùng), "the agent (Hermes) made none
+  (...): DeepSeek is asked once, given no repairs", "DeepSeek's cannot is
+  a send, which the agent makes with its lamp-services tools", "DeepSeek
+  failed: handed to the agent (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes) wasn't
   kept", "the agent (Hermes) made none (no answer within 45 s): DeepSeek's
   one answer, given no repairs, stands as not made", "DeepSeek's cannot is
   one the brief asks for: not handed to the agent", "no agent on the lamp:
@@ -1611,6 +1647,12 @@ cả hai người viết.
   `agent_tasks::tests::a_check_after_a_make_handed_to_the_agent_tells_the_persons_task`,
   `a_make_whose_make_run_is_refused_stays_deepseeks`,
   `a_say_handing_the_ask_back_goes_to_the_agent_and_a_reminder_stays`,
+  `a_make_asking_for_a_linked_service_goes_straight_to_the_agent`,
+  `a_make_naming_no_service_still_tries_deepseek_first`,
+  `with_either_switch_off_a_service_make_tries_deepseek_first`,
+  `a_service_make_the_agent_gives_no_answer_for_gets_deepseeks_one_try`,
+  `deepseeks_cannot_of_a_send_goes_to_the_agent_that_makes_service_skills`,
+  `make_skill_agent::tests::a_linked_service_is_asked_for_in_whole_words`,
   `make_skill_agent::tests` (luật gửi thành một dòng `skill_make` và câu trả
   lời được đọc lại, không bao giờ là `prepare`; lamp-tasks cũ hay lần chạy
   bị từ chối thì không bao giờ được giao; không có target `lamp` là
@@ -1620,7 +1662,8 @@ cả hai người viết.
 - **Chưa thử trên đèn:** hàng kiểm tra của nó, 16 lần tạo (mười hai lần đơn
   giản, bốn lỗi DeepSeek đã biết) trên một đèn có agent, so sánh với
   DeepSeek: có giữ không, phần nói lại và thời gian. Người dùng của agent có
-  thuộc nhóm `lamp-agents` trên đèn hay không.
+  thuộc nhóm `lamp-agents` trên đèn hay không. Ba lần tạo gửi thư bị từ chối
+  trên lamp-9adf được agent tạo thẳng khi `LAMP_AGENT_SERVICES` bật.
 
 ### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, tắt)
 

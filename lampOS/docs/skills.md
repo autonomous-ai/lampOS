@@ -4123,6 +4123,33 @@ the same code for both writers.
   gets the repairs (up to 3, `MOST_REPAIRS`). Its answers go through the
   very same checks. With no agent on the lamp, DeepSeek keeps its 3
   repairs and its failure stands, as today.
+- **A make that asks for a linked service goes straight to the agent**
+  (the owner's ask, 13 Nov; #6797). With `LAMP_AGENT_SERVICES=on` and a
+  made skill's code on (`LAMP_MADE_SCRIPTS=on`, so the making model is told
+  to make a service skill as one `do.task` for the agent;
+  `make_skill_agent::services_through_agent`), a voice make whose words
+  ask for a linked service is handed to the Hermes agent at once and
+  DeepSeek is not asked. The person's line and the model's request are
+  both read, in whole words and in any case
+  (`make_skill_agent::service_asked`): mail, mails, email, emails,
+  emailed, emailing, inbox, gmail, calendar, calendars, meeting, meetings,
+  appointment, appointments, "google drive", "drive file", "drive files",
+  "drive folder", github, "pull request" and "pull requests" always; and,
+  only for a service `lamp-services` tells linked now (asked only when
+  none of those words is there), event, events and agenda (the calendar),
+  drive (Drive), issue, issues, repo and repository (GitHub), and each
+  other service's own name (figma, linear, asana, ahrefs, facebook, slack,
+  "monday.com", hubspot, amplitude, notion). "voicemail", "Monday" alone,
+  "an issue with the air" with GitHub not linked and "when I drive home"
+  ask for none. On lamp-9adf, 13 Nov (build 12635), DeepSeek refused 3 of
+  3 voice makes that send mail ("when I leave my desk, email me that I'm
+  out") with a `cannot:` the brief asks for, so they were never handed
+  over. When the agent gives no answer (no make run here, none within its
+  45 s, an error), DeepSeek is then asked once, given no repairs, and its
+  answer is the make, as a make DeepSeek failed first has its one answer
+  stand. With no Hermes agent on the lamp nothing changes: DeepSeek makes
+  it alone with its repairs. Either switch off, every make tries DeepSeek
+  first, as before.
 - **The brief's own refusals stay DeepSeek's.** A DeepSeek `cannot:` whose
   sentence is one the system prompt asks for (hearing what is said,
   knowing who someone is, sending a message, the reminder line, sending
@@ -4130,7 +4157,12 @@ the same code for both writers.
   the clock not set, the reads' "You can ask me for it yourself any time",
   and the rest in `made_skill::BRIEFS_OWN_REFUSALS`, kept beside the brief
   and held to the prompt by a test) is said as it is and never handed to
-  the agent. Any other `cannot:` goes to the agent.
+  the agent. Any other `cannot:` goes to the agent. With a service skill
+  made as a task for the agent (`LAMP_AGENT_SERVICES` and a made skill's
+  code on), the refusals of a send ("sending a message", "sending or
+  writing on its own", `made_skill::BRIEFS_SEND_REFUSALS`) go to the agent
+  too, as it sends through its `lamp-services` tools; the others stay
+  DeepSeek's.
 - **What a skill would have to find out goes to the agent.** The lamp has
   no topic that carries the weather, the news or anything from the
   internet. The system prompt says that a request needing information
@@ -4219,8 +4251,12 @@ the same code for both writers.
   (`app_make::say_waiting_at`, once, not begun after 15 s); never when the
   hand-over failed at once, nor when the turn was cut already. The made
   line is the same either way.
-- **The journal.** "made by DeepSeek", "DeepSeek failed: handed to the
-  agent (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes)
+- **The journal.** "made by DeepSeek", "it asks for a linked service
+  (gmail): straight to the agent (Hermes), DeepSeek not asked" (the
+  service's code, never the person's words), "the agent (Hermes) made none
+  (...): DeepSeek is asked once, given no repairs", "DeepSeek's cannot is a
+  send, which the agent makes with its lamp-services tools", "DeepSeek
+  failed: handed to the agent (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes)
   wasn't kept", "the agent (Hermes) made none (no answer within 45 s):
   DeepSeek's one answer, given no repairs, stands as not made", "DeepSeek's
   cannot is one the brief asks for: not handed to the agent", "no agent on
@@ -4242,6 +4278,12 @@ the same code for both writers.
   `agent_tasks::tests::a_check_after_a_make_handed_to_the_agent_tells_the_persons_task`,
   `a_make_whose_make_run_is_refused_stays_deepseeks`,
   `a_say_handing_the_ask_back_goes_to_the_agent_and_a_reminder_stays`,
+  `a_make_asking_for_a_linked_service_goes_straight_to_the_agent`,
+  `a_make_naming_no_service_still_tries_deepseek_first`,
+  `with_either_switch_off_a_service_make_tries_deepseek_first`,
+  `a_service_make_the_agent_gives_no_answer_for_gets_deepseeks_one_try`,
+  `deepseeks_cannot_of_a_send_goes_to_the_agent_that_makes_service_skills`,
+  `make_skill_agent::tests::a_linked_service_is_asked_for_in_whole_words`,
   `make_skill_agent::tests` (the rules sent as one `skill_make` line and
   the answer read back, never a `prepare`; an older lamp-tasks or a make run
   refused is never handed over; no `lamp` target is no agent; a silent
@@ -4249,8 +4291,9 @@ the same code for both writers.
   [tasks.md](tasks.md)).
 - **Not yet shown on a lamp:** its row, the 16 makes (twelve simple, four
   known DeepSeek failures) on a lamp with an agent, comparing kept, the
-  say-back and the time with DeepSeek's; and a `curl` from inside a make's run, answered by default and failing with `held`
-  ([tasks.md](tasks.md)).
+  say-back and the time with DeepSeek's; a `curl` from inside a make's run, answered by default and failing with `held`
+  ([tasks.md](tasks.md)); and the three mail makes refused on lamp-9adf
+  made by the agent, straight, with `LAMP_AGENT_SERVICES` on.
 
 ##### A made skill loosened (`LAMP_MADE_SKILL_LOOSE=on`, off)
 
