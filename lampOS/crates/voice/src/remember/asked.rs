@@ -168,6 +168,7 @@ pub(crate) fn force() -> crate::second_provider::net::Force {
         asks_to_keep(last.words()?).then_some(crate::second_provider::net::Forced {
             name: super::REMEMBER,
             only: None,
+            fields: None,
         })
     })
 }

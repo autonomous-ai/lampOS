@@ -2964,7 +2964,15 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   việc duyệt với mọi cổng ở trên; `no` không giữ gì, kết thúc việc chờ và
   đèn nói nó vẫn tắt (`skill_write_yes::DECLINED_NEXT`); `unclear` không
   giữ gì và đèn hỏi lại một lần (`UNCLEAR_NEXT`), và `unclear` lần hai kết
-  thúc việc chờ như một `no` (`skill_write_yes::answered`). Journal: "the
+  thúc việc chờ như một `no` (`skill_write_yes::answered`). Vòng bị buộc
+  chỉ được nói `approve_id` và `answer` trong form của `make_skill`, cả hai
+  bắt buộc (`skill_write_yes::APPROVE_FIELDS`, #6921), nên lời gọi bị buộc
+  không mang theo việc tạo hay sửa nào bên cạnh câu trả lời. `no` hoặc
+  `unclear` được đọc trước bước kiểm tra chủ đèn, nên của bất kỳ ai (cả
+  khách) cũng kết thúc hoặc hỏi lại việc chờ của chủ đèn và không bao giờ
+  giữ một lời đồng ý; một `answer` ngoài ba giá trị này được đọc là `no`;
+  hai câu trả lời trong một dòng được xử lý theo thứ tự gọi, mỗi cái riêng.
+  Journal: "the
   line after a skill's task said back whole: its first round must call
   make_skill", rồi các dòng của việc duyệt, hoặc "the answer to NAME's
   say-back was no: nothing kept, it stays off" / "… was unclear: nothing
