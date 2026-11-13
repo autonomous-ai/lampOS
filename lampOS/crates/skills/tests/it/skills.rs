@@ -8604,7 +8604,7 @@ body = { gesture = "nod" }
         let answer = program.call("jive", "{}");
         assert_eq!(answer["ok"], false, "{answer}");
         let error = answer["error"].as_str().unwrap_or_default().to_owned();
-        assert!(error.starts_with("I can't move right now"), "{answer}");
+        assert!(error.starts_with(lamp_skills::CANNOT_MOVE), "{answer}");
         assert!(program.said().iter().all(|said| !said.contains("nod")));
         error
     };
