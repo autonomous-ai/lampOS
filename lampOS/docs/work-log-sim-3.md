@@ -3,6 +3,15 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 05:2x GMT+7: green; #6961 has two reads
+
+- `sim-macos` green on #6954 (21691deb92, after a rerun of the supervisor
+  flake), #6961 (c65697678e), #6971 (fc570d8b20).
+- READ-OKs: nine on #6954 (21691deb92); nine and Heron on #6961
+  (c65697678e) = two counted; sim-2 on #6972 (cd670bfb38, first read).
+- Asked: sim-2 restate #6954; ten and sim-2 restate #6971; sim-1 or ten the
+  second read of #6972.
+
 ## 2026-11-14 05:1x GMT+7: #6954's macOS red is the supervisor flake
 
 - Train 892 carries #6966 (the supervisor flake fix), #6965, #6975.
