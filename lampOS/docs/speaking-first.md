@@ -463,13 +463,17 @@ the model's comes, about a second later. A say that is never begun has no
 such line. Then one line, once the outcome is known; the connection stays
 open until then:
 - `{"outcome":"spoken"}`: the turn completed with the model's audio played
-  whole, the proof a reminder's acknowledgement takes (complete, with
-  audio, no playback gaps, no owner left, the microphone allowed).
+  to its end (complete, with audio, no owner left, the microphone
+  allowed), with or without gaps in its playback (#6749 D: a skill task's
+  ask said whole was answered `dropped` for its gaps, so lamp-skills
+  counted it unsaid and asked again 10 minutes later). A reminder's say
+  with gaps keeps its own proof: its words at least 80% of what the
+  speaker wrote (#5258).
 - `{"outcome":"dropped","why":"…"}`: begun and not spoken: the reason the
   turn was cancelled (`user_interrupted`, …), or what became of it
-  (`no_audio_answer`, `provider_failed`,
-  `audio_written_with_playback_gaps_unscored`). Never tried again here: the
-  asker decides.
+  (`no_audio_answer`, `provider_failed`, a reminder's
+  `audio_written_with_playback_gaps_unscored`). Only a cut or a failed say
+  is dropped. Never tried again here: the asker decides.
 - `{"outcome":"expired"}`.
 
 **The asker's cancel**: while it waits for the outcome, the asker may

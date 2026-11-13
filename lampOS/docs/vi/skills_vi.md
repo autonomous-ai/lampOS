@@ -2288,10 +2288,20 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   chỉ cái "có" của chủ đèn. Mỗi lúc chỉ một việc chờ, như mọi read-back: việc
   chờ mới hơn thay thế nó. Route Live không bao giờ bắt đầu nó. Khi có
   "có", lamp-control ghi đúng SHA-256 thư mục và các grant đó, và tác vụ
-  chạy ở lần kích hoạt kế tiếp. Giới hạn (`task-asks.json` trong
+  chạy ở lần kích hoạt kế tiếp. Mô hình được bảo chỉ nói đúng điều đó, không
+  bao giờ nói nó đang chạy (`skill_task_yes::APPROVED_NEXT`; code của kỹ năng
+  tự tạo, `CODE_APPROVED_NEXT`; một write, `skill_write_yes::APPROVED_NEXT`),
+  và trong `YES_WITHIN` các câu sau cái "có" được báo rằng nó chưa chạy gì và
+  một lần hỏi tới nó lúc này là một lần chạy mới, nên mô hình gọi kỹ năng đó
+  (`skill_write_yes::waiting_note`; #6749 A: trên lamp-52e6 ngày 13/11, được
+  bảo tác vụ "sẽ chạy ngay", mô hình nói ở lần "desk check" kế tiếp rằng nó
+  "đã được đồng ý và đang chạy" và không gọi gì). Trong phòng đông người, cái
+  "có" được nghe trong 45 s của thread tính từ lúc kết thúc câu đọc lại như
+  đã phát, không phải từ lúc bắt đầu (#6749 C, docs/second-voice.md). Giới hạn (`task-asks.json` trong
   `--state-dir` của lamp-skills): một SHA-256 đã nói thì không hỏi lại
   trước một ngày; tối đa 3 lần hỏi đã nói cho mọi kỹ năng trong 24 giờ; lần
-  không nói được thì thử lại sau ít nhất 10 phút, ở lần kích hoạt sau;
+  không nói được thì thử lại sau ít nhất 10 phút, ở lần kích hoạt sau (một
+  lần phát tới cuối dù có khoảng hở khi phát được tính là đã nói, #6749 D);
   script đổi là SHA-256 khác nên hỏi lại; mỗi lúc một lần hỏi cho mỗi kỹ
   năng; sổ ghi không đọc được thì không hỏi gì. Sổ được tỉa ngay khi đọc,
   trước mọi kiểm tra (`task::prune_asks`): lần hỏi ghi ngày sau hiện tại

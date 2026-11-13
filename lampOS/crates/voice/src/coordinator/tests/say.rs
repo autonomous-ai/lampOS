@@ -280,6 +280,47 @@ fn a_say_whose_turn_completes_with_its_audio_played_is_spoken() {
     assert_eq!(test.answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
 }
 
+/// #6749 D (lamp-52e6, 13 Nov): a skill task's ask said whole, with gaps in
+/// its playback, was answered `dropped`
+/// (`audio_written_with_playback_gaps_unscored`), so lamp-skills counted it
+/// unsaid and asked again 10 min later. A say that played to its end
+/// through gaps, nobody's turn taken over it, is `spoken`, however much of
+/// it the gaps' zeros were; one cut over its gaps is still dropped.
+#[test]
+fn a_say_played_to_its_end_through_gaps_is_spoken() {
+    for zeros in [0, 64, 2_400] {
+        let mut test = Test::new();
+        let first = test.generation(17);
+        test.accept(&first, 240);
+        test.retire(&first);
+        let current = test.reply.as_mut().unwrap();
+        current.playback_gaps = 2;
+        current.gap_zeros.total = zeros;
+        test.provider_complete();
+        assert!(test.finish_if_settled());
+        assert_eq!(
+            test.answered.try_recv(),
+            Ok(Answer::Done(Outcome::Spoken)),
+            "{zeros} zero frames"
+        );
+    }
+    let mut cut = Test::new();
+    let first = cut.generation(17);
+    cut.accept(&first, 120);
+    cut.reply.as_mut().unwrap().playback_gaps = 1;
+    cancel_reply(
+        &mut cut.owner,
+        &mut cut.reply,
+        &mut cut.trace,
+        "user_interrupted",
+    )
+    .unwrap();
+    assert_eq!(
+        cut.answered.try_recv(),
+        Ok(Answer::Done(Outcome::Dropped("user_interrupted".into())))
+    );
+}
+
 /// A person speaks over it: the voice cancels the turn, and the asker is
 /// told it was dropped, and why.
 #[test]
