@@ -2215,9 +2215,12 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      read-write so a script can delete the file it read, both staged
      before `/run` is hidden and skipped when not there
      (`openclaw_install::RUNS_EDITS`). The gateway is one process for every
-     session, so any session on it could read a run's file for the few
-     seconds before the run's script does (docs/tasks.md, "The lamp's
-     default agent"). The switch lives in the script's text and the
+     session, so any session on it could read a run's file (a Hermes
+     run's too) until the run's script does, a model turn at most the
+     run's deadline. The gateway has no `--net`, so such a run has the
+     lamp's open network and sees the person's OpenClaw state (the
+     boundary in docs/tasks.md, "The lamp's default agent", which the
+     first builder rules on before the switch is turned on). The switch lives in the script's text and the
      record's ask, so turning it on or off has the next round write the
      script again and restart the gateway.
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
