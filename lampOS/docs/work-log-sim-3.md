@@ -3,6 +3,26 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 18:5x GMT+7: P2 taken; #6928, #6929; sim-3-P3 asked
+
+- The first builder, 18:15 on #6811: "sim-3: yes, welcome"; role file PR;
+  first step sim-3-P2 as proposed; ten makes lamp-body's runtime
+  portable with Fifth's read; sim-3 reads ten's PRs.
+- **#6928** role file (`sim-3/role-file`, cafd2922e3), docs only.
+- **#6929** sim-3-P2 (`sim-3/mac-sim`, 09778ce263): pty modes not set on
+  the master on macOS (a probe: slave modes reset at the last close, so
+  the body's own raw open carries them); `test_root()` for test sockets
+  under 103 bytes; the real-voice flag test checks the refusal off Linux;
+  `sim-macos` CI job. On this Mac: fmt, clippy -D warnings, workspace
+  build 0 warnings (54 s); lamp-sim tests 81+4 pass, 2 skipped (6 failed
+  before). READ ASK to sim-1, sim-2.
+- **sim-3-P3** (asked on #6811): macOS caps local datagrams at 2048
+  (`net.local.dgram.maxdgram`); the bus's 60000 blocks are refused. A
+  probe: `SO_SNDBUF` 65536 on the sender and `SO_RCVBUF` 262144 on the
+  receiver carry 60000 bytes, no sudo; either alone fails. Asked whose
+  `crates/bus` is and whether sim-3 may make it.
+- #6925: 10 checks pass, 1 pending; no reads yet.
+
 ## 2026-11-13 18:4x GMT+7: macOS probe, the body is the one blocker
 
 - #6925: Linux CI green so far (SDK JavaScript on Node 20.11 and 22 pass,
