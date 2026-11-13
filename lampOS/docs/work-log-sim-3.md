@@ -3,6 +3,19 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 23:2x GMT+7: step 2 read; a third place for the switch
+
+- Quiet check; #6961's `sim-macos` job still running.
+- Read for step 2 (stt.rs at 162fedbec2): `Results` (`type`, `channel.
+  alternatives[0].transcript`, `is_final`, `speech_final`, `from_finalize`,
+  `start`, `duration`), `SpeechStarted` (`timestamp`); in: `Finalize`,
+  `CloseStream`, `KeepAlive`; auth `Token <key>`; with `stt_base_url` the path
+  is `{base}/ws/audio/transcriptions`; a `Finalize` answer is waited 1 s.
+- Told ten: `secure()` takes only `wss` (ws in tests only), so the loopback
+  switch must cover the STT socket's `ws://` too.
+- tungstenite 0.30.0 (sync, `handshake`) is in Cargo.lock already: no new
+  package for step 2's server.
+
 ## 2026-11-13 23:1x GMT+7: #6961, P4 step 1b (resident synthesizer)
 
 - **#6961** (`sim-3/apple-speech`, 30804d4ffa, stacked on #6954):
