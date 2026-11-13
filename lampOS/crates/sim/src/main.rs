@@ -161,7 +161,7 @@ fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
             .spawn(move || {
                 lamp_sim::speech::serve(listener, token, std::sync::Arc::new(resident))
             })?;
-        lamp_sim::apple_speech::serve_on_main_thread(lines, &language);
+        lamp_sim::apple_speech::serve_on_main_thread(lines, &language)?;
         return server
             .join()
             .unwrap_or_else(|_| Err(std::io::Error::other("the speech service ended")));
