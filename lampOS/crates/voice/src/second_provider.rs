@@ -1045,6 +1045,11 @@ pub(crate) fn carries_past_silent_from_environment() -> bool {
         && on(CONVERSATION_CARRIES_PAST_SILENT_ENVIRONMENT)
 }
 
+/// What each call of a round is answered when the person's words named an
+/// agent for the work and the round called the lamp's own tools instead of
+/// handing it over (#6547, V2's P1 on 12587): none was run.
+const NAMED_AGENT_NOT_RUN: &str = "Not run: the person asked another agent to do this. Hand it over with start_agent_task instead.";
+
 /// What a `not_for_me` is answered in a turn named to a face
 /// ([`NAMED_ALWAYS_ENVIRONMENT`]): the model is asked once more.
 pub(crate) const NAMED_TO_A_FACE_ANSWER: &str =
@@ -16034,6 +16039,45 @@ async fn answer(
             // done is said instead, and nothing loops. Once a request
             // ([`crate::agent_tasks::AskedAgain`]).
             let start = crate::agent_tasks::START;
+            // The words named an agent for the work and the model called its
+            // own tools instead ("Hermes, look up the weather" answered with
+            // `weather`: V2's P1 on 12587, Fifth's row-6547): none of them
+            // runs; each is answered as not run, and the turn is asked again
+            // once to hand it over. Its held words are not said.
+            if catching
+                && round == 1
+                && round < MAX_ROUNDS
+                && decline_held.is_some()
+                && !calls.is_empty()
+                && !calls
+                    .iter()
+                    .any(|call| call.name == start || call.name == NOT_FOR_ME)
+                && let Some(agent) = named_agent.as_deref()
+                && shared.named_asked_again.first(request)
+            {
+                let names: Vec<&str> = calls.iter().map(|call| call.name.as_str()).collect();
+                shared.named_ask_said(format!(
+                    "lamp-voice second: request {request}: named agent, called {} not {start}: none run, asked again",
+                    names.join(", ")
+                ));
+                messages.push(Message::assistant_calls_with(
+                    Some(std::mem::take(&mut text)),
+                    &calls,
+                    reasoning.take(),
+                ));
+                for call in &calls {
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        NAMED_AGENT_NOT_RUN.to_owned(),
+                    ));
+                }
+                messages.push(Message::system(crate::agent_tasks::named_no_start_note(
+                    agent,
+                )));
+                decline_held = Some(String::new());
+                catch_owed = Some("named agent");
+                continue;
+            }
             if catching && round == 1 && calls.is_empty() {
                 let named_held = named_agent.is_some() && decline_held.is_some();
                 if named_held || crate::agent_tasks::speaks_a_read_back(&text) {
