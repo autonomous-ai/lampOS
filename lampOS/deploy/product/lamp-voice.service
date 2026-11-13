@@ -443,6 +443,11 @@ Environment=LAMP_SKILL_TASKS=on
 # scripts/ files run by one task step, said back with its grants; on only at the person's later yes to that package's
 # SHA-256, never at once; passed to both routes. The same line in lamp-skills and lamp-skills-manage@.
 Environment=LAMP_MADE_SCRIPTS=on
+# The lamp's agent's connectors (#6648, #6664, docs/skills.md): a voice make of a skill that reads or writes a linked
+# service is one `do.task` for the lamp's agent, its grants said back; a send comes back here for the owner's
+# spoken yes; passed to both routes. The same line in lamp-tasks, lamp-skills, lamp-skills-manage@ and
+# lamp-control. On in the product (owner, 13 Nov).
+Environment=LAMP_AGENT_SERVICES=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill

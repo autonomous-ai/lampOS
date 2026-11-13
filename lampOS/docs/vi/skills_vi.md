@@ -1350,9 +1350,10 @@ từ chối; và `the_read_steps_are_the_catalogues_readable_services`),
 `app_make::tests::a_voice_make_line_is_asked_on_the_say_socket`, và
 `crates/skills/tests/it/made.rs` với `lamp-skills` thật.
 
-### Dịch vụ đã liên kết thành task cho agent của đèn (`LAMP_AGENT_SERVICES=on`, tắt)
+### Dịch vụ đã liên kết thành task cho agent của đèn (`LAMP_AGENT_SERVICES=on`, bật trong sản phẩm)
 
-Yêu cầu của chủ, 12/11. Với `LAMP_AGENT_SERVICES=on` trong `lamp-voice`
+Yêu cầu của chủ, 12/11; bật trong cả năm unit sản phẩm từ 13/11. Với
+`LAMP_AGENT_SERVICES=on` trong `lamp-voice`
 (đặt giống nhau trong lamp-tasks, lamp-skills, lamp-skills-manage@ và
 lamp-control,
 [services_vi.md](services_vi.md); đúng `on`; `made_skill::AGENT_SERVICES_ENVIRONMENT`) và

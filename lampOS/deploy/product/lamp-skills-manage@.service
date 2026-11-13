@@ -36,6 +36,9 @@ Environment=LAMP_SKILL_TASKS=on
 # A made skill's code of its own (#6307): install_made holds its scripts/ to the made cap again as it is put on
 # (made_skill::put_on_scripts), and its `do.task` reads back (task_asks). The same line in lamp-skills and lamp-voice.
 Environment=LAMP_MADE_SCRIPTS=on
+# The lamp's agent's connectors (#6664): a `do.task`'s linked-service grants held as it is put on. The same line in
+# lamp-tasks, lamp-skills, lamp-voice and lamp-control. On in the product (owner, 13 Nov).
+Environment=LAMP_AGENT_SERVICES=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills' [present] values, as lamp-skills
 # loads them, so the app's on and off act on the skills as they run. The same line in lamp-skills.service and lamp-cloud.service.
 Environment=LAMP_NUDGES_PRESENT=on

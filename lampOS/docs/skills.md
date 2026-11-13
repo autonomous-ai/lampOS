@@ -3824,9 +3824,10 @@ Tests:
   `made::a_made_skill_goes_on_through_the_helper_with_no_yes` (the
   voice's call through the real helper).
 
-##### A linked service as a task for the lamp's agent (`LAMP_AGENT_SERVICES=on`, off)
+##### A linked service as a task for the lamp's agent (`LAMP_AGENT_SERVICES=on`, on in the product)
 
-The owner's ask, 12 Nov. With `LAMP_AGENT_SERVICES=on` in `lamp-voice`
+The owner's ask, 12 Nov; on in all five product units since 13 Nov. With
+`LAMP_AGENT_SERVICES=on` in `lamp-voice`
 (set alike in lamp-tasks, lamp-skills, lamp-skills-manage@ and lamp-control,
 [services.md](services.md), "The lamp's agent's connectors"; `on` exactly; `made_skill::AGENT_SERVICES_ENVIRONMENT`,
 `made_skill::agent_services_on`), and `LAMP_MADE_SCRIPTS=on` beside it (a
