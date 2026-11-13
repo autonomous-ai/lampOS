@@ -711,15 +711,18 @@ pub fn about(name: &str) -> String {
 
 /// Said with a Google Drive file list that found nothing. The product's
 /// Drive link holds `drive.file` alone, so Google shows the lamp only the
-/// files it made or that were opened with it; a file made elsewhere is
-/// hidden, and "nothing found" would say it isn't there (11 Nov, a
-/// tester's lamp: a file made outside the lamp was never found).
-pub const DRIVE_ONLY_OWN: &str = "The lamp sees only the Google Drive files it made or that were opened with it, so to find another file, open it with the lamp first.";
+/// files it made itself (nothing in lampOS offers a file picker or Drive's
+/// "Open with"); a file made elsewhere is hidden, and "nothing found"
+/// would say it isn't there (11 Nov, a tester's lamp: a file made outside
+/// the lamp was never found).
+pub const DRIVE_ONLY_OWN: &str = "The lamp can see only the Google Drive files it made itself, so a file made elsewhere won't show up here.";
 
 /// `result`, a read's quoted answer, told why when it is a Google Drive
-/// file list that found nothing ([`DRIVE_ONLY_OWN`]).
+/// file list that found nothing: none quoted and none left out for
+/// length ([`DRIVE_ONLY_OWN`]).
 pub fn drive_none_told(code: &str, args: &Value, mut result: Value) -> Value {
-    let none = result["quoted"].as_array().is_some_and(Vec::is_empty);
+    let none = result["quoted"].as_array().is_some_and(Vec::is_empty)
+        && result["left_out"].as_u64().unwrap_or(0) == 0;
     if none && code == "google_drive" && text(args, "what") == Some("files") {
         result["nothing_found_why"] = json!(DRIVE_ONLY_OWN);
     }
