@@ -280,10 +280,12 @@ fn code_rules() -> String {
          [[do]] step, alone in its step: task = {{ task = \"what the code does, in a few plain \
          words\", run = \"scripts/main.py\" }}, run naming one of its .py files; and at the \
          top, before any table, grants = [ ... ] listing only what the code uses on the lamp, \
-         of: {grants}. The code is Python run on the lamp; it reaches the lamp only through \
-         the lamp's own SDK, with only those grants, and has no other network. Its other steps \
-         run at once; what the code finds comes back as the lamp's task news. The lamp says \
-         back what it uses and waits for the person's yes before it runs any code.",
+         of: {grants}. The code is Python 3 run on the lamp; it reaches the lamp only through \
+         the lamp's own SDK, with only those grants, and has no other network: {sdk}. There \
+         is no other lamp module, and each call takes only the arguments named. Its other \
+         steps run at once; what the code finds comes back as the lamp's task news. The lamp \
+         says back what it uses and waits for the person's yes before it runs any code.",
+        sdk = made_skill::SCRIPT_SDK,
         most = made_skill::MOST_SCRIPTS,
         each = made_skill::MOST_SCRIPT_BYTES / 1024,
         all = made_skill::MOST_SCRIPTS_BYTES / 1024,
@@ -610,9 +612,21 @@ pub fn tool() -> lamp_gemini::Tool {
     }
 }
 
-/// What [`tool`]'s description adds with a made skill's code on (#6307).
-pub const CODE_TOLD: &str = " One that runs its own code is not put on until the person agrees \
-     to what you are told to say of it.";
+/// What [`tool`]'s description adds with a made skill's code on (#6307):
+/// plainly, that a made skill may carry a script of its own, not on until
+/// the person agrees (#6749 B: on lamp-52e6, "make a skill that checks the
+/// processor temperature and sets the light" was answered "I can't run a
+/// script or check a temperature", and the function was never called).
+/// Short: with every switch on the description stays within 1,024 bytes;
+/// the example ask is the `request`'s ([`CODE_REQUEST_TOLD`]).
+pub const CODE_TOLD: &str = " A made skill may carry its own Python script, run by its task once \
+     the person agrees; never say the lamp can't run a script.";
+
+/// What the `request` parameter's description adds with a made skill's
+/// code on (#6749 B): an ask its own script answers, passed whole.
+const CODE_REQUEST_TOLD: &str = " A made skill's own script may check what the lamp reads and \
+     act on it (\"make a skill that checks the processor temperature and sets the light\"): \
+     pass such an ask whole.";
 
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
@@ -654,6 +668,15 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
         "enum": crate::made_clash::CHOICES,
         "description": "With clash_id only: replace the other skill, keep both (they may take turns), or cancel, as the person chose in any words."
     });
+    if code {
+        let request = format!(
+            "{}{CODE_REQUEST_TOLD}",
+            parameters["properties"]["request"]["description"]
+                .as_str()
+                .unwrap_or_default()
+        );
+        parameters["properties"]["request"]["description"] = json!(request);
+    }
     if writes || tasks || code {
         parameters["properties"][crate::skill_write_yes::APPROVE_ID] = json!({
             "type": "string",
@@ -5484,6 +5507,148 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert!(parameters["properties"]["approve_id"].is_object());
         assert!(parameters["properties"].get(READ_BACK).is_none());
         made_skill::set_scripts_here(None);
+    }
+
+    /// #6749 B: on lamp-52e6 with `LAMP_MADE_SCRIPTS` on, "make a skill
+    /// that checks the processor temperature and sets the light" got "I
+    /// can't run a script or check a temperature" and `make_skill` was
+    /// never called. With the switch on, the function says plainly that a
+    /// made skill may carry its own Python script, run by its task once the
+    /// person agrees, with that ask as its example, within the link's
+    /// bounds with every switch on; off, the function is as before.
+    #[test]
+    fn a_made_script_is_offered_to_the_voice_with_its_switch_alone() {
+        made_skill::set_scripts_here(Some(false));
+        let off = tool();
+        for word in ["script", "Python", "temperature"] {
+            assert!(
+                !off.description.contains(word),
+                "{word}: {}",
+                off.description
+            );
+        }
+        let parameters = off.parameters.clone().unwrap();
+        assert_eq!(
+            parameters["properties"]["request"]["description"],
+            "What this skill should do and when, in the person's own words for this ask, \
+             nothing else: never a time, step or trigger of an earlier skill or turn."
+        );
+        made_skill::set_scripts_here(Some(true));
+        let on = tool();
+        for part in [
+            "its own Python script",
+            "run by its task once the person agrees",
+            "never say the lamp can't run a script",
+        ] {
+            assert!(on.description.contains(part), "{part}: {}", on.description);
+        }
+        let request = on.parameters.unwrap()["properties"]["request"]["description"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert!(
+            request.contains("checks the processor temperature and sets the light"),
+            "{request}"
+        );
+        // Every switch on, as on the lamps: still within the link's bounds.
+        made_skill::set_writes_here(Some(true));
+        crate::skill_task_yes::set_on_here(Some(true));
+        let all = tool();
+        assert!(all.description.len() <= 1_024, "{}", all.description.len());
+        assert!(!all.description.contains("yes"), "{}", all.description);
+        assert!(all.parameters.unwrap().to_string().len() <= 4_096);
+        crate::skill_task_yes::set_on_here(None);
+        made_skill::set_writes_here(None);
+        made_skill::set_scripts_here(None);
+    }
+
+    /// #6749 E: the making model is told the lamp's real calls for its
+    /// code (`lampos`' `Lamp.local()`, `device()`, `light(colour, level,
+    /// for_ms)`), never left to guess a module and its keywords (lamp-9adf,
+    /// 13 Nov: `from lamp import light`, `light.set_light(..., for="59s")`).
+    #[test]
+    fn the_maker_is_told_the_lamps_real_calls_for_its_code() {
+        made_skill::set_scripts_here(Some(true));
+        let on = system_with(false);
+        for part in [
+            "from lampos import Lamp",
+            "await Lamp.local()",
+            "await lamp.device()",
+            "temperature_c",
+            "await lamp.light(colour, level, for_ms)",
+            "asyncio.run(main())",
+        ] {
+            assert!(on.contains(part), "{part}: {on}");
+        }
+        made_skill::set_scripts_here(Some(false));
+        assert!(!system_with(false).contains("lampos"));
+        made_skill::set_scripts_here(None);
+    }
+
+    /// #6749 E: a made script that doesn't parse (lamp-9adf's `for="59s"`)
+    /// goes back to the model as a repair before anything is said back;
+    /// fixed, it is kept and said back, waiting for the yes; never fixed,
+    /// the person hears it couldn't be made.
+    #[test]
+    fn a_made_script_that_doesnt_parse_is_repaired_before_its_said_back() {
+        made_skill::set_scripts_here(Some(true));
+        made_skill::set_code_at_once_here(Some(false));
+        let (root, keeping) = keeping("code-parse");
+        let with = |main: &str| {
+            format!(
+                "```skill.toml\n{CODE_TOML}```\n\n```SKILL.md\n{CODE_CARD}```\n\n\
+                 ```scripts/main.py\n{main}```\n"
+            )
+        };
+        let bad =
+            with("from lamp import light\nlight.set_light(colour=\"red\", level=3, for=\"59s\")\n");
+        let good = with(
+            "import asyncio\nfrom lampos import Lamp\n\nasync def main():\n    lamp = await Lamp.local()\n    \
+             await lamp.light(\"red\", 3, 59000)\n    await lamp.close()\n\nasyncio.run(main())\n",
+        );
+        if made_skill::a_python_here().is_none() {
+            eprintln!("skipped: no python3 here to parse a made script with");
+            made_skill::set_code_at_once_here(None);
+            made_skill::set_scripts_here(None);
+            let _ = std::fs::remove_dir_all(&root);
+            return;
+        }
+        let (url, served) = service(vec![(200, bad.clone()), (200, good)]);
+        let told = make_with(
+            7,
+            Some(CODE_REQUEST),
+            CODE_REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 2);
+        assert_eq!(told["made"], "photo-booth", "{told}");
+        assert_eq!(told["code_waits_for_yes"], true, "{told}");
+        // Never fixed: on a lamp of its own, so it isn't the same ask made.
+        let (other, keeping) = self::keeping("code-parse-never");
+        let (url, served) = service(vec![(200, bad); 1 + MOST_REPAIRS]);
+        let told = make_with(
+            8,
+            Some(CODE_REQUEST),
+            CODE_REQUEST,
+            &keeping,
+            chat_at(url),
+            NOW + 1,
+            || None,
+        );
+        assert_eq!(served.join().unwrap(), 1 + MOST_REPAIRS);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
+        );
+        made_skill::set_code_at_once_here(None);
+        made_skill::set_scripts_here(None);
+        made_skill::set_python_here(None);
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&other);
     }
 
     /// #6307, on: a made skill with code of its own is kept and said back

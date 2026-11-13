@@ -3424,6 +3424,214 @@ fn code_matches(files: &Files, uses: &Uses) -> Result<(), Refused> {
     }
 }
 
+/// The Python a made skill's scripts are parsed with as it is made (#6749
+/// E): the lamp's own. A script is never run here: [`PARSES`] reads it from
+/// stdin alone and hands it to Python's own parser.
+pub const PYTHON: &str = "/usr/bin/python3";
+/// What [`PYTHON`] runs, with `-I` (no environment, user site or working
+/// folder on its path): the bytes on its stdin parsed, never compiled to
+/// run, nor run. Bytes, not text, so the parse never hangs on the
+/// locale's encoding: Python reads a script's source as UTF-8.
+const PARSES: &str = "import ast,sys; ast.parse(sys.stdin.buffer.read())";
+/// The longest one script's parse is waited for: Python starts and parses
+/// 8 KiB in well under it on the lamp.
+const PARSE_WITHIN: Duration = Duration::from_secs(2);
+/// How often [`parsed`] looks whether Python has ended.
+const PARSE_POLL: Duration = Duration::from_millis(5);
+/// The most of Python's words read after a parse that failed.
+const MOST_PARSE_WORDS: u64 = 4 * 1024;
+/// The most of a parse error's own words told the repair, in characters.
+const MOST_PARSE_ERROR_CHARS: usize = 80;
+/// The most of the script's line told the repair, in characters.
+const MOST_PARSE_LINE_CHARS: usize = 80;
+// A script is written to Python's stdin whole before its end is awaited:
+// within any pipe's buffer, so the write never waits on Python.
+const _: () = assert!(MOST_SCRIPT_BYTES <= 16 * 1024);
+
+/// Why a made skill is refused when a script it wrote isn't Python that
+/// parses (#6749 E), the lamp's reason; the person hears [`NOT_MADE_TRY`]
+/// once its repairs are used up, and the repair is told where it broke.
+pub const SCRIPT_DOESNT_PARSE: &str = "its code isn't Python that parses";
+
+/// How a made skill's code reaches the lamp, told the making model
+/// (`make_skill_local`) and a repair of code that didn't parse: the lamp's
+/// own `lampos` SDK on the lamp (`sdk/python`), as a run's script imports
+/// it, its calls named as they are, so no module or keyword is guessed
+/// (lamp-9adf, 13 Nov: `from lamp import light` and
+/// `light.set_light(..., for="59s")`).
+pub const SCRIPT_SDK: &str = "import asyncio; from lampos import Lamp; async def main(): lamp = \
+     await Lamp.local(), then only await lamp.device() (a dict; temperature_c maps each sensor to \
+     degrees C; grant device), await lamp.air() (air), await lamp.light(colour, level, for_ms) (a \
+     light step's colour, level 1-5, for_ms in ms; light), await lamp.say(text) (speak), await \
+     lamp.gesture(name) (body), await lamp.close(); last, asyncio.run(main())";
+
+#[cfg(test)]
+thread_local! {
+    /// [`PYTHON`] as a test of this thread sets it.
+    static PYTHON_HERE: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+}
+
+/// The Python [`scripts_parse`] parses with: [`PYTHON`], or a test's.
+fn python() -> PathBuf {
+    #[cfg(test)]
+    if let Some(python) = PYTHON_HERE.with(|here| here.borrow().clone()) {
+        return python;
+    }
+    PathBuf::from(PYTHON)
+}
+
+/// [`python`] for this test's thread alone.
+#[cfg(test)]
+pub(crate) fn set_python_here(python: Option<PathBuf>) {
+    PYTHON_HERE.with(|here| *here.borrow_mut() = python);
+}
+
+/// A Python this machine runs, set for this test's thread ([`python`]):
+/// [`PYTHON`] when it runs, else `python3` on the PATH; none when neither
+/// does, and the test that needs one says it was skipped.
+#[cfg(test)]
+pub(crate) fn a_python_here() -> Option<PathBuf> {
+    let found = [PathBuf::from(PYTHON), PathBuf::from("python3")]
+        .into_iter()
+        .find(|python| {
+            Command::new(python)
+                .args(["-I", "-c", "pass"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .is_ok_and(|status| status.success())
+        });
+    set_python_here(found.clone());
+    found
+}
+
+/// What [`parsed`] found of one script.
+#[derive(Debug)]
+enum Parse {
+    /// Python's parser took it.
+    Parses,
+    /// Python's parser refused it: the line it named, and its error ("SyntaxError:
+    /// invalid syntax").
+    Not { line: Option<usize>, error: String },
+    /// Python couldn't tell: not started, not ended within its time, or
+    /// ended with no parse error. Why, for the journal.
+    Unchecked(String),
+}
+
+/// `text` parsed by `python` ([`PARSES`]), on its stdin alone, with an
+/// empty environment from `/`, waited for at most `within`, then killed.
+fn parsed(python: &Path, text: &str, within: Duration) -> Parse {
+    let child = Command::new(python)
+        .args(["-I", "-c", PARSES])
+        .env_clear()
+        .current_dir("/")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn();
+    let mut child = match child {
+        Ok(child) => child,
+        Err(why) => return Parse::Unchecked(format!("python not started: {why}")),
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        // A Python that ended before reading it is told by its end below.
+        let _ = stdin.write_all(text.as_bytes());
+    }
+    let began = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) if began.elapsed() < within => std::thread::sleep(PARSE_POLL),
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Parse::Unchecked(format!("python not ended within {within:?}"));
+            }
+        }
+    };
+    if status.success() {
+        return Parse::Parses;
+    }
+    let mut words = Vec::new();
+    if let Some(stderr) = child.stderr.take() {
+        let _ = stderr.take(MOST_PARSE_WORDS).read_to_end(&mut words);
+    }
+    let words = String::from_utf8_lossy(&words);
+    // Python's own traceback names the parsed source `<unknown>`, and its
+    // last line is the error: anything else is Python failing, not the
+    // script.
+    let error = words
+        .lines()
+        .map(str::trim)
+        .rfind(|line| !line.is_empty())
+        .filter(|line| {
+            line.split_once(':')
+                .map_or(*line, |(kind, _)| kind)
+                .ends_with("Error")
+        });
+    let Some(error) = error else {
+        return Parse::Unchecked(format!("python ended {status} with no parse error"));
+    };
+    let line = words
+        .lines()
+        .filter_map(|line| line.trim().strip_prefix("File \"<unknown>\", line "))
+        .filter_map(|rest| {
+            rest.split(|c: char| !c.is_ascii_digit())
+                .next()?
+                .parse()
+                .ok()
+        })
+        .next_back();
+    Parse::Not {
+        line,
+        error: cut_chars(error, MOST_PARSE_ERROR_CHARS),
+    }
+}
+
+/// Each `.py` file of a made skill's code parsed as Python (#6749 E), before
+/// its check and its say-back: one that doesn't parse is refused for a
+/// repair, told the file, the line, Python's error and the line as written,
+/// and the lamp's calls ([`SCRIPT_SDK`]). Nothing of it is run. A parse
+/// Python can't tell ([`Parse::Unchecked`]) is journaled and leaves the
+/// script as it is: the person's yes still stands before it runs.
+fn scripts_parse(scripts: &[(String, String)]) -> Result<(), Refused> {
+    let python = python();
+    for (path, text) in scripts
+        .iter()
+        .filter(|(path, _)| path.ends_with(RUNNABLE_ENDING))
+    {
+        match parsed(&python, text, PARSE_WITHIN) {
+            Parse::Parses => {}
+            Parse::Unchecked(why) => {
+                eprintln!("lamp-voice: a made skill's {path} was not parsed: {why}");
+            }
+            Parse::Not { line, error } => {
+                let kind = error
+                    .split_once(':')
+                    .map_or(error.as_str(), |(kind, _)| kind);
+                let at = line.map_or(String::new(), |line| format!(" at line {line}"));
+                eprintln!("lamp-voice: a made skill's code doesn't parse: {path}{at} ({kind})");
+                let shown = line
+                    .and_then(|line| text.lines().nth(line.checked_sub(1)?))
+                    .map(str::trim)
+                    .filter(|shown| !shown.is_empty())
+                    .map_or(String::new(), |shown| {
+                        format!(": {}", cut_chars(shown, MOST_PARSE_LINE_CHARS))
+                    });
+                return Err(Refused(
+                    SCRIPT_DOESNT_PARSE.into(),
+                    Some(format!(
+                        "The lamp refused its code: {path} isn't Python that parses{at}, \
+                         {error}{shown}. Reach the lamp only so: {SCRIPT_SDK}."
+                    )),
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// [`held`] for a skill added from a file ([`capped_added`]): the cap
 /// before #6066, unchanged (App Only's P2 on #6103): the light, the head,
 /// [`TOPICS`] and its note (`speak`), nothing more.
@@ -6179,6 +6387,9 @@ pub fn keep_asked(
     // Its code only with a task step to run it, and that step's file one
     // it wrote (#6307).
     code_matches(&files, &uses)?;
+    // Each .py it wrote Python that parses, before its check and its
+    // say-back (#6749 E): one that doesn't goes to a repair.
+    scripts_parse(&files.scripts)?;
     // A write's words and recipients are the request's own (#6066): the
     // heard line's, for a make by voice.
     if !uses.writes.is_empty() {
@@ -12636,6 +12847,164 @@ task = { task = "take a photo and send it to the app", run = "scripts/main.py" }
             keep(&answer(CODE_TOML, CODE_CARD), false, "local:6", &keeping).unwrap_err();
         assert_eq!(unwritten.0, SCRIPTS_NOT_HELD);
         set_scripts_here(None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// The script lamp-9adf's model wrote (#6749 E, 13 Nov): `for` is a
+    /// Python keyword, so the line is a SyntaxError, and it was kept and
+    /// said back.
+    const FOR_PY: &str = "from lamp import light\n\
+        color = \"red\"\n\
+        light.set_light(colour=color, level=3, for=\"59s\")\n";
+
+    /// #6749 E: a written `.py` that doesn't parse is refused before it is
+    /// said back, with lines for a repair that name the file, the line and
+    /// the lamp's real calls; one that parses is kept as before. Nothing of
+    /// it is run: the script goes to Python's own parser on stdin alone.
+    #[test]
+    fn a_made_script_that_doesnt_parse_is_refused_for_a_repair() {
+        use std::os::unix::fs::PermissionsExt;
+        if a_python_here().is_none() {
+            eprintln!("skipped: no python3 here to parse a made script with");
+            return;
+        }
+        set_scripts_here(Some(true));
+        let dir = scratch("made-code-parse");
+        let program = dir.join("pack");
+        fs::write(
+            &program,
+            "#!/bin/sh\nname=$(basename \"$4\")\ncat \"$4/skill.toml\" > \"$3/$name-1.0.0.tar\"\nexit 0\n",
+        )
+        .unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let keeping = Keeping {
+            directory: dir.join("made"),
+            program,
+            manage: dir.join("manage.sock"),
+            installed: dir.join("skills"),
+        };
+        let refused = keep(
+            &code_answer(CODE_TOML, &[("scripts/main.py", FOR_PY)]),
+            false,
+            "local:1",
+            &keeping,
+        )
+        .unwrap_err();
+        assert_eq!(refused.0, SCRIPT_DOESNT_PARSE);
+        let lines = refused.1.expect("lines for a repair");
+        for part in [
+            "scripts/main.py",
+            "line 3",
+            "SyntaxError",
+            "for=\"59s\"",
+            "from lampos import Lamp",
+            "await lamp.light(colour, level, for_ms)",
+        ] {
+            assert!(lines.contains(part), "{part}: {lines}");
+        }
+        assert!(lines.len() <= MOST_REPAIR_BYTES, "{}", lines.len());
+        // Nothing kept, so nothing said back.
+        assert!(index(&keeping.directory).is_empty());
+        // Said plainly, once its repairs are used up.
+        assert_eq!(plain_reason(&refused.0), NOT_MADE_TRY);
+        // Any .py of its code, not only the one its task runs.
+        let other = keep(
+            &code_answer(
+                CODE_TOML,
+                &[
+                    ("scripts/main.py", MAIN_PY),
+                    ("scripts/util.py", "def f(:\n"),
+                ],
+            ),
+            false,
+            "local:2",
+            &keeping,
+        )
+        .unwrap_err();
+        assert_eq!(other.0, SCRIPT_DOESNT_PARSE);
+        assert!(other.1.unwrap().contains("scripts/util.py"));
+        // A file that isn't Python is never parsed as Python.
+        let made = keep(
+            &code_answer(
+                CODE_TOML,
+                &[
+                    ("scripts/main.py", MAIN_PY),
+                    ("scripts/notes.txt", "def f(:\n"),
+                ],
+            ),
+            false,
+            "local:3",
+            &keeping,
+        )
+        .unwrap();
+        assert!(made.uses.code, "{made:?}");
+        set_python_here(None);
+        set_scripts_here(None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// #6749 E: the parse is Python's alone, on stdin, within its time; a
+    /// Python that can't be started or doesn't end in time leaves the
+    /// script unchecked (journaled), never refused: the person's yes still
+    /// stands before it runs.
+    #[test]
+    fn a_scripts_parse_is_bounded_and_leaves_it_unchecked_when_python_cant_tell() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = scratch("made-code-parse-bounds");
+        let missing = dir.join("no-python");
+        assert!(matches!(
+            parsed(&missing, "x = 1\n", PARSE_WITHIN),
+            Parse::Unchecked(_)
+        ));
+        let slow = dir.join("slow-python");
+        fs::write(&slow, "#!/bin/sh\nsleep 5\n").unwrap();
+        fs::set_permissions(&slow, fs::Permissions::from_mode(0o755)).unwrap();
+        let began = Instant::now();
+        assert!(matches!(
+            parsed(&slow, "x = 1\n", Duration::from_millis(200)),
+            Parse::Unchecked(_)
+        ));
+        assert!(
+            began.elapsed() < Duration::from_secs(2),
+            "{:?}",
+            began.elapsed()
+        );
+        // A Python that fails some other way than a parse error is no
+        // refusal either.
+        let broken = dir.join("broken-python");
+        fs::write(
+            &broken,
+            "#!/bin/sh\necho 'Fatal Python error: init' >&2\nexit 1\n",
+        )
+        .unwrap();
+        fs::set_permissions(&broken, fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(matches!(
+            parsed(&broken, "x = 1\n", PARSE_WITHIN),
+            Parse::Unchecked(_)
+        ));
+        if let Some(python) = a_python_here() {
+            assert!(matches!(
+                parsed(&python, MAIN_PY, PARSE_WITHIN),
+                Parse::Parses
+            ));
+            match parsed(&python, FOR_PY, PARSE_WITHIN) {
+                Parse::Not { line, error } => {
+                    assert_eq!(line, Some(3));
+                    assert!(error.starts_with("SyntaxError"), "{error}");
+                }
+                other => panic!("{other:?}"),
+            }
+            // Never run: a script that would write a file parses, and
+            // writes nothing.
+            let mark = dir.join("ran");
+            let writes = format!("open({:?}, 'w').write('ran')\n", mark.display().to_string());
+            assert!(matches!(
+                parsed(&python, &writes, PARSE_WITHIN),
+                Parse::Parses
+            ));
+            assert!(!mark.exists());
+        }
+        set_python_here(None);
         let _ = fs::remove_dir_all(&dir);
     }
 
