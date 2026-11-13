@@ -656,6 +656,9 @@ pub trait Runner {
     /// is set, as at its deadline. A runner whose run dies with lamp-tasks
     /// needs none.
     fn stop_on(&self, _stop: std::sync::Arc<std::sync::atomic::AtomicBool>) {}
+    /// Whatever the runner makes before its first run, at
+    /// [`HandOvers::start`]; nothing by default.
+    fn prepare(&self) {}
 }
 
 /// Ends the token however the run ends, a panic too, and once only: the
@@ -990,7 +993,7 @@ pub const OPENCLAW_NS: &str = "/usr/local/lib/lampos/openclaw-ns";
 /// folder (`lamp_update::openclaw_install::RUNS_EDITS`, [`DEFAULT_AGENT_SWITCH`]
 /// on in lamp-update): without it, a script in a run's folder on OpenClaw's
 /// gateway could never read its token.
-pub const OPENCLAW_RUNS_LINE: &str = " T=/run/lampos-tasks/runs S=/tmp/.lampos-ns\n";
+pub const OPENCLAW_RUNS_LINE: &str = " T=/run/lampos-tasks/runs/gateway S=/tmp/.lampos-ns\n";
 
 /// Whether OpenClaw's namespace script `text` shows the runs' token folder
 /// and lamp-control's socket.
@@ -1178,6 +1181,17 @@ fn ended_as(state: &str) -> Result<u64, String> {
 }
 
 impl Runner for HarnessRunner {
+    /// With [`DEFAULT_AGENT_SWITCH`] on, the gateway's subfolder of the
+    /// runs' folder made at once, so OpenClaw's namespace (started by its
+    /// own unit) finds it there to show; a run makes it again if missing.
+    fn prepare(&self) {
+        if self.default_agent
+            && let Err(why) = crate::run_token_file::gateway_dir(&self.runs)
+        {
+            eprintln!("[lamp-tasks] skill tasks: {why}");
+        }
+    }
+
     fn stop_on(&self, stop: std::sync::Arc<std::sync::atomic::AtomicBool>) {
         let _ = self.stopping.set(stop);
     }
@@ -1288,8 +1302,11 @@ impl Runner for HarnessRunner {
         };
         started.agent = Some(agent.clone());
         if late_token {
+            // Only in the gateway's own subfolder: the rest of the runs'
+            // folder (Hermes's runs' files) is never shown to OpenClaw.
+            let gateway = crate::run_token_file::gateway_dir(&self.runs)?;
             started.token = Some(crate::run_token_file::RunTokenFile::write(
-                &self.runs, &run.run, &token,
+                &gateway, &run.run, &token,
             )?);
         }
         drop(token);
@@ -1448,6 +1465,7 @@ impl HandOvers {
         }
         let (listener, binding) = crate::runtime::bind(&self.socket)?;
         self.runner.stop_on(stop.clone());
+        self.runner.prepare();
         let served = std::thread::Builder::new()
             .name("tasks-skill-task".into())
             .spawn(move || {

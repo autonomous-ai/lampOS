@@ -2256,12 +2256,14 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      (#6685; off unless set, read only with `LAMP_SKILL_TASKS` on, the same
      switch lamp-tasks reads): `openclaw-ns` also shows lamp-control's
      `/run/lampos-control/control.sock` alone, read-only (Hermes's own
-     lines), and lamp-tasks' runs' token folder `/run/lampos-tasks/runs`,
-     read-write so a script can delete the file it read, both staged
+     lines), and the gateway's own subfolder of lamp-tasks' runs' token
+     folder, `/run/lampos-tasks/runs/gateway` (`GATEWAY_RUNS`), read-write
+     so a script can delete the file it read; a Hermes run's file, in the
+     folder above, is never shown, both staged
      before `/run` is hidden and skipped when not there
      (`openclaw_install::RUNS_EDITS`). The gateway is one process for every
-     session, so any session on it could read a run's file (a Hermes
-     run's too) until the run's script does, a model turn at most the
+     session, so any session on it could read an OpenClaw run's file until
+     the run's script does, a model turn at most the
      run's deadline. The gateway has no `--net`, so such a run has the
      lamp's open network and sees the person's OpenClaw state (the
      boundary in docs/tasks.md, "The lamp's default agent", which the

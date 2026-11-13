@@ -6717,11 +6717,27 @@ fn a_skill_run_goes_to_openclaw_as_the_default_only_with_the_switch_and_its_name
             assert!(!call.to_string().contains(RUN_SECRET), "{call}");
         }
         nothing_left(&rig);
+        // Only OpenClaw's run uses the gateway's subfolder (Heron's P2 on
+        // #6767): a Hermes run's file is never where a gateway sees it.
+        let gateway = rig
+            .root
+            .path()
+            .join("runs")
+            .join(lamp_tasks::run_token_file::GATEWAY_RUNS);
         let new = calls
             .iter()
             .find(|call| call["args"][0] == "new")
             .expect("a new");
-        new["args"][1].as_str().unwrap().to_owned()
+        let engine = new["args"][1].as_str().unwrap().to_owned();
+        assert_eq!(gateway.is_dir(), engine == "openclaw", "{engine}");
+        if gateway.is_dir() {
+            assert_eq!(
+                fs::read_dir(&gateway).unwrap().count(),
+                0,
+                "its file is gone"
+            );
+        }
+        engine
     };
     let shows = format!(
         "H=x L=/run/lampos-control/control.sock B=y P=z{}",
