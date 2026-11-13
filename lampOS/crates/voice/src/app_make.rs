@@ -32,8 +32,11 @@
 //!     ([`write_here`]) and put on at once as a made one is.
 //! - **Made here.** A `make` is written by the lamp's own chat with the
 //!   voice's own example, check and one repair
-//!   ([`crate::make_skill_local::make_kept`], [`make_here`]), kept as made
-//!   from [`LOCAL_STORE`], and once kept it is put on at once
+//!   ([`crate::make_skill_local::make_kept`], [`make_here`]); with
+//!   `LAMP_MAKE_SKILL_AGENT` on, one it didn't make goes to the lamp's
+//!   agent by the voice make's own hand-over, with the skill-creator guide
+//!   under `LAMP_MAKE_AGENT_GUIDE` ([`crate::make_skill_agent`]); kept as
+//!   made from [`LOCAL_STORE`], and once kept it is put on at once
 //!   (`made_skill::put_on`, and the manage helper's own check of the mark
 //!   it makes, `made_skill::going_on`). The lamp then says one short line
 //!   through the say service, at a good moment: `made_skill::on_line` ("I
@@ -476,6 +479,14 @@ pub const LINE_PRIORITY: u8 = crate::say::URGENT_FROM;
 /// and what isn't is kept against the ask for the app, its `needs_link`
 /// ([`link_noted`]); a check that can't be made keeps nothing, and the
 /// make stands either way.
+///
+/// With `LAMP_MAKE_SKILL_AGENT` on in the coordinator's environment and a
+/// tasks part (`LAMP_TASKS_DIR`), a make the lamp's own model didn't make
+/// goes to the lamp's agent (Hermes), with the skill-creator guide when
+/// `LAMP_MAKE_AGENT_GUIDE` is on, by the voice make's own hand-over
+/// ([`crate::make_skill_agent::Agent::for_app`]; the owner's ask, 13 Nov:
+/// the app's MAKE IT makes its skill as the voice make does). Its answer
+/// goes through the same checks, and a kept skill goes on as above.
 pub fn make_here(
     keeping: &made_skill::Keeping,
     brief: &str,
@@ -484,12 +495,22 @@ pub fn make_here(
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     say: impl FnOnce(&str),
 ) {
-    make_here_with(keeping, brief, request_id, at_unix_ms, chat, say, || {
-        crate::services::linked_codes(Path::new(crate::services::FOLDER))
-    })
+    make_here_with(
+        keeping,
+        brief,
+        request_id,
+        at_unix_ms,
+        chat,
+        say,
+        || crate::services::linked_codes(Path::new(crate::services::FOLDER)),
+        crate::make_skill_agent::Agent::for_app().as_ref(),
+    )
 }
 
-/// [`make_here`], what is linked given by `linked`.
+/// [`make_here`], what is linked given by `linked`, and a make DeepSeek
+/// didn't make handed to the lamp's agent `agent`; none keeps it DeepSeek's
+/// alone, with its repairs, as with the switch off.
+#[allow(clippy::too_many_arguments)]
 pub fn make_here_with(
     keeping: &made_skill::Keeping,
     brief: &str,
@@ -498,6 +519,7 @@ pub fn make_here_with(
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     say: impl FnOnce(&str),
     linked: impl FnOnce() -> Option<Vec<String>>,
+    agent: Option<&crate::make_skill_agent::Agent>,
 ) {
     handed(
         &keeping.directory,
@@ -511,6 +533,7 @@ pub fn make_here_with(
         keeping,
         chat,
         &from,
+        agent,
     ) {
         Ok(made) => {
             if let Some(needs) = made_skill::needs_link(&made.uses, linked) {
@@ -922,12 +945,18 @@ pub fn start_from_environment(asks: Option<crate::say::OwnAsks>) {
         PathBuf::from(crate::skill_words::INSTALLED),
         app_caller_is_lamp_cloud,
     ) {
-        Ok(()) => eprintln!(
-            "lamp-voice: an app's skill: listening at {} (made: {}, written: {})",
-            path.display(),
-            on.make,
-            on.written
-        ),
+        Ok(()) => {
+            let agent = crate::make_skill_agent::Agent::for_app();
+            eprintln!(
+                "lamp-voice: an app's skill: listening at {} (made: {}, written: {}, \
+                 the lamp's agent after DeepSeek: {}, its guide: {})",
+                path.display(),
+                on.make,
+                on.written,
+                agent.is_some(),
+                agent.as_ref().is_some_and(|agent| agent.guide)
+            )
+        }
         Err(error) => eprintln!(
             "lamp-voice: an app's skill: cannot listen at {}: {error}",
             path.display()
@@ -1659,6 +1688,89 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
     }
 
+    /// The owner's ask, 13 Nov: with `LAMP_MAKE_SKILL_AGENT` on, the app's
+    /// MAKE IT makes as the voice make does. DeepSeek's one answer refused,
+    /// the typed words go to the lamp's agent by the voice make's own
+    /// hand-over, asking for the skill-creator guide only with
+    /// `LAMP_MAKE_AGENT_GUIDE`; its answer is kept through the same checks
+    /// and goes on at once, said as on. Off, the agent is never asked: the
+    /// lamp's own model makes it with its repairs, as before.
+    #[test]
+    fn an_app_make_goes_to_the_agent_only_with_its_switch() {
+        use crate::make_skill_agent::tests::stub;
+        use crate::make_skill_local::tests::{
+            chat_at, faces, good, keeping, manage_helper, service,
+        };
+        let words = "make me a skill that dims the light at 10 pm";
+        let on_line = |said: &[String]| {
+            assert_eq!(said.len(), 1, "{said:?}");
+            assert!(
+                said[0].starts_with("I made evening dim, and it's on:"),
+                "{said:?}"
+            );
+        };
+        for guide in [false, true] {
+            let (root, keeping) = keeping(&format!("app-agent-{guide}"));
+            let tasks = stub(Some("hermes"), std::sync::Arc::new(|_: &str| Some(good())));
+            let agent = if guide { tasks.guided() } else { tasks.agent() };
+            let at = now_unix_ms();
+            let brief = begin(&keeping.directory, words, "r1", at).unwrap();
+            let (url, served) = service(vec![(200, faces())]);
+            let asked = manage_helper(&keeping.manage);
+            let mut said = Vec::new();
+            make_here_with(
+                &keeping,
+                &brief,
+                "r1",
+                at,
+                chat_at(url),
+                |line| said.push(line.to_owned()),
+                || None,
+                Some(&agent),
+            );
+            // DeepSeek once, no repair; then the agent, once.
+            assert_eq!(served.join().unwrap(), 1, "{guide}");
+            assert_eq!(tasks.hand_overs(), 1, "{guide}");
+            let sent = tasks.sent.lock().unwrap().clone();
+            let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+            assert_eq!(make["guide"] == true, guide, "{make}");
+            assert!(make["rules"].as_str().unwrap().contains(words), "{make}");
+            let told = status(&keeping.directory, Some("r1"), at);
+            assert_eq!(told["state"], "on", "{told}");
+            assert_eq!(told["name"], "evening-dim");
+            assert_eq!(asked.join().unwrap()["install_made"], told["sha256"]);
+            on_line(&said);
+            let _ = fs::remove_dir_all(&root);
+        }
+        // Off: no agent, though one is there to be asked.
+        let (root, keeping) = keeping("app-agent-off");
+        let tasks = stub(Some("hermes"), std::sync::Arc::new(|_: &str| Some(good())));
+        let at = now_unix_ms();
+        let brief = begin(&keeping.directory, words, "r1", at).unwrap();
+        let (url, served) = service(vec![(200, faces()), (200, good())]);
+        let asked = manage_helper(&keeping.manage);
+        let mut said = Vec::new();
+        make_here_with(
+            &keeping,
+            &brief,
+            "r1",
+            at,
+            chat_at(url),
+            |line| said.push(line.to_owned()),
+            || None,
+            None,
+        );
+        // DeepSeek's answer and its own repair.
+        assert_eq!(served.join().unwrap(), 2);
+        assert_eq!(tasks.hand_overs(), 0);
+        assert!(tasks.sent.lock().unwrap().is_empty());
+        let told = status(&keeping.directory, Some("r1"), at);
+        assert_eq!(told["state"], "on", "{told}");
+        assert_eq!(asked.join().unwrap()["install_made"], told["sha256"]);
+        on_line(&said);
+        let _ = fs::remove_dir_all(&root);
+    }
+
     /// Made and kept, and the manage helper not there: it stays off, the
     /// lamp says why in one line, and the app is told `not_kept` and why;
     /// nothing waits for a yes.
@@ -2060,6 +2172,7 @@ mod tests {
             chat_at(url),
             |_| {},
             || panic!("a skill that reads nothing never asks what is linked"),
+            None,
         );
         assert_eq!(served.join().unwrap(), 1);
         let told = status(&keeping.directory, Some("r1"), at);

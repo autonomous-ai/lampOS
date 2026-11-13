@@ -2123,15 +2123,19 @@ pub fn pending() -> bool {
 /// model `chat` gives and kept in `keeping` as made from `from`; a
 /// refused one asked again with what was refused, up to [`MOST_REPAIRS`] times. Blocking: the model
 /// is asked on a thread of its own. Shared by the voice's `make_skill` and
-/// the app's typed ask (`crate::app_make`).
+/// the app's typed ask (`crate::app_make`). With the lamp's agent `agent`
+/// (`LAMP_MAKE_SKILL_AGENT`, [`crate::make_skill_agent::Agent::for_app`]),
+/// a make DeepSeek didn't make is handed to it exactly as a voice make's
+/// is ([`handed_to_agent`]); with none, DeepSeek keeps its repairs.
 pub fn make_kept(
     request: &str,
     brief: String,
     keeping: &Keeping,
     chat: impl Fn() -> Result<Chat, String> + Send + Sync + 'static,
     from: &str,
+    agent: Option<&crate::make_skill_agent::Agent>,
 ) -> Result<Made, Refused> {
-    make_kept_heard(request, None, brief, keeping, chat, from, None)
+    make_kept_heard(request, None, brief, keeping, chat, from, agent)
 }
 
 /// [`make_kept`] by voice: a write held to `heard`, the line the person
@@ -4693,6 +4697,7 @@ light = { dim = 1 }
             &keeping,
             chat_at(url),
             "local:1:1",
+            None,
         );
         assert_eq!(served.join().unwrap(), 1);
         let line = kept_line(&made, false, 12);
@@ -4964,7 +4969,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
 
     /// A skill's answer the lamp can't say plainly: refused by the check
     /// with its lines, so a repair would follow.
-    fn faces() -> String {
+    pub(crate) fn faces() -> String {
         good().replace(
             "topic = \"voice/state\"\nfield = \"state\"\nequals = \"resting\"\n",
             "topic = \"humans/faces/tracked\"\nnear = 0.14\n",

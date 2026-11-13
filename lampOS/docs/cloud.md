@@ -911,7 +911,11 @@ journal says each change, never more (`make_skill::ready_line`): "making
 a skill is ready: the lamp's maker answers", or "making a skill is not
 ready:" and the voice's own `why`, or "lamp-voice's maker isn't
 answering yet" when its socket doesn't answer (`make_skill::readiness`).
-No computer or Harness is part of it. lamp-voice binds the socket as it
+No computer or Harness is part of it; with lamp-voice's
+`LAMP_MAKE_SKILL_AGENT=on`, a make the lamp's own model didn't make goes to
+the lamp's own agent, Hermes, in a skill run's namespace, as a voice make's
+does ([skills.md](skills.md), "The app's MAKE IT too"), and the app sees
+`making` meanwhile. lamp-voice binds the socket as it
 starts, before its privacy wait, so it answers whatever the privacy
 switch reads ([skills.md](skills.md), "Asked for in the app").
 

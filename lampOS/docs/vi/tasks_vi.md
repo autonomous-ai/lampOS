@@ -14,7 +14,11 @@ trên máy tính (người xây dựng đầu tiên, 3/11, trên Queue;
 (`put_on_made_skill` đã bị bỏ từ #5977: kỹ năng đã tạo được bật ngay khi được
 giữ lại), có hay không có phần
 tasks, và một kỹ năng gõ trong ứng dụng (`LAMP_APP_MAKE_SKILL`) cũng được tạo
-như vậy, không bao giờ được giao đi. Các câu tin của kỹ năng đã tạo (`made`,
+như vậy, không bao giờ được giao đi như một việc. Khi có
+`LAMP_MAKE_SKILL_AGENT=on`, một lần tạo bằng giọng nói hay một lần tạo bằng
+MAKE IT của ứng dụng mà mô hình của đèn không tạo được sẽ được giao cho Hermes
+của chính đèn trong namespace của lần chạy kỹ năng ("Một lần tạo bằng giọng
+nói trong namespace của lần chạy kỹ năng", bên dưới). Các câu tin của kỹ năng đã tạo (`made`,
 `not_kept`) và việc sửa nó qua một việc giao cũng bị bỏ theo. Một việc mà lời
 của nó là bản hướng dẫn của một kỹ năng, do một bản phát hành trước giao đi,
 không bao giờ được kể: câu trả lời của nó là các tệp.
@@ -813,7 +817,9 @@ token.
 ### Một lần tạo bằng giọng nói trong namespace của lần chạy kỹ năng (`skill_make`, #6643)
 
 Điều kiện của first builder trên #6643 (12/11 18:15): một lần tạo bằng giọng
-nói mà DeepSeek không giữ được, được giao cho agent của đèn
+nói mà DeepSeek không giữ được (và, theo yêu cầu của chủ sở hữu ngày 13/11,
+một lần tạo bằng MAKE IT của ứng dụng, từ coordinator của lamp-voice trong
+cùng unit), được giao cho agent của đèn
 (`LAMP_MAKE_SKILL_AGENT`, [skills_vi.md](skills_vi.md), "Giao cho agent của
 đèn khi DeepSeek thất bại"), chạy trong namespace của lần chạy kỹ
 năng và không bao giờ chạy như một task Harness có công cụ riêng của
