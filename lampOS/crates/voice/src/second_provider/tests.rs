@@ -14388,6 +14388,37 @@ fn words_on_the_way_count_only_for_an_empty_cut_in() {
     );
 }
 
+/// #6840: a "Yes." in the clear whose final words came back empty, with
+/// "Yes" on the way, while a read-back awaits its answer, is taken as said;
+/// a plain no too. With no answer awaited, words on the way that are no
+/// plain yes or no, or final words of its own, nothing changes, and the
+/// cut-in's stop path over the lamp's voice is as before.
+#[test]
+fn an_empty_final_with_a_yes_on_the_way_answers_an_awaited_read_back() {
+    let on = |words: &str| Some(words.to_owned());
+    assert_eq!(
+        super::answer_on_the_way("", on("Yes."), true).as_deref(),
+        Some("Yes.")
+    );
+    assert_eq!(
+        super::answer_on_the_way(" ", on("No, don't."), true).as_deref(),
+        Some("No, don't.")
+    );
+    assert_eq!(super::answer_on_the_way("", on("Yes."), false), None);
+    assert_eq!(
+        super::answer_on_the_way("", on("What's the weather?"), true),
+        None
+    );
+    assert_eq!(super::answer_on_the_way("Yes.", on("Yes."), true), None);
+    assert_eq!(super::answer_on_the_way("", None, true), None);
+    // Over the lamp's voice, as before: the clear-line path takes no part.
+    assert_eq!(
+        super::words_on_the_way("", on("Stop"), true).as_deref(),
+        Some("Stop")
+    );
+    assert_eq!(super::words_on_the_way("", on("Yes."), false), None);
+}
+
 /// #1712, item 4 (`LAMP_FOLLOWS_ON`): a line begun soon after the lamp's
 /// words finished is told it may follow on from them, as the Live route
 /// tells it; not when its End marks a sound, nor when it was judged in a
