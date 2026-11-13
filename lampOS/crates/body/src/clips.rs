@@ -39,10 +39,56 @@ impl Clip {
         let step_us = u64::from(self.step_ms) * 1_000;
         let frame = (elapsed_us / step_us) as usize;
         let share = (elapsed_us % step_us) as f32 / step_us as f32;
+        Some(self.between(frame, share))
+    }
+
+    /// `share` of the way from frame `frame` to the next.
+    fn between(&self, frame: usize, share: f32) -> [f32; 5] {
         let (from, to) = (self.frames[frame], self.frames[frame + 1]);
-        Some(std::array::from_fn(|joint| {
+        std::array::from_fn(|joint| {
             f32::from(from[joint]) + (f32::from(to[joint]) - f32::from(from[joint])) * share
-        }))
+        })
+    }
+
+    /// The time from frame `frame` to the next, stretched where any joint
+    /// would go faster than `ceiling` counts a second, so that none does;
+    /// a step under it keeps its time (V1's stretch, #6893).
+    fn step_within_us(&self, frame: usize, ceiling: f32) -> u64 {
+        let (from, to) = (self.frames[frame], self.frames[frame + 1]);
+        let farthest = (0..5)
+            .map(|joint| (i32::from(to[joint]) - i32::from(from[joint])).unsigned_abs())
+            .max()
+            .unwrap_or(0);
+        let needed = (f64::from(farthest) / f64::from(ceiling.max(1.0)) * 1e6).ceil() as u64;
+        (u64::from(self.step_ms) * 1_000).max(needed)
+    }
+
+    /// [`Self::duration_us`] with each step stretched to `ceiling`
+    /// (`LAMP_BODY_ENERGY`); `None` is the clip as recorded.
+    pub fn duration_within_us(&self, ceiling: Option<f32>) -> u64 {
+        match ceiling {
+            None => self.duration_us(),
+            Some(ceiling) => (0..self.frames.len().saturating_sub(1))
+                .map(|frame| self.step_within_us(frame, ceiling))
+                .sum(),
+        }
+    }
+
+    /// [`Self::at`] with each step stretched to `ceiling`
+    /// (`LAMP_BODY_ENERGY`); `None` is the clip as recorded.
+    pub fn at_within(&self, elapsed_us: u64, ceiling: Option<f32>) -> Option<[f32; 5]> {
+        let Some(ceiling) = ceiling else {
+            return self.at(elapsed_us);
+        };
+        let mut left = elapsed_us;
+        for frame in 0..self.frames.len().saturating_sub(1) {
+            let step_us = self.step_within_us(frame, ceiling);
+            if left < step_us {
+                return Some(self.between(frame, left as f32 / step_us as f32));
+            }
+            left -= step_us;
+        }
+        None
     }
 }
 
@@ -201,6 +247,51 @@ mod tests {
         assert_eq!(TWO.at(150_000), Some([5.0, -10.0, 0.0, 20.0, 0.0]));
         assert_eq!(TWO.at(200_000), None);
         assert_eq!(TWO.at(u64::MAX), None);
+    }
+
+    /// `LAMP_BODY_ENERGY` (#6893): a step of head roll at `FASTEST`'s
+    /// 1,300 counts a second is stretched to the servo's 1,000; a step under
+    /// it keeps its time; no ceiling is the clip as recorded.
+    #[test]
+    fn a_step_over_the_servos_speed_is_stretched_to_it_and_one_under_it_is_not() {
+        const ROLL: Clip = Clip {
+            name: "roll",
+            step_ms: 100,
+            frames: &[[0, 0, 0, 0, 0], [0, 130, 0, 0, 0], [0, 130, 50, 0, 0]],
+        };
+        let ceiling = Some(1_000.0);
+        assert_eq!(ROLL.duration_within_us(None), ROLL.duration_us());
+        assert_eq!(ROLL.duration_within_us(ceiling), 130_000 + 100_000);
+        for elapsed in (0..=300_000).step_by(5_000) {
+            assert_eq!(ROLL.at_within(elapsed, None), ROLL.at(elapsed));
+        }
+        assert_eq!(
+            ROLL.at_within(65_000, ceiling),
+            Some([0.0, 65.0, 0.0, 0.0, 0.0])
+        );
+        assert_eq!(
+            ROLL.at_within(130_000, ceiling),
+            Some([0.0, 130.0, 0.0, 0.0, 0.0])
+        );
+        assert_eq!(
+            ROLL.at_within(180_000, ceiling),
+            Some([0.0, 130.0, 25.0, 0.0, 0.0])
+        );
+        assert_eq!(ROLL.at_within(230_000, ceiling), None);
+        // Played at a 20 ms tick, no joint goes faster than the ceiling, and
+        // every built-in clip comes out at least as long, ending at nothing.
+        for clip in ALL.into_iter().chain([&ROLL]) {
+            let mut last = [0.0f32; 5];
+            for elapsed in (0..clip.duration_within_us(ceiling)).step_by(20_000) {
+                let now = clip.at_within(elapsed, ceiling).unwrap();
+                for joint in 0..5 {
+                    let speed = (now[joint] - last[joint]).abs() / 0.02;
+                    assert!(speed <= 1_000.5, "{} joint {joint}: {speed}", clip.name);
+                }
+                last = now;
+            }
+            assert!(clip.duration_within_us(ceiling) >= clip.duration_us());
+        }
     }
 
     /// docs/control.md's gestures are the body's clips but `idle`, the
