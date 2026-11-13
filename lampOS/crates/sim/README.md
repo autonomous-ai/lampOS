@@ -148,10 +148,11 @@ HTTP side runs on another thread), writing each line to buffers made into
 (arm64) through this service, 5 requests each a second apart, medians, first
 bytes after 19 ms for "Hi there.", 13 ms for 8 words and 18 ms for 20 (the
 whole line after 29, 32 and 61 ms). The first line a synthesizer speaks loads
-its voice (about 290 ms alone; 1.5 to 1.7 s in a debug build while a lamp
-was starting), so the
-service speaks one line to nobody before it writes its token: the token is its
-"ready", and the first real line starts in about 50 ms (53 ms measured, 3 runs);
+its voice (294 to 348 ms in a release build, 3 runs; 1.5 to 1.7 s in a debug
+build while a lamp was starting), so the service speaks one line to nobody
+before it writes its token: the token is its "ready" (0.32 to 0.84 s after
+start, release), and the first real line's first bytes come after 11 to 12 ms
+over HTTP (release, 3 runs; 53 ms in the debug build);
 whisper.cpp (`base.en`) wrote back a 15-word line's output word for word. A
 line ends at the synthesizer's empty end buffer, or 300 ms after its last
 buffer if that never comes (it did not on macOS 14, Heron's read on #6961);
