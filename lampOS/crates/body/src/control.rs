@@ -528,7 +528,7 @@ impl<P: BusPort, C: Clock> MotorControl<P, C> {
 
     /// Only the owned Linux adapter uses this for explicit resource cleanup.
     /// No public access to the raw transport bypasses the command boundary.
-    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     pub(crate) fn port_mut(&mut self) -> &mut P {
         &mut self.port
     }
