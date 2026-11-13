@@ -73,6 +73,9 @@ Environment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json
 # setup. Row 10 passed whole on lamp-52e6 on 22 Oct (#2843). Its functions reach every chat request on the
 # second route since #3430.
 Environment=LAMP_ONBOARDING=on
+# The walk's done line also names a few things to try first, once per setup (#5316, docs/onboarding.md "The walk's
+# last words name a few things to try"). Played on lamp-52e6, build 12587: the closing quoted, tries_said true.
+Environment=LAMP_ONBOARDING_FIRST_TRIES=on
 # The walk waits for the first update after setup (#6284, docs/onboarding.md "Held for the first update"): one line
 # when a newer build is read, one when it has switched. With setup's and lamp-update's.
 Environment=LAMP_FIRST_UPDATE=on

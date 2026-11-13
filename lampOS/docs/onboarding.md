@@ -397,7 +397,8 @@ the model's. Tests:
 
 **The walk's last words name a few things to try** (#5316, the first
 customers' stage 2 on #5296), with `LAMP_ONBOARDING_FIRST_TRIES=on` exactly
-(off unless set; not in the product unit until #5296's run 3). The done line
+(off unless set; on in the product unit since its played row on
+lamp-52e6, build 12587, on #5316). The done line
 goes on, after the app's guide: "If you'd like somewhere to start, ask me for
 a timer, the weather, or anything you're curious about. You can also add a
 skill from the Skill Store in the app, or just ask me to make one."
