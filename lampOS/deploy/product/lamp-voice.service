@@ -398,6 +398,8 @@ Environment=LAMP_MAKE_SKILL_AGENT=on
 Environment=LAMP_MAKE_AGENT_ONE_PATH=on
 # #7270, docs/skills.md; owner, 16 Nov
 Environment=LAMP_MADE_NOT_ON_TOLD=on
+# #6768, docs/skills.md; owner, 13 Nov
+Environment=LAMP_MAKE_AGENT_GUIDE=on
 Environment=LAMP_APP_MAKE_SKILL=on
 # A skill added from a file in the app, on a spoken yes (#5080): lamp-cloud hands it over the app-make socket,
 # the same line in lamp-cloud.service; it never starts on its own.
