@@ -3,6 +3,18 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 05:4x GMT+7: #7000 two reads, NEXT TRAIN
+
+- **#7000** at bb5d491284: READ-OKs from sim-2 (05:34, Linux, dash) and
+  sim-1 (05:37, Linux; with the fix taken out, the test fails). Merge-tree
+  against 1b1b7d08df is clean, and every check passes but ARM64 test.
+  NEXT TRAIN posted.
+- **My slip again:** the READ ASK named a full SHA whose tail I typed from
+  memory, and it does not exist (sim-2 caught it). Full SHAs now come from
+  `git rev-parse` only.
+- ten's bus speaker PR A (#7002, the playback trait in lamp-audio) asks
+  Heron and Fifth. PR B (`bus:speaker1`) follows it.
+
 ## 2026-11-14 05:2x GMT+7: #6991 merged (train 897); the real lamp-voice on macOS; #7000
 
 - **Train 897 (#6999)** merged #6991, so the loopback switch is on lamp-voice
