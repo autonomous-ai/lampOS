@@ -313,11 +313,35 @@ lần chạy, và được trả lời khi lần chạy kết thúc
       `/run/lampos-tasks/runs/<run-id>` một lần (file thường, không bao
       giờ qua link) rồi xóa nó, kể cả khi kết nối sau đó thất bại; khi file
       chưa có, nó tìm lại mỗi 0,1 s trong tối đa 10 s.
-    - **Ranh giới (quyết định của lead trên #6685):** giữa lúc ghi file và
-      lần đọc đầu của script, thường vài giây, một phiên khác trên cùng
-      gateway OpenClaw (cùng user, cùng namespace) có thể đọc nó. Sau đó
-      file không còn, và token kết thúc cùng lần chạy (khi xong hoặc tới
-      hạn). Hermes vẫn giữ namespace riêng cho từng lần chạy.
+    - **Ranh giới (quyết định của lead trên #6685; first builder quyết
+      điểm 1 và 2 trước khi bật switch):**
+      1. **Khoảng hở của token.** Từ lúc ghi file tới lần đọc đầu của
+         script, một phiên khác trên cùng gateway OpenClaw (cùng user,
+         cùng namespace) có thể đọc nó. Khoảng này kéo dài tới khi model
+         chạy script: một lượt của model, không cố định, tối đa tới hạn
+         của lần chạy (`RUN_LIFETIME`). Gateway thấy cả thư mục runs với
+         quyền đọc-ghi, nên điều này cũng áp dụng cho file của một lần chạy
+         Hermes trước khi wrapper của nó lấy, và một phiên có thể đặt file
+         dưới id của lần chạy kế tiếp khiến lần chạy đó bị từ chối. Sau lần
+         đọc file không còn, và token kết thúc cùng lần chạy.
+      2. **Mạng và dữ liệu riêng của OpenClaw.** Gateway của OpenClaw không
+         có network namespace riêng (không `--net`), nên một lần chạy trên
+         nó có mạng mở của đèn, không phải mạng đã rào của Hermes: một
+         script giữ token có thể đọc qua `control.sock` những gì kỹ năng
+         được cấp và gửi thẳng ra ngoài. Cùng gateway đó cũng đọc trạng thái
+         OpenClaw của người dùng (`/var/lib/lampos-openclaw/state`).
+      Hermes vẫn giữ namespace và mạng đã rào riêng cho từng lần chạy.
+    - **Vì sao theo từng engine, và engine tiếp theo tham gia thế nào.**
+      Danh sách engine là những gì bản cài của mỗi engine chứng minh,
+      không phải tên của nó: token chỉ được tới script của đúng lần chạy,
+      và các engine được khởi động theo hai cách. Hermes (và, với PR 2 của
+      #6685, các engine agent-ns bọc) khởi động một tiến trình cho mỗi lần
+      chạy qua wrapper đọc file token khi exec, nên lamp-tasks kiểm tra các
+      dòng run của wrapper. OpenClaw là một gateway sống lâu, nên token chỉ
+      có thể tới từ thư mục của lần chạy, và lamp-tasks kiểm tra script
+      namespace của nó cho thấy thư mục token. Engine tiếp theo tham gia
+      bằng cách bản cài của nó ghi một trong hai cách đó, và lamp-tasks đọc
+      file đó trước khi gửi lần chạy tới.
   - **Thư mục riêng.** lamp-tasks tạo `skill-<run-id>` (0700,
     `RUN_FOLDER_PREFIX`) trong project Harness của nó
     `/var/lib/lampos-tasks/harnesses/lamp-tasks` (tạo 0700 khi chưa có),

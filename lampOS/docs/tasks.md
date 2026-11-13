@@ -2687,11 +2687,34 @@ for each run, and is answered once the run ends
       `/run/lampos-tasks/runs/<run-id>` once (a regular file, never through
       a link) and deletes it, even when the connection then fails; while
       the file isn't there yet it looks again every 0.1 s for up to 10 s.
-    - **The boundary (the lead's call on #6685):** between the file's
-      write and the script's first read, usually seconds, any other session
-      on the same OpenClaw gateway (same user, same namespace) could read
-      it. After it, the file is gone, and the token is ended with the run
-      (its end or its deadline). Hermes keeps its per-run namespace.
+    - **The boundary (the lead's call on #6685; the first builder rules
+      on 1 and 2 before the switch is turned on):**
+      1. **The token's window.** From the file's write to the script's
+         first read, any other session on the same OpenClaw gateway (same
+         user, same namespace) could read it. That lasts until the model
+         runs the script: a model turn, not a fixed time, at most the run's
+         deadline (`RUN_LIFETIME`). The gateway sees the whole runs folder
+         read-write, so this covers a Hermes run's file too, before its
+         wrapper takes it, and a session could put a file under the next
+         run's id so that run is refused. After the read the file is gone,
+         and the token is ended with the run (its end or its deadline).
+      2. **The network and OpenClaw's own data.** OpenClaw's gateway has no
+         network namespace of its own (no `--net`), so a run on it has the
+         lamp's open network, not Hermes's fenced one: a script holding a
+         run's token could read through `control.sock` what its skill is
+         granted and send it out directly. The same gateway also reads the
+         person's OpenClaw state (`/var/lib/lampos-openclaw/state`).
+      Hermes keeps its per-run namespace and fenced network.
+    - **Why per engine, and how the next one joins.** The engine list is
+      what each engine's install proves, not its name: a run's token must
+      reach only that run's script, and the engines are started two ways.
+      Hermes (and, with #6685's PR 2, the engines agent-ns wraps) start a
+      process per run through a wrapper that reads the run's token file at
+      exec, so lamp-tasks checks the wrapper's run lines. OpenClaw is one
+      long-lived gateway, so the token can only come from the run's folder,
+      and lamp-tasks checks that its namespace script shows the runs'
+      token folder. A next engine joins by its install writing one of those
+      two, and lamp-tasks reading that file before it sends a run there.
   - **Its own folder.** lamp-tasks makes `skill-<run-id>` (0700,
     `RUN_FOLDER_PREFIX`) in its Harness project
     `/var/lib/lampos-tasks/harnesses/lamp-tasks` (made 0700 when missing),
