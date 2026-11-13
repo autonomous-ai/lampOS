@@ -3,6 +3,24 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 22:5x GMT+7: step 1b (c) yes; the Rust probe works
+
+- The first builder, 21:28: P4 step 1b **(c)**: (b) now (done, #6954), (a)
+  after their read with: objc2 packages macOS-target-only in `crates/sim`;
+  MIT/Apache only (a `cargo deny` check); `unsafe` in one module, scoped
+  `#[allow(unsafe_code)]`, a SAFETY note per call; before and after numbers.
+  Also: every READ-OK now posts a second-reader ask (#6959).
+- Licences: objc2, objc2-encode, block2, objc2-foundation MIT;
+  objc2-avf-audio, -core-foundation, -audio-toolbox, -core-audio-types
+  "Zlib OR Apache-2.0 OR MIT"; bitflags, libc "MIT OR Apache-2.0".
+  cargo-deny is not installed here and the repo has no deny.toml.
+- A Rust probe (scratch, not committed) of `writeUtterance:toBufferCallback:`:
+  callbacks come only with the **main thread's** run loop pumped (a worker
+  thread's own run loop got none in 60 s). With it: cold 328 ms; warm first
+  buffer 7.7 / 9.2 / 8.9 ms (2 / 9 / 22 words), done 16 / 26 / 47 ms;
+  float32, 22,050 Hz, mono. So `lamp-sim speech` keeps the synthesizer on its
+  main thread, and step 4 starts it as a child process of `run`.
+
 ## 2026-11-13 22:4x GMT+7: P4 step 2, latency first
 
 - Quiet check.
