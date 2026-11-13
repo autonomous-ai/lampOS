@@ -47,7 +47,8 @@
 //! `installed` at a version older than the pin's `cli.version`, is
 //! installed again by the same one-shot, the same loopback kit and the
 //! same hold, with Harness's home (its sign-in) kept, but only while
-//! Harness is not in use ([`busy`]): a later round moves it otherwise. The
+//! Harness is not in use ([`busy`]): a later round moves it otherwise, a
+//! task worked on holding it back [`DEFER_CAP`] at most (#6656). The
 //! Harness that was there is kept first ([`KEPT`]) and put back when the
 //! new one fails, recorded `failed` with `upgrade` and `from_version`.
 use crate::{
@@ -91,6 +92,15 @@ pub const RETRY_AFTER: Duration = STUCK_AFTER;
 /// A failed move to a newer pin (`upgrade`, #5957) is tried again with the
 /// same pin only by a round this long after it; another pin at once.
 pub const UPGRADE_RETRY_AFTER: Duration = Duration::from_secs(24 * 60 * 60);
+/// The longest a task on `tasks/status` holds back a move to a newer pin
+/// (#6656, the first builder's (c), 13 Nov): a task left on a machine that
+/// is offline is never seen to end, so past this the move goes ahead. A
+/// sign-in or a hand-over running now still holds it back every round.
+pub const DEFER_CAP: Duration = Duration::from_secs(6 * 60 * 60);
+/// When a task on `tasks/status` first held back a move (#6656), in
+/// lamp-update's records (0600): `{"version":1,"since_unix_ms":N}`. Gone
+/// once nothing is in use, or once a move stops Harness.
+pub const DEFERRED: &str = "harness-deferred.json";
 /// Where a move keeps the Harness that was there, under Harness's home
 /// (#5957), until it is installed or put back.
 pub const KEPT: &str = ".harness/lampos-upgrade-from";
@@ -265,6 +275,61 @@ fn write(records: &Path, mut said: HarnessInstall) -> HarnessInstall {
     said
 }
 
+#[derive(Serialize, Deserialize)]
+struct Deferred {
+    version: u32,
+    since_unix_ms: u64,
+}
+
+/// Whether `why` (Harness in use now, or none) still holds a move back at
+/// `now_unix_ms` (#6656). None: nothing does, and the kept time is let
+/// go. A sign-in or a hand-over running now always does. A task on
+/// `tasks/status` ([`busy::is_task`]) does until [`DEFER_CAP`] after it
+/// first did, that time kept in [`DEFERRED`] (written now when none can
+/// be read); past it, one line says so and nothing holds the move back.
+fn held_back(
+    records: &Path,
+    why: Option<&'static str>,
+    now_unix_ms: u64,
+    say: &mut dyn FnMut(&str),
+) -> Option<&'static str> {
+    let path = records.join(DEFERRED);
+    let Some(why) = why else {
+        let _ = fs::remove_file(&path);
+        return None;
+    };
+    if !busy::is_task(why) {
+        return Some(why);
+    }
+    let kept = fs::read(&path)
+        .ok()
+        .and_then(|text| serde_json::from_slice::<Deferred>(&text).ok())
+        .filter(|kept| kept.version == 1 && kept.since_unix_ms <= now_unix_ms);
+    let since = match kept {
+        Some(kept) => kept.since_unix_ms,
+        None => {
+            let kept = Deferred {
+                version: 1,
+                since_unix_ms: now_unix_ms,
+            };
+            if let Ok(text) = serde_json::to_vec(&kept) {
+                let _ = write_whole(&path, &text, 0o600);
+            }
+            now_unix_ms
+        }
+    };
+    let waited = now_unix_ms - since;
+    if waited < DEFER_CAP.as_millis() as u64 {
+        return Some(why);
+    }
+    say(&format!(
+        "Harness's move has waited {} h for {why}, past its {} h bound: it is moved now (#6656)",
+        waited / 3_600_000,
+        DEFER_CAP.as_secs() / 3600
+    ));
+    None
+}
+
 fn state(install: &str, at_unix_ms: u64) -> HarnessInstall {
     HarnessInstall::new(install, None, at_unix_ms)
 }
@@ -349,7 +414,7 @@ pub fn after_round_when(
         if let (Some(said), Ok(Some(pin))) = (&before, pin)
             && let Some((from, want)) = upgrade_due(said, pin, records, now_unix_ms)
         {
-            if let Some(why) = in_use() {
+            if let Some(why) = held_back(records, in_use(), now_unix_ms, say) {
                 say(&format!(
                     "Harness {from} is to be moved to the pinned {want}: at a later round, {why}"
                 ));
@@ -1056,7 +1121,7 @@ fn upgrade(
             HarnessInstall::upgrade_failed(&from, now_unix_ms()),
         );
     }
-    if let Some(why) = (kit.in_use)(root) {
+    if let Some(why) = held_back(records, (kit.in_use)(root), now_unix_ms(), say) {
         drop(handed);
         say(&format!(
             "Harness {from} is to be moved to the pinned {want}: at a later round, {why}"
@@ -1080,6 +1145,8 @@ fn upgrade(
         return write(records, left(now_unix_ms()));
     }
     say(&format!("Harness {from} is moved to the pinned {want}"));
+    // The move is under way: a later hold starts its bound afresh (#6656).
+    let _ = fs::remove_file(records.join(DEFERRED));
     // A copy not kept is not let go: one already there (a put-back that
     // failed) is the only good one, and KEEP makes a new one beside it
     // (`.new`), renamed only once whole.

@@ -16,6 +16,20 @@
 use lamp_msgs::TaskStatus;
 use std::{fs, io::Read, path::Path};
 
+/// A task on `tasks/status` being worked on: a reason [`super::DEFER_CAP`]
+/// bounds (#6656), unlike a sign-in or a hand-over running now.
+pub const TASK_WORKED_ON: &str = "a handed-over task is being worked on";
+/// `tasks/status` there but not read: bounded as a task is (#6656), since
+/// it may say one is being worked on.
+pub const TASKS_UNREAD: &str = "lamp-tasks' status can't be read";
+
+/// Whether `why` is about `tasks/status` (a task worked on, or a status
+/// not read), which defers a move for at most [`super::DEFER_CAP`]
+/// (#6656); a sign-in or a hand-over running now defers every round.
+pub fn is_task(why: &str) -> bool {
+    why == TASK_WORKED_ON || why == TASKS_UNREAD
+}
+
 /// The most of one process's command line read.
 const MOST_CMDLINE: u64 = 16 * 1024;
 /// The most processes looked at.
@@ -47,17 +61,17 @@ fn tasks_worked_on(bus: &Path) -> Option<&'static str> {
     }
     // A bus that can't be opened fails closed, as a failed read does.
     let Ok(bus) = lamp_bus::Bus::new(bus) else {
-        return Some("lamp-tasks' status can't be read");
+        return Some(TASKS_UNREAD);
     };
     let kept = match bus.latest(TaskStatus::TOPIC) {
         Ok(Some(kept)) => kept,
         Ok(None) => return None,
-        Err(_) => return Some("lamp-tasks' status can't be read"),
+        Err(_) => return Some(TASKS_UNREAD),
     };
     match serde_json::from_slice::<TaskStatus>(&kept.payload) {
         Ok(status) if status.tasks.is_empty() && status.unread.is_empty() => None,
-        Ok(_) => Some("a handed-over task is being worked on"),
-        Err(_) => Some("lamp-tasks' status can't be read"),
+        Ok(_) => Some(TASK_WORKED_ON),
+        Err(_) => Some(TASKS_UNREAD),
     }
 }
 
