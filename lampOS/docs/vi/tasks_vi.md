@@ -1019,9 +1019,10 @@ chỉ tới Hermes (`HarnessRunner`, ở trên).
 
 Quyết định của chủ đèn (13/11): mọi thứ chạm vào một dịch vụ đã liên kết
 đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`;
-bật trong các unit `lamp-skills`, `lamp-tasks`, `lamp-control` và `lamp-services` của sản phẩm, mỗi unit một lần, quyết định của chủ đèn, 13/11) và `LAMP_AGENT_SERVICES=on` trong
-lamp-tasks, socket trao việc cũng nhận lệnh ghi cố định của một kỹ năng tự
-tạo (`do.write`, docs/skills.md) như một lượt chạy
+bật trong các unit `lamp-skills`, `lamp-tasks`, `lamp-control` và
+`lamp-services` của sản phẩm, mỗi unit một lần) và `LAMP_AGENT_SERVICES=on`
+trong lamp-tasks, socket trao việc cũng nhận lệnh ghi cố định của một kỹ
+năng tự tạo (`do.write`, docs/skills.md) như một lượt chạy
 (`skill_task::WriteHandOver`, `answer_with`):
 
 - **Dòng:** `{"op":"skill_write","skill","folder","grants","write"}`, cần
