@@ -807,6 +807,7 @@ mod tests {
                 (PYTHONPATH_ENV, "/sdk".into()),
             ],
             deadline,
+            started: Default::default(),
         }
     }
 
@@ -918,6 +919,22 @@ mod tests {
         assert!(calls(&rig).is_empty(), "nothing sent, nothing to stop");
         assert!(*count.lock().unwrap() >= 1);
         nothing_left(&rig);
+    }
+
+    #[test]
+    fn a_fixed_write_is_refused_before_anything_began() {
+        let rig = rig(r#"{"status":"ok"}"#, false);
+        let runner = runner(&rig);
+        let (_count, end) = ended();
+        let mut run = skill_run(&rig, Duration::from_secs(20));
+        run.script = PathBuf::new();
+        let said = runner.run(&run, &end).unwrap_err();
+        assert!(said.contains("fixed write is not taken"), "{said}");
+        assert!(
+            !run.started.load(Ordering::Acquire),
+            "not begun: lamp-skills sends it"
+        );
+        assert!(calls(&rig).is_empty(), "nothing sent");
     }
 
     #[test]
