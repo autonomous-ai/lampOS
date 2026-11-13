@@ -123,10 +123,12 @@ below). An ordinary bedtime request belongs to the bedtime skill.
    line after the ask decides; any other words, a busy room, no line within
    the wait, or an owner's language other than English (the yes is heard by
    English words only) are no yes: Skills says `stay` and stands up, as a
-   "never mind" does (on heard words that aren't a yes, the cancel before
-   `stay`, which may never begin; see "Never mind" below), and never powers off (#5774's P2: a TV's "I'm
-   unplugging you" or "I'm unplugging the kettle" folds the arm, then stands
-   up). Only on the yes, Ready read once more,
+   "never mind" does (on a heard no, a line of five words or fewer opening
+   with "no", "nope", "nah", "not", "never" or a "-n't" word, the cancel
+   before `stay`, which may never begin; any other words keep the line
+   first; see "Never mind" below), and never powers off (#5774's P2: a TV's
+   "I'm unplugging you" or "I'm unplugging the kettle" folds the arm, then
+   stands up after its line). Only on the yes, Ready read once more,
    Skills sends setup's change helper `{"shutdown":"lamp"}`, the app's Turn
    off (shutdown.md, "The ways a person asks"), and waits 2 s for its answer.
    The helper takes this one request from `lamp-skills.service`, by its
@@ -320,10 +322,11 @@ Skills checks first that the latch is in force and the body's own state is
 fresh (500 ms), names that request, and is Folding (spoken only) or Ready,
 never Failed. It then asks Voice for the line ("Okay, I'll stay." or the
 timeout's) at priority 8, and publishes the cancel only once Voice says the
-line has begun. For the timeout, and for silence or a yes not taken at the
-turn-off ask, a line that never begins cancels nothing: someone may be
-unplugging it quietly, hands at the arm. A spoken "never mind" and a heard
-refusal at the turn-off ask (words that aren't a yes) publish the cancel
+line has begun. For the timeout, and for silence, a yes not taken or other
+words at the turn-off ask (a TV, someone else talking), a line that never
+begins cancels nothing: someone may be unplugging it quietly, hands at the
+arm (the Reviewer-lead's P2 on #6519). A spoken "never mind" and a heard no
+at the turn-off ask publish the cancel
 first, then ask for the line, which plays when the voice is free or never
 (expired, the voice not reached): the person is there and said so, so the
 lamp stands at once. On lamp-52e6 (build 12130) a "No." whose `stay` line
@@ -331,10 +334,12 @@ expired cancelled nothing, and a "never mind" 75 s later, past the ask, with
 the request still kept, did not stand it either. On build 12200 the voice
 model answered the "No." with its own turn, which held the exact line until
 it expired (30 s), and a cancel published after the line kept the arm down
-that long while the lamp said it was standing back up (#6515). A heard "no"
-and a "never mind" for the same request (the model may call
-`stay_plugged_in` on the same "No.") say the line once: the second finds
-the request cancelled and says nothing. A "never mind" needs no run under
+that long while the lamp said it was standing back up (#6515). A heard "no",
+a "never mind" and the timeout for the same request (the model may call
+`stay_plugged_in` on the same "No.") say the line once: one that finds the
+request cancelled, or another's line still being asked, says nothing (a
+"never mind" still publishes its cancel then). A cancel that failed before
+the line is tried again once the line begins. A "never mind" needs no run under
 way, only the kept request.
 
 The body checks again itself. It accepts a cancel only if its source label is
