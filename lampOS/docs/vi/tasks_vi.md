@@ -288,7 +288,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     tên (#6506). Socket điều khiển, SDK và bridge trong namespace của các
     engine khác là bước 2b. Không có đích của đèn, hay Harness chưa sẵn sàng (không
     có chương trình Harness, hay phần này đang khởi động), cũng bị từ chối
-    bằng lời. Khi không có đích của đèn, hay Harness không khởi động lần
+    bằng lời. Unit sản phẩm không còn `ConditionPathExists=/usr/local/bin/harness`
+    (có từ #811; #6685 PR 3, theo câu hỏi của first builder): trên đèn không
+    có chương trình Harness, systemd vẫn khởi động phần này, chỉ marker của
+    setup giữ nó lại; mọi việc giao đi bị từ chối là `no_harness`, health
+    của nó vẫn ok, và Harness cài sau được dùng khi lệnh cài của lamp-update
+    khởi động lại phần này (test
+    `the_product_unit_starts_the_part_with_no_harness_program`). Khi không có đích của đèn, hay Harness không khởi động lần
     chạy (`harness new` không gửi được hoặc không chắc), lamp-tasks đọc
     trạng thái đăng nhập của Harness một lần (`harness auth status
     --json`); nếu chưa đăng nhập, lời từ chối nói lý do bằng lời cho người
