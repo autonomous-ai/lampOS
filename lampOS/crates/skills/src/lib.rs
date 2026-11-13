@@ -3038,7 +3038,14 @@ pub const ASK_WORDS: std::ops::RangeInclusive<usize> = 2..=8;
 /// #6059): only beside a tool that takes no choice and no flag, since the
 /// voice calls it with nothing (`plain_tool`); at most [`MOST_ASKS`], each [`ASK_WORDS`]
 /// words of letters, digits and apostrophes, one space between them, and
-/// none the same as another, whatever its letters' case.
+/// none the same as another, whatever its letters' case. Never ordinary
+/// speech (Thirteen's P1 and P2s and the Reviewer-lead's P2 on #6842): a
+/// phrase that is or holds a yes, a no or a consent's words, a negation or
+/// a question, a stop, the lamp's own words for what it does itself or its
+/// first-round rules' phrases, or only words said around an ask, is
+/// refused by the voice's own check, which matches it
+/// (`lamp_voice::skill_named::ask_refused`). One that holds another
+/// skill's name is left out of the tools file ([`tools_file_summary`]).
 fn checked_asks(asks: &[String], plain_tool: bool) -> Result<(), String> {
     if asks.is_empty() {
         return Ok(());
@@ -3069,6 +3076,9 @@ fn checked_asks(asks: &[String], plain_tool: bool) -> Result<(), String> {
         }
         if !seen.insert(ask.to_lowercase()) {
             return Err(format!("ask {ask:?} is listed twice"));
+        }
+        if let Some(why) = lamp_voice::skill_named::ask_refused(ask) {
+            return Err(format!("ask {ask:?}: {why}"));
         }
     }
     Ok(())
@@ -9781,8 +9791,26 @@ pub fn tools_file_summary(
             if let Some(when) = &skill.when {
                 whens.insert(name.clone(), json!(when));
             }
-            if !skill.asks.is_empty() {
-                asks.insert(name.clone(), json!(skill.asks));
+            // Never one that holds another skill's name, its function's or
+            // its own, core and with a choice included ("dance for me"
+            // beside the lamp's `dance`): the voice drops it too
+            // (`lamp_voice::skill_named`, Thirteen's P2 on #6842).
+            let kept: Vec<&String> = skill
+                .asks
+                .iter()
+                .filter(|ask| {
+                    !skills
+                        .iter()
+                        .filter(|other| other.name != skill.name)
+                        .any(|other| {
+                            std::iter::once(&other.name)
+                                .chain(&other.tool)
+                                .any(|theirs| lamp_voice::skill_named::ask_holds_name(ask, theirs))
+                        })
+                })
+                .collect();
+            if !kept.is_empty() {
+                asks.insert(name.clone(), json!(kept));
             }
             tools.push(tool);
         }

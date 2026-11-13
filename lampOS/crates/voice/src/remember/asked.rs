@@ -26,7 +26,7 @@ const BEFORE: &[&str] = &[
 /// "Can you …", "Could you …": an ask, even ending in a question mark.
 const ASKING: &[&str] = &["can", "could", "would", "will"];
 /// The plain asks to keep something, at a sentence's start.
-const ASKS: &[&[&str]] = &[
+pub(crate) const ASKS: &[&[&str]] = &[
     &["remember", "that"],
     &["remember", "my"],
     &["remember", "i"],
@@ -49,7 +49,7 @@ const REFUSED: &[&str] = &["no", "not", "never", "don't", "dont", "stop"];
 /// A keep taken back anywhere in the line ("…, but do not save that",
 /// "Actually, don't keep it", "Never mind"): reviewer-two's and Third's P2
 /// on #3463. Matched as words in a row, wherever they are.
-const WITHDRAWN: &[&[&str]] = &[
+pub(crate) const WITHDRAWN: &[&[&str]] = &[
     &["don't", "save"],
     &["dont", "save"],
     &["do", "not", "save"],

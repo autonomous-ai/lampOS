@@ -34,7 +34,7 @@ const ASKING: &[&str] = &["can", "could", "would", "will"];
 /// which may take its length with "for" ("a timer for ten minutes"); a
 /// reminder's takes it only with "in", so "remind me to exercise for ten
 /// minutes" says what to do, not when (reviewer-two's P2 on `50e0a193b`).
-const ASKS: &[(&[&str], bool)] = &[
+pub(crate) const ASKS: &[(&[&str], bool)] = &[
     (&["remind", "me"], false),
     (&["set", "a", "timer"], true),
     (&["set", "a", "reminder"], false),

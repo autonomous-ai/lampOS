@@ -13349,6 +13349,25 @@ enum Taken {
 /// ([`Taken::AskAgain`]); it runs nothing. Any other turn drops it,
 /// running nothing. The journal never has the words.
 #[allow(clippy::too_many_arguments)]
+/// Whether a yes of any kind is held for the person's next words: a keep or
+/// a forget ([`HeldForget`]), a setup face save ([`HeldSave`]), a face
+/// rename held or asked ([`held_rename::waits`]), a skill's write or task
+/// yes (`skill_write_yes::awaited`, which `skill_task_yes` waits through),
+/// or a made skill's clash waiting for their choice. A line said then is
+/// never read for a skill by its name or its asks
+/// ([`crate::skill_named`], Thirteen's P1 on #6842).
+fn a_yes_held(shared: &Shared) -> bool {
+    let now = std::time::Instant::now();
+    shared
+        .held_forget
+        .lock()
+        .is_ok_and(|hold| hold.held.is_some())
+        || shared.held_save.lock().is_ok_and(|hold| hold.is_some())
+        || held_rename::waits(shared)
+        || crate::skill_write_yes::awaited(now)
+        || crate::made_clash::awaited(now)
+}
+
 fn take_held_forget(
     shared: &Shared,
     request: u64,
@@ -14619,6 +14638,11 @@ async fn answer(
     // One the same person asked for in words on their turn just before
     // runs at once ([`asked_just_before`]).
     let asks_now = crate::remember::asks_to_forget(&said);
+    // Whether a yes of any kind waits for these words, read before the
+    // holds below take it: then the line is never read for a skill by its
+    // name or its asks (Thirteen's P1 on #6842: a pushed skill's "yes
+    // please" ran beside a held keep's yes).
+    let yes_held = heard && a_yes_held(shared);
     // What these words, the request's own, say of forgetting everything
     // ([`crate::remember::everything_asked`]): `Some(false)`, a refusal or
     // a smaller ask such as "forget that", outweighs an ask just before and
@@ -14698,12 +14722,23 @@ async fn answer(
     // model (#6772: on lamp-52e6 at 12587 the model answered "I don't have
     // a camera" over the pushed photo-booth skill, with no call). Never
     // beside a read-back: a question about a skill is not an ask to run it.
+    // Never while a yes is held for these words, nor when the holds above
+    // took them as one (a keep or forget, a face save or rename, a face
+    // question asked): the line is the held question's answer.
+    let yes_taken = held_forget_runs.is_some()
+        || unseen_yes.is_some()
+        || held_save_runs.is_some()
+        || held_save_dropped.is_some()
+        || face_to_ask.is_some()
+        || held_rename_runs.is_some()
+        || held_rename_dropped.is_some()
+        || rename_note.is_some();
     let skill_named = heard
         .then(|| {
             shared
                 .skill_named
                 .as_ref()
-                .filter(|_| read_back_named.is_none())
+                .filter(|_| read_back_named.is_none() && !yes_held && !yes_taken)
                 .and_then(|named| named(&said))
         })
         .flatten();

@@ -2131,8 +2131,35 @@ camera, so I can't take photos…" với `calls=none`.
   `relaxing-music` (`examples/relaxing-music` có "relaxing music" và
   "play me something to relax"). "is there a camera?", "don't take a
   photo" và "Take a photo, wait." là của model. Một cụm hai kỹ năng cùng
-  có, hoặc trùng tên một kỹ năng khác, không chạy kỹ năng nào. Khớp tối
-  đa 8 từ, của tên hay của cụm. Tuyến Live không đổi.
+  có không chạy kỹ năng nào, và một cụm chứa tên của một kỹ năng khác đã
+  cài, kể cả kỹ năng lõi và kỹ năng có lựa chọn hay cờ ("dance for me"
+  bên cạnh `dance` của đèn), bị bỏ khỏi tệp tools và bị giọng nói bỏ qua;
+  các tên vẫn chạy. Khớp tối đa 8 từ, của tên hay của cụm. Tuyến Live
+  không đổi.
+- **Một cụm xin không bao giờ là lời nói thường** (P1 và các P2 của
+  Thirteen, P2 của Reviewer-lead trên #6842): `skill_named::ask_refused`,
+  mà bước kiểm tra khi nạp gọi và giọng nói chạy lại khi khớp, từ chối một
+  cụm là hoặc chứa một lời đồng ý, một lời từ chối hay lời của một sự đồng
+  thuận ("yes please", "no thanks", "never mind", "forget that",
+  "remember that", "not now"), một từ phủ định hay từ hỏi ("what time is
+  it", "is there a camera"), một lệnh dừng ("stop it", "stop the music"),
+  lời của chính đèn cho việc nó tự làm ("turn off the light", "good
+  night", "remind me in ten minutes", đèn, âm thanh, giấc ngủ, nhắc nhở và
+  hẹn giờ của nó) hay một cụm của các luật vòng đầu của nó
+  (`LAMP_MEMORY_KEEP_ASKED`, `LAMP_SCHEDULE_ASKED`, `LAMP_REMINDERS_ASKED`,
+  `LAMP_SKILL_ASKED`: "light show", "what reminders do I have"), chỉ gồm
+  những từ được nói quanh một lời xin ("hey lamp"), hoặc không có gì của
+  riêng kỹ năng bên cạnh chúng ("turn on the light", "play some music").
+  Một kỹ năng làm tại đèn, bằng giọng nói hay từ ứng dụng, không bao giờ
+  mang `asks`: `made_skill::tidied` gỡ chúng ra, và giới hạn từ chối cái
+  nó không gỡ được (`made_skill::MADE_ASKS`).
+- **Một lời đồng ý đang giữ đi trước:** khi một lời đồng ý bất kỳ đang chờ
+  câu trả lời của người (giữ hay quên, lưu khuôn mặt lúc cài đặt, đổi tên
+  khuôn mặt, lời đồng ý cho việc ghi hay task của một kỹ năng, xung đột
+  của một kỹ năng làm ra), hoặc câu đó đã được nhận là một lời đồng ý,
+  không câu nào được đọc để tìm kỹ năng theo tên hay theo cụm xin
+  (`a_yes_held` của `second_provider`): "Yes, please." là câu trả lời cho
+  câu hỏi đang giữ.
 - **Các chỉ dẫn:** chỉ dẫn có sẵn (`config::CHAT_INSTRUCTION`, và bản có
   camera), thứ đèn sản phẩm chạy (cấu hình provider của nó không nêu
   `instruction_file`), nói "never say you have no arms, legs, body or
@@ -2153,8 +2180,16 @@ camera, so I can't take photos…" với `calls=none`.
   `a_wait_beside_a_skills_name_goes_to_the_model`,
   `a_skills_own_ask_phrases_call_it_in_code` ("take a photo" và "photo
   booth" của Seventh từ #6413, hai câu của Sixth từ #5749) và
-  `a_camera_question_is_not_an_ask`; `it::asks` của lamp-skills (các giới
-  hạn, và `asks` của tệp tools).
+  `a_camera_question_is_not_an_ask`,
+  `a_held_yes_leaves_yes_please_to_the_held_question` và
+  `ordinary_speech_given_as_asks_goes_to_the_model` (các câu thử của cả
+  hai lượt đọc); trong `skill_named::tests`:
+  `an_ask_that_is_ordinary_speech_is_refused_and_runs_nothing`,
+  `an_ask_holding_any_installed_skills_name_is_dropped` và
+  `an_ask_that_is_another_skills_name_leaves_that_name_running`;
+  `made_skill::tests::a_made_skills_asks_are_taken_out_or_refused`;
+  `it::asks` của lamp-skills (các giới hạn, các câu thử bị từ chối khi
+  nạp, và `asks` của tệp tools, cụm chứa tên kỹ năng khác bị bỏ ra).
 
 ## Socket gọi kỹ năng phân biệt bên gọi (#6128)
 

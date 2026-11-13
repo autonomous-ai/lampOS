@@ -134,7 +134,7 @@ pub fn only_a_stop(text: &str) -> bool {
 /// (#2287's follow-up; the reviewer on #2308). "Not now." does, and "Not
 /// now, thanks." "Not now, we're talking about the report." asks something
 /// more, and so does "Later we should eat."
-const PUT_OFFS: &[&[&str]] = &[
+pub(crate) const PUT_OFFS: &[&[&str]] = &[
     &["not", "now"],
     &["not", "right", "now"],
     &["not", "yet"],
