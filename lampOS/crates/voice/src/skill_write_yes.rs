@@ -396,9 +396,16 @@ pub fn approve_force() -> crate::second_provider::net::Force {
         Some(crate::second_provider::net::Forced {
             name: crate::made_skill::MAKE,
             only: None,
+            fields: Some(&APPROVE_FIELDS),
         })
     })
 }
+
+/// The only `make_skill` fields the forced approval round is told, both
+/// required ([`approve_force`], #6921): the wait's id and the person's
+/// answer, so the forced call, a task's yes or a remove's, can carry no
+/// make or edit beside them.
+pub const APPROVE_FIELDS: [&str; 2] = [APPROVE_ID, ANSWER];
 
 /// Whether `waiting` is a skill's task's wait, or a made skill's remove
 /// (#6960): the ones [`approve_force`] forces, whose call always says what
@@ -455,6 +462,11 @@ pub const UNCLEAR_NEXT: &str = "Nothing was agreed yet: their answer wasn't clea
 /// keeps nothing and asks once more, and a second unclear ends the wait as
 /// a no. What the model is told; none for a yes (or no answer given), so
 /// [`approve`] takes it with every guard, and none for an id not waiting.
+/// Read before the owner check: anyone's no or unclear (a guest's too)
+/// ends or re-asks the owner's wait, never keeping a yes. An answer
+/// outside [`ANSWERS`] reads as a no. Two answers in one line are taken
+/// in call order, each as its own: once the wait has ended, the next finds
+/// no id waiting.
 pub fn answered(id: &str, request: u64, answer: Option<&str>) -> Option<Value> {
     if answer == Some("yes") {
         return None;
