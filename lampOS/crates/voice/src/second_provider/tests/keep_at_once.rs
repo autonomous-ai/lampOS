@@ -465,3 +465,160 @@ async fn in_english_the_line_is_said_by_the_voice_as_before() {
     assert_eq!(went.asked.len(), 1, "{went:?}");
     assert_eq!(spoken, vec![KEPT.to_owned()], "{went:?}");
 }
+
+fn keeping_text(text: &str) -> Vec<net::Result<ChatEvent>> {
+    vec![
+        Ok(ChatEvent::ToolCalls(vec![call(
+            "letter",
+            "remember",
+            json!({"text": text}),
+        )])),
+        Ok(ChatEvent::Done),
+    ]
+}
+
+/// A value-letter A cannot disappear, nor be covered by an unrelated article.
+#[test]
+fn a_changed_letter_a_value_goes_to_round_two_like_off() {
+    let said = "Remember my blood type is A";
+    let mut premature = Vec::new();
+    for text in ["Blood type is B.", "A person has blood type B."] {
+        let off = keep_turn(
+            false,
+            said,
+            keeping_text(text),
+            vec![words("Let me check that letter.")],
+            kept,
+        );
+        let on = keep_turn(
+            true,
+            said,
+            keeping_text(text),
+            vec![words("Let me check that letter.")],
+            kept,
+        );
+        assert_eq!(off.asked.len(), 2);
+        if on != off {
+            premature.push((text, on.asked.len(), on.said().join(" | ")));
+        }
+    }
+    assert!(
+        premature.is_empty(),
+        "changed letter was fast-acknowledged: {premature:?}"
+    );
+}
+
+#[test]
+fn an_unchanged_letter_a_value_can_still_be_answered_at_once() {
+    let went = keep_turn(
+        true,
+        "Remember my blood type is A",
+        keeping_text("Blood type is A."),
+        vec![words("The second round.")],
+        kept,
+    );
+    assert_eq!(went.asked.len(), 1, "{went:?}");
+    assert_eq!(went.said(), vec![KEPT]);
+}
+
+#[test]
+fn an_ordinary_article_paraphrase_can_still_be_answered_at_once() {
+    let went = keep_turn(
+        true,
+        "Remember that I have a cat",
+        keeping_text("Has a cat."),
+        vec![words("The second round.")],
+        kept,
+    );
+    assert_eq!(went.asked.len(), 1, "{went:?}");
+    assert_eq!(went.said(), vec![KEPT]);
+}
+
+/// A successful tool result cannot fast-confirm the opposite of the heard fact.
+#[test]
+fn an_added_negation_goes_to_round_two_like_off() {
+    for text in [
+        "Doesn't like tea.",
+        "Does not like tea.",
+        "Never likes tea.",
+    ] {
+        let turn = |on| {
+            keep_turn(
+                on,
+                "Remember that I like tea",
+                keeping_text(text),
+                vec![words("Let me check that fact.")],
+                kept,
+            )
+        };
+        let off = turn(false);
+        let on = turn(true);
+        assert_eq!(off.asked.len(), 2);
+        assert_eq!(on, off, "{text}");
+    }
+}
+
+#[test]
+fn an_equivalent_negation_stays_fast() {
+    let went = keep_turn(
+        true,
+        "Remember that I don't like tea",
+        keeping_text("Doesn't like tea."),
+        vec![words("The second round.")],
+        kept,
+    );
+    assert_eq!(went.asked.len(), 1, "{went:?}");
+    assert_eq!(went.said(), vec![KEPT]);
+}
+
+/// A changed absence must take the same continuation as the disabled switch.
+#[test]
+fn without_and_no_longer_changes_go_to_round_two_like_off() {
+    for (said, text) in [
+        (
+            "Remember that I like tea with milk",
+            "Likes tea without milk.",
+        ),
+        (
+            "Remember that I like tea without milk",
+            "Likes tea with milk.",
+        ),
+        ("Remember that I like tea", "No longer likes tea."),
+        ("Remember that I no longer like tea", "Likes tea."),
+    ] {
+        let turn = |on| {
+            keep_turn(
+                on,
+                said,
+                keeping_text(text),
+                vec![words("Let me check that fact.")],
+                kept,
+            )
+        };
+        let off = turn(false);
+        let on = turn(true);
+        assert_eq!(off.asked.len(), 2);
+        assert_eq!(on, off, "{said} / {text}");
+    }
+}
+
+#[test]
+fn unchanged_without_and_no_longer_stay_fast() {
+    for (said, text) in [
+        (
+            "Remember that I like tea without milk",
+            "Likes tea without milk.",
+        ),
+        ("Remember that I no longer like tea", "No longer likes tea."),
+    ] {
+        let went = keep_turn(
+            true,
+            said,
+            keeping_text(text),
+            vec![words("The second round.")],
+            kept,
+        );
+        assert_eq!(went.asked.len(), 1, "{went:?}");
+        assert_eq!(went.said(), vec![KEPT]);
+    }
+}

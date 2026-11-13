@@ -1007,9 +1007,25 @@ order is kept. A written turn is the same from the chat on.
     and "not", so "I don't like tea" kept "Likes tea." goes to round 2 and
     kept "Doesn't like tea." stays fast; one letter alone is a word, so
     "blood type O" kept "type A" goes to round 2 (Thirteen's P3 on #5565).
+    Presence of negation must also agree in both directions: "I like tea"
+    kept as "Doesn't like tea" goes to round 2. This uses the same folded
+    negation marker, so "don't", "do not" and "doesn't" remain equivalent.
+    "Without" counts too, so adding or dropping it takes round 2; "no
+    longer" is covered by "no". Unchanged forms remain fast.
+    It does not associate negation with individual clauses of a mixed fact.
+    For standalone "a" in the requested payload, an additional conservative
+    check requires one kept text with the same ordered normalized content,
+    retaining every "a". "Blood type A" kept as "Blood type B" therefore
+    goes to round 2, even if another article "a" appears elsewhere or in
+    another call. Unchanged "Blood type A" and "I have a cat" kept as
+    "Has a cat" stay fast. Reordered or split payloads containing "a", and
+    some article paraphrases, deliberately take round 2. The lead-in
+    "make a note" is removed before this check. This is lexical coverage,
+    not a claim of semantic equivalence; "i" remains an existing exclusion.
     Not content: the memory's common words (`remember::SEARCH_COMMON`,
     "my", "is", "and"…) but its question words, ask verbs ("tell", "can",
-    "will"…) and "not", which are; "I", "a", thanks, a greeting or the
+    "will"…) and "not", which are; "I", "a" (subject to the extra check),
+    thanks, a greeting or the
     name, "user", "person", "also", "too". So a keep told in the third person
     stays fast ("Remember that I like tea" kept "The user likes tea.",
     "… I take my coffee black" kept "Takes coffee black."), as do "tea and
