@@ -3,6 +3,17 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 01:3x GMT+7: #6972, a made sound for the microphone
+
+- Quiet check.
+- **#6972** (`sim-3/mic-lavfi`, cd670bfb38, on 7cc8c754a2, independent):
+  `LAMP_SIM_MIC=lavfi:SOURCE` (ffmpeg makes the sound, `-re` so it comes at
+  real time, no host device opened), as `LAMP_SIM_CAMERA=lavfi:` does. On this
+  Mac with `lavfi:sine=frequency=440:sample_rate=16000 --microphone`:
+  `lamp-bus hz mic1/audio` 250 messages in 5 s, 50.55 Hz, missed 0; ffmpeg
+  gone with lamp-sim. lamp-sim 85+4 pass. READ ASK to sim-1, sim-2 (posted
+  first as "#6974" by mistake, edited to #6972 within a minute).
+
 ## 2026-11-14 01:0x GMT+7: step 4 read (no code yet)
 
 - Quiet check; the lead passed the `shake` finding to lamp-control/body owners.
