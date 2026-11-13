@@ -11927,7 +11927,19 @@ light = { colour = "green", level = 3, for = "20s" }
             &keeping,
             &busy_asked(),
         );
-        assert!(said.is_err(), "{said:?}");
+        // Refused as today's refusal of a part a made skill can't have:
+        // no trigger, `said` named as such a part, and the trigger lines
+        // for its repair, never a said start's own (`SAID_ONLY`) nor a
+        // written skill's put-on cap.
+        assert_eq!(
+            said,
+            Err(Refused(
+                UNSAID.into(),
+                Some(format!(
+                    "{UNSAID_PART}no [trigger]; parts said. {SAYABLE_TRIGGERS}"
+                ))
+            ))
+        );
         assert!(index(&keeping.directory).is_empty());
         let brief = brief(BUSY_ASK).unwrap();
         assert!(!brief.contains("[said]"), "{brief}");
