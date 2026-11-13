@@ -2187,13 +2187,12 @@ của webhook hay bot); đưa bí mật qua app là việc tiếp theo.
 Một dịch vụ đã liên kết mà tệp dùng được cấp quyền của dịch vụ đó (phán quyết
 của chủ, 13/11: mọi thứ chạm tới các kết nối đều đi qua agent của đèn từ đầu
 đến cuối), như `do.task` của một kỹ năng dịch vụ tạo bằng giọng nói, khi
-`LAMP_AGENT_SERVICES=on` (`upload_agent::services_read`): `<code>-read` cho mỗi
-dịch vụ tệp nêu tên (Gmail, hay mail, email, inbox; lịch; Google Drive;
-monday.com; GitHub, Figma, Asana, Ahrefs, Facebook, HubSpot; Slack, Notion,
-Linear và Amplitude chỉ khi viết hoa, vì đó cũng là từ thường), và
-`<code>-write` cho dịch vụ mà một câu bảo gửi, trả lời, soạn, thêm, tạo, lên
-lịch, đăng hay lưu vào (câu không nêu dịch vụ nào thì ghi vào dịch vụ được
-nêu gần nhất). Đèn nói lại bằng lời thường ("reads your Gmail"), và quyền dịch
+`LAMP_AGENT_SERVICES=on` (`upload_agent::services_read`): `<code>-read` và
+`<code>-write` cho mỗi dịch vụ tệp nêu tên, tìm theo một bảng tên, không phân
+biệt hoa thường (Gmail, hay mail, email, inbox; lịch; Google Drive;
+monday.com; GitHub, Figma, Asana, Ahrefs, Facebook, HubSpot, Slack, Notion,
+Linear, Amplitude). Tệp làm gì với chúng là việc agent phán đoán khi chạy;
+chốt chặn là lời đồng ý bằng giọng nói của chủ ở lần chạy đầu. Đèn nói lại bằng lời thường ("reads your Gmail"), và quyền dịch
 vụ luôn hỏi lời đồng ý ở lần chạy đầu. Home mới của lần chạy khi đó có các
 kết nối của đèn (`lamp-services mcp`, `skill_make::fresh_home_for`), nên agent
 chỉ tới dịch vụ qua lamp-control với token riêng của lần chạy, không bao giờ

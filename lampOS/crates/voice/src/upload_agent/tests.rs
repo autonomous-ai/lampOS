@@ -389,9 +389,9 @@ Post each strip to {link}.
 
 /// The owner's ruling (13 Nov): a file that uses a linked service goes to
 /// the lamp's agent end to end, with that service's grants as a voice-made
-/// service skill's `do.task` carries them: `-read` for a service it names,
-/// `-write` for one a sentence says to send, reply or add to. Said back
-/// plainly, and its first run keeps the spoken yes.
+/// service skill's `do.task` carries them: `-read` and `-write` for each
+/// service it names. Said back plainly, and its first run keeps the spoken
+/// yes.
 #[test]
 fn a_file_that_uses_a_linked_service_gets_its_grants_with_the_switch_on() {
     switches(true, false);
@@ -434,48 +434,33 @@ fn a_file_that_uses_a_linked_service_gets_its_grants_with_the_switch_on() {
     switches(false, false);
 }
 
-/// The services are read conservatively: a service named plainly, or a
-/// word that can only be one; a name that is an everyday word only
-/// capitalised; write only where a sentence naming it says to write.
+/// The services are read by their names alone, in any case, from a table
+/// of names: each one named gets its read and its write; what the file does
+/// with them is the agent's to judge, after the owner's yes.
 #[test]
-fn services_are_read_conservatively() {
+fn services_are_read_by_their_names() {
     assert!(services_read("Tell me a joke and glow.").is_empty());
+    assert!(services_read("Send the photo to the image API.").is_empty());
     assert_eq!(
         services_read("Say my next calendar event."),
-        ["google_calendar-read"]
-    );
-    assert_eq!(
-        services_read("Add a dentist event to my calendar. Then glow."),
         ["google_calendar-read", "google_calendar-write"]
     );
-    // Write is per sentence: the send is the chat's, not the mail's.
     assert_eq!(
-        services_read("Count my inbox. Send the count to the Slack channel."),
-        ["gmail-read", "slack-read", "slack-write"]
+        services_read("Count my inbox. Send the count to the slack channel."),
+        ["gmail-read", "gmail-write", "slack-read", "slack-write"]
     );
     assert_eq!(
         services_read("Save the photo to Google Drive."),
         ["google_drive-read", "google_drive-write"]
     );
     assert_eq!(
-        services_read("List my open GitHub issues and the Notion page."),
-        ["github-read", "notion-read"]
+        services_read("List my open GitHub issues and the NOTION page."),
+        ["github-read", "github-write", "notion-read", "notion-write"]
     );
     assert_eq!(
         services_read("Check monday.com boards."),
-        ["mondaydotcom-read"]
+        ["mondaydotcom-read", "mondaydotcom-write"]
     );
-    // A write naming no service is the last named one's ("reply to it").
-    assert_eq!(
-        services_read("Read my newest email. Reply to it with thanks."),
-        ["gmail-read", "gmail-write"]
-    );
-    assert!(services_read("Send the photo to the image API.").is_empty());
-    for none in [
-        "Take it slack on Monday and drive to work.",
-        "I have a notion to glow in a linear fade.",
-        "Raise the amplitude of the chime.",
-    ] {
-        assert!(services_read(none).is_empty(), "{none}");
-    }
+    // Monday alone is a day, and a drive alone is not Google Drive.
+    assert!(services_read("On Monday, drive to work.").is_empty());
 }
