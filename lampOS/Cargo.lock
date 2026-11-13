@@ -1999,6 +1999,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "curve25519-dalek",
+ "futures-util",
  "jiff-tzdb",
  "lamp-actions",
  "lamp-bus",
@@ -2021,6 +2022,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tokio-tungstenite",
  "toml",
  "webpki-roots 1.0.9",
 ]

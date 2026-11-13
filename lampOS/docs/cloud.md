@@ -22,6 +22,27 @@ against lamp-06c1.
   never falling back to a plain connection. Off unless set, until the
   backend's broker is shown taking it on a lamp.
   The keepalive is 60 s (V1 asks 65,535 s, which never notices a dead link).
+  One connection, TCP to CONNACK, may take 10 s (`wss::CONNECT`).
+  **Over WSS when TCP keeps failing (#6256, F9).** After 3 failed
+  connections in a row (`wss::FAILURES`, none reaching CONNACK), and with a
+  `wss://` address from the ping's `mqtt_ws_url`, the lamp goes over MQTT
+  over WSS: the same login, client id and will, through a bridge on
+  `127.0.0.1` (an ephemeral port) that carries the MQTT bytes as binary
+  WebSocket frames, sub-protocol `mqtt`, over TLS with the webpki roots.
+  No `rumqttc` websocket feature: the workspace's `tokio-tungstenite`. The
+  bridge lives only while on WSS. Every 10 min (`wss::TCP_AGAIN`) it tries a
+  TCP connection to the broker's port, and when one is taken the lamp goes
+  back to TCP; a Wi-Fi move or a new account also starts again on TCP. Every
+  lamp does this, whatever its region: the address comes only from the
+  backend, and a healthy lamp never gets there. The journal says `the
+  broker's TCP port failed 3 times in a row: on to MQTT over WSS, …` and
+  `the broker's TCP port takes a connection again: back from WSS to TCP`.
+  A new `mqtt_ws_url` alone never moves a connection; it is kept in memory
+  only, as the first ping goes out at start. A healthy lamp is not slowed:
+  TCP is always tried first. Where port 1883 is dropped (no answer), WSS is
+  reached about 33 s after the first try (3 × 10 s, plus the 1 s and 2 s
+  waits between), plus the WSS connection itself; where it is refused, about
+  3 s.
   It takes, and tells the broker it takes, packets of up to about 11.7 MiB
   (`MOST_PACKET_BYTES`): a `faces.add_photo` with the largest photo, in
   base64, and 1 MiB more for the envelope and a sender writing `/` as
@@ -89,7 +110,8 @@ against lamp-06c1.
   channels) or a new `device_id` replaces the account: the connection is made
   again with it, and the rotated login is kept in `lamp-cloud`'s own state
   folder (`/var/lib/lampos-cloud/rotated.json`, 0600), preferred over
-  setup's while its device id is the same. The reply's `region` (`""` or
+  setup's while its device id is the same. The reply's `mqtt_ws_url` (anything not a string reads as `""`) is the
+  broker's WSS address (see "Stays on the broker"). The reply's `region` (`""` or
   `"CN"`; anything else reads as `""`, #6414) is no part of the account, so
   it never reconnects the broker: on a change it is written to `region` in
   the same folder (`/var/lib/lampos-cloud/region`, 0644, written whole and

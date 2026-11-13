@@ -104,9 +104,9 @@ pub async fn once(
 
 /// Pings every `every` with the newest account and identity until
 /// `accounts` closes. `key` is the bearer. `keep` is given each account a
-/// reply moved to, before it is sent on. `region` is given each reply's
-/// region (`ping::Region`, #6414): no part of the account, so it never
-/// moves the broker. `login`, with `LAMP_SIGNED_OUT=on`, is told what each
+/// reply moved to, before it is sent on. `heard` is given each reply, for
+/// its region (`ping::Region`, #6414) and its WSS address (#6256 F9):
+/// neither is part of the account, so neither moves the broker. `login`, with `LAMP_SIGNED_OUT=on`, is told what each
 /// ping's answer says of the login.
 #[allow(clippy::too_many_arguments)]
 pub async fn pings(
@@ -116,7 +116,7 @@ pub async fn pings(
     every: Duration,
     say: &mut impl Say,
     keep: &mut impl FnMut(&Account),
-    region: &mut impl FnMut(&str),
+    heard: &mut impl FnMut(&ping::Reply),
     mut login: Option<&mut Login>,
 ) {
     let mut client = match client() {
@@ -161,7 +161,7 @@ pub async fn pings(
                     }
                     let reply = ping::reply(&body);
                     if let Some(reply) = &reply {
-                        region(&reply.region);
+                        heard(reply);
                     }
                     if let Some(next) = reply.and_then(|reply| ping::after(&account, &reply)) {
                         keep(&next);
@@ -289,7 +289,7 @@ mod tests {
                 Duration::from_millis(20),
                 &mut say,
                 &mut keep,
-                &mut |_: &str| {},
+                &mut |_: &ping::Reply| {},
                 None,
             )
             .await;
@@ -368,7 +368,7 @@ mod tests {
                 Duration::from_millis(2),
                 &mut say,
                 &mut |_: &Account| {},
-                &mut |_: &str| {},
+                &mut |_: &ping::Reply| {},
                 Some(&mut login),
             )
             .await;

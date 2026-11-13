@@ -415,7 +415,16 @@ fn main() -> ExitCode {
         // login for the voice to read; said once each time it changes.
         let mut region_kept = std::env::var_os("STATE_DIRECTORY")
             .map(|dir| ping::Region::at(PathBuf::from(dir).join("region")));
-        let mut region = |region: &str| {
+        // The broker's WSS address (#6256 F9), for when its TCP port keeps
+        // failing; a new one alone never moves a working connection.
+        let (ws_url_tx, ws_url) = watch::channel(String::new());
+        let mut heard = |reply: &ping::Reply| {
+            ws_url_tx.send_if_modified(|kept| {
+                let changed = *kept != reply.mqtt_ws_url;
+                kept.clone_from(&reply.mqtt_ws_url);
+                changed
+            });
+            let region = reply.region.as_str();
             if let Some(result) = region_kept.as_mut().and_then(|kept| kept.take(region)) {
                 match result {
                     Ok(()) => say(&format!("the backend places the lamp in region {region:?}")),
@@ -433,7 +442,7 @@ fn main() -> ExitCode {
             ping::EVERY,
             &mut said,
             &mut keep,
-            &mut region,
+            &mut heard,
             login.as_mut(),
         );
         let telling = async move {
@@ -442,7 +451,7 @@ fn main() -> ExitCode {
                 None => std::future::pending().await,
             }
         };
-        let staying = online::run(accounts, me, &mut lamp, &mut said_too, ping::FIRST);
+        let staying = online::run(accounts, me, ws_url, &mut lamp, &mut said_too, ping::FIRST);
         let reporting = async move {
             match reporting {
                 Some((shared, sources)) => reports::run(shared, sources, report_build).await,
