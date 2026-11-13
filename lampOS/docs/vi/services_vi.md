@@ -1578,6 +1578,13 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   giọng của đèn, trong vòng 1.5 s (`own_echo::TAIL_US`) sau khi lời của đèn
   kết thúc, hoặc khi không có hook nghe để biết lúc nó bắt đầu, được xét như
   mọi câu khác.
+- **Một cái "có" trả về rỗng** (#6840). Nếu chữ cuối cùng của speech to
+  text cho một câu như vậy trả về rỗng nhưng trên đường đi nó có một câu
+  "có" hay "không" trơn, các chữ đó được tính là đã nói khi lệnh ghi còn chờ
+  (`second_provider::answer_on_the_way`, docs/not-speech.md); mọi chữ khác
+  trên đường đi bị bỏ và được đếm trong journal. Trên lamp-9adf ngày 13/11
+  câu "Yes." của chủ đèn cho một lần dời lịch trả về 0 chữ và lệnh ghi bị
+  bỏ ở câu kế tiếp.
 - **Không lời nhắc, không câu huỷ của đèn.** Lời nhắc riêng của đèn "Say
   'send it' to send it." (`SAY_SEND_IT`, `nudge_waiting`; với một bản nháp
   "Say 'save it' to save the draft.", `SAY_SAVE_IT`) và câu riêng

@@ -8359,7 +8359,7 @@ async fn spoken(
     // as a cough). A stop among them is the stop it was
     // (`LAMP_SPOKEN_STOP_ENDS`); any other words keep it from being taken
     // for a wordless sound (`LAMP_CUT_IN_WORDLESS_ASKS`).
-    let on_the_way = words_on_the_way(&text, interim, marks.over_the_lamps_voice);
+    let on_the_way = words_on_the_way(&text, interim.clone(), marks.over_the_lamps_voice);
     let text = match on_the_way.as_deref() {
         Some(words) if shared.spoken_stop_ends && crate::spoken_stop::is_stop_request(words) => {
             eprintln!(
@@ -8393,6 +8393,38 @@ async fn spoken(
         _ => text,
     };
     let words_were_on_the_way = on_the_way.is_some() && text.trim().is_empty();
+    // A line in the clear whose final words came back empty, though speech
+    // to text had a plain yes or no on the way, while a read-back awaits its
+    // answer (#6840, lamp-9adf on 13 Nov: the owner's "Yes." to a calendar
+    // move came back as 0 words, opened nothing, and the waiting write was
+    // dropped at the next line). Only then; any other words on the way are
+    // thrown away as before, and the journal counts them.
+    let text = if on_the_way.is_none() && text.trim().is_empty() {
+        let awaited = interim.as_deref().is_some_and(|words| {
+            crate::services::answer_awaited(words)
+                || crate::skill_write_yes::answer_awaited(request, Instant::now())
+        });
+        match answer_on_the_way(&text, interim.clone(), awaited) {
+            Some(words) => {
+                eprintln!(
+                    "lamp-voice second: request {request}: its final words came back empty; its {} words on the way answer a waiting read-back: taken as said (#6840)",
+                    words.split_whitespace().count()
+                );
+                words
+            }
+            None => {
+                if let Some(words) = interim.as_deref() {
+                    eprintln!(
+                        "lamp-voice second: request {request}: its final words came back empty; its {} words on the way are thrown away (#6840)",
+                        words.split_whitespace().count()
+                    );
+                }
+                text
+            }
+        }
+    } else {
+        text
+    };
     // Snapshot the actual line before name carries or older words are
     // joined. Those may belong to someone else and never prove this name.
     let enrollment_allowed = shared.remember_speaker
@@ -12067,6 +12099,21 @@ fn plain_words(words: &str) -> String {
 /// begun in the clear (#4938).
 fn words_on_the_way(text: &str, interim: Option<String>, over: bool) -> Option<String> {
     interim.filter(|words| over && text.trim().is_empty() && !words.trim().is_empty())
+}
+
+/// The words speech to text had on the way for a line in the clear whose
+/// final words (`text`) came back empty, while a read-back awaits its
+/// answer (`awaited`: a services write's, [`crate::services::answer_awaited`],
+/// or a skill's yes, [`crate::skill_write_yes::answer_awaited`]): `interim`,
+/// only when it is a plain yes or no ([`crate::services::plain_yes`],
+/// [`crate::services::plain_no`]). None otherwise, so nothing changes with
+/// no answer awaited (#6840).
+fn answer_on_the_way(text: &str, interim: Option<String>, awaited: bool) -> Option<String> {
+    interim.filter(|words| {
+        awaited
+            && text.trim().is_empty()
+            && (crate::services::plain_yes(words) || crate::services::plain_no(words))
+    })
 }
 
 /// The next of a listener's early words; never, once there are none.
