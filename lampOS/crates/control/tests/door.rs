@@ -562,6 +562,22 @@ async fn the_admin_socket_says_which_streams_are_usable() {
     );
 }
 
+/// The app must not read the admin socket as an open door: the clients answer says whether
+/// the door listens (false until lamp-control binds it; #5299, the App Only E2E on lamp-0c89).
+#[tokio::test]
+async fn the_clients_answer_says_whether_the_door_listens() {
+    let lamp = lamp("listening").await;
+    assert_eq!(
+        admin(&lamp, json!({"clients": true})).await["listening"],
+        json!(false)
+    );
+    lamp.shared.set_listening(true);
+    assert_eq!(
+        admin(&lamp, json!({"clients": true})).await["listening"],
+        json!(true)
+    );
+}
+
 /// Fourteen's P3 on #3778: frames before `hello` don't move its deadline;
 /// a client that never says it is closed at the hello time from its welcome.
 #[tokio::test]

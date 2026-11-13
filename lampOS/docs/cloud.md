@@ -2816,7 +2816,7 @@ app that asks anyway is told `developer access is off on this lamp`.
   it with a stock HPKE library (CryptoKit's `HPKE`, Tink's `HpkeDecrypt`) and
   drops its key, the code and the pin at `until_unix_ms`. Built from `ring`
   alone (`crate::seal`).
-- **`control.clients`** (`{}`): `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}], "shown": {"body": "can move the lamp's body", …}}`. `shown` is the lamp's words for every grant it knows, by wire name, once per answer (absent from an older lamp-control), so the app never shows a raw wire name for a grant it has no label of its own for.
+- **`control.clients`** (`{}`): `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}], "shown": {"body": "can move the lamp's body", …}, "listening": true}`. `listening` is whether the door listens on the network: false while lamp-control serves only the owner's side and skill runs (`LAMP_CONTROL` not on, #6059), when its admin socket is there with no door behind it, so the app shows the switch off or "not listening" and never "On" for the socket alone (absent from an older lamp-control: the socket's being there is all the app has). `shown` is the lamp's words for every grant it knows, by wire name, once per answer (absent from an older lamp-control), so the app never shows a raw wire name for a grant it has no label of its own for.
   Nothing in it is secret, so it is not sealed.
 - **`control.revoke`** (`{"client": "c_1"}`): `{"revoked": true|false, "saved": true}`,
   `revoked` whether it was paired. It takes effect at once either way; when

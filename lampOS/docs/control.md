@@ -272,6 +272,8 @@ lamp-control revoke c_…
 lamp-control clients
 ```
 
+The admin socket's `{"clients": true}` answer also says `listening`: whether the door listens on the network. It is false when lamp-control serves only the owner's side and skill runs (below), so the admin socket's being there is never read as the door's being open (#5299).
+
 - **Off by default:** the door (`--listen`, TLS, pairing) opens only with `LAMP_CONTROL=on`. The product unit (`deploy/product/lamp-control.service`, as `lampos` in `lampos-parts.slice`) doesn't set it.
 - **A skill's tasks without the door** (#6059, the first builder's (b)): with `LAMP_CONTROL` not on but `LAMP_SKILL_TASKS=on`, `serve` runs with no TCP listener, no TLS and no pairing. It serves only the owner's side (`--admin-socket`: the voice's yes records, lamp-tasks' mints) and, with a run user named, the run socket. Its lease and journal tick runs as with the door. The developer door stays the owner's choice in the app.
 - **Both off:** `serve` says so and exits 0, with nothing served.
