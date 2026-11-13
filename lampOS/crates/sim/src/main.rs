@@ -428,8 +428,18 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     // The real body, then the real door.
     let mut children: Vec<Child> = Vec::new();
     let d = |name: &str| dir.join(name).display().to_string();
-    let mut body = body_command(&bin, dir, &bus_root)?.spawn()?;
-    thread::sleep(Duration::from_secs(1));
+    // Off Linux there is no body yet (lamp-body's serial runtime is Linux only;
+    // ten makes it portable): the lamp runs without one, as a lamp whose body
+    // is down, and says so once instead of starting it five times and ending
+    // (the first builder on #6811, 13 Nov 18:44: "yes, for now").
+    let mut body: Option<Child> = if BODY_RUNS_HERE {
+        let child = body_command(&bin, dir, &bus_root)?.spawn()?;
+        thread::sleep(Duration::from_secs(1));
+        Some(child)
+    } else {
+        eprintln!("lamp-sim: {NO_BODY_HERE}");
+        None
+    };
     // `--controls`: the real lamp-controls, which publishes `controls/state` for a real voice (controls.rs);
     // off unless asked. It ends with the lamp, as the others do.
     let mut controls: Option<Child> = if lamp_sim::controls::wanted(args) || real_voice.is_some() {
@@ -523,7 +533,9 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             );
             ended = true;
         }
-        if let Ok(Some(status)) = body.try_wait() {
+        if let Some(running) = body.as_mut()
+            && let Ok(Some(status)) = running.try_wait()
+        {
             eprintln!(
                 "lamp-sim: lamp-body ended ({status}): {}",
                 why_body_ended(dir)
@@ -536,7 +548,7 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
                 restarts.push(std::time::Instant::now());
                 match body_command(&bin, dir, &bus_root).and_then(|mut c| c.spawn()) {
                     Ok(next) => {
-                        body = next;
+                        body = Some(next);
                         eprintln!("lamp-sim: lamp-body started again");
                     }
                     Err(error) => {
@@ -574,7 +586,7 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
         if ended {
             // The parts run in their own process groups under a watcher shell:
             // end each group, not only the shell.
-            children.push(body);
+            children.extend(body);
             children.extend(controls);
             children.extend(voice);
             if let Some(launch) = &real_voice {
@@ -591,6 +603,14 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
         }
     }
 }
+
+/// Whether the real `lamp-body` can run on this system: its serial runtime is
+/// Linux only until ten's portable body (then this goes).
+const BODY_RUNS_HERE: bool = cfg!(target_os = "linux");
+
+/// The one line lamp-sim says where it runs without a body.
+const NO_BODY_HERE: &str = "no body on this system (lamp-body's runtime is Linux only for now): \
+     the lamp runs without one, and body, look and gesture calls are refused as on a lamp whose body is down";
 
 /// The real `lamp-body` on the simulated servo bus; its exit reports go to
 /// `DIR/body.log`, one after another.

@@ -149,3 +149,19 @@ jobs:
           cargo test --locked -p lamp-sim -- \
             --skip voice::tests::a_speaker_stream_is_opened_counted_told_in_stats_and_ends_when_the_door_closes \
             --skip voice::tests::a_player_that_never_reads_holds_neither_the_stats_nor_the_doors_closing_and_is_waited_for
+      # With no body on macOS for now, the lamp comes up, says so once and stays up (it ended after
+      # about 15 s, five body restarts, before): up within 30 s, still up 20 s later, then ended.
+      - name: lamp-sim runs without a body and stays up
+        working-directory: lampOS
+        run: |
+          dir="$HOME/.lampsim/ci"; mkdir -p -m 700 "$HOME/.lampsim"
+          target/debug/lamp-sim run "$dir" --bin-dir target/debug --listen 127.0.0.1:7799 > sim.log 2>&1 &
+          sim=$!
+          for i in $(seq 1 60); do grep -q 'lamp-sim: up on' sim.log && break; sleep 0.5; done
+          grep -q 'lamp-sim: up on' sim.log || { cat sim.log; exit 1; }
+          sleep 20
+          kill -0 "$sim" || { echo "lamp-sim ended"; cat sim.log; exit 1; }
+          grep -q 'no body on this system' sim.log || { cat sim.log; exit 1; }
+          if grep -q 'lamp-body started again' sim.log; then cat sim.log; exit 1; fi
+          kill "$sim"; wait "$sim" || true
+          cat sim.log
