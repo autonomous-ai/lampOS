@@ -4151,7 +4151,17 @@ pub fn serve<C: Clock>(
             .is_some_and(|side| side.order.contains(&engine))
     };
     let (hermes_on, openclaw_on) = (lamp_has(EngineKind::Hermes), lamp_has(EngineKind::Openclaw));
-    if skill_tasks && let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+    // Only with LAMP_SKILL_DEFAULT_AGENT on (Thirteen's P3 on #6829): off, a
+    // lamp with no Harness program (#6849 starts the part there) neither
+    // sweeps leftover runs nor reads Harness as absent; nothing changes.
+    if skill_tasks
+        && crate::skill_task::on(
+            std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH)
+                .ok()
+                .as_deref(),
+        )
+        && let Some(home) = std::env::var_os("HOME").map(PathBuf::from)
+    {
         set_no_harness(&no_harness, &config, lamp_side.clone(), absent, home);
     }
     if hermes_on {

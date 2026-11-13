@@ -2809,8 +2809,10 @@ for each run, and is answered once the run ends
     signed out only once Harness is set up here and its start's sweep is
     done), or no Harness program at all (after a sweep of the folders and
     token files an earlier start left, `skill_task::sweep_without_harness`;
+    the sweep and these looks are set up only with the switch on, so off,
+    a lamp with no Harness program sweeps nothing, Thirteen's P3 on #6829;
     the product unit's `ConditionPathExists=/usr/local/bin/harness` still
-    keeps lamp-tasks off on such a lamp). Signed in, signed in and offline,
+    keeps lamp-tasks off on such a lamp until #6849). Signed in, signed in and offline,
     or not read yet: through Harness as above. Nothing is asked at the
     run's start: the sign-in is the last one read, so the start waits on
     no network and no Harness call. The default agent is the same
