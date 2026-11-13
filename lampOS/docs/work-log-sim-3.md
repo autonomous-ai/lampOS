@@ -3,6 +3,21 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 21:3x GMT+7: 883 merged #6933; #6949
+
+- Train 883 (#6942) merged as 162fedbec2 with **#6933** (P3, the bus's
+  buffers on macOS) and ten's #6931. P2 and P3 are in: P4 steps 1, 2, 4 may
+  start.
+- ten's view on the loopback switch (#6811, 20:29): agrees, loopback
+  literals only, STT/TTS only, default off; the first builder's call.
+- **#6949** (`sim-3/bus-macos-doc`, 651dcf01be): docs/bus.md says a macOS
+  socket whose buffer can't be raised fails at once (#6933's P3). READ ASK to
+  the first builder and Heron.
+- My slip: a command ended `cd` into the person's main checkout, then
+  `git switch lamp-sim-3` there (20:34). Switched back to lamp-voice at
+  a1595beffc; no tracked change was there. Git commands now run only in the
+  scratch worktree.
+
 ## 2026-11-13 21:2x GMT+7: #6939 green, NEXT TRAIN; #6933 rides 883; P4 blocker found
 
 - #6939's macOS job rerun passed (a one-off on the 3-vCPU runner). NEXT TRAIN
