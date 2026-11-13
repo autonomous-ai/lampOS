@@ -4,7 +4,7 @@
 //! caller obligations, especially qualification, placement and child reaping.
 pub mod channel;
 pub mod config;
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub mod native;
 pub mod qualification;
 pub mod supervisor;

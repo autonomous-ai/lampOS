@@ -209,7 +209,7 @@ impl<B: Backend, C: Clock> Worker<B, C> {
         })
     }
     /// Native open already consumed this exact priority snapshot. It is not renewed.
-    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     pub(crate) fn initial_authority(&mut self, snapshot: Snapshot) -> io::Result<()> {
         let n = self.now()?;
         self.guard.install(n, snapshot).map_err(invalid)?;
