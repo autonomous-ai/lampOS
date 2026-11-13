@@ -759,9 +759,10 @@ longest datagrams, about Linux's default); both are the socket's own and need
 no privilege. If the system refuses to raise one (a `kern.ipc.maxsockbuf` set
 below them, say), the trouble comes at once, not at the first long message: a
 subscriber is not made (`receive buffer of <its socket>: <why>`), and a
-publisher makes no socket for that subscriber, which gets nothing, and says so
-once on the publish, as it does any root it cannot use (the first builder's P3
-on #6933). The test of a 60,000-byte message asserts delivery on both. Before
+publisher stops linking at that subscriber: it and any not yet linked after it
+get nothing until the publisher's next look tries again, and the publish says
+so once, as it does any root it cannot use (the first builder's P3 on #6933;
+one send size for all, so a refusal hits every new link alike). The test of a 60,000-byte message asserts delivery on both. Before
 that change, a subscriber on a Mac that did not read held 25 messages of 141
 bytes, or 5 pieces of sound, before the next was dropped; with the larger
 receive buffer it holds more, and how many has not been measured. Each subscriber is sent to from a socket of its own
