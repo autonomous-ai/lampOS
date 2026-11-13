@@ -45,6 +45,9 @@ pub fn is_move_name(name: &str) -> bool {
 pub struct Idler {
     state: u64,
     last: Option<&'static str>,
+    /// Each wait drawn is scaled by this: 1 is today, an energy level's
+    /// `idle_share` shortens them (`crate::energy`, #6893).
+    pub share: f64,
 }
 
 impl Idler {
@@ -52,6 +55,7 @@ impl Idler {
         Self {
             state: seed,
             last: None,
+            share: 1.0,
         }
     }
 
@@ -68,7 +72,7 @@ impl Idler {
     pub fn gap(&mut self) -> Duration {
         let share = (self.next() >> 11) as f64 / (1u64 << 53) as f64;
         let drawn = GAP_LEAST.as_secs_f64() + (GAP_MOST - GAP_LEAST).as_secs_f64() * share;
-        Duration::from_secs_f64(drawn)
+        Duration::from_secs_f64(drawn * self.share)
     }
 
     /// The next move, the last one a third as likely as each other. The two
@@ -166,6 +170,26 @@ mod tests {
         }
         // An arm held by a hand: the head alone.
         assert!((0..100).all(|_| idler.pick(true, false).name != clips::IDLE.name));
+    }
+
+    /// A share scales every wait and keeps their spread: level 5's half
+    /// draws 20 s to 90 s, and 1 is the waits of today, exactly.
+    #[test]
+    fn a_share_scales_the_waits() {
+        let today: Vec<Duration> = {
+            let mut idler = Idler::new(3);
+            (0..500).map(|_| idler.gap()).collect()
+        };
+        let mut lively = Idler::new(3);
+        lively.share = 0.5;
+        for gap in &today {
+            let half = lively.gap();
+            assert!((half.as_secs_f64() - gap.as_secs_f64() / 2.0).abs() < 1e-6);
+            assert!((GAP_LEAST / 2..=GAP_MOST / 2).contains(&half), "{half:?}");
+        }
+        let mut same = Idler::new(3);
+        same.share = 1.0;
+        assert!(today.iter().all(|gap| *gap == same.gap()));
     }
 
     /// With only two moves, not strict turns: a repeat about one time in
