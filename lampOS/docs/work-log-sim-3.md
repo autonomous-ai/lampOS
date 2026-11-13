@@ -3,6 +3,14 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 19:5x GMT+7: resident synthesizer measured
+
+- A throwaway Swift probe (scratch, not committed) of
+  `AVSpeechSynthesizer.write(_:toBufferCallback:)`, en-US, 5 runs: cold first
+  call 340 ms; warm first buffer 8 ms for 2, 9 and 22 words; whole line 17,
+  22, 37 ms (`say`: 700, 839, 1,149 ms). Native rate is not 24 kHz:
+  resample to `pcm_24000`. Posted on #6811.
+
 ## 2026-11-13 19:4x GMT+7: P4 step 1, latency first
 
 - Quiet check: nothing new for sim-3.
