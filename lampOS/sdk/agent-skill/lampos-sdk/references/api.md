@@ -46,7 +46,7 @@ pairing keeps it for later connects.
 | `person.left` (look) | `count`: 0 | nobody in view for 5 s, after someone was |
 | `person.facing` (look) | `facing` | someone turns to the lamp, or the last one turns away |
 | `person.stood_up` (look) | `side` | someone in view stands up |
-| `hand` (look) | `seen`; when seen `x`, `y`, `size`, `open`, `confidence` | a hand seen, moved, opened, closed or gone, at most 4 a second |
+| `hand` (look) | `seen`; when seen `x`, `y`, `size`, `open`, `confidence` | a hand seen, moved, opened, closed or gone, at most 4 a second; in development: nothing publishes `humans/hands/tracked` on a customer lamp yet, so none comes |
 | `phrase.heard` (hear) | `phrase`: one of yours | a line the lamp heard holds your phrase; register up to 16 with `phrases` |
 | `name.heard` (hear) | none | someone says the lamp's name |
 | `sound.heard` (sound) | `class` (`music`, `laughter`, `door`, `footsteps`), `score` | a class's score rises past 0.5 |
@@ -93,7 +93,7 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 | follow a hand (in development: the lamp doesn't track hands yet; lamp-body refuses a hold that says `follow`) | `async with lamp.follow_hand() as following:` | `lamp.withHand(async (following) => …)`, `lamp.followHand().start()` | `lamp_follow_hand(seconds)`, `lamp_follow_stop()` | body and look |
 | a move of your own | `await lamp.move(frames, step_ms)` | `lamp.move(frames, stepMs)` | `lamp_move(step_ms, frames)` | body, a body lease |
 | a move through poses in degrees, eased | `await lamp.move_poses([{"pitch": 10}, {"yaw": -8}])` | `lamp.movePoses([{ pitch: 10 }, { yaw: -8 }])` | `lamp_move_poses(poses)` | body, a body lease |
-| a recorded move (refused on every lamp today) | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
+| a recorded move in one of your pushed skills (plays from build 12171; refused "not routed yet" on 11913 and before) | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
 | aim the joints (from build 11102: all five, `roll`, `shoulder`, `elbow` while the lamp stands; 11048 and older: `yaw`, `pitch` only) | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | `lamp_joints(within_ms, pitch, roll, yaw, shoulder, elbow)` | body, the lease named |
 | light | `await lamp.light("green", 3, 10_000, pattern="breathe")` (no `pattern`: steady) | `lamp.light('green', 3, 10000, 'breathe')` (`undefined`: steady) | `lamp_light(colour, level, for_ms, pattern)` | light |
 | ring, pixel by pixel | `await lamp.ring(pixels, for_ms=3_000, brightness=50)`: `lamp.ring_pixels` colours (`"#rrggbb"` or `(r, g, b)`), from pixel 0 around the ring | `lamp.ring(pixels, { forMs: 3000, brightness: 50 })` (`lamp.ringPixels` of them) | `lamp_ring(pixels, rgb, brightness, for_ms)` | light |
