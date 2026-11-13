@@ -1357,26 +1357,38 @@ sau:
     cái kia, nên "glow green when I'm present" chỉ thỉnh thoảng hiện). Một
     lần tạo bằng giọng nói, sau khi được giữ và trước khi bật, được so với
     mọi kỹ năng trên đèn (`made_clash::found`): thư mục kỹ năng và thư mục
-    pushed bên cạnh, mỗi cái theo `skill.toml` của nó, rồi các kỹ năng đã
-    tạo, đang giữ và đang bật, theo `"clash"` giữ cùng mỗi cái trong
-    `made.json` (`made_clash::signature`). Xung đột là cùng một trigger
+    pushed bên cạnh, mỗi cái theo `skill.toml` của nó theo thứ tự thư mục,
+    rồi các kỹ năng đã tạo, đang giữ và đang bật, theo `"clash"` giữ cùng
+    mỗi cái trong `made.json` (`made_clash::signature`). Mọi kỹ năng nó
+    xung đột đều được tìm ra, không chỉ cái đầu tiên (lamp-9adf, 13/11: với
+    `blink-green-twice`, `glow-green-on-return` và `green-blink-on-return`
+    trên cùng một lần đến, chỉ cái đầu được nêu tên và thay, còn hai cái
+    kia vẫn xung đột). Xung đột là cùng một trigger
     (topic của nó, và `field`, `when`, `equals`, `above`, `below`,
     `present`, `changes`; không tính nhịp hay khung giờ, nên hai kỹ năng
     trên một lần đến xung đột dù cooldown khác nhau) và cả hai dùng ánh
     sáng, hoặc cả hai cử động đầu (một bước `[[do]]` có `light`, hoặc có
     `body`). Trigger khác, hoặc cùng trigger mà không chung đầu ra, thì
     không xung đột. Khi xung đột, không bật gì: mô hình được báo tên nói
-    của kỹ năng kia (`clashes_with`), thứ cả hai dùng (`shares`), một
-    `clash_id`, và được dặn nói nguyên văn "NEW would start at the same
-    moment as OTHER, which is on the lamp, and both use the light. Shall I
-    replace OTHER, keep both (they may take turns), or cancel?". "Giữ"
+    của các kỹ năng kia (`clashes_with`, ngắn gọn: tối đa ba tên, rồi "and
+    N more", như "a, b, c and 2 more", `made_clash::spoken_list`), thứ
+    chúng dùng (`shares`: ánh sáng, cái đầu, hoặc cả hai, gộp lại), một
+    `clash_id`, và được dặn nói nguyên văn, khi chỉ một cái, "NEW would
+    start at the same moment as OTHER, which is on the lamp, and both use
+    the light. Shall I replace OTHER, keep both (they may take turns), or
+    cancel?", và khi nhiều hơn, "NEW would start at the same moment as A,
+    B and C, which are on the lamp, and they all use the light. Shall I
+    replace them all, keep them all (they may take turns), or cancel?".
+    "Giữ"
     không hứa cái nào thắng (P2 của Heron trên #6614): vòng đèn hiện yêu
     cầu mới nhất trong cùng mức ưu tiên (`ring_requests`), và lamp-skills
     chạy các lượt của một sự kiện theo thứ tự tên thư mục, mỗi lượt một
     luồng riêng, nên không có gì bảo đảm yêu cầu của cái mới đến sau cùng.
     Lượt bị cắt trước đó thì nói "I made NAME, but didn't put it on: OTHER
     starts at the same moment and uses the light. Ask me again to replace
-    it or to keep both." (`made_clash::cut_line`). Câu trả lời quay lại là
+    it or to keep both.", khi nhiều hơn "I made NAME, but didn't put it
+    on: A, B and C start at the same moment and use the light. Ask me
+    again to replace them or to keep them all." (`made_clash::cut_line`). Câu trả lời quay lại là
     `make_skill` chỉ với `clash_id` và `choice` (`replace`, `keep` hoặc
     `cancel`), nên `request` không còn bắt buộc (`made_clash::chosen`);
     một lần tạo không có `request`, hoặc một `choice` không có
@@ -1404,12 +1416,19 @@ sau:
     đã phát và không bị cắt (`made_clash::lamp_said`,
     `made_clash::lamp_cut`), chứa trọn câu hỏi; trước đó mô hình được dặn
     hỏi lại trọn câu và xung đột tiếp tục chờ. **Thay** bật cái mới trước
-    theo SHA-256 (`made_skill::put_on_within`), rồi nhờ manage helper bằng
-    chính `{"remove": NAME}` của nó, như nút gỡ của ứng dụng, và bỏ kỹ
-    năng đã tạo khỏi `made.json`. Nếu bật thất bại thì không gỡ gì ("OTHER
-    stays as it was"); nếu gỡ thất bại (kỹ năng lõi bị từ chối ở đó) thì
-    cả hai đều bật và đèn nói "NEW is on, but OTHER wasn't removed: … Both
-    are on." **Giữ** bật cái mới bên cạnh và nói "Both are on." **Hủy**
+    theo SHA-256 (`made_skill::put_on_within`), rồi lần lượt với từng kỹ
+    năng nó xung đột, nhờ manage helper bằng chính `{"remove": NAME}` của
+    nó, như nút gỡ của ứng dụng, và bỏ kỹ năng đã tạo khỏi `made.json`;
+    kết quả liệt kê những cái đã gỡ (`replaced`) và những cái chưa gỡ
+    (`not_removed`), và nói "Done: NEW is on, and I removed OTHER." Nếu
+    bật thất bại thì không gỡ gì ("OTHER stays as it was", "A, B and C
+    stay as they were"); một lần gỡ thất bại (kỹ năng lõi bị từ chối ở
+    đó) để cái đó bật và không ảnh hưởng việc gỡ các cái khác: khi không
+    gỡ được cái nào, đèn nói "NEW is on, but OTHER wasn't removed: … Both
+    are on." ("… weren't removed: … All are on." khi nhiều hơn), khi gỡ
+    được một phần thì "NEW is on, and I removed A, but B wasn't removed: …
+    B is still on." **Giữ** bật cái mới bên cạnh chúng và nói "Both are
+    on." ("All are on." khi nhiều hơn). **Hủy**
     không bật gì, và kỹ năng đã tạo bị bỏ khỏi `made.json` cùng gói của nó
     (`made_skill::forget_unput`), cũng như một kỹ năng mà xung đột không
     nhận được lựa chọn trong 5 phút (bỏ ở câu nghe được kế tiếp) hoặc bị
@@ -1420,6 +1439,8 @@ sau:
     `replace_keep_and_cancel_each_do_what_they_say`,
     `an_echoed_unsaid_or_live_replace_is_refused`,
     `replace_never_leaves_both_off`,
+    `a_make_clashing_with_three_names_and_replaces_all_three`,
+    `many_clashes_are_named_short_and_each_is_removed_on_its_own`,
     `cancel_and_expiry_forget_the_made_one`,
     `a_make_with_no_request_is_refused_plainly`,
     `the_waiting_note_shows_only_while_a_clash_waits`,
