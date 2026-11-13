@@ -3,6 +3,15 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 05:5x GMT+7: NEXT TRAIN #6954
+
+- sim-2 restated READ-OK on #6954 (21691deb92) and #6971 (fc570d8b20), and
+  read #6989 (27920da862). #6954 now has two signed reads (nine, sim-2).
+- **NEXT TRAIN #6954** posted: all checks green (ARM64 build/release/1/1,
+  clippy, virtual lamp, sim-macos); merge-tree 0 on c5b43c47aa.
+- The bot left #6961 out until #6954 is on lamp-voice (then rebase; reads carry
+  if the patch is the same). #6971 and #6989 wait on ten's read.
+
 ## 2026-11-14 05:4x GMT+7: #6988 HOLD (stale bus line, conflicts with #6989)
 
 - #6989's `sim-macos` passed; the first builder: "good", readers ten, sim-2.
