@@ -1818,8 +1818,8 @@ struct Shared {
     /// Which skill a heard line asks what it uses: read back in code
     /// before round 1 ([`Engine::reading_back_by_words`]).
     read_back_asked: Option<ReadBackAsked>,
-    /// The skill a heard line plainly asks for by its name: run in code
-    /// before round 1 ([`Engine::calling_skills_named`]).
+    /// The skill a heard line plainly asks for by its name: called in code
+    /// as round 1 ([`Engine::calling_skills_named`]).
     skill_named: Option<SkillNamed>,
     /// With the tasks part: the agent a spoken line's words name for the
     /// work, whose round 1 answered in words alone is asked again once
@@ -6228,13 +6228,16 @@ impl Engine {
     }
 
     /// A heard line that plainly asks for an installed skill by its name
-    /// (`named`: "photo booth", "run photo booth") has that skill's
-    /// function run in code before round 1, through the turn's own runner
-    /// as the model's call would be, and round 1 is told its result to
-    /// word; the model's own call of the same skill after it is not run
-    /// twice (#6772: on lamp-52e6 at 12587 the model answered "I don't
-    /// have a camera" over the pushed photo-booth skill, with no call).
-    /// Before any turn only.
+    /// (`named`: "photo booth", "run photo booth", `LAMP_SKILL_NAMED`) has
+    /// that skill's function called in code as round 1, asked of no chat:
+    /// the call goes the way a model's round-1 call goes, the rule's hold
+    /// and the Policy's (a hold ends the turn, nothing run), the pause's
+    /// grace, the turn's runner, and what its answer asks for (a look, a
+    /// search walked on, a recording); round 2 words its answer, and the
+    /// model's own call of the same skill after it is not run twice (#6772:
+    /// on lamp-52e6 at 12587 the model answered "I don't have a camera"
+    /// over the pushed photo-booth skill, with no call). Before any turn
+    /// only.
     pub fn calling_skills_named(mut self, named: SkillNamed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.skill_named = Some(named);
@@ -13054,6 +13057,18 @@ fn chat_for(
     }
 }
 
+/// Round 1 of a line that named a skill ([`Engine::calling_skills_named`]):
+/// its call, as a chat would end a round that only calls it, asked of none.
+fn named_round(
+    call: Option<net::ToolCall>,
+) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+    futures_util::stream::iter([
+        Ok(ChatEvent::ToolCalls(call.into_iter().collect())),
+        Ok(ChatEvent::Done),
+    ])
+    .boxed()
+}
+
 /// [`chat_for`], saying how far it gets to `watch` when given.
 fn chat_watching(
     shared: &Shared,
@@ -14679,11 +14694,10 @@ async fn answer(
         })
         .flatten();
     // A spoken line that plainly asks for an installed skill by its name
-    // ("photo booth"): its function run in code before round 1, never left
-    // to the model (#6772: on lamp-52e6 at 12587 the model answered "I
-    // don't have a camera" over the pushed photo-booth skill, with no
-    // call). Never beside a read-back: a question about a skill is not an
-    // ask to run it.
+    // ("photo booth"): its function is round 1's call, never left to the
+    // model (#6772: on lamp-52e6 at 12587 the model answered "I don't have
+    // a camera" over the pushed photo-booth skill, with no call). Never
+    // beside a read-back: a question about a skill is not an ask to run it.
     let skill_named = heard
         .then(|| {
             shared
@@ -15228,44 +15242,34 @@ async fn answer(
                 read_back_ran = Some((name.to_owned(), result));
             }
         }
-        // The skill the heard words ask for by its name, run in code
-        // ([`Engine::calling_skills_named`]): through the same runner as
-        // the model's own call of it, and round 1 is told its result to
-        // word. Round 1's bounds run from its end, as after a read-back:
-        // a skill may take seconds.
-        let mut skill_ran: Option<((String, Value), Value)> = None;
-        if let Some(named) = skill_named.filter(|_| !forgot_before_question) {
-            let call = net::ToolCall {
+        // The skill the heard words ask for by its name
+        // ([`Engine::calling_skills_named`]): round 1 is its call, not the
+        // model's, and goes through the round's own call path as a model's
+        // round-1 call does: the rule's hold, the Policy's for a spoken
+        // turn (which ends the turn held, nothing run: Twelve's P1 1 and the
+        // Reviewer-lead's P2 on #6782), the pause's grace, the runner, a
+        // recording offered, and what its answer asks for (a look, a search
+        // walked on: Twelve's P1 2). The model words its answer in round 2,
+        // told so beside the request. Its answer, once run, for a model's
+        // call of the same skill after it.
+        let mut named_call: Option<net::ToolCall> = skill_named
+            .filter(|_| !forgot_before_question)
+            .map(|(name, args)| net::ToolCall {
                 extra: None,
-                id: "skill_named_by_words".into(),
-                name: named.0.clone(),
-                args: named.1.clone(),
-            };
-            let function = crate::skill_named::function_of(&call.name, &call.args).to_owned();
-            let by_rule = shared
-                .hold
-                .as_ref()
-                .is_some_and(|hold| hold(request, &call.name));
-            if by_rule {
-                eprintln!(
-                    "lamp-voice second: request {request}: a skill asked for by its name not run: the line is held ({function})"
-                );
-            } else {
-                ran_tool.store(true, Ordering::Relaxed);
-                let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
-                saved_at = Some(tokio::time::Instant::now());
-                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
-                    return Err(Stop::Gone);
-                }
-                eprintln!(
-                    "lamp-voice second: request {request}: the heard words named a skill: run in code ({function})"
-                );
-                messages.push(Message::system(crate::skill_named::ran_note(
-                    &crate::skill_named::spoken(&function),
-                    &result,
-                )));
-                skill_ran = Some((named, result));
-            }
+                id: crate::skill_named::CALL_ID.into(),
+                name,
+                args,
+            });
+        let named_by_words = named_call.is_some();
+        let mut skill_ran: Option<((String, Value), Value)> = None;
+        if let Some(call) = &named_call {
+            let function = crate::skill_named::function_of(&call.name, &call.args);
+            eprintln!(
+                "lamp-voice second: request {request}: the heard words named a skill: round 1 calls it in code ({function})"
+            );
+            messages.push(Message::system(crate::skill_named::ran_note(
+                &crate::skill_named::spoken(function),
+            )));
         }
         // Their yes did not count (#2377): told once, beside the request.
         if let Some(told) = unseen_yes {
@@ -15320,10 +15324,6 @@ async fn answer(
                 crate::made_skill::MAKE.to_owned(),
                 serde_json::json!({ crate::make_skill_local::READ_BACK: name }),
             ));
-        }
-        // And the skill the heard words ran by its name.
-        if let Some((named, _)) = &skill_ran {
-            turn_called.push(named.clone());
         }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
@@ -15453,17 +15453,24 @@ async fn answer(
             // What the voice was given before this round: whether it said any.
             let pieces_before = queue.pieces;
             let mut refused = false;
+            // Round 1 of a line that named a skill: its call, asked of no
+            // chat ([`Engine::calling_skills_named`]).
+            let mut by_words = (round == 1 && !quoted && !words_round)
+                .then(|| named_call.take())
+                .flatten();
             // At most one second try in a turn, whatever round 1 is asked again.
-            let watch =
-                (may_go_twice && round == 1 && !tries.as_ref().is_some_and(|tries| tries.went()))
-                    .then(net::Watch::default);
+            let watch = (by_words.is_none()
+                && may_go_twice
+                && round == 1
+                && !tries.as_ref().is_some_and(|tries| tries.went()))
+            .then(net::Watch::default);
             let mut first_reach = watch.as_ref().map(net::Watch::reach);
             let told = if quoted || words_round {
                 ChatTold::Only(&[])
             } else {
                 told_for(scope.as_ref())
             };
-            if logs_prompt {
+            if logs_prompt && by_words.is_none() {
                 // Round 1 begun early is asked as it was begun.
                 let asked = match &prepared {
                     Some(prepared) if round == 1 && !quoted => &prepared.messages,
@@ -15472,6 +15479,8 @@ async fn answer(
                 shared.log_prompt((request, round), asked, told);
             }
             let mut stream = match prepared.take() {
+                // The skill the heard words named: its call alone, at once.
+                _ if by_words.is_some() => named_round(by_words.take()),
                 // A quoted line's every round declares no function at all.
                 _ if quoted => match watch.clone() {
                     Some(watch) => shared.services.chat_watched(messages.clone(), told, watch),
@@ -16128,9 +16137,12 @@ async fn answer(
             // own tools instead ("Hermes, look up the weather" answered with
             // `weather`: V2's P1 on 12587, Fifth's row-6547): none of them
             // runs; each is answered as not run, and the turn is asked again
-            // once to hand it over. Its held words are not said.
+            // once to hand it over. Its held words are not said. Never on a
+            // line that named a skill, whose round 1 is the code's call, not
+            // the model's (#6782).
             if catching
                 && round == 1
+                && !named_by_words
                 && round < MAX_ROUNDS
                 && decline_held.is_some()
                 && !calls.is_empty()
@@ -16180,7 +16192,9 @@ async fn answer(
                 catch_owed = Some("named agent");
                 continue;
             }
-            if catching && round == 1 && calls.is_empty() {
+            // Never on a line that named a skill, whose round 1 is its call
+            // and whose words come after it (Twelve's P3 2 on #6782).
+            if catching && round == 1 && calls.is_empty() && !named_by_words {
                 let named_held = named_agent.is_some() && decline_held.is_some();
                 if named_held || crate::agent_tasks::speaks_a_read_back(&text) {
                     let what = if named_held {
@@ -17393,6 +17407,11 @@ async fn answer(
                 };
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
+                }
+                // The skill the heard words named, run: a model's call of it
+                // after is given this answer, never run again.
+                if call.id == crate::skill_named::CALL_ID {
+                    skill_ran = Some(((call.name.clone(), call.args.clone()), answer.told.clone()));
                 }
                 // The first setup save refused only for the read-back's yes
                 // is held for that yes ([`HeldSave`]); any other answer to a

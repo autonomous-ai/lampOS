@@ -381,6 +381,12 @@ fn line(skill: &Tool) -> String {
     line.replace('\n', " ")
 }
 
+/// Whether `skill` takes neither a choice nor a yes-or-no: what a call
+/// with no arguments runs whole (`crate::skill_named`).
+pub(crate) fn takes_nothing(skill: &Tool) -> bool {
+    choice(skill).is_none() && flag(skill).is_none()
+}
+
 /// The skill's choice: its parameter's name, its words, what it says of it.
 fn choice(skill: &Tool) -> Option<(&str, Vec<&str>, Option<&str>)> {
     properties(skill).find_map(|(name, schema)| {

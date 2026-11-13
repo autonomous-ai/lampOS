@@ -2035,19 +2035,24 @@ Bảng đầy đủ các khóa `[[while]]` ở [skills.md](../skills.md).
 
 ## Kỹ năng được gọi theo tên thì chạy trong code (#6772)
 
-Trên tuyến thứ hai, một câu nói chỉ đơn giản xin một kỹ năng đã cài theo
-tên của nó thì hàm của kỹ năng đó **chạy trong code trước vòng 1**; model
-chỉ nói lời trả lời. Trên lamp-52e6 ở 12587 (hàng photo-booth của Seventh
-trên #6413), kỹ năng `photo-booth` đẩy lên đang bật và được đưa ra, một
-trong 48 hàm, vậy mà "photo booth" được trả lời "I'm Lamp — I don't have a
+Với `LAMP_SKILL_NAMED=on` (tắt trừ khi đặt đúng `on`; chỉ chuyển cho
+tuyến thứ hai, và không bật trong unit sản phẩm nào), một câu nói trên
+tuyến thứ hai chỉ đơn giản xin một kỹ năng đã cài theo tên của nó thì hàm
+của kỹ năng đó **được gọi trong code làm vòng 1**; model chỉ nói lời trả
+lời, ở vòng 2. Trên lamp-52e6 ở 12587 (hàng photo-booth của Seventh trên
+#6413), kỹ năng `photo-booth` đẩy lên đang bật và được đưa ra, một trong
+48 hàm, vậy mà "photo booth" được trả lời "I'm Lamp — I don't have a
 camera, so I can't take photos…" với `calls=none`.
 
 - **Kỹ năng nào:** những kỹ năng mà các kỹ năng đưa cho giọng nói lúc đó
   (`tools::skill_tools`, qua `use_skill` như nó đưa ra khi
-  `LAMP_USE_SKILL` bật), không bao giờ là kỹ năng lõi (danh sách `core`
-  của tệp tools): kỹ năng của chính đèn được xin bằng lời của chúng, có
-  cái có lựa chọn do model chọn, và `LAMP_SKILL_ASKED` ép chúng. Kỹ năng
-  từ Store, đẩy lên từ máy tính hay tạo ở đèn thì được khớp.
+  `LAMP_USE_SKILL` bật) mà **không nhận lựa chọn và không nhận có/không**
+  (`use_skill::takes_nothing`), không bao giờ là kỹ năng lõi (danh sách
+  `core` của tệp tools): kỹ năng của chính đèn được xin bằng lời của
+  chúng, có cái có lựa chọn do model chọn, và `LAMP_SKILL_ASKED` ép
+  chúng. Kỹ năng từ Store, đẩy lên từ máy tính hay tạo ở đèn thì được
+  khớp. Kỹ năng nhận lựa chọn hay có/không ("white noise", mưa hay biển)
+  là của model, model cho nó một giá trị.
 - **Câu nào** (`skill_named::named`): tên hàm nói thành các từ liền nhau,
   khớp lỏng (`photo_booth` là "photo booth" hay "photobooth", số nói bằng
   chữ hay chữ số), ngoài ra chỉ có lời chào, tên đèn, "please" hay
@@ -2058,30 +2063,59 @@ camera, so I can't take photos…" với `calls=none`.
   là của model như trước: "is there a camera in here?" (không nêu kỹ năng
   nào), "what does photo booth use?" (được đọc lại thay vào đó, xem "Nói lại và
   cái có"), "don't run photo booth", "turn off photo booth", "I loved the
-  photo booth yesterday", và hai kỹ năng trong một câu. Kỹ năng có tên
-  chính là một từ như vậy ("hello", "start") không bao giờ được khớp.
+  photo booth yesterday", và hai kỹ năng trong một câu. "Wait" không bao
+  giờ được đứng quanh tên, dù `skill_asked` cho phép
+  (`skill_named::NOT_AROUND`): "Photo booth, wait" và "wait, photo booth"
+  có thể là người đang dừng lại, nên là của model. Kỹ năng có tên chính
+  là một từ như vậy ("hello", "start", "wait") không bao giờ được khớp.
   Không đọc tệp kỹ năng nào cho câu dài hơn 16 từ.
-- **Chạy thế nào:** như lệnh gọi của chính model, qua bộ chạy của lượt:
+- **Chạy thế nào:** vòng 1 là lệnh gọi của nó, không hỏi chat nào:
   `use_skill` với `skill` là hàm của nó khi `LAMP_USE_SKILL` bật, nếu
-  không thì chính hàm đó, không lựa chọn, không có/không; nó chờ lệnh giữ
-  của Policy như mọi lệnh gọi. Vòng 1 được cho kết quả và được bảo làm
-  theo `next`, không bao giờ nói là không làm được
+  không thì chính hàm đó, không đối số, mang id `skill_named::CALL_ID`.
+  Nó đi qua đúng đường gọi của vòng, như lệnh gọi vòng 1 của model: lệnh
+  giữ của quy tắc; lệnh giữ của **Policy** (`LAMP_POLICY_HOLDS_ACTIONS`)
+  cho lượt nói, khi giữ thì lượt kết thúc ở trạng thái giữ, không chạy gì
+  và không hỏi chat nào; thời gian ân hạn của quãng ngừng
+  (`LAMP_ENDPOINT_PAUSE_JOIN`); bộ chạy của lượt, bản ghi âm kỹ năng đưa
+  ra được kiểm như mọi lần; và những gì **câu trả lời** của kỹ năng xin:
+  một cái nhìn (`"look": true` với `LAMP_SECOND_SKILL_LOOK`) được xin ở
+  coordinator và đèn nói "Let me look.", một cuộc tìm được đi tiếp như
+  sau lệnh gọi của model. Lượt được hỏi kèm một ghi chú rằng kỹ năng được
+  gọi cho họ, hãy nói điều câu trả lời bảo, nói thẳng nếu nó không làm
+  được hay hỏng, và không bao giờ nói là thiếu thứ nó dùng
   (`skill_named::ran_note`). Lệnh gọi cùng kỹ năng của model trong lượt
-  đó không chạy lần hai; nó nhận kết quả lần chạy đầu
-  (`same_skill_again`, `ran_already`). Giới hạn thời gian của vòng 1 tính
-  từ sau lần chạy, như sau một lần đọc lại. Nhật ký ghi `the heard words
-  named a skill: run in code (photo_booth)`.
+  đó không chạy lần hai; nó nhận câu trả lời lần chạy đầu
+  (`same_skill_again`, `ran_already`). Phần bắt đọc lại của #6547 không
+  bao giờ hỏi lại lượt như vậy. Nhật ký ghi `the heard words named a
+  skill: round 1 calls it in code (photo_booth)`, và lúc khởi động nói về
+  công tắc một lần.
+- **Một câu tốn bao nhiêu:** danh sách hàm được giữ khi tệp tools và
+  socket gọi của mỗi thư mục kỹ năng, cùng tệp tools của executive, không
+  đổi (`skill_named::Heard`); một câu ngắn khi đó chỉ đọc thời gian của
+  chúng. Trên Mac, 45 kỹ năng: 0,65 ms một câu khi đọc mỗi lần so với 7 µs
+  khi giữ (3,9 ms so với 34 µs ở bản debug), trong
+  `skill_named::tests::what_reading_the_skills_costs_a_short_line`.
 - **Chưa có:** "take a photo" không nêu kỹ năng nào, và skill.toml không
   có lời riêng cho những gì xin nó (chỉ có tên, mô tả cho model và
   `when`), nên câu như vậy vẫn là của model. Tuyến Live không đổi.
-- **Chỉ dẫn có sẵn** (`config::CHAT_INSTRUCTION`, và bản có camera) nói
-  "never say you have no arms, legs, body or camera for it": đèn có
-  camera, và grant của một kỹ năng nói kỹ năng đó được dùng gì.
-- **Test:** `skill_named::tests` (bảng khớp, lệnh gọi và cùng kỹ năng lần
-  nữa) và `second_provider::tests::skill_named_words`:
-  `photo_booth_by_name_runs_in_code_with_no_model_call` và
-  `photo_booth_by_name_runs_once_when_the_model_calls_it_too` hỏng khi móc
-  chưa có trong `answer`; `a_camera_line_naming_no_skill_goes_to_the_model`.
+- **Các chỉ dẫn:** chỉ dẫn có sẵn (`config::CHAT_INSTRUCTION`, và bản có
+  camera), thứ đèn sản phẩm chạy (cấu hình provider của nó không nêu
+  `instruction_file`), nói "never say you have no arms, legs, body or
+  camera for it": đèn có camera, và grant của một kỹ năng nói kỹ năng đó
+  được dùng gì. Tệp tính cách (`deploy/character/lamp.txt`) chỉ giữ "You
+  cannot play music, make calls or control anything else yet" cho những
+  gì không hàm hay kỹ năng nào của nó làm, và không bao giờ để nó nói là
+  không có camera cho một việc như vậy ([character.md](../character.md)).
+- **Test:** `skill_named::tests` (bảng khớp có "wait",
+  `only_a_skill_that_takes_nothing_is_run_by_its_name`,
+  `the_functions_kept_follow_the_tools_file`, lệnh gọi và cùng kỹ năng
+  lần nữa) và `second_provider::tests::skill_named_words`:
+  `photo_booth_by_name_runs_in_code_with_no_model_call`,
+  `photo_booth_by_name_runs_once_when_the_model_calls_it_too`,
+  `the_policys_hold_runs_nothing_for_a_skill_named`,
+  `a_skill_named_whose_answer_asks_a_look_takes_it`,
+  `a_camera_line_naming_no_skill_goes_to_the_model` và
+  `a_wait_beside_a_skills_name_goes_to_the_model`.
 
 ## Socket gọi kỹ năng phân biệt bên gọi (#6128)
 

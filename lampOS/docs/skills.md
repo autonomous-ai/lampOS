@@ -1127,19 +1127,24 @@ running. The test uses a folder of Desk tutor's shape.
 
 ### A skill asked for by its name runs in code (#6772)
 
-On the second route, a spoken line that plainly asks for an installed
-skill by its name has that skill's function **run in code before round
-1**; the model only words the answer. On lamp-52e6 at 12587 (Seventh's
-photo-booth row on #6413) the pushed `photo-booth` skill was on and
-offered, one of 48 functions, and "photo booth" was answered "I'm Lamp — I
-don't have a camera, so I can't take photos…" with `calls=none`.
+With `LAMP_SKILL_NAMED=on` (off unless set to `on` exactly; passed to the
+second route alone, and on in no product unit), a spoken line on the
+second route that plainly asks for an installed skill by its name has that
+skill's function **called in code as round 1**; the model only words the
+answer, in round 2. On lamp-52e6 at 12587 (Seventh's photo-booth row on
+#6413) the pushed `photo-booth` skill was on and offered, one of 48
+functions, and "photo booth" was answered "I'm Lamp — I don't have a
+camera, so I can't take photos…" with `calls=none`.
 
 - **Which skills:** those the skills offer the voice now
   (`tools::skill_tools`, through `use_skill` as it offers them when
-  `LAMP_USE_SKILL` is on), never a core skill's (the tools file's `core`):
-  the lamp's own skills are asked by their own words, some with a choice
-  the model makes, and `LAMP_SKILL_ASKED` forces them. A skill from the
-  Store, pushed from a computer or made at the lamp is matched.
+  `LAMP_USE_SKILL` is on) that take **no choice and no yes-or-no**
+  (`use_skill::takes_nothing`), never a core skill's (the tools file's
+  `core`): the lamp's own skills are asked by their own words, some with a
+  choice the model makes, and `LAMP_SKILL_ASKED` forces them. A skill from
+  the Store, pushed from a computer or made at the lamp is matched. One
+  that takes a choice or a yes-or-no ("white noise", rain or ocean) is the
+  model's, which gives it one.
 - **Which lines** (`skill_named::named`): the function's name said as words
   in a row, loosely (`photo_booth` as "photo booth" or "photobooth", a
   number as a word or a digit), with nothing else but a greeting, the
@@ -1150,30 +1155,59 @@ don't have a camera, so I can't take photos…" with `calls=none`.
   it. Any other word leaves the line to the model, as before: "is there a
   camera in here?" (no skill named), "what does photo booth use?" (read
   back instead, "Said back, and the yes" below), "don't run photo booth", "turn off photo booth",
-  "I loved the photo booth yesterday", and two skills in one line. A skill
-  whose name is itself such a word ("hello", "start") is never matched.
-  No skills' file is read for a line of more than 16 words.
-- **How it runs:** as the model's own call would, through the turn's
-  runner: `use_skill` with `skill` its function when `LAMP_USE_SKILL` is
-  on, else its function, with no choice or yes-or-no; it waits for the
-  Policy's hold as any call does. Round 1 is told its result and to do as
-  its `next` says, never that it can't do it (`skill_named::ran_note`).
+  "I loved the photo booth yesterday", and two skills in one line. "Wait"
+  never goes around the name, though `skill_asked` allows it
+  (`skill_named::NOT_AROUND`): "Photo booth, wait" and "wait, photo booth"
+  may be a person stopping, and are the model's. A skill whose name is
+  itself such a word ("hello", "start", "wait") is never matched. No
+  skills' file is read for a line of more than 16 words.
+- **How it runs:** round 1 is its call, asked of no chat:
+  `use_skill` with `skill` its function when `LAMP_USE_SKILL` is on, else
+  its function, with no arguments, given the id
+  `skill_named::CALL_ID`. It goes through the round's own call path, as a
+  model's round-1 call does: the rule's hold; the **Policy's**
+  (`LAMP_POLICY_HOLDS_ACTIONS`) for the spoken turn, which, when it holds,
+  ends the turn held with nothing run and no chat asked; the pause's grace
+  (`LAMP_ENDPOINT_PAUSE_JOIN`); the turn's runner, with the recording a
+  skill offers checked as any; and what the skill's **answer asks for**: a
+  look (`"look": true` with `LAMP_SECOND_SKILL_LOOK`) is asked of the
+  coordinator and the lamp says "Let me look.", a search walks on as after
+  a model's call. The turn is asked with a note that the skill is called
+  for them, to say what its answer tells, plainly if it was not done or
+  failed, and never that it lacks what it uses (`skill_named::ran_note`).
   The model's own call of the same skill in that turn is not run twice;
-  it is given the first run's result (`same_skill_again`, `ran_already`).
-  Round 1's time limit starts after the run, as after a read-back. The
-  journal says `the heard words named a skill: run in code (photo_booth)`.
+  it is given the first run's answer (`same_skill_again`, `ran_already`).
+  The #6547 read-back catch never asks such a turn again. The journal says
+  `the heard words named a skill: round 1 calls it in code (photo_booth)`,
+  and the start says the switch once.
+- **What a line costs:** the functions are kept while each skills folder's
+  tools file and call socket, and the executive's tools file, are unchanged
+  (`skill_named::Heard`); a short line then only reads their times. On a
+  Mac, 45 skills: 0.65 ms a line read each time against 7 µs kept (3.9 ms
+  against 34 µs in a debug build), in
+  `skill_named::tests::what_reading_the_skills_costs_a_short_line`.
 - **Not yet:** "take a photo" names no skill, and a skill.toml has no
   words of its own for what asks for it (only its name, its description
   for the model and its `when`), so such a line is still the model's. The
   Live route is unchanged.
-- **The built-in instruction** (`config::CHAT_INSTRUCTION`, and the camera
-  one) says "never say you have no arms, legs, body or camera for it": the
-  lamp has a camera, and a skill's grant says what that skill may use.
-- **Tests:** `skill_named::tests` (the matcher table, the call and the
-  same skill again) and `second_provider::tests::skill_named_words`:
-  `photo_booth_by_name_runs_in_code_with_no_model_call` and
-  `photo_booth_by_name_runs_once_when_the_model_calls_it_too` failed with
-  the hook not yet in `answer`; `a_camera_line_naming_no_skill_goes_to_the_model`.
+- **The instructions:** the built-in one (`config::CHAT_INSTRUCTION`, and
+  the camera one), which a product lamp runs (its provider setting names no
+  `instruction_file`), says "never say you have no arms, legs, body or
+  camera for it": the lamp has a camera, and a skill's grant says what that
+  skill may use. The character file (`deploy/character/lamp.txt`) keeps
+  "You cannot play music, make calls or control anything else yet" only
+  for what none of its functions or skills does, and never lets it say it
+  has no camera for one ([character.md](character.md)).
+- **Tests:** `skill_named::tests` (the matcher table with "wait",
+  `only_a_skill_that_takes_nothing_is_run_by_its_name`,
+  `the_functions_kept_follow_the_tools_file`, the call and the same skill
+  again) and `second_provider::tests::skill_named_words`:
+  `photo_booth_by_name_runs_in_code_with_no_model_call`,
+  `photo_booth_by_name_runs_once_when_the_model_calls_it_too`,
+  `the_policys_hold_runs_nothing_for_a_skill_named`,
+  `a_skill_named_whose_answer_asks_a_look_takes_it`,
+  `a_camera_line_naming_no_skill_goes_to_the_model` and
+  `a_wait_beside_a_skills_name_goes_to_the_model`.
 
 ### The call socket tells its caller apart (#6128)
 

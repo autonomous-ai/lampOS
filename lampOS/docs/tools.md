@@ -373,10 +373,13 @@ and none of the skills' own (`crate::use_skill`):
   `a_plain_question_about_the_lamp_asks_its_help`,
   `a_plain_question_about_the_lamp_in_vietnamese_asks_its_help`,
   `a_plain_question_about_the_lamp_forces_its_help_only_when_offered`.
-- **A skill asked for by its name** (the second route, no switch, #6772):
-  a line that is only an installed, non-core skill's name ("photo booth",
-  "run photo booth") has its function run in code before round 1, and the
-  model words the result; see [skills.md](skills.md#a-skill-asked-for-by-its-name-runs-in-code-6772).
+- **A skill asked for by its name** (the second route,
+  `LAMP_SKILL_NAMED=on`, off by default, #6772): a line that is only an
+  installed, non-core skill's name ("photo booth", "run photo booth"), for
+  a skill that takes no choice or yes-or-no, has its function called in
+  code as round 1, through the round's call path (the Policy's hold, a
+  look its answer asks for), and the model words the result; see
+  [skills.md](skills.md#a-skill-asked-for-by-its-name-runs-in-code-6772).
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
