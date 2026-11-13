@@ -19,10 +19,10 @@ pub struct Identity {
 
 impl std::fmt::Debug for Identity {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // Never the key.
+        // Never the key, and the pin only by its first 8 characters, as the journal keeps it.
         formatter
             .debug_struct("Identity")
-            .field("pin", &self.pin)
+            .field("pin", &self.pin_for_log())
             .finish_non_exhaustive()
     }
 }
@@ -119,6 +119,10 @@ mod tests {
         let again = load_or_make(&dir, "lamp-test").unwrap();
         assert_eq!(again.pin, made.pin);
         assert!(!format!("{made:?}").contains(&format!("{:?}", made.key)));
+        // Debug shows the pin by its first 8 characters only: no 9 of them in a row.
+        let shown = format!("{made:?}");
+        assert!(shown.contains(made.pin_for_log()));
+        assert!(!shown.contains(&made.pin[..9]));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
