@@ -3044,10 +3044,31 @@ pub const BRIEFS_OWN_REFUSALS: &[&str] = &[
     "deleting or changing what is in your services",
 ];
 
+/// The brief's own refusals ([`BRIEFS_OWN_REFUSALS`]) of a send: with a
+/// service skill made as a task for the lamp's agent
+/// ([`AGENT_SERVICES_ENVIRONMENT`] and a made skill's code on) the agent
+/// sends through its `lamp-services` tools, so a DeepSeek `cannot:` with
+/// one of them goes to the agent and is not said as it is (lamp-9adf, 13
+/// Nov: 3 of 3 voice makes that send mail refused by DeepSeek, never
+/// handed over).
+pub const BRIEFS_SEND_REFUSALS: &[&str] = &["sending a message", SENDS_ON_ITS_OWN];
+
+/// Whether the model's `cannot:` reason `why` is one of the brief's own
+/// refusals of a send ([`BRIEFS_SEND_REFUSALS`]), as
+/// [`briefs_own_refusal`] reads it.
+pub fn briefs_send_refusal(why: &str) -> bool {
+    briefs_own_refusal_in(why, BRIEFS_SEND_REFUSALS)
+}
+
 /// Whether the model's `cannot:` reason `why` is one of the brief's own
 /// refusals ([`BRIEFS_OWN_REFUSALS`]), in any case, a verb's "-ing" said
 /// as the prompt says it ("hearing what is said" for "hear what is said").
 pub fn briefs_own_refusal(why: &str) -> bool {
+    briefs_own_refusal_in(why, BRIEFS_OWN_REFUSALS)
+}
+
+/// [`briefs_own_refusal`], against `refusals`.
+fn briefs_own_refusal_in(why: &str, refusals: &[&str]) -> bool {
     let plain = |text: &str| {
         text.to_lowercase()
             .replace("hearing ", "hear ")
@@ -3055,9 +3076,7 @@ pub fn briefs_own_refusal(why: &str) -> bool {
             .replace("sending ", "send ")
     };
     let why = plain(why);
-    BRIEFS_OWN_REFUSALS
-        .iter()
-        .any(|refusal| why.contains(&plain(refusal)))
+    refusals.iter().any(|refusal| why.contains(&plain(refusal)))
 }
 
 /// The verbs of an ask the lamp itself would have to carry out, each with
