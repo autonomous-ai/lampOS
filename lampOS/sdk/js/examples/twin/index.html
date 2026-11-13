@@ -98,8 +98,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const token = new URLSearchParams(location.search).get('t') ?? '';
 const withToken = (path) => `${path}?t=${encodeURIComponent(token)}`;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const lost = (what) => { const line = document.getElementById('status'); if (line) { line.textContent = `${what} could not load: reload the page`; line.style.color = '#d9534f'; } };
-const model = await retrying((n) => fetch(withToken('/model.json') + (n ? `&again=${n}` : '')).then((r) => r.json()), { wait, said: () => lost("the lamp's description") });
+const lost = (what, error) => { const line = document.getElementById('status'); if (line) { line.textContent = `${what} ${refusedText(error) ?? 'could not load: reload the page'}`; line.style.color = '#d9534f'; } };
+const model = await retrying((n) => fetched(withToken('/model.json') + (n ? `&again=${n}` : ''), (r) => r.json()), { wait, said: (error) => lost("the lamp's description", error) });
 const view = document.getElementById('view');
 const status = document.getElementById('status');
 const log = (text) => {
@@ -150,7 +150,7 @@ const disc = new THREE.Mesh(new THREE.SphereGeometry(0.012, 24, 16), new THREE.M
 
 const bones = {};
 const rest = {};
-const gltf = await retrying((n) => new GLTFLoader().loadAsync(withToken('/lamp.glb') + (n ? `&again=${n}` : '')), { wait, said: () => lost('the lamp model') });
+const gltf = await retrying((n) => new GLTFLoader().loadAsync(withToken('/lamp.glb') + (n ? `&again=${n}` : '')), { wait, said: (error) => lost('the lamp model', error) });
 scene.add(gltf.scene);
 gltf.scene.traverse((node) => {
   for (const joint of model.joints) if (node.name === joint.bone) { bones[joint.name] = node; rest[joint.name] = node.quaternion.clone(); }
@@ -337,13 +337,27 @@ window.twinSend = send;
 // <panel-load>
 // Work a browser can lose (its request aborted, no status): tried again, `tries` times, under another URL (the attempt's number
 // goes in the query); when none comes, `said()` puts a plain line on the page and the last error is thrown, never silence.
+// A refusal (403: the token or the address) will not change by asking again: said at once, with the way out, and thrown.
+// (A function declaration, so the page's first fetches, above this block, can use it: a const here would not be set yet.)
+function refusedText(error) {
+  return error?.status === 403 || /\b403\b/.test(String(error?.message ?? '')) ? 'was refused (403): open the page from the link the terminal printed, with its token' : undefined;
+}
+// A fetch that throws, with its HTTP status, when the answer is not ok (a body that is not the file never reads as the file).
+async function fetched(url, how) {
+  const reply = await fetch(url);
+  if (!reply.ok) throw Object.assign(new Error(`the server answered ${reply.status}`), { status: reply.status });
+  return how(reply);
+}
 async function retrying(work, { tries = 4, wait, said = () => {} }) {
   let last;
   for (let attempt = 0; attempt < tries; attempt += 1) {
-    try { return await work(attempt); } catch (error) { last = error; }
+    try { return await work(attempt); } catch (error) {
+      last = error;
+      if (refusedText(error)) break;
+    }
     await wait(300 * (attempt + 1));
   }
-  said();
+  said(last);
   throw last;
 }
 // A module import that FAILED TO FETCH (each browser words it its own way) never ran panel.js, so it is safe to try again; any
@@ -351,16 +365,16 @@ async function retrying(work, { tries = 4, wait, said = () => {} }) {
 const lostFetch = (error) => /dynamically imported module|importing a module script failed/i.test(String(error?.message ?? error));
 // `probe(attempt)` answers the HTTP status of panel.js (404: this twin has no panel; 403: the page's token was refused).
 async function loadPanel({ probe, load, say, wait, tries = 4 }) {
-  let status;
+  let answer;
   for (let attempt = 0; attempt < tries; attempt += 1) {
-    try { status = await probe(attempt); } catch { status = undefined; }
+    try { answer = await probe(attempt); } catch { answer = undefined; }
     // The server answered that it has no panel (a plain twin): nothing to load, nothing to say.
-    if (status === 404) return 'none';
-    if (status === 403) {
+    if (answer === 404) return 'none';
+    if (answer === 403) {
       say('the buttons were refused (403): open the page from the link the terminal printed, with its token');
       return 'refused';
     }
-    if (status === 200) {
+    if (answer === 200) {
       try { await load(attempt); return 'loaded'; } catch (error) {
         if (!lostFetch(error)) {
           say(`the buttons started but stopped (${error?.message ?? error}): reload the page`);
@@ -371,7 +385,7 @@ async function loadPanel({ probe, load, say, wait, tries = 4 }) {
     }
     await wait(300 * (attempt + 1));
   }
-  say(typeof status === 'number' && status !== 200 ? `the buttons could not load (the server answered ${status}): reload the page` : 'the buttons could not load: reload the page');
+  say(typeof answer === 'number' && answer !== 200 ? `the buttons could not load (the server answered ${answer}): reload the page` : 'the buttons could not load: reload the page');
   return 'failed';
 }
 // </panel-load>
