@@ -32,7 +32,7 @@ the platform sim-1's and sim-2's READ ASKs list as "not run". It:
   `READ-OK <sha>` or `HOLD <sha>` with what it ran on the Mac;
 - runs lamp-sim, the twin and their tests on macOS arm64 and reports what
   breaks there, with a proposed fix;
-- checks the issues and pull requests every 7 minutes and talks with the
+- checks the issues and pull requests every 10 minutes, reading only what changed (the lead: the account is shared), and talks with the
   other builders on the issue or pull request a problem belongs to.
 
 ## It may
