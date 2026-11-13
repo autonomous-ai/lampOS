@@ -418,7 +418,7 @@ export const DEVICE = Object.freeze({ cpu_load: 0.25, memory_used: 0.4, disk_fre
 // What the lamp says for a missing grant (lamp-control's `not_granted`): for `camera` and `microphone` it says the way out.
 const notGranted = (missing) => {
   const said = `not granted: ${missing.join(', ')}`;
-  return missing.some((g) => g === 'camera' || g === 'microphone' || g === 'speaker') ? `${said} (the app does not grant it yet: only a pairing code made on the lamp itself carries it)` : said;
+  return missing.some((g) => g === 'camera' || g === 'microphone' || g === 'speaker') ? `${said} (only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)` : said;
 };
 
 export class FakeLamp {

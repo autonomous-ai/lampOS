@@ -3178,7 +3178,7 @@ def test_a_missing_camera_grant_says_the_app_does_not_grant_it_and_another_keeps
             async with await Lamp.connect(keyring=ring) as lamp:
                 with pytest.raises(errors.BY_CODE["no_grant"]) as camera:
                     await lamp.camera_snapshot()
-                assert camera.value.why == "not granted: camera (the app does not grant it yet: only a pairing code made on the lamp itself carries it)"
+                assert camera.value.why == "not granted: camera (only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)"
                 with pytest.raises(errors.BY_CODE["no_grant"]) as say:
                     await lamp.say("x")
                 assert say.value.why == "not granted: speak"
