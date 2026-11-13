@@ -4496,7 +4496,9 @@ the same code for both writers.
   (`own1.lamp@example.invalid`), put back in the agent's answer before the
   checks.
 - **With the lamp's skill-creator guide (`LAMP_MAKE_AGENT_GUIDE=on`,
-  off unless set; the owner's ask, 13 Nov).** As V1's `skill-creator`
+  on in the product, in lamp-voice's unit; the owner's ask, 13 Nov; it
+  makes nothing while `LAMP_MAKE_SKILL_AGENT`, off again since 14 Nov, is
+  off).** As V1's `skill-creator`
   did, the agent drafts, checks and fixes before it answers. Each make's
   line also says `"guide":true`, and lamp-tasks writes the guide,
   `guide.md` (0600), beside `rules.md` in the make's folder

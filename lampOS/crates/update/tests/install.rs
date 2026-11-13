@@ -2239,6 +2239,40 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
     }
 }
 
+/// A voice make handed to the lamp's agent is made with the lamp's
+/// skill-creator guide and checked by the lamp's own pack in its run (#6768,
+/// `make_skill_agent::GUIDE_ENVIRONMENT`): on in lamp-voice alone, once,
+/// whose second route's worker reads it, beside the maker. The hand-over it
+/// rides on is off again (14 Nov, #1711), so until that is back it makes nothing.
+#[test]
+fn the_product_makes_an_agents_skill_with_the_lamps_guide() {
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let wanted = usize::from(*unit == "lamp-voice.service");
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_MAKE_AGENT_GUIDE"))
+                .count(),
+            wanted,
+            "{unit}"
+        );
+        if wanted == 0 {
+            continue;
+        }
+        for line in [
+            "Environment=LAMP_MAKE_AGENT_GUIDE=on",
+            "Environment=LAMP_MAKE_SKILL=on",
+        ] {
+            assert_eq!(
+                service.iter().filter(|set| **set == line).count(),
+                1,
+                "the voice lacks {line}"
+            );
+        }
+    }
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story), and a cut-in with no words gets its
 /// question (the memory owner's call, 4 Nov; the lamp's own echo can still

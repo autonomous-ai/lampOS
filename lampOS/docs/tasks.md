@@ -3233,7 +3233,7 @@ as a Harness task with the agent's own tools
   rules (the system prompt and the brief) at most 48 KiB with no NUL,
   `within_ms` from 1 to 120 s.
 - **The guide (`"guide":true`, lamp-voice's `LAMP_MAKE_AGENT_GUIDE`,
-  off):** only when the line says `true` (a boolean, `false` by default),
+  on in the product):** only when the line says `true` (a boolean, `false` by default),
   the lamp's skill-creator guide (`skill_make::GUIDE`, from
   `skill_make_guide.md`: a lamp version of V1's
   `skills/skill-creator/SKILL.md`, Apache-2.0, its first line naming that
