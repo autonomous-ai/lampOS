@@ -1485,12 +1485,6 @@ fn moves_of(
     }
 }
 
-/// `LAMP_BODY_ENERGY`, off unless exactly `on` (#6893).
-#[cfg(unix)]
-fn energy_switch() -> bool {
-    lamp_body::energy_in::enabled_from_environment()
-}
-
 fn main() -> std::process::ExitCode {
     // Its log lines never block it or end it, and its last ones reach the
     // journal (`lamp_ipc::log_relay`).
@@ -1791,7 +1785,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     };
     // The character's energy level (`character/energy`, #6893): only with
     // `LAMP_BODY_ENERGY=on`; off, never read and every step is level 1.
-    let mut energy_in = if energy_switch() {
+    let mut energy_in = if lamp_body::energy_in::enabled_from_environment() {
         match lamp_bus::Bus::from_environment() {
             Ok(bus) => {
                 eprintln!(
@@ -1986,9 +1980,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 .ok()
                 .as_deref(),
         ),
-        energy: lamp_body::body::energy_switch(
-            std::env::var(lamp_body::body::ENERGY).ok().as_deref(),
-        ),
+        energy: lamp_body::energy_in::enabled_from_environment(),
         // The app's reach reads the servos' own ranges, so it turns them on.
         own_ranges: lamp_body::body::own_ranges_from(
             std::env::var(lamp_body::body::OWN_RANGES).ok().as_deref(),

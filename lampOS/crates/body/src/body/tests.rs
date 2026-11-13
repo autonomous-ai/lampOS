@@ -18310,9 +18310,9 @@ fn the_follower_is_as_before_off_and_its_acceleration_slews_under_energy() {
     assert!((at + 40.0).abs() < 1.0, "{at}");
     assert!(most < 215.0, "{most}");
     // Only the exact value turns it on, and the body's own limits leave it off.
-    assert!(energy_switch(Some("on")));
+    assert!(crate::energy_in::enabled(Some("on")));
     for value in [None, Some("1"), Some("ON"), Some("on "), Some("true")] {
-        assert!(!energy_switch(value));
+        assert!(!crate::energy_in::enabled(value));
     }
     assert!(!Limits::FOLDED.energy && limits.clip_ceiling().is_none());
     assert_eq!(energy.clip_ceiling(), Some(1_000.0));
