@@ -776,8 +776,13 @@ mod tests {
             let (_, folder, _, _, at_start) = &seen[0];
             assert_eq!(
                 at_start,
-                &vec![".hermes".to_owned(), ".hermes/config.yaml".to_owned()],
-                "only the provider config, never what an earlier make left"
+                &vec![
+                    ".hermes".to_owned(),
+                    ".hermes/config.yaml".to_owned(),
+                    ".hermes/installs".to_owned(),
+                    ".hermes/tools".to_owned(),
+                ],
+                "only the provider config and the runtime links, never what an earlier make left"
             );
             assert!(!folder.exists(), "dropped after {result:?}");
             assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
@@ -796,6 +801,17 @@ mod tests {
             "{config}"
         );
         assert!(config.contains("127.0.0.1:7741"), "{config}");
+        // Hermes's prepared runtime (#6643, c0a4): its dependency record
+        // and its store, each a link to the lasting home's own, which the
+        // namespace shows read-only; never its memory, sessions or state.
+        let hermes = made.path.join(HOME_FOLDER).join(HERMES_FOLDER);
+        for name in ["installs", "tools"] {
+            assert_eq!(
+                std::fs::read_link(hermes.join(name)).unwrap(),
+                Path::new("/var/lib/lampos-hermes/.hermes").join(name),
+                "{name}"
+            );
+        }
         // lamp-update's four settings, the same as its own.
         for (key, value) in MAKE_CONFIG {
             let (block, name) = key.split_once('.').unwrap();
