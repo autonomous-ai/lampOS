@@ -699,6 +699,10 @@ pub struct Asked {
     /// and is refused with [`crate::moves::PERSON_USING`] over anything
     /// higher. Without it, a gesture asked over one playing is as before.
     pub replace: bool,
+    /// The energy level the character keeps (`crate::energy`, #6893), 0 or
+    /// 1 for today. Only with `LAMP_BODY_ENERGY=on`; taken only once the
+    /// lamp is settled (no gesture, the pose and the arm still).
+    pub energy: u8,
 }
 
 /// A holder's aim counted from the found `home` (pitch, roll, yaw counts),
@@ -739,6 +743,7 @@ impl Asked {
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        energy: 0,
     };
 
     /// What a lamp a hand put to sleep is asked (#1362): as paused, it sees
@@ -768,6 +773,7 @@ impl Asked {
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        energy: 0,
     };
 }
 
@@ -1129,12 +1135,28 @@ impl Tuning {
     /// The largest reach that may be chosen: about 16 degrees up, 2 down,
     /// 9 of roll and 22 of yaw.
     pub const REACH_CAP: [u16; 4] = [180, 25, 100, 250];
-    pub const SPEED_CAP: u16 = 300;
+    /// Level 5 of `crate::energy` (#6893, #6885); the unit runs 300.
+    pub const SPEED_CAP: u16 = 800;
     pub const SERVO_SPEED_CAP: u16 = 1_000;
     pub const SERVO_ACCELERATION_CAP: u8 = 150;
 }
 
 impl Limits {
+    /// These limits at an energy level (`crate::energy`): level 1 is these,
+    /// above it the pose may move faster, never slower, its acceleration
+    /// six times its speed as `folded_with` sets it.
+    pub fn at(self, level: u8) -> Self {
+        if crate::energy::taken(level) == 1 {
+            return self;
+        }
+        let speed = crate::energy::speed(self.speed, level);
+        Self {
+            speed,
+            acceleration: self.acceleration.max(speed * 6.0),
+            ..self
+        }
+    }
+
     /// The folded limits with another reach and speed, each within its cap.
     /// Whatever the reach, the head's pitch keeps its absolute window.
     pub fn folded_with(tuning: Tuning) -> Result<Self, &'static str> {
@@ -4126,6 +4148,7 @@ pub(crate) fn run_looking(
         night_woke: false,
         aim_from_home: false,
         replace: false,
+        energy: 0,
     };
     run_alive(
         io, runtime, limits, home, standing, looking, news, asked, watch,
@@ -5402,6 +5425,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // and how.
     let mut idle_due: Option<Duration> = None;
     let mut idler = idle::Idler::new(standing.map_or(0, |up| up.idle_seed));
+    // The energy level taken (`crate::energy`, #6893): 1 is the limits and
+    // the stand's pace this body was given, exactly.
+    let base = limits;
+    let mut limits = limits;
+    let stand_base = standing.map(|up| up.seconds);
+    let mut energy = 1u8;
     // Expression's rest offsets of the head (pitch, roll) averaged over a
     // breath, the average a drift last left, and when one last did.
     let mut rest_average: Option<([f32; 2], [f32; 2])> = None;
@@ -5614,6 +5643,27 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         // What its eyes saw and a gesture asked of it, since the last step.
         let (mut asked_now, asked_by, asked_source) = asked();
+        // A new energy level only once settled, so that a cap never drops
+        // under a joint still moving: no gesture playing or waiting, the
+        // pose's filter still and the arm up or down.
+        let level = crate::energy::taken(asked_now.energy);
+        if level != energy
+            && playing.is_none()
+            && pending.is_none()
+            && velocity.iter().all(|speed| speed.abs() < 1.0)
+            && stand_velocity == 0.0
+        {
+            energy = level;
+            limits = base.at(level);
+            if let (Some(up), Some(seconds)) = (standing.as_mut(), stand_base) {
+                up.seconds = crate::energy::stand_seconds(seconds, level);
+            }
+            idler.share = crate::energy::of(level).idle_share;
+            eprintln!(
+                "lamp-body: step {}: energy level {level}: {} counts a second",
+                report.steps, limits.speed
+            );
+        }
         // A person or a health check lets a seated lamp stand (#4501).
         if asked_now.unseat
             && let Some((joint, why)) = seated.take()

@@ -1038,7 +1038,7 @@ fn a_wider_reach_and_speed_can_be_chosen_only_inside_their_caps() {
             ..tuning
         },
         Tuning {
-            speed: 301,
+            speed: 801,
             ..tuning
         },
         Tuning {
@@ -3258,6 +3258,7 @@ fn gesture_run_full(
                 asleep: false,
                 woken: false,
                 replace: false,
+                energy: 0,
             }
         },
         |glimpse| {
@@ -3389,6 +3390,7 @@ fn expression_run_with(
             asleep: false,
             woken: false,
             replace: false,
+            energy: 0,
         },
         |glimpse| seen.push((seen_at.get(), glimpse.goals)),
     );
@@ -3561,6 +3563,7 @@ fn speaking_run_with(
             asleep: false,
             woken: false,
             replace: false,
+            energy: 0,
         },
         |glimpse| seen.push((seen_at.get(), *glimpse)),
     );
@@ -4276,6 +4279,7 @@ fn rest_glances_watched(
             asleep: false,
             woken: false,
             replace: false,
+            energy: 0,
         },
         |glimpse| {
             let at = seen_at.get();
@@ -5354,6 +5358,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             asleep: false,
             woken: false,
             replace: false,
+            energy: 0,
         },
         |glimpse| steps.push((glimpse.goals, glimpse.arm_goals, glimpse.stand)),
     );
@@ -5427,6 +5432,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             asleep: false,
             woken: false,
             replace: false,
+            energy: 0,
         },
         |_| {},
     );
@@ -5518,6 +5524,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 asleep: false,
                 woken: false,
                 replace: false,
+                energy: 0,
             }
         },
         |glimpse| {
@@ -5948,6 +5955,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     asleep: false,
                     woken: false,
                     replace: false,
+                    energy: 0,
                 }
             },
             |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -6034,6 +6042,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 asleep: false,
                 woken: false,
                 replace: false,
+                energy: 0,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -6125,6 +6134,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 night_woke: false,
                 aim_from_home: false,
                 replace: false,
+                energy: 0,
             }
         },
         |glimpse| stood.push((watched.get(), glimpse.stand)),
@@ -9119,6 +9129,7 @@ fn called_run(
                 asleep: false,
                 woken: false,
                 replace: false,
+                energy: 0,
             }
         },
         |glimpse| {
@@ -18111,4 +18122,140 @@ fn a_look_held_on_a_resting_lamp_whose_head_stops_short_is_answered_where_it_sto
 fn a_look_held_on_a_resting_lamp_whose_base_stops_short_is_answered_where_it_stopped() {
     // 16 counts, 1.4 degrees, short of 5 right.
     answered_there_clamped_at(&a_held_look_at_rest_with((YAW, 16.0)), 3.6, 5.0);
+}
+
+/// The product unit's limits (`deploy/product/lamp-body.service`).
+fn unit_limits() -> Limits {
+    Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 300,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap()
+}
+
+/// Level 1 is today exactly: the unit's limits and stand pace come back
+/// unchanged, and 0 (the switch off, nothing said) is level 1. The cap
+/// takes level 5's 800 and refuses 801.
+#[test]
+fn energy_level_one_is_the_unit_exactly() {
+    let unit = unit_limits();
+    assert_eq!(unit.speed, f32::from(crate::energy::TABLE[0].speed));
+    for level in [0, 1, 6] {
+        assert_eq!(format!("{:?}", unit.at(level)), format!("{unit:?}"));
+        assert_eq!(
+            format!("{:?}", Limits::FOLDED.at(level)),
+            format!("{:?}", Limits::FOLDED)
+        );
+    }
+    assert_eq!(crate::energy::stand_seconds(6.0, 1), 6.0);
+    let lively = unit.at(5);
+    assert_eq!((lively.speed, lively.acceleration), (800.0, 4_800.0));
+    // Only the speed and its acceleration change.
+    assert_eq!(
+        format!(
+            "{:?}",
+            Limits {
+                speed: unit.speed,
+                acceleration: unit.acceleration,
+                ..lively
+            }
+        ),
+        format!("{unit:?}")
+    );
+    let tuning = Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 800,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    };
+    assert!(Limits::folded_with(tuning).is_ok());
+    assert!(
+        Limits::folded_with(Tuning {
+            speed: 801,
+            ..tuning
+        })
+        .is_err()
+    );
+}
+
+/// A held look 480 counts round from 1 s, asked at `level` from the start,
+/// and at `later` from 1.2 s: each step's yaw goal.
+fn yaw_turned(level: u8, later: u8) -> Vec<(Duration, u16)> {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(5));
+    let time = clock.time.clone();
+    let seen = clock.time.clone();
+    let mut yaw = Vec::new();
+    let limits = Limits {
+        yaw: 500.0,
+        ..unit_limits()
+    };
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Resting, 0)),
+        move || {
+            let now = time.get();
+            Asked {
+                held: true,
+                aim: (now >= Duration::from_secs(1)).then_some([-480.0, 0.0]),
+                energy: if now >= Duration::from_millis(1_200) {
+                    later
+                } else {
+                    level
+                },
+                ..Asked::default()
+            }
+        },
+        |glimpse| yaw.push((seen.get(), glimpse.goals[2])),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    yaw
+}
+
+/// When the yaw goal first lands within 6 counts of the look, from 1 s.
+fn landed(yaw: &[(Duration, u16)]) -> Duration {
+    let there = i32::from(HOME[2]) - 480;
+    yaw.iter()
+        .find(|(_, goal)| (i32::from(*goal) - there).abs() <= 6)
+        .map(|(at, _)| *at - Duration::from_secs(1))
+        .unwrap()
+}
+
+/// The fastest the yaw goal moved in one step, counts.
+fn fastest(yaw: &[(Duration, u16)]) -> i32 {
+    yaw.windows(2)
+        .map(|pair| (i32::from(pair[1].1) - i32::from(pair[0].1)).abs())
+        .max()
+        .unwrap()
+}
+
+/// Level 5 turns 480 counts in 1.3 s at most; level 1 and nothing said
+/// turn it exactly as each other, slower; a level said mid-turn waits until
+/// the pose is still, so a moving joint keeps the speed it started with.
+#[test]
+fn an_energy_level_turns_faster_and_waits_for_the_lamp_to_settle() {
+    let today = yaw_turned(0, 0);
+    assert_eq!(yaw_turned(1, 1), today);
+    let lively = yaw_turned(5, 5);
+    assert!(
+        landed(&lively) <= Duration::from_millis(1_300),
+        "{:?}",
+        landed(&lively)
+    );
+    assert!(
+        landed(&today) > Duration::from_millis(1_700),
+        "{:?}",
+        landed(&today)
+    );
+    assert!(fastest(&today) <= 6 && fastest(&lively) > 6);
+    // Said at 1.2 s, while turning: the turn ends at today's pace.
+    let said_late = yaw_turned(0, 5);
+    assert_eq!(landed(&said_late), landed(&today));
+    assert!(fastest(&said_late) <= 6);
 }
