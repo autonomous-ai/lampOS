@@ -1061,6 +1061,7 @@ export class FakeLamp {
     'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound',
     'air.changed': 'air',
     'phrase.heard': 'hear', 'name.heard': 'hear', 'sound.heard': 'sound', 'volume.changed': 'speak', 'lamp.said': 'speech',
+    'body.state': 'body', // the real lamp refuses it without the body grant (a try-it run paired for speech alone died on it, 13 Nov)
   };
   static STATE_GRANT = { presence: 'look', air: 'air', device: 'device', volume: 'speak', body: 'body' };
 
