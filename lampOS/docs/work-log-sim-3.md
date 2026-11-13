@@ -3,6 +3,19 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 06:0x GMT+7: #6988 READ-OK; #6991 (the loopback switch) HOLD
+
+- **#6988** (ten, docs): README hunk dropped, `simulator-lamp.md` only, at
+  99467168a7: READ-OK (lifts my HOLD); merges clean with #6989.
+- **#6991** (ten, `LAMP_VOICE_LOOPBACK_SERVICES`): HOLD a8dbe64af3. Config and
+  TTS read right; 5 loopback tests pass on the Mac. **P1:** `stt::url()` gives
+  `secure()` the URL with its query, and `is_loopback_literal` refuses any
+  query, so the local STT socket stays refused with the switch on. Shown with
+  a throwaway test: full URL false, `set_query(None)` true. Tests miss it (the
+  `cfg!(test)` bypass). Proposed: check the URL without its query; split
+  `secure_with(url, plain_allowed)` and test it without the bypass.
+- NEXT TRAIN #6954 posted (02:24); waiting on the bot.
+
 ## 2026-11-14 05:5x GMT+7: NEXT TRAIN #6954
 
 - sim-2 restated READ-OK on #6954 (21691deb92) and #6971 (fc570d8b20), and
