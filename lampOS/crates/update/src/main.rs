@@ -1363,7 +1363,14 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     |say: &mut dyn FnMut(&str)| first.due(lamp_update::records::unix_ms(), say);
                 match app_check.wait_or(ears.as_mut(), every, &mut say, &mut due) {
                     Woken::Asked => {
-                        eprintln!("lamp-update: the app asked for a check: a round now")
+                        eprintln!("lamp-update: the app asked for a check: a round now");
+                        // The owner's retry of a refused build (#6266) drops
+                        // its refusal before the round, as without the first
+                        // update (#6800).
+                        app_check.retry_asked(
+                            &lamp_update::records::Records::new(records.clone()),
+                            &mut say,
+                        );
                     }
                     Woken::Due | Woken::Waited => {}
                 }
@@ -1374,10 +1381,8 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                     eprintln!("lamp-update: the app asked for a check: a round now");
                     // The owner's retry of a refused build (#6266) drops its
                     // refusal before the round.
-                    let retries = app_check.take_retries();
-                    lamp_update::app_check::drop_refusals(
+                    app_check.retry_asked(
                         &lamp_update::records::Records::new(records.clone()),
-                        &retries,
                         &mut say,
                     );
                 }
