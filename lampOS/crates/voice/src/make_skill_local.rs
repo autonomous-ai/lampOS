@@ -2204,6 +2204,7 @@ fn made_and_journaled_by(
             made,
             request,
             "",
+            MOST_REPAIRS,
             || round_fits(began.elapsed()),
             |repair| kept(ask(Arc::clone(&chat), repair)),
         );
@@ -2318,24 +2319,26 @@ impl Before<'_> {
 }
 
 /// A refused `made`'s repairs: its check's lines go back to the writer
-/// (`again`), up to [`MOST_REPAIRS`] times, each begun only while `fits`.
-/// `by` names the writer in the journal ("" for DeepSeek, as before).
-/// Beside the last answer, the last refusal a repair was asked for.
+/// (`again`), up to `most` times ([`MOST_REPAIRS`], or the agent's own
+/// with its guide), each begun only while `fits`. `by` names the writer in
+/// the journal ("" for DeepSeek, as before). Beside the last answer, the
+/// last refusal a repair was asked for.
 fn repaired(
     mut made: Result<Made, Refused>,
     request: &str,
     by: &str,
+    most: usize,
     fits: impl Fn() -> bool,
     mut again: impl FnMut(String) -> Result<Made, Refused>,
 ) -> (Result<Made, Refused>, Option<Refused>) {
     let mut refused_before = None;
-    for round in 1..=MOST_REPAIRS {
+    for round in 1..=most {
         let Err(Refused(why, Some(lines))) = &made else {
             break;
         };
         if !fits() {
             eprintln!(
-                "lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}{by}: no time left, \
+                "lamp-voice: a made skill's repair {round} of {most}{by}: no time left, \
                  not asked"
             );
             break;
@@ -2346,7 +2349,7 @@ fn repaired(
         // What was refused, in the lamp's own words: the part itself (its
         // keys and topic, or the check's first line) is journaled where it
         // was refused, never the model's lines.
-        eprintln!("lamp-voice: a made skill's repair {round} of {MOST_REPAIRS}{by}: {why}");
+        eprintln!("lamp-voice: a made skill's repair {round} of {most}{by}: {why}");
         refused_before = Some(Refused(why.clone(), None));
         made = again(repair);
     }
@@ -2413,6 +2416,7 @@ fn handed_to_agent(
         kept(Ok(first)),
         request,
         " by the agent",
+        agent.most_repairs(),
         || began.elapsed() + agent.within <= agent.make_within,
         |repair| kept(write(&repair)),
     );
@@ -4940,6 +4944,73 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
         assert_eq!(served.join().unwrap(), 1);
         assert_eq!(tasks.hand_overs(), 2);
         assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The rules of each make handed to the agent, and whether each asked
+    /// for the guide.
+    fn handed_rules(tasks: &crate::make_skill_agent::tests::StubTasks) -> Vec<(String, bool)> {
+        tasks
+            .sent
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|line| line["op"] == "skill_make")
+            .map(|line| {
+                (
+                    line["rules"].as_str().unwrap().to_owned(),
+                    line["guide"] == true,
+                )
+            })
+            .collect()
+    }
+
+    /// `LAMP_MAKE_AGENT_GUIDE` (the owner's ask, 13 Nov): every make asks
+    /// for the guide; the agent's first answer, refused by the lamp's own
+    /// check, goes back once more with the check's words, and its fixed
+    /// answer is the one kept.
+    #[test]
+    fn with_the_guide_a_refused_answer_goes_back_with_the_checks_words_and_its_fix_is_kept() {
+        let (root, keeping) = keeping("agent-guided");
+        let tasks = agent_answering(vec![Some(faces()), Some(good())]);
+        let (url, served) = service(vec![(200, faces())]);
+        let told = made_by(&keeping, url, Some(&tasks.guided()), NOW);
+        assert_eq!(told["made"], "evening-dim", "{told}");
+        assert_eq!(served.join().unwrap(), 1);
+        let rules = handed_rules(&tasks);
+        assert_eq!(rules.len(), 2);
+        assert!(rules.iter().all(|(_, guide)| *guide));
+        assert!(
+            !rules[0].0.contains(made_skill::REPAIR_MARK),
+            "{}",
+            rules[0].0
+        );
+        let (_, repair) = rules[1].0.split_once(made_skill::REPAIR_MARK).unwrap();
+        assert!(repair.contains("humans/faces/tracked"), "{repair}");
+        assert_eq!(made_skill::entries(&keeping.directory).len(), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// With the guide, an agent's answer the lamp's check still refuses
+    /// after [`crate::make_skill_agent::GUIDED_MOST_REPAIRS`] more rounds is
+    /// refused as today: said as not made, nothing kept.
+    #[test]
+    fn with_the_guide_an_answer_still_refused_after_its_rounds_is_refused_as_today() {
+        let (root, keeping) = keeping("agent-guided-refused");
+        let tasks = agent_answering(vec![Some(faces()); 1 + MOST_REPAIRS]);
+        let (url, served) = service(vec![(200, faces())]);
+        let told = made_by(&keeping, url, Some(&tasks.guided()), NOW);
+        assert!(told.get("made").is_none(), "{told}");
+        assert_eq!(
+            told["error"],
+            format!("the skill couldn't be made: {}", made_skill::NOT_MADE_TRY)
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        assert_eq!(
+            tasks.hand_overs(),
+            1 + crate::make_skill_agent::GUIDED_MOST_REPAIRS
+        );
+        assert!(made_skill::entries(&keeping.directory).is_empty());
         let _ = std::fs::remove_dir_all(&root);
     }
 
