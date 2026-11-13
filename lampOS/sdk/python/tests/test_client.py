@@ -397,6 +397,26 @@ def test_keep_connected_carries_a_program_across_the_lamps_restart(tmp_path):
     run(go())
 
 
+def test_the_fake_refuses_a_body_state_subscription_without_the_body_grant_as_the_lamp_does(tmp_path):
+    """lamp-control's `EventKind::needs` gives `body.state` the body grant; the fake's table lacked it, so a program paired
+    for speech alone could subscribe to it here and meet the refusal only on a lamp (the try-it run on lamp-75c9, 13 Nov;
+    the JS fake got it in #6779)."""
+
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = await paired(fake, tmp_path / "a")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                with pytest.raises(LampError) as refused:
+                    await lamp.on("body.state", print)
+                assert refused.value.code == "no_grant" and "body" in str(refused.value)
+        async with FakeLamp(grants=("light", "body")) as fake:
+            ring = await paired(fake, tmp_path / "b")
+            async with await Lamp.connect(keyring=ring) as lamp:
+                await lamp.on("body.state", print)
+
+    run(go())
+
+
 def test_keep_connected_stops_on_what_connecting_again_cant_mend(tmp_path):
     """No pairing, and an error in the program's own setup, end it at once;
     it doesn't retry them."""
