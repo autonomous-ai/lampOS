@@ -32,6 +32,11 @@ Environment=LAMP_HERMES_ON_LAMP=on
 # A skill's task on the lamp's Hermes (#6306, docs/tasks.md): the hand-over socket and the model bridge bound,
 # each run with its one-run token from lamp-control and a network of only lo (lamp-update's line, the same name).
 Environment=LAMP_SKILL_TASKS=on
+# The lamp's agent's connectors (#6648, docs/services.md "The lamp's agent's connectors"): Hermes's config.yaml
+# gets mcp_servers.lamp-services at start, reaching a linked service only by a skill run's one-run token and grants;
+# a write waits for the owner's spoken yes. The same line in lamp-skills, lamp-skills-manage@, lamp-voice and
+# lamp-control. On in the product (owner, 13 Nov).
+Environment=LAMP_AGENT_SERVICES=on
 # The same for the lamp's own OpenClaw (#6226; no memory floor, every lamp has 6 GB): with both installed the
 # lamp's target is Hermes, the default again (#6498, the lead's decision); LAMP_LAMP_ENGINE=openclaw picks
 # OpenClaw, and either falls back to the other when it is not installed. Its Gateway runs always under

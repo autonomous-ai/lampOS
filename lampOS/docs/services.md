@@ -2364,7 +2364,7 @@ token ever leaves root's store: neither lamp-control nor the run holds one.
   switch off ignores it, no "sent" without done); in lamp-control, `session::tests` (the switch off, no grant, the
   wrong kind, a paired computer, a granted read) and `protocol::tests`.
 
-## The lamp's agent's connectors (`LAMP_AGENT_SERVICES`, off unless set)
+## The lamp's agent's connectors (`LAMP_AGENT_SERVICES`, on in the product)
 
 The owner's ask (12 Nov): the lamp's agent gets the services the owner linked
 in the app, so a task that needs words made at run time ("sum up this
@@ -2399,7 +2399,10 @@ never through an open socket.
   makes a connector skill as a `do.task` ([skills.md](skills.md)),
   lamp-skills and lamp-skills-manage@ take its service grants as they load
   and put it on, and lamp-control keeps them in the yes and the token.
-  No product unit sets the switch.
+  All five product units set `LAMP_AGENT_SERVICES=on` since 13 Nov (the
+  owner's ask, test
+  `the_product_gives_the_lamps_agent_the_linked_services`); a drop-in
+  with `LAMP_AGENT_SERVICES=off` in all five turns it off.
 - **The token and its grants.** A skill's `do.task` run (lamp-tasks,
   `skill_task`) is started with `LAMP_CONTROL_SOCKET` and a one-run token
   `LAMP_CONTROL_TOKEN`, which lamp-control mints from the owner's kept yes to

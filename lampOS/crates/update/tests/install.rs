@@ -1966,6 +1966,47 @@ fn the_product_lets_a_made_skill_write_after_its_owners_yes() {
     );
 }
 
+/// The lamp's agent gets the owner's linked services in the product
+/// (#6648, #6664): the owner's ask on 13 Nov. `LAMP_AGENT_SERVICES=on` in
+/// the five units that read it, `lamp-tasks` (Hermes's `lamp-services`
+/// MCP server), `lamp-skills` and its manage helper (a `do.task`'s service
+/// grants load and are put on), `lamp-voice` (a service skill made as a
+/// `do.task`, its grants said back) and `lamp-control` (the grants kept in
+/// the yes and the run's token), each once, and no other product unit
+/// names it. It does nothing without `LAMP_SKILL_TASKS` on in those parts.
+#[test]
+fn the_product_gives_the_lamps_agent_the_linked_services() {
+    let name = lamp_skills::task::AGENT_SERVICES_ENVIRONMENT;
+    assert_eq!(name, "LAMP_AGENT_SERVICES");
+    let switch = format!("Environment={name}=on");
+    let owners = [
+        "lamp-tasks.service",
+        "lamp-skills.service",
+        "lamp-skills-manage@.service",
+        "lamp-voice.service",
+        "lamp-control.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = service.iter().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+        if on == 1 {
+            assert!(
+                service.contains(&"Environment=LAMP_SKILL_TASKS=on"),
+                "{unit} lacks LAMP_SKILL_TASKS"
+            );
+        }
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+}
+
 /// A skill added from a file in the app, on at once (#5080, #5977): the
 /// switch is on in both parts that read it, `lamp-cloud` (the kind, with
 /// the skills page) and `lamp-voice` (the app-make socket, with the maker
