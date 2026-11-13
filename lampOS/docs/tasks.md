@@ -1926,7 +1926,13 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     `request N: named agent, no start_agent_task: asked again`, then what
     came of it (`…: asked again: start_agent_task called`, `…: still no
     call, said it wasn't done`, or `…: called <names>, not start_agent_task`).
-    It is asked again only once the join window (`JOIN_WITHIN`, 3 s from
+    If round 1 calls only the lamp's own tools instead ("Hermes, look up the
+    weather" answered with `weather`: V2's P1 on 12587), none of them runs:
+    each is answered as not run, its words are not said, the turn is asked
+    again once with the same note, and the journal says `request N: named
+    agent, called <names> not start_agent_task: none run, asked again`
+    (`agent_tasks_named::named_answered_by_an_own_tool_runs_none_and_is_asked_again_once`;
+    with no agent named, an own tool runs as before). It is asked again only once the join window (`JOIN_WITHIN`, 3 s from
     the answer's start, about the line's end) has passed with no newer line
     begun: a paused ask's second half begun within it joins the first
     (`LAMP_JOIN_CUT_WORDS`), and the first half is never asked again nor
@@ -2007,16 +2013,20 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     computer paired (no staff: the test the description already uses),
     `where`'s `enum` is `["lamp"]` alone and its description never names
     the computer; with one paired, `["lamp", "computer"]` as before. A
-    `where` `"computer"` that still comes in that state (or one the heard
-    words set from "on my computer") goes to the lamp while the lamp has
-    its target, never to a computer that isn't there; with the switch
+    hand-over that still asks for a computer in that state (`where`
+    `"computer"`, one the heard words set from "on my computer", "on my
+    Mac" or an agent of the computer's named, or a `who` that is neither
+    the lamp nor one of its engines) is refused, nothing prepared, and the
+    model is told no computer is paired and to ask whether the lamp's own
+    agent should do it: never quietly the lamp's task (V2's P1 on 12587,
+    Fifth's row-6547: claude, garbled, doc, mac); with the switch
     `LAMP_TASKS_WHO` off, where the staff are never read, it goes to the
     configured target as before. Until a staff read has come back (none
     made yet, or every one so far failed), the staff are empty, which
     counts as none paired: `computer` leaves `where`. A later read that
     fails keeps the staff last read. Tests:
     `agent_tasks::tests::where_offers_no_computer_without_a_pairing`,
-    `agent_tasks::tests::no_computer_paired_a_computer_named_goes_to_the_lamp`,
+    `agent_tasks::tests::no_computer_paired_a_computer_asked_for_is_refused_never_the_lamps`,
     `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
   - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,

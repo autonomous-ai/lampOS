@@ -418,3 +418,55 @@ fn a_paused_ask_is_joined_and_never_asked_again_half_said() {
         journal.lock().unwrap()
     );
 }
+
+/// V2's P1 on 12587 (Fifth's row-6547, "hermes"): Hermes named for the
+/// work and round 1 calls the lamp's own `weather` instead of handing it
+/// over. The weather call is not run, its words are not said, and the turn
+/// is asked again once with the note; the hand-over then runs.
+#[test]
+fn named_answered_by_an_own_tool_runs_none_and_is_asked_again_once() {
+    let went = went(
+        "Hermes, look up the weather in Hanoi.",
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "w0",
+                "weather",
+                json!({"place": "Hanoi"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![starting(), saying("Hermes is on it.")],
+        false,
+    );
+    assert_eq!(went.said, said(&["Hermes is on it."]), "{went:?}");
+    assert_eq!(went.ran, [crate::agent_tasks::START.to_owned()], "{went:?}");
+    assert!(went.told, "{went:?}");
+    assert_eq!(
+        went.journal,
+        [
+            "lamp-voice second: request 1: named agent, called weather not start_agent_task: none run, asked again".to_owned(),
+            format!("{ASKED_AGAIN}: start_agent_task called"),
+        ]
+    );
+}
+
+/// No agent named: round 1's own tool runs as before, nothing asked again.
+#[test]
+fn an_own_tool_with_no_agent_named_runs_as_before() {
+    let went = went(
+        "Look up the weather in Hanoi.",
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "w0",
+                "weather",
+                json!({"place": "Hanoi"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![saying("It is sunny in Hanoi.")],
+        false,
+    );
+    assert_eq!(went.ran, ["weather".to_owned()], "{went:?}");
+    assert!(!went.told, "{went:?}");
+    assert!(went.journal.is_empty(), "{:?}", went.journal);
+}
