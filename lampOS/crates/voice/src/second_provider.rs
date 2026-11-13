@@ -16339,8 +16339,19 @@ async fn answer(
                 // ask is open its answer is the skill's own line, so the
                 // words are dropped with no ask again; said in the round
                 // that calls an unplug tool, they ran ahead of it, and the
-                // next round speaks from its answer.
-                let unplug_said = unmade == Some(crate::action_claim::Claim::Unplug);
+                // next round speaks from its answer. Beside a stay that
+                // ran they are dropped too: the skill says its own stay line
+                // (Twelve's P3 on #6532). Readiness ("Safe to unplug me
+                // now.") no call backs (his P2): held as the others are.
+                let unplug_said = matches!(
+                    unmade,
+                    Some(
+                        crate::action_claim::Claim::Unplug
+                            | crate::action_claim::Claim::UnplugReady
+                    )
+                );
+                let unplug_dropped =
+                    unplug_said && (unplug_asked || crate::action_claim::stayed_in(&call_statuses));
                 let unplug_calling = unplug_said
                     && calls.iter().any(|call| {
                         crate::action_claim::unplug_tool(&call.name, &call.args).is_some()
@@ -16383,9 +16394,9 @@ async fn answer(
                             }
                         }
                     }
-                    Some(_) if unplug_said && unplug_asked => {
+                    Some(_) if unplug_dropped => {
                         eprintln!(
-                            "lamp-voice second: request {request} chat round {round}: its reply claims an unplug action while the skill's ask is open: not said, its {} call(s) run (LAMP_ACTION_CLAIM_CHECKED)",
+                            "lamp-voice second: request {request} chat round {round}: its reply claims an unplug action while the skill's ask is open or after a stay ran: not said, its {} call(s) run (LAMP_ACTION_CLAIM_CHECKED)",
                             calls.len()
                         );
                         text.clear();

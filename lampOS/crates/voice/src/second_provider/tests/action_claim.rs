@@ -1648,10 +1648,11 @@ fn an_unplug_claim_with_no_call_is_asked_again_and_stands_after_its_call() {
     );
 }
 
-/// A real `stay_plugged_in`, by its name or through `use_skill`, backs the
-/// words after it while the ask is open.
+/// A real `stay_plugged_in`, by its name or through `use_skill`, makes the
+/// stay; the model's words after it are not said, as the skill says its own
+/// stay line (Twelve's P3 on #6532), and nothing is asked again.
 #[test]
-fn an_unplug_claim_after_a_stay_that_ran_stands() {
+fn an_unplug_claim_after_a_stay_that_ran_is_the_skills_to_say() {
     for first in [
         calling(crate::action_claim::STAY_TOOL),
         calling_with(
@@ -1665,7 +1666,29 @@ fn an_unplug_claim_after_a_stay_that_ran_stands() {
             first,
             vec![saying("Okay, staying on.")],
         );
-        assert_eq!(went.said, said(&["Okay, staying on."]), "{went:?}");
+        assert!(went.said.is_empty(), "{went:?}");
+        assert_eq!(went.asked, 2, "{went:?}");
         assert!(!told_claim(&went), "{went:?}");
     }
+}
+
+/// A `prepare_to_unplug` that ran has only begun the fold: "Safe to unplug
+/// me now." after it is never said (Twelve's P2 on #6532). It is asked again
+/// once, and said again it is the line that it wasn't done.
+#[test]
+fn readiness_said_after_a_fold_begun_is_not_said() {
+    let ready = "Safe to unplug me now.";
+    let went = unplug_turn(
+        None,
+        "Lamp, I'm unplugging you now.",
+        calling(crate::without_a_tool::UNPLUG_TOOL),
+        vec![saying(ready), saying(ready)],
+    );
+    assert_eq!(went.ran, [crate::without_a_tool::UNPLUG_TOOL], "{went:?}");
+    assert!(told_claim(&went), "{went:?}");
+    assert_eq!(
+        went.said,
+        said(&[crate::action_claim::NOT_DONE_LINE]),
+        "{went:?}"
+    );
 }
