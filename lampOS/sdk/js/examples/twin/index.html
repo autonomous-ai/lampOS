@@ -346,23 +346,37 @@ async function retrying(work, { tries = 4, wait, said = () => {} }) {
   said();
   throw last;
 }
+// A module import that FAILED TO FETCH (each browser words it its own way) never ran panel.js, so it is safe to try again; any
+// other error came from panel.js running, which may already have put its part on the page (a banner each on a real lamp): never run twice.
+const lostFetch = (error) => /dynamically imported module|importing a module script failed/i.test(String(error?.message ?? error));
+// `probe(attempt)` answers the HTTP status of panel.js (404: this twin has no panel; 403: the page's token was refused).
 async function loadPanel({ probe, load, say, wait, tries = 4 }) {
+  let status;
   for (let attempt = 0; attempt < tries; attempt += 1) {
-    let present;
-    try { present = await probe(attempt); } catch { present = undefined; }
+    try { status = await probe(attempt); } catch { status = undefined; }
     // The server answered that it has no panel (a plain twin): nothing to load, nothing to say.
-    if (present === false) return 'none';
-    if (present === true) {
-      try { await load(attempt); return 'loaded'; } catch { /* the next attempt, under another URL */ }
+    if (status === 404) return 'none';
+    if (status === 403) {
+      say('the buttons were refused (403): open the page from the link the terminal printed, with its token');
+      return 'refused';
+    }
+    if (status === 200) {
+      try { await load(attempt); return 'loaded'; } catch (error) {
+        if (!lostFetch(error)) {
+          say(`the buttons started but stopped (${error?.message ?? error}): reload the page`);
+          return 'failed';
+        }
+        /* the next attempt, under another URL */
+      }
     }
     await wait(300 * (attempt + 1));
   }
-  say('the buttons could not load: reload the page');
+  say(typeof status === 'number' && status !== 200 ? `the buttons could not load (the server answered ${status}): reload the page` : 'the buttons could not load: reload the page');
   return 'failed';
 }
 // </panel-load>
 loadPanel({
-  probe: async (attempt) => (await fetch(withToken('/panel.js') + (attempt ? `&again=${attempt}` : ''))).ok,
+  probe: async (attempt) => (await fetch(withToken('/panel.js') + (attempt ? `&again=${attempt}` : ''))).status,
   load: (attempt) => import(withToken('/panel.js') + (attempt ? `&again=${attempt}` : '')),
   say: (text) => { status.textContent = text; status.style.color = '#d9534f'; },
   wait,
