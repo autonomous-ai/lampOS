@@ -238,6 +238,10 @@ impl Shared {
 
     /// `{"mint": {"skill", "run", "expires_in_ms"?}}` on the admin socket:
     /// lamp-control reads the owner's yes itself and names exactly its grants.
+    /// A yes kept with no grant (a skill whose code uses nothing of the
+    /// lamp's) mints a token that names none: its run may say hello and
+    /// nothing that needs a grant. No yes, or one that no longer holds, is
+    /// refused.
     fn mint(&self, asked: &Value, now: u64) -> Value {
         let (Some(skill), Some(run)) = (asked["skill"].as_str(), asked["run"].as_str()) else {
             return json!({"error": "mint: a skill and a run, both text"});
@@ -256,8 +260,7 @@ impl Shared {
             return json!({"error": "skill runs are off on this lamp"});
         };
         let grants = match yes.grants(skill) {
-            Ok(grants) if !grants.is_empty() => grants,
-            Ok(_) => return json!({"error": "the owner's yes names no grant for this skill"}),
+            Ok(grants) => grants,
             Err(why) => return json!({"error": why}),
         };
         let Some(token) = crate::runs::new_token(&ring::rand::SystemRandom::new()) else {

@@ -1705,7 +1705,7 @@ mod tests {
     impl Tokens for FakeTokens {
         fn mint(&self, skill: &str, run: &str) -> Result<Minted, String> {
             if self.refuse {
-                return Err("the owner's yes names no grant for this skill".into());
+                return Err("the owner hasn't said yes to this skill's task".into());
             }
             self.minted.borrow_mut().push((skill.into(), run.into()));
             let secret = format!("tok-{}", self.minted.borrow().len());
@@ -1995,6 +1995,62 @@ mod tests {
             assert!(tokens.live.borrow().is_empty(), "{yes:?}");
             assert_eq!(tokens.ended.borrow().len(), 1, "{yes:?}");
         }
+    }
+
+    /// A task whose skill uses nothing of the lamp's (#6307's made code
+    /// skill, a pushed skill with no grant): its line asks none, the
+    /// owner's yes names none, and lamp-control's token naming none is
+    /// taken, so it runs and its token ends with it.
+    #[test]
+    fn a_task_with_no_grants_runs_on_a_token_that_names_none() {
+        let no_grants = |v: &mut Value| v["grants"] = json!([]);
+        let tokens = FakeTokens {
+            yes: Some(Vec::new()),
+            ..FakeTokens::default()
+        };
+        let first = runner(&tokens, Ok(5));
+        let answer = answer(&line(no_grants), true, skills(), &tokens, &first);
+        assert_eq!(answer, json!({"ok": true, "id": 5}));
+        let seen = first.seen.borrow();
+        assert_eq!(seen.len(), 1);
+        assert!(seen[0].2, "the run's token was live");
+        assert!(tokens.live.borrow().is_empty());
+        assert_eq!(tokens.ended.borrow().len(), 1);
+        // But a yes with no grant is no yes for a task that asks some.
+        let refused = super::answer(&line(|_| {}), true, skills(), &tokens, &first);
+        assert_eq!(refused["error"], "no_token", "{refused}");
+
+        // Through lamp-control's admin socket: its answer naming no grant
+        // is read, and the run goes.
+        let (_dir, control, served) = admin(
+            |asked| match asked.get("mint") {
+                Some(mint) => json!({
+                    "token": "t".repeat(43),
+                    "run": mint["run"],
+                    "skill": mint["skill"],
+                    "grants": [],
+                    "expires_in_ms": 840_000,
+                }),
+                None => json!({"ended": true}),
+            },
+            2,
+        );
+        let others = FakeTokens::default();
+        let second = runner(&others, Ok(6));
+        let answer = super::answer(&line(no_grants), true, skills(), &control, &second);
+        assert_eq!(answer, json!({"ok": true, "id": 6}));
+        let seen = second.seen.borrow();
+        assert!(
+            seen[0]
+                .1
+                .iter()
+                .any(|(name, value)| *name == TOKEN_ENV && *value == "t".repeat(43)),
+            "{:?}",
+            seen[0].1
+        );
+        let asked = served.join().unwrap();
+        assert!(asked[0].get("mint").is_some());
+        assert!(asked[1].get("end").is_some());
     }
 
     #[test]
