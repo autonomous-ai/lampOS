@@ -3,6 +3,30 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 05:2x GMT+7: #6991 merged (train 897); the real lamp-voice on macOS; #7000
+
+- **Train 897 (#6999)** merged #6991, so the loopback switch is on lamp-voice
+  (71483d9690). #6971 (7489a42a16) and the step-4 branch still merge clean.
+  #6971's checks are all green; it waits on two signed reads.
+- **The real lamp-voice under `--real-voice=local`** (fake https LLM, nothing
+  billed): it prints its usage and ends.
+  - `serve`, `directed` and the capture, speaker, sleep and ring workers are
+    `cfg(target_os = "linux")` in voice's `main.rs`, and `audio_workers` is
+    gated whole. 74 such gates in `crates/voice/src`.
+  - Told ten (05:16): step 3 is bigger than the speaker seam. I offered to
+    map the gates, reading only.
+  - lamp-sim's side was fine: warm after 363 ms, first line 15 ms, then 11
+    and 10 ms.
+- **Release-build voice warm-up** (README on the step-4 branch, bf55dc5190):
+  warm after 294–348 ms, ready after 0.32–0.84 s, first line's first byte
+  after 11–12 ms.
+- **#7000** (`sim-3/voice-status`, bb5d491284): the voice's watcher ended
+  with `rm`'s 0, so a failed voice was said to end with 0. It now exits with
+  the voice's status.
+  - Test: a fake voice exits 3, the status is 3, and the key folder is gone.
+    It fails without the fix.
+  - READ ASK to sim-1 and sim-2.
+
 ## 2026-11-14 04:3x GMT+7: #6961 merged (train 896); #6971 rebased
 
 - **Train 896 (#6998)** merged #6961 at 21:33Z: the resident synthesizer is
