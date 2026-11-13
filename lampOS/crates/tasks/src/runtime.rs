@@ -1331,6 +1331,8 @@ impl SetUp {
     /// A read of Harness's sign-in that answered: kept, and the failures
     /// counted from naught again.
     fn sign_in_read(&mut self, sign_in: SignIn) {
+        // What a skill's run reads at its start (#6685 PR 3), never asked there.
+        crate::skill_task::harness_sign_in_read(Some(sign_in));
         self.sign_in = Some(sign_in);
         self.sign_in_answered = true;
         self.sign_in_failures = 0;
@@ -1342,7 +1344,11 @@ impl SetUp {
     /// True when it is let go.
     fn sign_in_not_read(&mut self) -> bool {
         self.sign_in_failures = self.sign_in_failures.saturating_add(1);
-        self.sign_in_failures >= SIGN_IN_FAILED_READS && self.sign_in.take().is_some()
+        let let_go = self.sign_in_failures >= SIGN_IN_FAILED_READS && self.sign_in.take().is_some();
+        if let_go {
+            crate::skill_task::harness_sign_in_read(None);
+        }
+        let_go
     }
 }
 enum Job {
@@ -3972,6 +3978,80 @@ impl HarnessSwitches {
 
 /// Production adapter. CLI configuration and environment are inspected only
 /// after the default-off check. Harness owns account/session provisioning.
+/// Where the lamp's own target is read at each run: the targets file
+/// `serve --set-up-later` reads, else the targets given.
+fn lamp_target_of(config: &Config) -> Box<dyn Fn() -> Option<Target> + Send + Sync> {
+    match config.set_up_later.as_ref() {
+        Some(later) => {
+            let file = later.targets.clone();
+            Box::new(move || {
+                read_targets(&file)
+                    .ok()
+                    .and_then(|mut targets| targets.remove(LAMP_TARGET))
+            })
+        }
+        None => {
+            let lamp = config.targets.get(LAMP_TARGET).cloned();
+            Box::new(move || lamp.clone())
+        }
+    }
+}
+
+/// What a skill's run with no Harness account reads at its start (#6685
+/// PR 3), put in `slot`: the lamp's default agent ([`lamp_default`], else
+/// the build's first switched on, [`lamp_order`], else the lamp target's
+/// own engine), lamp-tasks' `home`, and Harness's sign-in as the part's
+/// looks last read it. With no Harness program (`absent`), the runs an
+/// earlier start left are swept first, on a thread of its own (no Harness
+/// to close a session with: folders and token files, each run's token
+/// ended), and only then is Harness said absent; until then a run is
+/// refused as before ("Harness isn't set up on this lamp yet").
+fn set_no_harness(
+    slot: &crate::skill_task::NoHarnessSlot,
+    config: &Config,
+    side: Option<LampSide>,
+    absent: bool,
+    home: PathBuf,
+) {
+    let target = lamp_target_of(config);
+    let default_engine = Box::new(move || {
+        side.as_ref()
+            .and_then(|side| lamp_default(side).or_else(|| lamp_order(side).first().copied()))
+            .or_else(|| target().map(|lamp| lamp.engine))
+    });
+    let swept = Arc::new(AtomicBool::new(false));
+    let here = {
+        let swept = swept.clone();
+        Box::new(move || {
+            if !absent {
+                crate::skill_task::harness_sign_in()
+            } else if swept.load(Ordering::Acquire) {
+                crate::skill_task::HarnessHere::Absent
+            } else {
+                crate::skill_task::HarnessHere::Unknown
+            }
+        })
+    };
+    let sweep_home = home.clone();
+    let _ = slot.set(crate::skill_task::NoHarness {
+        here,
+        default_engine,
+        home,
+    });
+    if absent
+        && let Err(error) = thread::Builder::new()
+            .name("skill-sweep".into())
+            .spawn(move || {
+                crate::skill_task::sweep_without_harness(&sweep_home);
+                swept.store(true, Ordering::Release);
+            })
+    {
+        eprintln!(
+            "tasks: a skill's run with no Harness stays off: the start's sweep not started: {error}"
+        );
+    }
+}
+
 pub fn serve<C: Clock>(
     config: Config,
     clock: C,
@@ -3988,13 +4068,20 @@ pub fn serve<C: Clock>(
     // The Harness a skill's run is started through (#6510 Part 1 step 2):
     // set below once Harness is, as spoken tasks have it.
     let skill_harness: crate::skill_task::SkillHarnessSlot = Arc::default();
+    // A skill's run with no Harness account (#6685 PR 3): set below, once
+    // the lamp's default agent can be read.
+    let no_harness: crate::skill_task::NoHarnessSlot = Arc::default();
     // Joined at the stop, so a skill's run is ended before the process exits.
     let mut skill_served: Option<thread::JoinHandle<()>> = None;
     let skill_stop = stop.clone();
     match std::env::var_os("HOME").map(PathBuf::from) {
         Some(home) if skill_tasks => {
-            match crate::skill_task::HandOvers::lamp(&home, skill_harness.clone())
-                .start(true, stop.clone())
+            match crate::skill_task::HandOvers::lamp(
+                &home,
+                skill_harness.clone(),
+                no_harness.clone(),
+            )
+            .start(true, stop.clone())
             {
                 Ok(served) => {
                     eprintln!(
@@ -4034,21 +4121,7 @@ pub fn serve<C: Clock>(
     let dir = config.dir.clone();
     // Where a skill's run finds the lamp's own target at each run: the
     // targets file `serve --set-up-later` reads, else the targets given.
-    let lamp_target: Box<dyn Fn() -> Option<Target> + Send + Sync> =
-        match config.set_up_later.as_ref() {
-            Some(later) => {
-                let file = later.targets.clone();
-                Box::new(move || {
-                    read_targets(&file)
-                        .ok()
-                        .and_then(|mut targets| targets.remove(LAMP_TARGET))
-                })
-            }
-            None => {
-                let lamp = config.targets.get(LAMP_TARGET).cloned();
-                Box::new(move || lamp.clone())
-            }
-        };
+    let lamp_target = lamp_target_of(&config);
     let from_machines = config
         .set_up_later
         .as_ref()
@@ -4078,6 +4151,9 @@ pub fn serve<C: Clock>(
             .is_some_and(|side| side.order.contains(&engine))
     };
     let (hermes_on, openclaw_on) = (lamp_has(EngineKind::Hermes), lamp_has(EngineKind::Openclaw));
+    if skill_tasks && let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+        set_no_harness(&no_harness, &config, lamp_side.clone(), absent, home);
+    }
     if hermes_on {
         eprintln!(
             "{}",

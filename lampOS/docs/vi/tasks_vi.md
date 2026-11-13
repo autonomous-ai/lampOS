@@ -384,6 +384,65 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     <engine>` trong thư mục riêng của nó (bên dưới). Các thông báo sau khi
     khởi động nói "the lamp's default agent". Tắt: mọi lần chạy là của
     Hermes của đèn qua wrapper riêng của nó, như trên (giai đoạn tạm).
+  - **Không có tài khoản Harness: agent của chính đèn, do lamp-tasks tự
+    khởi động** (#6685 PR 3, với `LAMP_SKILL_DEFAULT_AGENT=on`). Khách hàng
+    không có tài khoản Harness vẫn có việc của kỹ năng: agent của chính đèn
+    là sản phẩm. Khi nào dùng (`skill_task::starts_without_harness`): công
+    tắc bật, và Harness được đọc là đã đăng xuất qua các lượt xem đăng nhập
+    của chính phần này (`harness auth status`, `serve --set-up-later`, giữ
+    bởi `skill_task::harness_sign_in_read`; chỉ tính là đăng xuất khi
+    Harness đã được thiết lập ở đây và lượt quét lúc khởi động đã xong),
+    hoặc không có chương trình Harness nào (sau một lượt quét các thư mục
+    và file token mà lần khởi động trước để lại,
+    `skill_task::sweep_without_harness`; `ConditionPathExists=/usr/local/bin/harness`
+    của unit sản phẩm vẫn giữ lamp-tasks tắt trên đèn như vậy). Đã đăng
+    nhập, đăng nhập nhưng đang offline, hay chưa đọc: qua Harness như trên.
+    Lúc bắt đầu lần chạy không hỏi gì: trạng thái đăng nhập là lần đọc gần
+    nhất, nên việc bắt đầu không chờ mạng và không gọi Harness. Agent mặc
+    định vẫn như vậy (`runtime::lamp_default`), nếu không thì engine đầu
+    tiên được bật của bản build (`runtime::lamp_order`), nếu không thì
+    engine của đích của đèn; không có thì bị từ chối ("the lamp has no
+    default agent yet …").
+    - **Một lần kiểm tra, rồi một cách khởi động cho mọi agent**
+      (`skill_task::default_agent_takes_tasks`): kiểm tra đường chạy duy
+      nhất ở trên, và lối vào việc của wrapper (`TASK_ENTRY_LINES`: `if [
+      "${1-}" = --lamp-task ]` và `agent_task "$Q"`, cùng các dòng cho mọi
+      agent) với `agent_task` trong phần dữ liệu của agent, trước đường
+      chạy (`AGENT_TASK_LINE`). Wrapper không có chúng (lamp-update cũ hơn,
+      hay agent chưa có việc của riêng nó) bị từ chối bằng lời, có ghi
+      nhật ký: "the lamp's default agent (<engine>) isn't set up for a
+      skill's run yet (its wrapper /usr/local/bin/<engine> takes no skill's
+      run without Harness: …), so nothing was started", không tạo hay khởi
+      động gì. Hiện tại phần dữ liệu của Hermes có `agent_task` (`chat -q`
+      với lời của việc, như Harness và một lần make khởi động nó); Claude
+      Code và các agent thường khác chưa có; OpenClaw hoàn toàn chưa có
+      wrapper đường chạy duy nhất, nên bị từ chối như trên.
+    - **Cùng thư mục và file token.** `skill-<run-id>` (0700) trong cùng
+      project Harness, file token của lần chạy được ghi trước khi khởi động
+      (`RunTokenFile`), và lời của việc trong file `task` của thư mục (0600,
+      `TASK_FILE`). Rồi lamp-tasks tự khởi động wrapper của agent:
+      `/usr/local/bin/<engine> --lamp-task` trong thư mục đó, môi trường
+      chỉ còn `PATH`, `HOME` và `SHELL`, stdin, stdout và stderr là null,
+      trong một process group riêng. Wrapper đọc file token một lần rồi
+      xoá, cho lần chạy token, socket, SDK và `--net` (cùng các dòng nhận
+      lần chạy), và `agent_task` của nó biến file việc thành các đối số
+      riêng của agent, khởi động bằng cùng một `unshare` vào `agent-ns`
+      (docs/install.md, "The one run path"). Token không nằm trong đối số
+      nào và trong môi trường nào lamp-tasks đưa.
+    - **Kết thúc.** Wrapper thoát, tới hạn của lần chạy (14 phút) hay
+      lamp-tasks dừng, cái nào tới trước, xem mỗi 50 ms (`RUN_TICK`). Thoát
+      0 là `{"ok":true,"id":0}`; trạng thái khác là `run_failed` "the
+      lamp's default agent ended with status <n>"; tới hạn là "the run was
+      ended at its deadline, 840 s"; khi dừng là "the run was ended as
+      lamp-tasks stops". Dù kết thúc thế nào, guard của nó trước hết cho
+      lamp-control kết thúc token, rồi giết cả process group của lần chạy
+      (`unshare --kill-child` của wrapper kéo theo namespace của agent) và
+      thu dọn nó, rồi xoá thư mục (cả file việc) và file token. Không giữ
+      gì lần chạy in ra. Các process của nó vẫn ở trong cgroup và giới hạn
+      của `lamp-tasks.service`. Test:
+      `signed_out_the_default_agent_starts_with_no_harness_and_leaves_nothing`,
+      `a_run_with_no_harness_is_ended_at_its_deadline_or_the_stop_and_its_status_said`,
+      `signed_in_a_skill_run_still_goes_through_harness`.
   - **Thư mục riêng.** lamp-tasks tạo `skill-<run-id>` (0700,
     `RUN_FOLDER_PREFIX`) trong project Harness của nó
     `/var/lib/lampos-tasks/harnesses/lamp-tasks` (tạo 0700 khi chưa có),

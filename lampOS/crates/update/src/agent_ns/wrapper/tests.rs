@@ -216,6 +216,21 @@ impl Lamp {
         folder
     }
 
+    /// The wrapper run with `args` in `cwd`, nothing else in its
+    /// environment but `PATH` and `OUT`.
+    fn run_args(&self, cwd: &Path, args: &[&str], path: &str) -> Output {
+        let _ = fs::remove_file(self.top.join("out/argv"));
+        let _ = fs::remove_file(self.top.join("out/env"));
+        Command::new(&self.wrapper)
+            .args(args)
+            .current_dir(cwd)
+            .env_clear()
+            .env("PATH", path)
+            .env("OUT", self.top.join("out"))
+            .output()
+            .unwrap()
+    }
+
     fn run_in(&self, cwd: &Path, env: &[(&str, &str)], path: &str) -> Output {
         let _ = fs::remove_file(self.top.join("out/argv"));
         let _ = fs::remove_file(self.top.join("out/env"));
@@ -948,4 +963,155 @@ fn write_engine_writes_the_one_path_with_its_switch() {
 
 fn on_path(root: &Path, path: &str) -> PathBuf {
     on(root, path)
+}
+
+/// (#6685 PR 3) The task entry is the same lines for every agent, in the
+/// run path, and only an agent with a task of its own (Hermes's data) has
+/// `agent_task`, in its data block.
+#[test]
+fn the_task_entry_is_the_same_for_every_agent_and_only_in_the_run_path() {
+    assert_eq!(ONE_PATH_RUN.matches(TASK_ENTRY).count(), 1);
+    assert!(ONE_PATH_RUN.ends_with(&format!("{TASK_ENTRY}agent_start \"$@\"\n")));
+    for agent in one_path_agents() {
+        let text = one_path_text(&agent).unwrap();
+        let run = text.find(ONE_PATH_RUN_LINE).unwrap();
+        assert_eq!(text[run..].matches(TASK_ENTRY).count(), 1);
+        let task = text[..run].matches(AGENT_TASK_LINE).count();
+        assert_eq!(
+            task,
+            usize::from(!agent.task.is_empty()),
+            "{}",
+            agent.engine
+        );
+        assert!(!text[run..].contains(AGENT_TASK_LINE));
+        sh_n(&text);
+    }
+    assert!(
+        one_path_text(&hermes_install::agent())
+            .unwrap()
+            .contains(&format!(
+                "{AGENT_TASK_LINE}{}}}\n{ONE_PATH_RUN_LINE}",
+                hermes_install::AGENT_TASK
+            ))
+    );
+    let lower = TASK_ENTRY.to_lowercase();
+    for name in ["hermes", "claude", "codex", "openclaw"] {
+        assert!(!lower.contains(name), "{name} in the task entry");
+    }
+    let mut bad = agent_of("eng").unwrap();
+    bad.task = "agent_start x\n".into();
+    assert!(one_path_text(&bad).is_err(), "unindented task lines");
+}
+
+/// (#6685 PR 3) Hermes takes a skill's run with no Harness by its task
+/// entry: `--lamp-task` alone in a run's folder, the run's token file read
+/// once and deleted, the token in its environment only, `--net`, and
+/// `chat -q` with the folder's task words, as one argument, after the
+/// namespace script, with approvals off as in any run.
+#[test]
+fn hermes_takes_a_skills_run_with_no_harness_by_its_task_entry() {
+    let folder = tempfile::tempdir().unwrap();
+    let top = fs::canonicalize(folder.path()).unwrap();
+    let place = top.join("hermes-home");
+    let program = place.join(".local/bin/hermes");
+    fs::create_dir_all(program.parent().unwrap()).unwrap();
+    fs::write(&program, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    let forwarder = top.join("hermes-token");
+    fs::write(&forwarder, "tok_forwarder\n").unwrap();
+    let text = one_path_text(&hermes_install::agent())
+        .unwrap()
+        .replace(hermes_install::TOKEN, forwarder.to_str().unwrap())
+        .replace(hermes_install::PLACE, place.to_str().unwrap());
+    let lamp = lamp_of("hermes", &text);
+    let file = lamp.token_file("run-1");
+    let run = lamp.folder("run-1");
+    let words = "Run `scripts/main.py` for the skill `photo-booth`; it's \"data\" $HOME";
+    fs::write(run.join("task"), words).unwrap();
+    let out = lamp.run_args(&run, &["--lamp-task"], "/usr/bin:/bin");
+    assert!(out.status.success(), "{out:?}");
+    assert!(!file.exists(), "the token file read once and deleted");
+    let argv = lamp.read("argv").unwrap();
+    let argv: Vec<&str> = argv.lines().collect();
+    assert!(argv.contains(&"--net"), "{argv:?}");
+    let ns = argv.iter().position(|arg| *arg == NS).unwrap();
+    assert_eq!(argv[ns + 1..], ["chat", "-q", words]);
+    assert!(!argv.iter().any(|arg| arg.contains(TOKEN)));
+    let env = lamp.read("env").unwrap();
+    let lines: Vec<&str> = env.lines().collect();
+    for line in [
+        format!("{TOKEN_ENV}={TOKEN}"),
+        "LAMP_NS_NET=run".to_owned(),
+        "HERMES_YOLO_MODE=1".to_owned(),
+        "LAMP_NS_ENGINE=hermes".to_owned(),
+    ] {
+        assert!(lines.contains(&line.as_str()), "{line}: {env}");
+    }
+}
+
+/// (#6685 PR 3) The task entry starts nothing but a skill's run of an
+/// agent that takes one: an agent with no `agent_task`, no run's folder,
+/// another argument, or no task file or a linked one: each ends it
+/// before the namespace, and a run's token file is gone first.
+#[test]
+fn the_task_entry_starts_nothing_else() {
+    let lamp = lamp_of("eng", &one_path_text(&agent_of("eng").unwrap()).unwrap());
+    let file = lamp.token_file("run-1");
+    let run = lamp.folder("run-1");
+    fs::write(run.join("task"), "words").unwrap();
+    let out = lamp.run_args(&run, &["--lamp-task"], &lamp.path());
+    assert!(!out.status.success());
+    assert!(lamp.read("argv").is_none());
+    assert!(!file.exists());
+    assert!(
+        String::from_utf8_lossy(&out.stderr)
+            .contains("eng: it takes no skill's task without Harness yet"),
+        "{out:?}"
+    );
+    // An agent with a task of its own.
+    let mut agent = agent_of("eng").unwrap();
+    agent.task = "  agent_start task-of \"$1\"\n".into();
+    let lamp = lamp_of("eng", &one_path_text(&agent).unwrap());
+    let refused = |cwd: &Path, args: &[&str], why: &str| {
+        let out = lamp.run_args(cwd, args, &lamp.path());
+        assert!(!out.status.success(), "{args:?}");
+        assert!(lamp.read("argv").is_none(), "{args:?}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains(why),
+            "{why}: {out:?}"
+        );
+    };
+    let elsewhere = lamp.top.join("elsewhere");
+    fs::write(elsewhere.join("task"), "words").unwrap();
+    refused(&elsewhere, &["--lamp-task"], "only for a skill's run");
+    for (run, setup) in [("run-2", "two"), ("run-3", "none"), ("run-4", "link")] {
+        let file = lamp.token_file(run);
+        let folder = lamp.folder(run);
+        match setup {
+            "two" => {
+                fs::write(folder.join("task"), "words").unwrap();
+                refused(&folder, &["--lamp-task", "more"], "only for a skill's run");
+            }
+            "none" => refused(&folder, &["--lamp-task"], "no task at"),
+            _ => {
+                fs::write(lamp.top.join("elsewhere/real"), "words").unwrap();
+                symlink(lamp.top.join("elsewhere/real"), folder.join("task")).unwrap();
+                refused(&folder, &["--lamp-task"], "no task at");
+            }
+        }
+        assert!(!file.exists(), "{run}: its token file is gone");
+    }
+    // A good one: the agent's own arguments after the namespace script.
+    let file = lamp.token_file("run-5");
+    let folder = lamp.folder("run-5");
+    fs::write(folder.join("task"), "words").unwrap();
+    let out = lamp.run_args(&folder, &["--lamp-task"], &lamp.path());
+    assert!(out.status.success(), "{out:?}");
+    assert!(!file.exists());
+    let argv = lamp.read("argv").unwrap();
+    let argv: Vec<&str> = argv.lines().collect();
+    let ns = argv.iter().position(|arg| *arg == NS).unwrap();
+    let task = folder.join("task");
+    assert_eq!(argv[ns + 1..], ["task-of", task.to_str().unwrap()]);
+    assert!(argv.contains(&"--net"));
 }
