@@ -61,7 +61,10 @@ const _: () = assert!(SESSION_EXPIRY_S > WILL_DELAY_S);
 /// event loop keeps them. The backend reads only `type`, `id` and `device` of
 /// an `offline`, and takes messages on a channel in the order they come.
 pub fn options_with_will(account: &Account, identity: &Identity) -> Option<MqttOptions> {
-    let mut options = options(account)?;
+    Some(with_will(options(account)?, account, identity))
+}
+
+fn with_will(mut options: MqttOptions, account: &Account, identity: &Identity) -> MqttOptions {
     let properties = LastWillProperties {
         delay_interval: Some(WILL_DELAY_S),
         payload_format_indicator: None,
@@ -78,7 +81,7 @@ pub fn options_with_will(account: &Account, identity: &Identity) -> Option<MqttO
         false,
         Some(properties),
     ));
-    Some(options)
+    options
 }
 
 /// Where lamp-cloud reads whether the broker is reached over TLS: `on`, and
@@ -107,13 +110,21 @@ pub fn tls_from(value: Option<&str>) -> bool {
 /// The client's options for `account`: V1's, with this lamp's keepalive,
 /// over TLS (1.2 and 1.3, the webpki roots, as the ping has it) when `tls`.
 pub fn options_with(account: &Account, tls: bool) -> Option<MqttOptions> {
-    let mut options = MqttOptions::new(
-        account.client_id(),
+    options_at(
+        account,
         account.mqtt_endpoint.trim(),
         account.mqtt_port,
-    );
+        tls,
+    )
+}
+
+/// [`options_with`] to `host` and `port` in place of the account's broker:
+/// the WSS bridge's (`crate::wss`), with the same login and client id.
+fn options_at(account: &Account, host: &str, port: u16, tls: bool) -> Option<MqttOptions> {
+    let mut options = MqttOptions::new(account.client_id(), host, port);
     options
         .set_keep_alive(KEEP_ALIVE)
+        .set_connection_timeout(crate::wss::CONNECT.as_secs())
         .set_clean_start(true)
         .set_credentials(account.mqtt_username.trim(), account.mqtt_password.as_str())
         .set_connect_properties(ConnectProperties {
@@ -526,6 +537,15 @@ async fn relink_wanted(changes: &Option<Arc<crate::settings::Changes>>) {
     }
 }
 
+/// Ends when, on WSS, the broker's TCP port took a connection again; never
+/// on TCP. Cancel-safe: a notice not waited for is kept.
+async fn tcp_again(bridge: &Option<crate::wss::Bridge>) {
+    match bridge {
+        Some(bridge) => bridge.tcp_back.notified().await,
+        None => std::future::pending().await,
+    }
+}
+
 /// Where `run` says what happens: one line for each change of state.
 pub trait Say {
     fn line(&mut self, line: &str);
@@ -543,6 +563,7 @@ impl<F: FnMut(&str)> Say for F {
 pub async fn run(
     mut accounts: watch::Receiver<Option<Account>>,
     identity: watch::Receiver<Identity>,
+    ws_url: watch::Receiver<String>,
     lamp: &mut impl Lamp,
     say: &mut impl Say,
     first: Duration,
@@ -556,7 +577,7 @@ pub async fn run(
             continue;
         };
         tokio::select! {
-            () = session(&account, &identity, lamp, say, first) => return,
+            () = session(&account, &identity, &ws_url, lamp, say, first) => return,
             changed = accounts.changed() => {
                 if changed.is_err() {
                     return;
@@ -572,6 +593,7 @@ pub async fn run(
 async fn session(
     account: &Account,
     identity: &watch::Receiver<Identity>,
+    ws_url: &watch::Receiver<String>,
     lamp: &mut impl Lamp,
     say: &mut impl Say,
     first: Duration,
@@ -579,19 +601,29 @@ async fn session(
     // With the switch, the broker is left a will (`options_with_will`), on
     // the first connection and on every one made again after a Wi-Fi change.
     let will = lamp.offline_will();
-    let made = || {
-        if will {
-            options_with_will(account, &identity.borrow())
+    // `bridged`: the WSS bridge's port while on WSS (#6256 F9).
+    let made = |bridged: Option<u16>| {
+        let options = match bridged {
+            Some(port) => options_at(account, "127.0.0.1", port, false),
+            None => options(account),
+        }?;
+        Some(if will {
+            with_will(options, account, &identity.borrow())
         } else {
-            options(account)
-        }
+            options
+        })
     };
-    let Some(options) = made() else {
+    let Some(options) = made(None) else {
         say.line("the broker's TLS cannot be set up (LAMP_CLOUD_TLS): not connecting in the clear in its place");
         return std::future::pending().await;
     };
     let (mut client, mut events) = AsyncClient::new(options, 64);
     let mut wait = first;
+    // Over WSS after `wss::FAILURES` failed TCP connections in a row, with
+    // the ping's address; the bridge lives only while on WSS.
+    let mut tcp_failures = 0u32;
+    let mut bridge: Option<crate::wss::Bridge> = None;
+    let mut back_to_tcp = false;
     // Health and crash reports, with their switch (#1683): handed over only
     // while connected, and kept until the broker acknowledges them.
     let reports = lamp.reports();
@@ -658,6 +690,11 @@ async fn session(
                         if changes.as_ref().is_some_and(|changes| changes.take_relink()) {
                             break None;
                         }
+                    }
+                    // On WSS, the broker's TCP port took a connection again.
+                    () = tcp_again(&bridge) => {
+                        back_to_tcp = true;
+                        break None;
                     }
                     _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() => {
                         let me = identity.borrow().clone();
@@ -849,12 +886,23 @@ async fn session(
             for line in std::mem::take(&mut handed.journal) {
                 say.line(&line);
             }
-            tell(
-                say,
-                "a Wi-Fi change moved the lamp: the link is dropped and made again at once"
-                    .to_owned(),
-            );
-            let Some(options) = made() else {
+            // Either way the next connection is over TCP again: a new
+            // network may not drop the broker's port.
+            let was_wss = bridge.take().is_some();
+            tcp_failures = 0;
+            if std::mem::take(&mut back_to_tcp) {
+                say.line("the broker's TCP port takes a connection again: back from WSS to TCP");
+            } else {
+                tell(
+                    say,
+                    "a Wi-Fi change moved the lamp: the link is dropped and made again at once"
+                        .to_owned(),
+                );
+                if was_wss {
+                    say.line("trying TCP again on the new network: off WSS");
+                }
+            }
+            let Some(options) = made(None) else {
                 drop(client);
                 drop(events);
                 say.line("the broker's TLS cannot be set up (LAMP_CLOUD_TLS): not connecting in the clear in its place");
@@ -867,6 +915,9 @@ async fn session(
         match polled {
             Ok(Event::Incoming(Packet::ConnAck(_))) => {
                 wait = first;
+                if bridge.is_none() {
+                    tcp_failures = 0;
+                }
                 if let Some(changes) = &changes {
                     changes.set_broker(account.mqtt_endpoint.trim(), account.mqtt_port);
                     changes.online();
@@ -942,7 +993,8 @@ async fn session(
             }
             Ok(_) => {}
             Err(error) => {
-                connected = false;
+                // A failed connection, or a working one that dropped.
+                let failed = !std::mem::replace(&mut connected, false);
                 dropped(
                     &mut handed,
                     lamp,
@@ -957,6 +1009,30 @@ async fn session(
                 }
                 // The error names a code or an I/O kind, never the login.
                 tell(say, format!("offline, trying again: {error}"));
+                if bridge.is_none() {
+                    tcp_failures = if failed { tcp_failures + 1 } else { 0 };
+                    let url = ws_url.borrow().clone();
+                    if crate::wss::over(tcp_failures, &url) == crate::wss::Over::Wss {
+                        let tcp = (account.mqtt_endpoint.trim().to_owned(), account.mqtt_port);
+                        match crate::wss::Bridge::open(url, tcp, crate::wss::TCP_AGAIN).await {
+                            Ok(opened) => {
+                                say.line(&format!(
+                                    "the broker's TCP port failed {tcp_failures} times in a row: on to MQTT over WSS, TCP tried again every {} min",
+                                    crate::wss::TCP_AGAIN.as_secs() / 60
+                                ));
+                                if let Some(options) = made(Some(opened.port)) {
+                                    drop(client);
+                                    drop(events);
+                                    (client, events) = AsyncClient::new(options, 64);
+                                    bridge = Some(opened);
+                                    wait = first;
+                                    continue;
+                                }
+                            }
+                            Err(why) => say.line(&format!("no WSS bridge: {why}")),
+                        }
+                    }
+                }
                 // A Wi-Fi change that moves the lamp meanwhile cuts the wait
                 // short: one try at once, then the waits from the first.
                 let relinked = tokio::select! {
@@ -976,6 +1052,11 @@ async fn session(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// No WSS address from a ping: TCP only, as before #6256 F9.
+    fn no_wss() -> watch::Receiver<String> {
+        watch::channel(String::new()).1
+    }
 
     /// Only the lamp's own account channel commands it: not its reply
     /// channel, another lamp's, a longer or shorter topic, or an empty one.
@@ -1472,7 +1553,7 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
-            run(accounts, me, &mut lamp, &mut say, first).await;
+            run(accounts, me, no_wss(), &mut lamp, &mut say, first).await;
         });
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         while !until(&seen.lock().unwrap()) && tokio::time::Instant::now() < deadline {
@@ -1530,7 +1611,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let renames = |seen: &[Seen]| {
             publishes(seen)
@@ -1589,7 +1678,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let added = |seen: &[Seen]| {
             publishes(seen)
@@ -1629,7 +1726,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
             lamp
         });
         let sets = |seen: &[Seen]| {
@@ -1755,7 +1860,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let sets = |seen: &[Seen]| {
             publishes(seen)
@@ -1836,6 +1949,7 @@ mod tests {
             run(
                 accounts,
                 me,
+                no_wss(),
                 &mut lamp,
                 &mut say,
                 Duration::from_millis(600),
@@ -1974,7 +2088,7 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
-            run(accounts, me, &mut lamp, &mut say, first).await;
+            run(accounts, me, no_wss(), &mut lamp, &mut say, first).await;
         });
         let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
         while !until(&seen.lock().unwrap(), &lines.lock().unwrap())
@@ -2249,7 +2363,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
             lamp.texts
         });
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
@@ -2346,7 +2468,15 @@ mod tests {
         let task = tokio::spawn(async move {
             let mut lamp = lamp;
             let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         while !enough(&lines.lock().unwrap()) && tokio::time::Instant::now() < deadline {
@@ -2562,7 +2692,15 @@ mod tests {
                     ..Fake::default()
                 };
                 let mut say = |_: &str| {};
-                run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+                run(
+                    accounts,
+                    me,
+                    no_wss(),
+                    &mut lamp,
+                    &mut say,
+                    Duration::from_millis(50),
+                )
+                .await;
             });
             let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
             while shared.with(|reports| reports.queued()) > 0
@@ -2605,7 +2743,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let subscribed = Seen::Subscribe("fa/d-42".into());
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
@@ -2639,7 +2785,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let connected = |seen: &[Seen]| seen.iter().any(|s| matches!(s, Seen::Connect { .. }));
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);

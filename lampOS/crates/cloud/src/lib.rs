@@ -38,3 +38,4 @@ pub mod update_alerts;
 pub mod update_events;
 pub mod upload;
 pub mod wire;
+pub mod wss;
