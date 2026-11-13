@@ -4753,17 +4753,16 @@ bytes, as above):
   more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on`;
   off, such a file is refused ("it reaches the internet, which a skill's
   task can't on this lamp").
-- **A linked service it uses gets that service's grant** (the owner's
+- **A linked service it uses gets that service's grants** (the owner's
   ruling, 13 Nov: anything that touches the connectors goes to the lamp's
   agent end to end), as a voice-made service skill's `do.task` carries
   them, with `LAMP_AGENT_SERVICES=on` (`upload_agent::services_read`):
-  `<code>-read` for each service the file names (Gmail, or mail, email or
-  inbox; calendar; Google Drive; monday.com; GitHub, Figma, Asana, Ahrefs,
-  Facebook, HubSpot; Slack, Notion, Linear and Amplitude only
-  capitalised, as they are everyday words too), and `<code>-write` for one
-  a sentence says to send, reply, draft, add, create, schedule, post, save
-  or the like to (a sentence naming no service writes to the last one
-  named: "Read my newest email. Reply to it."). Said back in plain words
+  `<code>-read` and `<code>-write` for each service the file names, found
+  by a table of names in any case (Gmail, or mail, email or inbox;
+  calendar; Google Drive; monday.com; GitHub, Figma, Asana, Ahrefs,
+  Facebook, HubSpot, Slack, Notion, Linear, Amplitude). What the file does
+  with them is the agent's to judge as it runs; the guard is the owner's
+  spoken yes at its first run. Said back in plain words
   ("reads your Gmail", "prepares sends with your Gmail, each sent only on
   your yes"), and a service grant always keeps its first run's spoken
   yes. `upload_agent::capped_with` and the manage helper hold it with
@@ -4811,7 +4810,7 @@ bytes, as above):
 
 Tests: `upload_agent::tests` (the 4 KB photobooth file, the switch off,
 a short light-and-speak file, the first run's yes, no secret written,
-a key refused, a linked service's grants, services read conservatively),
+a key refused, a linked service's grants, services read by their names),
 `task::tests::an_agent_skill_from_a_file_carries_its_task_only_with_its_switch`,
 `an_agent_skill_from_a_file_carries_a_service_grant_only_with_its_switch`.
 

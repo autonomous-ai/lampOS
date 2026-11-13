@@ -24,11 +24,10 @@
 //!   file is refused, [`NO_NET`]). Each is said back when it goes on.
 //! - **A linked service it uses** (the owner's ruling, 13 Nov: anything
 //!   that touches the connectors goes to the lamp's agent end to end), with
-//!   `LAMP_AGENT_SERVICES` on: `<code>-read` for each service it names
-//!   (Gmail or mail, the calendar, Google Drive, GitHub…), and
-//!   `<code>-write` when a sentence naming it says to send, reply, add or
-//!   create ([`services_read`]), as a voice-made service skill's `do.task`
-//!   carries them. Its run reaches the service only through lamp-control
+//!   `LAMP_AGENT_SERVICES` on: `<code>-read` and `<code>-write` for each
+//!   service it names (Gmail or mail, the calendar, Google Drive, GitHub…,
+//!   [`services_read`]), as a voice-made service skill's `do.task` carries
+//!   them; what it does with them is the agent's to judge. Its run reaches the service only through lamp-control
 //!   under its one-run token (lamp-tasks gives its fresh home
 //!   `lamp-services mcp`), each send only on the owner's spoken yes; the
 //!   grant always keeps its first run's yes. Off, a file naming a service is
@@ -236,53 +235,13 @@ pub fn grants_read(text: &str) -> Vec<String> {
     grants
 }
 
-/// The words that say a service is written to, in a sentence that names
-/// it ([`services_read`]): a send, a reply, an event or file added.
-const WRITE_WORDS: &[&str] = &[
-    "send",
-    "sends",
-    "sending",
-    "reply",
-    "replies",
-    "replying",
-    "draft",
-    "drafts",
-    "compose",
-    "write",
-    "writes",
-    "create",
-    "creates",
-    "add",
-    "adds",
-    "schedule",
-    "schedules",
-    "book",
-    "post",
-    "posts",
-    "save",
-    "saves",
-    "upload",
-    "uploads",
-    "share",
-    "shares",
-    "forward",
-    "invite",
-    "comment",
-    "update",
-    "updates",
-];
-
 /// The linked services `text` names, by catalog code
-/// ([`crate::made_skill::SERVICE_GRANT_CODES`]'s order): a plain name, or a
-/// word that can only be one ("inbox", "calendar"); a name that is also an
-/// everyday word (Slack, Notion, Linear, Amplitude) only capitalised.
+/// ([`crate::made_skill::SERVICE_GRANT_CODES`]'s order), from a table of
+/// their names, in any case: a service's own name, or the plain name of
+/// what it holds ("mail", "inbox", "calendar").
 fn services_named(text: &str) -> Vec<&'static str> {
     let lower = text.to_lowercase();
     let said = words(text);
-    let cased: std::collections::BTreeSet<&str> = text
-        .split(|c: char| !c.is_alphanumeric())
-        .filter(|word| !word.is_empty())
-        .collect();
     let any = |list: &[&str]| list.iter().any(|word| said.contains(*word));
     crate::made_skill::SERVICE_GRANT_CODES
         .into_iter()
@@ -293,49 +252,22 @@ fn services_named(text: &str) -> Vec<&'static str> {
             "google_calendar" => any(&["calendar", "calendars", "gcal"]),
             "google_drive" => any(&["gdrive"]) || lower.contains("google drive"),
             "mondaydotcom" => lower.contains("monday.com"),
-            "slack" | "notion" | "linear" | "amplitude" => {
-                let mut name = (*code).to_owned();
-                name[..1].make_ascii_uppercase();
-                cased.contains(name.as_str())
-            }
-            "github" | "figma" | "asana" | "ahrefs" | "facebook" | "hubspot" => any(&[*code]),
-            _ => false,
+            code => any(&[code]),
         })
         .collect()
 }
 
-/// The linked services' grants `text` asks for, whatever the switch:
-/// `<code>-read` for each service it names, and `<code>-write` for one a
-/// sentence says to write to ([`WRITE_WORDS`]): one it names, or, naming
-/// none ("reply to the newest one"), the ones the last sentence naming a
-/// service named. Read then write, in
-/// [`crate::made_skill::SERVICE_GRANT_CODES`]' order.
+/// The linked services' grants `text` asks for, whatever the switch: for
+/// each service it names, `<code>-read` and `<code>-write`, in
+/// [`crate::made_skill::SERVICE_GRANT_CODES`]' order. What the file does
+/// with it is the agent's to judge as it runs; the guard is the owner's
+/// spoken yes at its first run, which names the service and that it may
+/// prepare sends, each sent only on the owner's yes.
 pub fn services_read(text: &str) -> Vec<String> {
-    let mut written: Vec<&str> = Vec::new();
-    let mut last: Vec<&str> = Vec::new();
-    for sentence in text
-        .replace(". ", "\n")
-        .replace("! ", "\n")
-        .replace("? ", "\n")
-        .lines()
-    {
-        let named = services_named(sentence);
-        if !named.is_empty() {
-            last = named;
-        }
-        let said = words(sentence);
-        if WRITE_WORDS.iter().any(|word| said.contains(*word)) {
-            written.extend(&last);
-        }
-    }
-    let mut grants = Vec::new();
-    for code in services_named(text) {
-        grants.push(format!("{code}-read"));
-        if written.contains(&code) {
-            grants.push(format!("{code}-write"));
-        }
-    }
-    grants
+    services_named(text)
+        .into_iter()
+        .flat_map(|code| [format!("{code}-read"), format!("{code}-write")])
+        .collect()
 }
 
 /// Whether a skill with `grants` keeps its spoken yes (the camera, the
