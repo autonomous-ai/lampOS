@@ -2342,15 +2342,27 @@ Hermes của đèn, không phải bởi `lamp-skills`:
 - **lamp-tasks** kiểm tra dòng như của một task (kỹ năng, thư mục, một quyền
   khớp với dịch vụ của lệnh ghi, nội dung tối đa 8 KiB) và chạy nó như một
   task (`skill_task::WriteHandOver`): token do lamp-control cấp, giữ đúng một
-  quyền đó, và Hermes được bảo gọi `service_write` một lần với đúng nội
-  dung đó, trích dẫn như dữ liệu.
+  quyền đó, và Hermes được bảo, kèm tên kỹ năng và id của lượt chạy, gọi
+  `service_write` một lần chỉ nêu dịch vụ và action của lệnh ghi
+  (`{"service":"gmail-app","action":"send_mail"}`). **Không bao giờ có nội
+  dung** (P2 của Reviewer-lead trên #6824 và #6879): lời nhắc là argv của
+  tác tử (`harness new --task`, hoặc `hermes chat -q` khi không có Harness,
+  đọc được trong `/proc/<pid>/cmdline`) và transcript của Harness, nên không
+  người nhận, tiêu đề hay nội dung nào có trong đó. `Debug` của `SkillRun`
+  chỉ in độ dài của lời nhắc.
 - **lamp-control** cấp cho một kỹ năng không có lời đồng ý task nào mà bước
   `[[do]]` duy nhất là một lệnh ghi cố định
   (`service_write::fixed_write_of`) một quyền `-write` của nó
   (`task_yes::KeptYes::fixed_write_grant`) và đánh dấu lượt chạy là của một
-  lệnh ghi cố định; `service.write` của lượt đó tới đây kèm id của lượt chạy
-  (`fixed_write_run`). Ở đó không đọc lời đồng ý nào: lời đồng ý của chủ cho
-  lệnh ghi là của chương trình này.
+  lệnh ghi cố định, giữ lệnh ghi đó như tệp của kỹ năng ghi trong suốt lượt
+  chạy (`runs::FixedWrite`, `Debug` của nó không bao giờ hiện nội dung).
+  `service.write` của lượt đó tới đây kèm id của lượt chạy
+  (`fixed_write_run`). Lệnh gọi không nêu nội dung riêng nào (không trường
+  nào, hoặc chỉ các trường bằng đúng của lệnh ghi đã giữ, như `action`:
+  `FixedWrite::covers`) được đưa lệnh ghi đã giữ theo token của lượt chạy,
+  nên tác tử không bao giờ thấy nó; lệnh gọi nêu bất kỳ nội dung nào khác
+  đi đúng như đã hỏi và bị từ chối ở đây, như dưới. Ở đó không đọc lời đồng
+  ý nào: lời đồng ý của chủ cho lệnh ghi là của chương trình này.
 - **Ở đây**, một lệnh gọi mang `fixed_write_run` chỉ đi qua cùng
   `skill_write` như lệnh gọi của `lamp-skills`
   (`serve::Services::run_fixed_write`): lời đồng ý đã giữ của chủ khớp đúng
@@ -2388,9 +2400,11 @@ lamp-services. Test:
 `a_fixed_write_is_handed_to_lamp_tasks_with_its_one_grant`,
 `a_write_the_agent_couldnt_take_is_sent_straight_once`,
 `no_straight_send_once_the_agents_run_began`,
-`a_fixed_write_runs_on_its_one_grant_with_its_exact_content`,
+`a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
+`a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`,
 `a_fixed_writes_run_is_minted_its_one_write_grant`,
 `a_fixed_writes_run_names_its_run_to_lamp_services`,
+`a_fixed_writes_contentless_call_is_given_the_skills_write`,
 `a_fixed_writes_run_sends_the_approved_content_once_within_the_bounds`.
 
 ## Lượt chạy của một kỹ năng trên Hermes của đèn (#6432, `LAMP_SKILL_TASKS`, bật trong sản phẩm)

@@ -602,12 +602,14 @@ impl<H: Http, M: Mail> Services<H, M> {
 
     /// A skill's fixed write sent by its run on the lamp's agent
     /// (`LAMP_SKILL_WRITE_AGENT`, the owner's ruling, 13 Nov): `args` the
-    /// run's `service_write` exactly as it asked it, which goes only through
-    /// [`Self::skill_write`] (the owner's kept yes to that exact content, the
-    /// link it was said under, the day's bounds and the sent-log), never
-    /// held for a spoken yes, and once a run: a second, whatever it says, is
-    /// refused ([`skill_writes::ONCE_A_RUN`]). The run's other calls, and any
-    /// with the switch off here, are refused.
+    /// run's `service_write` as lamp-control sends it on (the skill's own
+    /// write, held from the mint, when the call named no content of its
+    /// own, `lamp_control::runs::FixedWrite`; else as asked), which goes
+    /// only through [`Self::skill_write`] (the owner's kept yes to that
+    /// exact content, the link it was said under, the day's bounds and the
+    /// sent-log), never held for a spoken yes, and once a run: a second,
+    /// whatever it says, is refused ([`skill_writes::ONCE_A_RUN`]). The
+    /// run's other calls, and any with the switch off here, are refused.
     async fn run_fixed_write(
         &self,
         name: &str,
