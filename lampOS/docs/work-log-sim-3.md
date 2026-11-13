@@ -3,6 +3,20 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 18:4x GMT+7: macOS probe, the body is the one blocker
+
+- #6925: Linux CI green so far (SDK JavaScript on Node 20.11 and 22 pass,
+  so the `ps -A -o pid= -o ppid=` call works on procps too); ARM64 and
+  virtual-lamp jobs pending at the check.
+- Local probe `sim-3/mac-pty-probe` (not pushed): master termios only off
+  macOS. Then on macOS: lamp-control up, Python SDK pairs (light, speak).
+  lamp-body says `the body requires Linux; no device was opened`;
+  lamp-sim gives up after five ends and the lamp ends (about 15 s).
+- Asked the first builder on #6811: lamp-sim on macOS without a body until
+  ten's portable body, or wait. Also seen: `tools/lamp-sim-check.sh` and
+  `lamp-sim-conformance.sh` call `timeout`, which macOS lacks.
+- Not tried: AVFoundation camera and microphone, the JS tour.
+
 ## 2026-11-13 18:3x GMT+7: #6925, and the macOS scope (sim-3-P2)
 
 - The lead's answers (via the person): push own branches after gates;
