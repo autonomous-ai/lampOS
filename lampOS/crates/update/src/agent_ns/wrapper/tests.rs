@@ -719,8 +719,12 @@ fn the_one_path_refuses_data_that_is_not_plain() {
     let mut hermes_home = good.clone();
     hermes_home.home = hermes_install::PLACE.into();
     assert!(
-        one_path_text(&hermes_home).is_ok(),
-        "one of the agents' homes"
+        one_path_text(&hermes_home).is_err(),
+        "an own home is its engine's alone"
+    );
+    assert!(
+        one_path_text(&hermes_install::agent()).is_ok(),
+        "Hermes's own home"
     );
     assert_eq!(
         text_for("claude", SHOWN[0]).unwrap(),
@@ -840,7 +844,7 @@ fn hermes_on_the_one_path_has_its_data_and_approvals_off_only_in_a_run() {
 
 /// (#6685) With the one run path, the namespace script takes the agent's
 /// home from its wrapper: every edit found once for every switch, the home
-/// checked against the agents' homes (its own under [`HOMES`], or one of
+/// checked against the agents' homes (its own under [`HOMES`], or its own in
 /// [`OWN_HOMES`]) before anything is mounted, and the only agent's word in
 /// it the homes' list. Off, it is as before.
 #[test]
@@ -880,7 +884,7 @@ fn the_one_path_namespace_takes_the_home_from_the_wrapper_and_checks_it() {
     symlink(&own, homes.join("linked")).unwrap();
     let check = one_path_home_check()
         .replace(HOMES, homes.to_str().unwrap())
-        .replace(OWN_HOMES[0], own.to_str().unwrap());
+        .replace(OWN_HOMES[0].1, own.to_str().unwrap());
     let check = check.split_once('\n').unwrap().1.to_owned();
     let ok = |engine: &str, home: &Path| {
         Command::new("/bin/sh")
@@ -897,7 +901,8 @@ fn the_one_path_namespace_takes_the_home_from_the_wrapper_and_checks_it() {
             .success()
     };
     assert!(ok("claude", &homes.join("claude")));
-    assert!(ok("claude", &own), "an installer's own home");
+    assert!(ok(OWN_HOMES[0].0, &own), "an installer's own home");
+    assert!(!ok("claude", &own), "another engine's own home");
     assert!(!ok("codex", &homes.join("claude")), "another agent's home");
     assert!(!ok("linked", &homes.join("linked")), "a link");
     assert!(!ok("claude", &top), "no agent's home");

@@ -2512,9 +2512,11 @@ yet on a lamp.
     naming no agent;
   - **the agent's data** (`wrapper::Agent`), the only lines that differ
     from one agent to another: `E=<engine>`; `H=<home>`, its home,
-    `/var/lib/lampos-agents/<engine>` or an installer's own home
-    (`OWN_HOMES`: Hermes's `/var/lib/lampos-hermes`, shown at that path
-    since its checkout's scripts and Python name it); `X=<program>`, its
+    `/var/lib/lampos-agents/<engine>` or its engine's own home from an
+    installer (`OWN_HOMES`, `(engine, home)` pairs: Hermes's
+    `/var/lib/lampos-hermes`, for Hermes only, shown at that path since its
+    checkout's scripts and Python name it; another agent naming it is
+    refused); `X=<program>`, its
     program, or empty to find it on `PATH` as above; `agent_env() { … }`,
     lines run at every start; `agent_run_env() { … }`, lines run in a
     skill's run only. Hermes's (`hermes_install::agent`): its program
@@ -2539,8 +2541,10 @@ yet on a lamp.
 
   `agent-ns` then takes the home from `LAMP_NS_HOME` instead of
   `/var/lib/lampos-agents/$E` (`ONE_PATH_NS_EDITS`), and before anything
-  is mounted checks it is `/var/lib/lampos-agents/<the same engine>` or one
-  of the installers' own homes, a folder and not a link
+  is mounted checks it is `/var/lib/lampos-agents/<the same engine>` or
+  that engine's own home from an installer, matched as `<engine>:<home>`
+  (`case $E:$H in "$E":/var/lib/lampos-agents/"$E"|hermes:/var/lib/lampos-hermes)`,
+  so Hermes's home is never another agent's), a folder and not a link
   (`one_path_home_check`; the list is root's text, `lampos` can change
   neither), and shows it read-write at its own path; the rest (the skills,
   lamp-skills' and lamp-control's sockets, a run's own network with the
@@ -2551,7 +2555,12 @@ yet on a lamp.
   `hermes-ns` out (`hermes_install::wrapper_for`, `ns_for`; its ask
   carries `"one_path": true`). Off, every wrapper and namespace script is
   as before, byte for byte. A wrapper of either text is lamp-update's
-  (`ours`), so turning the switch writes it again.
+  (`ours`), so turning the switch writes it again. A round still writes a
+  wrapper that the login shell does not find first (and says so); lamp-tasks
+  therefore asks again, live, at each skill run's start, whether
+  `command -v <engine>` in `lampos`'s login shell is the wrapper, and
+  refuses the run otherwise (docs/tasks.md, "The lamp's default agent, by
+  the one run path").
 Tests (`agent_ns::wrapper::tests`, on any computer): plain names only; the
 mark in the first 512 bytes; no path to the program in the wrapper; the
 token only assigned and exported; the wrapper run with a stand-in

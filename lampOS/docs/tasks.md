@@ -2685,7 +2685,31 @@ for each run, and is answered once the run ends
       the one `unshare` into `/usr/local/lib/lampos/agent-ns`);
     - the agent namespace `/usr/local/lib/lampos/agent-ns` takes the home
       from the wrapper (`AGENT_NS_HOME_LINE`) and shows lamp-control's
-      socket (`AGENT_NS_TASKS_LINE`, lamp-update's `LAMP_SKILL_TASKS` on).
+      socket (`AGENT_NS_TASKS_LINE`, lamp-update's `LAMP_SKILL_TASKS` on);
+    - **what Harness would start is that wrapper**, asked live at the run's
+      start, never on the voice's turn and never from a round's snapshot
+      (`skill_task::login_finds_wrapper`): Harness starts whatever
+      `lampos`'s login shell finds as `command -v <engine>`, and an
+      engine's own program earlier on that `PATH` (`~/.local/bin/<engine>`)
+      would run with no namespace and the lamp's network. lamp-tasks is
+      `lampos` (with `NoNewPrivileges`), so it cannot run lamp-update's
+      `runuser -l lampos`; it runs lamp-update's own command
+      (`skill_task::login_command`, `command -v <engine>`, held to
+      lamp-update's source by a test) in a login shell it starts itself
+      (`LoginLookup`): `/bin/sh -l -c`, the shell Harness reads an engine's
+      launch environment through (`hold::LAUNCH_SHELL`; `lampos`'s own is
+      `/usr/sbin/nologin`), its environment cleared to `HOME` (Harness's
+      home, lamp-tasks' own `/var/lib/lampos-tasks`, where Harness's
+      installer's `~/.local/bin` is), `SHELL`, `USER`/`LOGNAME` `lampos`
+      and `PATH=/usr/local/bin:/usr/bin:/bin`, in its own process group,
+      bounded to 2 s (`LOGIN_LOOKUP_WITHIN`; past it the group is killed).
+      The one line it prints and `/usr/local/bin/<engine>` must be the same
+      file once both are resolved as `readlink -f` resolves them
+      (`found_is_wrapper`): a link to the wrapper counts, any other file
+      does not. Another program found first, none found, a shell that
+      fails, prints more than one line, cannot be started or runs past
+      2 s is refused in words, with no token file written and nothing
+      asked of Harness.
 
     The same lines for Hermes, Claude Code or any other agent: a test pins
     them to the wrappers lamp-update writes for Hermes and Claude Code
@@ -2693,9 +2717,12 @@ for each run, and is answered once the run ends
     fails the check is refused in words, journaled: "the lamp's default
     agent (<engine>) isn't set up for a skill's run yet (<why>), so nothing
     was started", with nothing made or asked, and no other agent runs it
-    instead. OpenClaw's one gateway has no wrapper started per run, so as
-    the default it is refused this way until it has a fenced path of its
-    own (a later step). The token file is written before the launch, as for
+    instead. A wrapper lamp-update wrote (its mark, `WRAPPER_MARK`, in the
+    first 512 bytes) without the run lines is said as an agent with no
+    fenced run path for a skill's run yet, whatever lamp-update's switch,
+    with no engine named in the check: OpenClaw's one gateway has no
+    wrapper started per run, so as the default it is refused this way until
+    it has a fenced path of its own (a later step). The token file is written before the launch, as for
     Hermes, and the run is `harness new <engine>` in its own folder (below).
     Messages after the launch say "the lamp's default agent". Off, every
     run is the lamp's Hermes through its own wrapper, as above (the

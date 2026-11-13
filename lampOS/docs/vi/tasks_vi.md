@@ -312,7 +312,31 @@ lần chạy, và được trả lời khi lần chạy kết thúc
       `/usr/local/lib/lampos/agent-ns`);
     - namespace agent `/usr/local/lib/lampos/agent-ns` lấy thư mục home từ
       wrapper (`AGENT_NS_HOME_LINE`) và cho thấy socket của lamp-control
-      (`AGENT_NS_TASKS_LINE`, `LAMP_SKILL_TASKS` của lamp-update bật).
+      (`AGENT_NS_TASKS_LINE`, `LAMP_SKILL_TASKS` của lamp-update bật);
+    - **thứ Harness sẽ khởi động chính là wrapper đó**, hỏi trực tiếp lúc
+      bắt đầu lần chạy, không bao giờ trong lượt nói và không bao giờ từ
+      ảnh chụp của một vòng (`skill_task::login_finds_wrapper`): Harness
+      khởi động thứ mà login shell của `lampos` tìm thấy bằng `command -v
+      <engine>`, và chương trình riêng của engine nằm trước trên `PATH` đó
+      (`~/.local/bin/<engine>`) sẽ chạy không có namespace và có mạng của
+      đèn. lamp-tasks chạy dưới `lampos` (với `NoNewPrivileges`), nên không
+      chạy được `runuser -l lampos` của lamp-update; nó chạy đúng lệnh của
+      lamp-update (`skill_task::login_command`, `command -v <engine>`, một
+      test giữ nó khớp với mã nguồn của lamp-update) trong một login shell
+      tự khởi động (`LoginLookup`): `/bin/sh -l -c`, shell mà Harness dùng
+      để đọc môi trường khởi động của engine (`hold::LAUNCH_SHELL`; shell
+      riêng của `lampos` là `/usr/sbin/nologin`), môi trường được xoá chỉ
+      còn `HOME` (home của Harness, chính `/var/lib/lampos-tasks` của
+      lamp-tasks, nơi có `~/.local/bin` của trình cài Harness), `SHELL`,
+      `USER`/`LOGNAME` `lampos` và `PATH=/usr/local/bin:/usr/bin:/bin`,
+      trong nhóm tiến trình riêng, giới hạn 2 giây (`LOGIN_LOOKUP_WITHIN`;
+      quá hạn thì cả nhóm bị kill). Dòng duy nhất nó in ra và
+      `/usr/local/bin/<engine>` phải là cùng một file sau khi cả hai được
+      phân giải như `readlink -f` (`found_is_wrapper`): symlink tới wrapper
+      thì được, file khác thì không. Tìm thấy chương trình khác trước,
+      không tìm thấy gì, shell lỗi, in ra hơn một dòng, không khởi động
+      được hoặc chạy quá 2 giây đều bị từ chối bằng lời, không ghi file
+      token và không hỏi gì Harness.
 
     Cùng các dòng đó cho Hermes, Claude Code hay agent nào khác: một test
     ghim chúng vào các wrapper mà lamp-update ghi cho Hermes và Claude Code
@@ -320,9 +344,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     qua được kiểm tra bị từ chối bằng lời, có ghi nhật ký: "the lamp's
     default agent (<engine>) isn't set up for a skill's run yet (<lý do>),
     so nothing was started", không tạo hay hỏi gì, và không agent nào khác
-    chạy thay. Gateway duy nhất của OpenClaw không có wrapper khởi động theo
-    từng lần chạy, nên khi là mặc định nó bị từ chối như vậy cho tới khi có
-    đường chạy đã rào của riêng nó (một bước sau). File token được ghi
+    chạy thay. Một wrapper do lamp-update ghi (có dấu `WRAPPER_MARK` trong
+    512 byte đầu) mà không có các dòng nhận lần chạy được báo là agent chưa
+    có đường chạy đã rào cho lần chạy kỹ năng, bất kể công tắc của
+    lamp-update, và phép kiểm tra không gọi tên engine nào: gateway duy nhất
+    của OpenClaw không có wrapper khởi động theo từng lần chạy, nên khi là
+    mặc định nó bị từ chối như vậy cho tới khi có đường chạy đã rào của
+    riêng nó (một bước sau). File token được ghi
     trước khi khởi động, như với Hermes, và lần chạy là `harness new
     <engine>` trong thư mục riêng của nó (bên dưới). Các thông báo sau khi
     khởi động nói "the lamp's default agent". Tắt: mọi lần chạy là của
