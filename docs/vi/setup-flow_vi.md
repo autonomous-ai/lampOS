@@ -77,6 +77,8 @@ Các field lấy từ `SetupRequest` trong `system/domain/device.go`. `device_id
 
 Tiếng Nhật dùng `stt_language: "ja"`. Setup có Japanese (日本語), các câu đăng ký giọng tiếng Nhật và sáu voice ElevenLabs chọn lọc; mặc định là Shizuka. Xem [danh mục giọng Nhật](realtime-voice_vi.md#tiếng-nhật-và-giọng-elevenlabs).
 
+Tiếng Ả Rập dùng `stt_language: "ar"`. Setup có Arabic (العربية), các câu đăng ký giọng tiếng Ả Rập hiển thị từ phải sang trái và sáu voice ElevenLabs chọn lọc; mặc định là Salma. Xem [tiếng Ả Rập và giọng](realtime-voice_vi.md#tiếng-ả-rập-và-giọng-elevenlabs).
+
 Tiếng Hàn dùng `stt_language: "ko"`. Setup có Korean (한국어), các câu đăng ký giọng tiếng Hàn và sáu voice ElevenLabs chọn lọc; mặc định là Anna Kim. Xem [tiếng Hàn và giọng](realtime-voice_vi.md#tiếng-hàn-và-giọng-elevenlabs).
 
 **Response:** Trả về ngay `{"status": 1}`. Setup chạy async trong goroutine sau 2s delay.

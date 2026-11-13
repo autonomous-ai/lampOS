@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 
-from hal.presets import LANG_EN, LANG_JA, LANG_KO, LANG_VI, LANG_ZH_CN, LANG_ZH_TW
+from hal.presets import LANG_AR, LANG_EN, LANG_JA, LANG_KO, LANG_VI, LANG_ZH_CN, LANG_ZH_TW
 
 logger = logging.getLogger("hal.voice.lang_id")
 
@@ -29,6 +29,7 @@ _APP_TO_MODEL: Dict[str, str] = {
     LANG_VI: "vi",
     LANG_JA: "ja",
     LANG_KO: "ko",
+    LANG_AR: "ar",
     LANG_ZH_CN: "zh",
     LANG_ZH_TW: "zh",
 }

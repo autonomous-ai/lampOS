@@ -31,8 +31,8 @@ func matchChitchat(text string) *Result {
 	if text == "" {
 		return nil
 	}
-	t := strings.ToLower(strings.TrimSpace(text))
-	t = strings.TrimRight(t, ".!?,。！？，")
+	t := normalizeArabic(strings.ToLower(strings.TrimSpace(text)))
+	t = strings.TrimRight(t, ".!?,。！？，؟،")
 
 	// A bare wake word means the user is just calling the device.
 	t = stripWakeWord(t)
@@ -56,11 +56,15 @@ func matchChitchat(text string) *Result {
 			for _, p := range phrases {
 				// Whole-phrase match: "hi" must not match inside "this".
 				matches := containsPhrase(t, p)
-				// Japanese has no word separators and Korean attaches endings to
-				// words: a social phrase inside a longer request must fall through
-				// to the agent (e.g. 何している？, 미안한데 불 좀 켜줘).
-				if lang == i18n.LangJA || lang == i18n.LangKO {
+				// Japanese has no word separators, Korean attaches endings and Arabic
+				// attaches prefixes and suffixes to words: a social phrase inside a
+				// longer request must fall through to the agent (e.g. 何している？,
+				// 미안한데 불 좀 켜줘, شكرا بس شغل الموسيقى).
+				switch lang {
+				case i18n.LangJA, i18n.LangKO:
 					matches = t == strings.TrimRight(p, ".!?,。！？，")
+				case i18n.LangAR:
+					matches = t == strings.TrimRight(normalizeArabic(p), ".!?,؟،")
 				}
 				if !matches {
 					continue
@@ -150,8 +154,8 @@ func stripWakeWord(s string) string {
 			return ""
 		}
 		c := rest[0]
-		if c == ' ' || c == ',' || c == '.' || c == '!' || c == '?' {
-			return strings.TrimSpace(strings.TrimLeft(rest, " ,.!?"))
+		if c == ' ' || c == ',' || c == '.' || c == '!' || c == '?' || strings.HasPrefix(rest, "،") {
+			return strings.TrimSpace(strings.TrimLeft(rest, " ,.!?،"))
 		}
 	}
 	return s
@@ -171,4 +175,22 @@ func bareAttentionResult() *Result {
 		Rule:            "chitchat_attention",
 		Actions:         []string{"POST /emotion happy"},
 	}
+}
+
+// arabicFolds maps spelling variants speech-to-text emits interchangeably to one form.
+var arabicFolds = strings.NewReplacer("أ", "ا", "إ", "ا", "آ", "ا", "ٱ", "ا", "ى", "ي", "ة", "ه", "ـ", "")
+
+// normalizeArabic drops diacritics and folds alef, alef maqsura and ta marbuta, so
+// "شكراً" matches "شكرا" and "إلى" matches "الى". Text without Arabic is unchanged.
+func normalizeArabic(s string) string {
+	if !strings.ContainsFunc(s, func(r rune) bool { return r >= 0x0600 && r <= 0x06FF }) {
+		return s
+	}
+	s = strings.Map(func(r rune) rune {
+		if (r >= 0x064B && r <= 0x065F) || r == 0x0670 {
+			return -1
+		}
+		return r
+	}, s)
+	return arabicFolds.Replace(s)
 }

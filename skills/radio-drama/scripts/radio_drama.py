@@ -280,6 +280,7 @@ ANNOUNCE = {
     "vi": {"new": "Đây là {title}, tập {n} nhé.", "resume": "Nghe tiếp {title}, tập {n} nhé.", "chain": "Tập {n}."},
     "ja": {"new": "{title}、第{n}話です。", "resume": "{title}、第{n}話の続きです。", "chain": "第{n}話。"},
     "ko": {"new": "{title}, {n}화예요.", "resume": "{title}, {n}화 이어서 들려드릴게요.", "chain": "{n}화."},
+    "ar": {"new": "إليك {title}، الحلقة {n}.", "resume": "نكمل {title}، الحلقة {n}.", "chain": "الحلقة {n}."},
     "zh-CN": {"new": "这是{title}，第{n}集。", "resume": "继续播放{title}，第{n}集。", "chain": "第{n}集。"},
     "zh-TW": {"new": "這是{title}，第{n}集。", "resume": "繼續播放{title}，第{n}集。", "chain": "第{n}集。"},
 }

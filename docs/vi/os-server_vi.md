@@ -39,10 +39,12 @@ Nhật. Giọng ElevenLabs mặc định là `Shizuka`, với sáu giọng Nhậ
 danh mục voice chung. Chitchat tiếng Nhật chỉ khớp toàn câu sau khi chuẩn hóa
 dấu câu và wake word; câu hỏi như `何している？` tiếp tục được gửi cho agent. Khi HAL
 không trả được danh sách voice, fallback ElevenLabs vẫn lọc theo ngôn ngữ:
-English dùng Rachel, Japanese dùng Shizuka. Ngôn ngữ trống trả đủ 48 voice;
+English dùng Rachel, Japanese dùng Shizuka. Ngôn ngữ trống trả đủ 54 voice;
 ngôn ngữ không hỗ trợ dùng nhóm English. `ko` trả sáu giọng tiếng Hàn (mặc định
 Anna Kim). Xem
-[tiếng Hàn và giọng](realtime-voice_vi.md#tiếng-hàn-và-giọng-elevenlabs). Xem [chọn giọng tiếng Nhật](realtime-voice_vi.md#tiếng-nhật-và-giọng-elevenlabs).
+[tiếng Hàn và giọng](realtime-voice_vi.md#tiếng-hàn-và-giọng-elevenlabs).
+`ar` và các mã vùng tiếng Ả Rập trả sáu giọng tiếng Ả Rập (mặc định Salma). Xem
+[tiếng Ả Rập và giọng](realtime-voice_vi.md#tiếng-ả-rập-và-giọng-elevenlabs). Xem [chọn giọng tiếng Nhật](realtime-voice_vi.md#tiếng-nhật-và-giọng-elevenlabs).
 
 Ambient LED gọi HAL `/led/restore` sau khoảng yên lặng. OS không chọn màu fallback hay hiệu ứng thở; mỗi device khai báo `ambient_led.resting` trong `presets.json`. HAL giữ trạng thái user tắt/đặt màu và quyền sở hữu của overlay đang hoạt động.
 

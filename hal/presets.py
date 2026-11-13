@@ -5,19 +5,23 @@ LANG_EN = "en"
 LANG_VI = "vi"
 LANG_JA = "ja"
 LANG_KO = "ko"
+LANG_AR = "ar"
 LANG_ZH_CN = "zh-CN"
 LANG_ZH_TW = "zh-TW"
-SUPPORTED_LANGS = [LANG_EN, LANG_VI, LANG_ZH_CN, LANG_ZH_TW, LANG_JA, LANG_KO]
+SUPPORTED_LANGS = [LANG_EN, LANG_VI, LANG_ZH_CN, LANG_ZH_TW, LANG_JA, LANG_KO, LANG_AR]
 DEFAULT_LANG = LANG_EN
 
 def normalize_language(language: str | None) -> str:
-    """Canonicalize Japanese and Korean locale aliases without changing other provider codes."""
+    """Canonicalize Japanese, Korean and Arabic locale aliases without changing other provider codes."""
     value = (language or "").strip()
     key = value.lower().replace("_", "-")
     if key in ("ja", "ja-jp"):
         return LANG_JA
     if key in ("ko", "ko-kr"):
         return LANG_KO
+    # Every regional Arabic (ar-SA, ar-EG, ...) shares one phrase and voice pool.
+    if key == "ar" or key.startswith("ar-"):
+        return LANG_AR
     return value
 
 

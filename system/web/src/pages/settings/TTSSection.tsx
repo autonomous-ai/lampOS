@@ -61,17 +61,19 @@ const LANG_LABEL: Record<Lang, string> = {
   "vi":    "Vietnamese",
   "ja":    "Japanese (日本語)",
   "ko":    "Korean (한국어)",
+  "ar":    "Arabic (العربية)",
   "zh-CN": "Chinese (Simplified)",
   "zh-TW": "Chinese (Traditional)",
 };
-const LANG_OPTIONS: Lang[] = ["", "en", "vi", "ja", "ko", "zh-CN", "zh-TW"];
+const LANG_OPTIONS: Lang[] = ["", "en", "vi", "ja", "ko", "ar", "zh-CN", "zh-TW"];
 
 // Keep ElevenLabs names a strict subset of HAL's VOICE_IDS_BY_LANG, or they 404.
-type LangBucket = "en" | "vi" | "ja" | "ko" | "zh";
+type LangBucket = "en" | "vi" | "ja" | "ko" | "ar" | "zh";
 function langBucket(lang: Lang): LangBucket {
   if (lang === "vi") return "vi";
   if (lang === "ja") return "ja";
   if (lang === "ko") return "ko";
+  if (lang === "ar") return "ar";
   if (lang === "zh-CN" || lang === "zh-TW") return "zh";
   return "en";
 }
@@ -87,6 +89,9 @@ const GEMINI_VOICES = [
 const KOREAN_VOICES = ["Anna Kim", "Selly Han", "Rosa Oh", "Stella", "Hyunbin", "Minho"];
 // HAL learned the Korean voice names in this version; older HAL sends the name as a voice ID and fails.
 const MIN_KOREAN_HAL_VERSION = "0.1.305";
+const ARABIC_VOICES = ["Salma", "Sara", "Farah", "Mona", "Haytham", "Anas"];
+// First HAL that knows the Arabic voice names and Arabic speech.
+const MIN_ARABIC_HAL_VERSION = "0.1.308";
 const VOICES: Record<Vendor, Record<LangBucket, string[]>> = {
   elevenlabs: {
     en: [
@@ -98,10 +103,11 @@ const VOICES: Record<Vendor, Record<LangBucket, string[]>> = {
     vi: ["Ngan", "Linh", "Huyen", "Freya", "Nathan"],
     ja: ["Shizuka", "Konoha", "Rin", "Asahi", "Hinata", "Hiroki"],
     ko: KOREAN_VOICES,
+    ar: ARABIC_VOICES,
     zh: ["Amy", "Sage", "Xiaoxi", "Yun", "Evan Zhao"],
   },
-  openai: { en: OPENAI_VOICES, vi: OPENAI_VOICES, ja: OPENAI_VOICES, ko: OPENAI_VOICES, zh: OPENAI_VOICES },
-  gemini: { en: GEMINI_VOICES, vi: GEMINI_VOICES, ja: GEMINI_VOICES, ko: GEMINI_VOICES, zh: GEMINI_VOICES },
+  openai: { en: OPENAI_VOICES, vi: OPENAI_VOICES, ja: OPENAI_VOICES, ko: OPENAI_VOICES, ar: OPENAI_VOICES, zh: OPENAI_VOICES },
+  gemini: { en: GEMINI_VOICES, vi: GEMINI_VOICES, ja: GEMINI_VOICES, ko: GEMINI_VOICES, ar: GEMINI_VOICES, zh: GEMINI_VOICES },
 };
 
 function voicesFor(vendor: Vendor, lang: Lang, sttLang: string): string[] {
@@ -168,8 +174,9 @@ export function TTSSection({
   const effectiveSpeed = Math.max(speedMin, Math.min(speedMax, ttsSpeed));
 
   const [lang, setLang] = useState<Lang>("");
-  // A saved Korean voice stays visible when the filter follows another robot language.
-  const filterLang: Lang = lang || (KOREAN_VOICES.includes(ttsVoice) ? "ko" : "");
+  // A saved Korean or Arabic voice stays visible when the filter follows another robot language.
+  const filterLang: Lang = lang
+    || (KOREAN_VOICES.includes(ttsVoice) ? "ko" : ARABIC_VOICES.includes(ttsVoice) ? "ar" : "");
   const [piperInstalled, setPiperInstalled] = useState<string[]>([]);
   const piperLang: string = choice === "piper" ? (ttsVoice.split("_")[0] || "") : "";
   const voices = choice === "piper"
@@ -356,6 +363,11 @@ export function TTSSection({
         {filterLang === "ko" && vendor === "elevenlabs" && (
           <div style={{ fontSize: 12, color: C.textDim, marginTop: 4 }}>
             Korean voices need hardware drivers (HAL) v{MIN_KOREAN_HAL_VERSION} or later.
+          </div>
+        )}
+        {filterLang === "ar" && vendor === "elevenlabs" && (
+          <div style={{ fontSize: 12, color: C.textDim, marginTop: 4 }}>
+            Arabic voices need hardware drivers (HAL) v{MIN_ARABIC_HAL_VERSION} or later.
           </div>
         )}
       </div>
