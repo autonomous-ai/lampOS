@@ -865,7 +865,7 @@ sau:
    `needs_link` trong câu trả lời của việc tạo, và sau câu báo đã bật, mô
    hình được dặn nói với người dùng, bằng lời của nó và bằng ngôn ngữ của
    cuộc trò chuyện, rằng kỹ năng sẽ chạy khi dịch vụ đó được liên kết trong
-   ứng dụng, ở Skills, rồi Connectors (`made_skill::needs_link_ask`; chủ
+   ứng dụng: mở đèn này, rồi Settings, rồi Linked accounts (`made_skill::needs_link_ask`; chủ
    đèn, 10/11: không bao giờ là một câu tiếng Anh cố định); tạo từ ứng dụng,
    `needs_link: [{"code", "name"}]` trong `skills.made`. Khi `lamp-services`
    không trả lời thì không có cả hai, và việc tạo vẫn thành

@@ -331,16 +331,17 @@ pub struct Services<H, M> {
 
 /// What a call to a service not linked is told, after its name: and where
 /// the person links it, so the lamp says the way, not only the lack.
-pub const NOT_LINKED: &str =
-    "isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors.";
+pub const NOT_LINKED: &str = "isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts.";
 
 /// What a write the link doesn't allow is told, after "<Service> is linked
 /// without permission to <what>": what to do about it.
-pub const NO_PERMISSION: &str = "link it again in the app (Skills, then Connectors) and allow it.";
+pub const NO_PERMISSION: &str =
+    "link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it.";
 
 /// What a call naming a service the lamp has no connector for is told,
 /// after "The lamp can't link <name> yet.": where the ones it can are.
-pub const CANT_LINK: &str = "The services it can link are in the app: Skills, then Connectors.";
+pub const CANT_LINK: &str =
+    "The services it can link are in the app: open this lamp, then Settings, then Linked accounts.";
 
 /// The words for a write `service` is linked without permission for.
 fn no_permission(service: &catalog::Service, what: &str) -> String {
@@ -3627,7 +3628,7 @@ mod tests {
         ));
         assert_eq!(
             answer["error"],
-            "Notion isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors."
+            "Notion isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts."
         );
         let connected = run(services.tool(r#"{"op":"call","name":"services_connected"}"#));
         assert!(!connected.to_string().contains("planted"));
@@ -4620,11 +4621,11 @@ mod tests {
             ),
             (
                 json!({"error":{"code":403,"status":"PERMISSION_DENIED","details":[{"reason":"ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}).to_string(),
-                "not made: Google Drive is linked without permission to make this change: link it again in the app (Skills, then Connectors) and allow it.",
+                "not made: Google Drive is linked without permission to make this change: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it.",
             ),
             (
                 refused("insufficientPermissions"),
-                "not made: Google Drive is linked without permission to make this change: link it again in the app (Skills, then Connectors) and allow it.",
+                "not made: Google Drive is linked without permission to make this change: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it.",
             ),
             (
                 "not json".to_owned(),
@@ -6336,7 +6337,7 @@ mod tests {
         )
     }
 
-    const GMAIL_NO_SEND: &str = "Gmail is linked without permission to send mail: link it again in the app (Skills, then Connectors) and allow it.";
+    const GMAIL_NO_SEND: &str = "Gmail is linked without permission to send mail: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it.";
 
     /// "For write permission, or anything that has no Connector yet, the
     /// lamp must tell the user": a send the link's scopes don't allow is
@@ -6386,7 +6387,7 @@ mod tests {
             "end":"2026-11-10T10:00:00+07:00"}});
         assert_eq!(
             run(services.tool(&event.to_string()))["error"],
-            "Google Calendar is linked without permission to add calendar events: link it again in the app (Skills, then Connectors) and allow it."
+            "Google Calendar is linked without permission to add calendar events: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it."
         );
     }
 
@@ -6462,7 +6463,7 @@ mod tests {
         };
         let cant = |name: &str| {
             format!(
-                "The lamp can't link {name} yet. The services it can link are in the app: Skills, then Connectors."
+                "The lamp can't link {name} yet. The services it can link are in the app: open this lamp, then Settings, then Linked accounts."
             )
         };
         assert_eq!(ask(json!("Outlook")), cant("Outlook"));
@@ -6514,7 +6515,7 @@ mod tests {
         }
         assert_eq!(
             ask("Outlook", mail.clone())["error"],
-            "The lamp can't link Outlook yet. The services it can link are in the app: Skills, then Connectors."
+            "The lamp can't link Outlook yet. The services it can link are in the app: open this lamp, then Settings, then Linked accounts."
         );
         run(services.admin(&set_line(
             "github",
@@ -6538,6 +6539,51 @@ mod tests {
             "{sent}"
         );
         assert!(services.http.calls.lock().unwrap().is_empty());
+    }
+
+    /// On a Lamp 2 the app's Connectors is the "Linked accounts" row on the
+    /// lamp's Settings page, not inside Skills (#5867): every line that
+    /// tells where to link a service says that way, and the old path comes
+    /// back nowhere in the crates or the skills, however a line is wrapped.
+    #[test]
+    fn where_to_link_is_the_lamps_linked_accounts() {
+        for told in [
+            NOT_LINKED,
+            NO_PERMISSION,
+            CANT_LINK,
+            reads::GMAIL_APP_NO_READS,
+            writes::DRIVE_NO_WRITE_SCOPE,
+        ] {
+            assert!(
+                told.contains("open this lamp, then Settings, then Linked accounts"),
+                "{told}"
+            );
+            assert!(!told.contains("Skills"), "{told}");
+        }
+        let old = ["Skills,", "then", "Connectors"].join(" ");
+        let lamp_os = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut dirs = vec![lamp_os.join("crates"), lamp_os.join("skills")];
+        let mut seen = 0;
+        while let Some(dir) = dirs.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    if path.file_name().is_some_and(|name| name != "target") {
+                        dirs.push(path);
+                    }
+                    continue;
+                }
+                let Some("rs" | "md" | "toml") = path.extension().and_then(|e| e.to_str()) else {
+                    continue;
+                };
+                let text = std::fs::read_to_string(&path).unwrap();
+                let flat = text.replace("\\\n", " ");
+                let flat = flat.split_whitespace().collect::<Vec<_>>().join(" ");
+                assert!(!flat.contains(&old), "{}", path.display());
+                seen += 1;
+            }
+        }
+        assert!(seen > 100, "{seen}");
     }
 
     /// An app password, a personal key or a link listing no scopes is not

@@ -8,8 +8,8 @@ description: Once a morning, when you have settled at the desk between 7 and 11,
 Once a morning, when you have sat at your desk for two minutes between 7:00
 and 11:00, the lamp tells you what is on your Google Calendar today: how
 many events, then each one's time and title ("You have 3 events today. At
-9:30, Design review. ..."). It needs Google Calendar linked in the app,
-under Skills, then Connectors.
+9:30, Design review. ..."). It needs Google Calendar linked in the app:
+open this lamp, then Settings, then Linked accounts.
 
 When it reads:
 

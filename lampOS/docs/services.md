@@ -507,8 +507,8 @@ account's identity and `gmail.send` only, no `gmail.readonly`.
   Google refuses is first told at a send.
 - **Reads:** none. A `service_read` of `gmail-app`, linked or not, answers
   "This Gmail link, made with Google sign-in, can only send mail. To read
-  mail, link Gmail with an app password in the app: Skills, then
-  Connectors.", unless `gmail` is linked with an app password (below). Its
+  mail, link Gmail with an app password in the app: open this lamp, then
+  Settings, then Linked accounts.", unless `gmail` is linked with an app password (below). Its
   read list is empty, so no read route is ever called with its token.
 - **Writes:** `send_mail`, read back and sent as `gmail`'s, on a spoken
   "send": one `POST /gmail/v1/users/me/messages/send` from the account
@@ -1115,8 +1115,8 @@ each scope taken whole); otherwise, and when a link records no scopes at
 all (one set before scopes were kept, or by hand), the first call is
 refused before any read-back, nothing held or called:
 `writes::DRIVE_NO_WRITE_SCOPE`, "This Google Drive link can't make files.
-To let the lamp make one, link Google Drive again in the app: Skills, then
-Connectors." No scopes is refused because such a link may be read-only,
+To let the lamp make one, link Google Drive again in the app: open this lamp, then
+Settings, then Linked accounts." No scopes is refused because such a link may be read-only,
 and the person would dictate the whole file to hear only a failure;
 linking again through the app records the scopes.
 
@@ -1146,7 +1146,7 @@ create (#5825) refuses a bare `drive.file`; that check is to call the same
 helper once #5825 lands. Only Google's links record their scopes in this
 form, so no other service is in the table. With
 none of them, the call fails with "<Service> is linked without permission to
-<what>: link it again in the app (Skills, then Connectors) and allow it."
+<what>: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it."
 (`serve::NO_PERMISSION`, after the colon), `<what>` being "send mail", "add
 calendar events", "change calendar events" or "delete calendar events": nothing is held, nothing is called. An app password, a
 personal key (`pat`) or a link recording no scopes is not checked, as
@@ -1729,7 +1729,7 @@ answers, the cap refuses a made skill's `services`. With it on, see the next
 section.
 
 A call to a service that isn't linked fails with "<Service> isn't linked to
-this lamp yet. It can be linked in the app: Skills, then Connectors."
+this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts."
 (`serve::NOT_LINKED`), so the lamp says where to link it, not only that it
 isn't.
 
@@ -1742,7 +1742,7 @@ call then gets that service's answer, or its `NOT_LINKED` words.
 
 A call naming a service the lamp has no connector for (no code or name in
 the catalogue matches) fails with "The lamp can't link <name> yet. The services it can
-link are in the app: Skills, then Connectors." (`serve::CANT_LINK`, after the
+link are in the app: open this lamp, then Settings, then Linked accounts." (`serve::CANT_LINK`, after the
 first sentence). `<name>` is the name the call gave, said only when it is at
 most 40 characters, all letters, digits, spaces, `-` or `_`; any other name,
 or none, is said as "that service". `services_connected`'s description names
@@ -1920,7 +1920,7 @@ with its `--state-dir`; off, [switches.md](switches.md)). A read refused
 because the service isn't linked (`NOT_LINKED`; never "couldn't be
 reached" or another refusal) is said once, as exact words through the say
 socket after the gate is judged again: "Gmail isn't linked to this lamp
-yet. It can be linked in the app: Skills, then Connectors." The skill's
+yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts." The skill's
 name is kept in the state folder's `link-noted`, so no later read and no
 restart says it again; a read that succeeds takes it out, so a link lost
 later is told once more. The journal's "not read" line adds "told once",
@@ -1977,8 +1977,8 @@ before, and:
 - made by voice, the make's answer carries `needs_link`
   (`[{"code", "name"}]`), and after the line that it's on the model is
   asked to tell the person, in its own words and the conversation's
-  language, that the skill will start once Gmail is linked in the app,
-  under Skills, then Connectors (`made_skill::needs_link_ask`; the owner,
+  language, that the skill will start once Gmail is linked in the app:
+  open this lamp, then Settings, then Linked accounts (`made_skill::needs_link_ask`; the owner,
   10 Nov, "đồng bộ luôn": never a fixed English sentence said as it is);
 - made from the app, the ask keeps it, and `skills.made` tells it as
   `needs_link: [{"code": "gmail", "name": "Gmail"}]` ([cloud.md](cloud.md),
