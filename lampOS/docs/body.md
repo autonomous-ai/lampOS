@@ -634,7 +634,7 @@ false cut-in was heard in either. Body's exit reports over 17.6 minutes at 300 a
 pitch's highest single 20 ms step read 328 and 281, roll 32 at both, the base 196 and 200, and the arm's shoulder and
 elbow 376 and 488 against 396 and 488. Single steps over the pitch's 240 come at both speeds; the strain bounds act on
 six steps in a row (pitch, roll and yaw 240, 150 and 220; the arm 560 under `--force-limit 600`), and at 300 nothing
-was eased and nothing retreated. The product runs 300, `Tuning::SPEED_CAP`. Folded, the head reaches 15 counts below
+was eased and nothing retreated. The product runs 300; `Tuning::SPEED_CAP` is 800, energy level 5's (below). Folded, the head reaches 15 counts below
 home (`--reach`); stood up, its downward reach grows toward the upward one (`bounds()`), so a nod dips from wherever the
 speaking posture holds the head.
 
@@ -1021,6 +1021,31 @@ and 2,047. On 2026-10-09 the old runtime saved a pose of this lamp with the
 shoulder at 2,658 and the elbow at 2,650, so it has stood there; nothing
 else about the pose has been checked on this unit, and the old runtime
 reached it by moving all five joints together over five seconds.
+
+### How lively it moves: the energy level (`LAMP_BODY_ENERGY=on`, #6893)
+
+With `LAMP_BODY_ENERGY=on` (off unless exactly `on`, set in no unit) the body reads the character's
+energy level, 1 to 5, from `character/energy` (`{"level": 1..5, "chosen": bool}`) at most once a second
+(`energy_in.rs`). A level outside 1 to 5 or a message that does not read is not taken; a publisher gone
+keeps the last level, not 1. Off, the body never reads it and runs at level 1. Level 1 is today exactly:
+the limits and the stand pace the unit gives (`Limits::at(1)` returns them unchanged, a test pins it
+against `deploy/product/lamp-body.service`). Levels 2 to 5 (`energy.rs` `TABLE`) only go livelier, never
+under what the unit gives:
+
+| level | pose speed, counts/s (acceleration 6x) | stand and fold, s | idle wait x |
+|---|---|---|---|
+| 1 | the unit's (300) | the unit's (6) | 1.0 (40 to 180 s) |
+| 2 | 425 | 5.5 | 0.85 |
+| 3 | 550 | 5 | 0.7 |
+| 4 | 675 | 4.5 | 0.6 |
+| 5 | 800 | 4 | 0.5 (20 to 90 s) |
+
+A new level is taken only once the lamp is settled: no gesture playing or waiting, the pose's filter
+still (every joint under 1 count a second) and the arm not rising or folding, so a speed cap never drops
+under a joint still moving. On the host, a 480-count turn of the base lands in 1.12 s at level 5 and
+1.92 s at level 1. Every other bound (strain, load, tip, reach, the servo's own speed) is untouched.
+The table also holds each level's head roll standing, lean toward a listener and nod size; those are
+not applied yet (a later part of #6893), nor how often gestures play, which lives outside the body.
 
 ### A stand asked by voice
 
