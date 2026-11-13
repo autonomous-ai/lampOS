@@ -1025,11 +1025,20 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             product,
             openclaw::SKILLS_PRODUCT_DEFAULT,
         );
-        // OpenClaw takes no skill's run yet (#6685: its own fenced path per run
-        // is a later step), so its namespace shows lamp-control's socket to none.
+        // A skill's run on OpenClaw is one turn on its warm gateway (#6685 step 4),
+        // only with the one run path on (LAMP_SKILL_DEFAULT_AGENT=on, read only with
+        // LAMP_SKILL_TASKS on): then its wrapper carries its gateway data and its
+        // namespace shows lamp-control's socket alone. Off, as before: neither.
+        let one_path = switches.tasks
+            && lamp_update::agent_ns::default_agent(
+                std::env::var(lamp_update::agent_ns::DEFAULT_AGENT_SWITCH)
+                    .ok()
+                    .as_deref(),
+            );
         let shown = lamp_update::hermes_install::Shown {
             skills,
-            ..Default::default()
+            tasks: one_path,
+            one_path,
         };
         if acts && wanted && harness.is_none() {
             say("OpenClaw on the lamp: off, as Harness before the sign-in is off");

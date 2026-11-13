@@ -334,8 +334,9 @@ fi
 /// the same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]),
 /// with its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
 /// `shown.skills`, lamp-skills' socket folder is shown read-only too; with
-/// `shown.tasks`, lamp-control's socket alone, read-only (no round asks
-/// for it: OpenClaw takes no skill's run yet, #6685); neither, as before.
+/// `shown.tasks`, lamp-control's socket alone, read-only (a round asks for
+/// it with the one run path on only: a skill's run on the gateway reaches
+/// the lamp through it, #6685 step 4); neither, as before.
 /// A voice make's home lines ([`hermes_install::NS_HOME_LINE`]) are
 /// Hermes's alone: a make runs Hermes only, so they are taken out.
 pub fn ns_text(shown: Shown) -> String {
@@ -356,6 +357,44 @@ pub fn ns_text(shown: Shown) -> String {
 /// [`NS`]; the gateway's own start gets it from [`ns_text`].
 pub fn wrapper_text() -> String {
     agent_ns::with_ns_path(&agent_ns::with_hook_note(WRAPPER_TEXT, "openclaw"))
+}
+
+/// The line after `#!/bin/sh` of OpenClaw's wrapper with the one run path
+/// on ([`Shown::one_path`], #6685 step 4): the same for every gateway
+/// agent, naming none, what lamp-tasks looks for
+/// (`lamp_tasks::gateway_run::GATEWAY_MARK`) before a skill's run goes to
+/// the lamp's default agent as one turn on its warm gateway.
+pub const GATEWAY_MARK: &str = "# lampOS: a gateway agent: a skill's run is one turn on its warm gateway (#6685). Written by lamp-update.\n";
+
+/// OpenClaw's data as a gateway agent, after [`GATEWAY_MARK`]: shell
+/// comments, each `#@<key> <value>`, which lamp-tasks reads
+/// (`lamp_tasks::gateway_run::GatewayAgent::of`) and no shell runs. The
+/// gateway's loopback [`PORT`]; the namespace it runs in ([`NS`], which
+/// shows lamp-control's socket with the one run path on); the agent a
+/// skill's run is one turn of (its fence, lamp-tasks'
+/// `openclaw_config::SKILL_RUN_AGENT`); and the arguments, after the
+/// wrapper, of a turn (`gateway call agent`, the gateway's own RPC, never
+/// `--local`, so no turn runs outside the warm gateway), of its stop
+/// (`chat.abort`) and of its end (`sessions.delete`), as templates.
+pub const GATEWAY_DATA: &str = r#"#@port 18789
+#@ns /usr/local/lib/lampos/openclaw-ns
+#@agent lamp-skill-run
+#@turn gateway call agent --expect-final --json --timeout {ms} --params {"agentId":"{agent}","sessionKey":"agent:{agent}:{name}","message":{message},"idempotencyKey":"{name}","timeout":{secs},"deliver":false}
+#@stop gateway call chat.abort --json --timeout {ms} --params {"sessionKey":"agent:{agent}:{name}"}
+#@end gateway call sessions.delete --json --timeout {ms} --params {"key":"agent:{agent}:{name}","deleteTranscript":true}
+"#;
+
+/// [`WRAPPER`]'s text for `shown`: with [`Shown::one_path`], OpenClaw a
+/// gateway agent ([`GATEWAY_MARK`] and [`GATEWAY_DATA`] after `#!/bin/sh`,
+/// the rest [`wrapper_text`] as it is); else [`wrapper_text`], byte for
+/// byte.
+pub fn wrapper_text_for(shown: Shown) -> String {
+    let text = wrapper_text();
+    if !shown.one_path {
+        return text;
+    }
+    let rest = text.strip_prefix("#!/bin/sh\n").unwrap_or(&text);
+    format!("#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}{rest}")
 }
 
 /// [`UNIT`], written by a round (whose sandbox writes
@@ -508,10 +547,14 @@ struct Ask {
     remove: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     skills: bool,
-    /// [`Shown::tasks`]: lamp-control's socket shown (no round asks for it
-    /// yet, #6685).
+    /// [`Shown::tasks`]: lamp-control's socket shown (a round asks for it
+    /// with the one run path on only, #6685 step 4).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     tasks: bool,
+    /// [`Shown::one_path`]: OpenClaw's wrapper a gateway agent's
+    /// ([`wrapper_text_for`]).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    one_path: bool,
 }
 
 /// The install as [`RECORD`] has it, when lamp-update could have written
@@ -633,7 +676,7 @@ pub fn present(root: &Path, shown: Shown) -> bool {
         && package_version(root).as_deref() == Some(VERSION)
         && holds(root, LOCKFILE_AT, LOCKFILE)
         && node_version(root).as_deref() == Some(NODE_VERSION)
-        && holds(root, WRAPPER, &wrapper_text())
+        && holds(root, WRAPPER, &wrapper_text_for(shown))
         && holds(root, NS, &ns_text(shown))
         && agent_ns::hook_shim_there(root)
         && fs::read(unit_path(root)).is_ok_and(|bytes| bytes == UNIT_TEXT.as_bytes())
@@ -659,6 +702,7 @@ fn ask(records: &Path, remove: bool, shown: Shown) -> io::Result<()> {
         remove,
         skills: shown.skills,
         tasks: shown.tasks,
+        one_path: shown.one_path,
     })
     .map_err(io::Error::other)?;
     write_whole(&records.join(ASK), &text, 0o600)
@@ -1004,7 +1048,7 @@ fn install_with(
             Shown {
                 skills: asked.skills,
                 tasks: asked.tasks,
-                one_path: false,
+                one_path: asked.one_path,
             },
         );
         if said.install == "failed" {
@@ -1492,7 +1536,7 @@ fn write_root_file(root: &Path, path: &str, text: &str, mode: u32) -> Result<(),
 fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
     write_root_file(root, NS, &ns_text(shown), 0o755)?;
     agent_ns::write_hook_shim(root)?;
-    write_root_file(root, WRAPPER, &wrapper_text(), 0o755)
+    write_root_file(root, WRAPPER, &wrapper_text_for(shown), 0o755)
 }
 
 /// An OpenClaw in [`PLACE`] that is not this build's moved out of the

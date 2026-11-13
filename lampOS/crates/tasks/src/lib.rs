@@ -5,6 +5,7 @@
 pub mod engine;
 pub mod follow;
 pub mod gateway;
+pub mod gateway_run;
 pub mod harness;
 pub mod hermes_config;
 pub mod hold;

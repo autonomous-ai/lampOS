@@ -2888,6 +2888,24 @@ pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
     }
 }
 
+/// The fence of a skill's run on OpenClaw's gateway
+/// ([`crate::openclaw_config::write_skill_run_fence`]): the fence agent in
+/// `state_dir`'s config, its approvals in OpenClaw's home (`state_dir`'s
+/// parent), its workspace in lamp-tasks' Harness project under `home`.
+/// One journal line.
+pub fn set_up_skill_run_fence(state_dir: &Path, home: &Path) -> String {
+    let project = home.join(MACHINES_PROJECT.trim_start_matches("~/"));
+    let openclaw_home = state_dir.parent().unwrap_or(state_dir);
+    match crate::openclaw_config::write_skill_run_fence(state_dir, openclaw_home, &project) {
+        Ok(changed) => format!(
+            "tasks: OpenClaw's fence for a skill's run ({}): {}",
+            crate::openclaw_config::SKILL_RUN_AGENT,
+            if changed { "written" } else { "unchanged" }
+        ),
+        Err(error) => format!("tasks: OpenClaw's fence for a skill's run not written: {error}"),
+    }
+}
+
 /// `LAMP_HERMES_ON_LAMP` (#5978): Hermes' settings written at the part's
 /// start ([`crate::hermes_config::write`]) under `hermes_home`, for
 /// lamp-cloud's forwarder, with its local token read from `token_path`.
@@ -4183,6 +4201,15 @@ pub fn serve<C: Clock>(
             "{}",
             set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
         );
+        // #6685 step 4: with LAMP_SKILL_DEFAULT_AGENT on only, the fence a
+        // skill's run on OpenClaw's warm gateway is held to. Off, nothing
+        // here is written.
+        if std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on") {
+            eprintln!(
+                "{}",
+                set_up_skill_run_fence(Path::new(OPENCLAW_STATE_DIR), &side.home)
+            );
+        }
     }
     let served = serve_with_adapter(config, clock, stop, move |session| {
         // The update hold (#5229), off unless set: held, or lifted on a

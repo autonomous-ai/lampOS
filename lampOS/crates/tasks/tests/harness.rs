@@ -6646,6 +6646,8 @@ fn skill_run(deadline: Duration) -> SkillRun {
         skill: "photo-booth".into(),
         prompt: "Run `scripts/main.py` for the skill `photo-booth`.".into(),
         folder: PathBuf::from("/var/lib/lampOS/skills/photo-booth"),
+        script: PathBuf::from("/var/lib/lampOS/skills/photo-booth/scripts/main.py"),
+        task: "\"take a photo\"".into(),
         env: vec![
             (skill_task::SOCKET_ENV, skill_task::CONTROL_SOCKET.into()),
             (skill_task::TOKEN_ENV, RUN_SECRET.into()),

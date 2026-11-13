@@ -2792,9 +2792,11 @@ for each run, and is answered once the run ends
     instead. A wrapper lamp-update wrote (its mark, `WRAPPER_MARK`, in the
     first 512 bytes) without the run lines is said as an agent with no
     fenced run path for a skill's run yet, whatever lamp-update's switch,
-    with no engine named in the check: OpenClaw's one gateway has no
-    wrapper started per run, so as the default it is refused this way until
-    it has a fenced path of its own (a later step). The token file is written before the launch, as for
+    with no engine named in the check. An agent whose wrapper is a
+    gateway agent's (OpenClaw's with lamp-update's switch on, below,
+    "A skill's run on a gateway agent") takes the run as one turn on its
+    warm gateway instead; OpenClaw's wrapper with the switch off has no
+    gateway data either, so it is refused this way. The token file is written before the launch, as for
     Hermes, and the run is `harness new <engine>` in its own folder (below).
     Messages after the launch say "the lamp's default agent". Off, every
     run is the lamp's Hermes through its own wrapper, as above (the
@@ -3446,6 +3448,146 @@ Tests: `skill_task::tests::the_net_grant_keeps_the_network_and_no_grant_holds_it
 `a_fresh_home_is_taken_with_the_lasting_home_covered`,
 `an_agent_run_follows_its_file_in_a_fresh_home_with_no_key`,
 `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
+
+## A skill's run on a gateway agent (#6685 step 4, option (a), off unless `LAMP_SKILL_DEFAULT_AGENT=on`)
+
+A made skill's fixed write (`LAMP_SKILL_WRITE_AGENT`, above) is never a
+gateway agent's run: it has no script for the run's `start`, so it is
+refused before anything began (`not_started`), and lamp-skills sends it
+itself. A run is marked begun only once its turn is sent.
+
+With the one run path on, the one hand-over (`skill_task::answer`, the
+`Runner` interface) has two adapters behind it, chosen by what the lamp's
+default agent is, never by its name (`skill_task::AgentRun`):
+
+- **A per-run agent** (`AgentRun::PerRun`): its wrapper is the one run
+  path's (`wrapper_takes_runs`); the run is `harness new <engine>` in its
+  own folder, in a network namespace of its own (above). Hermes, Claude
+  Code.
+- **A gateway agent** (`AgentRun::Gateway`): its wrapper is lamp-update's
+  (`WRAPPER_MARK`) with `gateway_run::GATEWAY_MARK` as its second line and
+  the gateway's data after it, shell comments `#@<key> <value>` that no
+  shell runs (`lamp_update::openclaw_install::GATEWAY_DATA`): `port` (the
+  gateway's loopback port, 18789), `ns` (the namespace script the gateway
+  runs in, `/usr/local/lib/lampos/openclaw-ns`), `agent` (the fence agent,
+  `lamp-skill-run`), and `turn`, `stop` and `end`: the arguments, after
+  the wrapper, of one turn, of its stop and of its end, as templates
+  (`{name}`, `{agent}`, `{message}`, `{secs}`, `{ms}`). lamp-tasks knows
+  no engine's commands: they are lamp-update's data. Each key once, the
+  port a port, the paths and names plain, and the turn must carry
+  `{message}`; else the run is refused in words ("is a gateway agent's,
+  but ..."). The gateway's namespace must show lamp-control's socket
+  (`AGENT_NS_TASKS_LINE`): else refused, naming lamp-update's
+  `LAMP_SKILL_DEFAULT_AGENT` or `LAMP_SKILL_TASKS`. No login-shell lookup
+  is made: Harness starts nothing; lamp-tasks runs the wrapper itself, by
+  its full path. OpenClaw is the one gateway agent today: lamp-update
+  writes its wrapper this way only with `LAMP_SKILL_DEFAULT_AGENT=on`
+  (with `LAMP_SKILL_TASKS` on); off, its wrapper and namespace are byte
+  for byte as before.
+
+**A run on a gateway agent** (`gateway_run::GatewayRunner`):
+
+1. lamp-tasks makes `skill-<run-id>` (0700) in its Harness project
+   `/var/lib/lampos-tasks/harnesses/lamp-tasks`, which OpenClaw's
+   namespace shows, and writes in it `token` (the run's one-run token,
+   0600, made exclusively) and `start` (0700,
+   `gateway_run::start_text`): the one command the run may run. `start`
+   reads `token` once and deletes it (a second start has none and fails),
+   and runs the skill's script as it is (`python3 <skill
+   folder>/<script>`) with `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET` and
+   `PYTHONPATH` in its environment only. The token is never in the turn's
+   words, its arguments, the gateway's config or its session.
+2. The gateway must answer on `127.0.0.1:<port>` (`gateway::answers`),
+   waited for at most 60 s (`gateway::READY_WITHIN`); else `run_failed`
+   "the default agent's gateway did not answer ...", and no turn is sent.
+3. One turn, through the wrapper (which joins the running gateway's
+   namespaces, `nsenter`): `openclaw gateway call agent --expect-final
+   --json --timeout <ms> --params {"agentId":"lamp-skill-run",
+   "sessionKey":"agent:lamp-skill-run:skill-<run-id>","message":<words>,
+   "idempotencyKey":"skill-<run-id>","timeout":<secs>,"deliver":false}`:
+   the gateway's own RPC, never `openclaw agent --local`, so no turn ever
+   runs outside the warm gateway (a plain `openclaw agent` falls back to
+   a local run when the gateway is unreachable). The words
+   (`gateway_run::prompt`) say to run `start` once and nothing else, the
+   task quoted as data. The process is in a group of its own, its
+   environment cleared to `PATH`, its answer read to 256 KiB.
+4. **Its end.** The run is held to its deadline (14 minutes, the token's
+   life; the gateway is told the same as the turn's `timeout`, so it ends
+   the turn itself too). Exit 0 with the gateway's `status` `ok` (or none)
+   is `{"ok":true,"id":0}`; another `status` or exit status is
+   `run_failed` in words. At the deadline, or as lamp-tasks stops, the
+   token is ended with lamp-control first, then the turn's process group
+   is killed; `run_failed` "the run was ended at its deadline, 840 s".
+   However it ends: the token ended, then (once a turn was sent)
+   `chat.abort` and `sessions.delete` (with its transcript) on the run's
+   session, each bounded to 10 s and journaled when they fail, then the
+   run's folder removed. Nothing the turn printed is kept.
+
+**The fence lamp-tasks writes** (`openclaw_config::write_skill_run_fence`,
+at lamp-tasks' start with `LAMP_SKILL_DEFAULT_AGENT=on` only, as
+`lampos`, OpenClaw's user; off, nothing): in OpenClaw's `openclaw.json`,
+`agents.list` gets the fence agent `lamp-skill-run` (made with OpenClaw's
+own `main` first and `default`, when there is no list, so the person's
+spoken tasks keep their agent; a list there is kept): its own workspace
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs` (0700),
+sandbox off, `tools.allow: ["exec"]` (no read, write, edit, web, browser,
+process or session tools), nothing elevated, and its exec on the gateway's
+host by an allow-list with no prompt and no safe binaries
+(`host: gateway`, `security: allowlist`, `ask: off`, `safeBins: []`). In
+OpenClaw's exec approvals (`/var/lib/lampos-openclaw/.openclaw/exec-approvals.json`),
+the same agent gets `security: allowlist`, `ask: off`,
+`askFallback: deny`, `autoAllowSkills: false` and one allow-list entry:
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`. Every other
+key of both files is kept; a file already right is not written.
+
+### What the gateway's fence does and doesn't stop, compared with Hermes's `--net`
+
+- **Network.** Hermes's run is in a network namespace of its own with only
+  `lo` and lamp-tasks' model bridge: it can reach nothing else. A turn on
+  the gateway runs in the gateway's process, which has the lamp's normal
+  network (its unit has no network namespace: its model provider is at
+  `127.0.0.1:7741` and it binds loopback). The turn's model and the
+  gateway can reach anything the lamp can. The skill's script, started
+  by `start`, has the same network. Not fenced.
+- **Filesystem.** Both run in a mount namespace that shows only the
+  agent's own folder, the work folder, the skills read-only and
+  lamp-control's socket (OpenClaw's `ALLOWED`; `/run`, `/var/lib` and
+  `/etc/lampOS` empty and read-only otherwise). The gateway's namespace is
+  shared by every OpenClaw turn: the run's folder is visible to a spoken
+  OpenClaw task running at the same time (it is 0700, but the same
+  `lampos` user).
+- **Exec.** Hermes's run may run any command in its namespace (its
+  hardline list holds, approvals are off). The fence agent's only tool is
+  `exec`, and its allow-list matches resolved binary paths: only a run's
+  `start` runs, no chaining or redirection unless each part is allowed.
+  This is OpenClaw's policy, enforced in the gateway's own process, not by
+  the kernel: a bug in it, or a change in a later OpenClaw, opens it.
+  The script `start` runs is the skill's as the owner said yes to; what
+  that script runs is not fenced by OpenClaw.
+- **Token scope.** The same in both: one token per run, minted for that
+  run's skill and grants, ended with lamp-control when the run ends,
+  given only in the script's environment. With Hermes the token is in the
+  agent's own environment for the whole run; on the gateway it is in a
+  0600 file in the run's folder until `start` reads it once, so the
+  model has no tool to read it, and after the first start it is gone.
+- **Concurrency.** Hermes's run is a process of its own, killed with its
+  group. A gateway turn shares the one gateway with the person's spoken
+  OpenClaw tasks: a long turn takes the gateway's CPU and memory from them
+  (`MemoryMax=2500M` for all of them together), and OpenClaw queues turns
+  per session and globally, so a skill's run may wait behind a spoken
+  task. The kill at the deadline ends lamp-tasks' call and asks the
+  gateway to abort the turn (`chat.abort`), and the turn's own `timeout`
+  ends it on the gateway; whether OpenClaw kills an exec still running
+  then is OpenClaw's (its exec `timeout`), not checked here. The token
+  ended first means such a leftover can do nothing on the lamp.
+- **Not verified on a lamp.** The keys of `openclaw.json`, the exec
+  approvals' path and form, `gateway call agent` / `chat.abort` /
+  `sessions.delete` and their parameters are as OpenClaw 2026.3.2 has them
+  (its schema and docs); the lamp runs 2026.11.2. lamp-update's
+  `tools.exec.mode` key is kept as it was. Expected cost: no new process
+  beyond one CLI call (a turn starts in seconds on a warm gateway, not the
+  ~53 s to a ready per-run gateway, and adds the turn's own memory to the
+  gateway, not ~1.5 GB of a gateway of its own); to be measured on c0a4.
 
 ## Devin (#1854)
 
