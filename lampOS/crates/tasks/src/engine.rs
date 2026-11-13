@@ -770,6 +770,14 @@ fn close_due(task: &Task, now: &Clock) -> bool {
             })
 }
 
+/// A close that failed only because the agent still runs background
+/// commands (#5689): `observe_background_commands` from the read before
+/// it, or `close_background_commands` from Harness's refusal.
+pub(crate) fn background_code(code: &str) -> bool {
+    code.strip_prefix("observe_") == Some(crate::harness::BACKGROUND_COMMANDS)
+        || code == crate::harness::CLOSE_BACKGROUND_COMMANDS
+}
+
 /// Whether `task`'s harness is closed though its answer is not told yet
 /// (#6530): one on the lamp's own agent ([`crate::runtime::LAMP_TARGET`],
 /// not joined on a computer) whose newest answer was kept at least
@@ -2615,7 +2623,24 @@ impl<P: Persistence> Engine<P> {
         let mut next = self.state.clone();
         let at = next_audit(&mut next, now)?;
         let task = &mut next.tasks[index];
+        // Background commands still running (#5689: the read before found
+        // them, or Harness refused the close for them) are work not done
+        // yet, not a failure: that try is not counted, so the close is
+        // tried again every CLOSE_RETRY_MS, read first, never with `--now`,
+        // until they end. Not past WATCH_AT_MOST_MS after the told answer
+        // was kept, or after a restart: then it counts as any failure.
+        let background = matches!(&result, Err(code) if background_code(code));
+        let recent = task.observations.last().is_some_and(|newest| {
+            newest.observed.boot_id == now.boot_id
+                && now
+                    .monotonic_ms
+                    .saturating_sub(newest.observed.monotonic_ms)
+                    <= WATCH_AT_MOST_MS
+        });
         let close = task.close.as_mut().expect("current close");
+        if background && recent {
+            close.tries = close.tries.saturating_sub(1);
+        }
         (close.state, close.code) = match result {
             Ok(Closed::Closed) => (CloseState::Closed, None),
             Ok(Closed::Gone) => (CloseState::Closed, Some("gone".into())),
@@ -4395,6 +4420,144 @@ mod tests {
             .finish_close(&job, Ok(Closed::Refused), &clock(14))
             .unwrap();
         assert!(engine.begin_close(&clock(10_000_000)).unwrap().is_none());
+    }
+
+    /// `show` of the told turn, as Harness 0.6.52 writes it: idle with
+    /// `background` as its `backgroundCommands` (absent for `None`), read
+    /// as the CLI adapter reads it (#5689).
+    fn shown_idle(background: Option<serde_json::Value>) -> Observation {
+        let mut reply = serde_json::json!({"id": AGENT, "state": "idle",
+            "ask": "Write a two-line poem about coffee.",
+            "answer": "A poem about coffee, in poem.txt.", "truncated": false, "tools": 2});
+        if let Some(background) = background {
+            reply["backgroundCommands"] = background;
+        }
+        crate::harness::parse_observation(reply.to_string().as_bytes(), AGENT).unwrap()
+    }
+
+    /// One pushed read of task `id` at `at` that finds `seen`.
+    fn pushed_read(engine: &mut Engine<Memory>, id: u64, seen: Observation, at: u64) {
+        assert!(engine.push(id, &clock(at)).unwrap());
+        let job = engine.begin_observation(&clock(at)).unwrap().unwrap();
+        engine.finish_observation(&job, seen, &clock(at)).unwrap();
+    }
+
+    /// #5689 (Harness 0.6.52, openharness#4229): an agent idle with its
+    /// answer while two background commands it started still run has not
+    /// finished. The read keeps nothing, nothing is listed settled, told or
+    /// closed. Once none runs, the same answer is kept, told once and its
+    /// harness closed once.
+    #[test]
+    fn an_agent_idle_with_background_commands_running_is_told_and_closed_only_once_they_end() {
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        let running = shown_idle(Some(serde_json::json!(2)));
+        assert_eq!(running.state, "working");
+        assert!(!settled(&running));
+        pushed_read(&mut engine, id, running, 10);
+        assert!(engine.state.tasks[0].observations.is_empty());
+        assert!(engine.settled_within(&clock(11), u64::MAX).is_empty());
+        assert!(engine.begin_close(&clock(11)).unwrap().is_none());
+        // Still running at the watch's own looks: still nothing.
+        pushed_read(&mut engine, id, shown_idle(Some(serde_json::json!(1))), 20);
+        assert!(engine.state.tasks[0].observations.is_empty());
+        // None left: kept on that read, told, then closed, once each.
+        pushed_read(&mut engine, id, shown_idle(Some(serde_json::json!(0))), 30);
+        let task = &engine.state.tasks[0];
+        assert_eq!(task.observations.len(), 1);
+        assert!(settled(&task.observations[0].data));
+        let observation = task.observations[0].id;
+        assert!(engine.begin_close(&clock(31)).unwrap().is_none(), "untold");
+        engine
+            .handle(&claim(&engine, id, observation), &clock(32), true)
+            .unwrap();
+        engine
+            .handle(&acknowledgement(&engine, id, observation), &clock(33), true)
+            .unwrap();
+        assert!(
+            engine
+                .handle(&claim(&engine, id, observation), &clock(34), true)
+                .is_err(),
+            "told once"
+        );
+        let job = engine.begin_close(&clock(35)).unwrap().unwrap();
+        engine
+            .finish_close(&job, Ok(Closed::Closed), &clock(36))
+            .unwrap();
+        assert!(engine.begin_close(&clock(10_000_000)).unwrap().is_none());
+    }
+
+    /// #5689: `backgroundCommands` unknown (`null`: Codex, OpenClaw,
+    /// Windows) or absent (Harness before 0.6.52) never holds a finish: the
+    /// idle answer is kept on the read and its harness closed once told, as
+    /// before.
+    #[test]
+    fn background_commands_unknown_or_absent_finish_as_before() {
+        for background in [None, Some(serde_json::Value::Null)] {
+            let seen = shown_idle(background.clone());
+            assert_eq!(seen.state, "idle", "{background:?}");
+            let (mut engine, _) = opened();
+            let id = accepted(&mut engine, 0);
+            pushed_read(&mut engine, id, seen, 10);
+            assert_eq!(engine.state.tasks[0].observations.len(), 1);
+            assert_eq!(engine.settled_within(&clock(11), u64::MAX).len(), 1);
+            let observation = engine.state.tasks[0].observations[0].id;
+            engine
+                .handle(&claim(&engine, id, observation), &clock(12), true)
+                .unwrap();
+            engine
+                .handle(&acknowledgement(&engine, id, observation), &clock(13), true)
+                .unwrap();
+            assert!(engine.begin_close(&clock(14)).unwrap().is_some());
+        }
+    }
+
+    /// #5689: a close that finds background commands still running, in the
+    /// read before it or in Harness's refusal, is not done: tried again a
+    /// minute later, read first, for as long as they run, without counting
+    /// as a try, until the close goes through. A day after the told answer
+    /// was kept, such a try counts as any failure, and three end it.
+    #[test]
+    fn a_close_held_by_background_commands_is_tried_again_until_they_end() {
+        let (mut engine, _) = opened();
+        told(&mut engine, "idle", 10);
+        let mut at = 13;
+        let codes = ["observe_background_commands", "close_background_commands"];
+        for round in 0..2 * usize::from(CLOSE_TRIES) {
+            let job = engine.begin_close(&clock(at)).unwrap().unwrap();
+            assert_eq!(job.tries, 1, "round {round}");
+            engine
+                .finish_close(&job, Err(codes[round % 2].into()), &clock(at))
+                .unwrap();
+            let close = engine.state.tasks[0].close.as_ref().unwrap();
+            assert_eq!(close.state, CloseState::Failed);
+            assert!(
+                engine
+                    .begin_close(&clock(at + CLOSE_RETRY_MS - 1))
+                    .unwrap()
+                    .is_none()
+            );
+            at += CLOSE_RETRY_MS;
+        }
+        let job = engine.begin_close(&clock(at)).unwrap().unwrap();
+        engine
+            .finish_close(&job, Ok(Closed::Closed), &clock(at))
+            .unwrap();
+        assert!(engine.begin_close(&clock(at * 10)).unwrap().is_none());
+
+        // A day on, they count: three, then it is left open.
+        let (mut engine, _) = opened();
+        told(&mut engine, "idle", 10);
+        let mut at = 10 + WATCH_AT_MOST_MS + 1;
+        for tries in 1..=CLOSE_TRIES {
+            let job = engine.begin_close(&clock(at)).unwrap().unwrap();
+            assert_eq!(job.tries, tries);
+            engine
+                .finish_close(&job, Err(codes[0].into()), &clock(at))
+                .unwrap();
+            at += CLOSE_RETRY_MS;
+        }
+        assert!(engine.begin_close(&clock(at * 10)).unwrap().is_none());
     }
 
     /// A restart while a close was under way leaves it not known, and so

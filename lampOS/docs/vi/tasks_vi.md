@@ -1662,6 +1662,17 @@ lại hơn 7 phút trong `epoll_wait`.
   làm) chỉ dành cho lần chạy skill do chính lamp-tasks mở
   (`HarnessRunner`, #6510 Part 1 bước 2), lúc hết hạn hay khi xong. Việc
   đóng ở trên không bao giờ dùng `--now`.
+- **Lệnh nền còn chạy** (#5689, Harness 0.6.52, openharness#4229): `show`
+  của agent `idle` có `backgroundCommands` lớn hơn 0 được đọc là `working`,
+  nên chưa được giữ, chưa kể tin, chưa đóng cho tới khi không còn lệnh nào
+  chạy; khi đó tin được kể một lần. `null` (Codex, OpenClaw, Windows) hay
+  không có trường này (Harness trước 0.6.52) thì như trước. Sự kiện
+  `background` của `watch --json` là còn đang làm: không đọc, chờ `done`
+  sau nó. Nếu lần đọc trước khi đóng thấy lệnh nền
+  (`observe_background_commands`), hay `close` từ chối với `N background
+  commands running` (`close_background_commands`), việc đóng được thử lại
+  sau một phút, đọc trước, không bao giờ dùng `--now`, và không tính vào ba
+  lần thử, trong tối đa một ngày sau khi câu trả lời được giữ.
 - **Test:** `the_lamps_own_agent_is_closed_once_done_its_news_untold`. Đang
   làm, hay idle chưa có câu trả lời: để mở. Xong mà chưa kể: để mở dưới một
   phút, rồi đóng. Trên máy tính: chờ kể.
