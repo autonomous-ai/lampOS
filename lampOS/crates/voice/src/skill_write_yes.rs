@@ -96,6 +96,9 @@ pub struct Waiting {
     /// told in [`waiting_note`] alike, and every wait's yes is the owner's
     /// only (`make_skill_local::not_owners_yes_refused`).
     pub noted: bool,
+    /// The person's answer to it was read as unclear once ([`answered`]):
+    /// a second unclear keeps nothing and ends the wait.
+    pub unclear: bool,
 }
 
 /// A skill's task, or a made skill's code, just agreed to (#6749 A): its
@@ -176,6 +179,7 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
             echoes: Vec::new(),
             said: VecDeque::new(),
             noted,
+            unclear: false,
         });
     });
     if code {
@@ -251,9 +255,16 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
             "(For you to know, not to answer: the skill {} that the lamp just said back waits \
              for their yes {before}, approve_id \"{}\". If they agree, in any words, call \
              make_skill with only that approve_id. If they decline, wait or change it, don't \
-             call it: it stays off.)",
+             call it: it stays off.{answer})",
             crate::made_skill::spoken_name(&waiting.asks.skill),
-            waiting.id
+            waiting.id,
+            answer = if is_a_tasks_wait(waiting) {
+                " For this one, always give answer with that approve_id: \"yes\" only if they \
+                 agree, \"no\" if they decline or wait, \"unclear\" if you can't tell; left \
+                 out, it is read as unclear."
+            } else {
+                ""
+            }
         ))
     })
 }
@@ -317,6 +328,119 @@ pub fn answer_awaited(request: u64, now: Instant) -> bool {
                         !cut && crate::services::read_back_said(&waiting.asks.say_back, said)
                     })
         })
+    })
+}
+
+/// The `make_skill` argument beside [`APPROVE_ID`] that says what the
+/// person answered the say-back (#6835 gap 2): [`ANSWERS`]. Code decides
+/// when the call is made ([`approve_force`]); the model decides what it
+/// says.
+pub const ANSWER: &str = "answer";
+/// What [`ANSWER`] takes. Left out, it reads as `yes`, as before.
+pub const ANSWERS: [&str; 3] = ["yes", "no", "unclear"];
+
+/// The force the second route's chat is given with a skill's tasks on and
+/// `make_skill` declared (`second_provider::net::Chat::forcing`, #6835
+/// gap 2, the first builder's option (b) on #6811): the round 1 of the
+/// person's line right after a skill's task said back is made to call
+/// `make_skill`, the call that takes its `approve_id` and the person's
+/// [`ANSWER`]. Only while a task's wait (never a make's writes or code)
+/// holds, within [`YES_WITHIN`], and the lamp's newest answer kept toward it
+/// held the whole say-back uncut: so one round only (the round's own answer
+/// is newer, and is no say-back), never after a cut or partial read-back,
+/// never with nothing waiting, and never in the say-back's own written turn
+/// (no answer kept yet). On lamp-52e6 (13 Nov, row-photo2) the model,
+/// after a `use_skill` it started itself and the read-back said unasked,
+/// answered "Yes." with "Want me to go ahead with that?" and called
+/// nothing, so no yes was kept.
+pub fn approve_force() -> crate::second_provider::net::Force {
+    std::sync::Arc::new(|messages: &[crate::second_provider::net::Message]| {
+        messages.last().filter(|message| message.role == "user")?;
+        if !approve_forced_now(Instant::now()) {
+            return None;
+        }
+        eprintln!(
+            "lamp-voice second: the line after a skill's task said back whole: its first round must call {}",
+            crate::made_skill::MAKE
+        );
+        Some(crate::second_provider::net::Forced {
+            name: crate::made_skill::MAKE,
+            only: None,
+        })
+    })
+}
+
+/// Whether `waiting` is a skill's task's wait, the one [`approve_force`]
+/// forces (never a made skill's writes or code).
+fn is_a_tasks_wait(waiting: &Waiting) -> bool {
+    waiting.asks.grants.is_some() && !waiting.asks.code
+}
+
+/// Whether [`approve_force`] forces a request at `now`.
+pub fn approve_forced_now(now: Instant) -> bool {
+    kept::waiting(|waiting| {
+        waiting.as_ref().is_some_and(|waiting| {
+            is_a_tasks_wait(waiting)
+                && now.saturating_duration_since(waiting.at) <= YES_WITHIN
+                && waiting
+                    .said
+                    .iter()
+                    .max_by_key(|(id, ..)| *id)
+                    .is_some_and(|(id, said, cut)| {
+                        *id >= waiting.request
+                            && !cut
+                            && crate::services::read_back_said(&waiting.asks.say_back, said)
+                    })
+        })
+    })
+}
+
+/// What the model is told when the person declined the say-back.
+pub const DECLINED_NEXT: &str = "Nothing was agreed. Say only, in the conversation's language, \
+     that it stays off: nothing runs or is sent. Ask nothing, call nothing.";
+/// What the model is told when the person's answer was unclear, once.
+pub const UNCLEAR_NEXT: &str = "Nothing was agreed yet: their answer wasn't clear. Ask them \
+     once, short, in the conversation's language, whether it may go ahead, yes or no. Call \
+     nothing now.";
+
+/// The person's `answer` ([`ANSWER`]) to the wait `id` in `request`, when
+/// it is not a yes: a no ends the wait and keeps nothing; an unclear one
+/// keeps nothing and asks once more, and a second unclear ends the wait as
+/// a no. What the model is told; none for a yes (or no answer given), so
+/// [`approve`] takes it with every guard, and none for an id not waiting.
+pub fn answered(id: &str, request: u64, answer: Option<&str>) -> Option<Value> {
+    if answer == Some("yes") {
+        return None;
+    }
+    kept::waiting(|kept| {
+        let waiting = kept.as_mut().filter(|waiting| waiting.id == id)?;
+        // Left out: a yes for a made skill's writes or code, as before;
+        // for a skill's task, whose approval call code forces whatever the
+        // person said ([`approve_force`]), unclear, so a forced call with
+        // no answer never keeps a yes nobody gave.
+        let answer = match answer {
+            Some(answer) => answer,
+            None if is_a_tasks_wait(waiting) => "unclear",
+            None => return None,
+        };
+        let skill = waiting.asks.skill.clone();
+        if answer == "unclear" && !waiting.unclear {
+            waiting.unclear = true;
+            eprintln!(
+                "lamp-voice: request {request}: the answer to {skill}'s say-back was unclear: nothing kept, asked once more"
+            );
+            return Some(json!({ "approved": false, "next": UNCLEAR_NEXT }));
+        }
+        *kept = None;
+        eprintln!(
+            "lamp-voice: request {request}: the answer to {skill}'s say-back was {}: nothing kept, it stays off",
+            if answer == "unclear" {
+                "unclear again"
+            } else {
+                "no"
+            }
+        );
+        Some(json!({ "approved": false, "next": DECLINED_NEXT }))
     })
 }
 

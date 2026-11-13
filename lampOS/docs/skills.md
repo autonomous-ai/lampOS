@@ -1719,6 +1719,29 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   every guard: said whole and uncut first, a later heard line, the echo
   held, `YES_WITHIN`, its `approve_id` noted on each later heard line, and
   the owner's yes only (`make_skill_local::not_owners_yes_refused`).
+  The person's line right after it has its round 1 forced to `make_skill`
+  (`tool_choice`, `skill_write_yes::approve_force`, given with
+  `make_skill` declared and the switch on, before every other force),
+  whose `approve_id` form also takes `answer`: `yes`, `no` or `unclear`
+  (left out: `yes` for a made skill's writes or
+  code, as before; `unclear` for a skill's task, so a forced call with no
+  answer never keeps a yes). Code decides when; the model decides what (#6835 gap
+  2, the first builder's option (b) on #6811; on lamp-52e6 on 13 Nov the
+  model, after a `use_skill` it started itself, answered the owner's
+  "Yes." with "Want me to go ahead with that?" and called nothing). The
+  force holds only while a task's wait (never a make's writes or code) is
+  within `YES_WITHIN` and the lamp's newest answer kept toward it held the
+  whole say-back uncut: so for that one round, never after a cut or
+  partial read-back, never in the say-back's own turn, never with nothing
+  waiting. `yes` goes through the approval with every guard above; `no`
+  keeps nothing, ends the wait and the lamp says it stays off
+  (`skill_write_yes::DECLINED_NEXT`); `unclear` keeps nothing and the lamp
+  asks once more (`UNCLEAR_NEXT`), and a second `unclear` ends the wait as
+  a `no` (`skill_write_yes::answered`). The journal: "the line after a
+  skill's task said back whole: its first round must call make_skill",
+  then the approval's lines, or "the answer to NAME's say-back was no:
+  nothing kept, it stays off" / "… was unclear: nothing kept, asked once
+  more".
   One wait at a time, as for any read-back: a newer one replaces it. The
   Live route never begins such a say ("a task's yes is taken on the second
   route only"). On the yes lamp-control records exactly that folder's
