@@ -14,6 +14,13 @@
 //! - [`SKILLS_DIR`] in `skills.external_dirs`: Hermes reads the lamp's own
 //!   skills where they are, read-only, never copied into `HERMES_HOME`;
 //!   the dirs a person added there are kept;
+//! - [`RUN_ENV`] in `terminal.shell_init_files` (#6684): Hermes's launcher
+//!   replaces the `PYTHONPATH` it is started with, so a skill run's SDK
+//!   path reaches Hermes's commands only through the files its terminal
+//!   sources before its login snapshot. A list there replaces Hermes's
+//!   defaults ([`SHELL_DEFAULTS`]), so they are listed first when the merge
+//!   makes the list (unless `terminal.auto_source_bashrc` is off); the
+//!   files a person listed are kept;
 //! - `.env`'s [`TOKEN_ENV`] line: the forwarder's local token, never the
 //!   relay's key;
 //! - with [`AGENT_SERVICES_SWITCH`] on, `mcp_servers.lamp-services`
@@ -65,6 +72,16 @@ pub const APPROVALS: &str = "manual";
 /// The lamp's own skills, the folder lamp-skills reads (`lamp-skills
 /// --dir`), given to Hermes in place through `skills.external_dirs`.
 pub const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
+
+/// lamp-update's root-owned file (`lamp_update::hermes_install::RUN_ENV`)
+/// that puts the lamp's SDK on a skill run's `PYTHONPATH`, given to Hermes
+/// in `terminal.shell_init_files` (#6684).
+pub const RUN_ENV: &str = "/usr/local/lib/lampos/hermes-run-env.sh";
+
+/// What Hermes's terminal sources while `terminal.shell_init_files` is
+/// unset (and `auto_source_bashrc` on), in its order: an explicit list
+/// replaces them, so the merge keeps them when it makes the list.
+pub const SHELL_DEFAULTS: [&str; 3] = ["~/.profile", "~/.bash_profile", "~/.bashrc"];
 
 /// The lamp's agent's connectors' switch, `on` exactly; off unless set
 /// (`lamp_services::AGENT_SERVICES_ENVIRONMENT`), in lamp-tasks' own unit.
@@ -496,6 +513,50 @@ fn add_to_list(parts: &mut Vec<Part>, top: &str, child: &str, item: &str) -> Res
     Ok(())
 }
 
+/// The inline value of `top.child`, `Some("")` for one with lines under
+/// it; `None` when `top` or `child` is not there, or `top` is not a block
+/// mapping (then [`add_to_list`] says what it is).
+fn child_value(parts: &[Part], top: &str, child: &str) -> Result<Option<String>, Refused> {
+    let Some(part) = parts.iter().find(|part| part.key.as_deref() == Some(top)) else {
+        return Ok(None);
+    };
+    if !inline_value(&part.lines[0]).is_empty() {
+        return Ok(None);
+    }
+    let (_, starts) = children(part, top)?;
+    Ok(starts
+        .iter()
+        .find(|(_, key)| key == child)
+        .map(|(index, _)| inline_value(&part.lines[*index]).to_owned()))
+}
+
+/// [`RUN_ENV`] in `terminal.shell_init_files`. Making the list, Hermes's
+/// [`SHELL_DEFAULTS`] go in first, as Hermes would have sourced them, unless
+/// `terminal.auto_source_bashrc` is off (YAML 1.1's `false`, `no`, `off`);
+/// a list already there is kept as it is, [`RUN_ENV`] added last.
+fn add_shell_init(parts: &mut Vec<Part>) -> Result<(), Refused> {
+    const TOP: &str = "terminal";
+    const CHILD: &str = "shell_init_files";
+    let listed = child_value(parts, TOP, CHILD)?.is_some_and(|value| !is_unset(&value));
+    let auto = child_value(parts, TOP, "auto_source_bashrc")?.is_none_or(|value| {
+        let bare = value
+            .split(" #")
+            .next()
+            .unwrap_or_default()
+            .trim()
+            .trim_matches(['"', '\'']);
+        !["false", "no", "off"]
+            .iter()
+            .any(|off| bare.eq_ignore_ascii_case(off))
+    });
+    if !listed && auto {
+        for file in SHELL_DEFAULTS {
+            add_to_list(parts, TOP, CHILD, file)?;
+        }
+    }
+    add_to_list(parts, TOP, CHILD, RUN_ENV)
+}
+
 fn quoted(value: &str) -> String {
     let mut out = String::with_capacity(value.len() + 2);
     out.push('"');
@@ -551,6 +612,7 @@ pub fn merge_config_for(text: &str, port: u16, agent_services: bool) -> Result<S
         Some(&one("mode", APPROVALS)),
     )?;
     add_to_list(&mut parts, "skills", "external_dirs", SKILLS_DIR)?;
+    add_shell_init(&mut parts)?;
     merge_mcp_servers(&mut parts, agent_services)?;
     let mut out = String::new();
     for part in &parts {
@@ -1317,5 +1379,92 @@ skills:
             );
         }
         assert!(!text.contains("~/.hermes/skills/<"), "never a copy");
+    }
+
+    /// The lines under `terminal.shell_init_files` in `text`, trimmed.
+    fn init_files(text: &str) -> Vec<String> {
+        let lines: Vec<&str> = text.lines().collect();
+        let Some(at) = lines
+            .iter()
+            .position(|line| line.trim() == "shell_init_files:")
+        else {
+            return Vec::new();
+        };
+        lines[at + 1..]
+            .iter()
+            .take_while(|line| line.trim_start().starts_with("- "))
+            .map(|line| line.trim().to_owned())
+            .collect()
+    }
+
+    #[test]
+    fn the_run_env_goes_after_hermess_defaults_when_the_list_is_made() {
+        let quoted = |path: &str| format!("- \"{path}\"");
+        let made = [
+            SHELL_DEFAULTS[0],
+            SHELL_DEFAULTS[1],
+            SHELL_DEFAULTS[2],
+            RUN_ENV,
+        ]
+        .map(quoted);
+        for text in [
+            "",
+            HARNESS,
+            "terminal: {}\n",
+            "terminal:\n  backend: local\n",
+            "terminal:\n  shell_init_files: []\n",
+            "terminal:\n  auto_source_bashrc: true\n",
+        ] {
+            let merged = merge_config(text, 7741).unwrap();
+            assert_eq!(init_files(&merged), made, "{text:?}");
+            assert_eq!(
+                merge_config(&merged, 7741).unwrap(),
+                merged,
+                "twice: {text:?}"
+            );
+        }
+        let kept = merge_config("terminal:\n  backend: local\n", 7741).unwrap();
+        assert!(kept.contains("  backend: local\n"), "{kept}");
+        assert!(
+            merge_config(HARNESS, 7741)
+                .unwrap()
+                .contains(&hooks_block(HARNESS))
+        );
+    }
+
+    #[test]
+    fn a_persons_list_is_kept_and_the_defaults_stay_off_when_they_turned_them_off() {
+        let theirs =
+            merge_config("terminal:\n  shell_init_files:\n  - ~/.nvm/nvm.sh\n", 7741).unwrap();
+        assert_eq!(
+            init_files(&theirs),
+            ["- ~/.nvm/nvm.sh".to_owned(), format!("- \"{RUN_ENV}\"")]
+        );
+        let there = format!("terminal:\n  shell_init_files:\n  - {RUN_ENV}/\n");
+        assert_eq!(
+            merge_config(&there, 7741).unwrap(),
+            merge_config(&there, 7741).unwrap()
+        );
+        assert_eq!(
+            init_files(&merge_config(&there, 7741).unwrap()),
+            [format!("- {RUN_ENV}/")],
+            "there already"
+        );
+        for off in ["false", "False", "no", "off", "'false'", "false # mine"] {
+            let text = format!("terminal:\n  auto_source_bashrc: {off}\n");
+            let merged = merge_config(&text, 7741).unwrap();
+            assert_eq!(init_files(&merged), [format!("- \"{RUN_ENV}\"")], "{off}");
+        }
+    }
+
+    #[test]
+    fn a_terminal_it_cannot_merge_is_refused_and_left() {
+        for text in [
+            "terminal: local\n",
+            "terminal:\n  shell_init_files: {a: b}\n",
+            "terminal:\n  shell_init_files:\n  - [a]\n",
+        ] {
+            assert!(merge_config(text, 7741).is_err(), "{text:?}");
+        }
     }
 }

@@ -147,11 +147,13 @@ impl Lamp {
     fn hermes_at(&self, commit: &str) {
         put_hermes(self.root(), commit);
     }
-    /// Hermes and its two entry points, as this build's install leaves them.
+    /// Hermes, its two entry points and the file its terminal sources, as
+    /// this build's install leaves them.
     fn hermes_there(&self) {
         self.hermes_at(COMMIT);
         fs::write(self.at(WRAPPER), wrapper_text(false)).unwrap();
         fs::write(self.at(NS), ns_text(false, false)).unwrap();
+        fs::write(self.at(RUN_ENV), RUN_ENV_TEXT).unwrap();
         agent_ns::write_hook_shim(self.root()).unwrap();
         // The build's own lampos SDK beside them (#6507).
         crate::sdk_tree::write(self.root()).unwrap();
@@ -166,7 +168,7 @@ impl Lamp {
         fs::write(self.records().join(ASK), "{\"version\":1}").unwrap();
     }
     fn entry_points(&self) -> Vec<&'static str> {
-        [WRAPPER, NS]
+        [WRAPPER, NS, RUN_ENV]
             .into_iter()
             .filter(|path| self.at(path).exists())
             .collect()
@@ -500,10 +502,11 @@ fn on_with_harness_there_installs_the_pinned_hermes_as_lampos() {
         names
     };
     // The namespace script, the shared hook stand-in's folder (#6530) and
-    // the build's own lampos SDK (#6507, one folder, no staging left beside).
+    // the build's own lampos SDK (#6507, one folder, no staging left beside)
+    // and the file Hermes's terminal sources for a run's SDK path (#6684).
     assert_eq!(
         names("/usr/local/lib/lampos"),
-        ["hermes-ns", "ns-bin", "sdk-python"]
+        ["hermes-ns", "hermes-run-env.sh", "ns-bin", "sdk-python"]
     );
     assert_eq!(names(agent_ns::BIN), ["harness"]);
     assert!(crate::sdk_tree::present(lamp.root()));
@@ -3072,4 +3075,89 @@ fn with_the_one_path_hermes_runs_through_the_one_agent_namespace() {
         fs::read_to_string(lamp.records().join(ASK)).unwrap(),
         "{\"version\":1,\"skills\":true}"
     );
+}
+
+/// #6684: Hermes's launcher replaces the `PYTHONPATH` it is started with,
+/// so [`RUN_ENV`] puts the SDK back in its terminal's login snapshot, for a
+/// skill run only: with `LAMP_CONTROL_SOCKET` set, the SDK first and what
+/// was there kept, never twice; without it, `PYTHONPATH` as it was.
+#[test]
+fn the_run_env_puts_the_sdk_on_a_skill_runs_pythonpath_only() {
+    assert!(
+        RUN_ENV.starts_with("/usr/local/lib/lampos/"),
+        "beside the namespace script, root's"
+    );
+    assert_eq!(
+        RUN_ENV_TEXT.matches(SDK_PYTHONPATH).count(),
+        3,
+        "the one SDK path the wrapper gives a run"
+    );
+    let folder = tempfile::tempdir().unwrap();
+    let file = folder.path().join("hermes-run-env.sh");
+    fs::write(&file, RUN_ENV_TEXT).unwrap();
+    let sourced = |socket: Option<&str>, path: Option<&str>| {
+        let mut command = std::process::Command::new("/bin/sh");
+        command
+            .args(["-c", ". \"$1\"; . \"$1\"; printf '%s|%s' \"${PYTHONPATH-unset}\" \"$(env | grep -c '^PYTHONPATH=')\"", "sh"])
+            .arg(&file)
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin");
+        if let Some(socket) = socket {
+            command.env("LAMP_CONTROL_SOCKET", socket);
+        }
+        if let Some(path) = path {
+            command.env("PYTHONPATH", path);
+        }
+        let out = command.output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let socket = Some(CONTROL_SOCKET);
+    assert_eq!(
+        sourced(socket, None),
+        format!("{SDK_PYTHONPATH}|1"),
+        "exported"
+    );
+    assert_eq!(
+        sourced(socket, Some("/h/repo:/h/site")),
+        format!("{SDK_PYTHONPATH}:/h/repo:/h/site|1"),
+        "first, and Hermes's own kept"
+    );
+    assert_eq!(
+        sourced(socket, Some(SDK_PYTHONPATH)),
+        format!("{SDK_PYTHONPATH}|1")
+    );
+    assert_eq!(sourced(None, None), "unset|0", "no run, nothing set");
+    assert_eq!(
+        sourced(Some(""), Some("/a")),
+        "/a|1",
+        "an empty socket is no run"
+    );
+    assert_eq!(sourced(None, Some("/a:/b")), "/a:/b|1");
+}
+
+/// The install writes [`RUN_ENV`] root's 0644, never run, and its text is
+/// part of Hermes being there: changed or missing, it is written again.
+#[test]
+fn the_run_env_is_written_with_the_entry_points_and_counted_in_present() {
+    let lamp = Lamp::new();
+    lamp.hermes_there();
+    let shown = OFF;
+    assert!(present(lamp.root(), shown));
+    fs::write(
+        lamp.at(RUN_ENV),
+        "PYTHONPATH=/elsewhere; export PYTHONPATH\n",
+    )
+    .unwrap();
+    assert!(
+        !present(lamp.root(), shown),
+        "another text is Hermes missing"
+    );
+    fs::remove_file(lamp.at(RUN_ENV)).unwrap();
+    assert!(!present(lamp.root(), shown), "so is none");
+    write_entry_points(lamp.root(), shown).unwrap();
+    assert!(holds(lamp.root(), RUN_ENV, RUN_ENV_TEXT));
+    let mode = fs::metadata(lamp.at(RUN_ENV)).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o644);
+    assert!(present(lamp.root(), shown));
 }

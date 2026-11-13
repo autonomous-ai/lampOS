@@ -328,6 +328,27 @@ pub const RUNS: &str = "/run/lampos-tasks/runs";
 /// `lamp_tasks::skill_task::SDK_PYTHONPATH`): a run's `PYTHONPATH`.
 pub const SDK_PYTHONPATH: &str = "/usr/local/lib/lampos/sdk-python";
 
+/// The file Hermes's terminal sources before its session's login snapshot
+/// (`terminal.shell_init_files`, written there by lamp-tasks'
+/// `hermes_config::RUN_ENV`, #6684): Hermes's own launcher replaces the
+/// `PYTHONPATH` it is started with, so a skill run's [`SDK_PYTHONPATH`]
+/// never reaches its commands any other way. Root's, 0644: Hermes reads it
+/// and cannot change it.
+pub const RUN_ENV: &str = "/usr/local/lib/lampos/hermes-run-env.sh";
+
+/// [`RUN_ENV`]'s text: [`SDK_PYTHONPATH`] put first on `PYTHONPATH` only
+/// when `LAMP_CONTROL_SOCKET` is set, which only a skill run's start sets
+/// (the wrapper's run lines); a person's own Hermes, or a spoken task,
+/// gets nothing. Already first, it is not added again.
+pub const RUN_ENV_TEXT: &str = "\
+# lampOS: a skill run's lampos SDK on PYTHONPATH (lamp-update writes this file).
+case ${LAMP_CONTROL_SOCKET-} in ?*)
+  case ${PYTHONPATH-} in /usr/local/lib/lampos/sdk-python|/usr/local/lib/lampos/sdk-python:*) ;;
+  *) PYTHONPATH=/usr/local/lib/lampos/sdk-python${PYTHONPATH:+:$PYTHONPATH}; export PYTHONPATH ;;
+  esac ;;
+esac
+";
+
 /// The lines a wrapper finds a skill's run by (#6510 Part 1 step 2), as
 /// text for `concat!`: Harness passes an engine no variable of
 /// lamp-tasks', so the run is named by its folder. Only when `pwd -P` is
@@ -912,7 +933,7 @@ pub(crate) fn on(root: &Path, path: &str) -> PathBuf {
 
 /// The entry points `lampos` reaches Hermes by, any of them there.
 fn entry_points(root: &Path) -> impl Iterator<Item = PathBuf> + '_ {
-    [WRAPPER, NS]
+    [WRAPPER, NS, RUN_ENV]
         .into_iter()
         .map(|path| on(root, path))
         .filter(|path| fs::symlink_metadata(path).is_ok())
@@ -952,6 +973,8 @@ pub fn present(root: &Path, shown: Shown) -> bool {
             let (ns, text) = ns_for(shown);
             holds(root, ns, &text)
         }
+        // What Hermes's terminal sources for a skill run's SDK path (#6684).
+        && holds(root, RUN_ENV, RUN_ENV_TEXT)
         // The build's own lampos SDK, one copy for every agent (#6507).
         && crate::sdk_tree::present(root)
         && agent_ns::hook_shim_there(root)
@@ -1386,7 +1409,7 @@ fn install_with(
 /// another engine's namespace script still uses it. Hermes's folder and
 /// Hermes in it stay.
 fn remove_entry_points(root: &Path, say: &mut dyn FnMut(&str)) {
-    for path in [WRAPPER, NS] {
+    for path in [WRAPPER, NS, RUN_ENV] {
         match fs::remove_file(on(root, path)) {
             Ok(()) => say(&format!("{path} taken out")),
             Err(error) if error.kind() == ErrorKind::NotFound => {}
@@ -1771,6 +1794,10 @@ pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
 fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
     // The build's own lampos SDK first (#6507): the one read-only copy a skill's script imports.
     crate::sdk_tree::write(root)?;
+    // What Hermes's terminal sources for a skill run's SDK path (#6684): 0644, never run.
+    let place = on(root, RUN_ENV);
+    write_whole(&place, RUN_ENV_TEXT.as_bytes(), 0o644)
+        .map_err(|error| format!("{RUN_ENV}: {error}"))?;
     let (ns_path, ns) = ns_for(shown);
     let wrapper = wrapper_for(shown);
     for (path, text) in [(ns_path, ns.as_str()), (WRAPPER, wrapper.as_str())] {
