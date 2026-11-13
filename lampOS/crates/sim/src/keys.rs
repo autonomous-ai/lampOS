@@ -474,7 +474,7 @@ mod tests {
     const FILE: &str = "[main]\ngemini = \"test-key-not-real-gemini\"\n[own]\ndeepseek = \"test-key-not-real-deepseek\"\ndeepseek_url = \"https://test-not-real.invalid/v1\"\ndeepgram = \"test-key-not-real-deepgram\"\nelevenlabs = \"test-key-not-real-eleven\"\nopenai = \"test-key-not-real-openai\"\n";
 
     fn folder(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("lsm-keys-{name}-{}", std::process::id()));
+        let dir = crate::test_root().join(format!("lsm-keys-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir

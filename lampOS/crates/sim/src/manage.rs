@@ -166,7 +166,7 @@ mod tests {
         // The socket in a short folder of its own: a Unix socket path holds
         // about 100 bytes, and a deep target folder would not bind (and the
         // connect loop below would wait for ever).
-        let socket_dir = std::env::temp_dir().join(format!("lsm-{}", std::process::id()));
+        let socket_dir = crate::test_root().join(format!("lsm-{}", std::process::id()));
         std::fs::create_dir_all(&socket_dir).unwrap();
         let socket = socket_dir.join("m.sock");
         let (s, b, l) = (socket.clone(), bin.clone(), dir.join("log"));
