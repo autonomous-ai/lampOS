@@ -3300,6 +3300,7 @@ fn a_lamp_with_a_make(base: &Path) -> PathBuf {
         ("h/.hermes/state.db", "STATE"),
         ("h/.hermes/hermes-agent/run.sh", "echo ran"),
         ("h/.hermes/tools/python-3/bin/python3", "the interpreter"),
+        ("h/.hermes/installs/k/facts.json", "the dependency record"),
         ("h/.local/bin/README", "the program"),
         ("w/top.md", "W"),
         ("w/lamp/AGENTS.md", "HARNESS PROJECT"),
@@ -3381,10 +3382,11 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         ]
     };
     let mut wanted = vec![
-        format!("mkdir -m 0700 {x} {x}/f {x}/c {x}/t"),
+        format!("mkdir -m 0700 {x} {x}/f {x}/c {x}/t {x}/i"),
         format!("mount --bind {f} {x}/f"),
         format!("mount --bind {h}/.hermes/hermes-agent {x}/c"),
         format!("mount --bind {h}/.hermes/tools {x}/t"),
+        format!("mount --bind {h}/.hermes/installs {x}/i"),
         format!("mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
         format!("mount --move {x}/c {h}/.hermes/hermes-agent"),
@@ -3393,6 +3395,9 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     wanted.push(format!("mkdir {h}/.hermes/tools"));
     wanted.push(format!("mount --move {x}/t {h}/.hermes/tools"));
     wanted.extend(ro(format!("{h}/.hermes/tools")));
+    wanted.push(format!("mkdir {h}/.hermes/installs"));
+    wanted.push(format!("mount --move {x}/i {h}/.hermes/installs"));
+    wanted.extend(ro(format!("{h}/.hermes/installs")));
     wanted.extend(ro(format!("{h}/.hermes")));
     wanted.extend(ro(h.to_string()));
     wanted.extend(ro(w.to_string()));
@@ -3402,13 +3407,14 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     wanted.push(format!("mkdir {f}"));
     wanted.push(format!("mount --move {x}/f {f}"));
     wanted.extend(ro(format!("{w}/lamp")));
-    wanted.push(format!("rmdir {x}/f {x}/c {x}/t {x}"));
+    wanted.push(format!("rmdir {x}/f {x}/c {x}/t {x}/i {x}"));
     assert_eq!(lines, wanted);
     for step in [
         "mkdir -m 0700".to_owned(),
         format!("--bind {f} "),
         format!("--bind {h}/.hermes/hermes-agent "),
         format!("--bind {h}/.hermes/tools "),
+        format!("--bind {h}/.hermes/installs "),
         format!("none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
         format!("--move {x}/c "),
@@ -3416,6 +3422,9 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         format!("mkdir {h}/.hermes/tools"),
         format!("--move {x}/t "),
         format!("relatime {h}/.hermes/tools"),
+        format!("mkdir {h}/.hermes/installs"),
+        format!("--move {x}/i "),
+        format!("relatime {h}/.hermes/installs"),
         format!("relatime {h}/.hermes"),
         format!("relatime {h}"),
         format!("relatime {w}"),
@@ -3478,6 +3487,7 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
         echo \"lasting: $(ls -A \"$H/.hermes\" | tr '\\n' ' ')\"\n\
         cat \"$H/.hermes/hermes-agent/run.sh\" >/dev/null && echo CHECKOUT\n\
         cat \"$H/.hermes/tools/python-3/bin/python3\" >/dev/null && echo TOOLS\n\
+        cat \"$H/.hermes/installs/k/facts.json\" >/dev/null && echo INSTALLS\n\
         cat \"$H/.local/bin/README\" >/dev/null && echo PROGRAM\n\
         echo \"lamp: $(ls -A \"$W/lamp\" | tr '\\n' ' ')\"\n\
         cat \"$W/lamp/AGENTS.md\" 2>/dev/null && echo SEEN-PROJECT\n\
@@ -3487,6 +3497,7 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
         touch \"$H/.hermes/x\" 2>/dev/null && echo WROTE-LASTING\n\
         touch \"$H/.hermes/hermes-agent/x\" 2>/dev/null && echo WROTE-CHECKOUT\n\
         touch \"$H/.hermes/tools/x\" 2>/dev/null && echo WROTE-TOOLS\n\
+        touch \"$H/.hermes/installs/x\" 2>/dev/null && echo WROTE-INSTALLS\n\
         touch answer.md && touch \"$HOME/.hermes/memory.md\" && echo ANSWERED\n";
     // On the lamp, Hermes's home and the work folder are mounts by now
     // (moved from the staging); here they are made so, for `ro` to find.
@@ -3515,7 +3526,7 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
     assert!(out.status.success(), "{out:?}");
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
-        "lasting: hermes-agent tools \nCHECKOUT\nTOOLS\nPROGRAM\nlamp: make-task-1 \nANSWERED\n"
+        "lasting: hermes-agent installs tools \nCHECKOUT\nTOOLS\nINSTALLS\nPROGRAM\nlamp: make-task-1 \nANSWERED\n"
     );
     // Outside, the make's answer is there and nothing else was touched.
     assert!(make.join("answer.md").exists());
