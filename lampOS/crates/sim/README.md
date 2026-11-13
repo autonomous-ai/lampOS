@@ -119,6 +119,32 @@ deepgram = "..."        # LAMPOS_VOICE_DEEPGRAM_KEY
 
 The file must be a regular file you own, mode 0600 (or 0400), and not a symbolic link, as lamp-voice demands of its own credential files; otherwise `voice-keys` stops with the refusal and the `chmod 600` line that fixes it (exit 2). A name lamp-sim does not know is refused by its line only (a key pasted where a name belongs would otherwise be echoed), and a known key that is not quoted text by its name and line; a value is never shown. A key is never written, logged or put in a lamp's folder, and its type prints only its name, where it came from and its length.
 
+## A local speech service (`lamp-sim speech`)
+
+```sh
+lamp-sim speech ~/.lampsim/b [--listen 127.0.0.1:7732]   # the token is written to ~/.lampsim/b/speech.token (0600)
+```
+
+A text-to-speech service in the host's own voice for the real voice's SECOND
+route (sim-3-P4 step 1, `speech.rs`): it answers the OpenAI-compatible
+`POST /audio/speech` (or `/v1/audio/speech`) the route already calls, with
+`response_format` `pcm` only (24 kHz mono S16LE, chunked); `model` and `voice`
+are read past. It listens on loopback only (another address is refused at
+start) and speaks only for a request whose `Authorization: Bearer` is the run's
+token, at most 4 lines at once (more are answered 503), a line at most 4,096
+characters. Each line says on stderr its characters, when its first bytes went
+and how much sound it made.
+
+The engine is macOS's `say`, one process a line, rendered whole before the
+first byte: measured on macOS 26 (arm64) through this service, 5 requests each,
+medians, first bytes after 715 ms for "Hi there.", 887 ms for 8 words and
+1,298 ms for 20. Off macOS there is no engine yet (`say` is not found). A
+resident synthesizer that streams as it speaks is the next step.
+
+The real lamp-voice cannot use it yet: its service URLs must be https and it
+trusts only its built-in roots. A loopback switch for it is ten's step 3, and
+`lamp-sim run --real-voice=local` (step 4) will start this service with it.
+
 ## Known gaps
 
 - No ears or eyes models run: hands, sound classes and phrases are made by hand (above); no name, touch or real face events.
