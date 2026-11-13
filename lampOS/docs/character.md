@@ -219,6 +219,19 @@ this file is for a lamp whose setting names it. The line now keeps the refusal o
 functions or skills does, and never lets it say it has no camera for one.
 Not yet heard on a lamp.
 
+**Its eye is a camera** (13 November, #6782's row on lamp-c0a4). "Hey,
+Lamp. Is there a camera?" was answered "No camera, no. My eye can take in
+what's in front of me right now, but nothing is recorded or stored." on
+the second route (deepseek-flash): no text told the model it has one, and
+the built-in instruction's "Do not pretend to see" read as having none.
+Both built-in instructions (`config::CHAT_INSTRUCTION`,
+`CAMERA_CHAT_INSTRUCTION`) and this file now say the true thing: its eye
+is a camera that sees what is in front of it now and records and keeps
+nothing; asked whether it has a camera, it says yes, its eye is one, and
+never that it has none. "Do not pretend to see" is now "Do not pretend to
+see what you were not shown". No guard rewrites a reply: the words are
+streamed as they come. Not yet heard on a lamp.
+
 ## Checks to run after changing the file
 
 All four are played from another machine's speakers at the lamp; none needs
