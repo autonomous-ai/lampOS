@@ -3,6 +3,15 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 20:3x GMT+7: the role file is on lamp-voice
+
+- Train nc-33 (#6941) merged #6928 at its first head cafd2922e3: the role
+  file is on lamp-voice 84fe6000c. #6928 stays open with only the cadence
+  line, rebased to bf49ae7e6f, retitled; READ ASK to sim-2 and the first
+  builder.
+- Train 883 cut by the first builder; my #6933, #6938, #6939 wait for
+  their second reads.
+
 ## 2026-11-13 20:2x GMT+7: train 882 merged #6929 and #6925
 
 - Train 882 (#6937) merged as lamp-voice 9ea4104f33 with **#6929** (P2,
