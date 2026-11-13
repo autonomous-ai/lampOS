@@ -2411,9 +2411,23 @@ pub fn serve(
         );
         crate::tools::make_skill_asked::force()
     });
+    // The person's line right after a skill's task said back must call
+    // make_skill, the call that takes its approve_id and their answer
+    // (#6835 gap 2): code decides when, the model what. First of all.
+    let task_yes = (tools.make_skill && crate::skill_task_yes::on()).then(|| {
+        eprintln!(
+            "lamp-voice second: the line right after a skill's task said back whole must call {} in its first round ({})",
+            crate::made_skill::MAKE,
+            crate::skill_task_yes::ENVIRONMENT
+        );
+        crate::skill_write_yes::approve_force()
+    });
     let net = match first_force(
-        named,
-        first_force(remember, first_force(make, first_force(keep, set))),
+        task_yes,
+        first_force(
+            named,
+            first_force(remember, first_force(make, first_force(keep, set))),
+        ),
     ) {
         Some(force) => net.forcing(force),
         None => net,
