@@ -474,7 +474,7 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
 - `lamp.said`: a line the lamp said out loud: `text`, `by` (`lamp`, or `computer` for a line this
   computer had it say, which comes back to it alone), `source` (`reply`, `exact`, `cached`), and
   `cut: true` when it was cut short (talked over, stopped: the text may not have been said in
-  full). Grant `speech`. Shown on lamp-75c9 on stable 12587 (13 Nov 2026, build 11971): a computer's own
+  full). Grant `speech`. Shown on lamp-75c9 on stable 12587 (13 Nov 2026; merged in build 11971): a computer's own
   `say` came back to it as `lamp.said` with `by` computer and `source` `exact`, and no `reply` came; not
   shown on a lamp: the lamp's fixed phrases ("Going to sleep now"), the `reply` and `cached` sources and
   `cut`. It brings the lamp's fixed phrases and a computer's own say; a reply of the lamp's
