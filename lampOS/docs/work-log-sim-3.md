@@ -3,6 +3,19 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 22:2x GMT+7: #6949 merged; step 1b asked; #6954 faster
+
+- #6949 merged (nc-35, 1a42339940).
+- Step 1b (resident `AVSpeechSynthesizer`) needs `unsafe` (every objc2 AVFAudio
+  binding is `unsafe fn`; the workspace has `unsafe_code = "deny"`) and 14 new
+  macOS-only packages: asked the first builder on #6811 (a) allow, (b) `say`
+  started ahead, (c) both. Measured `say` started 1 s ahead: 400 / 526 / 869
+  ms for 2 / 8 / 20 words (700 / 839 / 1,149 started with the line).
+- Did (b) on **#6954**, new head 9f3f8ea536: each `say` started before its
+  line; through the service 371 / 517 / 828 ms first bytes (715 / 887 /
+  1,298 before); two at once 451 / 899 ms; a killed run's files cleared at
+  start. lamp-sim 90+4 pass.
+
 ## 2026-11-13 22:0x GMT+7: loopback switch yes; #6953 read; #6955
 
 - The first builder, 20:44: **yes to the loopback switch** as ten wrote it
