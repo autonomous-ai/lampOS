@@ -164,6 +164,39 @@ The real lamp-voice cannot use it yet: its service URLs must be https and it
 trusts only its built-in roots. A loopback switch for it is ten's step 3, and
 `lamp-sim run --real-voice=local` (step 4) will start this service with it.
 
+## A local speech-to-text socket (`lamp-sim listen`)
+
+```sh
+whisper-server -m ggml-base.en.bin --host 127.0.0.1 --port 7734    # whisper.cpp, your own install and model
+lamp-sim listen ~/.lampsim/b [--listen 127.0.0.1:7733] [--whisper http://127.0.0.1:7734]   # token in ~/.lampsim/b/listen.token (0600)
+```
+
+The listening half of the real voice's SECOND route on a desktop (sim-3-P4
+step 2, `listen.rs`): a WebSocket in the part of Deepgram's streaming protocol
+the route uses. It serves `/ws/audio/transcriptions` (the route's path when
+`stt_base_url` is set) and `/v1/listen`, takes only linear16, 16 kHz, mono
+(a socket asking for another is refused 400), and opens only for this run's
+token as `Authorization: Token` (or `Bearer`). In: binary audio, `Finalize`,
+`CloseStream`, `KeepAlive`. Out: `SpeechStarted` when a 20 ms frame rises over
+the speech level after 0.3 s under it, and at each `Finalize` (and at
+`CloseStream`, for what is held) one final `Results` (`is_final`,
+`speech_final` and `from_finalize` all true, with its `start` and `duration`)
+holding the words of the line. The route ends the line itself and waits 1 s
+for that answer. No interim results. A line holds at most 60 s of audio (older
+is let go); at most 4 sockets at once.
+
+At `Finalize` the line goes, as a 16 kHz WAV, to the developer's own
+whisper.cpp `whisper-server` (`/inference`), at a loopback address only; a
+failed ask answers the final with no words and says why on stderr. Measured on
+macOS 26 (arm64), whisper.cpp 1.9.2 with `ggml-base.en` kept warm, a client
+speaking the route's protocol, 6 runs each: `Finalize` to the final `Results`
+45 ms for a 1.2 s line and 72 ms for a 5 s one, both words exact (the clips
+were made with `say`, not a person through a microphone).
+
+As with `lamp-sim speech`, the real lamp-voice reaches it only with ten's
+loopback switch (step 3), and `lamp-sim run --real-voice=local` (step 4)
+starts both.
+
 ## Known gaps
 
 - No ears or eyes models run: hands, sound classes and phrases are made by hand (above); no name, touch or real face events.

@@ -2577,6 +2577,7 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+ "tungstenite",
  "zune-jpeg",
 ]
 
