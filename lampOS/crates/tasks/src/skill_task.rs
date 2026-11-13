@@ -6011,6 +6011,7 @@ mod tests {
             &hand.skill,
             SkillRun::prompt(&hand),
             &hand.folder,
+            SkillRun::task_parts(&hand),
             "run-1",
             &RunToken::new("tok".into()),
         );
