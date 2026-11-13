@@ -3,6 +3,17 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 05:3x GMT+7: train 892 put the body on lamp-voice; #6989
+
+- Train 892 (#6984) merged as c5b43c47aa: **#6965** (lamp-body runs on any
+  unix), #6966 (the supervisor flake's 500 ms), #6975 (spd-say flake fix).
+- **#6989** (`sim-3/mac-body`, 27920da862, rebased; kept my job header over
+  #6965's): `sim-macos` runs the whole lamp with the real body and no longer
+  skips the speaker tests. On this Mac at c5b43c47aa: lamp-sim 84+4 with no
+  skips, 2/2; the smoke script passes on the tip's build (0 bad reads, it may
+  stand). READ ASK to ten, sim-2.
+- **#6938 closed** as replaced by #6989.
+
 ## 2026-11-14 05:2x GMT+7: green; #6961 has two reads
 
 - `sim-macos` green on #6954 (21691deb92, after a rerun of the supervisor
