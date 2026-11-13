@@ -1167,16 +1167,17 @@ một thư.
 backend) giữ `https://www.googleapis.com/auth/drive.file`, `openid`,
 `userinfo.email` và `userinfo.profile`, không bao giờ `drive.readonly`
 (Backend2, 16:06 ngày 9/11). Nên đèn tạo tệp dưới liên kết `drive.file` đó,
-và chỉ thấy, đọc và tìm được các tệp nó đã tạo hoặc chủ đèn đã chọn cho nó,
-không phải phần còn lại của Drive. Không có kế hoạch mở rộng quyền truy cập.
-Một lần đọc `files` (tìm với `query`, hoặc các tệp mới nhất) trả về rỗng thì
-nói rõ điều đó bên cạnh `quoted` rỗng, trong `nothing_found_why`
-(`reads::DRIVE_ONLY_OWN`): "The lamp sees only the Google Drive files it
-made or that were opened with it, so to find another file, open it with
-the lamp first." Không có nó, đèn nói là không tìm thấy gì, như thể tệp
-không tồn tại (11/11, đèn của một người thử: một tệp tạo ngoài đèn không
-bao giờ được tìm thấy). Một lần tìm có liệt kê tệp, và lần đọc rỗng của bất
-kỳ dịch vụ nào khác, không mang khóa này. Một lần ghi chỉ được chuẩn bị khi `scopes`
+và chỉ thấy, đọc và tìm được các tệp chính nó đã tạo, không phải phần còn
+lại của Drive (lampOS không có trình chọn tệp hay "Open with" của Drive).
+Không có kế hoạch mở rộng quyền truy cập. Một lần đọc `files` (tìm với
+`query`, hoặc các tệp mới nhất) không tìm thấy gì, không trích tệp nào và
+không bỏ tệp nào vì độ dài, thì nói rõ điều đó bên cạnh `quoted` rỗng, trong
+`nothing_found_why` (`reads::DRIVE_ONLY_OWN`): "The lamp can see only the
+Google Drive files it made itself, so a file made elsewhere won't show up
+here." Không có nó, đèn nói là không tìm thấy gì, như thể tệp không tồn tại
+(11/11, đèn của một người thử: một tệp tạo ngoài đèn không bao giờ được tìm
+thấy). Một lần tìm có liệt kê tệp hoặc có bỏ bớt tệp, và lần đọc rỗng của
+bất kỳ dịch vụ nào khác, không mang khóa này. Một lần ghi chỉ được chuẩn bị khi `scopes`
 của liên kết có `https://www.googleapis.com/auth/drive` hoặc
 `https://www.googleapis.com/auth/drive.file` (`writes::drive_may_write`, mỗi
 scope được so nguyên vẹn); nếu không, và khi liên kết không ghi scope nào
