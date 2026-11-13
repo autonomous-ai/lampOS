@@ -1810,6 +1810,32 @@ cả hai người viết.
   như hôm nay. Tắt thì dòng, lời dặn lần chạy và thư mục của lần tạo giữ
   nguyên từng byte như hôm nay. Worker của tuyến thứ hai đọc nó (được
   `process::second_route_worker_environment` chuyển cho).
+  - **Kiểm tra của hướng dẫn là kiểm tra của giọng nói** (P2 của Heron
+    trên #6768). lamp-tasks bắt đầu lần chạy với môi trường đã xoá sạch,
+    nên dòng có hướng dẫn còn mang giá trị của worker cho hai công tắc mà
+    `lamp-skills pack` đọc và làm đổi điều nó từ chối
+    (`make_skill_agent::CHECK_SWITCHES`,
+    `"switches":{"LAMP_AGENT_SERVICES":"on"|"off","LAMP_SKILL_WRITES":"on"|"off"}`,
+    chỉ `on` khi đúng là `on`), và lamp-tasks đưa mỗi `on` vào môi trường
+    của lần chạy ([tasks_vi.md](tasks_vi.md)). Nhờ vậy một bước `write`,
+    hay một `do.task` có grant của dịch vụ liên kết, mà giọng nói sẽ giữ
+    thì cũng đóng gói được trong lần chạy, và Hermes không bao giờ bị bảo
+    bỏ đúng bước đã được yêu cầu. Tắt thì dòng giữ như hôm nay, không có
+    `switches`.
+  - **Người dùng nghe gì trong lúc chờ** (P3 của Heron trên #6768): "Let me
+    think about that a little longer." một lần, qua dịch vụ nói, khi
+    lamp-tasks báo lần chạy của lần giao đầu tiên đã bắt đầu (không bao giờ
+    sau một lượt bị cắt, và bỏ qua nếu không nói được trong 15 giây), rồi
+    im lặng cho đến khi đèn nói lại kỹ năng hoặc nói không tạo được. Với
+    hướng dẫn, một câu trả lời có thể mất tới 90 giây, cộng tối đa 5 giây
+    chờ thêm của lamp-tasks, và phần của agent tới 120 giây khi có một lần
+    sửa. Một lần sửa của giọng nói chỉ bắt đầu khi thêm một câu trả lời 90
+    giây vẫn kết thúc trong 120 giây, tức là chỉ sau một câu trả lời đến
+    trong 30 giây: sau một câu trả lời từ 60 giây trở lên thì không còn lần
+    sửa nào của giọng nói vừa, và kết luận của kiểm tra giọng nói cho câu
+    đó giữ nguyên; cả hai lần sửa chỉ xảy ra khi câu trả lời đầu và lần sửa
+    đầu cộng lại không quá 30 giây. Những lần sửa thường vừa là của chính
+    hướng dẫn, bên trong lần chạy.
 - **Không có lần chạy tạo thì không giao.** Khi lamp-tasks không cho được
   lần chạy đó (bản cũ không có socket tạo, `LAMP_SKILL_TASKS` tắt, hoặc khi
   `held` mà wrapper của Hermes không có các dòng mạng), lần tạo không được
@@ -1888,7 +1914,11 @@ cả hai người viết.
   lời được đọc lại, không bao giờ là `prepare`; lamp-tasks cũ hay lần chạy
   bị từ chối thì không bao giờ được giao; không có target `lamp` là
   không có agent; lần chạy im lặng thì hết giờ;
-  `the_guide_is_asked_for_only_with_its_switch`), các test của hướng dẫn
+  `the_guide_is_asked_for_only_with_its_switch`,
+  `the_checks_switches_are_lamp_tasks_list_with_this_workers_values`;
+  `tests/it/make_check.rs` của lamp-skills đóng gói một bản nháp `write` và
+  một bản nháp `do.task` dịch vụ trong lần tạo đúng khi kiểm tra của giọng
+  nói đóng gói được), các test của hướng dẫn
   `with_the_guide_a_refused_answer_goes_back_with_the_checks_words_and_its_fix_is_kept`
   và `with_the_guide_an_answer_still_refused_after_its_rounds_is_refused_as_today`,
   và `skill_make::tests` của lamp-tasks (xem [tasks_vi.md](tasks_vi.md)). Chưa thử trên đèn: một lệnh
@@ -1899,8 +1929,10 @@ cả hai người viết.
   thuộc nhóm `lamp-agents` trên đèn hay không. Ba lần tạo gửi thư bị từ chối
   trên lamp-9adf được agent tạo thẳng khi `LAMP_AGENT_SERVICES` bật. Với
   hướng dẫn: một lần tạo DeepSeek không giữ được do Hermes tạo, bản nháp được
-  kiểm tra và sửa trong lần chạy, được nói lại và được bật; và câu trả lời
-  mất bao lâu ở đó.
+  kiểm tra và sửa trong lần chạy, được nói lại và được bật; một lần tạo gửi
+  mail (`write`) mà bước của nó vẫn còn sau kiểm tra của hướng dẫn ở đó, cũng
+  cho thấy terminal của Hermes chuyển các công tắc `LAMP_*` của lần chạy cho
+  kiểm tra nó chạy; và câu trả lời mất bao lâu ở đó.
 
 ### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, bật trong sản phẩm)
 

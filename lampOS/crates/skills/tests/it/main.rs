@@ -9,6 +9,7 @@ mod format;
 mod holds;
 mod journal_output;
 mod made;
+mod make_check;
 mod night_sleep;
 mod package;
 mod pushed;

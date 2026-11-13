@@ -3229,9 +3229,9 @@ as a Harness task with the agent's own tools
   lamp-tasks sweeps the `make-*` folders (and their homes) a lamp-tasks
   stopped mid-make left (`skill_make::sweep`).
 - **The line:** `{"op":"skill_make","rules","within_ms"}`, checked whole
-  (`MakeLine::parse`): no other field but `guide`, the rules (the system
-  prompt and the brief) at most 48 KiB with no NUL, `within_ms` from 1 to
-  120 s.
+  (`MakeLine::parse`): no other field but `guide` and `switches`, the
+  rules (the system prompt and the brief) at most 48 KiB with no NUL,
+  `within_ms` from 1 to 120 s.
 - **The guide (`"guide":true`, lamp-voice's `LAMP_MAKE_AGENT_GUIDE`,
   off):** only when the line says `true` (a boolean, `false` by default),
   the lamp's skill-creator guide (`skill_make::GUIDE`, from
@@ -3247,6 +3247,29 @@ as a Harness task with the agent's own tools
   the rules say, no file outside its folder but the check's own, and no
   other command. Without it the run's words and the folder's files are
   as before, byte for byte.
+- **The check's switches (`"switches"`, only with `"guide":true`;
+  Heron's P2 on #6768):** the run starts with a cleared environment, so
+  without them the guide's `lamp-skills pack` would load the draft with
+  none of the lamp's switches and refuse a `write` step or a `do.task`'s
+  linked-service grant that the voice's own check, run with lamp-voice's
+  switches, accepts. The line carries lamp-voice's values of the two
+  switches `lamp-skills` reads as it loads a skill to pack it and that
+  change its verdict (`CHECK_SWITCHES`): `LAMP_AGENT_SERVICES` (a
+  `do.task`'s `<code>-read`/`<code>-write` grants) and `LAMP_SKILL_WRITES`
+  (a `write` step or a `"write"` permission), each `"on"` or `"off"`, as
+  `{"LAMP_AGENT_SERVICES":"on","LAMP_SKILL_WRITES":"on"}`
+  (`CheckSwitches`). Each `on` is put in the run's environment as
+  `NAME=on` (`CheckSwitches::env`), as lamp-voice's worker is given it;
+  `off` puts nothing. Any other name (`LAMP_SKILL_TASKS`, `PATH`), a value
+  but `"on"` or `"off"` (`null`, `true`, `"ON"`), a name twice, `null` for
+  the whole field, or `switches` without `"guide":true` is `bad_request`
+  and starts nothing. The others `pack` reads change no verdict
+  (`LAMP_NUDGES_PRESENT`: both forms are checked) or are read only as a
+  skill runs or goes on (`LAMP_SKILL_TASKS`, `LAMP_SKILL_READS`,
+  `LAMP_MADE_SCRIPTS`), so a `do.task` with a script and a lamp grant packs
+  either way. Only with the guide, because only the guide's run runs the
+  check: without it the run is told to run nothing, and its words,
+  folder and environment stay today's, byte for byte.
 - **The run: Hermes only** (the first builder's ruling, 12 Nov 19:14):
   the lamp's Hermes started exactly as a skill's `do.task` run is
   (`skill_task::HermesRunner` inside `skill_make::MakeHermes`, row-6443's
@@ -3388,7 +3411,16 @@ as a Harness task with the agent's own tools
   and license, the run told the check's command, and without it (or with
   `false`) the run's words and folder today's, byte for byte, and a guide
   that is not a boolean refused
-  (`the_guide_is_given_only_when_the_line_asks_for_it`).
+  (`the_guide_is_given_only_when_the_line_asks_for_it`); the check's
+  switches that are `on` in the run's environment and no others, and an
+  unknown name, a value but `on`/`off`, a name twice or switches without
+  the guide refused (`the_checks_switches_reach_the_run_only_as_allowed`).
+  lamp-skills' `tests/it/make_check.rs` runs the real `lamp-skills pack`
+  with exactly the make run's environment and with the voice worker's: a
+  `write` draft and a `do.task` draft with a script and `gmail-read`
+  grants pack in the make exactly when the voice's check packs them (on,
+  both; off, neither; with the run's environment as it was before, never),
+  and `CHECK_SWITCHES` is lamp-skills' own two names.
 
 **The lamp rows (not yet run):** on lamp-9adf with this build, ask "Hey
 Lamp, make me a skill that checks the weather every morning". DeepSeek's

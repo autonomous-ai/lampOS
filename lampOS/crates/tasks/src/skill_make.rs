@@ -47,6 +47,15 @@
 //!   `/tmp`), fix it at most twice by the check's words, then answer
 //!   ([`guided_prompt`]). Without it the run's words and files are as
 //!   before, byte for byte ([`prompt`]).
+//! - **The check's switches** (`"switches"`, only with `"guide":true`,
+//!   Heron's P2 on #6768): the run is started with a cleared environment,
+//!   so the guide's `lamp-skills pack` would load the draft with none of
+//!   the lamp's switches and refuse a step the voice's own check (run with
+//!   lamp-voice's) accepts. The line carries lamp-voice's values of the
+//!   switches `lamp-skills` reads as it loads a skill to pack it,
+//!   [`CHECK_SWITCHES`] alone, each `"on"` or `"off"`
+//!   ([`CheckSwitches`]); each `on` is put in the run's environment, as
+//!   lamp-voice's worker has it, so the two checks agree.
 //! - **The make's folder**: `make-<run id>` in the lamp's work folder (the
 //!   one a skill's run starts in, shown to Hermes in its namespace), 0700,
 //!   with the rules in [`RULES_FILE`], 0600. The run starts there and is
@@ -121,6 +130,65 @@ pub struct MakeLine {
     /// only when the line says `true`.
     #[serde(default)]
     pub guide: bool,
+    /// The voice's values of the check's switches ([`CheckSwitches`]),
+    /// only beside `"guide":true`; `null` is not one.
+    #[serde(default, deserialize_with = "given")]
+    pub switches: Option<CheckSwitches>,
+}
+
+/// The line's `switches` when given: an object, never `null`.
+fn given<'de, D: serde::Deserializer<'de>>(switches: D) -> Result<Option<CheckSwitches>, D::Error> {
+    CheckSwitches::deserialize(switches).map(Some)
+}
+
+/// The switches `lamp-skills` reads as it loads a skill folder to pack it,
+/// so that change what the guide's check refuses, and the only ones a
+/// make's line may carry: `LAMP_AGENT_SERVICES` (a `do.task`'s linked
+/// service grants, `lamp_skills::task::AGENT_SERVICES_ENVIRONMENT`) and
+/// `LAMP_SKILL_WRITES` (a `write` step or a `"write"` permission,
+/// `lamp_skills::service_write::ENVIRONMENT`). The others it reads at
+/// `pack` change no verdict (`LAMP_NUDGES_PRESENT`: both forms are checked)
+/// or are read only as a skill runs or goes on (`LAMP_SKILL_TASKS`,
+/// `LAMP_SKILL_READS`, `LAMP_MADE_SCRIPTS`). lamp-skills' and lamp-voice's
+/// tests hold this list to their own names.
+pub const CHECK_SWITCHES: [&str; 2] = ["LAMP_AGENT_SERVICES", "LAMP_SKILL_WRITES"];
+
+/// One of the check's switches as the line gives it: `"on"` or `"off"`,
+/// nothing else.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Switch {
+    On,
+    #[default]
+    Off,
+}
+
+/// The check's switches a make's line carries ([`CHECK_SWITCHES`]): any
+/// other name, a name twice or a value but `"on"` or `"off"` is no make's
+/// line; one not given is off.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CheckSwitches {
+    #[serde(rename = "LAMP_AGENT_SERVICES", default)]
+    pub agent_services: Switch,
+    #[serde(rename = "LAMP_SKILL_WRITES", default)]
+    pub skill_writes: Switch,
+}
+
+impl CheckSwitches {
+    /// The run's environment lines for them: `NAME=on` for each one on,
+    /// none for one off, as lamp-voice's worker is given only an exact
+    /// `on`.
+    pub fn env(&self) -> Vec<(&'static str, String)> {
+        [
+            (CHECK_SWITCHES[0], self.agent_services),
+            (CHECK_SWITCHES[1], self.skill_writes),
+        ]
+        .into_iter()
+        .filter(|(_, switch)| *switch == Switch::On)
+        .map(|(name, _)| (name, "on".to_owned()))
+        .collect()
+    }
 }
 
 /// The line's `op`: `skill_make` only.
@@ -146,6 +214,14 @@ impl MakeLine {
         }
         if !(LEAST_WITHIN..=MOST_WITHIN).contains(&make.within()) {
             return Err(("bad_request", "within_ms is out of its bounds".into()));
+        }
+        // The switches are for the guide's check alone: without the guide
+        // the run is told to run nothing.
+        if make.switches.is_some() && !make.guide {
+            return Err((
+                "bad_request",
+                "switches are given only with the guide".into(),
+            ));
         }
         Ok(make)
     }
@@ -214,11 +290,18 @@ pub fn guided_prompt(folder: &Path) -> String {
 /// `HERMES_HOME` under it and [`HOME_ENV`] naming it, and nothing else of
 /// its own (no token, no grant).
 pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
-    make_run_with(folder, within, false)
+    make_run_with(folder, within, false, &CheckSwitches::default())
 }
 
-/// [`make_run`], with the guide's words ([`guided_prompt`]) when `guide`.
-pub fn make_run_with(folder: &Path, within: Duration, guide: bool) -> SkillRun {
+/// [`make_run`], with the guide's words ([`guided_prompt`]) when `guide`,
+/// and the check's `switches` that are on in its environment
+/// ([`CheckSwitches::env`]).
+pub fn make_run_with(
+    folder: &Path,
+    within: Duration,
+    guide: bool,
+    switches: &CheckSwitches,
+) -> SkillRun {
     SkillRun {
         // The make's own run id, from its folder's name (`make-<run id>`).
         run: folder
@@ -238,7 +321,7 @@ pub fn make_run_with(folder: &Path, within: Duration, guide: bool) -> SkillRun {
         // run (#6882): a gateway refuses an empty script, as a fixed write.
         script: PathBuf::new(),
         task: String::new(),
-        env: home_env(folder).to_vec(),
+        env: home_env(folder).into_iter().chain(switches.env()).collect(),
         deadline: within,
         started: Default::default(),
         start_in: Some(folder.to_path_buf()),
@@ -551,8 +634,9 @@ pub fn answer(
     };
     started();
     // A make has no token to end.
+    let switches = make.switches.clone().unwrap_or_default();
     let ran = runner.run(
-        &make_run_with(&folder.path, make.within(), make.guide),
+        &make_run_with(&folder.path, make.within(), make.guide, &switches),
         &|| {},
     );
     match ran {
@@ -1189,6 +1273,85 @@ mod tests {
         assert_eq!(refused["error"], "bad_request");
         assert_eq!(seen.len(), 3);
         assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
+    }
+
+    /// Heron's P2 on #6768: with the guide, the line's check switches
+    /// ([`CHECK_SWITCHES`]) that are `on` are in the run's environment, so
+    /// the guide's `lamp-skills pack` loads the draft as the voice's check
+    /// does (lamp-skills' `tests/it/make_check.rs` runs both); one `off`
+    /// or not given is not there. Only those names, only `"on"` or
+    /// `"off"`, each once and only beside `"guide":true`: anything else is
+    /// `bad_request`, and starts nothing.
+    #[test]
+    fn the_checks_switches_reach_the_run_only_as_allowed() {
+        let work = tempfile::tempdir().unwrap();
+        let runner = writing(Some("A"));
+        let make = |extra: &str| {
+            format!(r#"{{"op":"skill_make","rules":"R","within_ms":2000,"guide":true{extra}}}"#)
+                .into_bytes()
+        };
+        let base =
+            |run: &SeenRun| -> Vec<&'static str> { run.2.iter().map(|(name, _)| *name).collect() };
+        for (extra, on) in [
+            ("", &[][..]),
+            (r#","switches":{}"#, &[]),
+            (
+                r#","switches":{"LAMP_AGENT_SERVICES":"off","LAMP_SKILL_WRITES":"off"}"#,
+                &[],
+            ),
+            (
+                r#","switches":{"LAMP_SKILL_WRITES":"on"}"#,
+                &["LAMP_SKILL_WRITES"],
+            ),
+            (
+                r#","switches":{"LAMP_AGENT_SERVICES":"on","LAMP_SKILL_WRITES":"on"}"#,
+                &["LAMP_AGENT_SERVICES", "LAMP_SKILL_WRITES"],
+            ),
+        ] {
+            let answered = answer(&make(extra), true, work.path(), &runner, &mut || {});
+            assert_eq!(answered, json!({"ok": true, "answer": "A"}), "{extra}");
+            let seen = runner.seen.0.lock().unwrap();
+            let run = seen.last().unwrap();
+            let names = base(run);
+            assert_eq!(&names[..3], ["HOME", crate::hold::HERMES_HOME, HOME_ENV]);
+            assert_eq!(&names[3..], on, "{extra}");
+            assert!(run.2[3..].iter().all(|(_, value)| value == "on"));
+        }
+        let started = runner.seen.0.lock().unwrap().len();
+        for bad in [
+            // A name not on the list, however lamp-like.
+            r#","switches":{"LAMP_SKILL_TASKS":"on"}"#,
+            r#","switches":{"PATH":"/tmp"}"#,
+            // A value but "on" or "off".
+            r#","switches":{"LAMP_SKILL_WRITES":"yes"}"#,
+            r#","switches":{"LAMP_SKILL_WRITES":true}"#,
+            r#","switches":{"LAMP_SKILL_WRITES":null}"#,
+            r#","switches":{"LAMP_SKILL_WRITES":"ON"}"#,
+            // A name twice.
+            r#","switches":{"LAMP_SKILL_WRITES":"off","LAMP_SKILL_WRITES":"on"}"#,
+            r#","switches":["LAMP_SKILL_WRITES"]"#,
+            r#","switches":null"#,
+        ] {
+            let refused = answer(&make(bad), true, work.path(), &runner, &mut || {});
+            assert_eq!(refused["error"], "bad_request", "{bad}");
+        }
+        // Without the guide no switch is taken: the run runs nothing.
+        for unguided in [
+            r#"{"op":"skill_make","rules":"R","within_ms":2000,"switches":{"LAMP_SKILL_WRITES":"on"}}"#,
+            r#"{"op":"skill_make","rules":"R","within_ms":2000,"guide":false,"switches":{}}"#,
+        ] {
+            let refused = answer(unguided.as_bytes(), true, work.path(), &runner, &mut || {});
+            assert_eq!(refused["error"], "bad_request", "{unguided}");
+        }
+        assert_eq!(runner.seen.0.lock().unwrap().len(), started);
+        assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
+        // The serde names are the list's.
+        let all: CheckSwitches = serde_json::from_value(json!({
+            CHECK_SWITCHES[0]: "on", CHECK_SWITCHES[1]: "on"
+        }))
+        .unwrap();
+        let named: Vec<&str> = all.env().into_iter().map(|(name, _)| name).collect();
+        assert_eq!(named, CHECK_SWITCHES);
     }
 
     /// A run that can't be held off the network, or whose namespace has no
