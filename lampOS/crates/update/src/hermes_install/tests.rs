@@ -3259,6 +3259,27 @@ fn a_lamp_with_a_make(base: &Path) -> PathBuf {
         ("h/.hermes/hermes-agent/run.sh", "echo ran"),
         ("h/.hermes/tools/python-3/bin/python3", "the interpreter"),
         ("h/.hermes/installs/k/facts.json", "the dependency record"),
+        ("h/.hermes/installs/k/.install.lock", ""),
+        ("h/.hermes/installs/k/environments/g1/.lease-managed", ""),
+        ("h/.hermes/installs/k/environments/g1/venv/pyvenv.cfg", "V"),
+        ("h/.hermes/installs/k/environments/g2/venv/pyvenv.cfg", "V"),
+        ("h/.hermes/installs/k/pm-runtime/.prepare.lock", ""),
+        (
+            "h/.hermes/installs/k/pm-runtime/selected.json",
+            "the PM runtime record",
+        ),
+        (
+            "h/.hermes/installs/k/pm-runtime/generations/r1/.lease-managed",
+            "",
+        ),
+        (
+            "h/.hermes/installs/k/pm-runtime/generations/r1/.leases/old",
+            "",
+        ),
+        (
+            "h/.hermes/installs/old/facts.json",
+            "an install with no lock",
+        ),
         ("h/.local/bin/README", "the program"),
         ("w/top.md", "W"),
         ("w/lamp/AGENTS.md", "HARNESS PROJECT"),
@@ -3276,7 +3297,9 @@ fn a_lamp_with_a_make(base: &Path) -> PathBuf {
 /// a make, which keeps the network, the script hides Hermes's lasting
 /// home under an empty tmpfs with only its checkout, `tools` (the
 /// Python Hermes runs on) and `installs` (its dependency record, which a
-/// make's home links to) shown again, read-only; leaves Hermes's folder and the work folder read-only; hides
+/// make's home links to) shown again, read-only, but for its install
+/// lock and leases, bound back read-write (Hermes writes both at every
+/// start; no lock ends it); leaves Hermes's folder and the work folder read-only; hides
 /// the rest of `W/lamp` under another tmpfs, the make's own folder alone
 /// moved back, read-write; and starts Hermes there with the make's home.
 /// Each step failing ends it before Hermes runs; a home outside `W/lamp`
@@ -3342,29 +3365,44 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     };
     let mut wanted = vec![
         format!("mkdir -m 0700 {x} {x}/f {x}/c {x}/t {x}/i"),
-        format!("mount --bind {f} {x}/f"),
-        format!("mount --bind {h}/.hermes/hermes-agent {x}/c"),
-        format!("mount --bind {h}/.hermes/tools {x}/t"),
-        format!("mount --bind {h}/.hermes/installs {x}/i"),
-        format!("mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {h}/.hermes"),
+        format!("mount -n --bind {f} {x}/f"),
+        format!("mount -n --bind {h}/.hermes/hermes-agent {x}/c"),
+        format!("mount -n --bind {h}/.hermes/tools {x}/t"),
+        format!("mount -n --bind {h}/.hermes/installs {x}/i"),
+        // Only Hermes's install lock and a lease-managed generation's
+        // leases are bound back read-write, onto the staged `installs`
+        // before its read-only remount (`.leases` made first, as Hermes
+        // would); `g2` has no leases, `old` no lock.
+        format!("mount -n --bind {h}/.hermes/installs/k/.install.lock {x}/i/k/.install.lock"),
+        format!(
+            "mount -n --bind {h}/.hermes/installs/k/pm-runtime/.prepare.lock {x}/i/k/pm-runtime/.prepare.lock"
+        ),
+        format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
+        format!(
+            "mount -n --bind {h}/.hermes/installs/k/environments/g1/.leases {x}/i/k/environments/g1/.leases"
+        ),
+        format!(
+            "mount -n --bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases {x}/i/k/pm-runtime/generations/r1/.leases"
+        ),
+        format!("mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
-        format!("mount --move {x}/c {h}/.hermes/hermes-agent"),
+        format!("mount -n --move {x}/c {h}/.hermes/hermes-agent"),
     ];
     wanted.extend(ro(format!("{h}/.hermes/hermes-agent")));
     wanted.push(format!("mkdir {h}/.hermes/tools"));
-    wanted.push(format!("mount --move {x}/t {h}/.hermes/tools"));
+    wanted.push(format!("mount -n --move {x}/t {h}/.hermes/tools"));
     wanted.extend(ro(format!("{h}/.hermes/tools")));
     wanted.push(format!("mkdir {h}/.hermes/installs"));
-    wanted.push(format!("mount --move {x}/i {h}/.hermes/installs"));
+    wanted.push(format!("mount -n --move {x}/i {h}/.hermes/installs"));
     wanted.extend(ro(format!("{h}/.hermes/installs")));
     wanted.extend(ro(format!("{h}/.hermes")));
     wanted.extend(ro(h.to_string()));
     wanted.extend(ro(w.to_string()));
     wanted.push(format!(
-        "mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {w}/lamp"
+        "mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {w}/lamp"
     ));
     wanted.push(format!("mkdir {f}"));
-    wanted.push(format!("mount --move {x}/f {f}"));
+    wanted.push(format!("mount -n --move {x}/f {f}"));
     wanted.extend(ro(format!("{w}/lamp")));
     wanted.push(format!("rmdir {x}/f {x}/c {x}/t {x}/i {x}"));
     assert_eq!(lines, wanted);
@@ -3374,6 +3412,11 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         format!("--bind {h}/.hermes/hermes-agent "),
         format!("--bind {h}/.hermes/tools "),
         format!("--bind {h}/.hermes/installs "),
+        format!("--bind {h}/.hermes/installs/k/.install.lock "),
+        format!("--bind {h}/.hermes/installs/k/pm-runtime/.prepare.lock "),
+        format!("--bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases "),
+        format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
+        format!("--bind {h}/.hermes/installs/k/environments/g1/.leases "),
         format!("none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
         format!("--move {x}/c "),
@@ -3397,6 +3440,35 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         assert!(!out.status.success(), "{step}");
         assert!(out.stdout.is_empty(), "Hermes never runs: {step}");
     }
+    // With the lock already there, nothing is made for it; with no lock at
+    // all (the lasting Hermes never started), it ends before the lasting
+    // home is hidden and Hermes never runs.
+    let lock = base.join("h/.hermes/installs/k/.install.lock");
+    fs::remove_file(&lock).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&out.stderr)
+            .contains("no Hermes install lock: the lasting Hermes has not run")
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains("tmpfs")),
+        "{lines:?}"
+    );
+    fs::write(&lock, "").unwrap();
+    // Hermes's PM runtime folder with no `.prepare.lock` ends it too.
+    let prepare = base.join("h/.hermes/installs/k/pm-runtime/.prepare.lock");
+    fs::remove_file(&prepare).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Hermes runtime lock not shown"));
+    assert!(
+        !lines.iter().any(|line| line.contains("tmpfs")),
+        "{lines:?}"
+    );
+    fs::write(&prepare, "").unwrap();
     // A home outside the work folder's `lamp`, or missing, is refused
     // before anything is mounted.
     let other = base.join("other/make-task-1/home");
@@ -3420,8 +3492,9 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
 /// (Linux, where the kernel allows one; skipped otherwise): from inside a
 /// make's namespace, a `cat` of Hermes's lasting memories finds nothing,
 /// its lasting home shows only the checkout, `tools` and `installs`, read-only, `W/lamp` shows
-/// only the make's folder, and nothing but the make's folder can be
-/// written.
+/// only the make's folder, and nothing but the make's folder, Hermes's
+/// install lock and a lease-managed generation's leases can be written
+/// (never `facts.json` or an environment).
 #[cfg(target_os = "linux")]
 #[test]
 fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
@@ -3457,6 +3530,14 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
         touch \"$H/.hermes/hermes-agent/x\" 2>/dev/null && echo WROTE-CHECKOUT\n\
         touch \"$H/.hermes/tools/x\" 2>/dev/null && echo WROTE-TOOLS\n\
         touch \"$H/.hermes/installs/x\" 2>/dev/null && echo WROTE-INSTALLS\n\
+        echo x >> \"$H/.hermes/installs/k/facts.json\" 2>/dev/null && echo WROTE-FACTS\n\
+        touch \"$H/.hermes/installs/k/environments/g1/venv/x\" 2>/dev/null && echo WROTE-ENV\n\
+        touch \"$H/.hermes/installs/k/environments/g2/.leases\" 2>/dev/null && echo WROTE-G2\n\
+        echo x >> \"$H/.hermes/installs/k/pm-runtime/selected.json\" 2>/dev/null && echo WROTE-SELECTED\n\
+        echo p >> \"$H/.hermes/installs/k/pm-runtime/.prepare.lock\" && echo WROTE-PREPARE\n\
+        touch \"$H/.hermes/installs/k/pm-runtime/generations/r1/.leases/l\" && echo WROTE-RUNTIME-LEASE\n\
+        echo l >> \"$H/.hermes/installs/k/.install.lock\" && echo WROTE-LOCK\n\
+        touch \"$H/.hermes/installs/k/environments/g1/.leases/l\" && rm \"$H/.hermes/installs/k/environments/g1/.leases/l\" && echo WROTE-LEASE\n\
         touch answer.md && touch \"$HOME/.hermes/memory.md\" && echo ANSWERED\n";
     // On the lamp, Hermes's home and the work folder are mounts by now
     // (moved from the staging); here they are made so, for `ro` to find.
@@ -3485,9 +3566,27 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
     assert!(out.status.success(), "{out:?}");
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
-        "lasting: hermes-agent installs tools \nCHECKOUT\nTOOLS\nINSTALLS\nPROGRAM\nlamp: make-task-1 \nANSWERED\n"
+        "lasting: hermes-agent installs tools \nCHECKOUT\nTOOLS\nINSTALLS\nPROGRAM\nlamp: make-task-1 \nWROTE-LOCK\nWROTE-LEASE\nWROTE-PREPARE\nWROTE-RUNTIME-LEASE\nANSWERED\n"
     );
     // Outside, the make's answer is there and nothing else was touched.
     assert!(make.join("answer.md").exists());
     assert!(!base.join("w/lamp/x").exists() && !base.join("h/x").exists());
+    // The lock written through the make's bind is the lasting one; the
+    // dependency record is untouched.
+    assert_eq!(
+        fs::read_to_string(base.join("h/.hermes/installs/k/.install.lock")).unwrap(),
+        "l\n"
+    );
+    assert_eq!(
+        fs::read_to_string(base.join("h/.hermes/installs/k/facts.json")).unwrap(),
+        "the dependency record"
+    );
+    assert_eq!(
+        fs::read_to_string(base.join("h/.hermes/installs/k/pm-runtime/.prepare.lock")).unwrap(),
+        "p\n"
+    );
+    assert_eq!(
+        fs::read_to_string(base.join("h/.hermes/installs/k/pm-runtime/selected.json")).unwrap(),
+        "the PM runtime record"
+    );
 }
