@@ -23,7 +23,7 @@ import { WebSocket } from 'ws';
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // `work` or `value` after `ms`, whichever comes first; the timer is cleared either way. (A race against a bare sleep leaves its
 // timer running: 49 rows leave 49 of them, and the process lives on until the longest ends.)
-const within = (work, ms, value) => {
+export const within = (work, ms, value) => {
   let timer;
   return Promise.race([work, new Promise((resolve) => { timer = setTimeout(() => resolve(value), ms); })]).finally(() => clearTimeout(timer));
 };
@@ -39,12 +39,13 @@ export function resultText(row) {
 const volumeText = ({ level, muted }) => `${level}${muted ? ' (muted)' : ''}`;
 
 // The markdown of a run: the counts, then one line per row in the page's order.
-export function tableOf({ lamp, mode, rows, at, only, volume }) {
+export function tableOf({ lamp, mode, rows, at, only, volume, ended }) {
   const count = (result) => rows.filter((r) => r.result === result).length;
   const unseen = rows.filter((r) => r.result === 'PASS' && r.missing?.length).length;
   return [
     `# Controller pre-flight: ${cell(lamp.name || lamp.id)} (${cell(lamp.id)}, ${mode}) ${at}`, '',
     ...(only ? [`only: ${only.join(', ')}`, ''] : []),
+    ...(ended ? [`ended early: ${ended}`, ''] : []),
     ...(volume ? [`volume: ${volumeText(volume.before)} before the first row; ${volume.after ? `${volumeText(volume.after)} after the last${volume.after.level === volume.before.level && volume.after.muted === volume.before.muted ? ' (put back)' : ' (NOT put back)'}` : 'not read again'}`, ''] : []),
     `${count('PASS')} PASS${unseen ? ` (${unseen} with an expected event not seen)` : ''}, ${count('FAIL')} FAIL, ${count('REFUSED')} refused as designed, ${count('n/a')} n/a, of ${rows.length} rows`, '',
     '| row | result | expected events | evidence |', '| --- | --- | --- | --- |',
@@ -52,12 +53,23 @@ export function tableOf({ lamp, mode, rows, at, only, volume }) {
   ].join('\n');
 }
 
-// One y/N question on the terminal; no terminal means no.
-export function askYesNo(question, { input = process.stdin, output = process.stderr } = {}) {
+// One y/N question on the terminal; no terminal means no. A Ctrl-C at the question (readline holds the terminal in raw mode, so the
+// key reaches the reader as `SIGINT` and never the process) answers `null`: not a no to this row, but the run's stop. The input
+// closing (Ctrl-D) is a no.
+export function askYesNo(question, { input = process.stdin, output = process.stderr, signal } = {}) {
   if (!input.isTTY) return Promise.resolve(false);
+  if (signal?.aborted) return Promise.resolve(null);
   return new Promise((resolve) => {
     const reader = createInterface({ input, output });
-    reader.question(`${question} [y/N] `, (answer) => { reader.close(); resolve(/^y(es)?$/i.test(answer.trim())); });
+    let settled = false;
+    const settle = (value) => { if (!settled) { settled = true; signal?.removeEventListener('abort', onAbort); resolve(value); } reader.close(); };
+    // With stderr not a terminal (2>run.log) readline takes no raw mode and raises no SIGINT of its own: the process's own handler
+    // aborts `signal`, and that answers the question too.
+    const onAbort = () => settle(null);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    reader.on('SIGINT', () => settle(null));
+    reader.on('close', () => settle(false));
+    reader.question(`${question} [y/N] `, (answer) => settle(/^y(es)?$/i.test(answer.trim())));
   });
 }
 
@@ -96,16 +108,33 @@ export function expectedEvents(shows, heard) {
   return missing.length ? `NOT SEEN: ${missing.join(', ')}` : 'seen';
 }
 
+// The exit code of a run: 130 for a Ctrl-C, 1 for a FAIL or a run the page cut short (3 rows of 40 is not a pass), else 0.
+export const exitCodeOf = ({ aborted, interrupted, cutShort, rows }) => (aborted || interrupted ? 130 : cutShort || rows.some((r) => r.result === 'FAIL') ? 1 : 0);
+
 // Runs the pre-flight against the page at `url`. `log` gets one short line per row (never the url).
 export async function runPreflight({ url, signal, yesMoves = false, ask = askYesNo, log = () => {}, settleMs = 2000, expectMs = 6000, retryMs = 8000, retryEveryMs = 1000, only, answerMs = 40_000, now = () => new Date().toISOString() }) {
   const page = new URL(url);
   const token = page.searchParams.get('t');
   if (!token) throw new Error('the url has no ?t= token');
   const base = `http://${page.host}`;
-  const table = await (await fetch(`${base}/try.json?t=${encodeURIComponent(token)}`)).json();
+  const reply = await fetch(`${base}/try.json?t=${encodeURIComponent(token)}`);
+  if (!reply.ok) throw new Error(`the page answered ${reply.status} for its table (is the token in the url right and current?)`);
+  const table = await reply.json();
   const socket = new WebSocket(`ws://${page.host}/live?t=${encodeURIComponent(token)}`, { headers: { origin: base } });
   const heard = [];
   const waiting = new Map();
+  // A socket that closes mid-run ends the run: every row waiting is answered at once, and no later row is pressed (each would wait
+  // out its whole answer time for nothing).
+  // `sent` says which: the row went out and its answer never came, or the socket was already closed and nothing was sent.
+  const CLOSED = { ok: false, answer: 'the connection to the page closed', closed: true };
+  let closed = false;
+  let cutShort = false; // the page went away before every row was pressed: the run did not finish
+  let interrupted = false;
+  const rows = [];
+  socket.on('close', () => {
+    closed = true;
+    for (const resolve of waiting.values()) resolve({ ...CLOSED, sent: true });
+  });
   socket.on('message', (data) => {
     let message;
     try { message = JSON.parse(data); } catch { return; }
@@ -114,7 +143,6 @@ export async function runPreflight({ url, signal, yesMoves = false, ask = askYes
     else if (message.type === 'picture') heard.push({ event: `picture (${Buffer.from(message.jpeg ?? '', 'base64').length} bytes)`, at: Date.now() });
   });
   await new Promise((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
-  const rows = [];
   let id = 0;
   const real = table.mode === 'real';
   let movesTold = false;
@@ -124,17 +152,25 @@ export async function runPreflight({ url, signal, yesMoves = false, ask = askYes
     const unknown = only.filter((name) => !known.includes(name));
     if (unknown.length) { socket.close(); throw new Error(`--only: no such row ${unknown.join(', ')} (rows: ${known.join(', ')})`); }
   }
-  // One row pressed for its answer (not a row of the table): `{ ok, call, answer }`, or null when it is not on this page or off.
-  const quietly = async (name, args = {}) => {
-    const entry = table.controls.find((c) => c.id === name);
-    if (!entry || entry.disabled || socket.readyState !== WebSocket.OPEN) return null;
+  // The one way anything is sent to the page: its answer, `timedOut` after `ms`, or CLOSED at once when the socket is not open
+  // (a socket that closes later answers the waiting ones in its close handler).
+  const send = async (message, ms, timedOut) => {
+    if (socket.readyState !== WebSocket.OPEN) return { ...CLOSED, sent: false };
     id += 1;
     const mine = id;
     const answer = new Promise((resolve) => waiting.set(mine, resolve));
-    socket.send(JSON.stringify({ type: 'call', id: mine, name, args }));
-    const result = await within(answer, 8000, null);
+    socket.send(JSON.stringify({ ...message, id: mine }));
+    const result = await within(answer, ms, timedOut);
     waiting.delete(mine);
     return result;
+  };
+  // One row pressed for its answer (not a row of the table): `{ ok, call, answer }`, or null when it is not on this page, off, or
+  // the page is gone.
+  const quietly = async (name, args = {}) => {
+    const entry = table.controls.find((c) => c.id === name);
+    if (!entry || entry.disabled) return null;
+    const result = await send({ type: 'call', name, args }, 8000, null);
+    return result?.closed ? null : result;
   };
   // The lamp's level and mute, as `get volume` answers them (`{"volume":{"level":N,"muted":B}}` after the arrow in its line).
   const volumeNow = async () => {
@@ -151,34 +187,37 @@ export async function runPreflight({ url, signal, yesMoves = false, ask = askYes
   try {
     for (const [kind, list] of [['call', table.controls], ['stim', table.stimuli]]) {
       for (const entry of list) {
-        if (signal?.aborted) break;
+        if (closed && !signal?.aborted && !interrupted) cutShort = true;
+        if (signal?.aborted || interrupted || closed) break;
         const rowId = `${kind === 'call' ? 'call' : 'stim'}:${entry.id}`;
         if (only && !only.includes(rowId)) continue;
         if (entry.disabled) {
           // Off because the lamp did not grant what the row takes: refused as designed. Off for another reason (the run's flag):
           // n/a.
           const refused = GRANT_REASON.test(entry.disabled);
-          rows.push({ id: rowId, result: refused ? 'REFUSED' : 'n/a', evidence: entry.disabled });
+          // A grant refusal here is the PAGE's (drawn from the grants in the lamp's hello): the lamp was sent nothing for this row.
+          rows.push({ id: rowId, result: refused ? 'REFUSED' : 'n/a', evidence: refused ? `refused by the page, from the grants the lamp named in hello (nothing was sent to the lamp): ${entry.disabled}` : entry.disabled });
           log(`${rowId}: ${refused ? 'REFUSED' : 'n/a'}`);
           continue;
         }
         // A real lamp: what moves it or shows the room is the person's call, row by row.
         const touches = entry.moves || entry.needs?.some((g) => g === 'camera' || g === 'microphone');
-        if (real && touches && !yesMoves && !(await ask(`Press ${rowId} (${entry.label}) on the REAL lamp?`))) {
-          rows.push({ id: rowId, result: 'n/a', evidence: 'skipped: not confirmed by the person' });
-          log(`${rowId}: skipped`);
-          continue;
+        if (real && touches && !yesMoves) {
+          const said = await ask(`Press ${rowId} (${entry.label}) on the REAL lamp?`, { signal });
+          // A Ctrl-C at the question stops the run: this row is not pressed, and the clean-up below still runs.
+          if (said === null) { interrupted = true; log(`${rowId}: stopped by Ctrl-C at the question`); break; }
+          if (!said) {
+            rows.push({ id: rowId, result: 'n/a', evidence: 'skipped: not confirmed by the person' });
+            log(`${rowId}: skipped`);
+            continue;
+          }
         }
         // The person's yes (the question just answered, or --yes-moves) is the page's "this moves the real lamp": the server holds
         // a move until it has been told, once per connection.
         if (real && entry.moves && !movesTold) { socket.send(JSON.stringify({ type: 'moves_ok' })); movesTold = true; }
-        id += 1;
-        const mine = id;
         const since = Date.now();
-        const answer = new Promise((resolve) => waiting.set(mine, resolve));
-        socket.send(JSON.stringify({ type: kind, id: mine, name: entry.id, args: {} }));
-        let result = await within(answer, answerMs, { ok: false, answer: `no answer in ${answerMs / 1000} s` });
-        waiting.delete(mine);
+        const noAnswer = { ok: false, answer: `no answer in ${answerMs / 1000} s` };
+        let result = await send({ type: kind, name: entry.id, args: {} }, answerMs, noAnswer);
         // Only the sequence is waited for, never the row: `turn_end` is pressed again every second while the lamp says its turn has
         // not begun, for up to 8 s.
         let neverBegan = false;
@@ -186,14 +225,22 @@ export async function runPreflight({ url, signal, yesMoves = false, ask = askYes
           const until = Date.now() + retryMs;
           while (!result.ok && TURN_NOT_BEGUN.test(String(result.answer)) && Date.now() < until) {
             await sleep(retryEveryMs);
-            id += 1;
-            const again = id;
-            const next = new Promise((resolve) => waiting.set(again, resolve));
-            socket.send(JSON.stringify({ type: 'call', id: again, name: entry.id, args: {} }));
-            result = await within(next, answerMs, { ok: false, answer: `no answer in ${answerMs / 1000} s` });
-            waiting.delete(again);
+            const next = await send({ type: 'call', name: entry.id, args: {} }, answerMs, noAnswer);
+            // The page went away in the wait before the retry: nothing was sent, so the row keeps the lamp's earlier answer (it WAS
+            // pressed, once) and the run is cut short.
+            if (next.closed && !next.sent) { cutShort = true; break; }
+            result = next;
           }
           neverBegan = !result.ok && TURN_NOT_BEGUN.test(String(result.answer));
+        }
+        // The page went away: either while this row was out (it was pressed, its answer never came: FAIL) or before it went out (it
+        // was NOT pressed: n/a, and the table must not say a moving row was pressed when it was not). No events are waited for.
+        if (result.closed) {
+          cutShort = true;
+          const verdict = result.sent ? 'FAIL' : 'n/a';
+          rows.push({ id: rowId, result: verdict, evidence: result.sent ? 'pressed; the connection to the page closed before its answer' : 'not pressed: the connection to the page had closed' });
+          log(`${rowId}: ${verdict}`);
+          break;
         }
         // The events it said it would show are waited for (up to expectMs after the press), the rest settle for settleMs.
         const heardNow = () => heard.filter((h) => h.at >= since).map((h) => h.event);
@@ -221,12 +268,8 @@ export async function runPreflight({ url, signal, yesMoves = false, ask = askYes
     // pressed again (they touch only what this run made, and say so when none is kept); then the page's own end does the rest.
     for (const name of ['sound_remove', 'notes_delete']) {
       const entry = table.controls.find((c) => c.id === name);
-      if (!entry || entry.disabled || socket.readyState !== WebSocket.OPEN) continue;
-      id += 1;
-      const mine = id;
-      const answer = new Promise((resolve) => waiting.set(mine, resolve));
-      socket.send(JSON.stringify({ type: 'call', id: mine, name, args: {} }));
-      await within(answer, 5000, null);
+      if (!entry || entry.disabled) continue;
+      await send({ type: 'call', name, args: {} }, 5000, null);
     }
     // The volume the rows left is put back to what it was before the first row (only what differs is pressed).
     if (volumeBefore) {
@@ -238,7 +281,8 @@ export async function runPreflight({ url, signal, yesMoves = false, ask = askYes
     socket.close();
   }
   const volume = volumeBefore ? { before: volumeBefore, after: volumeAfter } : null;
-  return { markdown: tableOf({ lamp: table.lamp, mode: table.mode, rows, at: now(), only, volume }), rows, mode: table.mode, volume };
+  const ended = cutShort ? `the connection to the page closed after ${rows.length} rows; the rest were not pressed` : interrupted ? 'stopped by a Ctrl-C at a question; the rest were not pressed' : null;
+  return { markdown: tableOf({ lamp: table.lamp, mode: table.mode, rows, at: now(), only, volume, ended }), rows, mode: table.mode, volume, interrupted, cutShort };
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -253,11 +297,15 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const stopper = new AbortController();
   for (const signalName of ['SIGINT', 'SIGTERM']) process.on(signalName, () => stopper.abort());
   try {
-    const { markdown, rows } = await runPreflight({ url, signal: stopper.signal, yesMoves: args.includes('--yes-moves'), only: get('--only')?.split(',').map((x) => x.trim()).filter(Boolean), log: (line) => console.error(line) });
+    const { markdown, rows, interrupted, cutShort } = await runPreflight({ url, signal: stopper.signal, yesMoves: args.includes('--yes-moves'), only: get('--only')?.split(',').map((x) => x.trim()).filter(Boolean), log: (line) => console.error(line) });
     if (get('--out')) writeFileSync(get('--out'), markdown); else console.log(markdown);
-    process.exit(stopper.signal.aborted ? 130 : rows.some((r) => r.result === 'FAIL') ? 1 : 0);
+    process.exit(exitCodeOf({ aborted: stopper.signal.aborted, interrupted, cutShort, rows }));
   } catch (error) {
-    console.error(`preflight: ${String(error.message).replaceAll(url, '<the url>')}`);
+    // Neither the url nor its token (as typed or as encoded in a request line) is ever printed.
+    const token = (() => { try { return new URL(url).searchParams.get('t'); } catch { return null; } })();
+    let said = String(error.message).replaceAll(url, '<the url>');
+    for (const secret of token ? [token, encodeURIComponent(token)] : []) said = said.replaceAll(secret, '<token>');
+    console.error(`preflight: ${said}`);
     process.exit(2);
   }
 }

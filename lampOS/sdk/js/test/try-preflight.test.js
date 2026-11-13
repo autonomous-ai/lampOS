@@ -7,6 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
+import { CONTROLS } from '../examples/twin/controls.js';
 import { FakeLamp } from '../src/testing.js';
 import { expectedEvents, resultText, runPreflight, tableOf } from '../examples/twin/preflight.js';
 import { page } from './preflight-page.js';
@@ -33,6 +34,7 @@ test('on the fake twin every enabled row is pressed once with its defaults and n
   for (const row of rows) assert.ok(['PASS', 'FAIL', 'REFUSED', 'n/a'].includes(row.result) && row.evidence.length > 0, `${row.id}: ${row.result} has evidence`);
   assert.equal(rows.find((r) => r.id === 'call:microphone_stream').result, 'REFUSED', 'the fake twin has no microphone grant: refused as designed, said, not hidden');
   assert.match(rows.find((r) => r.id === 'call:microphone_stream').evidence, /did not grant microphone/);
+  assert.match(rows.find((r) => r.id === 'call:microphone_stream').evidence, /^refused by the page, from the grants the lamp named in hello/, 'whose refusal it is');
   assert.ok(rows.some((r) => /; events: .*done/.test(r.evidence)), `an event the page logged is the evidence: ${rows.map((r) => r.evidence).join(' | ').slice(0, 300)}`);
   // The only FAIL the fake gives is its own words for ending a turn that is not this computer's.
   assert.deepEqual(rows.filter((r) => r.result === 'FAIL').map((r) => r.id), [], 'no unexplained FAIL');
@@ -105,4 +107,16 @@ test('a PASS whose expected event was not seen says so in the cell and the count
   assert.match(md, /\| call:say \| PASS \(expected event not seen: lamp\.said\) \| NOT SEEN: lamp\.said \|/);
   assert.match(md, /\| call:gesture \| PASS \| {2}\|/);
   assert.match(md, /\| stim:touch \| PASS \| seen \|/);
+});
+
+test('a wrong token says the page refused it, and the message holds neither the url nor the token', async (t) => {
+  const { url, token } = await page(t);
+  const wrong = url.replace(token, 'not-the-token');
+  await assert.rejects(runPreflight({ url: wrong }), (error) => /answered 4\d\d for its table/.test(error.message) && !error.message.includes('not-the-token'));
+});
+
+test('follow_hand and volume_mute claim no event they cannot be told to show', () => {
+  // follow_hand puts no hand in view (the `hand` stimulus does); volume_mute's default (off) changes nothing on a lamp that is not muted.
+  for (const id of ['follow_hand', 'volume_mute']) assert.deepEqual(CONTROLS.find((c) => c.id === id).shows, [], id);
+  assert.deepEqual(CONTROLS.find((c) => c.id === 'volume').shows, ['volume.changed'], 'a row whose default does change keeps its claim');
 });
