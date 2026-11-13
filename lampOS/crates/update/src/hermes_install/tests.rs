@@ -2159,6 +2159,48 @@ fn the_first_tries_switch_is_on_in_the_product() {
     }
 }
 
+/// A known face giving another name is asked, and only their yes renames
+/// it (#5485, 9 of 9 on lamp-52e6, 9 Nov): both rename switches are on in
+/// the product. Only `lamp-voice` reads them, which sets each `on` once,
+/// and no product file sets either to anything else.
+#[test]
+fn the_rename_switches_are_on_in_the_product() {
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let voice = fs::read_to_string(product.join("lamp-voice.service")).unwrap();
+    assert!(
+        voice
+            .lines()
+            .any(|line| line == "Environment=LAMP_NAMES=checked")
+    );
+    for (name, want) in [
+        (
+            lamp_voice::known_faces::RENAME_ASKED_ENVIRONMENT,
+            "LAMP_NAMES_RENAME_ASKED",
+        ),
+        (
+            lamp_voice::known_faces::RENAME_YES_ENVIRONMENT,
+            "LAMP_NAMES_RENAME_YES",
+        ),
+    ] {
+        assert_eq!(name, want);
+        let switch = format!("Environment={name}=on");
+        let setting = format!("{name}=");
+        assert_eq!(
+            voice.lines().filter(|line| *line == switch).count(),
+            1,
+            "{name}"
+        );
+        for entry in fs::read_dir(&product).unwrap() {
+            let path = entry.unwrap().path();
+            if let Ok(text) = fs::read_to_string(&path) {
+                for line in text.lines().filter(|line| line.contains(&setting)) {
+                    assert_eq!(line, switch, "{}", path.display());
+                }
+            }
+        }
+    }
+}
+
 /// [`ns_text`] with [`TASKS_SWITCH`] on: each of [`TASKS_EDITS`] found
 /// once in [`NS_TEXT`] (and once with [`SKILLS_EDITS`] made) and made, so
 /// the text names [`CONTROL_SOCKET`], the file alone, and stages it before
