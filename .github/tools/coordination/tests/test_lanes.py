@@ -540,6 +540,30 @@ class BotDryRound(Repo):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("#8: its commits can't be listed", r.stdout)
 
+    # 13 Nov (Heron's P3 on #6959): every PR needs two signed readers, in the bot and in still-eligible.sh.
+    def one_read(self, n):
+        with open(os.path.join(self.fake, "head-%d.txt" % n)) as f:
+            h = f.read().strip()
+        self.fakefile("comments-%d.json" % n, json.dumps({"login": "w1", "body": "READ-OK " + h + "\n\nReviewer-lead, 01:00",
+                                                          "created_at": "2026-11-04T01:00:00Z"}) + "\n")
+
+    def test_a_pr_with_one_signed_read_sits_out(self):
+        r, lines = self.bot(before=lambda: self.one_read(7))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("#7 left out: two reads needed, short 1", r.stderr)
+        self.assertIn("dry: crate lane: would carry 8 9 onto " + self.base[:9], lines)
+        self.assertNothingChanged()
+
+    def test_still_eligible_fails_on_one_signed_read(self):
+        self.pr(8, ["lampOS/crates/x/src/lib.rs"])
+        os.makedirs(self.state, exist_ok=True)
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.one_read(8)
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("#8: TWO READS short 1", r.stdout)
+
     def test_either_queue_unread_makes_nothing_eligible(self):
         for issue in QUEUE:
             for f in os.listdir(self.fake):
