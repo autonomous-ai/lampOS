@@ -3,6 +3,21 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 22:0x GMT+7: loopback switch yes; #6953 read; #6955
+
+- The first builder, 20:44: **yes to the loopback switch** as ten wrote it
+  (STT/TTS loopback literals only, default off, set by `--real-voice=local`
+  only, a test failing if any product unit sets it); ten builds it, the first
+  builder and Heron read. Train 884 carries #6939.
+- #6949: Heron restated READ-OK at 2afd14b0c4; the first builder's read owed.
+- **#6953** (ten, body macOS step 2): READ-OK e31a19c1ff. Native clippy
+  clean; tests 594+44+2+9+3+1+125 pass. A throwaway probe: real SIGTERM 10/10
+  and SIGINT 10/10 taken by the sigwait thread, median 1.6 ms to "stop seen";
+  `kern.bootsessionuuid` answers. P2 for step 3: one boot id across the lamp.
+- **#6955** (`sim-3/boot-id`, 7001ca2954): `lamp_sim::boot_id()`, on macOS
+  `kern.bootsessionuuid` (as the body), so the body won't refuse lamp-control's
+  expression leases (`expression_in.rs:76`). READ ASK to sim-1, sim-2.
+
 ## 2026-11-13 21:4x GMT+7: #6954, P4 step 1 (lamp-sim speech)
 
 - #6949: Heron READ-OK 651dcf01be with a wording P3; taken at 2afd14b0c4
