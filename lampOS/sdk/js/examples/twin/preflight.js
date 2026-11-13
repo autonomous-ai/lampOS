@@ -139,7 +139,7 @@ export async function runPreflight({ url, signal, yesMoves = false, ask = askYes
     let message;
     try { message = JSON.parse(data); } catch { return; }
     if (message.type === 'result') waiting.get(message.id)?.(message);
-    else if (message.type === 'event') heard.push({ event: message.event, at: Date.now() });
+    else if (message.type === 'event') heard.push({ event: message.event, at: Date.now(), frame: message.frame });
     else if (message.type === 'picture') heard.push({ event: `picture (${Buffer.from(message.jpeg ?? '', 'base64').length} bytes)`, at: Date.now() });
   });
   await new Promise((resolve, reject) => { socket.once('open', resolve); socket.once('error', reject); });
@@ -249,14 +249,36 @@ export async function runPreflight({ url, signal, yesMoves = false, ask = askYes
           while (Date.now() - since < expectMs && !shows.every((name) => heardNow().includes(name))) await sleep(100);
           await sleep(Math.min(settleMs, 300));
         } else await sleep(settleMs);
+        // A turn the lamp took by the call and then refused in its `done` (how dropped, why "refused: the lamp is speaking") did not
+        // run, whatever the call said: pressed again every `retryEveryMs` for up to `retryMs` (the say before it may still be
+        // playing), and if it is still refused, n/a with the lamp's words, never a PASS.
+        const turnRefusal = (from) => heard.find((h) => h.at >= from && h.event === 'done' && h.frame?.how === 'dropped' && /^refused/.test(String(h.frame?.why)))?.frame?.why;
+        let refusedTurn = entry.id === 'turn_start' && result.ok ? turnRefusal(since) : undefined;
+        if (refusedTurn) {
+          const until = Date.now() + retryMs;
+          while (refusedTurn && Date.now() < until) {
+            await sleep(retryEveryMs);
+            const from = Date.now();
+            const previous = result;
+            result = await send({ type: 'call', name: entry.id, args: {} }, answerMs, noAnswer);
+            // The page went away: before the retry went out (nothing was sent: the row keeps what the lamp said, the refusal stands)
+            // or after (sent, never answered: FAIL). Either way the run is cut short.
+            if (result.closed) { cutShort = true; if (result.sent) refusedTurn = undefined; else result = previous; break; }
+            // A retry the lamp did not take (a refusal, no answer) is that call's own failure, not the earlier refused turn: FAIL.
+            if (!result.ok) { refusedTurn = undefined; break; }
+            await sleep(settleMs);
+            refusedTurn = turnRefusal(from);
+          }
+        }
         const events = [...new Set(heardNow())];
         // A lamp from before the feature says so in its parser's words: n/a, with the words beside it.
         const missing = !result.ok && notOnBuild(result.answer);
         const over = !result.ok && entry.id === 'turn_end' && (TURN_ALREADY_OVER.test(String(result.answer)) || neverBegan);
         // The lamp refusing for a grant this pairing does not hold (`no_grant`, naming it) is the design working.
         const refusedForGrant = !result.ok && !missing && !over && grantRefusal(result.answer, table.grants);
-        const verdict = result.ok ? 'PASS' : refusedForGrant ? 'REFUSED' : missing || over ? 'n/a' : 'FAIL';
-        const said = missing ? `not on this lamp's build (the lamp said: ${String(result.answer).slice(0, 200)})`
+        const verdict = refusedTurn ? 'n/a' : result.ok ? 'PASS' : refusedForGrant ? 'REFUSED' : missing || over ? 'n/a' : 'FAIL';
+        const said = refusedTurn ? `the lamp took the call and refused the turn (the lamp said: ${refusedTurn})`
+          : missing ? `not on this lamp's build (the lamp said: ${String(result.answer).slice(0, 200)})`
           : over ? `${neverBegan ? 'the turn never began' : "the lamp's turn was over before end was pressed"} (the lamp said: ${result.answer})`
             : `${result.call ?? entry.id}${result.ok ? '' : ` -> ${result.answer}`}`;
         rows.push({ id: rowId, result: verdict, missing: verdict === 'PASS' ? shows.filter((name) => !events.includes(name)) : [], expected: expectedEvents(shows, events), evidence: [said, events.length ? `events: ${events.join(', ')}` : ''].filter(Boolean).join('; ') });
