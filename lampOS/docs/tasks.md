@@ -3229,8 +3229,24 @@ as a Harness task with the agent's own tools
   lamp-tasks sweeps the `make-*` folders (and their homes) a lamp-tasks
   stopped mid-make left (`skill_make::sweep`).
 - **The line:** `{"op":"skill_make","rules","within_ms"}`, checked whole
-  (`MakeLine::parse`): no other field, the rules (the system prompt and the
-  brief) at most 48 KiB with no NUL, `within_ms` from 1 to 120 s.
+  (`MakeLine::parse`): no other field but `guide`, the rules (the system
+  prompt and the brief) at most 48 KiB with no NUL, `within_ms` from 1 to
+  120 s.
+- **The guide (`"guide":true`, lamp-voice's `LAMP_MAKE_AGENT_GUIDE`,
+  off):** only when the line says `true` (a boolean, `false` by default),
+  the lamp's skill-creator guide (`skill_make::GUIDE`, from
+  `skill_make_guide.md`: a lamp version of V1's
+  `skills/skill-creator/SKILL.md`, Apache-2.0, its first line naming that
+  origin and license) is written beside the rules as `guide.md`, 0600, and
+  the run is told (`guided_prompt`) to read it first, the rules winning
+  where they differ; to draft the skill in `draft/NAME` in its folder; to
+  check it with the lamp's own check, `CHECK_PROGRAM`
+  (`/opt/lampOS/skills/current/lamp-skills`, the voice's own `pack`)
+  `pack --out /tmp/lamp-check draft/NAME` (`CHECK_OUT`, the namespace's own
+  `/tmp`), fixing what it says at most twice; then to write `answer.md` as
+  the rules say, no file outside its folder but the check's own, and no
+  other command. Without it the run's words and the folder's files are
+  as before, byte for byte.
 - **The run: Hermes only** (the first builder's ruling, 12 Nov 19:14):
   the lamp's Hermes started exactly as a skill's `do.task` run is
   (`skill_task::HermesRunner` inside `skill_make::MakeHermes`, row-6443's
@@ -3367,7 +3383,12 @@ as a Harness task with the agent's own tools
   namespace text shows `control.sock` alone and never names `admin.sock`;
   only lamp-voice as root may hand a make over; the socket says `started`,
   then the answer; the default keeps the network and still shows no admin
-  socket, and `held` gives `LAMP_NS_NET=run`.
+  socket, and `held` gives `LAMP_NS_NET=run`; the guide given only when
+  the line asks for it, 0600 beside the rules, its first line its origin
+  and license, the run told the check's command, and without it (or with
+  `false`) the run's words and folder today's, byte for byte, and a guide
+  that is not a boolean refused
+  (`the_guide_is_given_only_when_the_line_asks_for_it`).
 
 **The lamp rows (not yet run):** on lamp-9adf with this build, ask "Hey
 Lamp, make me a skill that checks the weather every morning". DeepSeek's

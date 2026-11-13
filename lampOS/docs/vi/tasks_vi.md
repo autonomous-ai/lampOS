@@ -834,8 +834,23 @@ agent (`lamp_tasks::skill_make`).
   bỏ các thư mục `make-*` (cùng home của chúng) mà một lamp-tasks dừng
   giữa chừng để lại (`skill_make::sweep`).
 - **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
-  vẹn (`MakeLine::parse`): không có trường nào khác, luật (system prompt và
-  brief) tối đa 48 KiB và không có NUL, `within_ms` từ 1 đến 120 giây.
+  vẹn (`MakeLine::parse`): không có trường nào khác ngoài `guide`, luật
+  (system prompt và brief) tối đa 48 KiB và không có NUL, `within_ms` từ 1
+  đến 120 giây.
+- **Hướng dẫn (`"guide":true`, `LAMP_MAKE_AGENT_GUIDE` của lamp-voice,
+  tắt):** chỉ khi dòng ghi `true` (một boolean, mặc định `false`), hướng dẫn
+  skill-creator của đèn (`skill_make::GUIDE`, từ `skill_make_guide.md`: bản
+  cho đèn của `skills/skill-creator/SKILL.md` của V1, Apache-2.0, dòng đầu
+  ghi nguồn gốc và giấy phép đó) được ghi cạnh luật thành `guide.md`, 0600,
+  và lần chạy được dặn (`guided_prompt`) đọc nó trước, luật thắng khi hai
+  bên khác nhau; viết nháp kỹ năng trong `draft/NAME` trong thư mục của nó;
+  kiểm tra bằng kiểm tra của chính đèn, `CHECK_PROGRAM`
+  (`/opt/lampOS/skills/current/lamp-skills`, đúng `pack` của giọng nói)
+  `pack --out /tmp/lamp-check draft/NAME` (`CHECK_OUT`, `/tmp` riêng của
+  namespace), sửa theo lời nó tối đa hai lần; rồi ghi `answer.md` như luật
+  nói, không ghi tệp nào ngoài thư mục của nó trừ tệp của kiểm tra, và
+  không chạy lệnh nào khác. Không có nó thì lời dặn lần chạy và các tệp
+  trong thư mục giữ nguyên từng byte như trước.
 - **Lần chạy: chỉ Hermes** (quyết định của first builder, 12/11 19:14):
   Hermes của đèn được khởi động đúng như một lần chạy `do.task` của kỹ
   năng (`skill_task::HermesRunner` bên trong `skill_make::MakeHermes`,
@@ -973,7 +988,12 @@ agent (`lamp_tasks::skill_make`).
   thật: không thấy bộ nhớ lâu dài, chỉ thư mục của lần tạo ghi được); văn bản namespace của lamp-update chỉ cho thấy `control.sock` và
   không bao giờ nhắc `admin.sock`; chỉ lamp-voice chạy bằng root được giao
   một lần tạo; socket nói `started`, rồi câu trả lời; mặc định giữ mạng mà
-  vẫn không cho thấy admin socket, và `held` cho `LAMP_NS_NET=run`.
+  vẫn không cho thấy admin socket, và `held` cho `LAMP_NS_NET=run`; hướng
+  dẫn chỉ được đưa khi dòng yêu cầu, 0600 cạnh luật, dòng đầu là nguồn gốc
+  và giấy phép, lần chạy được dặn lệnh kiểm tra, còn không có nó (hoặc với
+  `false`) thì lời dặn và thư mục giữ nguyên từng byte như hôm nay, và
+  `guide` không phải boolean bị từ chối
+  (`the_guide_is_given_only_when_the_line_asks_for_it`).
 
 **Các dòng kiểm tra trên đèn (chưa chạy):** trên lamp-9adf với bản này, hỏi
 "Hey Lamp, make me a skill that checks the weather every morning". Câu trả

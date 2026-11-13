@@ -35,7 +35,18 @@
 //!
 //! - **The line** ([`MakeLine`]): `{"op":"skill_make","rules","within_ms"}`,
 //!   the system prompt and the brief as one text, and how long the run may
-//!   take, checked whole ([`MakeLine::parse`]).
+//!   take, checked whole ([`MakeLine::parse`]); with `"guide":true` too
+//!   (lamp-voice's `LAMP_MAKE_AGENT_GUIDE`), the lamp's skill-creator guide
+//!   is given ([`GUIDE_FILE`]).
+//! - **The guide** ([`GUIDE`], only when the line asks for it): a lamp
+//!   version of V1's `skill-creator` (Apache-2.0), written 0600 beside the
+//!   rules as [`GUIDE_FILE`]: take the intent from the person's words, draft
+//!   the skill in `draft/NAME` in the make's folder, check it with the
+//!   lamp's own check, `lamp-skills pack` ([`CHECK_PROGRAM`], the very
+//!   check the voice packs a made skill with, its output in the run's own
+//!   `/tmp`), fix it at most twice by the check's words, then answer
+//!   ([`guided_prompt`]). Without it the run's words and files are as
+//!   before, byte for byte ([`prompt`]).
 //! - **The make's folder**: `make-<run id>` in the lamp's work folder (the
 //!   one a skill's run starts in, shown to Hermes in its namespace), 0700,
 //!   with the rules in [`RULES_FILE`], 0600. The run starts there and is
@@ -106,6 +117,10 @@ pub struct MakeLine {
     pub op: MakeOp,
     pub rules: String,
     pub within_ms: u64,
+    /// Whether the lamp's skill-creator guide is given ([`GUIDE_FILE`]):
+    /// only when the line says `true`.
+    #[serde(default)]
+    pub guide: bool,
 }
 
 /// The line's `op`: `skill_make` only.
@@ -153,11 +168,57 @@ pub fn prompt(folder: &Path) -> String {
     )
 }
 
+/// The guide's file in a make's folder, beside the rules, only when the
+/// line asks for it.
+pub const GUIDE_FILE: &str = "guide.md";
+/// The lamp's skill-creator guide, as [`GUIDE_FILE`] holds it: a lamp
+/// version of V1's `skills/skill-creator/SKILL.md` (Apache-2.0; its first
+/// line names that origin and license), without V1's evals, benchmarks and
+/// viewer.
+pub const GUIDE: &str = include_str!("skill_make_guide.md");
+/// The lamp's own check of a skill's folder the guide names: the skills
+/// part's `pack`, the very check the voice packs a made skill with
+/// (`lamp_voice::made_skill::PROGRAM`), seen inside the make's namespace
+/// as it is outside (`/opt` is neither hidden nor written to). It reads the
+/// folder and writes its package only under `--out`, the run's own `/tmp`.
+pub const CHECK_PROGRAM: &str = "/opt/lampOS/skills/current/lamp-skills";
+/// Where the guide's check writes its package: the namespace's own `/tmp`,
+/// gone with the run.
+pub const CHECK_OUT: &str = "/tmp/lamp-check";
+
+/// The run's words with the guide ([`GUIDE_FILE`]): the guide read first,
+/// the rules winning where they differ, the draft checked with
+/// [`CHECK_PROGRAM`] alone and fixed at most twice, then the answer
+/// written as the rules say, to [`ANSWER_FILE`] alone.
+pub fn guided_prompt(folder: &Path) -> String {
+    format!(
+        "Everything you need is in two files in this folder, {folder}: {guide}, how to make a \
+         lamp skill, and {rules}, the skill's form and the person's request. Read {guide} first, \
+         then {rules}, and follow both; {rules} wins where they differ. Draft the skill in \
+         {folder}/draft/NAME and check it with the lamp's own check, run from this folder as \
+         {check} pack --out {out} draft/NAME, fixing what it says at most twice. Then write the \
+         answer exactly as {rules} says (the fenced blocks, or its one line when the skill can't \
+         be made), and nothing else, to the file {answer} in this folder. Write no file outside \
+         this folder but the check's own under {out}, install nothing and run no other command.",
+        guide = GUIDE_FILE,
+        rules = RULES_FILE,
+        answer = ANSWER_FILE,
+        check = CHECK_PROGRAM,
+        out = CHECK_OUT,
+        folder = folder.display(),
+    )
+}
+
 /// The run of a make in `folder`: its words, at most `within`, started in
 /// its folder, with its own fresh home ([`HOME_FOLDER`]) as `HOME`,
 /// `HERMES_HOME` under it and [`HOME_ENV`] naming it, and nothing else of
 /// its own (no token, no grant).
 pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
+    make_run_with(folder, within, false)
+}
+
+/// [`make_run`], with the guide's words ([`guided_prompt`]) when `guide`.
+pub fn make_run_with(folder: &Path, within: Duration, guide: bool) -> SkillRun {
     SkillRun {
         // The make's own run id, from its folder's name (`make-<run id>`).
         run: folder
@@ -167,7 +228,11 @@ pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
             .unwrap_or_default()
             .into(),
         skill: "make".into(),
-        prompt: prompt(folder),
+        prompt: if guide {
+            guided_prompt(folder)
+        } else {
+            prompt(folder)
+        },
         folder: folder.to_path_buf(),
         // A make has no skill script yet, so it is never a gateway agent's
         // run (#6882): a gateway refuses an empty script, as a fixed write.
@@ -313,9 +378,19 @@ fn file_in(at: &rustix::fd::OwnedFd, name: &str, text: &str) -> std::io::Result<
 /// each folder 0700 and each file 0600, made
 /// before a byte is written, each part opened from the one above, never
 /// through a link.
+#[cfg(test)]
 fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
+    put_with(work, rules, false)
+}
+
+/// [`put`], with the guide ([`GUIDE`]) beside the rules as [`GUIDE_FILE`]
+/// when `guide`, 0600 as they are.
+fn put_with(work: &Path, rules: &str, guide: bool) -> std::io::Result<MadeFolder> {
     let made = fresh_home(work)?;
     file_in(&made.fd, RULES_FILE, rules)?;
+    if guide {
+        file_in(&made.fd, GUIDE_FILE, GUIDE)?;
+    }
     Ok(made)
 }
 
@@ -465,7 +540,7 @@ pub fn answer(
     if let Err(why) = runner.ready() {
         return refusal(not_started(&why), &why);
     }
-    let folder = match put(work, &make.rules) {
+    let folder = match put_with(work, &make.rules, make.guide) {
         Ok(folder) => folder,
         Err(error) => {
             return refusal(
@@ -476,7 +551,10 @@ pub fn answer(
     };
     started();
     // A make has no token to end.
-    let ran = runner.run(&make_run(&folder.path, make.within()), &|| {});
+    let ran = runner.run(
+        &make_run_with(&folder.path, make.within(), make.guide),
+        &|| {},
+    );
     match ran {
         Err(why) => refusal(not_started(&why), &why),
         Ok(_) => match answer_read(&folder.fd) {
@@ -990,6 +1068,126 @@ mod tests {
             panic!("in the run");
         });
         assert!(panicking.is_err());
+        assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
+    }
+
+    /// A make's folder as its run saw it at its start: every path in it,
+    /// the run's words and the guide's text, if any.
+    type Looked = (Vec<String>, String, Option<String>);
+
+    /// Every make's folder and words, as each run saw them.
+    struct Looking {
+        seen: Mutex<Vec<Looked>>,
+    }
+
+    impl Runner for Looking {
+        fn ready(&self) -> Result<(), String> {
+            Ok(())
+        }
+
+        fn run(&self, run: &SkillRun, _: &dyn Fn()) -> Result<u64, String> {
+            let folder = run.start_in.clone().unwrap();
+            use std::os::unix::fs::MetadataExt;
+            let guide = folder.join(GUIDE_FILE);
+            if guide.exists() {
+                assert_eq!(std::fs::metadata(&guide).unwrap().mode() & 0o777, 0o600);
+            }
+            self.seen.lock().unwrap().push((
+                listing(&folder),
+                run.prompt.clone(),
+                std::fs::read_to_string(guide).ok(),
+            ));
+            std::fs::write(folder.join(ANSWER_FILE), "A").unwrap();
+            Ok(0)
+        }
+    }
+
+    /// `LAMP_MAKE_AGENT_GUIDE` (the owner's ask, 13 Nov: make skills as
+    /// V1's skill-creator did): the guide is given only when the line asks
+    /// for it, beside the rules, 0600, the run told to draft, check with
+    /// the lamp's own check and fix before it answers. Without it, or with
+    /// `false`, the run's words and its folder are today's, byte for byte.
+    #[test]
+    fn the_guide_is_given_only_when_the_line_asks_for_it() {
+        let work = tempfile::tempdir().unwrap();
+        let looking = Looking {
+            seen: Mutex::default(),
+        };
+        let guided = |guide: Value| {
+            json!({"op":"skill_make","rules":"R","within_ms":2_000,"guide":guide})
+                .to_string()
+                .into_bytes()
+        };
+        for asked in [line("R", 2_000), guided(json!(false)), guided(json!(true))] {
+            let answered = answer(&asked, true, work.path(), &looking, &mut || {});
+            assert_eq!(answered, json!({"ok": true, "answer": "A"}));
+        }
+        let seen = looking.seen.lock().unwrap();
+        let today = [
+            "home",
+            "home/.hermes",
+            "home/.hermes/config.yaml",
+            "rules.md",
+        ];
+        for (files, words, guide) in &seen[..2] {
+            assert_eq!(files, &today);
+            assert_eq!(guide, &None);
+            let folder = words
+                .split("in the file rules.md in this folder, ")
+                .nth(1)
+                .and_then(|rest| rest.split(". Read it").next())
+                .unwrap();
+            assert_eq!(
+                words,
+                &format!(
+                    "Everything you need is in the file rules.md in this folder, {folder}. Read it \
+                     and answer exactly as it says: the fenced blocks, or its one line when the \
+                     skill can't be made. Write that answer, and nothing else, to the file \
+                     answer.md in this folder. Write no other file anywhere, install nothing and \
+                     run nothing else."
+                )
+            );
+        }
+        let (files, words, guide) = &seen[2];
+        assert_eq!(
+            files,
+            &[
+                "guide.md",
+                "home",
+                "home/.hermes",
+                "home/.hermes/config.yaml",
+                "rules.md",
+            ]
+        );
+        assert_eq!(guide.as_deref(), Some(GUIDE));
+        for told in [
+            "guide.md",
+            "rules.md",
+            "/opt/lampOS/skills/current/lamp-skills pack --out /tmp/lamp-check draft/NAME",
+            "at most twice",
+            "answer.md",
+            "run no other command",
+        ] {
+            assert!(words.contains(told), "{told}: {words}");
+        }
+        // The guide names its origin and license first, and the same check.
+        assert!(GUIDE.starts_with(
+            "<!-- Adapted from V1's skills/skill-creator/SKILL.md (autonomous-ai/lampOS, main), \
+             Apache License 2.0"
+        ));
+        assert!(GUIDE.contains(&format!(
+            "{CHECK_PROGRAM} pack --out {CHECK_OUT} draft/NAME"
+        )));
+        // Anything but a boolean is no make's line.
+        let refused = answer(
+            &guided(json!("yes")),
+            true,
+            work.path(),
+            &looking,
+            &mut || {},
+        );
+        assert_eq!(refused["error"], "bad_request");
+        assert_eq!(seen.len(), 3);
         assert_eq!(std::fs::read_dir(work.path()).unwrap().count(), 0);
     }
 
