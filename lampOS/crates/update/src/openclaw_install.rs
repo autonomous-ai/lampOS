@@ -66,8 +66,8 @@
 use crate::{
     agent_ns, harness_install,
     hermes_install::{
-        self, NEEDS_AVAILABLE_KB, RETRY_IN_NEXT_WINDOW, available_kb, free_kb, gid_of, holds,
-        lock_named, on, owner, userns_argv,
+        self, NEEDS_AVAILABLE_KB, RETRY_IN_NEXT_WINDOW, Shown, available_kb, free_kb, gid_of,
+        holds, lock_named, on, owner, userns_argv,
     },
     install::{self, Runner, USER},
     records::write_whole,
@@ -95,6 +95,18 @@ pub const PRODUCT_DEFAULT: bool = true;
 /// OpenClaw [`SKILLS_SOCKET`] ([`ns_text`]); read as [`SWITCH`] is, with
 /// [`SKILLS_PRODUCT_DEFAULT`].
 pub const SKILLS_SWITCH: &str = "LAMP_OPENCLAW_SKILLS";
+
+/// A skill's run on the lamp's default agent (#6685), the switch lamp-tasks
+/// reads too: `on` exactly, with [`hermes_install::TASKS_SWITCH`] on, and
+/// OpenClaw's namespace also shows lamp-control's socket and
+/// [`RUN_TOKENS`] ([`Shown::tasks`]); otherwise off. Off until c0a4's row
+/// passes and its boundary has two reads (the first builder, #6059).
+pub const DEFAULT_AGENT_SWITCH: &str = "LAMP_SKILL_DEFAULT_AGENT";
+
+/// [`DEFAULT_AGENT_SWITCH`] as read: `on` exactly.
+pub fn default_agent(value: Option<&str>) -> bool {
+    value == Some("on")
+}
 /// On by default on a product lamp, as Hermes's skills switch is.
 pub const SKILLS_PRODUCT_DEFAULT: bool = true;
 
@@ -329,13 +341,55 @@ if [ \"$M\" = on ]; then
 fi
 ";
 
+/// lamp-tasks' folder of runs' token files (`lamp_tasks::run_token_file`,
+/// 0700, `lampos`'s): shown to OpenClaw's gateway, read-write, with
+/// [`Shown::tasks`], so a skill's script in a run's folder reads its run's
+/// token once and deletes it (the SDK's `_run_token`, #6685).
+pub const RUN_TOKENS: &str = "/run/lampos-tasks/runs";
+
+/// What [`ns_text`] adds for [`Shown::tasks`] after Hermes's
+/// `TASKS_EDITS` (lamp-control's socket alone, read-only): [`RUN_TOKENS`]
+/// staged before `/run` is hidden (skipped when it is not there) and moved
+/// back read-write, so the script can delete the file it read. OpenClaw's
+/// one gateway is not started per run, so no wrapper reads the token for
+/// it: any session on the gateway could read a run's file between
+/// lamp-tasks writing it and the script's first read (the boundary the
+/// lead accepted on #6685, kept as short as lamp-tasks makes it).
+const RUNS_EDITS: [(&str, &str); 4] = [
+    (
+        " S=/tmp/.lampos-ns\n",
+        " T=/run/lampos-tasks/runs S=/tmp/.lampos-ns\n",
+    ),
+    (
+        "else L=; fi\n",
+        "else L=; fi\n\
+         if [ -d \"$T\" ]; then mkdir -m 0700 \"$S/t\" && mount --bind \"$T\" \"$S/t\" || fail \"no $T\"; else T=; fi\n",
+    ),
+    (
+        "&& mount --move \"$S/l\" \"$L\" && ro \"$L\" || fail \"$L not shown\"; fi\n",
+        "&& mount --move \"$S/l\" \"$L\" && ro \"$L\" || fail \"$L not shown\"; fi\n\
+         if [ -n \"$T\" ]; then mkdir -p \"$T\" && mount --move \"$S/t\" \"$T\" || fail \"$T not shown\"; fi\n",
+    ),
+    (
+        "rm -f \"$S/r\" \"$S/l\" \"$S/b\" &&",
+        "rm -f \"$S/r\" \"$S/l\" \"$S/b\" && { [ -z \"$T\" ] || rmdir \"$S/t\"; } &&",
+    ),
+];
+
 /// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills, false)`,
 /// the same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]),
 /// with its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
-/// `skills`, lamp-skills' socket folder is shown read-only too; never
-/// lamp-control's socket, which only a skill's run under Hermes reaches.
-pub fn ns_text(skills: bool) -> String {
-    let mut text = hermes_install::ns_text(skills, false);
+/// `shown.skills`, lamp-skills' socket folder is shown read-only too; with
+/// `shown.tasks` (a skill's runs on OpenClaw, #6685), lamp-control's socket
+/// alone, read-only, and [`RUN_TOKENS`] ([`RUNS_EDITS`]); neither, as
+/// before.
+pub fn ns_text(shown: Shown) -> String {
+    let mut text = hermes_install::ns_text(shown.skills, shown.tasks);
+    if shown.tasks {
+        for (from, to) in RUNS_EDITS {
+            text = text.replacen(from, to, 1);
+        }
+    }
     for (from, to) in ENGINE_EDITS {
         text = text.replace(from, to);
     }
@@ -501,6 +555,9 @@ struct Ask {
     remove: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     skills: bool,
+    /// [`Shown::tasks`]: a skill's runs on OpenClaw (#6685).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    tasks: bool,
 }
 
 /// The install as [`RECORD`] has it, when lamp-update could have written
@@ -617,36 +674,37 @@ fn unit_path(root: &Path) -> PathBuf {
 /// [`LOCKFILE`], the Node at [`NODE_VERSION`], the wrapper
 /// and namespace script with this build's text (the script's as
 /// [`ns_text`]`(skills)`), and the gateway's unit.
-pub fn present(root: &Path, skills: bool) -> bool {
+pub fn present(root: &Path, shown: Shown) -> bool {
     fs::metadata(on(root, OPENCLAW)).is_ok()
         && package_version(root).as_deref() == Some(VERSION)
         && holds(root, LOCKFILE_AT, LOCKFILE)
         && node_version(root).as_deref() == Some(NODE_VERSION)
         && holds(root, WRAPPER, &wrapper_text())
-        && holds(root, NS, &ns_text(skills))
+        && holds(root, NS, &ns_text(shown))
         && agent_ns::hook_shim_there(root)
         && fs::read(unit_path(root)).is_ok_and(|bytes| bytes == UNIT_TEXT.as_bytes())
 }
 
 /// When `serve` starts, as Hermes's: off, an earlier record and ask are
 /// taken away; on with OpenClaw missing and no record, `absent`.
-pub fn at_start(root: &Path, records: &Path, switch: bool, skills: bool, now_unix_ms: u64) {
+pub fn at_start(root: &Path, records: &Path, switch: bool, shown: Shown, now_unix_ms: u64) {
     if !switch {
         for name in [RECORD, ASK] {
             let _ = fs::remove_file(records.join(name));
         }
         return;
     }
-    if !present(root, skills) && record(records).is_none() {
+    if !present(root, shown) && record(records).is_none() {
         write(records, OpenclawInstall::new("absent", None, now_unix_ms));
     }
 }
 
-fn ask(records: &Path, remove: bool, skills: bool) -> io::Result<()> {
+fn ask(records: &Path, remove: bool, shown: Shown) -> io::Result<()> {
     let text = serde_json::to_vec(&Ask {
         version: 1,
         remove,
-        skills,
+        skills: shown.skills,
+        tasks: shown.tasks,
     })
     .map_err(io::Error::other)?;
     write_whole(&records.join(ASK), &text, 0o600)
@@ -669,7 +727,7 @@ pub fn withhold(records: &Path) -> bool {
 pub fn after_round(
     root: &Path,
     records: &Path,
-    skills: bool,
+    shown: Shown,
     systemd: &mut dyn Systemd,
     now_unix_ms: u64,
     window: Result<crate::hermes_schedule::Window, String>,
@@ -685,7 +743,7 @@ pub fn after_round(
         Err(why) => say(&format!("OpenClaw's gateway unit not written: {why}")),
     }
     let before = record(records);
-    if present(root, skills) {
+    if present(root, shown) {
         gateway_on(root, systemd, say);
         if before
             .as_ref()
@@ -730,7 +788,7 @@ pub fn after_round(
         return None;
     }
     say(&format!("OpenClaw may be installed now: {}", window.name()));
-    if let Err(error) = ask(records, false, skills) {
+    if let Err(error) = ask(records, false, shown) {
         say(&format!(
             "OpenClaw is not installed: {ASK} not written: {error}"
         ));
@@ -850,7 +908,7 @@ pub fn after_round_off(
         }
         return false;
     }
-    let started = ask(records, true, false)
+    let started = ask(records, true, Shown::default())
         .map_err(|error| error.to_string())
         .and_then(|()| harness_install::start(root, systemd));
     match started {
@@ -982,7 +1040,18 @@ fn install_with(
         let _ = fs::remove_file(records.join(RECORD));
         None
     } else {
-        let said = steps(root, records, run, now_unix_ms, say, kit, asked.skills);
+        let said = steps(
+            root,
+            records,
+            run,
+            now_unix_ms,
+            say,
+            kit,
+            Shown {
+                skills: asked.skills,
+                tasks: asked.tasks,
+            },
+        );
         if said.install == "failed" {
             remove_entry_points(root, run, say);
         }
@@ -1033,9 +1102,9 @@ fn steps(
     now_unix_ms: &mut dyn FnMut() -> u64,
     say: &mut dyn FnMut(&str),
     kit: &Kit,
-    skills: bool,
+    shown: Shown,
 ) -> OpenclawInstall {
-    if present(root, skills) && kit.built() {
+    if present(root, shown) && kit.built() {
         say(&format!(
             "OpenClaw {VERSION} is already at {OPENCLAW}: nothing installed"
         ));
@@ -1174,7 +1243,7 @@ fn steps(
         }
         drop(downloads);
         // The namespace script first: npm runs inside it.
-        let ns = ns_text(skills);
+        let ns = ns_text(shown);
         if let Err(why) = write_root_file(root, NS, &ns, 0o755) {
             return fail("entry", why, say);
         }
@@ -1227,7 +1296,7 @@ fn steps(
             );
         }
     }
-    if let Err(why) = write_entry_points(root, skills) {
+    if let Err(why) = write_entry_points(root, shown) {
         return fail("entry", why, say);
     }
     if !fs::read(unit_path(root)).is_ok_and(|bytes| bytes == UNIT_TEXT.as_bytes()) {
@@ -1250,10 +1319,15 @@ fn steps(
         // lamp-tasks merges OpenClaw's models and skills at its start.
         say(&format!("lamp-tasks.service not started again: {why}"));
     }
-    let shown = if skills {
-        "its own folder, its work folder, the skills and lamp-skills' socket"
-    } else {
-        "its own folder, its work folder and the skills"
+    let shown = match (shown.skills, shown.tasks) {
+        (true, true) => {
+            "its own folder, its work folder, the skills, lamp-skills' socket, lamp-control's socket and the runs' token folder"
+        }
+        (true, false) => "its own folder, its work folder, the skills and lamp-skills' socket",
+        (false, true) => {
+            "its own folder, its work folder, the skills, lamp-control's socket and the runs' token folder"
+        }
+        (false, false) => "its own folder, its work folder and the skills",
     };
     say(&format!(
         "OpenClaw {} on Node {} installed for {USER} at {OPENCLAW}; Harness runs it through {WRAPPER}, its gateway {UNIT} (127.0.0.1:{PORT}) always on, in a namespace that shows it only {shown}",
@@ -1462,8 +1536,8 @@ fn write_root_file(root: &Path, path: &str, text: &str, mode: u32) -> Result<(),
 /// The namespace script, the shared hook stand-in
 /// ([`agent_ns::write_hook_shim`]), then the wrapper: root's, 0755, each
 /// written whole beside and renamed in.
-fn write_entry_points(root: &Path, skills: bool) -> Result<(), String> {
-    write_root_file(root, NS, &ns_text(skills), 0o755)?;
+fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
+    write_root_file(root, NS, &ns_text(shown), 0o755)?;
     agent_ns::write_hook_shim(root)?;
     write_root_file(root, WRAPPER, &wrapper_text(), 0o755)
 }

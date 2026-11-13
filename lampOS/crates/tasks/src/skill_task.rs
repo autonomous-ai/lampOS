@@ -929,6 +929,10 @@ pub struct SkillHarness {
     pub config: crate::harness::CliConfig,
     pub session: String,
     pub lamp: Box<dyn Fn() -> Option<crate::harness::Target> + Send + Sync>,
+    /// The lamp's default engine now (`runtime::lamp_default`, #6492), read
+    /// at each run (#6685); `None` before Harness has said, then the lamp
+    /// target's own engine counts.
+    pub default_engine: Box<dyn Fn() -> Option<crate::harness::EngineKind> + Send + Sync>,
 }
 
 impl SkillHarness {
@@ -958,7 +962,66 @@ impl SkillHarness {
             config,
             session,
             lamp,
+            default_engine: Box::new(|| None),
         }
+    }
+
+    /// With the lamp's default engine read by `default_engine` (#6685).
+    pub fn with_default_engine(
+        mut self,
+        default_engine: Box<dyn Fn() -> Option<crate::harness::EngineKind> + Send + Sync>,
+    ) -> Self {
+        self.default_engine = default_engine;
+        self
+    }
+}
+
+/// A skill's run on the lamp's default agent (#6685): `on` exactly, the
+/// switch lamp-update reads too (it shows OpenClaw's namespace lamp-control's
+/// socket and the runs' token folder). Off, every run goes to the lamp's
+/// Hermes (V2's (b)). Off until c0a4's row passes and its boundary has two
+/// reads.
+pub const DEFAULT_AGENT_SWITCH: &str = "LAMP_SKILL_DEFAULT_AGENT";
+
+/// OpenClaw's namespace script on the lamp (`lamp_update::openclaw_install::NS`).
+pub const OPENCLAW_NS: &str = "/usr/local/lib/lampos/openclaw-ns";
+
+/// The line OpenClaw's namespace script has when it shows the runs' token
+/// folder (`lamp_update::openclaw_install::RUNS_EDITS`, [`DEFAULT_AGENT_SWITCH`]
+/// on in lamp-update): without it, a script in a run's folder on OpenClaw's
+/// gateway could never read its token.
+pub const OPENCLAW_RUNS_LINE: &str = " T=/run/lampos-tasks/runs S=/tmp/.lampos-ns\n";
+
+/// Whether OpenClaw's namespace script `text` shows the runs' token folder
+/// and lamp-control's socket.
+pub fn openclaw_takes_runs(text: &str) -> bool {
+    text.contains(OPENCLAW_RUNS_LINE) && text.contains(" L=/run/lampos-control/control.sock ")
+}
+
+/// Which engine a skill's run goes to (#6685), and why when it isn't the
+/// lamp's default: with the switch off, always Hermes (V2's (b)); on, the
+/// lamp's default when it can take a run (Hermes; OpenClaw when its
+/// namespace script shows the runs' token folder), else Hermes, said.
+pub fn engine_for_run(
+    switch: bool,
+    default: crate::harness::EngineKind,
+    openclaw_ns: Option<&str>,
+) -> (crate::harness::EngineKind, Option<String>) {
+    use crate::harness::EngineKind;
+    match default {
+        _ if !switch => (EngineKind::Hermes, None),
+        EngineKind::Hermes => (EngineKind::Hermes, None),
+        EngineKind::Openclaw if openclaw_ns.is_some_and(openclaw_takes_runs) => {
+            (EngineKind::Openclaw, None)
+        }
+        EngineKind::Openclaw => (
+            EngineKind::Hermes,
+            Some("the lamp's OpenClaw can't take a skill's run yet (its namespace doesn't show the runs' token folder: lamp-update's LAMP_SKILL_DEFAULT_AGENT is off or its round hasn't run), so the lamp's Hermes runs it".into()),
+        ),
+        other => (
+            EngineKind::Hermes,
+            Some(format!("the lamp's default agent ({}) can't take a skill's run yet, so the lamp's Hermes runs it", other.argument())),
+        ),
     }
 }
 
@@ -1012,6 +1075,12 @@ pub struct HarnessRunner {
     pub held_by: Option<PathBuf>,
     /// How long a failed `wait` rests before it is asked again.
     pub retry: Duration,
+    /// [`DEFAULT_AGENT_SWITCH`] on: a run goes to the lamp's default agent
+    /// when it can take one ([`engine_for_run`]).
+    pub default_agent: bool,
+    /// OpenClaw's namespace script, read before a run goes to OpenClaw
+    /// ([`OPENCLAW_NS`] on a lamp). `None`: OpenClaw never takes a run.
+    pub openclaw_ns: Option<PathBuf>,
     /// lamp-tasks' stop ([`Runner::stop_on`]): set, a run being waited on
     /// is ended as at its deadline (revoke, `close --now`, its folder and
     /// token file removed), since Harness's daemon, not lamp-tasks, holds
@@ -1034,6 +1103,8 @@ impl HarnessRunner {
             harness,
             held_by: Some(PathBuf::from(HERMES)),
             retry: WAIT_RETRY,
+            default_agent: std::env::var(DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on"),
+            openclaw_ns: Some(PathBuf::from(OPENCLAW_NS)),
             stopping: std::sync::OnceLock::new(),
         }
     }
@@ -1119,11 +1190,26 @@ impl Runner for HarnessRunner {
                     .into(),
             );
         };
-        // Whatever the lamp's default engine (OpenClaw, or any other), a
-        // skill's run goes to the lamp's own Hermes on the lamp's machine
-        // (V2's (b), #1711 21:34): one path for every lamp. The person's
-        // own spoken tasks still go to the chosen or named engine (#6506).
-        if let Some(wrapper) = &self.held_by
+        // The lamp's default agent when it can take a run and the switch is
+        // on (#6685), else the lamp's own Hermes on the lamp's machine (V2's
+        // (b), #1711 21:34). The person's own spoken tasks still go to the
+        // chosen or named engine (#6506).
+        let default = (harness.default_engine)().unwrap_or(lamp.engine);
+        let openclaw_ns = self
+            .openclaw_ns
+            .as_ref()
+            .and_then(|path| std::fs::read_to_string(path).ok());
+        let (engine, fallback) =
+            engine_for_run(self.default_agent, default, openclaw_ns.as_deref());
+        if let Some(why) = fallback {
+            eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+        }
+        // OpenClaw's one gateway has no wrapper started per run: the script
+        // reads its token from the run's folder (the SDK, #6685), so its file
+        // is written only once the run's pane is up.
+        let late_token = engine == EngineKind::Openclaw;
+        if !late_token
+            && let Some(wrapper) = &self.held_by
             && !std::fs::read_to_string(wrapper).is_ok_and(|text| finds_runs_by_folder(&text))
         {
             return Err(NOT_FOUND_BY_FOLDER.into());
@@ -1158,10 +1244,11 @@ impl Runner for HarnessRunner {
             folder,
             token: None,
         };
-        started.token = Some(crate::run_token_file::RunTokenFile::write(
-            &self.runs, &run.run, &token,
-        )?);
-        drop(token);
+        if !late_token {
+            started.token = Some(crate::run_token_file::RunTokenFile::write(
+                &self.runs, &run.run, &token,
+            )?);
+        }
         let Some(project) = started.folder.to_str().map(str::to_owned) else {
             return Err("the run's folder is not a plain path".into());
         };
@@ -1171,7 +1258,7 @@ impl Runner for HarnessRunner {
             target: Target {
                 machine_id: lamp.machine_id.clone(),
                 project,
-                engine: EngineKind::Hermes,
+                engine,
             },
             session: None,
         };
@@ -1192,6 +1279,12 @@ impl Runner for HarnessRunner {
             }
         };
         started.agent = Some(agent.clone());
+        if late_token {
+            started.token = Some(crate::run_token_file::RunTokenFile::write(
+                &self.runs, &run.run, &token,
+            )?);
+        }
+        drop(token);
         let agents = [agent];
         let cancel = AtomicBool::new(false);
         let deadline = run.deadline.saturating_sub(began.elapsed());
@@ -2862,5 +2955,36 @@ mod tests {
         );
         // Swept again, nothing is left to find.
         assert!(leftovers(&project, &runs, &[]).is_empty());
+    }
+
+    /// #6685: the switch off, every run is Hermes's; on, the default's when
+    /// it can take a run (OpenClaw only when its namespace shows the runs'
+    /// token folder and lamp-control's socket), else Hermes, with the
+    /// journal's reason.
+    #[test]
+    fn a_run_goes_to_the_default_agent_only_with_the_switch_and_when_it_can_take_one() {
+        use crate::harness::EngineKind::{Claude, Hermes, Openclaw};
+        let shows = format!("A L=/run/lampos-control/control.sock B P{OPENCLAW_RUNS_LINE}");
+        assert!(openclaw_takes_runs(&shows));
+        assert!(!openclaw_takes_runs(
+            &shows.replace(" L=/run/lampos-control/control.sock ", " ")
+        ));
+        assert!(!openclaw_takes_runs(
+            " L=/run/lampos-control/control.sock S=/tmp/.lampos-ns\n"
+        ));
+        for default in [Hermes, Openclaw, Claude] {
+            assert_eq!(engine_for_run(false, default, Some(&shows)), (Hermes, None));
+        }
+        assert_eq!(engine_for_run(true, Hermes, None), (Hermes, None));
+        assert_eq!(
+            engine_for_run(true, Openclaw, Some(&shows)),
+            (Openclaw, None)
+        );
+        let (engine, why) = engine_for_run(true, Openclaw, None);
+        assert_eq!(engine, Hermes);
+        assert!(why.unwrap().contains("LAMP_SKILL_DEFAULT_AGENT"));
+        let (engine, why) = engine_for_run(true, Claude, Some(&shows));
+        assert_eq!(engine, Hermes);
+        assert!(why.unwrap().contains("(claude)"));
     }
 }
