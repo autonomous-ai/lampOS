@@ -377,8 +377,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     512 byte đầu) mà không có các dòng nhận lần chạy được báo là agent chưa
     có đường chạy đã rào cho lần chạy kỹ năng, bất kể công tắc của
     lamp-update, và phép kiểm tra không gọi tên engine nào. Một agent có
-    wrapper là của một gateway agent (của OpenClaw khi công tắc của
-    lamp-update bật, xem "Lần chạy kỹ năng trên một gateway agent" bên
+    wrapper là của một gateway agent (của OpenClaw khi
+    `LAMP_SKILL_DEFAULT_AGENT` và `LAMP_SKILL_GATEWAY_RUNS` của lamp-update bật, xem "Lần chạy kỹ năng trên một gateway agent" bên
     dưới) nhận lần chạy như một lượt trên gateway đang chạy sẵn của nó;
     wrapper của OpenClaw khi công tắc tắt không có dữ liệu gateway, nên bị
     từ chối như vậy. File token được ghi
@@ -1029,7 +1029,7 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   Tắt, hoặc không được cấp dịch vụ nào: config không có mục này, như của
   một lần tạo.
 
-## Lần chạy kỹ năng trên một gateway agent (#6685 bước 4, phương án (a), tắt trừ khi `LAMP_SKILL_DEFAULT_AGENT=on`)
+## Lần chạy kỹ năng trên một gateway agent (#6685 bước 4, phương án (a), tắt trừ khi `LAMP_SKILL_DEFAULT_AGENT=on` và `LAMP_SKILL_GATEWAY_RUNS=on`)
 
 Một lần ghi cố định của kỹ năng tự tạo (`LAMP_SKILL_WRITE_AGENT`, ở trên)
 không bao giờ là lần chạy của gateway agent: nó không có script cho
@@ -1169,6 +1169,17 @@ lamp-update).
   rỗng và chỉ đọc). Namespace của gateway được mọi lượt OpenClaw dùng
   chung: thư mục của lần chạy thấy được với một việc nói cho OpenClaw đang
   chạy cùng lúc (nó 0700, nhưng cùng user `lampos`).
+- **Những gì một lần chạy trên gateway không chặn, nói thẳng.** Script mà
+  `start` chạy là tiến trình con của gateway: nó có môi trường của
+  gateway, toàn bộ mạng như trên, và cùng user `lampos` với mọi agent
+  OpenClaw khác trên đèn (`main` và các agent người dùng thêm). Các agent
+  đó cũng thấy socket của lamp-control và skills-dev khi công tắc bật, và
+  script đọc được `openclaw.json`, nơi giữ token admin của gateway. Chỉ
+  các kiểm tra token lần chạy của chính lamp-control là còn giữ. Vì vậy
+  `LAMP_SKILL_GATEWAY_RUNS` (switches.md) vẫn tắt cho tới khi script được
+  cô lập khỏi gateway hoặc first builder chấp nhận điều này bằng văn bản;
+  khi tắt, lamp-update để wrapper và namespace của OpenClaw như trước
+  đường chạy chung, và lamp-tasks từ chối lần chạy đó bằng lời.
 - **Exec.** Lần chạy của Hermes được chạy mọi lệnh trong namespace của nó
   (danh sách cấm cứng vẫn giữ, approvals tắt). Công cụ duy nhất của agent
   rào là `exec`, và danh sách cho phép của nó so theo đường dẫn binary đã
@@ -1196,8 +1207,10 @@ lamp-update).
   Token kết thúc trước nên phần còn sót không làm được gì trên đèn.
 - **Chưa kiểm trên đèn.** Các khóa của `openclaw.json`, đường dẫn và dạng
   của exec approvals, `gateway call agent` / `chat.abort` /
-  `sessions.delete` và tham số của chúng là theo OpenClaw 2026.3.2 (schema
-  và tài liệu của nó); đèn chạy 2026.11.2. Khóa `tools.exec.mode` của
+  `sessions.delete` và tham số của chúng là theo OpenClaw 2026.11.2 (gói
+  của nó; `approvals get --gateway --json` đã đọc trên 2026.11.2 của c0a4,
+  không ghi gì); cả một lần chạy chưa thử trên đèn. Mỗi lúc chỉ một lần
+  chạy (`skill_task` nhận một). Khóa `tools.exec.mode` của
   lamp-update được giữ như cũ. Chi phí dự kiến: không thêm tiến trình nào
   ngoài một lời gọi CLI (một lượt bắt đầu trong vài giây trên gateway đang
   chạy sẵn, không phải ~53 s tới khi một gateway riêng sẵn sàng, và chỉ
