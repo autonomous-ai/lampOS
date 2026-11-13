@@ -350,6 +350,24 @@ const RUNS_EDITS: [(&str, &str); 2] = [
     ),
 ];
 
+/// What a round shows OpenClaw (#6882): `skills` (its skills switch) as
+/// read; lamp-control's socket, the pushed skills and the gateway mark
+/// ([`Shown::tasks`] and [`Shown::one_path`]) only with the one run path
+/// (`one_path`: `LAMP_SKILL_DEFAULT_AGENT=on` with `LAMP_SKILL_TASKS` on)
+/// and a gateway default agent's runs (`gateway_runs`:
+/// [`agent_ns::GATEWAY_RUNS_SWITCH`]) both on. Without the second,
+/// lamp-tasks refuses the gateway's runs, so OpenClaw is shown what it was
+/// before #6685: [`ns_text`] and [`wrapper_text_for`] byte for byte as with
+/// the one run path off.
+pub fn shown(skills: bool, one_path: bool, gateway_runs: bool) -> Shown {
+    let runs = one_path && gateway_runs;
+    Shown {
+        skills,
+        tasks: runs,
+        one_path: runs,
+    }
+}
+
 /// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills, false)`,
 /// the same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]),
 /// with its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
