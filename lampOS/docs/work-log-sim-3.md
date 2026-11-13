@@ -3,6 +3,15 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 03:2x GMT+7: sim-2 read the stack; sim-N signatures don't count
+
+- sim-2 READ-OK on #6954 (899cbf2b76), #6961 (7415ca3d4c), #6971 (a5552512b4).
+- The first builder (00:18): since #6959 the bot's `signer` never matched a
+  name with digits, so sim-1/2/3 READ-OKs count as unsigned (why #6965 and
+  #6966 sat out); #6979 fixes it. Until then readers without digits sign.
+- Updated #6961's and #6971's stack notes to the restacked commits; asked ten,
+  nine or Heron for second reads on #6954, #6961, #6971.
+
 ## 2026-11-14 03:0x GMT+7: the speech stack restacked on e99b6e1ffb
 
 - Train 889 merged (e99b6e1ffb). #6975: sim-2 posted NEXT TRAIN (my macOS
