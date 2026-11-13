@@ -84,7 +84,7 @@ head_green() {
   return 1
 }
 eligible() {
-  local p head ok sha held two own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
+  local p head ok sha held two own pc wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
   # 3 Nov 15:4x (the Reviewer-lead's HOLD on #5068): the repo is public, so markers count only from accounts with write
   # access (lib.sh, coord_writers). Every fetch fails closed: without the writers list, or without the Queue (every
   # issue in lib.sh's COORD_QUEUE_ISSUES) and so its HOLDs, no PR is eligible this round; without a PR's head, comments or body, that PR is not.
@@ -202,6 +202,18 @@ eligible() {
     # is said once per head, so an opt-out is seen before a train merges it on one read.
     if [[ $two == none && $($PYTHON -I $TOOLS_DIR/reads2.py --unasked < $bf) == unasked ]]; then
       grep -qx "$p unasked $head" $told || { say "#$p: its body names TWO READS but opts out with ONE READ, so one READ-OK carries ${head:0:9}" >&2; tell "$p unasked $head"; }
+    fi
+    # 11 Nov 16:4x (first builder): a PR that changes the product's defaults (lib.sh's COORD_PRODUCT_RE: the product
+    # units, the skills, install.rs's lists) waits for the first builder's `DEFAULT-ON <sha>` on its head or a
+    # same-patch head, said once per head. A diff that can't be read leaves it out (fail closed).
+    coord_product_change $head; pc=$?
+    if (( pc == 2 )); then
+      once product$p "#$p left out: its diff from lamp-voice can't be read for the default-on check"; continue
+    fi
+    fine product$p
+    if (( pc == 0 )) && ! coord_default_on $head $cf $wf; then
+      grep -qx "$p defaulton $head" $told || { say "#$p left out: it changes the product's defaults, and the first builder's DEFAULT-ON isn't on head ${head:0:9}" >&2; tell "$p defaulton $head"; }
+      continue
     fi
     # 30 Oct 15:0x (the Reviewer-lead's 14:58): a PR whose own ARM64 run on this head is red sits out. #4507's run was red
     # at 14:17 before trains 407 and 408 carried it; both failed in lamp-update, and the bot held #4524 and #4530 instead.

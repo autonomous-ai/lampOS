@@ -93,6 +93,36 @@ coord_cached_patch() {
   REPLY=${coord_patch_cache[$k]}
   [[ $REPLY != - ]]
 }
+# 11 Nov 16:4x (first builder): a PR that changes the product's defaults trains only on the first builder's DEFAULT-ON.
+# #6189 (train 794) and #6331 (train 806) turned switches on in the product on their READ-OKs alone, with no default-on
+# read: the hold list (train-hold.txt) only covers PRs that exist when it's written. COORD_PRODUCT_RE names the files
+# that decide what a customer's lamp does: the product units and their folder, the skills a product install ships,
+# and install.rs's PRODUCT lists.
+COORD_PRODUCT_RE='^lampOS/(deploy/product/|skills/|crates/update/src/install\.rs$)'
+# coord_product_change HEAD: 0 when HEAD's diff from its merge base with origin/lamp-voice touches COORD_PRODUCT_RE,
+# 1 when it doesn't, 2 when the diff can't be read (callers leave the PR out: fail closed).
+coord_product_change() {
+  local b f
+  b=$(git merge-base origin/lamp-voice $1 2>/dev/null) || return 2
+  f=$(git diff --name-only $b $1 2>/dev/null) || return 2
+  print -r -- $f | grep -qE "$COORD_PRODUCT_RE"
+}
+# coord_default_on HEAD COMMENTS WRITERS: 0 when a writer's DEFAULT-ON marker in COMMENTS (markers.py --default-on)
+# names a commit HEAD starts with, or a commit with HEAD's patch (a plain rebase, as a READ-OK carries).
+coord_default_on() {
+  local s lv hp
+  local -a shas
+  shas=(${(f)"$($PYTHON -I $TOOLS_DIR/markers.py --writers $3 --default-on < $2)"})
+  (( ${#shas} )) || return 1
+  for s in $shas; do [[ $1 == $s* ]] && return 0; done
+  lv=$(git rev-parse -q --verify origin/lamp-voice 2>/dev/null) || return 1
+  coord_cached_patch $1 $lv && hp=${REPLY#* } || return 1
+  for s in $shas; do
+    coord_cached_patch $s $lv || continue
+    [[ ${REPLY#* } == $hp ]] && return 0
+  done
+  return 1
+}
 coord_same_patch() {
   local hp s lv; local -a seen
   print -r -- $1
