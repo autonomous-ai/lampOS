@@ -15,7 +15,7 @@ use std::{
     fmt,
     fs::{self, OpenOptions},
     io::{self, Write},
-    os::unix::fs::OpenOptionsExt,
+    os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     sync::{Arc, Mutex, mpsc},
     thread,
@@ -833,7 +833,11 @@ fn stage_private(path: &Path, bytes: &[u8]) -> io::Result<PathBuf> {
     stage(path, bytes, 0o600)
 }
 
-/// `bytes` in a new temporary file beside `path` with `mode`, synced.
+/// `bytes` in a new temporary file beside `path` with `mode`, synced. The mode
+/// is set on the open file itself, after the open: `open(.., mode)` is cut by
+/// the process's umask, so a helper run by hand under `umask 077` wrote a 0644
+/// drop-in 0600 (the lead's run on lamp-75c9, 13 Nov), where the unit's 0022
+/// gave 0644. A file's mode is the one asked for, whatever the umask.
 pub(crate) fn stage(path: &Path, bytes: &[u8], mode: u32) -> io::Result<PathBuf> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -845,7 +849,11 @@ pub(crate) fn stage(path: &Path, bytes: &[u8], mode: u32) -> io::Result<PathBuf>
         .create_new(true)
         .mode(mode)
         .open(&temporary)?;
-    if let Err(why) = file.write_all(bytes).and_then(|()| file.sync_all()) {
+    if let Err(why) = file
+        .set_permissions(fs::Permissions::from_mode(mode))
+        .and_then(|()| file.write_all(bytes))
+        .and_then(|()| file.sync_all())
+    {
         let _ = fs::remove_file(&temporary);
         return Err(why);
     }
@@ -1382,6 +1390,49 @@ fn phones_within(command: &mut std::process::Command, within: Duration) -> Optio
 mod tests {
     use super::*;
     use std::{process::Command, time::Instant};
+
+    /// `stage` makes the mode it is asked for under any umask: 0644 under 077 (a helper run by hand as root), 0600 under 0, and
+    /// under the unit's 022. The umask belongs to the whole process, and a test that changes it makes the other tests' files and
+    /// folders wrong while it does (a first cut failed two reset tests that way), so the body runs in a child of this test binary
+    /// that runs this one test and nothing else.
+    #[test]
+    fn stage_sets_the_asked_mode_whatever_the_umask() {
+        const NAME: &str = "serve::tests::stage_sets_the_asked_mode_whatever_the_umask";
+        if std::env::var_os("LAMP_STAGE_MODE_CHILD").is_none() {
+            let me = std::env::current_exe().unwrap();
+            let out = Command::new(me)
+                .args(["--exact", NAME, "--test-threads=1", "--nocapture"])
+                .env("LAMP_STAGE_MODE_CHILD", "1")
+                .output()
+                .unwrap();
+            let said = String::from_utf8_lossy(&out.stdout).into_owned()
+                + &String::from_utf8_lossy(&out.stderr);
+            assert!(out.status.success(), "{said}");
+            assert!(said.contains("1 passed"), "the child ran the test: {said}");
+            return;
+        }
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir =
+            std::env::temp_dir().join(format!("lamp-setup-stage-mode-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        for (umask, mode) in [
+            (0o077, 0o644),
+            (0o022, 0o644),
+            (0o000, 0o600),
+            (0o077, 0o600),
+            (0o277, 0o640),
+        ] {
+            let before = rustix::process::umask(rustix::fs::Mode::from_raw_mode(umask));
+            let made = stage(&dir.join("sub").join("file"), b"x\n", mode);
+            rustix::process::umask(before);
+            let temporary = made.unwrap();
+            let got = fs::metadata(&temporary).unwrap().permissions().mode() & 0o777;
+            assert_eq!(got, mode, "umask {umask:o} asked {mode:o}");
+            assert_eq!(fs::read(&temporary).unwrap(), b"x\n");
+            fs::remove_file(&temporary).unwrap();
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     const STATIONS: &str =
         "printf 'Station aa:bb (on wlan0)\\n\\trx: 1\\nStation cc:dd (on wlan0)\\n'";
