@@ -3345,6 +3345,28 @@ gone ([switches.md](switches.md)). What happens:
      answered "I can't run a script or check a temperature" with no call).
      With every switch on the description stays within 1,024 bytes with no
      "yes". Off, the function is as before, word for word.
+   - **A plain ask to make one calls it** (`LAMP_MAKE_SKILL_ASKED=on`,
+     `tools::make_skill_asked`, the second route, off and in no product
+     unit; #6835 gap 3): on lamp-52e6 on 13 Nov (build 12635, #6755's words
+     in the description), the same ask was still answered "I can't read my
+     own processor temperature, so I can't make that happen on my own. A
+     skill can, though… Want me to make one?" with no call. With the
+     switch, a line whose sentence opens with a make ("make (me) a (new)
+     skill", "create", "build", "write", "set up" or "add" in its place;
+     "can you …", "I want you to …", "let's …" before it; or "I want / I'd
+     like / I need a skill"), past a greeting, the lamp's name and
+     "please", and that says what the skill does after it, in that sentence
+     or the next (`asks_to_make`), has its first chat round sent with
+     `tool_choice` naming `make_skill`, only when `make_skill` is declared
+     (`LAMP_MAKE_SKILL`). What the skill does, scripts and all, is then the
+     making model's and the checker's. "Make a skill." alone, a question
+     ("how do I make a skill?", "can you make skills?"), the ask further in,
+     a refusal before it, a make taken back anywhere in the line ("never
+     mind", "scratch that": `remember::asked::withdrawn`) and a round after
+     a call are asked as before, after a named ask and a face ask, and
+     before a keep ask, a schedule ask and a skill ask. The start says it
+     once: "a line that plainly asks the lamp to make a skill must call
+     make_skill in its first round (LAMP_MAKE_SKILL_ASKED)".
    - **Parsed before it is said back** (#6749 E,
      `made_skill::scripts_parse`): each `.py` it wrote goes, on stdin
      alone, to `/usr/bin/python3 -I -c 'import ast,sys;

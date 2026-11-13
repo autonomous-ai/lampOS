@@ -2400,7 +2400,21 @@ pub fn serve(
         crate::tools::skill_asked::force(offered)
     });
     let set = first_force(set, skill);
-    let net = match first_force(named, first_force(remember, first_force(keep, set))) {
+    // A line that plainly asks the lamp to make a skill must call
+    // make_skill, so a script skill is never refused in the model's own
+    // words (`LAMP_MAKE_SKILL_ASKED`, #6835 gap 3). Only with make_skill on.
+    let make = (crate::tools::make_skill_asked::on() && tools.make_skill).then(|| {
+        eprintln!(
+            "lamp-voice second: a line that plainly asks the lamp to make a skill must call {} in its first round ({})",
+            crate::made_skill::MAKE,
+            crate::tools::make_skill_asked::ENVIRONMENT
+        );
+        crate::tools::make_skill_asked::force()
+    });
+    let net = match first_force(
+        named,
+        first_force(remember, first_force(make, first_force(keep, set))),
+    ) {
         Some(force) => net.forcing(force),
         None => net,
     };
