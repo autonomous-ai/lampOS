@@ -533,8 +533,8 @@ grant it needs. With every grant: 33 tools. With `light` alone: 6
 **STATUS:** works with the fake lamp today (lamp-mcp's own tests, and a
 listing run on 9 Nov). On a customer lamp (stable 11091) a tool is refused
 where the lamp refuses its op: `lamp_skill_push` on 11048 and older ("skill push is not on this
-lamp"), `lamp_play` (the customer build: "not routed yet: waits for client packages"; from the next build, a move recorded in a pushed skill),
-`lamp_joints` for roll, shoulder or elbow ("not routed yet" on the customer build; next build: the body's pose), `lamp_look` at a name ("not in this release: look at who said the lamp's name (the lamp has no sound direction)"; at a face it is taken now, merged on lamp-voice, not run on a lamp yet, and can still be refused "no face in view" or "this lamp's gaze is not measured, so it cannot look at a face").
+lamp"), `lamp_play` (on 11913 and before: "not routed yet: waits for client packages"; from build 12171 it plays a move recorded in a pushed skill),
+`lamp_joints` for roll, shoulder or elbow ("not routed yet" on 11048 and older; from build 11102 the body's pose, shown on 12226), `lamp_look` at a name ("not in this release: look at who said the lamp's name (the lamp has no sound direction)"; at a face it is taken now, and on stable 12587 it was refused, "this lamp's gaze is not measured, so it cannot look at a face", as the product's body has no measured gaze; with one it can still be refused "no face in view").
 No MCP run on a lamp by this section's writer today.
 
 ### Staying connected (every update restarts the lamp)
