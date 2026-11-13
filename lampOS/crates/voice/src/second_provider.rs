@@ -1471,6 +1471,9 @@ pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
 /// The skill a heard line asks what it uses, by name, or none
 /// (`crate::make_skill_local::read_back_heard`, V2 on #6413).
 pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+/// The call a heard line plainly asks for by an installed skill's name, as
+/// its name and arguments, or none (`crate::skill_named::heard`, #6772).
+pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>;
 /// The agent a spoken line's own words name to do the work, as the person
 /// calls it, or none (#6547 (1b), `crate::agent_tasks::named_for_work`).
 pub type NamedAgent = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
@@ -1815,6 +1818,9 @@ struct Shared {
     /// Which skill a heard line asks what it uses: read back in code
     /// before round 1 ([`Engine::reading_back_by_words`]).
     read_back_asked: Option<ReadBackAsked>,
+    /// The skill a heard line plainly asks for by its name: run in code
+    /// before round 1 ([`Engine::calling_skills_named`]).
+    skill_named: Option<SkillNamed>,
     /// With the tasks part: the agent a spoken line's words name for the
     /// work, whose round 1 answered in words alone is asked again once
     /// ([`Engine::catching_named_agents`], #6547 (1b)).
@@ -4552,6 +4558,7 @@ impl Engine {
                 untied: None,
                 named_ask: None,
                 read_back_asked: None,
+                skill_named: None,
                 named_agent: None,
                 named_asked_again: crate::agent_tasks::AskedAgain::default(),
                 #[cfg(test)]
@@ -6216,6 +6223,21 @@ impl Engine {
     pub fn reading_back_by_words(mut self, asked: ReadBackAsked) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.read_back_asked = Some(asked);
+        }
+        self
+    }
+
+    /// A heard line that plainly asks for an installed skill by its name
+    /// (`named`: "photo booth", "run photo booth") has that skill's
+    /// function run in code before round 1, through the turn's own runner
+    /// as the model's call would be, and round 1 is told its result to
+    /// word; the model's own call of the same skill after it is not run
+    /// twice (#6772: on lamp-52e6 at 12587 the model answered "I don't
+    /// have a camera" over the pushed photo-booth skill, with no call).
+    /// Before any turn only.
+    pub fn calling_skills_named(mut self, named: SkillNamed) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.skill_named = Some(named);
         }
         self
     }
@@ -14656,6 +14678,21 @@ async fn answer(
                 .and_then(|asked| asked(&said))
         })
         .flatten();
+    // A spoken line that plainly asks for an installed skill by its name
+    // ("photo booth"): its function run in code before round 1, never left
+    // to the model (#6772: on lamp-52e6 at 12587 the model answered "I
+    // don't have a camera" over the pushed photo-booth skill, with no
+    // call). Never beside a read-back: a question about a skill is not an
+    // ask to run it.
+    let skill_named = heard
+        .then(|| {
+            shared
+                .skill_named
+                .as_ref()
+                .filter(|_| read_back_named.is_none())
+                .and_then(|named| named(&said))
+        })
+        .flatten();
     // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
     // once, after round 1 answers.
     let mut named_ask = shared
@@ -14777,6 +14814,7 @@ async fn answer(
                 && held_rename_dropped.is_none()
                 && rename_note.is_none()
                 && read_back_named.is_none()
+                && skill_named.is_none()
         })
         .map(|prepared| (prepared, said.clone()));
     // Only a note for the model, no one's words (a wordless cut's ask to go
@@ -15190,6 +15228,45 @@ async fn answer(
                 read_back_ran = Some((name.to_owned(), result));
             }
         }
+        // The skill the heard words ask for by its name, run in code
+        // ([`Engine::calling_skills_named`]): through the same runner as
+        // the model's own call of it, and round 1 is told its result to
+        // word. Round 1's bounds run from its end, as after a read-back:
+        // a skill may take seconds.
+        let mut skill_ran: Option<((String, Value), Value)> = None;
+        if let Some(named) = skill_named.filter(|_| !forgot_before_question) {
+            let call = net::ToolCall {
+                extra: None,
+                id: "skill_named_by_words".into(),
+                name: named.0.clone(),
+                args: named.1.clone(),
+            };
+            let function = crate::skill_named::function_of(&call.name, &call.args).to_owned();
+            let by_rule = shared
+                .hold
+                .as_ref()
+                .is_some_and(|hold| hold(request, &call.name));
+            if by_rule {
+                eprintln!(
+                    "lamp-voice second: request {request}: a skill asked for by its name not run: the line is held ({function})"
+                );
+            } else {
+                ran_tool.store(true, Ordering::Relaxed);
+                let result = run_tool(shared, request, heard, &call, scope.as_ref()).await;
+                saved_at = Some(tokio::time::Instant::now());
+                if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
+                    return Err(Stop::Gone);
+                }
+                eprintln!(
+                    "lamp-voice second: request {request}: the heard words named a skill: run in code ({function})"
+                );
+                messages.push(Message::system(crate::skill_named::ran_note(
+                    &crate::skill_named::spoken(&function),
+                    &result,
+                )));
+                skill_ran = Some((named, result));
+            }
+        }
         // Their yes did not count (#2377): told once, beside the request.
         if let Some(told) = unseen_yes {
             messages.push(Message::system(told));
@@ -15243,6 +15320,10 @@ async fn answer(
                 crate::made_skill::MAKE.to_owned(),
                 serde_json::json!({ crate::make_skill_local::READ_BACK: name }),
             ));
+        }
+        // And the skill the heard words ran by its name.
+        if let Some((named, _)) = &skill_ran {
+            turn_called.push(named.clone());
         }
         // Whether a claim with no call (or a step word alone, with the
         // switch) was asked again once already, and whether the next round
@@ -17129,6 +17210,21 @@ async fn answer(
                     messages.push(Message::tool(
                         call.id.clone(),
                         crate::make_skill_local::read_back_already(told).to_string(),
+                    ));
+                    continue;
+                }
+                // The skill the heard words ran by its name already: never
+                // run twice (#6772).
+                if let Some((named, told)) = &skill_ran
+                    && crate::skill_named::same_skill_again(&call.name, &call.args, named)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: the heard words ran that skill by its name already",
+                        call.name
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        crate::skill_named::ran_already(told).to_string(),
                     ));
                     continue;
                 }

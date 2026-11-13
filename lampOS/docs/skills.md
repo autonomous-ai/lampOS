@@ -1125,6 +1125,56 @@ the model's answer begins with those words. A `tools.json` left by a `lamp-skill
 killed stays until it starts again; a call then is answered as not
 running. The test uses a folder of Desk tutor's shape.
 
+### A skill asked for by its name runs in code (#6772)
+
+On the second route, a spoken line that plainly asks for an installed
+skill by its name has that skill's function **run in code before round
+1**; the model only words the answer. On lamp-52e6 at 12587 (Seventh's
+photo-booth row on #6413) the pushed `photo-booth` skill was on and
+offered, one of 48 functions, and "photo booth" was answered "I'm Lamp — I
+don't have a camera, so I can't take photos…" with `calls=none`.
+
+- **Which skills:** those the skills offer the voice now
+  (`tools::skill_tools`, through `use_skill` as it offers them when
+  `LAMP_USE_SKILL` is on), never a core skill's (the tools file's `core`):
+  the lamp's own skills are asked by their own words, some with a choice
+  the model makes, and `LAMP_SKILL_ASKED` forces them. A skill from the
+  Store, pushed from a computer or made at the lamp is matched.
+- **Which lines** (`skill_named::named`): the function's name said as words
+  in a row, loosely (`photo_booth` as "photo booth" or "photobooth", a
+  number as a word or a digit), with nothing else but a greeting, the
+  lamp's name, "please" or "thanks", a request before it ("can you",
+  "start", "I want"; `skill_asked`'s lists) or a word that asks to run it
+  ("run", "use", "open", "launch", "try", "skill", "your", "for me").
+  "photo booth", "Lamp, photo booth please." and "Run photo booth." run
+  it. Any other word leaves the line to the model, as before: "is there a
+  camera in here?" (no skill named), "what does photo booth use?" (read
+  back instead, "Said back, and the yes" below), "don't run photo booth", "turn off photo booth",
+  "I loved the photo booth yesterday", and two skills in one line. A skill
+  whose name is itself such a word ("hello", "start") is never matched.
+  No skills' file is read for a line of more than 16 words.
+- **How it runs:** as the model's own call would, through the turn's
+  runner: `use_skill` with `skill` its function when `LAMP_USE_SKILL` is
+  on, else its function, with no choice or yes-or-no; it waits for the
+  Policy's hold as any call does. Round 1 is told its result and to do as
+  its `next` says, never that it can't do it (`skill_named::ran_note`).
+  The model's own call of the same skill in that turn is not run twice;
+  it is given the first run's result (`same_skill_again`, `ran_already`).
+  Round 1's time limit starts after the run, as after a read-back. The
+  journal says `the heard words named a skill: run in code (photo_booth)`.
+- **Not yet:** "take a photo" names no skill, and a skill.toml has no
+  words of its own for what asks for it (only its name, its description
+  for the model and its `when`), so such a line is still the model's. The
+  Live route is unchanged.
+- **The built-in instruction** (`config::CHAT_INSTRUCTION`, and the camera
+  one) says "never say you have no arms, legs, body or camera for it": the
+  lamp has a camera, and a skill's grant says what that skill may use.
+- **Tests:** `skill_named::tests` (the matcher table, the call and the
+  same skill again) and `second_provider::tests::skill_named_words`:
+  `photo_booth_by_name_runs_in_code_with_no_model_call` and
+  `photo_booth_by_name_runs_once_when_the_model_calls_it_too` failed with
+  the hook not yet in `answer`; `a_camera_line_naming_no_skill_goes_to_the_model`.
+
 ### The call socket tells its caller apart (#6128)
 
 `DIR/call.sock` is the voice's path to the skills, but any program that can

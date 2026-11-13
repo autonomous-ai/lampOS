@@ -136,7 +136,7 @@ const AROUND_VI: &[&[&str]] = &[
 /// story) leaves the line to the model: a missed force only means the model
 /// answers as without the switch, while a wrong one changes the light nobody
 /// asked to change.
-const AROUND: &[&[&str]] = &[
+pub(crate) const AROUND: &[&[&str]] = &[
     &["hey"],
     &["hi"],
     &["hello"],
@@ -162,7 +162,7 @@ const AROUND: &[&[&str]] = &[
 /// "you" and "do" alone are not one, so a preference ("I like movie light")
 /// or a question ("do you like movie light?", "would you like a light
 /// show?") is the model's.
-const REQUESTS: &[&[&str]] = &[
+pub(crate) const REQUESTS: &[&[&str]] = &[
     &["can", "you"],
     &["could", "you"],
     &["would", "you"],
@@ -189,7 +189,7 @@ const REQUESTS: &[&[&str]] = &[
 ];
 
 /// How many words of `words` from `at` the first of `phrases` takes, if one.
-fn phrase_at(words: &[String], at: usize, phrases: &[&[&str]]) -> Option<usize> {
+pub(crate) fn phrase_at(words: &[String], at: usize, phrases: &[&[&str]]) -> Option<usize> {
     phrases
         .iter()
         .find(|phrase| {
