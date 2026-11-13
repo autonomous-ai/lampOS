@@ -16,6 +16,8 @@ has no product unit yet. Phase 1 and 1b make no server call. Phase 2
 (activity, below) sends frames only when the launcher also gives it the
 account (`--account`, `--key`); without them, **no frame leaves the
 lamp**.
+Phase 3, posture, sends a frame every 30 s only with its own sub-switch
+`LAMP_SEEN_POSTURE` on too, also off ([Phase 3: posture](#phase-3-posture)).
 
 ## Phase 0: the rules
 
@@ -34,8 +36,9 @@ lamp also says once when the opt-in is turned off.
 6. **Voice never leaves the lamp for this.**
 7. **The opt-in is said back once when it's turned on:** "I'll look now
    and then to see if you're eating, drinking or slouching. I keep none of
-   the pictures." (the first builder's wording). **And once when it's
-   turned off** (the lead's addition).
+   the pictures." (the first builder's wording). With posture on, a line
+   that names posture too (below, awaiting the PM's wording). **And once
+   when it's turned off** (the lead's addition).
 
 ## What phase 1 and 1b do
 
@@ -156,12 +159,23 @@ lamp also says once when the opt-in is turned off.
   > slouching. I keep none of the pictures.
   >
   > Off: Okay, I've stopped looking at the desk.
+  >
+  > On, with posture (`LAMP_SEEN_POSTURE` on): I'll look now and then to
+  > see if you're eating, drinking or slouching, and now and then how
+  > you're sitting, so I can remind you to sit back. I keep none of the
+  > pictures.
+
+  The posture line is **awaiting the PM's wording**: the proposed clause
+  is "…and now and then how you're sitting, so I can remind you to sit
+  back." It is one constant, `said_back::POSTURE_ON_LINE`.
 
   - Once the voice has begun a line (`{"event":"begun"}`) it counts as
     said, and what it said is kept in `lamp-seen`'s own state folder
     (`--state-folder`, `/var/lib/lampos-seen` by default), in
     `said-back.json`: `{"said":"on","for_at_unix_s":N}` for the yes it
-    was for, or `{"said":"off"}`. Never under `consent/`. A restart says
+    was for, with `"posture":true` when the line said was the posture
+    line, or `{"said":"off"}`. A record with no `posture` (one kept before
+    posture) is the plain line. Never under `consent/`. A restart says
     neither again. If the record can't be written, the line is still not
     said again while the process runs. A record left over after the yes
     was removed means nothing, because the gate reads the yes.
@@ -186,6 +200,13 @@ lamp also says once when the opt-in is turned off.
     (`not_said_yet`) until the on line for the kept yes has begun. A lamp
     with no say service never opens the gate: this fails closed by
     design, and `lamp-seen`'s unit needs `LAMP_SAY_GROUP` (Owed, below).
+  - **No posture frame before the posture line.** With posture sending,
+    the on line owed is the posture line. A yes whose plain line was said
+    before posture was switched on is owed the posture line once, and
+    posture's gate stays closed (`not_said_yet`) until it has begun for
+    the kept yes; activity's gate opens on either line. A forget then a
+    new yes needs the posture line again, as any new yes needs its on
+    line.
 - **Forget everything** (`memory/forgot`). Any forget turns the opt-in off
   in the running process at once. The voice removes the kept yes;
   `lamp-seen` doesn't. Until the file is read gone, or replaced by a yes
@@ -379,7 +400,8 @@ sizes taken.
 - Without `--account` and `--key`, no server call and no socket to it: no
   frame, label or key leaves the lamp. `humans/doing` still goes out, from
   the clock.
-- Posture (phase 3) is not built: `humans/posture` is not published.
+- Posture is phase 3's, below: without `LAMP_SEEN_POSTURE=on` it sends
+  nothing and `humans/posture` is not published.
 - No product unit, and no package. The binary is listed under `development`
   in `deploy/package-binaries.json`. The product's frame link has no
   `perception` consumer yet: `lamp-eyes` owns the camera, and the voice's
@@ -391,6 +413,120 @@ sizes taken.
   product doesn't set. Until it does, or until another "this face is known"
   is on the bus, the gate reads every face as a stranger and stays closed.
 
+## Phase 3: posture
+
+`src/pose.rs` and `src/pose/`. Off unless `LAMP_SEEN_POSTURE=on` beside
+`LAMP_SEEN_ACTIVITY=on`, with a frames socket and activity's account
+(`--account`, `--key`, `--public-key-file`, read and checked by
+`endpoint.rs`): posture uses the same base, key and host rule, on the pose
+path. Without the switch or the account it sends nothing and says nothing.
+
+Activity and posture share the frames: the sink inside the ring's mark is
+both, and each takes a frame only when it wants one (`Sink::ready` is
+either's). One frame and one blink can serve both.
+
+- **Behind the same rules.** Posture is the frames' sink inside the ring's
+  mark, so a frame reaches it only while the gate is open and the ring drew
+  the mark for it.
+- **Only once posture was said.** Posture's gate (`pose::gate`) is the
+  frames' gate, closed `not_said_yet` too until an on line naming posture
+  (`said_back::POSTURE_ON_LINE`) has begun for the kept yes (the
+  said-back record's `posture`, above). Only the plain line said, posture
+  asks no mark and takes no frame, while activity's bursts go on.
+- **Only the camera's own JPEG**, as activity takes: MJPG, at least
+  320×240, not derived, and sent at 320×240 as activity's are (`scale.rs`,
+  above: a larger frame is scaled down inside its copy). Another frame, or
+  one that does not decode at its size, is skipped and counted
+  (`pose_wrong_frame`), with no request and no backoff. It is ready for a frame only every 30 s (V1's
+  `POSE_SAMPLE_INTERVAL_S`), with no request running and the backoff not
+  holding back. While neither sense wants a frame, no mark is asked for,
+  so the ring blinks only for a frame on its way.
+- **One socket for each frame** (`pose/client.rs`), on a thread of its own
+  so the gate and the ring never wait:
+  1. connect to `<base>/ws/hal/api/dl/pose-estimation/ws` with
+     `X-API-Key`, `<base>` activity's: the account's `llm_base_url` ending
+     in exactly one `/v1` (`endpoint::v1_base`, above). The key goes only to `campaign-api.autonomous.ai` over TLS
+     (rustls, webpki roots), or in the clear to this computer for the
+     simulator and the tests;
+  2. the key exchange (`crypto.rs`). The server's key is fetched once from
+     `<base>/crypto/public-key` with `X-API-Key`, as V1 fetches it,
+     and kept; it is read again after a refused key exchange;
+  3. V1's pose config, its values exactly:
+     `{"type":"config","task":"pose","frame_interval":1.0,"confidence_threshold_2d":0.3,"min_valid_keypoints":5}`.
+     V1 sent none, so these are the server's defaults. The server's
+     sessions share one config object, so any other value would change
+     every V1 lamp's results. The answer must be `config_updated`;
+  4. the frame, and its answer: `ergo` (RULA), or `{"error":"busy"}`;
+  5. the socket closed, so the server drops its session and the keypoints
+     it kept.
+
+  Every wait is bounded at V1's 15 s. The frame's Base64 and its plaintext
+  message are wiped when the request ends (the encrypted copy handed to the
+  socket library is not).
+- **The gate closing stops it.** The frames tell the sink when the gate
+  closes, and the request is cancelled within 0.1 s: the socket is closed,
+  a frame not yet sent is never sent, and an answer that still comes is
+  dropped. A cancel is not a failure.
+- **Busy and failures**, as activity's bursts take them (`backoff::Retreat`,
+  one of its own).
+  WebSocket streams never get a 503, only `{"error":"busy"}`. Busy drops
+  that frame, with no retry. Three busy answers in a row, or any failure,
+  pause sending for 60 s, then 120, 240, 480 and at most 600 s, each with
+  ±20 % jitter. A failure is no connection, a refused or 5xx handshake or
+  key fetch, a refused key exchange, no answer within 15 s, or the server's
+  own error. While a pause has come and no frame has been answered since,
+  `diagnostics` says `warn` for part `seen`, so `lamp/health` shows it. An
+  answer clears it all.
+- **The window** (`pose/window.rs`), V1's rules (`pose.py` `_aggregate`):
+  - a sample is bad when `risk_level` is 2 or more, or any region's
+    subscore on either side is 4 or more;
+  - `bad_share` is the share of bad samples over the last ten minutes, 0
+    until there are 3 samples;
+  - `region` is the region most often high among the bad samples, with
+    ties going to neck, trunk, upper arm, then lower arm. Wrist counts
+    toward a bad sample, as in V1, but is never the region: the server
+    fixes it at 1;
+  - `window_s` is how long this sitting has been watched, at most 600 s.
+
+  An answer with no body found counts no sample. A sample is its time, one
+  flag and four bits: nothing of the frame or the answer is kept. The
+  window is forgotten whenever posture's gate closes, for any reason (the
+  privacy, sleep and anything not known included), and on
+  `room/stood_up`.
+- **Said on `humans/posture`** (`lamp_msgs/HumanPosture` v1:
+  `{window_s, bad_share, region}`) every 30 s while posture's gate is
+  open and the window holds at least one sample: as soon as the sitting's
+  first sample lands, then every 30 s. Closed, the topic says nothing and
+  its last value runs out, so no old sample is said while the privacy is
+  on. **With no sample, nothing is said either** (#6839's review): frames
+  not going out (the opt-in off, the slide shut), the server busy or
+  failing, no body found, or the window just wiped (any closing, the privacy,
+  sleep, `room/stood_up`). The topic runs out, so a skill holding on it
+  with `unknown = "holds_stale"` (Sit back) runs as it did, rather than
+  reading a fresh `bad_share` of 0 that would hold it quiet. Under three
+  samples a value said has `bad_share` 0 and region `none` (V1's minimum).
+- **Health.** `diagnostics` adds `sends: pose`, `pose` (`idle`, `sending`
+  or `backing_off`), the counts sent, answered, with no body, busy, failed
+  and cancelled, the window's samples, the frames skipped as not the
+  camera's own JPEG (`pose_wrong_frame`), and the last failure's kind.
+
+**Frame size.** Every frame is sent at 320×240, whatever size `lamp-eyes`'
+frame link (#6645) serves (`--full-look` included, scaled down as
+activity's are); V1 sent 640×480. The pose model needs no more: the server
+resizes the whole frame to RTMPose's own input
+(`predictors/pose2d/base.py` `preprocess`, `cv2.resize`) and returns the
+keypoints in the frame's pixels. One step depends on the size: the 3D
+lifter normalises the keypoints by a fixed 1920×1080
+(`predictors/pose3d/base.py`), so a 320×240 frame's pose is half the scale
+of V1's 640×480 (which was itself a third of what the lifter expects).
+Whether RULA reads the same at that scale is not measured; the lamp rows
+below should compare a slump at 320×240 against V1's 640×480. One frame
+every 30 s costs about 26 ms to scale from 1280×960 on a development Mac,
+an estimated 80–130 ms on a lamp.
+
+**Not done in phase 3:** no product unit or package (the binary is still
+under `development`), and the posture line's wording awaits the PM.
+
 ## Owed
 
 | Item | What | When |
@@ -400,7 +536,8 @@ sizes taken.
 | The say service for `lamp-seen` | Its unit in `LAMP_SAY_GROUP`, so it may reach the say socket. Without it the on line is never said and the gate never opens | with the product unit |
 | The frame source | A `perception` consumer of the product's camera: `lamp-eyes`' frame link (#6645), given to `lamp-seen` by its launcher | with the product unit |
 | A known face on the bus | `lamp-eyes --visits` in the product, or another marker the gate can read | before the switch goes on |
-| Posture's label | `humans/posture` (latest, `lamp_msgs/HumanPosture` v1: `{window_s, bad_share, region}`), declared; activity's `humans/doing` and `humans/doing_seen` are published (phase 2, above) | phase 3 |
+| Posture's on line wording | The posture line (`said_back::POSTURE_ON_LINE`, above) is gated in code but awaits the PM's wording | before `LAMP_SEEN_POSTURE` is on anywhere |
+| Posture at 320×240 | A slump read on `humans/posture` from frames sent at 320×240 (every frame is, above) against V1's 640×480, to see whether the 3D lifter's scale changes RULA (above) | with the lamp rows |
 | The frame size | Every frame is sent at 320×240, scaled down from the eyes' link at any larger size (`--full-look` included). Measure the labels at 320×240 on a lamp against V1's 640×480 before the switch goes on | before the switch goes on |
 | `humans/doing` when lamp-seen stops | A topic that has run out holds a skill's `[[while]]` closed until lamp-skills restarts (`unknown = "holds"` covers only a topic never said). lamp-seen under the keeper, or a skills change, before a skill reads it | before a skill reads it |
 | Skills | They read the labels with the existing `[[while]]` on a topic's field (for example `topic = "humans/doing"`, `field = "drank_s_ago"`); no new skill key | after the `humans/doing` row above |

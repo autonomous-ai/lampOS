@@ -2457,6 +2457,7 @@ dependencies = [
  "signal-hook",
  "tokio",
  "tokio-tungstenite",
+ "tungstenite",
  "webpki-roots 1.0.9",
  "zeroize",
  "zune-jpeg",
