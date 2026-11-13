@@ -3178,7 +3178,9 @@ as a Harness task with the agent's own tools
   forwarder's port, its key named by its variable, `LAMP_HERMES_TOKEN`,
   never a key, and lamp-update's four Hermes settings, `MAKE_CONFIG`, a
   test holding them equal to `hermes_install::CONFIG`: no update checks,
-  no language servers, a `chat -q` run that ends with its turn), and
+  no language servers, a `chat -q` run that ends with its turn; a setting
+  whose top-level block the provider config already has, `terminal:`, goes
+  into that one block, since Hermes refuses a file with a key twice), and
   nothing of Hermes's memory, sessions or state; beside it, two links to
   Hermes's prepared runtime in its lasting home, `home/.hermes/installs`
   (its dependency record and environments, `installs/<key>/facts.json`)

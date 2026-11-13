@@ -344,15 +344,28 @@ fn fresh_folder(work: &Path, head: &str) -> std::io::Result<MadeFolder> {
 
 /// A make's fresh config: the lamp's provider ([`crate::hermes_config::merge_config`],
 /// its key a variable's name only), the lamp's agent's connectors only when
-/// `services`, and [`MAKE_CONFIG`], each its own top-level block (the
-/// provider config has none of them).
+/// `services`, and [`MAKE_CONFIG`]. A setting whose top-level block the
+/// provider config already has (`terminal:`, with its `shell_init_files`)
+/// goes into that block, as its first line: a second block of the same
+/// name is a duplicate key, and Hermes refuses the whole file (exit 2,
+/// c0a4, 14 Nov). Any other is a block of its own.
 fn make_config(services: bool) -> std::io::Result<String> {
     let mut config =
         crate::hermes_config::merge_config_for("", crate::runtime::HERMES_FORWARDER_PORT, services)
             .map_err(|_| std::io::Error::other("the provider config was not made"))?;
     for (key, value) in MAKE_CONFIG {
         let (block, name) = key.split_once('.').unwrap_or(("", key));
-        config.push_str(&format!("{block}:\n  {name}: {value}\n"));
+        let head = format!("{block}:\n");
+        let line = format!("  {name}: {value}\n");
+        let at = if config.starts_with(&head) {
+            Some(0)
+        } else {
+            config.find(&format!("\n{head}")).map(|at| at + 1)
+        };
+        match at {
+            Some(at) => config.insert_str(at + head.len(), &line),
+            None => config.push_str(&format!("{head}{line}")),
+        }
     }
     Ok(config)
 }
@@ -891,6 +904,21 @@ mod tests {
                 "{name}"
             );
         }
+        // Each top-level key once: a second `terminal:` is a duplicate key
+        // and Hermes refuses the whole file (exit 2, c0a4, 14 Nov).
+        let mut tops: Vec<&str> = config
+            .lines()
+            .filter(|line| !line.starts_with([' ', '#', '-']) && line.contains(':'))
+            .map(|line| line.split(':').next().unwrap())
+            .collect();
+        let all = tops.len();
+        tops.sort_unstable();
+        tops.dedup();
+        assert_eq!(tops.len(), all, "{config}");
+        assert!(
+            config.contains("\nterminal:\n") || config.starts_with("terminal:\n"),
+            "{config}"
+        );
         // lamp-update's four settings, the same as its own.
         for (key, value) in MAKE_CONFIG {
             let (block, name) = key.split_once('.').unwrap();
