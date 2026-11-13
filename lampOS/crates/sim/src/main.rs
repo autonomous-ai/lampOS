@@ -92,9 +92,6 @@ fn main() {
     }
 }
 
-/// `speech DIR [--listen ADDR]`: the local text-to-speech service (speech.rs) on
-/// loopback, its token written to `DIR/speech.token` (0600) for the route's
-/// TTS credential file. Runs until stopped.
 /// A fresh token for a local service, written to `DIR/NAME` (0600, in a 0700
 /// folder made if need be) for the route's credential file: 16 random bytes.
 fn new_token(dir: &Path, name: &str) -> std::io::Result<(String, PathBuf)> {
@@ -141,6 +138,9 @@ fn listen(dir: &Path, args: &[String]) -> std::io::Result<()> {
     lamp_sim::listen::serve(listener, token, std::sync::Arc::new(recognizer))
 }
 
+/// `speech DIR [--listen ADDR]`: the local text-to-speech service (speech.rs) on
+/// loopback, its token written to `DIR/speech.token` (0600) for the route's
+/// TTS credential file. Runs until stopped.
 fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
     use std::os::unix::fs::DirBuilderExt;
     let listen = option(args, "--listen").unwrap_or_else(|| "127.0.0.1:7732".to_owned());
