@@ -3,6 +3,23 @@
 /// written can be refused as busy ("text file busy") when another test's
 /// fork holds its write handle for a moment, which failed one of them about
 /// one run in three.
+#[cfg(test)]
+pub(crate) static FAKE_PROGRAM: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// The folder a test makes its own under: the system's temp folder, or `/tmp`
+/// when that one is too long for the bus's sockets. A Unix socket's address
+/// holds 103 bytes, and macOS's temp folder (`/var/folders/…/T/`, about 49
+/// bytes) left the ring's and the voice's test sockets at 105 to 119.
+#[cfg(test)]
+pub(crate) fn test_root() -> std::path::PathBuf {
+    let temp = std::env::temp_dir();
+    if temp.as_os_str().len() > 24 {
+        std::path::PathBuf::from("/tmp")
+    } else {
+        temp
+    }
+}
+
 /// This machine's boot id, the one id the ring, lamp-control and lamp-body
 /// share as the bus's clock id: Linux's `/proc/sys/kernel/random/boot_id`, or
 /// on macOS the boot session uuid (`kern.bootsessionuuid`, as lamp-body reads
@@ -39,23 +56,6 @@ fn macos_boot_session() -> Option<String> {
 #[cfg(not(target_os = "macos"))]
 fn macos_boot_session() -> Option<String> {
     None
-}
-
-#[cfg(test)]
-pub(crate) static FAKE_PROGRAM: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-/// The folder a test makes its own under: the system's temp folder, or `/tmp`
-/// when that one is too long for the bus's sockets. A Unix socket's address
-/// holds 103 bytes, and macOS's temp folder (`/var/folders/…/T/`, about 49
-/// bytes) left the ring's and the voice's test sockets at 105 to 119.
-#[cfg(test)]
-pub(crate) fn test_root() -> std::path::PathBuf {
-    let temp = std::env::temp_dir();
-    if temp.as_os_str().len() > 24 {
-        std::path::PathBuf::from("/tmp")
-    } else {
-        temp
-    }
 }
 
 pub mod camera;
