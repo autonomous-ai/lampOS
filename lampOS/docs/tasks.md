@@ -1932,7 +1932,15 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     again once with the same note, and the journal says `request N: named
     agent, called <names> not start_agent_task: none run, asked again`
     (`agent_tasks_named::named_answered_by_an_own_tool_runs_none_and_is_asked_again_once`;
-    with no agent named, an own tool runs as before). It is asked again only once the join window (`JOIN_WITHIN`, 3 s from
+    with no agent named, an own tool runs as before). The agent-task tools
+    (`confirm_agent_task`, `check_agent_task`, `tasks_now`, the status read)
+    are not own tools: "Hermes, go ahead and run it" answered with
+    `confirm_agent_task` runs as called, nothing asked again (the
+    Reviewer-lead's P1 on #6786,
+    `agent_tasks_named::an_agent_task_tool_with_the_agent_named_runs_as_called`).
+    This catch waits out the join window below too; a newer line begun in it
+    is journalled `…: a newer line began within the join window: none run,
+    not asked again`. It is asked again only once the join window (`JOIN_WITHIN`, 3 s from
     the answer's start, about the line's end) has passed with no newer line
     begun: a paused ask's second half begun within it joins the first
     (`LAMP_JOIN_CUT_WORDS`), and the first half is never asked again nor
