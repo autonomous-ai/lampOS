@@ -2466,7 +2466,7 @@ lẫn lượt chạy đều không giữ token nào.
   tắt, không có quyền, sai loại, một máy tính đã ghép đôi, một lần đọc được
   cấp quyền) và `protocol::tests`.
 
-## Các kết nối của tác tử trên đèn (`LAMP_AGENT_SERVICES`, tắt nếu không đặt)
+## Các kết nối của tác tử trên đèn (`LAMP_AGENT_SERVICES`, bật trong sản phẩm)
 
 Yêu cầu của chủ (12/11): tác tử của đèn có được các dịch vụ chủ đã liên kết
 trong ứng dụng, để một việc cần lời soạn lúc chạy ("tóm tắt thư sáng nay rồi
@@ -2499,7 +2499,10 @@ qua một socket mở.
   lamp-skills, lamp-skills-manage@, lamp-voice và lamp-control: lamp-voice
   làm kỹ năng kết nối thành một `do.task` ([skills_vi.md](skills_vi.md)),
   lamp-skills và lamp-skills-manage@ nhận quyền dịch vụ của nó khi nạp và
-  cài, và lamp-control giữ chúng trong lời đồng ý và token. Không unit sản phẩm nào đặt công tắc này.
+  cài, và lamp-control giữ chúng trong lời đồng ý và token. Cả năm unit sản phẩm đặt
+  `LAMP_AGENT_SERVICES=on` từ 13/11 (yêu cầu của chủ, test
+  `the_product_gives_the_lamps_agent_the_linked_services`); một drop-in
+  với `LAMP_AGENT_SERVICES=off` trong cả năm unit thì tắt nó.
 - **Token và quyền.** Một lượt `do.task` của kỹ năng (lamp-tasks,
   `skill_task`) được chạy với `LAMP_CONTROL_SOCKET` và token một lượt
   `LAMP_CONTROL_TOKEN`, do lamp-control tạo từ lời đồng ý đã lưu của chủ cho
