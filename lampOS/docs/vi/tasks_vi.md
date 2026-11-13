@@ -688,14 +688,28 @@ agent (`lamp_tasks::skill_make`).
   `MAKE_CONFIG`, một kiểm thử giữ chúng bằng `hermes_install::CONFIG`:
   không kiểm tra cập nhật, không language server, lần chạy `chat -q` kết
   thúc cùng lượt của nó), và không có gì từ bộ nhớ, phiên hay trạng thái
-  của Hermes. Lần chạy nhận `HOME`, `HERMES_HOME` (`home/.hermes`) và
+  của Hermes; bên cạnh đó là hai liên kết tới runtime đã chuẩn bị của
+  Hermes trong home lâu dài, `home/.hermes/installs` (bản ghi phụ thuộc và
+  các môi trường, `installs/<key>/facts.json`) và `home/.hermes/tools` (uv,
+  Python và trình quản lý gói), để một lần tạo không bao giờ tự chuẩn bị
+  môi trường riêng. Hermes 0.22.2 giữ trạng thái phụ thuộc theo từng data
+  root (`pm/environments.py`, `<HERMES_HOME>/installs/<key>`): khi một
+  `HERMES_HOME` mới không có, nó đồng bộ một môi trường trước ("preparing
+  dependencies for this data root"), việc mà lần chạy của một lần tạo
+  không thể làm xong, và kết thúc `run_failed` trong chưa tới một giây trên
+  lamp-c0a4 (#6643). Dùng liên kết, không dùng bind mount: Hermes chỉ nhận
+  một môi trường đã ghi khi, sau khi resolve, nó nằm dưới
+  `<HERMES_HOME>/installs/<key>/environments`, và một liên kết resolve về
+  đúng đường dẫn lâu dài mà bản ghi ghi tên. Lần chạy nhận `HOME`, `HERMES_HOME` (`home/.hermes`) và
   `LAMP_NS_HOME` trỏ tới đó. Wrapper của lamp-update chỉ nhận
   `LAMP_NS_HOME` khi đường dẫn khớp
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home` và không có
   `..` (`WRAPPER_HOME_LINE`), rồi script namespace đặt `HOME` thành nó,
   che home lâu dài của Hermes (`/var/lib/lampos-hermes/.hermes`: bộ nhớ,
   phiên, trạng thái) dưới một tmpfs trống chỉ đọc, chỉ cho thấy lại bản
-  checkout và `tools` (Python mà Hermes chạy trên đó), chỉ đọc, để thư mục của Hermes và thư mục làm việc ở chế độ
+  checkout, `tools` (Python mà Hermes chạy trên đó) và `installs` (bản ghi
+  phụ thuộc của nó), chỉ đọc, để các liên kết resolve được và không gì
+  trong đó bị thay đổi, để thư mục của Hermes và thư mục làm việc ở chế độ
   chỉ đọc, và che phần còn lại của `lamp` trong thư mục làm việc dưới một
   tmpfs khác, chỉ thư mục của lần tạo được đưa lại, đọc-ghi
   (`NS_HOME_LINE`; docs/install.md).

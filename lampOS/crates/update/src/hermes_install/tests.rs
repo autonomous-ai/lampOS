@@ -3316,8 +3316,9 @@ fn a_lamp_with_a_make(base: &Path) -> PathBuf {
 
 /// #6643's HOLDs (the Reviewer-lead 19:58, SubDarren 20:0x, 12 Nov): for
 /// a make, which keeps the network, the script hides Hermes's lasting
-/// home under an empty tmpfs with only its checkout and `tools` (the
-/// Python Hermes runs on) shown again, read-only; leaves Hermes's folder and the work folder read-only; hides
+/// home under an empty tmpfs with only its checkout, `tools` (the
+/// Python Hermes runs on) and `installs` (its dependency record, which a
+/// make's home links to) shown again, read-only; leaves Hermes's folder and the work folder read-only; hides
 /// the rest of `W/lamp` under another tmpfs, the make's own folder alone
 /// moved back, read-write; and starts Hermes there with the make's home.
 /// Each step failing ends it before Hermes runs; a home outside `W/lamp`
@@ -3460,7 +3461,7 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
 /// The same lines run for real in a user and mount namespace of their own
 /// (Linux, where the kernel allows one; skipped otherwise): from inside a
 /// make's namespace, a `cat` of Hermes's lasting memories finds nothing,
-/// its lasting home shows only the checkout and `tools`, read-only, `W/lamp` shows
+/// its lasting home shows only the checkout, `tools` and `installs`, read-only, `W/lamp` shows
 /// only the make's folder, and nothing but the make's folder can be
 /// written.
 #[cfg(target_os = "linux")]
