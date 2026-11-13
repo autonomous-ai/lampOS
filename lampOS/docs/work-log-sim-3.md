@@ -3,6 +3,14 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 05:1x GMT+7: #6954's macOS red is the supervisor flake
+
+- Train 892 carries #6966 (the supervisor flake fix), #6965, #6975.
+- #6954 `sim-macos` (run 43484351137) red on lamp-body's
+  `actual_child_uses_same_worker_loop…` (the flake #6966 fixes), before
+  lamp-sim's tests ran; reran the failed job. #6961, #6971 pending.
+- The first builder asked sim-2 for #6972's first read.
+
 ## 2026-11-14 05:0x GMT+7: the drip test's EINVAL on macOS 15
 
 - nine (#6954) and Heron (#6961): `sim-macos` red on all three heads; the drip
