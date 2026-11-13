@@ -375,13 +375,22 @@ pub const GATEWAY_MARK: &str = "# lampOS: a gateway agent: a skill's run is one 
 /// `openclaw_config::SKILL_RUN_AGENT`); and the arguments, after the
 /// wrapper, of a turn (`gateway call agent`, the gateway's own RPC, never
 /// `--local`, so no turn runs outside the warm gateway), of its stop
-/// (`chat.abort`) and of its end (`sessions.delete`), as templates.
+/// (`chat.abort`) and of its end (`sessions.delete`), as templates; and
+/// the run's fence in the gateway's exec approvals, which live in its own
+/// store, never a file: `approvals get --gateway --json` (`fence-get`),
+/// `approvals set --gateway --stdin` (`fence-set`, which needs
+/// `operator.admin`), and the fence agent's entry (`fence-entry`, its
+/// allow-list the runs' start `{start}` alone, no prompt, a prompt's
+/// fallback denied), which lamp-tasks makes sure of before each run's turn.
 pub const GATEWAY_DATA: &str = r#"#@port 18789
 #@ns /usr/local/lib/lampos/openclaw-ns
 #@agent lamp-skill-run
 #@turn gateway call agent --expect-final --json --timeout {ms} --params {"agentId":"{agent}","sessionKey":"agent:{agent}:{name}","message":{message},"idempotencyKey":"{name}","timeout":{secs},"deliver":false}
 #@stop gateway call chat.abort --json --timeout {ms} --params {"sessionKey":"agent:{agent}:{name}"}
 #@end gateway call sessions.delete --json --timeout {ms} --params {"key":"agent:{agent}:{name}","deleteTranscript":true}
+#@fence-get approvals get --gateway --json --timeout {ms}
+#@fence-set approvals set --gateway --stdin --timeout {ms}
+#@fence-entry {"security":"allowlist","ask":"off","askFallback":"deny","autoAllowSkills":false,"allowlist":[{"pattern":"{start}"}]}
 "#;
 
 /// [`WRAPPER`]'s text for `shown`: with [`Shown::one_path`], OpenClaw a
