@@ -589,6 +589,20 @@ one is chosen) and kept in the thread as the lamp's:
   said"); any other words get neither line ("… had words on the way: not
   asked if someone spoke"), and the model is not asked words that never came
   final; with nothing on the way (a cough, a knock) the question is asked.
+- **A yes on the way, in the clear** (#6840, lamp-9adf, 13 Nov): the
+  owner's "Yes." to a calendar move's read-back came back from speech to
+  text with no words, opened nothing, and the waiting write was dropped at
+  the next line. For a line begun in the clear whose final is empty, while a
+  read-back awaits its answer (a services write's,
+  `services::answer_awaited`, or a skill's yes,
+  `skill_write_yes::answer_awaited`), words on the way that are a plain yes
+  or no (`services::plain_yes`, `services::plain_no`) are taken as said
+  (`second_provider::answer_on_the_way`; the journal: "its final words came
+  back empty; its N words on the way answer a waiting read-back: taken as
+  said (#6840)"). Any other words on the way, or with no answer awaited, are
+  thrown away as before, and the journal counts them: "its final words came
+  back empty; its N words on the way are thrown away (#6840)". The cut-in's
+  stop path over the lamp's voice is unchanged.
 - **Known gaps** (#4938): the lamp's own echo can still cut its answer with
   no words. A playback gap admitted the story's tail in the clear, or a loud
   word of its own made a yield commit (06c1, 3 Nov 02:13 and 02:24); with
