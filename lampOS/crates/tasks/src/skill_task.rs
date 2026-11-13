@@ -1568,6 +1568,21 @@ pub fn default_agent_takes_runs(
     Err(not_set_up(name, &why))
 }
 
+/// Whether a run refused by [`default_agent_takes_runs`] goes the
+/// switch-off way instead (#6914, V2's risk): the default is the lamp's
+/// Hermes, the same agent the switch-off path runs, and its wrapper is
+/// lamp-update's but not yet its one run path's, as after a round by an
+/// updater that predates the switch (#6898). The switch-off path's own
+/// check ([`finds_runs_by_folder`]) still holds. Any other engine is still
+/// refused: no other agent runs its skill (the first builder's (b)).
+pub fn hermes_waits_for_its_round(
+    engine: crate::harness::EngineKind,
+    wrapper: Option<&str>,
+) -> bool {
+    engine == crate::harness::EngineKind::Hermes
+        && wrapper.is_some_and(|text| lamp_updates(text) && !wrapper_takes_runs(text, engine))
+}
+
 /// The words of every refusal of the lamp's default agent `name` for a
 /// skill's run, with `why`.
 fn not_set_up(name: &str, why: &str) -> String {
@@ -2402,13 +2417,17 @@ impl Runner for HarnessRunner {
         // Off, the lamp's own Hermes on the lamp's machine (V2's (b), #1711
         // 21:34). The person's own spoken tasks still go to the chosen or
         // named engine (#6506).
-        let (engine, agent) = if self.default_agent {
+        let one_path = if self.default_agent {
             let engine = (harness.default_engine)().unwrap_or(lamp.engine);
             let read = |path: &Path| std::fs::read_to_string(path).ok();
+            let wrapper = self
+                .wrappers
+                .as_ref()
+                .and_then(|wrappers| read(&wrappers.join(engine.argument())));
             let checked = match &self.wrappers {
                 Some(wrappers) => default_agent_takes_runs(
                     engine,
-                    read(&wrappers.join(engine.argument())).as_deref(),
+                    wrapper.as_deref(),
                     self.agent_ns.as_deref().and_then(read).as_deref(),
                 )
                 // Live, here at the run's start: what Harness would start
@@ -2424,18 +2443,37 @@ impl Runner for HarnessRunner {
                 None if engine.cloud() => default_agent_takes_runs(engine, None, None),
                 None => Ok(()),
             };
-            if let Err(why) = checked {
-                eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
-                return Err(why);
+            match checked {
+                Ok(()) => Some(engine),
+                // The lamp's Hermes the default, its wrapper not yet
+                // rewritten (an older updater's round, #6898): the run goes
+                // the switch-off way below, as before (#6914).
+                Err(why) if hermes_waits_for_its_round(engine, wrapper.as_deref()) => {
+                    eprintln!(
+                        "[lamp-tasks] skill task {}: {why}; run through the lamp's Hermes as with {DEFAULT_AGENT_SWITCH} off until lamp-update rewrites its wrapper",
+                        run.run
+                    );
+                    None
+                }
+                Err(why) => {
+                    eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+                    return Err(why);
+                }
             }
-            (engine, "the lamp's default agent")
         } else {
-            if let Some(wrapper) = &self.held_by
-                && !std::fs::read_to_string(wrapper).is_ok_and(|text| finds_runs_by_folder(&text))
-            {
-                return Err(NOT_FOUND_BY_FOLDER.into());
+            None
+        };
+        let (engine, agent) = match one_path {
+            Some(engine) => (engine, "the lamp's default agent"),
+            None => {
+                if let Some(wrapper) = &self.held_by
+                    && !std::fs::read_to_string(wrapper)
+                        .is_ok_and(|text| finds_runs_by_folder(&text))
+                {
+                    return Err(NOT_FOUND_BY_FOLDER.into());
+                }
+                (EngineKind::Hermes, "the lamp's Hermes")
             }
-            (EngineKind::Hermes, "the lamp's Hermes")
         };
         let token = run
             .env

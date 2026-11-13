@@ -7284,15 +7284,6 @@ fn a_skill_run_is_refused_in_words_when_the_default_agent_cant_take_it() {
     let ns = ns_with_runs();
     refused(EngineKind::Claude, &[], Some(&ns), "(claude)");
     refused(
-        EngineKind::Hermes,
-        &[(
-            "hermes",
-            "#!/bin/sh\n# lampOS: Hermes on the lamp. Written by lamp-update.\nif [ \"${LAMP_NS_NET-}\" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi\n",
-        )],
-        Some(&ns),
-        "isn't lamp-update's one run path",
-    );
-    refused(
         EngineKind::Openclaw,
         &[(
             "openclaw",
@@ -7325,6 +7316,77 @@ fn a_skill_run_is_refused_in_words_when_the_default_agent_cant_take_it() {
         Some(&ns),
         "maker's cloud",
     );
+}
+
+/// #6914 (V2's risk, the first builder's 18:44): with the switch on and the
+/// lamp's Hermes the default, a Hermes wrapper lamp-update hasn't rewritten
+/// yet (a round from an older updater, #6898) is no refusal. The run goes
+/// the switch-off way, through the lamp's Hermes as before, while its
+/// wrapper still finds a run by its folder. A wrapper that doesn't find a
+/// run by its folder is still refused, as with the switch off. Any other
+/// default's wrapper that isn't its one-path one is still refused (the
+/// first builder's (b)).
+#[test]
+fn a_hermes_default_whose_wrapper_waits_for_its_round_runs_as_with_the_switch_off() {
+    let ns = ns_with_runs();
+    let off_wrapper = format!(
+        "#!/bin/sh\n# lampOS: Hermes on the lamp. Written by lamp-update.\n{}{}{}",
+        skill_task::WRAPPER_RUN_LINES.join(""),
+        skill_task::WRAPPER_NET_LINES[0],
+        skill_task::WRAPPER_NET_LINES[1],
+    );
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Hermes,
+        &[("hermes", &off_wrapper)],
+        Some(&ns),
+    );
+    runner.held_by = Some(rig.root.path().join("bin").join("hermes"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    let calls = rig.calls();
+    let new = calls
+        .iter()
+        .find(|call| call["args"][0] == "new")
+        .expect("a new");
+    assert_eq!(new["args"][1], "hermes");
+    nothing_left(&rig);
+
+    // The same, with a wrapper that doesn't find a run by its folder: the
+    // switch-off refusal, nothing asked of Harness.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let old = "#!/bin/sh\n# lampOS: Hermes on the lamp. Written by lamp-update.\nexec /usr/bin/unshare --map-root-user $N --mount \"$@\"\n";
+    let mut runner = one_path_runner(&rig, EngineKind::Hermes, &[("hermes", old)], Some(&ns));
+    runner.held_by = Some(rig.root.path().join("bin").join("hermes"));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Err(skill_task::NOT_FOUND_BY_FOLDER.into())
+    );
+    assert!(rig.calls().iter().all(|call| call["args"][0] != "new"));
+
+    // Claude Code the default with Hermes's switch-off wrapper beside it:
+    // still refused, never run on Hermes instead.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("hermes", &off_wrapper), ("claude", &off_wrapper)],
+        Some(&ns),
+    );
+    let said = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(
+        said.contains("(claude)") && said.contains("isn't set up"),
+        "{said}"
+    );
+    assert!(rig.calls().is_empty());
 }
 
 /// At its deadline the run's `wait` is cancelled and its session closed
