@@ -205,6 +205,20 @@ with a thinking budget of 0 the lamp answered five of five lines not meant
 for it, and with 128 it left alone nine of nine
 ([live-runtime.md](live-runtime.md), `thinking_budget`).
 
+**What it cannot do yet, and its functions** (13 November, #6782). The
+file said "You cannot play music, make calls or control anything else
+yet", whatever the lamp was given: a skill installed from the Store or
+pushed from a computer was offered as a function, and the line still told
+the model to refuse it. On lamp-52e6 at 12587 "photo booth" was answered
+"I'm Lamp — I don't have a camera" over the photo-booth skill it was
+offered. The product's provider setting
+(`deploy/product/settings/voice-provider.json`, which `lamp-update`
+installs) names no `instruction_file`, so a product lamp runs the built-in
+instruction (`config::CHAT_INSTRUCTION`), which says the same since #6772;
+this file is for a lamp whose setting names it. The line now keeps the refusal only for what none of its
+functions or skills does, and never lets it say it has no camera for one.
+Not yet heard on a lamp.
+
 ## Checks to run after changing the file
 
 All four are played from another machine's speakers at the lamp; none needs
