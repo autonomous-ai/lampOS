@@ -1341,3 +1341,171 @@ fn the_ask_carries_the_one_path() {
         "off writes the ask as before: {text}"
     );
 }
+
+/// #6882 P1-1: with the one run path on, OpenClaw's namespace shows the
+/// pushed skills' folder without `LAMP_NS_NET` (the gateway's unit never
+/// sets it), each edit found once; off, the text is byte for byte
+/// Hermes's with only [`ENGINE_EDITS`], as before.
+#[test]
+fn the_one_path_shows_the_pushed_skills_without_ns_net_and_off_changes_nothing() {
+    for skills in [false, true] {
+        for tasks in [false, true] {
+            let mut before = hermes_install::ns_text(skills, tasks);
+            for (from, to) in ENGINE_EDITS {
+                before = before.replace(from, to);
+            }
+            let before = before.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1);
+            let off = Shown {
+                skills,
+                tasks,
+                one_path: false,
+            };
+            assert_eq!(ns_text(off), before, "off: as before");
+            if !tasks {
+                assert_eq!(
+                    ns_text(Shown {
+                        one_path: true,
+                        ..off
+                    }),
+                    before
+                );
+                continue;
+            }
+            for (from, _) in RUNS_EDITS {
+                assert_eq!(before.matches(from).count(), 1, "`{from}`");
+            }
+            let on = ns_text(Shown {
+                one_path: true,
+                ..off
+            });
+            assert!(
+                on.contains("if [ -d \"$P\" ]; then mkdir -m 0700 \"$S/p\""),
+                "{on}"
+            );
+            // LAMP_NS_NET's other steps stay behind it.
+            assert_eq!(
+                on.matches("if [ \"${LAMP_NS_NET-}\" = run ]").count(),
+                before.matches("if [ \"${LAMP_NS_NET-}\" = run ]").count() - 1
+            );
+            assert!(on.contains("model.sock"));
+            let checked = std::process::Command::new("/bin/sh")
+                .args(["-n", "-c", &on])
+                .output()
+                .unwrap();
+            assert!(checked.status.success(), "{checked:?}");
+        }
+    }
+}
+
+/// #6882 P1-1, run under `sh` with every mount stubbed on a stand-in
+/// root that has the pushed skills' folder, and no `LAMP_NS_NET` (as the
+/// gateway's unit runs it): with the one run path on, the folder is
+/// staged, moved back and remounted read-only; off, never touched.
+#[test]
+fn the_gateways_namespace_shows_the_pushed_skills_read_only_with_the_one_path() {
+    for one_path in [false, true] {
+        let folder = tempfile::tempdir().unwrap();
+        let base = folder.path().to_string_lossy().into_owned();
+        let at = |path: &str| format!("{base}/root{path}");
+        let stubs = folder.path().join("stubs");
+        fs::create_dir_all(&stubs).unwrap();
+        let log = folder.path().join("log");
+        let resolv = at("/run/systemd/resolve/stub-resolv.conf");
+        for made in [
+            PLACE,
+            WORK,
+            SKILLS,
+            "/etc/lampOS",
+            "/dev/shm",
+            "/run/systemd/resolve",
+            hermes_install::PUSHED,
+        ] {
+            fs::create_dir_all(at(made)).unwrap();
+        }
+        fs::write(&resolv, "nameserver 127.0.0.53\n").unwrap();
+        let uid_map = folder.path().join("uid_map");
+        fs::write(&uid_map, "         0        996          1\n").unwrap();
+        let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                    case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; readlink) echo \"$RESOLV\";; \
+                    unshare) echo ran;; esac\n";
+        for name in [
+            "mount", "findmnt", "mkdir", "rmdir", "rm", "touch", "readlink", "unshare", "ip",
+        ] {
+            let path = stubs.join(name);
+            fs::write(&path, stub).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let mut text = ns_text(Shown {
+            skills: false,
+            tasks: true,
+            one_path,
+        });
+        let moved = [
+            "/var/tmp",
+            "/var/lib",
+            "/etc/lampOS",
+            "/etc/resolv.conf",
+            "/dev/shm",
+            "/tmp",
+            "/run",
+        ];
+        for (n, path) in moved.iter().enumerate() {
+            text = text.replace(path, &format!("\u{1}{n}\u{1}"));
+        }
+        for (n, path) in moved.iter().enumerate() {
+            text = text.replace(&format!("\u{1}{n}\u{1}"), &at(path));
+        }
+        let text = text
+            .replace("/proc/self/uid_map", &uid_map.to_string_lossy())
+            .replace("/usr/bin/unshare", &stubs.join("unshare").to_string_lossy());
+        let script = folder.path().join("openclaw-ns");
+        fs::write(&script, text).unwrap();
+        let out = std::process::Command::new("/bin/sh")
+            .arg(&script)
+            .arg("gateway")
+            .current_dir(at(WORK))
+            .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+            .env("LOG", &log)
+            .env("RESOLV", &resolv)
+            .env("LAMP_NS_UID", "996")
+            .env("LAMP_NS_GID", "994")
+            .env_remove("LAMP_NS_NET")
+            .output()
+            .unwrap();
+        assert!(out.status.success(), "{out:?}");
+        let lines: Vec<String> = fs::read_to_string(&log)
+            .unwrap()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        let stage = at("/tmp/.lampos-ns");
+        let pushed = at(hermes_install::PUSHED);
+        let wanted = [
+            format!("mkdir -m 0700 {stage}/p"),
+            format!("mount --bind {pushed} {stage}/p"),
+            format!("mount --move {stage}/p {pushed}"),
+            format!("mount -o remount,bind,ro,nosuid,nodev,relatime {pushed}"),
+            format!("rmdir {stage}/p"),
+        ];
+        let places: Vec<Option<usize>> = wanted
+            .iter()
+            .map(|line| lines.iter().position(|l| l == line))
+            .collect();
+        if one_path {
+            let places: Vec<usize> = places
+                .iter()
+                .zip(&wanted)
+                .map(|(at, line)| at.unwrap_or_else(|| panic!("no `{line}` in {lines:#?}")))
+                .collect();
+            assert!(places.is_sorted(), "{lines:#?}");
+        } else {
+            assert!(
+                !lines.iter().any(|line| line.contains(&pushed)),
+                "{lines:#?}"
+            );
+        }
+        // No model socket and no relay without LAMP_NS_NET, either way.
+        assert!(!lines.iter().any(|line| line.contains("model.sock")));
+        assert!(!lines.iter().any(|line| line.contains("net-relay")));
+    }
+}
