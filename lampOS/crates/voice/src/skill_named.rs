@@ -42,12 +42,18 @@
 //! line only means the model answers as it did; a wrong one runs a skill
 //! nobody asked for. Two skills named, none.
 //!
-//! "Take a photo" names no skill: a skill.toml has no words of its own
-//! for what asks for it, only its name, its description for the model and
-//! its `when`. Until it has, such a line is the model's.
+//! "Take a photo" names no skill, so a skill may give the phrases that ask
+//! for it: `asks` in its skill.toml (#6772's second part, the first
+//! builder's ruling on #6059), which the tools file carries beside its tool
+//! ([`crate::tools::skill_asks`]). An ask is matched as the name is, whole,
+//! with the same words around it, and runs the same way: "take a photo"
+//! runs the photo booth that asks it, and "Lamp, can you play some relaxing
+//! music?" the relaxing music. A phrase two skills give, or one that is
+//! another's name, runs neither.
 use crate::known_faces::lower_words;
 use crate::tools::skill_asked::{AROUND, REQUESTS, phrase_at};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 /// Only the exact value `on`; off unless set. The second route alone.
 pub const ENVIRONMENT: &str = "LAMP_SKILL_NAMED";
@@ -82,8 +88,9 @@ pub const RUNS: &[&[&str]] = &[
     &["for", "us"],
 ];
 
-/// The most words a skill's name is said in.
-const NAME_WORDS: usize = 6;
+/// The most words a skill's name or one of its asks is said in: an ask is
+/// at most 8 (lamp-skills' `ASK_WORDS`).
+const NAME_WORDS: usize = 8;
 
 /// A heard line longer than this is never a plain ask for a skill by its
 /// name: no skills' file is read for it.
@@ -109,14 +116,38 @@ fn plain_word(name: &str) -> bool {
     PLAIN.iter().any(|plain| plain == name)
 }
 
-/// `functions` as [`named`] matches them: each loosely, with its own name,
-/// none empty or a plain word.
-fn wanted<'a>(functions: impl IntoIterator<Item = &'a str>) -> Vec<(String, &'a str)> {
-    functions
-        .into_iter()
-        .map(|function| (loose(function), function))
-        .filter(|(name, _)| !name.is_empty() && !plain_word(name))
-        .collect()
+/// An ask phrase as it is matched: its words as a heard line's are read
+/// ([`lower_words`]), then made [`loose`] as a name is.
+fn loose_ask(ask: &str) -> String {
+    loose(&lower_words(ask).join("-"))
+}
+
+/// `functions` as [`named`] matches them: each loosely, by its own name
+/// and by each of its `asks` (#6772), none empty or a plain word, and none
+/// that two functions share: such a line names neither.
+fn wanted<'a>(
+    functions: impl IntoIterator<Item = &'a str>,
+    asks: &BTreeMap<String, Vec<String>>,
+) -> Vec<(String, &'a str)> {
+    let mut wanted: Vec<(String, &'a str)> = Vec::new();
+    for function in functions {
+        wanted.push((loose(function), function));
+        for ask in asks.get(function).into_iter().flatten() {
+            wanted.push((loose_ask(ask), function));
+        }
+    }
+    wanted.retain(|(name, _)| !name.is_empty() && !plain_word(name));
+    let shared: Vec<String> = wanted
+        .iter()
+        .filter(|(name, function)| {
+            wanted
+                .iter()
+                .any(|(other, theirs)| other == name && theirs != function)
+        })
+        .map(|(name, _)| name.clone())
+        .collect();
+    wanted.retain(|(name, _)| !shared.contains(name));
+    wanted
 }
 
 /// The function among `functions` (skills' functions as their tools file
@@ -125,7 +156,17 @@ fn wanted<'a>(functions: impl IntoIterator<Item = &'a str>) -> Vec<(String, &'a 
 /// at most, requests only before it, and no word but those `AROUND` it or
 /// [`RUNS`].
 pub fn named<'a>(heard: &str, functions: &[&'a str]) -> Option<&'a str> {
-    named_among(heard, &wanted(functions.iter().copied()))
+    asked(heard, functions, &BTreeMap::new())
+}
+
+/// [`named`], by a function's name or by one of its `asks` (each its
+/// phrases, by the function's name: [`crate::tools::skill_asks`]).
+pub fn asked<'a>(
+    heard: &str,
+    functions: &[&'a str],
+    asks: &BTreeMap<String, Vec<String>>,
+) -> Option<&'a str> {
+    named_among(heard, &wanted(functions.iter().copied(), asks))
 }
 
 /// [`named`] among functions already made [`wanted`].
@@ -219,9 +260,9 @@ pub fn heard(settings: &crate::tools::Settings, heard: &str) -> Option<(String, 
     if !short(heard) {
         return None;
     }
-    let functions = functions(settings);
+    let (functions, asks) = functions(settings);
     let functions: Vec<&str> = functions.iter().map(String::as_str).collect();
-    named(heard, &functions).map(|function| call(settings.use_skill, function))
+    asked(heard, &functions, &asks).map(|function| call(settings.use_skill, function))
 }
 
 /// Whether `heard` is a line short enough to be a plain ask by a name.
@@ -230,8 +271,9 @@ fn short(heard: &str) -> bool {
     count > 0 && count <= MOST_WORDS
 }
 
-/// The functions [`heard`] matches a line against, read from the files.
-fn functions(settings: &crate::tools::Settings) -> Vec<String> {
+/// The functions [`heard`] matches a line against, read from the files,
+/// and their asks.
+fn functions(settings: &crate::tools::Settings) -> (Vec<String>, BTreeMap<String, Vec<String>>) {
     let skills = crate::tools::skill_tools(settings);
     let reached = if settings.use_skill {
         crate::use_skill::offered(&skills)
@@ -239,12 +281,15 @@ fn functions(settings: &crate::tools::Settings) -> Vec<String> {
         &skills[..]
     };
     let core = crate::tools::core_skills(settings);
-    reached
+    let functions: Vec<String> = reached
         .iter()
         .filter(|tool| crate::use_skill::takes_nothing(tool))
         .map(|tool| tool.name.clone())
         .filter(|name| !core.contains(name))
-        .collect()
+        .collect();
+    let mut asks = crate::tools::skill_asks(settings);
+    asks.retain(|function, _| functions.contains(function));
+    (functions, asks)
 }
 
 /// A file's time and length as last changed, or none for no file.
@@ -283,8 +328,8 @@ impl Heard {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         if kept.as_ref().is_none_or(|(at, _)| *at != stamps) {
-            let read = functions(&self.settings);
-            let wanted = wanted(read.iter().map(String::as_str))
+            let (read, asks) = functions(&self.settings);
+            let wanted = wanted(read.iter().map(String::as_str), &asks)
                 .into_iter()
                 .map(|(name, function)| (name, function.to_owned()))
                 .collect();
@@ -550,6 +595,62 @@ mod tests {
             "{each_kept:?}"
         );
         std::fs::remove_dir_all(dir).ok();
+    }
+
+    /// A skill's own asks (#6772): Seventh's "take a photo" (#6413) and
+    /// Sixth's two lines (#5749) name the skill that asks them, whole and
+    /// with only what goes around a name; a camera question, a no, a
+    /// "wait", a part of an ask, and an ask two skills share, none.
+    #[test]
+    fn a_skills_own_asks_name_it() {
+        let asks: BTreeMap<String, Vec<String>> = [
+            (
+                "photo_booth".to_owned(),
+                vec!["take a photo".to_owned(), "Take a picture".to_owned()],
+            ),
+            (
+                "play_relaxing_music".to_owned(),
+                vec![
+                    "relaxing music".to_owned(),
+                    "play me something to relax".to_owned(),
+                ],
+            ),
+            ("desk_check".to_owned(), vec!["take a picture".to_owned()]),
+            ("absent".to_owned(), vec!["dance for me".to_owned()]),
+        ]
+        .into();
+        let functions = ["photo_booth", "play_relaxing_music", "desk_check"];
+        for (heard, function) in [
+            ("take a photo", "photo_booth"),
+            ("Take a photo.", "photo_booth"),
+            ("Lamp, can you take a photo please?", "photo_booth"),
+            ("photo booth", "photo_booth"),
+            (
+                "Hey Lamp, play me something to relax.",
+                "play_relaxing_music",
+            ),
+            (
+                "Lamp, can you play some relaxing music?",
+                "play_relaxing_music",
+            ),
+            ("relaxing music, please", "play_relaxing_music"),
+        ] {
+            assert_eq!(asked(heard, &functions, &asks), Some(function), "{heard}");
+        }
+        for heard in [
+            "is there a camera?",
+            "don't take a photo",
+            "Take a photo, wait.",
+            "take a photo of the cat",
+            "I hate relaxing music",
+            "take a",
+            "photo",
+            "take a picture",
+            "dance for me",
+            "take a photo and play some relaxing music",
+        ] {
+            assert_eq!(asked(heard, &functions, &asks), None, "{heard}");
+        }
     }
 
     /// The functions kept are read again once the tools file changes: a
