@@ -126,32 +126,32 @@ NOT_NAMES = {"tests", "test", "gates", "gate", "checks", "check", "note", "notes
 
 
 def signer(body):
-    """The signed name in a comment (as written; callers lowercase it), or "".
-
-    14 Nov 00:2x: a name may carry digits after its first letter ("sim-3, 22:5x"), so the sim builders sign. Before,
-    "sim-3" never matched, and with every PR needing two signed readers (reads2.py --always) its READ-OKs never counted."""
+    """The signed name in a comment (as written; callers lowercase it), or ""."""
     body = body.lstrip()
     # 3 Nov 10:1x: "The first builder, 18:5x" signs too (an optional "The"); #4905 sat out with my lifting READ-OK.
     # The author's signature: "<Name>, HH:MM" at the comment's or a line's start, after a sentence, or right after the
     # marker and its commit; never a name quoted in brackets ("(Fourteen, 09:3x: ...)").
+    # 14 Nov 00:5x (Heron's and SubDarren's HOLDs on #6979): here only, a name may carry digits after its first letter
+    # ("sim-3, 22:5x"), so the sim builders sign; a priority or check label with a time ("P1, 22:50") never does. The
+    # no-time paths below keep letters only, so "P3: …", "ARM64: green" and "H2: x" opening a line sign no one.
     sig = re.search(r"(?:^|\n|\. |(?:READ-OK|HOLD)\*{0,2} `?[0-9a-f]{7,40}`?[:,]? )\**(?:[Tt]he )?([A-Za-z][A-Za-z0-9-]+(?: builder)?)\**,? \d{1,2}:\d[\dx]", body[:800])
-    if sig:
+    if sig and not re.fullmatch(r"(?i)p\d+s?|h\d+|arm\d+|x86(-\d+)?|ipv\d", sig.group(1)):
         return sig.group(1)
     # 29 Oct 18:1x: the name right after the marker and its commit on the same line, with no time:
     # "HOLD 3559c8ab3a…  Reviewer-lead: one P2" (#4364, #4346 sat out on it as unsigned).
     # 3 Nov 16:4x: on the same line only ([ \t]+, not \s+); the next line is nxt's, with its label check.
-    same = re.search(r"(?:READ-OK|HOLD)\*{0,2} `?[0-9a-f]{7,40}`?[:,]?[ \t]+\**([A-Za-z][A-Za-z0-9-]+(?: builder)?)\**\s*[,:]", body[:400])
+    same = re.search(r"(?:READ-OK|HOLD)\*{0,2} `?[0-9a-f]{7,40}`?[:,]?[ \t]+\**([A-Za-z][A-Za-z-]+(?: builder)?)\**\s*[,:]", body[:400])
     # The name that starts the line after the marker's line: "Sixth, read at …", "Reviewer-lead: my P3 …".
     # 3 Nov 16:4x (the Reviewer-lead's note on #5068, Thirteen reproduced it): "Tests: 12 passed" there became a second
     # reader. Now the name is a capitalised word or "<word> builder", and never a label a read's lines open with
     # (NOT_NAMES). A name with a time after it ("Tests, 10:02") is the signature above, label or not.
-    nxt = re.search(r"\A[^\n]*\n\s*\**(?:[Tt]he )?([A-Z][A-Za-z0-9-]+|[A-Za-z][A-Za-z0-9-]+ builder)\**\s*[,:]", body)
+    nxt = re.search(r"\A[^\n]*\n\s*\**(?:[Tt]he )?([A-Z][A-Za-z-]+|[A-Za-z][A-Za-z-]+ builder)\**\s*[,:]", body)
     if nxt and nxt.group(1).lower() in NOT_NAMES:
         nxt = None
     # 30 Oct 22:0x: the name that opens the comment, with a colon and no time: "Sixth: #4562 at `b9521db47a`, …" then
     # "HOLD b9521db47a" a line below. It read as unsigned, and Sixth's "Sixth: … my re-read of my HOLD" READ-OK didn't
     # clear it, so #4562 sat out train 423 with both READ-OKs.
-    first = re.match(r"\**([A-Za-z][A-Za-z0-9-]+(?: builder)?)\**:", body)
+    first = re.match(r"\**([A-Za-z][A-Za-z-]+(?: builder)?)\**:", body)
     return same.group(1) if same else (nxt.group(1) if nxt else (first.group(1) if first else ""))
 
 

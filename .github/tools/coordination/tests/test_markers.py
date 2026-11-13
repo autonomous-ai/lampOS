@@ -754,6 +754,19 @@ class DigitNames(unittest.TestCase):
                  c("writer-a", "READ-OK " + HEAD + "\n\nsim-2, 23:10 GMT+7")]
         self.assertEqual(two_reads(items, HEAD, W, always=True), "met 2")
 
+    def test_labels_never_sign(self):
+        # Heron's table on #6979: each was "" on lamp-voice and must stay so.
+        for body in ("READ-OK " + HEAD + "\n\nP3: the doc", "READ-OK " + HEAD + "\n\nP2s, none blocking: x",
+                     "READ-OK " + HEAD + "\nH2: x", "P1: READ-OK " + HEAD, "READ-OK " + HEAD + " P2: one",
+                     "READ-OK " + HEAD + "\n\nARM64: green", "READ-OK " + HEAD + "\n\nIPv6: ok",
+                     "READ-OK " + HEAD + "\n\nP1, 22:50: one"):
+            self.assertEqual(signer(body), "", body)
+
+    def test_a_label_restate_is_not_a_second_reader(self):
+        items = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00"),
+                 c("writer-a", "READ-OK " + HEAD + "\n\nP3: the doc")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "short 1")
+
     def test_a_time_alone_is_still_no_name(self):
         self.assertEqual(signer("READ-OK " + HEAD + "\n\n12, 22:50"), "")
 
