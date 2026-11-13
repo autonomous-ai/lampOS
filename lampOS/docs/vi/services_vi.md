@@ -2353,9 +2353,11 @@ toàn bộ):
 Quyết định của chủ đèn (13/11, trong cuộc trò chuyện này; việc do first
 builder mở, hỏi trên Queue #6809): mọi thứ chạm vào một dịch vụ đã liên kết
 đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`;
-bật trong các unit `lamp-skills`, `lamp-tasks`, `lamp-control` và `lamp-services` của sản phẩm, mỗi unit một lần) và `LAMP_AGENT_SERVICES=on`, lệnh ghi cố
-định của một kỹ năng tự tạo được gửi bởi một lượt chạy của kỹ năng trên
-Hermes của đèn, không phải bởi `lamp-skills`:
+bật trong các unit `lamp-skills`, `lamp-tasks`, `lamp-control` và
+`lamp-services` của sản phẩm, mỗi unit một lần) và
+`LAMP_AGENT_SERVICES=on`, lệnh ghi cố định của một kỹ năng tự tạo được gửi
+bởi một lượt chạy của kỹ năng trên Hermes của đèn, không phải bởi
+`lamp-skills`:
 
 - **lamp-skills** không bao giờ gọi chương trình này cho lệnh ghi đó. Nó
   trao lệnh ghi cho lamp-tasks qua socket của `do.task` dưới dạng
@@ -2646,9 +2648,9 @@ qua một socket mở.
   nói rõ của chủ (cơ chế chờ của #6558); chỉ khi đó chương trình này mới gửi,
   tính vào giới hạn của kỹ năng (3 lần một ngày mỗi kỹ năng, 10 cho tất cả).
   Lệnh ghi cố định của một kỹ năng tự tạo chạy qua tác tử
-  (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm) là lệnh ghi duy nhất được gửi theo lệnh gọi
-  của một lượt chạy, và chỉ như lời đồng ý đã giữ của chủ, một lần ("Một kỹ
-  năng tự tạo ghi vào dịch vụ", "Qua tác tử của đèn").
+  (`LAMP_SKILL_WRITE_AGENT`, bật trong sản phẩm) là lệnh ghi duy nhất được
+  gửi theo lệnh gọi của một lượt chạy, và chỉ như lời đồng ý đã giữ của chủ,
+  một lần ("Một kỹ năng tự tạo ghi vào dịch vụ", "Qua tác tử của đèn").
 - **Nhật ký** từ máy chủ chỉ ghi độ dài của lời từ chối; các phần nó gọi ghi
   dịch vụ và `what` hay `action`, không bao giờ ghi nội dung, địa chỉ hay
   tiêu đề.
