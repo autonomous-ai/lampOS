@@ -82,7 +82,7 @@ export function grantRefusal(answer, grants) {
   if (!/^no_grant:|not granted/.test(text)) return false;
   if (!Array.isArray(grants)) return true;
   // The lamp names what it lacks after `not granted:`, one grant or a list.
-  // (A line may go on after the names: `not granted: camera (the app does not grant it yet: ...)`.)
+  // (A line may go on after the names: `not granted: camera (only the owner can add it: ...)`.)
   const named = (/not granted: ([a-z_]+(?:, ?[a-z_]+)*)/.exec(text)?.[1] ?? '').split(/,\s*/).filter(Boolean);
   return named.length === 0 || named.some((grant) => !grants.includes(grant));
 }
