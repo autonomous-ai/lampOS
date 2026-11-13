@@ -906,7 +906,7 @@ fn a_plan_never_wipes_software_system_or_shallow_paths() {
 /// Every store of the person's that a part keeps, as lamp-4ace's units set
 /// it or as the part's own default has it. A part that adds a store adds it
 /// here and to the plan.
-const PERSON_STORES: [&str; 46] = [
+const PERSON_STORES: [&str; 47] = [
     // lamp-4ace's units.
     "/var/lib/lampos-memory",
     "/var/lib/lampos-eyes/people.json",
@@ -966,6 +966,9 @@ const PERSON_STORES: [&str; 46] = [
     // slide, read by lamp-ears (#1722 item 1, docs/onboarding.md).
     "/var/lib/lampOS/consent/room-sounds.json",
     "/var/lib/lampOS/consent/face-expressions.json",
+    // The owner's yes to what the lamp sees for its skills, read by
+    // lamp-seen (#6543, Fourteen's ruling, docs/seen.md).
+    "/var/lib/lampOS/consent/seen-activity.json",
     "/var/lib/lampOS/voice/schedule-delivery",
     "/var/lib/lampOS/voice/first-output",
     "/run/lampos-voice/thread.json",

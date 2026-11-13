@@ -11,8 +11,9 @@ It is one process with one owner. It asks the camera for a frame only when
 the rules below allow, sends it encrypted, and puts **labels** on the bus.
 No frame and no voice ever reaches a skill, the bus or the model.
 
-It is off behind `LAMP_SEEN_ACTIVITY` ([switches.md](switches.md)), and
-has no product unit yet. Phase 1 and 1b make no server call. Phase 2
+It is off behind `LAMP_SEEN_ACTIVITY` ([switches.md](switches.md)). Its
+product unit is installed on every lamp, off
+([The product unit](#the-product-unit)). Phase 1 and 1b make no server call. Phase 2
 (activity, below) sends frames only when the launcher also gives it the
 account (`--account`, `--key`); without them, **no frame leaves the
 lamp**.
@@ -199,7 +200,8 @@ lamp also says once when the opt-in is turned off.
   - **No frame before the on line.** The gate stays closed
     (`not_said_yet`) until the on line for the kept yes has begun. A lamp
     with no say service never opens the gate: this fails closed by
-    design, and `lamp-seen`'s unit needs `LAMP_SAY_GROUP` (Owed, below).
+    design. The product unit runs as `lampos`, the say socket's group
+    (the voice's `LAMP_SAY_GROUP=lampos`), so it may reach it.
   - **No posture frame before the posture line.** With posture sending,
     the on line owed is the posture line. A yes whose plain line was said
     before posture was switched on is owed the posture line once, and
@@ -253,9 +255,10 @@ lamp also says once when the opt-in is turned off.
 
 ## Phase 2: activity
 
-With `--frames-socket` and the account (`--account`, setup's
-`backend.json`; `--key`, the account key; both as a unit's
-`LoadCredential=` gives them), the frames' sink is activity's
+With a frame link (`--frames-socket`, or `--frame-link-file` in the
+product) and the account (`--account`, setup's `backend.json`; `--key`,
+the account key; both as the product unit's `LoadCredential=` gives them,
+read by path inside the process), the frames' sink is activity's
 (`activity.rs`) instead of `Discard`. It still sits inside the ring's mark
 and behind the gate, so a frame reaches it only while the gate is clear
 (the on line for the kept yes begun included: `not_said_yet` closes it)
@@ -402,16 +405,14 @@ sizes taken.
   the clock.
 - Posture is phase 3's, below: without `LAMP_SEEN_POSTURE=on` it sends
   nothing and `humans/posture` is not published.
-- No product unit, and no package. The binary is listed under `development`
-  in `deploy/package-binaries.json`. The product's frame link has no
-  `perception` consumer yet: `lamp-eyes` owns the camera, and the voice's
-  camera worker, which serves `frames.rs`, isn't the product's camera
-  ([eyes.md](eyes.md#when-the-camera-is-open)). With no `--frames-socket`,
-  `lamp-seen` runs the gate and says it on `diagnostics`, and asks for no
-  frame.
-- `humans/familiar` is said only with `lamp-eyes --visits`, which the
-  product doesn't set. Until it does, or until another "this face is known"
-  is on the bus, the gate reads every face as a stranger and stays closed.
+- With no frame link (no `--frames-socket`, and no link kept in
+  `--frame-link-file`), `lamp-seen` runs the gate and says it on
+  `diagnostics`, and asks for no frame. In the product the eyes serve the
+  link ([The product unit](#the-product-unit)).
+- `humans/familiar` is said only with `lamp-eyes --visits`. Without it the
+  gate reads every face as a stranger and stays closed. The product unit
+  gives it with the switch on, for the stranger check only
+  ([The product unit](#the-product-unit)).
 
 ## Phase 3: posture
 
@@ -524,24 +525,94 @@ below should compare a slump at 320×240 against V1's 640×480. One frame
 every 30 s costs about 26 ms to scale from 1280×960 on a development Mac,
 an estimated 80–130 ms on a lamp.
 
-**Not done in phase 3:** no product unit or package (the binary is still
-under `development`), and the posture line's wording awaits the PM.
+**Not done in phase 3:** the posture line's wording awaits the PM.
+
+## The product unit
+
+`deploy/product/lamp-seen.service`, installed and enabled on every lamp by
+`lamp-update install` and carried by each build (`install::PRODUCT`; the
+binary is in `optional` in `deploy/package-binaries.json`, beside the
+other parts with a unit). With `LAMP_SEEN_ACTIVITY` unset, as in the
+product, it idles and touches nothing, and the eyes serve no link: the
+product is unchanged.
+
+- **Under the keeper.** In `lampos.target` (`PartOf=`, `WantedBy=`),
+  `Restart=on-failure` after 5 s, at most 5 starts in 10 min, as every
+  part ([keeper.md](keeper.md)). An update round restarts it with the
+  other running parts it changes; the round that first adds it starts it
+  only after the watch, once the switch is kept (`start_added` in
+  `round.rs`), not with the restart. The eyes may restart before it in
+  that round, with no `/run/lampos-seen` yet: no folder reads as no file,
+  so they start without a link. So `humans/doing` does not run out for
+  long when it stops.
+- **As `lampos`**, in `lampos-parts.slice`, `Nice=10`. That one user covers
+  the three it reaches: the bus (group `lampos`), the voice's say socket
+  (`LAMP_SAY_GROUP=lampos`) and the eyes' frame link, whose folder must be
+  the eyes' own user's with no group access. Least privilege:
+  `ProtectSystem=strict` with only the bus writable besides its own two
+  folders, no capabilities, `AF_INET`, `AF_INET6` and `AF_UNIX` only, and
+  the eyes' files kept as the same user (`/run/lampos-eyes`,
+  `/var/lib/lampos-eyes`, `/run/lampos-eyes-kept`, `/run/lampos-photos`)
+  and lamp-control's state made inaccessible.
+- **Its own state**: `/var/lib/lampos-seen` (0700, its
+  `StateDirectory=`, wiped by the reset plan), for the "said once" record,
+  `said-back.json`, passed as `--state-folder` (also its default), and
+  `/run/lampos-seen` (0700, kept across its own stop until the lamp
+  restarts). **The consent folder is only read**, as a member of `lampos`
+  (`root:lampos` 0750, the file 0640): `ProtectSystem=strict` leaves it
+  read-only, so `lamp-seen` never writes it (Fourteen's ruling). The reset
+  plan removes the yes, `seen-activity.json`, beside the other two.
+- **The account**: setup's `/etc/lampOS/setup/backend.json` and the
+  voice's `/etc/lampOS/voice/credential`, as `lamp-cloud` reads them,
+  handed in by `LoadCredential=` and passed as paths (`--account
+  %d/account --key %d/key`): the key is read inside the process, never on
+  a command line. A lamp without them starts all the same, and sends
+  nothing.
+- **The frame link.** Its `ExecStartPre=`, `lamp-seen frame-link`, keeps
+  the link's two boots (`link.rs`): with the switch on, two new boots from
+  `/dev/urandom`, as the voice makes its camera worker's
+  (`lamp_voice::process::new_boot`), written once, 0600, to
+  `/run/lampos-seen/frame-link.env` as
+  `LAMP_EYES_FRAME_LINK=--frame-link /run/lampos-eyes-frames/camera.frames
+  --frame-link-controller HEX32 --frame-link-reader HEX32`, and left as
+  they are while that file reads; with it off, the file removed.
+  `lamp-eyes.service` passes `--frame-link
+  /run/lampos-eyes-frames/camera.frames --frame-link-boots
+  /run/lampos-seen/frame-link.env`, and the eyes read the boots from the
+  file themselves (lampos's own, 0600, in a 0700 folder), never from their
+  line or environment ([eyes.md](eyes.md#the-cameras-frame-link-for-lamp-seen---frame-link-6543));
+  `lamp-seen serve --frame-link-file` reads the same line for its socket,
+  its own boot and the controller's. The unit is ordered before the eyes,
+  so the file is there when they start; the socket's folder,
+  `/run/lampos-eyes-frames`, is made 0700 `lampos` by `lampos.conf`.
+  Turning the switch on, or off, takes effect for the eyes only at their
+  next start (the lamp's restart, or the target's). Until then, after
+  turning it off, they keep their `--visits` counts and serve the link,
+  but no frame leaves: only lamp-seen may connect, and off it idles.
+- **The stranger check.** The same file's second line,
+  `LAMP_EYES_VISITS=--visits on`, kept alone beside it as
+  `/run/lampos-seen/eyes-visits.env` (the one file the eyes' unit loads,
+  `EnvironmentFile=-`, and removed with the switch off), starts the eyes
+  with `--visits` (they
+  already run with `LAMP_BUS=on`), so `humans/familiar` says the level of
+  the one at the lamp, with no name, face or picture. It is for the gate's
+  stranger check only (the first builder's yes on #6543); off, the eyes
+  run without it, as before.
+- **Not in `lamp/health`'s expected parts**: off, it says nothing on
+  `diagnostics`, so expecting it would mark every lamp stale. It goes in
+  with the switch.
 
 ## Owed
 
 | Item | What | When |
 |---|---|---|
-| Giving the yes | The voice's spoken yes writing `seen-activity.json`, the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`, removal on every forget, and the file in lamp-setup's reset list beside the other two (Fourteen's design on #6543) | before the switch goes on |
-| The state folder | `lamp-seen`'s unit with `StateDirectory=lampos-seen`, in the `lampos` group so it may read the consent folder | with the product unit |
-| The say service for `lamp-seen` | Its unit in `LAMP_SAY_GROUP`, so it may reach the say socket. Without it the on line is never said and the gate never opens | with the product unit |
-| The frame source | A `perception` consumer of the product's camera: `lamp-eyes`' frame link (#6645), given to `lamp-seen` by its launcher | with the product unit |
-| A known face on the bus | `lamp-eyes --visits` in the product, or another marker the gate can read | before the switch goes on |
+| Giving the yes | The voice's spoken yes writing `seen-activity.json`, the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`, removal on every forget (Fourteen's design on #6543) | before the switch goes on |
 | Posture's on line wording | The posture line (`said_back::POSTURE_ON_LINE`, above) is gated in code but awaits the PM's wording | before `LAMP_SEEN_POSTURE` is on anywhere |
 | Posture at 320×240 | A slump read on `humans/posture` from frames sent at 320×240 (every frame is, above) against V1's 640×480, to see whether the 3D lifter's scale changes RULA (above) | with the lamp rows |
 | The frame size | Every frame is sent at 320×240, scaled down from the eyes' link at any larger size (`--full-look` included). Measure the labels at 320×240 on a lamp against V1's 640×480 before the switch goes on | before the switch goes on |
-| `humans/doing` when lamp-seen stops | A topic that has run out holds a skill's `[[while]]` closed until lamp-skills restarts (`unknown = "holds"` covers only a topic never said). lamp-seen under the keeper, or a skills change, before a skill reads it | before a skill reads it |
+| `humans/doing` when lamp-seen stops | A topic that has run out holds a skill's `[[while]]` closed until lamp-skills restarts (`unknown = "holds"` covers only a topic never said). lamp-seen now runs under the keeper (above); the skills change (`unknown = "holds_stale"`) is still owed before a skill reads it | before a skill reads it |
 | Skills | They read the labels with the existing `[[while]]` on a topic's field (for example `topic = "humans/doing"`, `field = "drank_s_ago"`); no new skill key | after the `humans/doing` row above |
-| A product unit and a package | Its unit, `lamp/health`'s expected parts, the units list | before the switch goes on |
+| `lamp/health`'s expected parts | `--expect seen` in `lamp-health.service` once the switch is on in the product (off, it says nothing) | with the switch |
 
 V1 faults not ported: activity's per-face mode sent double events (one
 burst here, for the one remembered face), its heartbeat waited with no

@@ -9,6 +9,10 @@
 //! the pose model and `humans/posture` is said while someone sits (phase 3).
 //! Off unless `LAMP_SEEN_ACTIVITY=on`: off, it idles until stopped and
 //! touches nothing (no bus, no file, no socket).
+//!
+//! `lamp-seen frame-link`, run by the product unit before `serve`, keeps
+//! the frame link's two boots for the eyes and this part
+//! ([`lamp_seen::link`]): made once with the switch on, removed with it off.
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_camera::frames::{FrameClient, Role};
 use lamp_msgs::{
@@ -21,7 +25,7 @@ use lamp_seen::{
     burst::{Outcome, Pace},
     endpoint::Endpoint,
     frames::{self, Sink, Taker},
-    gate,
+    gate, link,
     mark::{BusRing, Marked},
     opt_in,
     opt_in::Reader as _,
@@ -43,7 +47,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32 [--account ABSOLUTE_PATH --key ABSOLUTE_PATH [--public-key-file ABSOLUTE_PATH]]] [--run-for-ms N]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, humans/familiar, expression/state,\nmemory/forgot, room/activity, room/stood_up) and the owner's opt-in (seen-activity.json in\n--opt-in-folder, default /var/lib/lampOS/consent, read again every 2 s and never written),\nsays on diagnostics whether a frame may be asked for, and says the sitting's timers on humans/doing every 30 s\nwhile one remembered face sits at the desk. With --frames-socket it is the camera frame\nlink's perception consumer: a frame asked for only while the gate is open and once the ring\nsaid it drew its mark (light/mark, light/mark_drawn). With --account (setup's\nbackend.json) and --key (the account key) too, one burst of 8 frames a minute goes to the\nperception service's activity socket, encrypted, on a socket closed after each burst, and\nwhat was seen goes on humans/doing and humans/doing_seen (#6543 phase 2); without them each\ncopy is dropped at once. No frame is asked for before the on line for the kept yes has\nbegun. The opt-in is said back once each way, on and off (a forget included; an on line not\nbegun is withdrawn), through the voice's say service\n(--say-socket, LAMP_SAY_SOCKET or /run/lampos-say/say.sock), and what was said back is\nkept in --state-folder (default /var/lib/lampos-seen). memory/forgot turns the opt-in off\nuntil the voice removes the kept yes or a later yes is given. With LAMP_SEEN_POSTURE=on and the account too, one frame every 30 s goes,\nencrypted, to the pose model on a socket closed after it, and humans/posture is said every\n30 s while someone sits (#6543 phase 3).";
+const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32 | --frame-link-file ABSOLUTE_PATH] [--account ABSOLUTE_PATH --key ABSOLUTE_PATH [--public-key-file ABSOLUTE_PATH]] [--run-for-ms N]\n       lamp-seen frame-link [--file ABSOLUTE_PATH] [--socket ABSOLUTE_PATH]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, humans/familiar, expression/state,\nmemory/forgot, room/activity, room/stood_up) and the owner's opt-in (seen-activity.json in\n--opt-in-folder, default /var/lib/lampOS/consent, read again every 2 s and never written),\nsays on diagnostics whether a frame may be asked for, and says the sitting's timers on humans/doing every 30 s\nwhile one remembered face sits at the desk. With --frames-socket it is the camera frame\nlink's perception consumer (or, with --frame-link-file, the link and boots that file keeps):\na frame asked for only while the gate is open and once the ring\nsaid it drew its mark (light/mark, light/mark_drawn). With --account (setup's\nbackend.json) and --key (the account key) too, one burst of 8 frames a minute goes to the\nperception service's activity socket, encrypted, on a socket closed after each burst, and\nwhat was seen goes on humans/doing and humans/doing_seen (#6543 phase 2); without them each\ncopy is dropped at once. No frame is asked for before the on line for the kept yes has\nbegun. The opt-in is said back once each way, on and off (a forget included; an on line not\nbegun is withdrawn), through the voice's say service\n(--say-socket, LAMP_SAY_SOCKET or /run/lampos-say/say.sock), and what was said back is\nkept in --state-folder (default /var/lib/lampos-seen). memory/forgot turns the opt-in off\nuntil the voice removes the kept yes or a later yes is given. With LAMP_SEEN_POSTURE=on and the account too, one frame every 30 s goes, encrypted,\nto the pose model on a socket closed after it, and humans/posture is said every 30 s while\nsomeone sits (#6543 phase 3).\n\nframe-link: with LAMP_SEEN_ACTIVITY=on, keeps in --file (/run/lampos-seen/frame-link.env)\ntwo new boots from /dev/urandom, made once, as LAMP_EYES_FRAME_LINK=--frame-link SOCKET\n--frame-link-controller HEX32 --frame-link-reader HEX32 and LAMP_EYES_VISITS=--visits on\n(the stranger check's humans/familiar) for lamp-eyes.service, the socket\n--socket (/run/lampos-eyes-frames/camera.frames); off, removes the file.";
 
 /// One step of the loop.
 const TICK: Duration = Duration::from_millis(100);
@@ -58,6 +62,9 @@ struct Config {
     state_folder: PathBuf,
     say_socket: PathBuf,
     frames: Option<(PathBuf, BootId, BootId)>,
+    /// The frame link's file ([`link::FILE`]), read at start for the
+    /// socket and the boots instead of `frames`.
+    frame_link_file: Option<PathBuf>,
     /// Setup's `backend.json`, the account key, and the server's public
     /// key if given ahead.
     account: Option<(PathBuf, PathBuf, Option<PathBuf>)>,
@@ -77,12 +84,31 @@ fn boot(value: Option<String>, flag: &str) -> Result<BootId, String> {
     if value.len() != 32 || !value.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(format!("{flag} needs 32 hex digits"));
     }
-    let mut bytes = [0u8; 16];
-    for (index, byte) in bytes.iter_mut().enumerate() {
-        *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
-            .map_err(|_| format!("{flag} needs 32 hex digits"))?;
+    link::parse_boot(&value).ok_or(format!("{flag} is not a boot"))
+}
+
+/// `lamp-seen frame-link`'s file and socket.
+#[derive(Debug, PartialEq, Eq)]
+struct FrameLink {
+    file: PathBuf,
+    socket: PathBuf,
+}
+
+fn parse_frame_link(mut args: impl Iterator<Item = String>) -> Result<FrameLink, String> {
+    let mut file = PathBuf::from(link::FILE);
+    let mut socket = PathBuf::from(link::SOCKET);
+    let mut seen = std::collections::BTreeSet::new();
+    while let Some(flag) = args.next() {
+        if !seen.insert(flag.clone()) {
+            return Err(format!("{flag} given twice"));
+        }
+        match flag.as_str() {
+            "--file" => file = absolute(args.next(), &flag)?,
+            "--socket" => socket = absolute(args.next(), &flag)?,
+            _ => return Err(USAGE.into()),
+        }
     }
-    BootId::new(bytes).map_err(|_| format!("{flag} is not a boot"))
+    Ok(FrameLink { file, socket })
 }
 
 fn parse(mut args: impl Iterator<Item = String>) -> Result<Config, String> {
@@ -92,6 +118,7 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Config, String> {
     let mut bus_root = PathBuf::from(lamp_bus::DEFAULT_ROOT);
     let mut opt_in_folder = PathBuf::from(lamp_msgs::consent::FOLDER);
     let mut state_folder = PathBuf::from(opt_in::STATE_FOLDER);
+    let mut frame_link_file = None;
     let mut say_socket = std::env::var_os("LAMP_SAY_SOCKET")
         .map_or_else(|| PathBuf::from(SayService::DEFAULT_SOCKET), PathBuf::from);
     let (mut socket, mut own, mut controller, mut run_for) = (None, None, None, None);
@@ -105,6 +132,7 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Config, String> {
             "--bus-root" => bus_root = absolute(args.next(), &flag)?,
             "--opt-in-folder" => opt_in_folder = absolute(args.next(), &flag)?,
             "--state-folder" => state_folder = absolute(args.next(), &flag)?,
+            "--frame-link-file" => frame_link_file = Some(absolute(args.next(), &flag)?),
             "--say-socket" => say_socket = absolute(args.next(), &flag)?,
             "--frames-socket" => socket = Some(absolute(args.next(), &flag)?),
             "--own-boot" => own = Some(boot(args.next(), &flag)?),
@@ -128,10 +156,15 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Config, String> {
         (Some(socket), Some(own), Some(controller)) => Some((socket, own, controller)),
         _ => return Err("--frames-socket needs --own-boot and --controller-boot".into()),
     };
+    if frames.is_some() && frame_link_file.is_some() {
+        return Err("--frames-socket and --frame-link-file are two ways to one link".into());
+    }
     let account = match (account, key, public_key) {
         (None, None, None) => None,
-        (Some(_), Some(_), _) if frames.is_none() => {
-            return Err("--account needs --frames-socket: nothing to send".into());
+        (Some(_), Some(_), _) if frames.is_none() && frame_link_file.is_none() => {
+            return Err(
+                "--account needs --frames-socket or --frame-link-file: nothing to send".into(),
+            );
         }
         (Some(account), Some(key), public_key) => Some((account, key, public_key)),
         _ => return Err("--account and --key go together".into()),
@@ -142,6 +175,7 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Config, String> {
         state_folder,
         say_socket,
         frames,
+        frame_link_file,
         account,
         run_for,
     })
@@ -429,8 +463,27 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     } else {
         frames::EVERY_US
     };
+    // The product's link: the socket and boots `lamp-seen frame-link` kept
+    // for the eyes and this part.
+    let from_file = match config.frame_link_file.as_deref().map(link::read) {
+        None => None,
+        Some(Ok(Some(link))) => {
+            eprintln!("lamp-seen: the frame link is {}", link.socket.display());
+            Some((link.socket, link.reader, link.controller))
+        }
+        Some(Ok(None)) => {
+            eprintln!("lamp-seen: no frame link kept: no frame is asked for");
+            None
+        }
+        Some(Err(error)) => {
+            eprintln!(
+                "lamp-seen: the frame link could not be read ({error}): no frame is asked for"
+            );
+            None
+        }
+    };
     // No frame without the ring's mark: no mark asked for, no frames.
-    let mut frames: Option<Frames> = match config.frames.as_ref() {
+    let mut frames: Option<Frames> = match config.frames.clone().or(from_file).as_ref() {
         None => None,
         Some((socket, own, controller)) => Some((
             Taker::with_every(
@@ -578,8 +631,29 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     Ok(())
 }
 
+/// `lamp-seen frame-link`: the link kept with the switch on, removed off.
+fn frame_link(args: impl Iterator<Item = String>) -> Result<(), Box<dyn std::error::Error>> {
+    let FrameLink { file, socket } = parse_frame_link(args)?;
+    let on = switched_on(std::env::var(ENVIRONMENT).ok().as_deref());
+    match link::prepare(&file, &socket, on, link::new_boot)? {
+        link::Prepared::Kept(_) => {
+            eprintln!("lamp-seen: the frame link kept in {}", file.display())
+        }
+        link::Prepared::Made(_) => {
+            eprintln!("lamp-seen: a new frame link kept in {}", file.display())
+        }
+        link::Prepared::Off => {}
+    }
+    Ok(())
+}
+
 fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let config = parse(std::env::args().skip(1))?;
+    let mut args = std::env::args().skip(1).peekable();
+    if args.peek().map(String::as_str) == Some("frame-link") {
+        args.next();
+        return frame_link(args);
+    }
+    let config = parse(args)?;
     let stop = Arc::new(AtomicBool::new(false));
     signal_hook::flag::register(signal_hook::consts::SIGTERM, stop.clone())?;
     signal_hook::flag::register(signal_hook::consts::SIGINT, stop.clone())?;
@@ -630,6 +704,7 @@ mod tests {
         assert!(config.frames.is_none());
         let config = parse(args("serve --state-folder /tmp/seen-state")).unwrap();
         assert_eq!(config.state_folder, PathBuf::from("/tmp/seen-state"));
+        assert!(config.frame_link_file.is_none());
         let config = parse(args("serve --say-socket /run/x/say.sock")).unwrap();
         assert_eq!(config.say_socket, PathBuf::from("/run/x/say.sock"));
         let hex = "0123456789abcdef0123456789abcdef";
@@ -652,8 +727,25 @@ mod tests {
                 None
             ))
         );
+        // The product's line: the link from its file, the account's two
+        // files by path, never their contents.
+        let config = parse(args(
+            "serve --bus-root /run/lampos-bus --say-socket /run/lampos-say/say.sock --opt-in-folder /var/lib/lampOS/consent --state-folder /var/lib/lampos-seen --frame-link-file /run/lampos-seen/frame-link.env --account /run/credentials/lamp-seen.service/account --key /run/credentials/lamp-seen.service/key",
+        ))
+        .unwrap();
+        assert_eq!(
+            config.frame_link_file,
+            Some(PathBuf::from("/run/lampos-seen/frame-link.env"))
+        );
+        assert_eq!(config.state_folder, PathBuf::from("/var/lib/lampos-seen"));
+        assert!(config.frames.is_none());
+        assert!(config.account.is_some());
         for bad in [
             "serve --account /a --key /k".to_owned(),
+            format!(
+                "serve --frames-socket /x --own-boot {hex} --controller-boot {hex} --frame-link-file /f"
+            ),
+            "serve --frame-link-file relative".to_owned(),
             format!(
                 "serve --frames-socket /x --own-boot {hex} --controller-boot {hex} --account /a"
             ),
@@ -689,5 +781,31 @@ mod tests {
             .is_err(),
             "a zero boot"
         );
+    }
+
+    #[test]
+    fn the_frame_link_command_line() {
+        assert_eq!(
+            parse_frame_link(args("")).unwrap(),
+            FrameLink {
+                file: PathBuf::from("/run/lampos-seen/frame-link.env"),
+                socket: PathBuf::from("/run/lampos-eyes-frames/camera.frames"),
+            }
+        );
+        assert_eq!(
+            parse_frame_link(args("--file /a/f.env --socket /b/s.frames")).unwrap(),
+            FrameLink {
+                file: PathBuf::from("/a/f.env"),
+                socket: PathBuf::from("/b/s.frames"),
+            }
+        );
+        for bad in [
+            "--file relative",
+            "--file /a --file /b",
+            "--other",
+            "--socket",
+        ] {
+            assert!(parse_frame_link(args(bad)).is_err(), "{bad}");
+        }
     }
 }

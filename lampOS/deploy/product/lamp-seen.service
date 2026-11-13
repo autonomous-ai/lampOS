@@ -1,0 +1,79 @@
+# lampOS seen: what the lamp sees for its skills, eating, drinking, a break and posture, from the cloud
+# perception service on the owner's opt-in (lampOS/docs/seen.md, #6543). The product unit
+# (lampOS/docs/install.md): installed and enabled on every lamp, under the keeper (in lampos.target,
+# restarted on a crash and by an update), and off unless a drop-in sets
+#   [Service]
+#   Environment=LAMP_SEEN_ACTIVITY=on
+# Off, `serve` idles and touches nothing (no bus, no file, no socket), and `frame-link` removes the
+# frame link's file, so the eyes serve no link and keep no visits: the product is unchanged.
+[Unit]
+Description=lampOS seen (lamp-seen)
+PartOf=lampos.target
+# Not before setup has finished (#806). The target's own condition holds back none of its parts.
+ConditionPathExists=/var/lib/lampos-setup/done
+# After the voice (its say socket says the opt-in back), and before the eyes, so the frame link's
+# file below is there when the eyes start and read it.
+After=local-fs.target network-online.target lamp-voice.service
+Before=lamp-eyes.service
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+# As the eyes' user: the eyes take a frame link reader only in a folder of their own user's with no
+# group or other access (/run/lampos-eyes-frames, made by lampos.conf). lampos is also the bus's group
+# and the say socket's (the voice's LAMP_SAY_GROUP=lampos), so no other group is needed.
+User=lampos
+Group=lampos
+Slice=lampos-parts.slice
+# Looking is never worth a late word.
+Nice=10
+# Root's files, handed in by systemd and read inside the process by path, never on the command line:
+# setup's account (llm_base_url, the perception service's base) and the voice's key, as lamp-cloud
+# reads them. A lamp without them starts all the same (one newline each: no base, nothing sent).
+SetCredential=account:\n
+SetCredential=key:\n
+LoadCredential=account:/etc/lampOS/setup/backend.json
+LoadCredential=key:/etc/lampOS/voice/credential
+# The frame link's two boots, made once from /dev/urandom with the switch on and kept until the lamp
+# restarts, for this part and the eyes (lamp-eyes.service reads the same file); removed with it off.
+ExecStartPre=/opt/lampOS/seen/current/lamp-seen frame-link --file /run/lampos-seen/frame-link.env --socket /run/lampos-eyes-frames/camera.frames
+# The owner's yes, /var/lib/lampOS/consent/seen-activity.json, only read here, as a member of lampos
+# (the folder is root:lampos 0750, the file 0640 root:lampos, written by the voice and the app's root
+# path; any forget removes it). lamp-seen never writes the consent folder: under ProtectSystem=strict
+# it can't. Its "said once" record goes in its own state folder below.
+# The said-once record, said-back.json, goes in --state-folder, passed as this unit's StateDirectory=.
+ExecStart=/opt/lampOS/seen/current/lamp-seen serve --bus-root /run/lampos-bus --say-socket /run/lampos-say/say.sock --opt-in-folder /var/lib/lampOS/consent --state-folder /var/lib/lampos-seen --frame-link-file /run/lampos-seen/frame-link.env --account %d/account --key %d/key
+Restart=on-failure
+RestartSec=5s
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=lamp-seen
+NoNewPrivileges=yes
+# Its own state, private and writable (the said-back record), and the frame link's
+# file, kept across its own stop and restart so the eyes and it keep one pair of boots.
+StateDirectory=lampos-seen
+StateDirectoryMode=0700
+RuntimeDirectory=lampos-seen
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+ProtectSystem=strict
+# The bus; nothing else is written, the consent folder least of all. The say and frame link sockets
+# are only connected to.
+ReadWritePaths=/run/lampos-bus
+# What the eyes keep as the same user (frames, faces, the known name, photos) and lamp-control's
+# owner's yes are not this part's: lamp-eyes and lamp-seen both run as lampos, so without this
+# lamp-seen could read the faces. The faces' folder is written as %S/lampos-eyes (%S is /var/lib
+# for a system unit) so no file names it whole (the voice's
+# nothing_but_the_reset_names_the_print).
+InaccessiblePaths=-/run/lampos-eyes -%S/lampos-eyes -/run/lampos-eyes-kept -/run/lampos-photos -/var/lib/lampos-control
+ProtectHome=yes
+PrivateTmp=yes
+# No device: /dev/urandom, for the boots, is among the few PrivateDevices= keeps.
+PrivateDevices=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=lampos.target
