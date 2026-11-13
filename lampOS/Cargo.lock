@@ -2596,6 +2596,7 @@ dependencies = [
  "lamp-msgs",
  "lamp-schedule",
  "lamp-services",
+ "lamp-tasks",
  "lamp-update",
  "lamp-voice",
  "libc",
