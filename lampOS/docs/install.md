@@ -2020,18 +2020,20 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      if [ -n "${LAMP_NS_HOME-}" ]; then
        F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk
        [ -d "$LAMP_NS_HOME" ] && [ -n "$W" ] && [ "${F%/*}" = "$W/lamp" ] || fail "no $LAMP_NS_HOME"
-       mkdir -m 0700 "$X" "$X/f" "$X/c" "$X/t" || fail "no make staging"
+       mkdir -m 0700 "$X" "$X/f" "$X/c" "$X/t" "$X/i" || fail "no make staging"
        mount --bind "$F" "$X/f" || fail "no $F"
        mount --bind "$H/.hermes/hermes-agent" "$X/c" || fail "no Hermes checkout"
        mount --bind "$H/.hermes/tools" "$X/t" || fail "no Hermes tools"
+       mount --bind "$H/.hermes/installs" "$X/i" || fail "no Hermes installs"
        mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$H/.hermes" || fail "$H/.hermes not hidden"
        mkdir "$H/.hermes/hermes-agent" && mount --move "$X/c" "$H/.hermes/hermes-agent" && ro "$H/.hermes/hermes-agent" || fail "Hermes checkout not shown"
        mkdir "$H/.hermes/tools" && mount --move "$X/t" "$H/.hermes/tools" && ro "$H/.hermes/tools" || fail "Hermes tools not shown"
+       mkdir "$H/.hermes/installs" && mount --move "$X/i" "$H/.hermes/installs" && ro "$H/.hermes/installs" || fail "Hermes installs not shown"
        ro "$H/.hermes"; ro "$H"; ro "$W"
        mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$W/lamp" || fail "$W/lamp not hidden"
        mkdir "$F" && mount --move "$X/f" "$F" || fail "$F not shown"
        ro "$W/lamp"
-       rmdir "$X/f" "$X/c" "$X/t" "$X" || fail "make staging left"
+       rmdir "$X/f" "$X/c" "$X/t" "$X/i" "$X" || fail "make staging left"
        cd "$F" || fail "$F not visible"
        HOME=$LAMP_NS_HOME
      fi
@@ -2041,8 +2043,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      A make keeps the network by default, so Hermes's lasting home
      (`/var/lib/lampos-hermes/.hermes`: memories, sessions, `state.db`,
      `.env`) is hidden under an empty read-only tmpfs, with only the
-     checkout (`hermes-agent`, where the program runs from) shown again,
-     read-only; Hermes's folder and the work folder are left read-only, and
+     checkout (`hermes-agent`, where the program runs from), `tools` (its
+     uv, Python and package manager) and `installs` (its dependency record,
+     `installs/<key>/facts.json`, and environments) shown again,
+     read-only. A make's fresh `HERMES_HOME` holds links named `installs`
+     and `tools` to those two (lamp-tasks' `skill_make::RUNTIME_LINKS`):
+     Hermes 0.22.2 keeps dependency state per data root
+     (`<HERMES_HOME>/installs/<key>`, `pm/environments.py`) and, finding
+     none, syncs its own first ("preparing dependencies for this data
+     root"), which ended a make `run_failed` in under a second on lamp-c0a4
+     (#6643). Links, not binds: Hermes takes a recorded environment only
+     under `<HERMES_HOME>/installs/<key>/environments` once resolved, and
+     a link resolves to the lasting path its record names. Hermes's folder
+     and the work folder are left read-only, and
      the rest of the work folder's `lamp` (the Harness project, other runs'
      folders) is hidden under another tmpfs, with the make's own folder
      alone moved back, read-write. Each step failing ends it before Hermes
@@ -2052,8 +2065,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      on Linux where a user namespace is allowed, run for real: a `cat` of
      the lasting `memories` finds nothing, the lasting home shows only the
      checkout, `lamp` only the make's folder, and only that folder can be
-     written. What only a lamp shows: Hermes running from the checkout with
-     the lasting home hidden.
+     written, and `installs` is shown read-only. What only a lamp shows:
+     Hermes running from the checkout with the lasting home hidden, on the
+     prepared runtime through the links, with no dependency sync.
    - **User namespaces checked first:** before anything is made, `lampos`
      must be able to make that namespace: `runuser -u lampos --
      /usr/bin/unshare --map-root-user --mount --pid --kill-child

@@ -3177,14 +3177,28 @@ as a Harness task with the agent's own tools
   never a key, and lamp-update's four Hermes settings, `MAKE_CONFIG`, a
   test holding them equal to `hermes_install::CONFIG`: no update checks,
   no language servers, a `chat -q` run that ends with its turn), and
-  nothing of Hermes's memory, sessions or state. The run
+  nothing of Hermes's memory, sessions or state; beside it, two links to
+  Hermes's prepared runtime in its lasting home, `home/.hermes/installs`
+  (its dependency record and environments, `installs/<key>/facts.json`)
+  and `home/.hermes/tools` (its uv, Python and package manager), so a make
+  never prepares an environment of its own. Hermes 0.22.2 keeps
+  dependency state per data root (`pm/environments.py`,
+  `<HERMES_HOME>/installs/<key>`): with none in a fresh `HERMES_HOME` it
+  syncs one first ("preparing dependencies for this data root"), which a
+  make's run could not finish and ended `run_failed` in under a second on
+  lamp-c0a4 (#6643). Links, not bind mounts: Hermes accepts a recorded
+  environment only under `<HERMES_HOME>/installs/<key>/environments` once
+  resolved, and a link resolves to the lasting path the record names. The
+  run
   gets `HOME`, `HERMES_HOME` (`home/.hermes`) and `LAMP_NS_HOME` set to it.
   lamp-update's wrapper takes `LAMP_NS_HOME` only for a path matching
   `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home` with no
   `..` (`WRAPPER_HOME_LINE`), and its namespace script then sets `HOME` to
   it, hides Hermes's lasting home (`/var/lib/lampos-hermes/.hermes`:
   memories, sessions, state) under an empty read-only tmpfs with only its
-  checkout and `tools` (the Python Hermes runs on) shown again, read-only, leaves Hermes's folder and the work
+  checkout, `tools` (the Python Hermes runs on) and `installs` (its
+  dependency record) shown again, read-only, so the links resolve and
+  nothing in them can be changed, leaves Hermes's folder and the work
   folder read-only, and hides the rest of the work folder's `lamp` under
   another tmpfs, the make's own folder alone moved back, read-write
   (`NS_HOME_LINE`; docs/install.md). The home goes with the make's folder
