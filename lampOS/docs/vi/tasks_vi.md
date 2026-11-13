@@ -980,6 +980,19 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   làm việc hay runner của lần tạo thì lần chạy bị từ chối `run_failed`
   (`NO_FRESH_HOME`) trước khi có token. Lần chạy script không có `net` giữ
   nguyên.
+- **Lần chạy của kỹ năng agent được cấp một dịch vụ đã liên kết**
+  (`gmail-read`, `skill_task::is_service_grant`; phán quyết của chủ, 13/11:
+  mọi thứ chạm tới các kết nối đều đi qua agent của đèn từ đầu đến cuối) có
+  các kết nối của đèn trong config của home mới, khi `LAMP_AGENT_SERVICES=on`
+  trong lamp-tasks (`Agent::services`, `skill_make::fresh_home_for`):
+  `mcp_servers.lamp-services`, đúng mục lamp-tasks ghi trong config lâu dài
+  của Hermes (`hermes_config::mcp_entry`), socket và token do Hermes điền từ
+  môi trường của lần chạy, không bao giờ được ghi ra. Vì vậy agent chỉ tới
+  dịch vụ qua lamp-control với token riêng của lần chạy và các quyền của nó,
+  mỗi lần gửi chỉ sau lời đồng ý bằng giọng nói của chủ. Lời giao việc nêu
+  các dịch vụ được dùng và nói chúng đi qua các công cụ đó, không cần khóa.
+  Tắt, hoặc không được cấp dịch vụ nào: config không có mục này, như của
+  một lần tạo.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 

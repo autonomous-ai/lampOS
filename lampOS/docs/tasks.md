@@ -3392,11 +3392,26 @@ one runner (a fresh home per run, the token as a file) with no new rules:
   (told `NO_RUN_NAMESPACE`, an agent run's own home); with no work folder or make runner the run is refused
   `run_failed` (`NO_FRESH_HOME`) before a token. A script's run without
   `net` is unchanged.
+- **An agent skill's run granted a linked service** (`gmail-read`,
+  `skill_task::is_service_grant`; the owner's ruling, 13 Nov: anything
+  that touches the connectors goes to the lamp's agent end to end) has
+  the lamp's connectors in its fresh home's config, with
+  `LAMP_AGENT_SERVICES=on` in lamp-tasks (`Agent::services`,
+  `skill_make::fresh_home_for`): `mcp_servers.lamp-services`, the same
+  entry lamp-tasks writes in Hermes's lasting config
+  (`hermes_config::mcp_entry`), its socket and token Hermes's to fill in
+  from the run's own environment, never written. So the agent reaches the
+  service only through lamp-control under the run's one-run token and its
+  grants, held off the network or not, each send only on the owner's
+  spoken yes. Its words name the services it may use and say they are
+  reached through those tools, with no key. Off, or with no service
+  granted, its config has none, as a make's.
 
 Tests: `skill_task::tests::the_net_grant_keeps_the_network_and_no_grant_holds_it`,
 `a_net_run_has_a_fresh_home_of_its_own_never_the_lasting_one`,
 `a_fresh_home_is_taken_with_the_lasting_home_covered`,
-`an_agent_run_follows_its_file_in_a_fresh_home_with_no_key`.
+`an_agent_run_follows_its_file_in_a_fresh_home_with_no_key`,
+`an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 
 ## Devin (#1854)
 

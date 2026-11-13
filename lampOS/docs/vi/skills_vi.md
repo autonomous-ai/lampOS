@@ -2183,6 +2183,20 @@ hỏi bằng giọng nói hay giữ trong thư mục kỹ năng: tệp chứa gi
 khóa hay token bị từ chối, kể cả khi nó nằm trong đường dẫn của một liên kết
 (mỗi phần giữa các `/` sau scheme và host, và mỗi phần quanh `:`, như khóa
 của webhook hay bot); đưa bí mật qua app là việc tiếp theo.
+Một dịch vụ đã liên kết mà tệp dùng được cấp quyền của dịch vụ đó (phán quyết
+của chủ, 13/11: mọi thứ chạm tới các kết nối đều đi qua agent của đèn từ đầu
+đến cuối), như `do.task` của một kỹ năng dịch vụ tạo bằng giọng nói, khi
+`LAMP_AGENT_SERVICES=on` (`upload_agent::services_read`): `<code>-read` cho mỗi
+dịch vụ tệp nêu tên (Gmail, hay mail, email, inbox; lịch; Google Drive;
+monday.com; GitHub, Figma, Asana, Ahrefs, Facebook, HubSpot; Slack, Notion,
+Linear và Amplitude chỉ khi viết hoa, vì đó cũng là từ thường), và
+`<code>-write` cho dịch vụ mà một câu bảo gửi, trả lời, soạn, thêm, tạo, lên
+lịch, đăng hay lưu vào (câu không nêu dịch vụ nào thì ghi vào dịch vụ được
+nêu gần nhất). Đèn nói lại bằng lời thường ("reads your Gmail"), và quyền dịch
+vụ luôn hỏi lời đồng ý ở lần chạy đầu. Home mới của lần chạy khi đó có các
+kết nối của đèn (`lamp-services mcp`, `skill_make::fresh_home_for`), nên agent
+chỉ tới dịch vụ qua lamp-control với token riêng của lần chạy, không bao giờ
+bằng khóa của tệp. Tắt: tệp nêu một dịch vụ bị từ chối.
 `lamp_voice::upload_agent`; xem bản tiếng Anh, "Run by the lamp's agent".
 
 ## Trigger theo ngày trong tuần (`trigger.days`, #6066)
