@@ -42,7 +42,7 @@ fn lamp_name(dir: &Path) -> String {
     format!("virtual-{:06x}", hash & 0xff_ffff)
 }
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] [--real-voice[=second] (the real lamp-voice: the Live route with your Gemini key, or =second its second route with your DeepSeek, Deepgram and ElevenLabs/OpenAI keys; needs --microphone)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim speech DIR [--listen 127.0.0.1:PORT] (a local OpenAI-compatible /audio/speech in the host's voice, pcm only, for the real voice's second route; its token in DIR/speech.token) | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] [--real-voice[=second] (the real lamp-voice: the Live route with your Gemini key, or =second its second route with your DeepSeek, Deepgram and ElevenLabs/OpenAI keys; needs --microphone)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim speech DIR [--listen 127.0.0.1:PORT] [--engine resident|say] [--language en-US] (a local OpenAI-compatible /audio/speech in the host's voice, pcm only, for the real voice's second route; its token in DIR/speech.token; on macOS the resident synthesizer unless --engine say) | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -134,11 +134,38 @@ fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
             let _ = std::fs::remove_file(entry.path());
         }
     }
+    // macOS: the resident synthesizer (apple_speech.rs) unless `--engine say`;
+    // it owns the main thread, so the HTTP side runs on another. Elsewhere, say.
+    let engine = option(args, "--engine").unwrap_or_else(|| "resident".to_owned());
+    if engine != "resident" && engine != "say" {
+        return Err(std::io::Error::other(format!(
+            "--engine {engine}: resident or say"
+        )));
+    }
     eprintln!(
-        "lamp-sim speech: on http://{} (POST /audio/speech, pcm), token in {}",
+        "lamp-sim speech: on http://{} (POST /audio/speech, pcm), token in {}, engine {}",
         listener.local_addr()?,
-        file.display()
+        file.display(),
+        if cfg!(target_os = "macos") {
+            engine.as_str()
+        } else {
+            "say"
+        }
     );
+    #[cfg(target_os = "macos")]
+    if engine == "resident" {
+        let language = option(args, "--language").unwrap_or_else(|| "en-US".to_owned());
+        let (resident, lines) = lamp_sim::apple_speech::resident();
+        let server = std::thread::Builder::new()
+            .name("speech-http".to_owned())
+            .spawn(move || {
+                lamp_sim::speech::serve(listener, token, std::sync::Arc::new(resident))
+            })?;
+        lamp_sim::apple_speech::serve_on_main_thread(lines, &language);
+        return server
+            .join()
+            .unwrap_or_else(|_| Err(std::io::Error::other("the speech service ended")));
+    }
     lamp_sim::speech::serve(
         listener,
         token,

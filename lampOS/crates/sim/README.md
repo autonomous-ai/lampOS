@@ -122,7 +122,7 @@ The file must be a regular file you own, mode 0600 (or 0400), and not a symbolic
 ## A local speech service (`lamp-sim speech`)
 
 ```sh
-lamp-sim speech ~/.lampsim/b [--listen 127.0.0.1:7732]   # the token is written to ~/.lampsim/b/speech.token (0600)
+lamp-sim speech ~/.lampsim/b [--listen 127.0.0.1:7732] [--engine resident|say] [--language en-US]   # the token is written to ~/.lampsim/b/speech.token (0600)
 ```
 
 A text-to-speech service in the host's own voice for the real voice's SECOND
@@ -135,15 +135,27 @@ token, at most 4 lines at once (more are answered 503), a line at most 4,096
 characters. Each line says on stderr its characters, when its first bytes went
 and how much sound it made.
 
-The engine is macOS's `say`, one process a line, rendered whole before the
-first byte; each `say` is started before its line comes (it waits on its
+On macOS the engine is the **resident synthesizer** (`apple_speech.rs`, step
+1b): Apple's `AVSpeechSynthesizer`, kept for the service's life and holding
+the main thread (its callbacks come only with the main run loop running; the
+HTTP side runs on another thread), writing each line to buffers made into
+24 kHz S16LE as they come (from its 22,050 Hz, linear). Measured on macOS 26
+(arm64) through this service, 5 requests each a second apart, medians, first
+bytes after 19 ms for "Hi there.", 13 ms for 8 words and 18 ms for 20 (the
+whole line after 29, 32 and 61 ms); the first line after start about 290 ms;
+whisper.cpp (`base.en`) wrote back a 15-word line's output word for word. It is
+the only `unsafe` in lamp-sim: one module, `#[allow(unsafe_code)]` on it alone,
+a SAFETY note on each call (the first builder's conditions, #6811 21:28); its
+`objc2` packages are macOS-only dependencies (MIT, or Zlib/Apache/MIT).
+
+`--engine say` (and any system other than macOS) uses macOS's `say` instead,
+one process a line, rendered whole before the first byte; each `say` is started before its line comes (it waits on its
 stdin), so a line pays only its rendering, not the ~0.4 s start. Measured on
 macOS 26 (arm64) through this service, 5 requests each a second apart,
 medians, first bytes after 371 ms for "Hi there.", 517 ms for 8 words and
 828 ms for 20 (715, 887 and 1,298 ms with a `say` started with the line); a
 second line at the same moment starts its own and takes about 0.9 s. A killed
-run's leftover files are cleared at the next start. Off macOS there is no engine yet: a request is answered 503 with the reason (`say` is not found). A
-resident synthesizer that streams as it speaks is the next step.
+run's leftover files are cleared at the next start. Off macOS there is no engine yet: a request is answered 503 with the reason (`say` is not found).
 
 The real lamp-voice cannot use it yet: its service URLs must be https and it
 trusts only its built-in roots. A loopback switch for it is ten's step 3, and

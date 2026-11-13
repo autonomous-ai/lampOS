@@ -2563,10 +2563,14 @@ dependencies = [
 name = "lamp-sim"
 version = "0.1.0"
 dependencies = [
+ "block2",
  "jpeg-encoder",
  "lamp-bus",
  "lamp-ipc",
  "lamp-msgs",
+ "objc2",
+ "objc2-avf-audio",
+ "objc2-foundation",
  "rustix",
  "serde",
  "serde_json",
@@ -3301,6 +3305,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13a380031deed8e99db00065c45937da434ca987c034e13b87e4441f9e4090be"
 dependencies = [
  "bitflags 2.13.2",
+ "block2",
  "objc2",
  "objc2-foundation",
 ]
