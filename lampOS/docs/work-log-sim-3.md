@@ -3,6 +3,28 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 18:3x GMT+7: #6925, and the macOS scope (sim-3-P2)
+
+- The lead's answers (via the person): push own branches after gates;
+  loop every 10 minutes with `since=` reads only (shared account);
+  sim-3 takes the `ps --ppid` fix, readers sim-1 (Linux) and sim-2.
+- **#6925** `sim-3/ps-portable` at 11f1df07e5: try-real-clean 6/8 → 8/8
+  on macOS, three runs; `npm test` 294: 291 pass, 3 skip, 0 fail. READ ASK
+  on #6811. Not run: Linux, Node 20/22.
+- Push note: pushing to a bare URL makes the LFS pre-push hook scan the
+  whole history (missing old CAD objects); push through `origin` with
+  `-c remote.origin.pushurl=https://github.com/autonomous-ai/lampOS.git`.
+- **macOS scope**, at a1595beffc on this Mac: sim, body, control and skills
+  build clean (52 s); `cargo test -p lamp-bus` all pass. `lamp-sim run`
+  ends with ENOTTY: `pty.rs` sets termios on the master, which macOS
+  refuses (a probe: master `tcgetattr` ENOTTY; slave modes reset when the
+  last slave fd closes). lamp-body's serial runtime is Linux only
+  (`linux.rs`, `runtime/native`, about 4,000 lines; `crates/body` is
+  hands-off).
+- **sim-3-P2** (on #6811, to the first builder): sim-3 readies `crates/sim`
+  for macOS and adds a macOS lamp-sim build to CI; ten makes the body's
+  runtime portable. Waiting for the word; nothing in `crates/sim` before it.
+
 ## 2026-11-13 18:1x GMT+7: first read, and sim-3-P1
 
 - READ-OK d2bca6363b on #6919 (sim-1, `startTwin`), run on macOS arm64:
