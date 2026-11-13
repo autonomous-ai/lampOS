@@ -2,10 +2,13 @@
 //! a release folder beside a fake keeper.
 use std::{
     env, fs,
+    io::ErrorKind,
     os::unix::fs::PermissionsExt,
     path::{Path, PathBuf},
     process::Command,
     sync::atomic::{AtomicUsize, Ordering},
+    thread,
+    time::Duration,
 };
 
 static NEXT: AtomicUsize = AtomicUsize::new(0);
@@ -33,15 +36,27 @@ impl Release {
         Self(base)
     }
     fn prepare(&self) -> (std::process::Output, u32) {
-        let child = Command::new(self.0.join("release/bin/service"))
-            .arg("prepare")
-            .current_dir(self.0.join("data"))
-            .env("AUTONOMOUS_SERVICE_NAME", "lamp-os")
-            .env("AUTONOMOUS_SERVICE_DATA", self.0.join("data"))
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .unwrap();
+        // A parallel test thread that forks between our write and our exec briefly
+        // holds a copy of the write fd, so exec fails with ETXTBSY until its child
+        // execs. Retry for up to ~1s; the window is microseconds, so this is ample.
+        let mut attempt = 0;
+        let child = loop {
+            let spawned = Command::new(self.0.join("release/bin/service"))
+                .arg("prepare")
+                .current_dir(self.0.join("data"))
+                .env("AUTONOMOUS_SERVICE_NAME", "lamp-os")
+                .env("AUTONOMOUS_SERVICE_DATA", self.0.join("data"))
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn();
+            match spawned {
+                Err(e) if e.kind() == ErrorKind::ExecutableFileBusy && attempt < 100 => {
+                    attempt += 1;
+                    thread::sleep(Duration::from_millis(10));
+                }
+                other => break other.unwrap(),
+            }
+        };
         let pid = child.id();
         (child.wait_with_output().unwrap(), pid)
     }
