@@ -3,18 +3,14 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { WebSocket } from 'ws';
+import { onFreePort } from './free-port.js';
 
 const server = fileURLToPath(new URL('../examples/twin/server.js', import.meta.url));
-const freePort = () => new Promise((resolve) => {
-  const probe = createServer();
-  probe.listen(0, '127.0.0.1', () => { const { port } = probe.address(); probe.close(() => resolve(port)); });
-});
 const until = async (ready) => { for (let i = 0; i < 100 && !ready(); i++) await new Promise((r) => setTimeout(r, 50)); };
 
 // The try-it server on the SDK's fake lamp with a stand-in lamp-sim, and a ring file the test writes.
@@ -26,12 +22,16 @@ async function started(t) {
   chmodSync(stub, 0o755);
   const glb = join(folder, 'lamp.glb');
   writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
-  const child = spawn(process.execPath, [server, '--fake', '--port', String(await freePort()), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub, '--ring-file', join(folder, 'ring.json')], { stdio: ['ignore', 'pipe', 'inherit'] });
-  t.after(() => child.kill('SIGTERM'));
-  const found = await new Promise((resolve, reject) => {
-    let text = '';
-    child.stdout.on('data', (chunk) => { text += chunk; const m = /http:\/\/localhost:(\d+)\/\?t=(\S+)/.exec(text); if (m) resolve({ port: m[1], token: m[2] }); });
-    child.on('close', (code) => reject(new Error(`the server ended (${code})`)));
+  const found = await onFreePort(async (port) => {
+    const child = spawn(process.execPath, [server, '--fake', '--port', String(port), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub, '--ring-file', join(folder, 'ring.json')], { stdio: ['ignore', 'pipe', 'pipe'] });
+    t.after(() => child.kill('SIGTERM'));
+    let errors = '';
+    child.stderr.on('data', (chunk) => { errors += chunk; process.stderr.write(chunk); });
+    return new Promise((resolve, reject) => {
+      let text = '';
+      child.stdout.on('data', (chunk) => { text += chunk; const m = /http:\/\/localhost:(\d+)\/\?t=(\S+)/.exec(text); if (m) resolve({ port: m[1], token: m[2] }); });
+      child.on('close', (code) => reject(new Error(`the server ended (${code}): ${errors}`)));
+    });
   });
   return { ...found, folder };
 }

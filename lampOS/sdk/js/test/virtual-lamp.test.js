@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { appCommands, parseArguments, pairingFrom, portFree, riggedCad, start } from '../examples/twin/virtual-lamp.js';
+import { freePort, onFreePort } from './free-port.js';
 
 const testing = new URL('../src/testing.js', import.meta.url).href;
 
@@ -33,7 +34,6 @@ const { join } = require('node:path');
 })();
 `;
 
-const freePort = () => new Promise((resolve) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
 const closed = (port) => new Promise((resolve) => { const probe = createServer(); probe.once('error', () => resolve(false)); probe.listen(port, '127.0.0.1', () => probe.close(() => resolve(true))); });
 
 test('the launcher reads its arguments and the pairing code it is given', () => {
@@ -63,11 +63,16 @@ test('one command: the lamp, the pairing and the twin on it, and all of it stops
   const stub = join(folder, 'lamp-sim');
   writeFileSync(stub, STUB);
   chmodSync(stub, 0o755);
-  const [port, twinPort] = [await freePort(), await freePort()];
+  let port;
+  let twinPort;
   // The twin wants the rigged CAD (an LFS file a clean clone does not have): any file that says it is a glTF will do for the page.
   const glb = join(folder, 'lamp.glb');
   writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
-  const running = await start({ 'lamp-sim': stub, dir: join(folder, 'lamp'), port: String(port), 'twin-port': String(twinPort), glb, flags: ['--no-open'] }, () => {});
+  // The two ports are probed free and closed before the launcher binds them: tried again on new ports if one was taken in between.
+  const running = await onFreePort((lampPort, pagePort) => {
+    [port, twinPort] = [lampPort, pagePort];
+    return start({ 'lamp-sim': stub, dir: join(folder, 'lamp'), port: String(port), 'twin-port': String(twinPort), glb, flags: ['--no-open'] }, () => {});
+  }, { ports: 2 });
   try {
     assert.match(running.url, new RegExp(`^http://localhost:${twinPort}/\\?t=`));
     const page = await fetch(running.url);
