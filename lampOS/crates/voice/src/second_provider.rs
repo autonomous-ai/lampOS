@@ -9044,6 +9044,8 @@ async fn spoken(
         }
         _ => text,
     };
+    // No words of the person's in it, however it is asked below.
+    let heard_none = text.trim().is_empty();
     // Only the lamp's name, and its words came back empty, as a lone name
     // often does: asked as the name the coordinator heard, or it would go
     // unanswered as a sound (#1712).
@@ -9066,6 +9068,18 @@ async fn spoken(
         }
         _ => called,
     };
+    // Nor while a write waits for the answer its read-back asked for: there
+    // the lamp's own move, or the room, set the call off as the person was
+    // to answer, and it is left as a sound (lamp-9adf, 13 Nov: a line of no
+    // words at the arrival move's second was answered as the name, and the
+    // one "Yes." after it found the mail dropped, #6363).
+    let held_call = called && heard_none && crate::services::awaits_an_answer();
+    if held_call {
+        eprintln!(
+            "lamp-voice second: request {request}: only the lamp's name, and no words of it came back, while a write waits for its answer: not answered as a call"
+        );
+    }
+    let called = called && !held_call;
     let text = if called && text.trim().is_empty() {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and no words of it came back: asked as the name"
@@ -9221,9 +9235,11 @@ async fn spoken(
         eprintln!("lamp-voice second: request {request}: no name came after it: answered as it is");
     }
     let empty = text.trim().is_empty();
-    // A line of no words: the lamp's answer to it is no answer of a new
-    // request's to a waiting write's read-back (`services::answered_in_place`).
-    if empty {
+    // A line of no words, even one asked as the name ("Lamp."): the lamp's
+    // answer to it is no answer of a new request's to a waiting write's
+    // read-back (`services::answered_in_place`). Not one said by the name
+    // just before, whose words go with it.
+    if empty || (heard_none && name_of.is_none()) {
         crate::services::answered_in_place(request);
     }
     // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it

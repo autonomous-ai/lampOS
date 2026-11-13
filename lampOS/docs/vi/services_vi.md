@@ -1639,9 +1639,18 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   lời như thế (`services::answered_in_place`, `Pending.in_place`, như lời
   đèn hỏi lại cũng không phải): trên đèn của một người thử ngày 11/11, một
   tiếng ồn 0 từ đã cắt câu trả lời của đèn cho câu đồng ý, được trả lời thay
-  cho nó, và câu đồng ý kế tiếp đã bỏ lần ghi. Một câu có lời riêng được trả
-  lời thay cho một câu bị giữ (một câu hỏi thật bị cắt ngang) vẫn tính là một
-  yêu cầu khác (P3 của Reviewer-lead trên #6367).
+  cho nó, và câu đồng ý kế tiếp đã bỏ lần ghi. Một câu không có từ nào được
+  nghe là một lời gọi và được hỏi như tên ("Lamp.") cũng vậy, trừ khi nó
+  được nói bởi cái tên ngay trước đó; và khi lần ghi đang chờ câu trả lời mà
+  phần đọc lại đã hỏi, lời gọi như thế không được trả lời mà để lại như một
+  âm thanh (`services::awaits_an_answer`, nhật ký "only the lamp's name, and
+  no words of it came back, while a write waits for its answer: not answered
+  as a call"): trên đèn của một người thử ngày 13/11, một câu không có từ
+  nào vào đúng giây của động tác chào khi có người đến của chính đèn đã được
+  trả lời như tên, và câu "Yes." duy nhất sau đó thấy thư đã bị bỏ (#6363).
+  Một câu có lời riêng được trả lời thay cho một câu bị giữ (một câu hỏi thật
+  bị cắt ngang) vẫn tính là một yêu cầu khác (P3 của Reviewer-lead trên
+  #6367).
 - **Tiếng vọng của chính đèn không phải câu của người nói** (#5846). Một câu
   mà tuyến thứ hai giữ lại là lời của chính đèn vọng lại (`own_echo`,
   `Echo::Held`) được báo qua thread (`Thread::own_echo_held` →

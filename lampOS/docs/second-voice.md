@@ -2339,6 +2339,16 @@ order is kept. A written turn is the same from the chat on.
     scored 0.901 to 1.000 (median 0.964) and 4 had no words back, 3 of
     them under 0.99: the rule costs about 3 bare calls in 82. Test:
     `a_wordless_call_under_the_bar_is_not_answered_with_the_switch`.
+  - While a prepared write waits for the answer its read-back asked for
+    (`services::awaits_an_answer`, #6363), that line with no words is left
+    as a sound at any score, with or without the switch: the journal says
+    "only the lamp's name, and no words of it came back, while a write waits
+    for its answer: not answered as a call". Asked as the name at any other
+    time, its answer is no answer to a waiting write's read-back
+    (`services::answered_in_place`). On lamp-9adf on 13 Nov one at the
+    second of the lamp's own arrival move was answered as the name, and the
+    one "Yes." after it found the mail dropped. Test:
+    `a_wordless_call_between_a_read_back_and_its_yes_keeps_the_write`.
 - **In a busy room, a line going on waits for the Policy**
   (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
   4): a line the rule would let out only as a conversation going on, and
