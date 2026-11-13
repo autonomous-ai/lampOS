@@ -3,6 +3,20 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 00:3x GMT+7: #6955 merged; #6965 READ-OK; #6966 READ-OK
+
+- Train 886 (#6963) merged as 7cc8c754a with **#6955** (one boot id on
+  macOS). #6959 merged: every PR needs two signed readers from train 886 on.
+- The loopback switch: ten's, in `crates/voice`, one PR (`LAMP_VOICE_LOOPBACK_
+  SERVICES`, STT `ws://` included); mine `--real-voice=local` in `crates/sim`.
+- **#6965** new head 9a7b02b272 (ten's `pthread_kill` fix + a 200-round drop
+  test): READ-OK, lifts my HOLD. `cargo test -p lamp-body --lib` 595/595, 10/10
+  on the Mac; clippy clean. Second-reader ask to Fifth / the lead.
+- **#6966** (ten, test-only 500 ms inhibit wait for three clean-stop tests):
+  READ-OK 05195bd66e. supervisor tests 20/20 idle, 10/10 under 30 busy
+  processes; the expiry test keeps 20 ms. The flake never showed on this Mac.
+  Second-reader ask to Fifth / nine.
+
 ## 2026-11-14 00:0x GMT+7: #6965 HOLD (SIGUSR1); the whole lamp ran on macOS
 
 - #6961: sim-2's P3s taken at a44d5acc46 (10 `unsafe` blocks; a line carries
