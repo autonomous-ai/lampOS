@@ -488,7 +488,15 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
 - `camera.frame`: `jpeg` (base64), `bytes`, `age_ms`, `fps_now`. Grant `camera`. In today's
   build, lamp run pending.
 - `camera.ended`: `why` (the lamp turned private, the camera stayed closed, the ring did not
-  show its mark). Grant `camera`. In today's build, lamp run pending.
+  show its mark). Grant `camera`. Works today for one of them (13 Nov 2026, lamp-75c9 on stable
+  12728 (lamp-update, 16:11 to 16:12 on 13 Nov), lamp-control 1d2c6f8664…, installed binaries,
+  nothing staged): a fast stream had brought 70 frames in 14 s when root stopped `lamp-eyes`
+  (20:13:37), and `camera.ended` came with `why` "the camera is closed" under a second later, not after
+  the 10 s a stalled picture file waits (`GONE_AFTER`): the fast path ends the moment the eyes'
+  frames socket closes (`run_fast` in crates/control/src/camera.rs). `lamp-eyes` was started again
+  at 20:13:42. Shown by stopping `lamp-eyes` (`systemctl stop`, as root), not by the lamp turning private or
+  by the ring's mark: those two `why`s are not shown on a lamp, and the slower path (no fast
+  stream) was not run.
 
 The grants, for reference (the 14 of `control.schema.json`, `$defs.grant`): `body`, `light`,
 `speak`, `look`, `hear`, `sound`, `skills`, `air`, `device`, `camera`, `microphone`, `speaker`,
