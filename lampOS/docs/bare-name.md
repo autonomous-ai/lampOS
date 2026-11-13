@@ -166,6 +166,7 @@ A third of every kind is read as espeak's Vietnamese voice reads English.
 | Set | Train | Test |
 |---|---|---|
 | Generated calls, three ways | 12,000 by 791 voices, of which the 1,685 by 113 of them are kept for validation | 1,500 by 113 other voices, and 450 by a British voice (Cori) |
+| Generated bare calls, women's voices (G', #5232) | 4,000: a bare "Lamp" by the train split's LibriTTS women, read in English, with a wider spread of speed (0.7–1.5), pause before what follows (up to 0.7 s) and pitch (±8 %); `speak.py --bare-female`, its own folder `calls-train-bare-female`, for the two women's voices the 30 Oct busy-room sweep (#3923) scored under the bar | |
 | Generated near misses, 12 kinds | 9,000 | 2,200, and 450 by Cori |
 | "lamp", MSWC, real people, the word alone | 202 clips | 51 clips |
 | Near misses, MSWC, real people | 6,714 clips | 1,279 clips |
