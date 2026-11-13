@@ -844,7 +844,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SKILL_UPLOAD` | You can add a skill from a file in the app; the lamp adds it and tells you it's on. |
 | `LAMP_SKILL_WRITTEN` | You can write a skill in your own words in the app; the lamp adds it and tells you it's on. |
 | `LAMP_SKILL_NAMED` | Say an installed skill's name or its own words, like "take a photo", and the lamp runs it, not saying no. |
-| `LAMP_MAKE_SKILL_AGENT` | A skill the lamp can't make on the first try is handed to its own helper agent before it gives up; with the agent's connectors on, one for your mail, calendar or another linked service goes to it at once. |
+| `LAMP_MAKE_SKILL_AGENT` | A skill the lamp can't make on the first try goes to its own helper agent before it gives up. |
 | `LAMP_MEMORY_EARLY_WORDS` | If the lamp recognises you partway through a talk, what you said earlier in it is remembered as yours. |
 | `LAMP_MEMORY_FOLLOWS_FACE` | Save your face mid-chat and what the lamp saw you say just before is remembered as yours. |
 | `LAMP_MEMORY_STABLE_ID` | If you change your name with the lamp, it keeps everything it remembered about you under the new name. |
