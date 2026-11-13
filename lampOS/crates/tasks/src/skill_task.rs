@@ -1002,6 +1002,14 @@ pub fn openclaw_takes_runs(text: &str) -> bool {
 /// lamp's default: with the switch off, always Hermes (V2's (b)); on, the
 /// lamp's default when it can take a run (Hermes; OpenClaw when its
 /// namespace script shows the runs' token folder), else Hermes, said.
+///
+/// Per engine because each is started its own way, and what counts is
+/// what its install proves: an engine started per run through a wrapper
+/// (Hermes) reads the run's token file at exec, checked by the wrapper's
+/// run lines when the run starts; one long-lived gateway (OpenClaw) can
+/// only have the token from the run's folder, checked by its namespace
+/// script here. A next engine joins by its install writing one of the
+/// two, and an arm here reading that file.
 pub fn engine_for_run(
     switch: bool,
     default: crate::harness::EngineKind,
