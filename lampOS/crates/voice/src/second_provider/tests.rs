@@ -31,6 +31,7 @@ mod read_back_words;
 mod remember_speaker;
 mod sent_write;
 mod short_done;
+mod skill_named_words;
 mod unplayed_join;
 mod voice_confirms;
 mod wake_not_name;
