@@ -788,7 +788,12 @@ never `forget_last`). The yes may say the forget too
 (`known_faces::plain_agreement_to_forget`, Thirteen's P2 on #6673): "Yes,
 forget it.", "Sure, go ahead and forget it.", "Ừ, quên đi.", and the forget
 said back alone, "Forget it." or "Quên đi.", which is only ever read as the
-answer to that question, by that person, within its 30 s. Any no, keep,
+answer to that question, by that person, within its 30 s. A yes after its
+30 s is journaled "too late", whoever the line is by then; one not theirs
+says why after "not the same person": "no one known on the line", "theirs,
+in a later session" or "another person" (`second_provider::not_theirs`, ids
+never said; Thirteen's row on #5627, a yes 42 s after the hold read as
+another person's). Any no, keep,
 wait, "đừng" or a question is no yes. If the line is no longer theirs when
 the forget runs (another face or voice came in), nothing is forgotten and
 the model is told it is still kept; it never runs in the room's scope
