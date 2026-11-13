@@ -4252,6 +4252,29 @@ the same code for both writers.
   today. Off, the line, the run's words and the make's folder are today's,
   byte for byte. Read by the second route's worker (passed by
   `process::second_route_worker_environment`).
+  - **The guide's check is the voice's** (Heron's P2 on #6768). lamp-tasks
+    starts the run with a cleared environment, so the guided line also
+    carries the worker's values of the two switches `lamp-skills pack`
+    reads that change what it refuses (`make_skill_agent::CHECK_SWITCHES`,
+    `"switches":{"LAMP_AGENT_SERVICES":"on"|"off","LAMP_SKILL_WRITES":"on"|"off"}`,
+    `on` only for an exact `on`), and lamp-tasks puts each `on` in the
+    run's environment ([tasks.md](tasks.md)). So a `write` step, or a
+    `do.task` with a linked service's grants, that the voice would keep
+    packs in the run too, and Hermes is never told to take out the step
+    that was asked for. Off, the line is today's, with no `switches`.
+  - **What the person hears while it works** (Heron's P3 on #6768): "Let
+    me think about that a little longer." once, through the say service,
+    as lamp-tasks says the first hand-over's run started (never after a
+    cut turn, and dropped if it can't be said within 15 s), then nothing
+    until the lamp says the skill back or that it couldn't make it. With
+    the guide one answer may take up to 90 s, plus up to 5 s of lamp-tasks'
+    grace, and the agent's part up to 120 s with a repair. A voice repair
+    begins only while one more 90 s answer still ends within the 120 s, so
+    only after an answer that came within 30 s: after an answer of 60 s or
+    more no voice repair fits and the voice's check of that answer stands,
+    and both repairs happen only when the first answer and the first
+    repair together took 30 s or less. The fixes that usually fit are the
+    guide's own, inside the run.
 - **No make run, no hand-over.** When lamp-tasks can't give that run (an
   older build with no make socket, `LAMP_SKILL_TASKS` off, or held and a
   Hermes wrapper without the network lines), the make is not handed over
@@ -4312,7 +4335,10 @@ the same code for both writers.
   `make_skill_agent::tests` (the rules sent as one `skill_make` line and
   the answer read back, never a `prepare`; an older lamp-tasks or a make run
   refused is never handed over; no `lamp` target is no agent; a silent
-  run times out; `the_guide_is_asked_for_only_with_its_switch`), the
+  run times out; `the_guide_is_asked_for_only_with_its_switch`,
+  `the_checks_switches_are_lamp_tasks_list_with_this_workers_values`;
+  lamp-skills' `tests/it/make_check.rs` packs a `write` and a service
+  `do.task` draft in the make exactly when the voice's check does), the
   guide's
   `with_the_guide_a_refused_answer_goes_back_with_the_checks_words_and_its_fix_is_kept`
   and `with_the_guide_an_answer_still_refused_after_its_rounds_is_refused_as_today`,
@@ -4323,7 +4349,10 @@ the same code for both writers.
   ([tasks.md](tasks.md)); and the three mail makes refused on lamp-9adf
   made by the agent, straight, with `LAMP_AGENT_SERVICES` on. With the
   guide: a make DeepSeek can't keep made by Hermes, its draft checked and
-  fixed in its run, said back, and kept on; and how long its answer takes
+  fixed in its run, said back, and kept on; a mail-sending (`write`) make
+  whose step survives the guide's check there, which also shows that
+  Hermes's terminal passes the run's `LAMP_*` switches to the check it
+  runs; and how long its answer takes
   there.
 
 ##### A made skill loosened (`LAMP_MADE_SKILL_LOOSE=on`, off)

@@ -668,9 +668,9 @@ agent (`lamp_tasks::skill_make`).
   bỏ các thư mục `make-*` (cùng home của chúng) mà một lamp-tasks dừng
   giữa chừng để lại (`skill_make::sweep`).
 - **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
-  vẹn (`MakeLine::parse`): không có trường nào khác ngoài `guide`, luật
-  (system prompt và brief) tối đa 48 KiB và không có NUL, `within_ms` từ 1
-  đến 120 giây.
+  vẹn (`MakeLine::parse`): không có trường nào khác ngoài `guide` và
+  `switches`, luật (system prompt và brief) tối đa 48 KiB và không có NUL,
+  `within_ms` từ 1 đến 120 giây.
 - **Hướng dẫn (`"guide":true`, `LAMP_MAKE_AGENT_GUIDE` của lamp-voice,
   tắt):** chỉ khi dòng ghi `true` (một boolean, mặc định `false`), hướng dẫn
   skill-creator của đèn (`skill_make::GUIDE`, từ `skill_make_guide.md`: bản
@@ -685,6 +685,30 @@ agent (`lamp_tasks::skill_make`).
   nói, không ghi tệp nào ngoài thư mục của nó trừ tệp của kiểm tra, và
   không chạy lệnh nào khác. Không có nó thì lời dặn lần chạy và các tệp
   trong thư mục giữ nguyên từng byte như trước.
+- **Công tắc của kiểm tra (`"switches"`, chỉ với `"guide":true`; P2 của
+  Heron trên #6768):** lần chạy bắt đầu với môi trường đã xoá sạch, nên
+  thiếu chúng thì `lamp-skills pack` của hướng dẫn sẽ nạp bản nháp không có
+  công tắc nào của đèn và từ chối một bước `write` hay một grant dịch vụ
+  liên kết của `do.task` mà kiểm tra của chính giọng nói, chạy với công tắc
+  của lamp-voice, chấp nhận. Dòng mang giá trị của lamp-voice cho hai công
+  tắc mà `lamp-skills` đọc khi nạp kỹ năng để đóng gói và làm đổi kết luận
+  của nó (`CHECK_SWITCHES`): `LAMP_AGENT_SERVICES` (grant
+  `<code>-read`/`<code>-write` của `do.task`) và `LAMP_SKILL_WRITES` (bước
+  `write` hay quyền `"write"`), mỗi cái `"on"` hoặc `"off"`, như
+  `{"LAMP_AGENT_SERVICES":"on","LAMP_SKILL_WRITES":"on"}`
+  (`CheckSwitches`). Mỗi `on` được đưa vào môi trường của lần chạy thành
+  `NAME=on` (`CheckSwitches::env`), như worker của lamp-voice nhận nó;
+  `off` không đưa gì. Tên nào khác (`LAMP_SKILL_TASKS`, `PATH`), giá trị
+  ngoài `"on"` hoặc `"off"` (`null`, `true`, `"ON"`), một tên hai lần,
+  `null` cho cả trường, hoặc `switches` không kèm `"guide":true` đều là
+  `bad_request` và không bắt đầu gì. Các công tắc khác mà `pack` đọc không
+  đổi kết luận (`LAMP_NUDGES_PRESENT`: cả hai dạng đều được kiểm tra) hoặc
+  chỉ được đọc khi kỹ năng chạy hay được bật (`LAMP_SKILL_TASKS`,
+  `LAMP_SKILL_READS`, `LAMP_MADE_SCRIPTS`), nên một `do.task` có script và
+  một grant của đèn vẫn đóng gói được dù bật hay tắt. Chỉ với hướng dẫn,
+  vì chỉ lần chạy có hướng dẫn mới chạy kiểm tra: không có nó thì lần chạy
+  được dặn không chạy gì, và lời dặn, thư mục và môi trường của nó giữ
+  nguyên từng byte như hôm nay.
 - **Lần chạy: chỉ Hermes** (quyết định của first builder, 12/11 19:14):
   Hermes của đèn được khởi động đúng như một lần chạy `do.task` của kỹ
   năng (`skill_task::HermesRunner` bên trong `skill_make::MakeHermes`,
@@ -775,7 +799,18 @@ agent (`lamp_tasks::skill_make`).
   và giấy phép, lần chạy được dặn lệnh kiểm tra, còn không có nó (hoặc với
   `false`) thì lời dặn và thư mục giữ nguyên từng byte như hôm nay, và
   `guide` không phải boolean bị từ chối
-  (`the_guide_is_given_only_when_the_line_asks_for_it`).
+  (`the_guide_is_given_only_when_the_line_asks_for_it`); các công tắc của
+  kiểm tra đang `on` có trong môi trường của lần chạy và không có gì khác,
+  còn tên lạ, giá trị ngoài `on`/`off`, một tên hai lần hay công tắc không
+  kèm hướng dẫn bị từ chối
+  (`the_checks_switches_reach_the_run_only_as_allowed`).
+  `tests/it/make_check.rs` của lamp-skills chạy `lamp-skills pack` thật với
+  đúng môi trường của lần tạo và với môi trường của worker giọng nói: một
+  bản nháp `write` và một bản nháp `do.task` có script và grant
+  `gmail-read` đóng gói được trong lần tạo đúng khi kiểm tra của giọng nói
+  đóng gói được (bật thì cả hai; tắt thì không cái nào; với môi trường của
+  lần chạy như trước đây thì không bao giờ), và `CHECK_SWITCHES` đúng là
+  hai tên của chính lamp-skills.
 
 **Các dòng kiểm tra trên đèn (chưa chạy):** trên lamp-9adf với bản này, hỏi
 "Hey Lamp, make me a skill that checks the weather every morning". Câu trả
