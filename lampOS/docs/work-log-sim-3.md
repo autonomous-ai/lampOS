@@ -3,6 +3,14 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 20:1x GMT+7: #6939, lamp-body in the macOS job
+
+- ten (on #6931) asked for lamp-body's clippy and tests on a Mac runner.
+  lamp-body on macOS at d1915de028 (no #6931): clippy clean, tests
+  589+44+2+9+3+1+125 pass. **#6939** (`sim-3/ci-body-macos`, 99b787298e,
+  stacked on #6929) adds both steps to `sim-macos`. READ ASK to ten, sim-2.
+- Train 882 still open at the check.
+
 ## 2026-11-13 20:0x GMT+7: #6929 and #6925 in train 882; Heron reads #6933
 
 - The first builder cut train 882 (#6937) at 19:09 with #6929 and #6925
