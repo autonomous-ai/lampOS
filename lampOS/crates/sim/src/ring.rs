@@ -396,7 +396,7 @@ mod tests {
 
     /// A ring on a bus of its own, asked by a test.
     fn asked(name: &str) -> (Ring, lamp_bus::Publisher, String, std::path::PathBuf) {
-        let root = std::env::temp_dir().join(format!("lsm-ring-{name}-{}", std::process::id()));
+        let root = crate::test_root().join(format!("lsm-ring-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         let bus = Bus::new(&root).unwrap();
         let ring = Ring::on(&bus).unwrap();

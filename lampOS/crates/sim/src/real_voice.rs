@@ -682,7 +682,7 @@ mod tests {
     const FAKE_KEY: &str = "test-key-not-real-for-the-voice";
 
     fn folder(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("lsm-voice-{name}-{}", std::process::id()));
+        let dir = crate::test_root().join(format!("lsm-voice-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -762,6 +762,14 @@ mod tests {
             "--real-voice=on"
         ])));
         let bin = folder("bin");
+        if !cfg!(target_os = "linux") {
+            // Off Linux it is refused before anything else is looked at.
+            let refused =
+                check(&args(&["run", "/d", "--real-voice", "--microphone"]), &bin).unwrap_err();
+            assert!(refused.contains("is for Linux only"), "{refused}");
+            let _ = fs::remove_dir_all(&bin);
+            return;
+        }
         let without_mic = check(&args(&["run", "/d", "--real-voice"]), &bin).unwrap_err();
         assert!(without_mic.contains("needs --microphone"), "{without_mic}");
         let without_binary =
