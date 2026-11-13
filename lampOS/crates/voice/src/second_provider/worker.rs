@@ -2935,6 +2935,10 @@ pub fn serve(
     // A skill the heard words ask what it uses, by name, read back in code
     // with the voice's own `make_skill` (V2 on #6413).
     let reads_back_by_words = tools.make_skill;
+    // A skill the heard words plainly ask for by its name, run in code with
+    // the skills as they are offered now (#6772): with a skills' folder.
+    let skills_named =
+        (!crate::tools::every_skills_folder(&tools).is_empty()).then(|| tools.clone());
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
     // (#1712).
@@ -3634,6 +3638,11 @@ pub fn serve(
     }
     if reads_back_by_words {
         engine = engine.reading_back_by_words(Arc::new(crate::make_skill_local::read_back_heard));
+    }
+    if let Some(settings) = skills_named {
+        engine = engine.calling_skills_named(Arc::new(move |heard: &str| {
+            crate::skill_named::heard(&settings, heard)
+        }));
     }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {
