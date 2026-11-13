@@ -2,10 +2,10 @@
 // /live only from its own origin: any website open in the browser can reach
 // localhost (examples/twin/guard.js).
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { startTwin } from './twin-start.js';
 import { WebSocket } from 'ws';
 import { newToken, originOk, tokenOk } from '../examples/twin/guard.js';
 
@@ -35,20 +35,9 @@ test('only the page\'s own origin may open the live link', () => {
 const glb = new URL('../../../../robots/lamp/hardware/cad/glb/lamp.glb', import.meta.url);
 const hasCad = existsSync(glb) && readFileSync(glb).toString('latin1', 0, 4) === 'glTF';
 
-test('the running twin refuses a request or an upgrade without its token or origin', { skip: !hasCad && 'lamp.glb is not here (Git LFS not pulled)' }, async () => {
-  const port = 18000 + Math.floor(Math.random() * 2000);
-  const server = spawn(process.execPath, [fileURLToPath(new URL('../examples/twin/server.js', import.meta.url)), '--fake', '--port', String(port)], { stdio: ['ignore', 'pipe', 'inherit'] });
-  try {
-    const url = await new Promise((resolve, reject) => {
-      let out = '';
-      server.stdout.on('data', (data) => {
-        out += data;
-        const found = out.match(/http:\/\/localhost:\d+\/\?t=\S+/);
-        if (found) resolve(found[0]);
-      });
-      server.on('exit', (code) => reject(new Error(`the twin exited ${code}`)));
-    });
-    const token = new URL(url).searchParams.get('t');
+test('the running twin refuses a request or an upgrade without its token or origin', { skip: !hasCad && 'lamp.glb is not here (Git LFS not pulled)' }, async (t) => {
+  const { port, token } = await startTwin(t, fileURLToPath(new URL('../examples/twin/server.js', import.meta.url)), (port) => ['--fake', '--port', String(port)]);
+  {
     const base = `http://127.0.0.1:${port}`;
     assert.equal((await fetch(`${base}/`)).status, 403);
     assert.equal((await fetch(`${base}/model.json?t=wrong`)).status, 403);
@@ -63,7 +52,5 @@ test('the running twin refuses a request or an upgrade without its token or orig
     assert.equal(await opens('/live', `http://localhost:${port}`), false);
     assert.equal(await opens(`/live?t=${token}`, undefined), false);
     assert.equal(await opens(`/live?t=${token}`, `http://localhost:${port}`), true);
-  } finally {
-    server.kill('SIGTERM');
   }
 });

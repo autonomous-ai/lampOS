@@ -2,30 +2,22 @@
 // parsing the lamp model between two requests reuses its connection, and a request that races the server's close is aborted
 // in the browser with no status (the try-it page's buttons were lost that way, 1 load in 8 drew them, on a loaded laptop).
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { connect, createServer } from 'node:net';
+import { connect } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { startTwin } from './twin-start.js';
 
 const server = fileURLToPath(new URL('../examples/twin/server.js', import.meta.url));
-const freePort = () => new Promise((resolve) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
 
 test('an idle connection to the twin is still open after 8 s (Node closes its own at 5 to 6 s)', async (t) => {
   const folder = mkdtempSync(join(tmpdir(), 'try-keepalive-'));
   t.after(() => rmSync(folder, { recursive: true, force: true }));
   const glb = join(folder, 'lamp.glb');
   writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
-  const port = await freePort();
-  const child = spawn(process.execPath, [server, '--fake', '--port', String(port), '--glb', glb], { stdio: ['ignore', 'pipe', 'inherit'] });
-  t.after(() => child.kill('SIGTERM'));
-  let text = '';
-  child.stdout.on('data', (chunk) => { text += chunk; });
-  let token;
-  for (let i = 0; i < 100 && !token; i += 1) { token = /\?t=(\S+)/.exec(text)?.[1]; await new Promise((r) => setTimeout(r, 100)); }
-  assert.ok(token, 'the twin printed its address');
+  const { port, token } = await startTwin(t, server, (port) => ['--fake', '--port', String(port), '--glb', glb]);
   const socket = connect(port, '127.0.0.1');
   t.after(() => socket.destroy());
   let answer = '';
