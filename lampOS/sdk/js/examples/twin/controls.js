@@ -157,9 +157,10 @@ export const CONTROLS = [
       await lamp.withLease(['body'], () => lamp.movePoses(poses, { wait: true }));
       return `lamp.withLease(['body'], () => lamp.movePoses(${q(poses)}, { wait: true }))`;
     } },
-  // The head follows the hand the lamp sees until the lease runs out (`for_ms`) or Stop; the `hand` events and the
-  // lease's end come in the log. The `hand` stimulus (room) puts one in view.
-  { id: 'follow_hand', group: 'Body', needs: ['body', 'look'], moves: true, ops: ['look', 'lease.take', 'lease.release'], shows: ['hand'], label: 'Follow a hand', fields: [number('for_ms', 1000, 30_000, 8000, { integer: true })],
+  // The head follows the hand the lamp sees until the lease runs out (`for_ms`) or Stop; the lease's end comes in the log.
+  // No `shows` here: a `hand` event comes only while a hand is in view, which this row does not put there (the `hand` stimulus,
+  // under Touch, does and claims it), so pressing this alone cannot be told to show one.
+  { id: 'follow_hand', group: 'Body', needs: ['body', 'look'], moves: true, ops: ['look', 'lease.take', 'lease.release'], shows: [], label: 'Follow a hand', fields: [number('for_ms', 1000, 30_000, 8000, { integer: true })],
     run: async ({ lamp, release }, a) => {
       await release();
       await lamp.followHand({ forMs: a.for_ms }).start();
@@ -236,7 +237,7 @@ export const CONTROLS = [
     run: async ({ lamp }, a) => answered(`lamp.volume({ to: ${a.to} })`, await lamp.volume({ to: a.to })) },
   { id: 'volume_step', group: 'Voice', needs: ['speak'], changes: "the lamp's volume", ops: ['volume'], shows: ['volume.changed'], hint: "steps the speaker volume once; it is not put back", hintReal: "steps the REAL lamp's volume once and leaves it there", label: 'Volume step', fields: [select('step', ['up', 'down'])],
     run: async ({ lamp }, a) => answered(`lamp.volume({ step: ${q(a.step)} })`, await lamp.volume({ step: a.step })) },
-  { id: 'volume_mute', group: 'Voice', needs: ['speak'], changes: "the lamp's volume", ops: ['volume'], shows: ['volume.changed'], hint: "mutes or unmutes the speaker; it is not put back", hintReal: "mutes or unmutes the REAL lamp's speaker and leaves it so", label: 'Mute', fields: [select('mute', ['on', 'off'], 'off')],
+  { id: 'volume_mute', group: 'Voice', needs: ['speak'], changes: "the lamp's volume", ops: ['volume'], shows: [], hint: "mutes or unmutes the speaker; it is not put back", hintReal: "mutes or unmutes the REAL lamp's speaker and leaves it so", label: 'Mute', fields: [select('mute', ['on', 'off'], 'off')],
     run: async ({ lamp }, a) => answered(`lamp.volume({ mute: ${a.mute === 'on'} })`, await lamp.volume({ mute: a.mute === 'on' })) },
   // The person's own volume, so this row puts it back: it reads the level, takes the one step (or the mute), then
   // restores the level and the mute it found, even when the step is refused. Nothing is left changed.

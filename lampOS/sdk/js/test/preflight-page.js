@@ -19,24 +19,38 @@ export async function page(t, { real, fake, home } = {}) {
   const stub = join(folder, 'lamp-sim');
   writeFileSync(stub, '#!/bin/sh\nexit 0\n');
   chmodSync(stub, 0o755);
-  const twinPort = await freePort();
-  const [file, args, env] = real
-    ? [tryJs, ['--real', '--host', fake.host, '--port', String(fake.port), '--twin-port', String(twinPort), '--glb', glb], { ...process.env, HOME: home, LAMP_TRY_CODE: fake.code, LAMP_TRY_PIN: fake.pin }]
-    : [serverJs, ['--fake', '--port', String(twinPort), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub], process.env];
-  const child = spawn(process.execPath, [file, ...args], { env, stdio: ['ignore', 'pipe', 'inherit'] });
-  let text = '';
-  child.stdout.on('data', (c) => { text += c; });
-  const ended = new Promise((resolve) => child.on('close', resolve));
+  // The port is probed free, closed, then the twin binds it: another test file can take it in between (EADDRINUSE, a red
+  // Node 22 on #6745). So the start is tried again on a new port when the twin ended with that.
+  let twinPort;
+  let child;
+  let text;
+  let ended;
+  let token;
+  for (let attempt = 1; ; attempt += 1) {
+    twinPort = await freePort();
+    const [file, args, env] = real
+      ? [tryJs, ['--real', '--host', fake.host, '--port', String(fake.port), '--twin-port', String(twinPort), '--glb', glb], { ...process.env, HOME: home, LAMP_TRY_CODE: fake.code, LAMP_TRY_PIN: fake.pin }]
+      : [serverJs, ['--fake', '--port', String(twinPort), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub], process.env];
+    child = spawn(process.execPath, [file, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    text = '';
+    let errors = '';
+    child.stdout.on('data', (c) => { text += c; });
+    child.stderr.on('data', (c) => { errors += c; process.stderr.write(c); });
+    ended = new Promise((resolve) => child.on('close', resolve));
+    const started = await new Promise((resolve) => {
+      const timer = setInterval(() => { const m = /\?t=(\S+)/.exec(text); if (m) { clearInterval(timer); resolve({ token: m[1] }); } }, 50);
+      ended.then((code) => { clearInterval(timer); resolve({ code, errors }); });
+    });
+    if (started.token) { token = started.token; break; }
+    if (attempt < 5 && /EADDRINUSE/.test(started.errors + text)) continue;
+    throw new Error(`ended ${started.code}`);
+  }
   t.after(async () => {
     child.kill('SIGTERM');
     let timer;
     await Promise.race([ended, new Promise((resolve) => { timer = setTimeout(resolve, 10000); })]);
     clearTimeout(timer); // a bare 10 s timer would keep the test file's process alive that long after its last test
     child.kill('SIGKILL');
-  });
-  const token = await new Promise((resolve, reject) => {
-    const timer = setInterval(() => { const m = /\?t=(\S+)/.exec(text); if (m) { clearInterval(timer); resolve(m[1]); } }, 50);
-    ended.then((code) => reject(new Error(`ended ${code}`)));
   });
   return { url: `http://127.0.0.1:${twinPort}/?t=${token}`, token, child, ended };
 }
