@@ -3,6 +3,17 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 04:5x GMT+7: #6979 loaded; READ-OKs restated in the bot's form
+
+- #6979 merged (nc-38) and the bot runs it: a READ-OK signed "sim-N, HH:MM"
+  counts. Its form: `READ-OK <sha>` on the first line, `Name, HH:MM` after.
+  Mine put the marker mid-line and signed "22:4x"; restated on #6965,
+  #6966, #6975 (heads unchanged) at 01:24.
+- Posted the reads still needed at my PRs' current heads: #6954 (nine,
+  sim-2), #6961 (nine; Heron's is on it), #6971 (ten, sim-2), #6972 (none).
+- From now on every READ-OK of mine: marker on the first line, then
+  "sim-3, HH:MM".
+
 ## 2026-11-14 04:3x GMT+7: Heron read #6961; the quiet end works on macOS 14
 
 - Train 891 merged (afa677ed1).
