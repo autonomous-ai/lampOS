@@ -29,12 +29,16 @@ client's config (`claude mcp add lamp -- lamp-mcp --home ~/.config/lampos`), or
 `python -m lamp_mcp` from the venv's python when the client can't find `lamp-mcp`
 on its PATH. An unpaired start says in one stderr line which folder it looked in.
 
-**On a customer lamp (stable 11450)** five things are missing: `play` and a
-look at a face or name, a motion's end (`wait=True` returns when the lamp takes
-it), limp and pose, mDNS (pair with `--host`), and local event times (`at` is
-UTC). Skill push, `joints` for `roll`, `shoulder` and `elbow` (while the lamp
-stands) and a head tap as a `touch` event are in 11450. Read
-[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-stable-11450)
+**On a customer lamp (the stable build; the GUIDE's Plan and status rows say
+the build and date each row works from)** three things are missing: limp and
+pose, mDNS (pair with `--host`), and local event times (`at` is UTC). `look` at
+a name is refused. Skill push (from 11091), `joints` for `roll`, `shoulder` and
+`elbow` (from build 11102, while the lamp stands), a head tap as a `touch`
+event (from 11372), a motion's end (`wait=True`, from 11716) and `play` (from
+12171) are in; a look at a face is taken by lamp-control, but on a customer lamp the
+body drops it ("this lamp's gaze is not measured, so it cannot look at a
+face"): never promise one. Read
+[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-the-stable-build)
 before promising any of them.
 
 ## Start without a lamp
