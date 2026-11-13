@@ -3028,13 +3028,13 @@ pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
 
 /// The fence of a skill's run on OpenClaw's gateway
 /// ([`crate::openclaw_config::write_skill_run_fence`]): the fence agent in
-/// `state_dir`'s config, its approvals in OpenClaw's home (`state_dir`'s
-/// parent), its workspace in lamp-tasks' Harness project under `home`.
-/// One journal line.
+/// `state_dir`'s config, its workspace in lamp-tasks' Harness project
+/// under `home`. Its approvals are set through the gateway before each
+/// run's turn (`crate::gateway_run`), never written here. One journal
+/// line.
 pub fn set_up_skill_run_fence(state_dir: &Path, home: &Path) -> String {
     let project = home.join(MACHINES_PROJECT.trim_start_matches("~/"));
-    let openclaw_home = state_dir.parent().unwrap_or(state_dir);
-    match crate::openclaw_config::write_skill_run_fence(state_dir, openclaw_home, &project) {
+    match crate::openclaw_config::write_skill_run_fence(state_dir, &project) {
         Ok(changed) => format!(
             "tasks: OpenClaw's fence for a skill's run ({}): {}",
             crate::openclaw_config::SKILL_RUN_AGENT,

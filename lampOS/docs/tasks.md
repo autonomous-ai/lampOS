@@ -3574,10 +3574,14 @@ default agent is, never by its name (`skill_task::AgentRun`):
   runs in, `/usr/local/lib/lampos/openclaw-ns`), `agent` (the fence agent,
   `lamp-skill-run`), and `turn`, `stop` and `end`: the arguments, after
   the wrapper, of one turn, of its stop and of its end, as templates
-  (`{name}`, `{agent}`, `{message}`, `{secs}`, `{ms}`). lamp-tasks knows
-  no engine's commands: they are lamp-update's data. Each key once, the
-  port a port, the paths and names plain, and the turn must carry
-  `{message}`; else the run is refused in words ("is a gateway agent's,
+  (`{name}`, `{agent}`, `{message}`, `{secs}`, `{ms}`); and the run's
+  fence in the gateway's exec approvals: `fence-get` (`approvals get
+  --gateway --json --timeout <ms>`), `fence-set` (`approvals set --gateway
+  --stdin --timeout <ms>`) and `fence-entry` (the fence agent's entry, JSON
+  with `{start}`). lamp-tasks knows no engine's commands: they are
+  lamp-update's data. Each key once, the port a port, the paths and names
+  plain, the turn must carry `{message}` and `fence-entry` must be a JSON
+  object with `{start}`; else the run is refused in words ("is a gateway agent's,
   but ..."). The gateway's namespace must show lamp-control's socket
   (`AGENT_NS_TASKS_LINE`): else refused, naming lamp-update's
   `LAMP_SKILL_DEFAULT_AGENT` or `LAMP_SKILL_TASKS`. No login-shell lookup
@@ -3602,7 +3606,23 @@ default agent is, never by its name (`skill_task::AgentRun`):
 2. The gateway must answer on `127.0.0.1:<port>` (`gateway::answers`),
    waited for at most 60 s (`gateway::READY_WITHIN`); else `run_failed`
    "the default agent's gateway did not answer ...", and no turn is sent.
-3. One turn, through the wrapper (which joins the running gateway's
+3. **The fence, made sure of** (`GatewayRunner::ensure_fence`), right
+   before each turn, since the gateway may come up after lamp-tasks
+   starts: `fence-get` through the wrapper; the answer must be the
+   approvals document (with `version` or `agents`), or it under `file`
+   beside its hash; any other shape is refused, never guessed at
+   (`gateway_run::set_entry`). When `agents.lamp-skill-run` is not
+   already the fence's entry, the whole document, every other key kept,
+   goes to `fence-set` on stdin, and `fence-get` again must show it. Each
+   call is bounded to 10 s (`AFTER_WITHIN`) and read to 256 KiB. Any
+   failure is `run_failed` "the default agent's fence for a skill's run
+   is not set (...), so nothing was started": no turn is sent and the
+   script never runs. The fence's write (`exec.approvals.get`/`set`, as
+   `sessions.delete` in step 5) needs the `operator.admin` scope, which
+   the lamp's loopback CLI with the shared gateway token gets (local
+   pairing is approved by itself, `gateway.nodes.pairing.autoApproveLocal`,
+   on by default); if the write fails, the run is refused as above.
+4. One turn, through the wrapper (which joins the running gateway's
    namespaces, `nsenter`): `openclaw gateway call agent --expect-final
    --json --timeout <ms> --params {"agentId":"lamp-skill-run",
    "sessionKey":"agent:lamp-skill-run:skill-<run-id>","message":<words>,
@@ -3613,7 +3633,7 @@ default agent is, never by its name (`skill_task::AgentRun`):
    (`gateway_run::prompt`) say to run `start` once and nothing else, the
    task quoted as data. The process is in a group of its own, its
    environment cleared to `PATH`, its answer read to 256 KiB.
-4. **Its end.** The run is held to its deadline (14 minutes, the token's
+5. **Its end.** The run is held to its deadline (14 minutes, the token's
    life; the gateway is told the same as the turn's `timeout`, so it ends
    the turn itself too). Exit 0 with the gateway's `status` `ok` (or none)
    is `{"ok":true,"id":0}`; another `status` or exit status is
@@ -3627,20 +3647,30 @@ default agent is, never by its name (`skill_task::AgentRun`):
 
 **The fence lamp-tasks writes** (`openclaw_config::write_skill_run_fence`,
 at lamp-tasks' start with `LAMP_SKILL_DEFAULT_AGENT=on` only, as
-`lampos`, OpenClaw's user; off, nothing): in OpenClaw's `openclaw.json`,
-`agents.list` gets the fence agent `lamp-skill-run` (made with OpenClaw's
-own `main` first and `default`, when there is no list, so the person's
-spoken tasks keep their agent; a list there is kept): its own workspace
+`lampos`, OpenClaw's user; off, nothing), for OpenClaw 2026.11.2: in
+OpenClaw's `openclaw.json`, `agents.entries` gets the fence agent
+`lamp-skill-run` (keyed, with no `id` and no `default`): its own workspace
 `/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs` (0700),
 sandbox off, `tools.allow: ["exec"]` (no read, write, edit, web, browser,
 process or session tools), nothing elevated, and its exec on the gateway's
-host by an allow-list with no prompt and no safe binaries
-(`host: gateway`, `security: allowlist`, `ask: off`, `safeBins: []`). In
-OpenClaw's exec approvals (`/var/lib/lampos-openclaw/.openclaw/exec-approvals.json`),
-the same agent gets `security: allowlist`, `ask: off`,
-`askFallback: deny`, `autoAllowSkills: false` and one allow-list entry:
-`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`. Every other
-key of both files is kept; a file already right is not written.
+host by an allow-list with no safe binaries (`host: gateway`,
+`mode: allowlist`, `safeBins: []`; never `mode` with the legacy
+`security`/`ask`, which OpenClaw's schema refuses). With a second agent,
+`agents.ownership: explicit` and `agents.defaults.systemAgent.agentId:
+main` are set, each only when not set already, so the person's spoken
+tasks keep their agent. A legacy `agents.list` (invalid on 2026.11.2) is
+refused, "Refused: ... legacy `agents.list` ...", and the file left as it
+is. Every other key is kept; a file already right is not written.
+
+**Its exec approvals are not a file**: OpenClaw keeps them in the
+gateway's own store, and a legacy `exec-approvals.json` in its state
+blocks them, so lamp-tasks writes none. They are set through the gateway
+before each run's turn (step 3 above): `agents.lamp-skill-run` gets
+`security: allowlist`, `ask: off`, `askFallback: deny`,
+`autoAllowSkills: false` and one allow-list entry:
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`
+(`openclaw_config::skill_run_approvals`, the same as lamp-update's
+`fence-entry`).
 
 ### What the gateway's fence does and doesn't stop, compared with Hermes's `--net`
 
