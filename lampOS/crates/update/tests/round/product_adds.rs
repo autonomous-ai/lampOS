@@ -640,6 +640,7 @@ fn lamp_control_off_by_both_switches_or_failed_is_not_started() {
 /// is. Refused, every later build was refused on a lamp that took the
 /// region's build through a round (lamp-52e6, 12635 to 12661).
 #[test]
+#[ignore = "PARKED (#6386): lamp-region.service is out of install::PRODUCT, so a round adds no unit of lamp-update's own; re-enable when China is scheduled and stable's lamp-update carries #6810"]
 fn a_unit_of_lamp_updates_own_added_by_a_build_starts_through_its_current_link_and_switches() {
     let mut lamp = product_lamp();
     let region =
@@ -673,6 +674,7 @@ fn a_unit_of_lamp_updates_own_added_by_a_build_starts_through_its_current_link_a
 /// Put back, a build that added a unit of lamp-update's own takes the unit
 /// away and leaves lamp-update's folder and link exactly as they were.
 #[test]
+#[ignore = "PARKED (#6386): lamp-region.service is out of install::PRODUCT, so a round adds no unit of lamp-update's own; re-enable when China is scheduled and stable's lamp-update carries #6810"]
 fn a_build_put_back_takes_away_a_unit_of_lamp_updates_own_and_leaves_its_folder() {
     let mut lamp = product_lamp();
     let before = lamp.lamp_files();
