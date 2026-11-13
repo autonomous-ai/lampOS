@@ -6628,6 +6628,7 @@ fn skill_runner_with(
         harness: slot,
         held_by: None,
         retry: Duration::from_millis(20),
+        lost_look: Duration::from_millis(600),
         stopping: std::sync::OnceLock::new(),
         default_agent: false,
         wrappers: None,
@@ -6668,6 +6669,8 @@ fn skill_ok_plan(rig: &Rig, waited_state: &str) {
         "machines":{"default":true},
         "new":{"default":true},
         "wait":{"stdout":waited(waited_state, AGENT)},
+        // Its session bound: an ask, an answer, tools.
+        "show":{"default":true},
         "close":{"exit":0},
     }));
 }
@@ -6675,8 +6678,8 @@ fn skill_ok_plan(rig: &Rig, waited_state: &str) {
 /// The run is `harness new hermes` in its own folder, `skill-<run-id>`,
 /// the positional argument, with no mode, no route and no token in any
 /// argument or environment Harness is given; then `wait` on its one
-/// agent; then, as it ended, `close --now`; and its folder and token file
-/// are gone.
+/// agent; then, as it stopped, `show` that it had a session (#6432); then
+/// `close --now`; and its folder and token file are gone.
 #[test]
 fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothing() {
     let rig = Rig::new();
@@ -6691,15 +6694,15 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
     assert!(run.started.load(std::sync::atomic::Ordering::Acquire));
     assert_eq!(
         ended_at.get(),
-        Some(3),
-        "ended after machines, new, wait; before close"
+        Some(4),
+        "ended after machines, new, wait, show; before close"
     );
     let calls = rig.calls();
     let verbs: Vec<&str> = calls
         .iter()
         .map(|call| call["args"][0].as_str().unwrap())
         .collect();
-    assert_eq!(verbs, ["machines", "new", "wait", "close"]);
+    assert_eq!(verbs, ["machines", "new", "wait", "show", "close"]);
     let folder = rig.root.path().join("project/skill-task-1");
     assert_eq!(
         calls[1]["args"],
@@ -6729,8 +6732,9 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
             "--json"
         ])
     );
+    assert_eq!(calls[3]["args"][3], AGENT);
     assert_eq!(
-        calls[3]["args"],
+        calls[4]["args"],
         json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
     );
     for call in &calls {
@@ -6746,6 +6750,130 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
         Ok(0)
     );
     assert!(rig.calls().iter().all(|call| call["args"][0] != "close"));
+    nothing_left(&rig);
+}
+
+/// The real Hermes, as Harness lists it apart from the wrapper's agent.
+const LIVE_HERMES: &str = "33333333-3333-4333-8333-333333333333";
+
+/// `show` of `id` with no session bound: no ask, no answer, no tools.
+fn unbound_show(id: &str) -> Value {
+    step(json!({"id":id,"state":"stopped","ask":null,"answer":"","truncated":false,"tools":0}))
+}
+
+/// `ps` with `rows` of (id, state, folder).
+fn ps_rows(rows: &[(&str, &str, &str)]) -> Value {
+    let rows: Vec<Value> = rows
+        .iter()
+        .map(|(id, state, folder)| ps_row(id, "Terminal harness", state, Some(folder)))
+        .collect();
+    step(json!({"you":null,"machine":"lamp","harnesses":rows,"next":[]}))
+}
+
+/// #6432: Harness says the run's agent `stopped` before it bound a
+/// session (it held the `hermes` wrapper's pid), and lists the real
+/// Hermes, still starting, in the run's own folder. The run waits on that
+/// one, and its own end is the run's: a stop with a session is `Ok(0)`,
+/// a failure is an error. Only that one is closed, and nothing is started
+/// again.
+#[test]
+fn a_skill_run_whose_agent_stopped_before_a_session_waits_on_the_live_one_in_its_folder() {
+    for (end, ran) in [("stopped", Ok(0)), ("failed", Err("failed"))] {
+        let rig = Rig::new();
+        let folder = rig.root.path().join("project/skill-task-1");
+        let folder = folder.to_str().unwrap();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true},
+            "wait":{"by_arg":{
+                AGENT: step(json!({"harnesses":[{"id":AGENT,"state":"stopped"}]})),
+                LIVE_HERMES: step(json!({"harnesses":[{"id":LIVE_HERMES,"state":end}]})),
+            }},
+            "show":{"by_arg":{
+                AGENT: unbound_show(AGENT),
+                LIVE_HERMES: {"default":true},
+            }},
+            "ps":ps_rows(&[
+                (AGENT, "stopped", folder),
+                (CREATION, "working", "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp"),
+                (LIVE_HERMES, "starting", folder),
+            ]),
+            "close":{"exit":0},
+        }));
+        let got = skill_runner(&rig, Some(EngineKind::Hermes))
+            .run(&skill_run(Duration::from_secs(20)), &|| {});
+        match ran {
+            Ok(id) => assert_eq!(got, Ok(id), "{end}"),
+            Err(said) => assert!(got.unwrap_err().contains(said), "{end}"),
+        }
+        let calls = rig.calls();
+        let of = |verb: &str| -> Vec<Value> {
+            calls
+                .iter()
+                .filter(|call| call["args"][0] == verb)
+                .map(|call| call["args"].clone())
+                .collect()
+        };
+        assert_eq!(of("new").len(), 1, "{end}: no second Hermes");
+        let waited: Vec<Value> = of("wait").into_iter().map(|args| args[3].clone()).collect();
+        assert_eq!(waited, [AGENT, LIVE_HERMES], "{end}");
+        assert_eq!(
+            of("close"),
+            [json!([
+                "close",
+                "--machine",
+                MACHINE,
+                LIVE_HERMES,
+                "--now",
+                "--json"
+            ])],
+            "{end}"
+        );
+        nothing_left(&rig);
+    }
+}
+
+/// #6432: `stopped` with no session bound and no live agent in the run's
+/// folder (only the stopped one, and another in another folder) is an
+/// error said plainly, never task 0, within the look's bound; nothing is
+/// started again, and nothing of the run is left.
+#[test]
+fn a_skill_run_whose_agent_stopped_before_a_session_with_none_live_is_an_error() {
+    let rig = Rig::new();
+    let folder = rig.root.path().join("project/skill-task-1");
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("stopped", AGENT),"exit":4},
+        "show":unbound_show(AGENT),
+        "ps":ps_rows(&[
+            (AGENT, "stopped", folder.to_str().unwrap()),
+            (LIVE_HERMES, "working", "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp"),
+        ]),
+        "close":{"exit":0},
+    }));
+    let began = Instant::now();
+    let why = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert_eq!(why, "Harness lost the lamp's Hermes as it started");
+    assert!(
+        began.elapsed() < Duration::from_secs(8),
+        "bounded: {:?}",
+        began.elapsed()
+    );
+    let calls = rig.calls();
+    let verbs: Vec<&str> = calls
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap())
+        .collect();
+    assert_eq!(verbs.iter().filter(|verb| **verb == "new").count(), 1);
+    assert_eq!(verbs.iter().filter(|verb| **verb == "wait").count(), 1);
+    assert!(
+        verbs.iter().filter(|verb| **verb == "ps").count() >= 2,
+        "{verbs:?}"
+    );
+    assert_eq!(verbs.last(), Some(&"close"));
     nothing_left(&rig);
 }
 
