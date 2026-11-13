@@ -313,6 +313,25 @@ pub const FACE_EXPRESSIONS_PATH: &str = "/var/lib/lampOS/consent/face-expression
 pub fn face_expressions_beside(room_sounds: &Path) -> PathBuf {
     room_sounds.with_file_name("face-expressions.json")
 }
+/// The owner's yes to seen activity for lamp-seen (#6543,
+/// `lamp_msgs::consent::SEEN_ACTIVITY`) beside `room_sounds`: kept the same
+/// way, but given by voice at any time ([`crate::seen_yes`]), never asked
+/// at onboarding.
+pub fn seen_activity_beside(room_sounds: &Path) -> PathBuf {
+    room_sounds.with_file_name("seen-activity.json")
+}
+/// [`ROOM_SOUNDS_GROUP`]'s id, from `/etc/group`. Not known: a yes kept is
+/// root's alone (0600), which its reader takes as no, said once here.
+pub(crate) fn consent_group() -> Option<u32> {
+    let name = ROOM_SOUNDS_GROUP;
+    let id = std::fs::read_to_string("/etc/group")
+        .ok()
+        .and_then(|groups| crate::say::group_id(&groups, name));
+    if id.is_none() {
+        eprintln!("lamp-voice: the group {name:?} is not known; a room sounds yes is root's alone");
+    }
+    id
+}
 /// `on` offers the face expressions step; anything else passes it over.
 pub const FACE_EXPRESSIONS_ASK_ENVIRONMENT: &str = "LAMP_FACE_EXPRESSIONS_ASK";
 
