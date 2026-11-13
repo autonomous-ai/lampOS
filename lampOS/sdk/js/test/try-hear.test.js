@@ -3,7 +3,6 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -11,9 +10,9 @@ import { WebSocket } from 'ws';
 import { schema } from 'lampos';
 import { FakeLamp } from '../src/testing.js';
 import { CONTROLS, checked, humWav, quietTone } from '../examples/twin/controls.js';
+import { onFreePort } from './free-port.js';
 
 const serverJs = new URL('../examples/twin/server.js', import.meta.url).pathname;
-const freePort = () => new Promise((resolve) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // A twin to talk to, on its own fake lamp with the try-it panel.
@@ -25,16 +24,21 @@ async function page(t) {
   const stub = join(folder, 'lamp-sim');
   writeFileSync(stub, '#!/bin/sh\nexit 0\n');
   chmodSync(stub, 0o755);
-  const twinPort = await freePort();
-  const [file, args, env] = [serverJs, ['--fake', '--port', String(twinPort), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub], process.env];
-  const child = spawn(process.execPath, [file, ...args], { env, stdio: ['ignore', 'pipe', 'inherit'] });
-  let text = '';
-  child.stdout.on('data', (c) => { text += c; });
-  const ended = new Promise((resolve) => child.on('close', resolve));
-  t.after(async () => { child.kill('SIGTERM'); await Promise.race([ended, sleep(10000)]); child.kill('SIGKILL'); });
-  const token = await new Promise((resolve, reject) => {
-    const timer = setInterval(() => { const m = /\?t=(\S+)/.exec(text); if (m) { clearInterval(timer); resolve(m[1]); } }, 50);
-    ended.then((code) => reject(new Error(`ended ${code}`)));
+  const { twinPort, token } = await onFreePort(async (twinPort) => {
+    const [file, args, env] = [serverJs, ['--fake', '--port', String(twinPort), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub], process.env];
+    const child = spawn(process.execPath, [file, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    let text = '';
+    let errors = '';
+    child.stdout.on('data', (c) => { text += c; });
+    child.stderr.on('data', (c) => { errors += c; process.stderr.write(c); });
+    const ended = new Promise((resolve) => child.on('close', resolve));
+    // Registered at once, not after the start settles: a twin that never prints its token and never ends must still be killed.
+    t.after(async () => { child.kill('SIGTERM'); await Promise.race([ended, sleep(10000)]); child.kill('SIGKILL'); });
+    const token = await new Promise((resolve, reject) => {
+      const timer = setInterval(() => { const m = /\?t=(\S+)/.exec(text); if (m) { clearInterval(timer); resolve(m[1]); } }, 50);
+      ended.then((code) => { clearInterval(timer); reject(new Error(`ended ${code}: ${errors}`)); });
+    });
+    return { twinPort, token };
   });
   return { url: `http://127.0.0.1:${twinPort}/?t=${token}`, base: `http://127.0.0.1:${twinPort}`, token, twinPort };
 }
