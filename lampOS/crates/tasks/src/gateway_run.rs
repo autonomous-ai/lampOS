@@ -76,8 +76,12 @@ pub const START_FILE: &str = "start";
 /// The interpreter the skill's script is run with (`HandOver`'s scripts
 /// are Python's).
 pub const INTERPRETER: &str = "python3";
-/// How long the turn's stop and its end each have.
+/// How long the turn's stop and its end, and each fence call, have at
+/// most (less when the run's deadline is nearer).
 pub const AFTER_WITHIN: Duration = Duration::from_secs(10);
+/// The least the turn's stop and end have together past the run's
+/// deadline, so cleanup still happens: a run's only overrun.
+pub const AFTER_FLOOR: Duration = Duration::from_secs(3);
 /// The most bytes of a turn's answer read.
 const MOST_ANSWER_BYTES: u64 = 256 * 1024;
 
@@ -369,6 +373,8 @@ struct Made<'a> {
     folder: PathBuf,
     name: String,
     sent: bool,
+    /// The run's deadline, as an instant.
+    until: Instant,
 }
 
 impl GatewayRunner {
@@ -417,9 +423,25 @@ impl Drop for Made<'_> {
     fn drop(&mut self) {
         (self.end_token)();
         if self.sent {
+            // Held to what is left of the run's deadline, but never less
+            // than AFTER_FLOOR for the two together.
             let runner = self.runner;
-            let stopped = runner.after(&runner.agent.stop, &self.name, AFTER_WITHIN);
-            runner.after(&runner.agent.end, &self.name, AFTER_WITHIN);
+            let cleanup_until = self.until.max(Instant::now() + AFTER_FLOOR);
+            let left = || {
+                cleanup_until
+                    .saturating_duration_since(Instant::now())
+                    .min(AFTER_WITHIN)
+            };
+            let stopped = runner.after(&runner.agent.stop, &self.name, left());
+            let within = left();
+            if within.is_zero() {
+                eprintln!(
+                    "[lamp-tasks] skill task {}: no time left to remove its gateway session",
+                    self.name
+                );
+            } else {
+                runner.after(&runner.agent.end, &self.name, within);
+            }
             if !stopped {
                 // Kept: the next run tries the stop again first.
                 *runner
@@ -546,33 +568,44 @@ fn answered(said: &str, token_left: bool) -> Result<u64, String> {
 }
 
 impl GatewayRunner {
-    /// One fence call, bounded by [`AFTER_WITHIN`]: what it printed, when
-    /// it ended with status 0.
-    fn fence_call(&self, template: &[String], input: Option<&str>) -> Result<String, String> {
-        let args = self.agent.fill(template, "", "", AFTER_WITHIN);
-        match call(self, &args, AFTER_WITHIN, None, input)? {
+    /// One fence call, bounded by [`AFTER_WITHIN`] and by `until` (the
+    /// run's deadline): what it printed, when it ended with status 0.
+    fn fence_call(
+        &self,
+        template: &[String],
+        input: Option<&str>,
+        until: Instant,
+    ) -> Result<String, String> {
+        let within = until
+            .saturating_duration_since(Instant::now())
+            .min(AFTER_WITHIN);
+        if within.is_zero() {
+            return Err("the run's deadline passed".into());
+        }
+        let args = self.agent.fill(template, "", "", within);
+        match call(self, &args, within, None, input)? {
             Turn::Done { code: 0, said } => Ok(said),
             Turn::Done { code, .. } => Err(format!(
                 "the gateway's approvals call ended with status {code}"
             )),
             Turn::Cut => Err(format!(
-                "the gateway's approvals call ran past {} s",
-                AFTER_WITHIN.as_secs()
+                "the gateway's approvals call ran past {} ms",
+                within.as_millis()
             )),
         }
     }
 
     /// The agent's entry ([`GatewayAgent::entry`] for `start`) in the
     /// gateway's exec approvals: got, set only when it is not there, and
-    /// got again to confirm it is.
-    pub fn ensure_fence(&self, start: &str) -> Result<(), String> {
+    /// got again to confirm it is; each call by `until` at the latest.
+    pub fn ensure_fence(&self, start: &str, until: Instant) -> Result<(), String> {
         let entry = self.agent.entry(start)?;
-        let got = self.fence_call(&self.agent.fence_get, None)?;
+        let got = self.fence_call(&self.agent.fence_get, None, until)?;
         let Some(doc) = set_entry(&got, &self.agent.agent, &entry)? else {
             return Ok(());
         };
-        self.fence_call(&self.agent.fence_set, Some(&doc))?;
-        let again = self.fence_call(&self.agent.fence_get, None)?;
+        self.fence_call(&self.agent.fence_set, Some(&doc), until)?;
+        let again = self.fence_call(&self.agent.fence_get, None, until)?;
         match set_entry(&again, &self.agent.agent, &entry)? {
             None => Ok(()),
             Some(_) => Err("the gateway's approvals do not hold the agent's entry once set".into()),
@@ -589,7 +622,11 @@ impl GatewayRunner {
                 "a fixed write is not taken by a gateway agent, so nothing was started".to_owned(),
             );
         }
+        // Everything is held to the run's deadline from here: the earlier
+        // run's stop, the gateway's wait, the fence, the turn, and the
+        // turn's stop and end (which alone get AFTER_FLOOR past it).
         let began = Instant::now();
+        let until = began + run.deadline;
         self.none_live(run.deadline)?;
         let token = run
             .env
@@ -623,6 +660,7 @@ impl GatewayRunner {
             folder: folder.clone(),
             name: name.clone(),
             sent: false,
+            until,
         };
         let write = |file: &str, text: &str, mode: u32| -> Result<(), String> {
             let mut out = std::fs::OpenOptions::new()
@@ -651,7 +689,7 @@ impl GatewayRunner {
         )?;
         // The gateway is the lamp's own, warm: it answers on loopback, or
         // the run is given up in words before any turn is sent.
-        let ready_until = Instant::now() + self.ready_within.min(run.deadline);
+        let ready_until = (began + self.ready_within).min(until);
         while !(self.ready)(self.agent.port) {
             if Instant::now() >= ready_until {
                 return Err(format!(
@@ -671,7 +709,10 @@ impl GatewayRunner {
         let starts = self
             .project
             .join(format!("{RUN_FOLDER_PREFIX}*/{START_FILE}"));
-        self.ensure_fence(starts.to_str().ok_or("the project is not a plain path")?)
+        self.ensure_fence(
+            starts.to_str().ok_or("the project is not a plain path")?,
+            until,
+        )
             .map_err(|why| {
                 format!("the default agent's fence for a skill's run is not set ({why}), so nothing was started")
             })?;
@@ -1017,6 +1058,25 @@ mod tests {
         assert!(said.contains("its gateway says error"), "{said}");
         assert_eq!(turns(&rig), 2, "a good stop freed it");
         assert!(runner.live.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn a_run_with_a_slow_stop_ends_within_its_deadline_and_the_floor() {
+        let rig = rig("", true);
+        std::fs::write(rig.dir.path().join("stopslow"), "").unwrap();
+        let (_, end) = ended();
+        let runner = runner(&rig);
+        let began = Instant::now();
+        let deadline = Duration::from_millis(500);
+        let said = runner.run(&skill_run(&rig, deadline), &end).unwrap_err();
+        let took = began.elapsed();
+        assert!(said.contains("ended at its deadline"), "{said}");
+        assert!(
+            took < deadline + AFTER_FLOOR + Duration::from_millis(700),
+            "{took:?}"
+        );
+        assert!(runner.live.lock().unwrap().is_some(), "the stop was cut");
+        nothing_left(&rig);
     }
 
     #[test]
