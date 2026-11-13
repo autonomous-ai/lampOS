@@ -47,15 +47,23 @@ async function started(t, flags) {
   chmodSync(stub, 0o755);
   const glb = join(folder, 'lamp.glb');
   writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
-  const child = spawn(process.execPath, [server, '--fake', '--port', String(await freePort()), '--glb', glb, ...flags(folder, stub)], { stdio: ['ignore', 'pipe', 'inherit'] });
-  t.after(() => child.kill('SIGTERM'));
-  const url = await new Promise((resolve, reject) => {
-    let text = '';
-    child.stdout.on('data', (chunk) => { text += chunk; const found = /http:\/\/localhost:(\d+)\/\?t=(\S+)/.exec(text); if (found) resolve({ port: found[1], token: found[2] }); });
-    child.on('close', (code) => reject(new Error(`the server ended (${code})`)));
-  });
-  return { ...url, folder };
+  // The port is probed free and closed, then the twin binds it: another test file can take it in between, and the twin dies with
+  // EADDRINUSE (a red Node 22 job on #6745). So the start is tried again, on a new port, when it ended with that.
+  for (let attempt = 1; ; attempt += 1) {
+    const child = spawn(process.execPath, [server, '--fake', '--port', String(await freePort()), '--glb', glb, ...flags(folder, stub)], { stdio: ['ignore', 'pipe', 'pipe'] });
+    t.after(() => child.kill('SIGTERM'));
+    let errors = '';
+    child.stderr.on('data', (chunk) => { errors += chunk; process.stderr.write(chunk); });
+    const url = await new Promise((resolve) => {
+      let text = '';
+      child.stdout.on('data', (chunk) => { text += chunk; const found = /http:\/\/localhost:(\d+)\/\?t=(\S+)/.exec(text); if (found) resolve({ port: found[1], token: found[2] }); });
+      child.on('close', (code) => resolve({ code }));
+    });
+    if (url.port) return { ...url, folder };
+    if (attempt >= 5 || !/EADDRINUSE/.test(errors)) throw new Error(`the server ended (${url.code})`);
+  }
 }
+
 
 const talk = (port, token) => new Promise((resolve, reject) => {
   const socket = new WebSocket(`ws://127.0.0.1:${port}/live?t=${token}`, { headers: { origin: `http://127.0.0.1:${port}` } });
