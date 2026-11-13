@@ -6375,9 +6375,15 @@ pub fn pushed_folder(installed: &Path) -> PathBuf {
 /// replace, once the manage helper removed it): dropped from the index,
 /// its package with it, so it is never told as on again.
 pub fn forget_named(directory: &Path, name: &str) {
-    if let Err(error) = forget_others(directory, name, "") {
+    if let Err(error) = forget_named_checked(directory, name) {
         eprintln!("lamp-voice: a replaced made skill wasn't dropped from the index: {error}");
     }
+}
+
+/// [`forget_named`], saying why when the index could not be written (a
+/// made skill removed by voice, `crate::made_remove::removed`).
+pub fn forget_named_checked(directory: &Path, name: &str) -> Result<(), String> {
+    forget_others(directory, name, "").map_err(|error| error.to_string())
 }
 
 /// The made skill `sha256`, kept and not on, dropped from the index, its

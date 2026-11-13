@@ -837,7 +837,7 @@ What a person would notice with each switch on, one plain line per switch counte
 | `LAMP_SKILL_LIGHT_SPEAKING` | While the lamp speaks, the ring takes on the colour of a light a skill has set, like a warm welcome-back glow. |
 | `LAMP_LIGHT_WHILE_MUTED` | You can still change the light from the app while the lamp is muted or its privacy switch is closed. |
 | `LAMP_LOOK_FULL_SIDE` | Nothing you'd notice: lets the lamp take larger still pictures, meant for reading handwriting. |
-| `LAMP_MAKE_SKILL` | You can ask the lamp, or type in the app, for a new skill; it writes it itself and puts it on, then tells you it's on. Ask it to remove one you made and it asks you first. |
+| `LAMP_MAKE_SKILL` | Ask the lamp, or type in the app, for a new skill and it makes it and puts it on; it asks before removing one. |
 | `LAMP_APP_MAKE_SKILL` | You can ask for a new skill in the app; the lamp makes it, puts it on and tells you it's on. |
 | `LAMP_AGENT_SERVICES` | A skill the lamp's agent runs can read your linked mail and prepare sends, sent only on your yes. |
 | `LAMP_SKILL_DEFAULT_AGENT` | A skill's longer job runs on the agent you chose for the lamp, not always on Hermes. |
