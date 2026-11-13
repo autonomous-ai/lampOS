@@ -3095,7 +3095,13 @@ pub fn task_asks(
     }
     let sha256 = crate::task::folder_sha256(&folder)?;
     let from = if pushed {
-        format!("your computer {}", super::pushed_by(&folder))
+        // "your computer NAME", or "your computer" when no name came with
+        // the push: never "your computer a computer", which no read-back
+        // says word for word, so no first yes was taken (#6715).
+        match super::pushed_computer(&folder) {
+            Some(computer) => format!("your computer {computer}"),
+            None => "your computer".to_owned(),
+        }
     } else if crate::task::made_with_code(&folder, pushed) {
         crate::task::FROM_MADE.to_owned()
     } else {
