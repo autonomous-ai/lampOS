@@ -3,6 +3,18 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 19:1x GMT+7: sim-3-P4 (the person's proposal), asked
+
+- **sim-3-P4** on #6811: a macOS voice for the virtual lamp where the
+  developer configures only an LLM endpoint, on the real lamp-voice SECOND
+  route: (1) a `say`-backed `/audio/speech` in lamp-sim (the route already
+  calls OpenAI-compatible `{base}/audio/speech`); (2) a local STT speaking
+  Deepgram's streaming protocol (the route's STT is `/v1/listen` or
+  `/ws/audio/transcriptions`) before whisper.cpp; (3) lamp-voice on macOS
+  (ALSA speaker, systemctl check; `crates/voice`, the voice's owners);
+  (4) `lamp-sim run --real-voice=local`. A voice brain only for the sim is
+  avoided. No code until the first builder's word.
+
 ## 2026-11-13 19:0x GMT+7: #6925 READ-OK from sim-2; P3 drafted
 
 - #6925: sim-2 READ-OK 11f1df07e5, run on Linux (procps-ng 4.0.4) 8/8
