@@ -1351,7 +1351,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        `harness-ask.json`, and the one-shot installs only if the fetched
        `cli.version` is newer, else records `installed` as it was.
        - **Not while Harness is in use:** a round waits, saying one line
-         (`Harness X is older than the pinned Y: moved at a later round,
+         (`Harness X is to be moved to the pinned Y: at a later round,
          …`), never an error, while `tasks/status`'s kept value lists a
          task in `tasks` or `unread` (one that can't be read counts as in
          use), or a Harness `login` (a sign-in by code), `new` or `reply`
@@ -1359,6 +1359,22 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          processes (`harness_install/busy.rs`; options before the verb,
          as in `harness --json login`, are passed over). lamp-tasks' store is
          private and never opened. The next idle round moves it.
+       - **A task waits 6 hours at most (#6656):** a task left on a machine
+         that is offline stays `unknown` and never ends, so a wait for
+         `tasks/status` (a task worked on, or a status that can't be read)
+         is bounded by `DEFER_CAP`, 6 h from the first round it held the
+         move back. That time is kept in lamp-update's records as
+         `harness-deferred.json` (`{"version":1,"since_unix_ms":N}`,
+         0600). Past it, the round says once `Harness's move has waited N h
+         for …, past its 6 h bound: it is moved now (#6656)` and asks the
+         move. A sign-in, hand-over or follow-up running now still waits
+         every round, past the bound too. The kept time goes once a round
+         finds nothing in use, or once the one-shot stops Harness for the
+         move, so a later task starts its 6 h afresh. Before, a task on an
+         offline laptop held a lamp on Harness 0.5.39 all evening, and
+         neither the app nor the voice could clear it. Tests:
+         `issue_6656_a_task_left_unknown_holds_the_move_back_six_hours_at_most`,
+         `issue_6656_the_one_shot_moves_past_the_bound_and_lets_the_time_go`.
        - **The ask:** `harness-ask.json` gains `upgrade_from` (the
          recorded version), so the one-shot moves the Harness that is there
          instead of saying "already at …, nothing installed". The record
@@ -1377,8 +1393,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
          left alone, `installed`). That version, not the record's (Harness
          may have moved itself), is the `from_version` of the `installing`
          record and of any `failed` `upgrade`. It checks the pinned files as
-         for a first install, then looks again whether Harness is in use: if
-         it is, it records `installed` at that version and a later round
+         for a first install, then looks again whether Harness is in use,
+         with the same 6 h bound for a task: if it is, it records `installed` at that version and a later round
          moves it. Then it stops `lamp-tasks.service` and runs `harness
          stop` (lamp-tasks starts the new daemon when it starts again).
          Either stop failing, or `id -u` failing first, is "not now" in the

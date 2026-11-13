@@ -2434,6 +2434,169 @@ fn put_back_refuses_a_kept_copy_without_its_cli_folder() {
     );
 }
 
+/// #6656 (the first builder's (c), 13 Nov): a task left on a machine that
+/// is offline stays `unknown` on `tasks/status` and never ends. It holds
+/// the move back at each round for at most [`DEFER_CAP`] from the first
+/// round it did, that time kept in [`DEFERRED`]; past it the move is asked
+/// with one line saying why. A sign-in running now still holds it back
+/// every round, past the bound too; a round with nothing in use lets the
+/// kept time go, so a later task starts its bound afresh.
+#[test]
+fn issue_6656_a_task_left_unknown_holds_the_move_back_six_hours_at_most() {
+    const H: u64 = 3_600_000;
+    let cap = DEFER_CAP.as_millis() as u64;
+    assert_eq!(cap, 6 * H);
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    installed_at(&lamp, Some("0.4.25"), 1);
+    let pin = Ok(Some(product::built_in()));
+    let mut systemd = Fake::default();
+    let mut round = |at: u64, why: Option<&'static str>, lines: &mut Vec<String>| {
+        after_round_when(
+            lamp.root(),
+            &lamp.records(),
+            &pin,
+            &mut systemd,
+            at,
+            &mut || why,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+    };
+    let kept = || -> Option<u64> {
+        let text = fs::read(lamp.records().join(DEFERRED)).ok()?;
+        let value: serde_json::Value = serde_json::from_slice(&text).unwrap();
+        value["since_unix_ms"].as_u64()
+    };
+    let t0 = 10 * H;
+    // Held back from the first round, and kept from then.
+    for at in [t0, t0 + H, t0 + cap - 1] {
+        let mut lines = Vec::new();
+        assert_eq!(round(at, Some(busy::TASK_WORKED_ON), &mut lines), None);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(lines[0].ends_with(busy::TASK_WORKED_ON), "{lines:?}");
+        assert_eq!(kept(), Some(t0));
+    }
+    // A sign-in running now holds it back past the bound, every round.
+    let mut lines = Vec::new();
+    assert_eq!(
+        round(
+            t0 + cap + H,
+            Some("a Harness sign-in is pending"),
+            &mut lines
+        ),
+        None
+    );
+    assert!(
+        lines[0].ends_with("a Harness sign-in is pending"),
+        "{lines:?}"
+    );
+    assert_eq!(kept(), Some(t0), "a running sign-in keeps the task's time");
+    // The same task past its bound: the move is asked, said once why.
+    let mut lines = Vec::new();
+    let said = round(t0 + cap + 2 * H, Some(busy::TASK_WORKED_ON), &mut lines).unwrap();
+    assert_eq!(said.from_version.as_deref(), Some("0.4.25"));
+    assert_eq!(said.install, "installing");
+    assert_eq!(
+        lines
+            .iter()
+            .filter(|line| line.contains("past its 6 h bound: it is moved now"))
+            .count(),
+        1,
+        "{lines:?}"
+    );
+    assert!(
+        lines.iter().all(|line| !line.contains("at a later round")),
+        "{lines:?}"
+    );
+    assert!(lamp.records().join(ASK).exists());
+    // A status not read is bounded the same way.
+    assert!(busy::is_task(busy::TASKS_UNREAD));
+    assert!(!busy::is_task("a hand-over is being sent to Harness"));
+
+    // On another lamp: a round with nothing in use lets the time go, and a
+    // later task starts its bound afresh.
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    installed_at(&lamp, Some("0.4.25"), 1);
+    let mut systemd = Fake::default();
+    let mut lines = Vec::new();
+    let mut round = |at: u64, why: Option<&'static str>| {
+        after_round_when(
+            lamp.root(),
+            &lamp.records(),
+            &pin,
+            &mut systemd,
+            at,
+            &mut || why,
+            &mut |line: &str| lines.push(line.to_owned()),
+        )
+    };
+    assert_eq!(round(t0, Some(busy::TASK_WORKED_ON)), None);
+    assert!(lamp.records().join(DEFERRED).exists());
+    // A sign-in, then nothing in use and an idle move: the time is gone.
+    assert_eq!(round(t0 + H, Some("a Harness sign-in is pending")), None);
+    assert!(lamp.records().join(DEFERRED).exists());
+    let said = round(t0 + 2 * H, None).unwrap();
+    assert_eq!(said.from_version.as_deref(), Some("0.4.25"));
+    assert!(!lamp.records().join(DEFERRED).exists());
+}
+
+/// #6656: the one-shot's own look, just before it stops Harness, keeps the
+/// same bound: a task worked on past [`DEFER_CAP`] no longer stops the
+/// move, and the move under way lets the kept time go. Within the bound it
+/// waits, as for any use.
+#[test]
+fn issue_6656_the_one_shot_moves_past_the_bound_and_lets_the_time_go() {
+    let kit = Kit {
+        in_use: |_| Some(busy::TASK_WORKED_ON),
+        ..Kit::BUILT
+    };
+    let cap = DEFER_CAP.as_millis() as u64;
+    for (since, moves) in [(10, false), (1, true)] {
+        let lamp = Lamp::new();
+        asked_to_move(&lamp, "0.4.25");
+        fs::write(
+            lamp.records().join(DEFERRED),
+            format!(r#"{{"version":1,"since_unix_ms":{since}}}"#),
+        )
+        .unwrap();
+        let log: Rc<RefCell<Vec<String>>> = Rc::default();
+        let mut run = mover(log.clone(), "0.4.25", product::VERSION, Ok(String::new()));
+        let mut lines = Vec::new();
+        let said = install_with(
+            lamp.root(),
+            &lamp.records(),
+            &mut run,
+            &mut || cap + 1,
+            &mut |line: &str| lines.push(line.to_owned()),
+            &kit,
+        )
+        .unwrap();
+        let stopped = log
+            .borrow()
+            .iter()
+            .any(|line| line.contains("/usr/local/bin/harness stop"));
+        assert_eq!(stopped, moves, "{lines:?}");
+        if moves {
+            assert_eq!(said.version.as_deref(), Some(product::VERSION), "{lines:?}");
+            assert!(!lamp.records().join(DEFERRED).exists());
+            assert!(
+                lines.iter().any(|line| line.contains("past its 6 h bound")),
+                "{lines:?}"
+            );
+        } else {
+            assert_eq!(said.version.as_deref(), Some("0.4.25"), "{lines:?}");
+            assert!(lamp.records().join(DEFERRED).exists());
+            assert!(
+                lines
+                    .iter()
+                    .any(|line| line.ends_with(busy::TASK_WORKED_ON)),
+                "{lines:?}"
+            );
+        }
+    }
+}
+
 /// #5957 (P2-3): a kept copy already there (a put-back that failed) is the
 /// only good one: KEEP refuses, and leaves it whole.
 #[test]
