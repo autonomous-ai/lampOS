@@ -6199,8 +6199,12 @@ impl Engine {
     /// words alone, with no call, they are not said: the turn is asked
     /// again once, told the person asked that agent and to call
     /// `start_agent_task`, and the journal says so and what came of it. A
-    /// round 1 that calls anything, and a second such answer in the same
-    /// request, go on as before. Before any turn only.
+    /// round 1 that calls only the lamp's own tools is asked again the same
+    /// way, none of them run (V2's P1 on 12587); one that calls an
+    /// agent-task tool (`crate::agent_tasks::is_task_tool`) or `not_for_me`,
+    /// and a second such answer in the same request, go on as before. Either
+    /// is asked again only once the join window has passed. Before any turn
+    /// only.
     pub fn catching_named_agents(mut self, named: NamedAgent) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.named_agent = Some(named);
@@ -15842,13 +15846,30 @@ async fn answer(
                 && round < MAX_ROUNDS
                 && decline_held.is_some()
                 && !calls.is_empty()
-                && !calls
-                    .iter()
-                    .any(|call| call.name == start || call.name == NOT_FOR_ME)
+                && !calls.iter().any(|call| {
+                    crate::agent_tasks::is_task_tool(&call.name) || call.name == NOT_FOR_ME
+                })
                 && let Some(agent) = named_agent.as_deref()
                 && shared.named_asked_again.first(request)
             {
                 let names: Vec<&str> = calls.iter().map(|call| call.name.as_str()).collect();
+                // Asked again only once the join window has passed, as the
+                // calls-empty catch below: a paused ask's second half joins
+                // its first, never handed over half said.
+                tokio::time::sleep_until(join_ends).await;
+                let newer = shared
+                    .begun
+                    .lock()
+                    .ok()
+                    .and_then(|begun| *begun)
+                    .is_some_and(|(latest, _)| latest > request);
+                if newer {
+                    shared.named_ask_said(format!(
+                        "lamp-voice second: request {request}: named agent, called {} not {start}: a newer line began within the join window: none run, not asked again",
+                        names.join(", ")
+                    ));
+                    return Ok(());
+                }
                 shared.named_ask_said(format!(
                     "lamp-voice second: request {request}: named agent, called {} not {start}: none run, asked again",
                     names.join(", ")
