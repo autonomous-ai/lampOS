@@ -6598,17 +6598,30 @@ fn the_index_lives_in_the_tasks_folder_the_reset_wipes() {
 /// as Harness. The runner as the lamp's, in the rig's folders, with no
 /// wrapper to look at.
 fn skill_runner(rig: &Rig, engine: Option<EngineKind>) -> HarnessRunner {
+    skill_runner_with(rig, engine, None)
+}
+
+/// [`skill_runner`] with the lamp's default engine `default` (none: the
+/// lamp target's own counts).
+fn skill_runner_with(
+    rig: &Rig,
+    engine: Option<EngineKind>,
+    default: Option<EngineKind>,
+) -> HarnessRunner {
     let slot: SkillHarnessSlot = Arc::default();
     let lamp = engine.map(|engine| Target {
         machine_id: MACHINE.into(),
         project: "~/harnesses/lamp-tasks/lamp".into(),
         engine,
     });
-    let _ = slot.set(SkillHarness::new(
-        rig.config.clone(),
-        "stable-session_123".into(),
-        Box::new(move || lamp.clone()),
-    ));
+    let _ = slot.set(
+        SkillHarness::new(
+            rig.config.clone(),
+            "stable-session_123".into(),
+            Box::new(move || lamp.clone()),
+        )
+        .with_default_engine(Box::new(move || default)),
+    );
     HarnessRunner {
         project: rig.root.path().join("project"),
         runs: rig.root.path().join("runs"),
@@ -6617,7 +6630,8 @@ fn skill_runner(rig: &Rig, engine: Option<EngineKind>) -> HarnessRunner {
         retry: Duration::from_millis(20),
         stopping: std::sync::OnceLock::new(),
         default_agent: false,
-        openclaw_ns: None,
+        wrappers: None,
+        agent_ns: None,
     }
 }
 
@@ -6733,30 +6747,55 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
     nothing_left(&rig);
 }
 
-/// #6685: with the switch on and OpenClaw the lamp's default, a skill's run
-/// is `harness new openclaw` in its own folder, when OpenClaw's namespace
-/// script shows the runs' token folder; otherwise, or with the switch off,
-/// it stays the lamp's Hermes. The token is in no argument, and nothing of
-/// the run is left after.
+/// lamp-update's one run path wrappers, as its own test pins them (the
+/// same bytes it writes).
+const ONE_PATH_HERMES: &str = include_str!("../../update/src/agent_ns/wrapper/one-path-hermes.sh");
+const ONE_PATH_CLAUDE: &str = include_str!("../../update/src/agent_ns/wrapper/one-path-claude.sh");
+
+/// An agent namespace script with what the one check looks for: the home
+/// taken from the wrapper and lamp-control's socket.
+fn ns_with_runs() -> String {
+    format!(
+        "#!/bin/sh\nE=${{LAMP_NS_ENGINE-}}{}W=/w K=/k{}",
+        skill_task::AGENT_NS_HOME_LINE,
+        skill_task::AGENT_NS_TASKS_LINE
+    )
+}
+
+/// The runner with [`skill_task::DEFAULT_AGENT_SWITCH`] on, the lamp's
+/// default `default`, each of `wrappers` (name, text) written in the
+/// rig's `bin`, and the agent namespace script `ns` when given.
+fn one_path_runner(
+    rig: &Rig,
+    default: EngineKind,
+    wrappers: &[(&str, &str)],
+    ns: Option<&str>,
+) -> HarnessRunner {
+    let mut runner = skill_runner_with(rig, Some(EngineKind::Hermes), Some(default));
+    let bin = rig.root.path().join("bin");
+    fs::create_dir_all(&bin).unwrap();
+    for (name, text) in wrappers {
+        fs::write(bin.join(name), text).unwrap();
+    }
+    runner.default_agent = true;
+    runner.wrappers = Some(bin);
+    runner.agent_ns = ns.map(|text| {
+        let path = rig.root.path().join("agent-ns");
+        fs::write(&path, text).unwrap();
+        path
+    });
+    runner
+}
+
+/// #6685: with the switch on, a skill's run is `harness new <default>` in
+/// its own folder, for Hermes and Claude Code alike, by the one check:
+/// lamp-update's one run path wrapper for that engine and the agent
+/// namespace showing lamp-control's socket. The token file is written
+/// before the launch and is in no argument; nothing of the run is left
+/// after. Off, the run is the lamp's Hermes whatever the default.
 #[test]
-fn a_skill_run_goes_to_openclaw_as_the_default_only_with_the_switch_and_its_namespace() {
-    let engine_of = |default_agent: bool, ns: Option<&str>| {
-        let rig = Rig::new();
-        rig.plan(json!({
-            "machines":{"default":true},
-            "new":{"default":true},
-            // OpenClaw's launch reads the pane until it is under way (#6499).
-            "show":{"each":[openclaw_seen("working", json!("Run the skill's script"))]},
-            "wait":{"stdout":waited("stopped", AGENT)},
-            "close":{"exit":0},
-        }));
-        let mut runner = skill_runner(&rig, Some(EngineKind::Openclaw));
-        runner.default_agent = default_agent;
-        runner.openclaw_ns = ns.map(|text| {
-            let path = rig.root.path().join("openclaw-ns");
-            fs::write(&path, text).unwrap();
-            path
-        });
+fn a_skill_run_goes_to_the_default_agent_by_the_one_path() {
+    let engine_of = |runner: HarnessRunner, rig: &Rig| {
         assert_eq!(
             runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
             Ok(0)
@@ -6765,41 +6804,105 @@ fn a_skill_run_goes_to_openclaw_as_the_default_only_with_the_switch_and_its_name
         for call in &calls {
             assert!(!call.to_string().contains(RUN_SECRET), "{call}");
         }
-        nothing_left(&rig);
-        // Only OpenClaw's run uses the gateway's subfolder (Heron's P2 on
-        // #6767): a Hermes run's file is never where a gateway sees it.
-        let gateway = rig
-            .root
-            .path()
-            .join("runs")
-            .join(lamp_tasks::run_token_file::GATEWAY_RUNS);
+        nothing_left(rig);
         let new = calls
             .iter()
             .find(|call| call["args"][0] == "new")
             .expect("a new");
-        let engine = new["args"][1].as_str().unwrap().to_owned();
-        assert_eq!(gateway.is_dir(), engine == "openclaw", "{engine}");
-        if gateway.is_dir() {
-            assert_eq!(
-                fs::read_dir(&gateway).unwrap().count(),
-                0,
-                "its file is gone"
-            );
-        }
-        engine
+        new["args"][1].as_str().unwrap().to_owned()
     };
-    let shows = format!(
-        "H=x L=/run/lampos-control/control.sock B=y P=z{}",
-        skill_task::OPENCLAW_RUNS_LINE
+    let ns = ns_with_runs();
+    for (default, name, text) in [
+        (EngineKind::Hermes, "hermes", ONE_PATH_HERMES),
+        (EngineKind::Claude, "claude", ONE_PATH_CLAUDE),
+    ] {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, "stopped");
+        let runner = one_path_runner(&rig, default, &[(name, text)], Some(&ns));
+        assert_eq!(engine_of(runner, &rig), name);
+    }
+    // The switch off: the lamp's Hermes, whatever the default (the interim).
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut off = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        Some(&ns),
     );
-    assert_eq!(engine_of(true, Some(&shows)), "openclaw");
-    assert_eq!(engine_of(false, Some(&shows)), "hermes", "the switch off");
-    assert_eq!(
-        engine_of(true, Some("H=x S=/tmp/.lampos-ns\n")),
-        "hermes",
-        "a namespace without the runs' folder"
+    off.default_agent = false;
+    assert_eq!(engine_of(off, &rig), "hermes");
+}
+
+/// #6685: with the switch on, a default agent that can't take a run by the
+/// one path is refused in words, naming it and why, with nothing made or
+/// asked, and no other agent runs it: no wrapper, a wrapper that is not
+/// the one path's (Hermes's own, OpenClaw's), another agent's, no agent
+/// namespace or one without lamp-control's socket, an agent in its maker's
+/// cloud.
+#[test]
+fn a_skill_run_is_refused_in_words_when_the_default_agent_cant_take_it() {
+    let refused = |default: EngineKind, wrappers: &[(&str, &str)], ns: Option<&str>, why: &str| {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, "stopped");
+        let runner = one_path_runner(&rig, default, wrappers, ns);
+        let said = runner
+            .run(&skill_run(Duration::from_secs(20)), &|| {})
+            .unwrap_err();
+        assert!(
+            said.starts_with("the lamp's default agent (")
+                && said.contains("isn't set up for a skill's run yet"),
+            "{said}"
+        );
+        assert!(said.contains(why), "{said}");
+        assert!(rig.calls().is_empty(), "nothing asked");
+        assert!(!rig.root.path().join("project").exists());
+        assert!(!rig.root.path().join("runs").exists());
+    };
+    let ns = ns_with_runs();
+    refused(EngineKind::Claude, &[], Some(&ns), "(claude)");
+    refused(
+        EngineKind::Hermes,
+        &[(
+            "hermes",
+            "#!/bin/sh\n# lampOS: Hermes on the lamp. Written by lamp-update.\nif [ \"${LAMP_NS_NET-}\" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi\n",
+        )],
+        Some(&ns),
+        "isn't lamp-update's one run path",
     );
-    assert_eq!(engine_of(true, None), "hermes", "no namespace script");
+    refused(
+        EngineKind::Openclaw,
+        &[(
+            "openclaw",
+            "#!/bin/sh\n# lampOS: OpenClaw. Written by lamp-update.\n",
+        )],
+        Some(&ns),
+        "(openclaw)",
+    );
+    refused(
+        EngineKind::Codex,
+        &[("codex", ONE_PATH_CLAUDE)],
+        Some(&ns),
+        "(codex)",
+    );
+    refused(
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        None,
+        "doesn't show lamp-control's socket",
+    );
+    refused(
+        EngineKind::Hermes,
+        &[("hermes", ONE_PATH_HERMES)],
+        Some("#!/bin/sh\nH=/var/lib/lampos-agents/$E S=/tmp/.lampos-ns\n"),
+        "doesn't show lamp-control's socket",
+    );
+    refused(
+        EngineKind::DevinCloud,
+        &[("devin-cloud", ONE_PATH_CLAUDE)],
+        Some(&ns),
+        "maker's cloud",
+    );
 }
 
 /// At its deadline the run's `wait` is cancelled and its session closed

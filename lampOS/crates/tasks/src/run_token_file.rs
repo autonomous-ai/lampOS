@@ -21,21 +21,6 @@ use crate::skill_task::RunToken;
 /// Where runs' token files are made: tmpfs, lamp-tasks' runtime folder.
 pub const RUNS_DIR: &str = "/run/lampos-tasks/runs";
 
-/// The subfolder of [`RUNS_DIR`] for the runs whose token no wrapper
-/// reads (OpenClaw's one gateway, #6685): the only part of it OpenClaw's
-/// namespace shows, so no gateway session ever sees a Hermes run's file
-/// (Heron's P2 on #6767).
-pub const GATEWAY_RUNS: &str = "gateway";
-
-/// `runs`' [`GATEWAY_RUNS`] subfolder, both made 0700 when missing and
-/// checked as [`RunTokenFile::write`] checks its folder.
-pub fn gateway_dir(runs: &Path) -> Result<PathBuf, String> {
-    open_dir(runs)?;
-    let dir = runs.join(GATEWAY_RUNS);
-    open_dir(&dir)?;
-    Ok(dir)
-}
-
 /// The longest run id a file is made for (lamp-control's own most).
 const RUN_ID_MAX: usize = 64;
 
@@ -169,27 +154,6 @@ mod tests {
 
     fn token() -> RunToken {
         RunToken::new(SECRET.into())
-    }
-
-    #[test]
-    fn the_gateway_folder_is_made_0700_under_the_runs_folder_and_a_link_is_refused() {
-        let root = tempfile::tempdir().unwrap();
-        let runs = root.path().join("runs");
-        let gateway = gateway_dir(&runs).unwrap();
-        assert_eq!(gateway, runs.join(GATEWAY_RUNS));
-        assert_eq!(mode(&runs), 0o700);
-        assert_eq!(mode(&gateway), 0o700);
-        assert_eq!(gateway_dir(&runs).unwrap(), gateway, "again, as it is");
-        let other = root.path().join("other");
-        std::fs::create_dir(&other).unwrap();
-        let linked = root.path().join("linked");
-        std::fs::create_dir(&linked).unwrap();
-        std::fs::set_permissions(&linked, std::fs::Permissions::from_mode(0o700)).unwrap();
-        symlink(&other, linked.join(GATEWAY_RUNS)).unwrap();
-        assert!(
-            gateway_dir(&linked).is_err(),
-            "a link is never the gateway's folder"
-        );
     }
 
     fn mode(path: &Path) -> u32 {

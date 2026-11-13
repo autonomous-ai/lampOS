@@ -126,13 +126,21 @@ pub const TASKS_SWITCH: &str = "LAMP_SKILL_TASKS";
 
 /// What [`NS`] shows Hermes beyond [`ALLOWED`], each by its own switch:
 /// lamp-skills' socket folder ([`SKILLS_SWITCH`]) and lamp-control's
-/// control socket ([`TASKS_SWITCH`]). Both off is [`NS_TEXT`].
+/// control socket ([`TASKS_SWITCH`]). Both off is [`NS_TEXT`]. And
+/// whether every agent runs by the one run path ([`Shown::one_path`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Shown {
     /// [`SKILLS_SOCKET`], read-only.
     pub skills: bool,
     /// [`CONTROL_SOCKET`] alone, read-only.
     pub tasks: bool,
+    /// The one run path (#6685; [`agent_ns::DEFAULT_AGENT_SWITCH`] on, read
+    /// only with [`TASKS_SWITCH`] on): Hermes's wrapper [`WRAPPER`] is the
+    /// one every agent has ([`agent_ns::wrapper::one_path_text`] with
+    /// Hermes's data, [`agent`]) and runs [`agent_ns::wrapper::NS`], never
+    /// [`NS`]; every other agent's wrapper is the same text with its own
+    /// data. Off, every wrapper and namespace script is as before.
+    pub one_path: bool,
 }
 
 /// Where the install is, in lamp-update's records (0600), next to
@@ -333,9 +341,13 @@ pub const SDK_PYTHONPATH: &str = "/usr/local/lib/lampos/sdk-python";
 /// [`CONTROL_SOCKET`], [`SDK_PYTHONPATH`] and [`NET_ENV`] `run` (its own
 /// network namespace), as lamp-tasks' `HermesRunner` gives them; the
 /// token is assigned and exported, never a command's argument. Any other
-/// folder: nothing here changes. Hermes's ([`WRAPPER_TASKS_EDITS`]) and
-/// every engine's ([`agent_ns::wrapper::wrapper_text`]) carry these.
-macro_rules! run_lines {
+/// folder: nothing here changes. These are the lines that find the run
+/// ([`run_lines_read`] reads its token); [`run_lines`] and
+/// [`one_run_lines`] are the whole block, which Hermes's own wrapper
+/// ([`WRAPPER_TASKS_EDITS`]) and every agent's
+/// ([`agent_ns::wrapper::wrapper_text`], [`agent_ns::wrapper::one_path_text`])
+/// carry.
+macro_rules! run_lines_find {
     () => {
         r#"# A skill's run (#6510): started by lamp-tasks through Harness in /var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run-id>,
 # it gets its one-run token from /run/lampos-tasks/runs/<run-id>, read once and deleted, in its environment only.
@@ -344,8 +356,16 @@ R=
 case $P in /var/lib/lampos-tasks/harnesses/lamp-tasks/skill-?*) R=${P#/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-} ;; esac
 case $R in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) R= ;; esac
 [ ${#R} -le 64 ] || R=
-unset HERMES_YOLO_MODE
-if [ -n "$R" ]; then
+"#
+    };
+}
+pub(crate) use run_lines_find;
+/// The lines that read a run's token file and give the run its
+/// environment, after [`run_lines_find`], open: [`run_lines`] and
+/// [`one_run_lines`] close them.
+macro_rules! run_lines_read {
+    () => {
+        r#"if [ -n "$R" ]; then
   F=/run/lampos-tasks/runs/$R
   C=
   if [ -f "$F" ] && [ ! -L "$F" ]; then C=$(cat -- "$F") || C=; fi
@@ -354,16 +374,46 @@ if [ -n "$R" ]; then
   LAMP_CONTROL_TOKEN=$C LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock PYTHONPATH=/usr/local/lib/lampos/sdk-python LAMP_NS_NET=run
   unset C
   export LAMP_CONTROL_TOKEN LAMP_CONTROL_SOCKET PYTHONPATH LAMP_NS_NET
-  # Nobody answers a skill's run: Hermes asks no approval in it, its hardline list still holds (#6684).
-  HERMES_YOLO_MODE=1
-  export HERMES_YOLO_MODE
-fi
 "#
     };
 }
+pub(crate) use run_lines_read;
+/// Hermes's own wrapper's run lines (with [`TASKS_SWITCH`] on and
+/// `LAMP_SKILL_DEFAULT_AGENT` off, [`WRAPPER_TASKS_EDITS`], and the older
+/// agent-namespace wrapper's): the one run path's lines
+/// ([`one_run_lines`]) with Hermes's approvals decided in them, as before
+/// the one run path (#6684).
+macro_rules! run_lines {
+    () => {
+        concat!(
+            $crate::hermes_install::run_lines_find!(),
+            "unset HERMES_YOLO_MODE\n",
+            $crate::hermes_install::run_lines_read!(),
+            "  # Nobody answers a skill's run: Hermes asks no approval in it, its hardline list still holds (#6684).\n",
+            "  HERMES_YOLO_MODE=1\n",
+            "  export HERMES_YOLO_MODE\n",
+            "fi\n"
+        )
+    };
+}
 pub(crate) use run_lines;
+/// The one run path's run lines (#6685, with `LAMP_SKILL_DEFAULT_AGENT`
+/// on): the same for every agent, naming none. What an agent needs only in
+/// a skill's run is its own data ([`crate::agent_ns::wrapper::Agent::run_env`]).
+macro_rules! one_run_lines {
+    () => {
+        concat!(
+            $crate::hermes_install::run_lines_find!(),
+            $crate::hermes_install::run_lines_read!(),
+            "fi\n"
+        )
+    };
+}
+pub(crate) use one_run_lines;
 /// [`run_lines`]'s text.
 pub const RUN_LINES: &str = run_lines!();
+/// [`one_run_lines`]'s text.
+pub const ONE_RUN_LINES: &str = one_run_lines!();
 
 /// What [`wrapper_text`] changes in [`WRAPPER_TEXT`] with [`TASKS_SWITCH`]
 /// on, each found exactly once (a test holds it): [`RUN_LINES`] first, so
@@ -404,6 +454,60 @@ pub fn wrapper_text(tasks: bool) -> String {
         }
     }
     agent_ns::with_hook_note(&text, "hermes")
+}
+
+/// Hermes's own lines in the one run path's wrapper, at every start (#6685,
+/// [`Shown::one_path`]): its forwarder token read from [`TOKEN`] (none ends
+/// it, as in [`WRAPPER_TEXT`]) and given as [`TOKEN_ENV`] with its
+/// [`HERMES_HOME`], and `HERMES_YOLO_MODE` unset, so Hermes asks its
+/// approvals. Data of Hermes's: only in its wrapper's data block.
+pub const AGENT_ENV: &str = r#"  T=$(cat /var/lib/lampos-cloud/hermes-token 2>/dev/null) && [ -n "$T" ] || fail "no forwarder token at /var/lib/lampos-cloud/hermes-token; lamp-cloud makes it with LAMP_HERMES_ON_LAMP=on"
+  LAMP_HERMES_TOKEN=$T HERMES_HOME=/var/lib/lampos-hermes/.hermes
+  export LAMP_HERMES_TOKEN HERMES_HOME
+  unset T HERMES_YOLO_MODE
+"#;
+/// Hermes's own lines in a skill's run only (#6684): nobody answers a
+/// skill's run, so Hermes asks no approval in it; its hardline list still
+/// holds.
+pub const AGENT_RUN_ENV: &str = "  # Nobody answers a skill's run: Hermes asks no approval in it, its hardline list still holds (#6684).
+  HERMES_YOLO_MODE=1
+  export HERMES_YOLO_MODE
+";
+
+/// Hermes's data in the one run path's wrapper ([`Shown::one_path`]): its
+/// home [`PLACE`], shown at that path (its checkout's scripts and its
+/// Python name it), its program [`HERMES`], [`AGENT_ENV`] and
+/// [`AGENT_RUN_ENV`].
+pub fn agent() -> agent_ns::wrapper::Agent {
+    agent_ns::wrapper::Agent {
+        engine: "hermes".to_owned(),
+        home: PLACE.to_owned(),
+        program: Some(HERMES.to_owned()),
+        env: AGENT_ENV.to_owned(),
+        run_env: AGENT_RUN_ENV.to_owned(),
+    }
+}
+
+/// [`WRAPPER`]'s text for `shown`: with [`Shown::one_path`], the one run
+/// path's wrapper with Hermes's data ([`agent`]); else [`wrapper_text`].
+pub fn wrapper_for(shown: Shown) -> String {
+    if shown.one_path {
+        agent_ns::wrapper::one_path_text(&agent()).unwrap_or_default()
+    } else {
+        wrapper_text(shown.tasks)
+    }
+}
+
+/// The namespace script [`WRAPPER`] runs for `shown`, and its text: with
+/// [`Shown::one_path`], the one every agent runs
+/// ([`agent_ns::wrapper::NS`], [`agent_ns::wrapper::ns_text`]); else
+/// [`NS`] ([`ns_text`]).
+pub fn ns_for(shown: Shown) -> (&'static str, String) {
+    if shown.one_path {
+        (agent_ns::wrapper::NS, agent_ns::wrapper::ns_text(shown))
+    } else {
+        (NS, ns_text(shown.skills, shown.tasks))
+    }
 }
 
 /// [`NS`]: only inside a user namespace (refused in the lamp's own, where
@@ -764,6 +868,10 @@ struct Ask {
     /// [`Shown::tasks`]. Absent (an older round's ask) is off.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     tasks: bool,
+    /// [`Shown::one_path`]: the wrapper written as the one run path's.
+    /// Absent (an older round's ask) is off.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    one_path: bool,
 }
 
 impl Ask {
@@ -771,6 +879,7 @@ impl Ask {
         Shown {
             skills: self.skills,
             tasks: self.tasks,
+            one_path: self.one_path,
         }
     }
 }
@@ -829,15 +938,20 @@ pub(crate) fn holds(root: &Path, path: &str, text: &str) -> bool {
 
 /// Hermes there as this build puts it, under `root`: its command, its
 /// checkout at [`COMMIT`], and the wrapper and namespace script with this
-/// build's text, the script's as [`ns_text`] for `shown`. Any of them
+/// build's text for `shown` ([`wrapper_for`], [`ns_for`]: with
+/// [`Shown::one_path`], the one run path's wrapper and the one agent
+/// namespace). Any of them
 /// otherwise is Hermes missing, put there again: so turning
 /// [`SKILLS_SWITCH`] or [`TASKS_SWITCH`] on or off has the script written
 /// again.
 pub fn present(root: &Path, shown: Shown) -> bool {
     fs::metadata(on(root, HERMES)).is_ok()
         && head(root).as_deref() == Some(COMMIT)
-        && holds(root, WRAPPER, &wrapper_text(shown.tasks))
-        && holds(root, NS, &ns_text(shown.skills, shown.tasks))
+        && holds(root, WRAPPER, &wrapper_for(shown))
+        && {
+            let (ns, text) = ns_for(shown);
+            holds(root, ns, &text)
+        }
         // The build's own lampos SDK, one copy for every agent (#6507).
         && crate::sdk_tree::present(root)
         && agent_ns::hook_shim_there(root)
@@ -864,6 +978,7 @@ fn ask(records: &Path, remove: bool, shown: Shown) -> io::Result<()> {
         remove,
         skills: shown.skills,
         tasks: shown.tasks,
+        one_path: shown.one_path,
     })
     .map_err(io::Error::other)?;
     write_whole(&records.join(ASK), &text, 0o600)
@@ -1647,16 +1762,18 @@ pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
     .collect()
 }
 
-/// The namespace script ([`ns_text`] for `shown`), the shared hook
-/// stand-in ([`agent_ns::write_hook_shim`]), then the wrapper: root's,
-/// 0755, each written whole beside and renamed in (never through a link),
-/// so `lampos` never finds a wrapper before what it runs.
+/// The namespace script ([`ns_for`] for `shown`), the shared hook
+/// stand-in ([`agent_ns::write_hook_shim`]), then the wrapper
+/// ([`wrapper_for`]): root's, 0755, each written whole beside and renamed
+/// in (never through a link), so `lampos` never finds a wrapper before
+/// what it runs. With [`Shown::one_path`], [`NS`] is taken out after: the
+/// wrapper runs the one namespace script every agent runs.
 fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
     // The build's own lampos SDK first (#6507): the one read-only copy a skill's script imports.
     crate::sdk_tree::write(root)?;
-    let ns = ns_text(shown.skills, shown.tasks);
-    let wrapper = wrapper_text(shown.tasks);
-    for (path, text) in [(NS, ns.as_str()), (WRAPPER, wrapper.as_str())] {
+    let (ns_path, ns) = ns_for(shown);
+    let wrapper = wrapper_for(shown);
+    for (path, text) in [(ns_path, ns.as_str()), (WRAPPER, wrapper.as_str())] {
         let place = on(root, path);
         if let Some(folder) = place.parent()
             && !folder.is_dir()
@@ -1664,8 +1781,16 @@ fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
             return Err(format!("{}: no such folder", folder.display()));
         }
         write_whole(&place, text.as_bytes(), 0o755).map_err(|error| format!("{path}: {error}"))?;
-        if path == NS {
+        if path == ns_path {
             agent_ns::write_hook_shim(root)?;
+        }
+    }
+    // The one run path: nothing runs Hermes's own namespace script any more.
+    if shown.one_path {
+        match fs::remove_file(on(root, NS)) {
+            Ok(()) => {}
+            Err(error) if error.kind() == ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("{NS}: {error}")),
         }
     }
     Ok(())
