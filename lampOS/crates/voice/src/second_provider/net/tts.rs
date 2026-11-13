@@ -1,8 +1,8 @@
 //! Streamed speech as 24 kHz mono 16-bit PCM from OpenAI or ElevenLabs, as
 //! V1's `hal/drivers/voice/tts/{openai,elevenlabs}.py` ask for it.
 use super::{
-    CONNECT, Error, Result, STALL, chunk, http_client, keeps_its_connection, local_socket,
-    openai_base, post, warm_get,
+    CONNECT, Error, Result, STALL, chunk, keeps_its_connection, local_socket, openai_base, post,
+    warm_get,
 };
 use crate::second_config::{SecondConfig, TtsProvider};
 use futures_util::{SinkExt, StreamExt};
@@ -581,8 +581,8 @@ impl Tts {
         voice: Option<&str>,
     ) -> Result<Self> {
         Ok(Self {
-            client: http_client()?,
-            fresh: super::fresh_client()?,
+            client: super::http_client_to(base_url)?,
+            fresh: super::fresh_client_to(base_url)?,
             provider,
             base_url: base_url.to_owned(),
             key: key.to_owned(),

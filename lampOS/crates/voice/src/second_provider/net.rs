@@ -117,6 +117,36 @@ fn http_client() -> Result<reqwest::Client> {
     client_kept(None)
 }
 
+/// Whether `base_url` is a plain local address of a speech service that
+/// `LAMP_VOICE_LOOPBACK_SERVICES=on` lets the real voice reach: its parsed host
+/// the literal `127.0.0.1` or `::1`, and the switch on (off in every product
+/// unit). Only the speech-to-text and text-to-speech clients ask; the language
+/// model's, Gemini's and the search's never do.
+pub(crate) fn plain_local_allowed(base_url: &str) -> bool {
+    crate::second_config::loopback_services_on()
+        && crate::second_config::is_loopback_literal(base_url)
+}
+
+/// [`http_client`] for a speech service at `base_url`: HTTPS only, unless
+/// [`plain_local_allowed`].
+fn http_client_to(base_url: &str) -> Result<reqwest::Client> {
+    kept_builder(None)?
+        .https_only(!cfg!(test) && !plain_local_allowed(base_url))
+        .build()
+        .map_err(|_| Error::Transport("HTTPS client setup"))
+}
+
+/// A client keeping no idle connection, so each request opens its own: a
+/// speech piece asked again after it failed to start is never sent on the
+/// connection that may have held it (#4338, lamp-3e83 on 29 Oct). For a
+/// speech service at `base_url`, HTTPS only as [`http_client_to`] is.
+pub(crate) fn fresh_client_to(base_url: &str) -> Result<reqwest::Client> {
+    fresh_builder()?
+        .https_only(!cfg!(test) && !plain_local_allowed(base_url))
+        .build()
+        .map_err(|_| Error::Transport("HTTPS client setup"))
+}
+
 /// The chat's client: [`http_client`], or with [`CHAT_KEPT_ENVIRONMENT`] on,
 /// idle connections kept at most [`CHAT_POOL_IDLE`], its connector watched by
 /// `opens`; and whether it is kept so.
@@ -138,12 +168,6 @@ fn chat_kept(value: Option<&str>) -> bool {
 /// [`http_client`] keeping no idle connection, so each request opens its
 /// own: a speech piece asked again after it failed to start is never sent on
 /// the connection that may have held it (#4338, lamp-3e83 on 29 Oct).
-pub(crate) fn fresh_client() -> Result<reqwest::Client> {
-    fresh_builder()?
-        .build()
-        .map_err(|_| Error::Transport("HTTPS client setup"))
-}
-
 fn fresh_builder() -> Result<reqwest::ClientBuilder> {
     Ok(reqwest::Client::builder()
         .tls_backend_preconfigured(tls()?)

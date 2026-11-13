@@ -84,11 +84,19 @@ pub(crate) fn url(
     key_terms: &[String],
     fillers: bool,
 ) -> Result<reqwest::Url> {
+    secure(built_url(proxy, language, key_terms, fillers)?)
+}
+
+/// The socket's URL with the route's own query, before it is checked.
+fn built_url(
+    proxy: Option<&str>,
+    language: Option<&str>,
+    key_terms: &[String],
+    fillers: bool,
+) -> Result<reqwest::Url> {
     let base = proxy.map_or_else(|| DEEPGRAM.to_owned(), proxied);
-    secure(
-        reqwest::Url::parse_with_params(&base, query(language, key_terms, fillers))
-            .map_err(|_| Error::Url)?,
-    )
+    reqwest::Url::parse_with_params(&base, query(language, key_terms, fillers))
+        .map_err(|_| Error::Url)
 }
 
 /// The Autonomous proxy's speech-to-text socket at `base_url`. It passes
@@ -101,11 +109,31 @@ fn proxied(base_url: &str) -> String {
     format!("{base}/ws/audio/transcriptions")
 }
 
-/// `url` when it is a secure websocket; a plain one only in tests.
+/// `url` when it is a secure websocket; a plain one only in tests, or to a
+/// local service address `LAMP_VOICE_LOOPBACK_SERVICES=on` allows
+/// ([`secure_with`]).
 fn secure(url: reqwest::Url) -> Result<reqwest::Url> {
+    if cfg!(test) && url.scheme() == "ws" {
+        return Ok(url);
+    }
+    secure_with(url, crate::second_config::loopback_services_on())
+}
+
+/// [`secure`] with the switch given, and nothing test-only inside: a plain
+/// `ws` URL passes only when `loopback_on` and its address (the route's own
+/// query set aside: host, user and fragment are still checked) is a loopback
+/// literal.
+fn secure_with(url: reqwest::Url, loopback_on: bool) -> Result<reqwest::Url> {
     match url.scheme() {
         "wss" => Ok(url),
-        "ws" if cfg!(test) => Ok(url),
+        "ws" if loopback_on && {
+            let mut bare = url.clone();
+            bare.set_query(None);
+            crate::second_config::is_loopback_literal(bare.as_str())
+        } =>
+        {
+            Ok(url)
+        }
         _ => Err(Error::Url),
     }
 }
@@ -1388,6 +1416,35 @@ mod tests {
     const QUERY: &str = "model=nova-3-general&encoding=linear16&sample_rate=16000&channels=1\
         &language=en&smart_format=true&interim_results=true&endpointing=300&vad_events=true\
         &keyterm=Lamp";
+
+    /// The switch on: the real URL the route builds for a loopback service
+    /// (its query included) passes; off, or for any other plain host, it
+    /// does not (the first build of this check refused the query).
+    #[test]
+    fn a_plain_socket_passes_only_to_a_loopback_address_with_the_switch_on() {
+        let built = |proxy: &str| built_url(Some(proxy), None, &[], false).unwrap();
+        for local in ["http://127.0.0.1:7733", "http://[::1]:7733"] {
+            let url = built(local);
+            assert_eq!(url.scheme(), "ws", "{url}");
+            assert!(url.query().is_some(), "{url}");
+            assert_eq!(secure_with(url.clone(), true).unwrap(), url);
+            assert!(
+                secure_with(url, false).is_err(),
+                "{local} with the switch off"
+            );
+        }
+        for other in [
+            "http://localhost:7733",
+            "http://127.0.0.2:7733",
+            "http://192.168.1.5:7733",
+            "http://user@127.0.0.1:7733",
+            "http://127.0.0.1:7733#frag",
+        ] {
+            assert!(secure_with(built(other), true).is_err(), "{other}");
+        }
+        let secure_url = built("https://campaign-api.autonomous.ai/api/v1/ai/");
+        assert!(secure_with(secure_url, false).is_ok());
+    }
 
     #[test]
     fn the_proxy_url_is_v1s() {
