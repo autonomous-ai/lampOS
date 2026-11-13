@@ -749,11 +749,17 @@ Not exercised at all:
   between messages, within wide bounds (10 to 101 a second), not against a
   clock.
 
-Socket buffers are the system's defaults, which
-the standard library cannot change. On this Mac a subscriber that does not
-read held 25 messages of 141 bytes, or 5 pieces of sound, before the next was
-dropped, and the system takes no datagram over 2,048 bytes: the test of a
-60,000-byte message asserts delivery on Linux and that refusal here. Each subscriber is sent to from a socket of its own
+Socket buffers are the system's defaults on Linux. On macOS the bus sets its
+own (`room.rs`, sim-3-P3): the system sends a local datagram no longer than the
+socket's send buffer, 2,048 bytes by default (`net.local.dgram.maxdgram`), and
+takes in no more than the receive buffer, 4,096 (`recvspace`), so every
+speaker, microphone and camera block was refused there. A publisher's socket
+gets 64,096 bytes to send with and a subscriber's 256,384 to take in (four
+longest datagrams, about Linux's default); both are the socket's own and need
+no privilege. The test of a 60,000-byte message asserts delivery on both. Before
+that change, a subscriber on a Mac that did not read held 25 messages of 141
+bytes, or 5 pieces of sound, before the next was dropped; with the larger
+receive buffer it holds more, and how many has not been measured. Each subscriber is sent to from a socket of its own
 because Linux charges a queued datagram to its sender (`unix(7)`), so one
 socket for all would let one stuck subscriber starve the rest: that is read,
 not measured, and macOS charges the receiver, so no test here tells the two

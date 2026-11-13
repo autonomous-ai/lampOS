@@ -63,6 +63,7 @@ mod live;
 pub mod logging;
 mod name;
 mod publish;
+mod room;
 mod subscribe;
 mod wire;
 

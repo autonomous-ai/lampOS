@@ -268,6 +268,14 @@ impl Subscriber {
                     ));
                 }
             };
+            // Room for the longest datagram before any publisher can find it.
+            if let Err(error) = crate::room::to_receive(&socket) {
+                let _ = fs::remove_file(&birth);
+                return Err(io::Error::new(
+                    error.kind(),
+                    format!("receive buffer of {}: {error}", birth.display()),
+                ));
+            }
             let named = fs::set_permissions(&birth, fs::Permissions::from_mode(FILE_MODE))
                 .and_then(|()| fs::hard_link(&birth, &path));
             let _ = fs::remove_file(&birth);
