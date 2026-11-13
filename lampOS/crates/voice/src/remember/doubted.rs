@@ -383,7 +383,7 @@ fn distance(a: &[char], b: &[char]) -> usize {
 /// Whether `asked` sounds like a mishearing of `kept`, both lower case:
 /// not the same word, the same first letter, and at most half the longer
 /// one's letters changed ("renunctinus" and "ranunculus").
-fn misheard_as(kept: &str, asked: &str) -> bool {
+pub(super) fn misheard_as(kept: &str, asked: &str) -> bool {
     let (kept, asked): (Vec<char>, Vec<char>) = (kept.chars().collect(), asked.chars().collect());
     kept != asked
         && kept.len() >= 4

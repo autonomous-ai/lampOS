@@ -3303,6 +3303,7 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
                 line: None,
                 asked_again: false,
                 one_face: false,
+                near: None,
             });
         }
         let taken = take_held_forget(
@@ -3371,6 +3372,7 @@ async fn the_natural_answers_to_the_one_face_question_run_it_and_a_no_keeps_it()
                 line: None,
                 asked_again: false,
                 one_face: true,
+                near: None,
             });
         }
         let taken = take_held_forget(
