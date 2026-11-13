@@ -814,10 +814,20 @@ tạo (`do.write`, docs/skills.md) như một lượt chạy
   là `bad_request`, và không xin token nào.
 - **Lượt chạy** là của một task (`run_on_token`, cùng việc cấp token, kiểm
   quyền, kết thúc và runner): lamp-control cấp token cho đúng một quyền đó
-  (docs/control.md), và Hermes được bảo gọi `service_write` của
-  `lamp-services` một lần với đúng nội dung đó, trích dẫn như dữ liệu, không
-  gọi lại dù nó trả lời gì. lamp-services chỉ gửi như lời đồng ý đã giữ của
-  chủ, một lần mỗi lượt chạy (docs/services.md, "Through the lamp's agent").
+  (docs/control.md), và Hermes được bảo, kèm tên kỹ năng và id của lượt
+  chạy, gọi `service_write` của `lamp-services` một lần chỉ nêu dịch vụ và
+  action của lệnh ghi (`{"service":"gmail-app","action":"send_mail"}`),
+  không gọi lại dù nó trả lời gì. lamp-control đưa cho lệnh gọi đó lệnh ghi
+  của kỹ năng theo token của lượt chạy (`runs::FixedWrite`), và
+  lamp-services chỉ gửi như lời đồng ý đã giữ của chủ, một lần mỗi lượt
+  chạy (docs/services.md, "Through the lamp's agent").
+- **Không bao giờ có nội dung trong lời nhắc** (P2 của Reviewer-lead trên
+  #6824 và #6879): lời nhắc là argv của tác tử (`harness new --task`, hoặc
+  `hermes chat -q` khi không có Harness, đọc được trong
+  `/proc/<pid>/cmdline`) và transcript của Harness, nên không người nhận,
+  tiêu đề hay nội dung nào của lệnh ghi có trong đó
+  (`WriteHandOver::prompt`). `Debug` của `SkillRun` chỉ in độ dài của lời
+  nhắc, với cả lượt chạy của một task.
 - **Tắt** (một trong hai công tắc), dòng `skill_write` bị từ chối như
   trước: `bad_request`, "not a skill's task line".
 - **Chưa bắt đầu** (#6823): lượt chạy của một lệnh ghi cố định thất bại
@@ -828,7 +838,8 @@ tạo (`do.write`, docs/skills.md) như một lượt chạy
   lamp-skills tự gửi thẳng lệnh ghi; lượt thất bại sau đó là `run_failed`,
   không biết lần gửi ra sao, và lamp-skills không thử gì thêm. Lượt chạy của
   một task vẫn là `run_failed` trong cả hai trường hợp, như trước. Test:
-  `a_fixed_write_runs_on_its_one_grant_with_its_exact_content`.
+  `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
+  `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 

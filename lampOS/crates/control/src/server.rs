@@ -274,8 +274,8 @@ impl Shared {
         let minted = {
             let mut door = self.door.lock().expect("door");
             let minted = door.mint_run(&token, run, skill, grants, for_ms, now);
-            if fixed_write && minted.is_ok() {
-                door.mark_fixed_write(run);
+            if let (Some(write), true) = (&fixed_write, minted.is_ok()) {
+                door.mark_fixed_write(run, write);
             }
             minted
         };

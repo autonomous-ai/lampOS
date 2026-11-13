@@ -3208,8 +3208,8 @@ to Hermes alone (`HarnessRunner`, above).
 The owner's ruling (13 Nov): everything that touches a linked service runs
 through the lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`,
 on in no product unit) and `LAMP_AGENT_SERVICES=on` in lamp-tasks, the
-hand-over socket also takes a made skill's fixed write (`do.write`, docs/skills.md)
-as a run (`skill_task::WriteHandOver`, `answer_with`):
+hand-over socket also takes a made skill's fixed write (`do.write`,
+docs/skills.md) as a run (`skill_task::WriteHandOver`, `answer_with`):
 
 - **The line:** `{"op":"skill_write","skill","folder","grants","write"}`,
   every field needed and no other taken. `skill` and `folder` are checked
@@ -3218,11 +3218,20 @@ as a run (`skill_task::WriteHandOver`, `answer_with`):
   object with a `service` and an `action`, at most 8 KiB as JSON. Anything
   else is `bad_request`, and no token is asked for.
 - **The run** is a task's (`run_on_token`, the same mint, grant check, end
-  and runner): lamp-control mints its token for that one grant (docs/control.md),
-  and Hermes is told to call `lamp-services`' `service_write` once with
-  exactly that content, quoted as data, never again whatever it answers.
-  lamp-services sends it only as the owner's kept yes has it, once a run
+  and runner): lamp-control mints its token for that one grant
+  (docs/control.md), and Hermes is told, with the skill's name and the
+  run's id, to call `lamp-services`' `service_write` once naming only the
+  write's service and action (`{"service":"gmail-app","action":"send_mail"}`),
+  never again whatever it answers. lamp-control gives that call the
+  skill's write by the run's token (`runs::FixedWrite`), and lamp-services
+  sends it only as the owner's kept yes has it, once a run
   (docs/services.md, "Through the lamp's agent").
+- **Never the content in the words** (the Reviewer-lead's P2 on #6824 and
+  #6879): the words are the agent's argv (`harness new --task`, or
+  `hermes chat -q` without Harness, readable in `/proc/<pid>/cmdline`) and
+  Harness's transcript, so no recipient, subject or text of the write is
+  ever in them (`WriteHandOver::prompt`). `SkillRun`'s `Debug` prints the
+  words' length only, for a task's run too.
 - **Off** (either switch), a `skill_write` line is refused as before:
   `bad_request`, "not a skill's task line".
 - **Not started** (#6823): a fixed write's run that fails before its agent
@@ -3232,8 +3241,9 @@ as a run (`skill_task::WriteHandOver`, `answer_with`):
   (`skill_task::NOT_STARTED`) in the runner's words, so lamp-skills sends
   the write straight itself; one that fails after is `run_failed`, its
   send's outcome unknown, and lamp-skills tries nothing more. A task's run
-  is `run_failed` either way, as before. Test:
-  `a_fixed_write_runs_on_its_one_grant_with_its_exact_content`.
+  is `run_failed` either way, as before. Tests:
+  `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
+  `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
 
 ## Devin (#1854)
 
