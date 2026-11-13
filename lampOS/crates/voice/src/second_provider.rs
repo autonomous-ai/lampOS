@@ -13552,6 +13552,23 @@ fn keep_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64, S
 /// [`keep_asker`]).
 type HeldAsker = (u64, String);
 
+/// Why a yes is not the held call's person's, as the journal says it, or
+/// none when it is: no known person on the line (none admitted, a gap, a
+/// cold face cache), the same person in a later session, or another
+/// person. Each starts "not the same person", so old greps still match
+/// (Thirteen's row on #5627: a dropped yes could not be told apart). Ids
+/// are never said.
+fn not_theirs(line: Option<&HeldAsker>, held: &HeldAsker) -> Option<&'static str> {
+    match line {
+        Some(line) if line == held => None,
+        None => Some("not the same person: no one known on the line"),
+        Some((_, person)) if *person == held.1 => {
+            Some("not the same person: theirs, in a later session")
+        }
+        Some(_) => Some("not the same person: another person"),
+    }
+}
+
 /// What became of a held forget on a turn ([`take_held_forget`]).
 enum Taken {
     /// Nothing held, or dropped: nothing runs and nothing is told.
@@ -13665,8 +13682,8 @@ fn take_held_forget(
             Some("a turn the lamp wrote")
         } else if held.request >= request {
             Some("not a later turn")
-        } else if asker != Some(&held.asker) {
-            Some("not the same person")
+        } else if let Some(why) = not_theirs(asker, &held.asker) {
+            Some(why)
         } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
             Some("too late")
         } else {
@@ -13711,11 +13728,14 @@ fn take_held_forget(
             Some("not a later turn")
         } else if !crate::known_faces::plain_agreement_to_forget(said) {
             Some("not a plain yes")
-        } else if line_person != Some(&held.asker) {
-            Some("not the same person")
         } else if now.saturating_duration_since(held.at) > crate::remember::ONE_FACE_FORGET_YES_FOR
         {
+            // Before the person: a late yes reads as late, whoever the
+            // line is theirs by by then (Thirteen's row on #5627, 42 s
+            // after the hold, journaled as "not the same person").
             Some("too late")
+        } else if let Some(why) = not_theirs(line_person, &held.asker) {
+            Some(why)
         } else if seen || (by_one_face && crate::person::private_room()) {
             None
         } else {
@@ -13780,8 +13800,8 @@ fn take_held_forget(
             return Taken::AskAgain;
         }
         Some("not a plain yes")
-    } else if asker != Some(&held.asker) {
-        Some("not the same person")
+    } else if let Some(why) = not_theirs(asker, &held.asker) {
+        Some(why)
     } else if now.saturating_duration_since(held.at) > crate::remember::HELD_FORGET_FOR {
         Some("too late")
     } else if held.call.name == crate::remember::REMEMBER && shared.forget_sight.is_none() {

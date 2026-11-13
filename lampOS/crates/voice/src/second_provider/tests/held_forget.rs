@@ -2230,3 +2230,29 @@ async fn a_keep_with_a_near_spelling_of_a_heard_word_waits_for_their_yes() {
         }
     }
 }
+
+/// Thirteen's row on #5627: a yes dropped as not the held forget's person
+/// says why (no one known on the line, theirs in a later session, or
+/// another person), each still opening "not the same person" so old greps
+/// match, and never with an id.
+#[test]
+fn a_yes_not_the_held_persons_says_why() {
+    let held: HeldAsker = (3, "p-a".to_owned());
+    assert_eq!(not_theirs(Some(&held), &held), None);
+    let cases = [
+        (None, "not the same person: no one known on the line"),
+        (
+            Some((4, "p-a".to_owned())),
+            "not the same person: theirs, in a later session",
+        ),
+        (
+            Some((3, "p-b".to_owned())),
+            "not the same person: another person",
+        ),
+    ];
+    for (line, said) in cases {
+        let why = not_theirs(line.as_ref(), &held).unwrap();
+        assert_eq!(why, said);
+        assert!(!why.contains("p-"), "no id is said: {why}");
+    }
+}

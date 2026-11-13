@@ -994,7 +994,13 @@ trong phạm vi của họ (`ScopeLease::mark_forget_agreed`, không bao giờ
 (`known_faces::plain_agreement_to_forget`, P2 của Thirteen trên #6673): «Yes,
 forget it.», «Ừ, quên đi.», «Vâng, quên đi ạ.», và cả việc quên nói lại một
 mình, «Forget it.» hay «Quên đi.», vốn chỉ được đọc như câu trả lời cho câu hỏi
-ấy, của người ấy, trong 30 giây ấy. Bất kỳ lời «không», «giữ», «khoan»,
+ấy, của người ấy, trong 30 giây ấy. Một lời «có» sau 30 giây ấy được ghi
+journal là "too late", dù lúc đó câu là của ai; một lời không phải của họ ghi
+lý do sau "not the same person": "no one known on the line" (không ai được
+nhận ra trên câu), "theirs, in a later session" (của họ, ở phiên sau) hoặc
+"another person" (người khác) (`second_provider::not_theirs`, không bao giờ
+ghi id; hàng của Thirteen trên #5627, một lời «có» 42 giây sau khi giữ bị đọc
+là của người khác). Bất kỳ lời «không», «giữ», «khoan»,
 «đừng» hay một câu hỏi đều không phải lời «có». Nếu lúc lệnh quên chạy câu
 không còn là của họ (một khuôn mặt hay giọng khác xuất hiện), không gì bị quên
 và mô hình được báo điều ấy vẫn được giữ; nó không bao giờ chạy trong phạm vi
