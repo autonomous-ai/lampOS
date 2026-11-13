@@ -2426,13 +2426,15 @@ With `LAMP_UPDATE_APPLY=on` in `lamp-update.service`'s environment:
 - **The update switch file.** `/etc/lampOS/update.env`
   (`manifest::UPDATE_ENV`, `deploy/product/settings/update.env`,
   `install::UPDATE_SETTING`) is carried by every build with settings from
-  updater 12 (`manifest::UPDATE_ENV_UPDATER`, #6607): `LAMP_APP_ENGINES=on`
-  and `LAMP_SKILL_TASKS=on`. No round rewrites lamp-update's own unit, so
+  updater 12 (`manifest::UPDATE_ENV_UPDATER`, #6607): `LAMP_APP_ENGINES=on`,
+  `LAMP_SKILL_TASKS=on` and, since 13 Nov, `LAMP_SKILL_DEFAULT_AGENT=on`
+  (the one run path, #6685, read only with `LAMP_SKILL_TASKS` on). No round rewrites lamp-update's own unit, so
   these lines in `lamp-update.service` never reached a lamp already in a
   home. lamp-update reads each switch at its start
   (`switches::update_switches`): set in its environment, `on` exactly, and
   that always wins; not set there at all, this file, by the models switch
-  file's rule (`LAMP_SKILL_TASKS` from the file only on a product lamp); a
+  file's rule (`LAMP_SKILL_TASKS` and `LAMP_SKILL_DEFAULT_AGENT` from the
+  file only on a product lamp); a
   missing or garbled file is off. A round places it as it does
   `models.env`. After each `serve` round lamp-update reads them again, and
   when they differ from its start's (the round wrote or changed the file,

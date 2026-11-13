@@ -2066,6 +2066,49 @@ fn the_product_gives_the_lamps_agent_the_linked_services() {
     }
 }
 
+/// The one run path on in the product (#6685, 13 Nov): `LAMP_SKILL_DEFAULT_AGENT=on`
+/// in the two units that read it, `lamp-tasks` (a skill's run on the
+/// lamp's default agent) and `lamp-update` (every agent's wrapper the one
+/// run path's), each once and beside `LAMP_SKILL_TASKS=on`, and no other
+/// product unit names it. lamp-update's carried switch file sets it too,
+/// since no round rewrites lamp-update's own unit (#6607): a lamp in a
+/// home whose lamp-tasks unit a round turns on gets the wrappers it checks.
+#[test]
+fn the_product_runs_a_skills_task_on_the_lamps_default_agent() {
+    let name = lamp_update::agent_ns::DEFAULT_AGENT_SWITCH;
+    assert_eq!(name, "LAMP_SKILL_DEFAULT_AGENT");
+    let switch = format!("Environment={name}=on");
+    let owners = ["lamp-tasks.service", "lamp-update.service"];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = service.iter().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+        if on == 1 {
+            assert!(
+                service.contains(&"Environment=LAMP_SKILL_TASKS=on"),
+                "{unit} lacks LAMP_SKILL_TASKS"
+            );
+        }
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+    let carried = install::UPDATE_SETTING.1;
+    assert_eq!(
+        carried
+            .lines()
+            .filter(|line| *line == format!("{name}=on"))
+            .count(),
+        1
+    );
+    assert!(carried.lines().any(|line| line == "LAMP_SKILL_TASKS=on"));
+}
+
 /// A skill added from a file in the app, on at once (#5080, #5977): the
 /// switch is on in both parts that read it, `lamp-cloud` (the kind, with
 /// the skills page) and `lamp-voice` (the app-make socket, with the maker

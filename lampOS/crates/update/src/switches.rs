@@ -260,9 +260,13 @@ pub struct UpdateSwitches {
     /// environment, on any lamp; from the carried file only on a product
     /// lamp (`product`), as before the file.
     pub tasks: bool,
+    /// The one run path (#6685, `LAMP_SKILL_DEFAULT_AGENT`,
+    /// crate::agent_ns::DEFAULT_AGENT_SWITCH), read as `tasks` is, and
+    /// only with `tasks` on.
+    pub one_path: bool,
 }
 
-/// Both of lamp-update's switches, each by [`update_switch`], `env` giving
+/// lamp-update's switches, each by [`update_switch`], `env` giving
 /// a variable's value in lamp-update's environment. Read at start, and
 /// again after each round: a round that writes or changes
 /// `/etc/lampOS/update.env` leaves them differing from the start's, and
@@ -275,10 +279,17 @@ pub fn update_switches(
 ) -> UpdateSwitches {
     let engines = crate::engines::SWITCH;
     let tasks = crate::hermes_install::TASKS_SWITCH;
+    let one_path = crate::agent_ns::DEFAULT_AGENT_SWITCH;
     let tasks_env = env(tasks);
+    let one_path_env = env(one_path);
+    let tasks =
+        (tasks_env.is_some() || product) && update_switch(root, tasks, tasks_env.as_deref());
     UpdateSwitches {
         engines: update_switch(root, engines, env(engines).as_deref()),
-        tasks: (tasks_env.is_some() || product) && update_switch(root, tasks, tasks_env.as_deref()),
+        tasks,
+        one_path: tasks
+            && (one_path_env.is_some() || product)
+            && update_switch(root, one_path, one_path_env.as_deref()),
     }
 }
 
@@ -487,6 +498,8 @@ mod tests {
         let tasks = crate::hermes_install::TASKS_SWITCH;
         assert!(crate::models::file_says_on(product, engines));
         assert!(crate::models::file_says_on(product, tasks));
+        let one_path = crate::agent_ns::DEFAULT_AGENT_SWITCH;
+        assert!(crate::models::file_says_on(product, one_path));
 
         let root = tempfile::tempdir().unwrap();
         // No file, nothing set: off.
@@ -500,9 +513,10 @@ mod tests {
             .join(crate::manifest::UPDATE_ENV.trim_start_matches('/'));
         std::fs::create_dir_all(at.parent().unwrap()).unwrap();
         std::fs::write(&at, product).unwrap();
-        // The unit lacks the lines: the carried file turns both on.
+        // The unit lacks the lines: the carried file turns them on.
         assert!(update_switch(root.path(), engines, None));
         assert!(update_switch(root.path(), tasks, None));
+        assert!(update_switch(root.path(), one_path, None));
         // The environment set always wins over the file.
         assert!(!update_switch(
             root.path(),
@@ -545,7 +559,8 @@ mod tests {
             now,
             UpdateSwitches {
                 engines: true,
-                tasks: true
+                tasks: true,
+                one_path: true
             }
         );
         assert!(restart_for(started, now));
@@ -553,9 +568,20 @@ mod tests {
         assert!(!restart_for(now, update_switches(root.path(), true, unset)));
         // Skill tasks from the file only on a product lamp; set, on any.
         let other = update_switches(root.path(), false, unset);
-        assert!(other.engines && !other.tasks);
+        assert!(other.engines && !other.tasks && !other.one_path);
         let set = |name: &str| (name == crate::hermes_install::TASKS_SWITCH).then(|| "on".into());
-        assert!(update_switches(root.path(), false, set).tasks);
+        let tasks_set = update_switches(root.path(), false, set);
+        assert!(tasks_set.tasks && !tasks_set.one_path);
+        // The one run path only with skill tasks on: off there holds it off.
+        let tasks_off =
+            |name: &str| (name == crate::hermes_install::TASKS_SWITCH).then(|| "off".into());
+        let held = update_switches(root.path(), true, tasks_off);
+        assert!(held.engines && !held.tasks && !held.one_path);
+        let one_path_off =
+            |name: &str| (name == crate::agent_ns::DEFAULT_AGENT_SWITCH).then(|| "off".into());
+        let no_path = update_switches(root.path(), true, one_path_off);
+        assert!(no_path.tasks && !no_path.one_path);
+        assert!(restart_for(now, no_path));
         // The environment set still wins: off there holds it off.
         let off = |_: &str| Some("off".into());
         assert_eq!(

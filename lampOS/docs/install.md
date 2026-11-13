@@ -2648,8 +2648,11 @@ yet on a lamp.
   while `agent-ns` is there (it is among the namespace scripts Hermes's
   and OpenClaw's removal look for).
 - **The one run path** (#6685, `LAMP_SKILL_DEFAULT_AGENT=on` in
-  lamp-update's own unit, read only with `LAMP_SKILL_TASKS` on; no product
-  unit sets it; lamp-tasks reads the same switch). One way to run a skill
+  lamp-update's own unit or, not set there, its carried switch file
+  `/etc/lampOS/update.env` on a product lamp (`switches::update_switches`,
+  as `LAMP_SKILL_TASKS` is), read only with `LAMP_SKILL_TASKS` on; on in
+  the product since 13 Nov, in that unit, that file and lamp-tasks', which
+  reads the same switch). One way to run a skill
   for every agent: every agent's wrapper is one text
   (`wrapper::one_path_text`), Hermes's included, and no agent is named in
   its run path. It is, in order:

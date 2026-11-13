@@ -43,8 +43,9 @@ use std::{
 /// lamp-tasks reads too: `on` exactly, read only with
 /// [`crate::hermes_install::TASKS_SWITCH`] on, and every agent's wrapper is
 /// [`wrapper::one_path_text`] with its own data, Hermes's too
-/// ([`crate::hermes_install::Shown::one_path`]); otherwise off. No product
-/// unit sets it.
+/// ([`crate::hermes_install::Shown::one_path`]); otherwise off. On in the
+/// product since 13 Nov: in lamp-update's unit and its carried switch file
+/// (`crate::switches::update_switches`, #6607) and in lamp-tasks' unit.
 pub const DEFAULT_AGENT_SWITCH: &str = "LAMP_SKILL_DEFAULT_AGENT";
 
 /// [`DEFAULT_AGENT_SWITCH`] as read: `on` exactly.

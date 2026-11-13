@@ -2740,8 +2740,9 @@ for each run, and is answered once the run ends
     its round not run): nothing is made or started, so a run never starts
     with no token on the lamp's network.
   - **The lamp's default agent, by the one run path, with
-    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, off until c0a4's row and two
-    reads). One way to run a skill for every agent in the lamp's Harness:
+    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, on in the product since 13 Nov:
+    in lamp-tasks' unit, and in lamp-update's unit and its carried switch
+    file `/etc/lampOS/update.env`). One way to run a skill for every agent in the lamp's Harness:
     no per-agent code and no engine name in the run path. lamp-tasks reads
     the lamp's default engine at each run (`runtime::lamp_default`, the
     app's choice first; before Harness has said, the lamp target's engine)
