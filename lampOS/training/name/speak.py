@@ -18,7 +18,8 @@ which cannot be used.
 With `--bare-female` (calls, train only), every call is a bare "Lamp" in
 the female voices, read in English, with a wider spread: speed, the pause
 before what follows (up to 0.7 s, as "Lamp, … what time is it?"), and the
-pitch moved up to 8 % either way. The busy-room sweep of 30 Oct (#3923)
+pitch moved up to 8 % either way, one pitch for the whole clip (the call
+and the question after it, as one person says both). The busy-room sweep of 30 Oct (#3923)
 found two women's voices whose "Lamp," the model scored under the bar
 most of the time (6 of 16, 1 of 4); these are more of that kind of call.
 They go to their own folder, `calls-train-bare-female`.
@@ -101,7 +102,13 @@ class Speaker:
         return "[[" + " ".join(out) + "]]"
 
     def say(
-        self, text: str, speaker: int, rng: random.Random, accent: bool, wide: bool = False
+        self,
+        text: str,
+        speaker: int,
+        rng: random.Random,
+        accent: bool,
+        wide: bool = False,
+        pitch: float | None = None,
     ) -> np.ndarray:
         from piper import SynthesisConfig
 
@@ -118,8 +125,9 @@ class Speaker:
             return np.zeros(0, np.float32)
         audio = np.concatenate([c.audio_int16_array for c in chunks]).astype(np.float32) / 32768.0
         audio = resample_poly(audio, 320, 441).astype(np.float32)
-        if wide:
-            audio = shifted(audio, rng.uniform(0.92, 1.08))
+        # One factor per clip, drawn by the caller (Heron's P3 on #6994).
+        if pitch is not None:
+            audio = shifted(audio, pitch)
         return audio
 
 
@@ -216,14 +224,15 @@ def main() -> None:
                 start = rng.choice(NEAR[what])
             wide = a.bare_female
             accent = not wide and rng.random() < 1 / 3
-            first = trimmed(speaker.say(start + rng.choice(ENDINGS), voice, rng, accent, wide))
+            pitch = rng.uniform(0.92, 1.08) if wide else None
+            first = trimmed(speaker.say(start + rng.choice(ENDINGS), voice, rng, accent, wide, pitch))
             # The name's end: the end of the first piece's sound.
             anchor = len(first) / RATE
             if what == "lamp in a sentence" or rng.random() < 0.25:
                 audio, rest = first, ""
             else:
                 rest = rng.choice(QUESTIONS)
-                second = trimmed(speaker.say(rest[0].upper() + rest[1:], voice, rng, accent, wide))
+                second = trimmed(speaker.say(rest[0].upper() + rest[1:], voice, rng, accent, wide, pitch))
                 pause = np.zeros(int(rng.uniform(0.03, 0.7 if wide else 0.35) * RATE), np.float32)
                 audio = np.concatenate([first, pause, second])
             reading = "vi" if accent else "en" if a.voice == "libritts" else a.voice
