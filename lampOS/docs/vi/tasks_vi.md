@@ -394,8 +394,10 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     Harness đã được thiết lập ở đây và lượt quét lúc khởi động đã xong),
     hoặc không có chương trình Harness nào (sau một lượt quét các thư mục
     và file token mà lần khởi động trước để lại,
-    `skill_task::sweep_without_harness`; `ConditionPathExists=/usr/local/bin/harness`
-    của unit sản phẩm vẫn giữ lamp-tasks tắt trên đèn như vậy). Đã đăng
+    `skill_task::sweep_without_harness`; lượt quét và các lần đọc này chỉ
+    được dựng khi switch bật, nên khi tắt, đèn không có chương trình Harness
+    không quét gì, P3 của Thirteen trên #6829; `ConditionPathExists=/usr/local/bin/harness`
+    của unit sản phẩm vẫn giữ lamp-tasks tắt trên đèn như vậy cho tới #6849). Đã đăng
     nhập, đăng nhập nhưng đang offline, hay chưa đọc: qua Harness như trên.
     Lúc bắt đầu lần chạy không hỏi gì: trạng thái đăng nhập là lần đọc gần
     nhất, nên việc bắt đầu không chờ mạng và không gọi Harness. Agent mặc
