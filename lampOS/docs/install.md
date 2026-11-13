@@ -1372,11 +1372,16 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        runs `cargo test -p lamp-update --lib harness_install`, and installs
        that pin in an ARM64 container from the copies on `127.0.0.1`
        (`harness version` says the new version, `harness --help` runs). It
-       then opens one PR onto lamp-voice with the workflow's own token, and
+       then pushes the branch and opens one PR onto lamp-voice with a token
+       of the pin GitHub App (secrets `LAMPOS_PIN_APP_ID` and
+       `LAMPOS_PIN_APP_KEY`), so the PR's own CI starts by itself (a push or
+       PR made with the workflow's own `GITHUB_TOKEN` starts none), and
        closes an older pin PR it opened. It never merges: a reader reads it,
-       a push starts its own CI (a PR opened by that token starts none), and
-       it merges only after its row "Each Harness pin move" in
-       `lamp-runs.md` passes (#5957 (b)).
+       and it merges only after its row "Each Harness pin move" in
+       `lamp-runs.md` passes (#5957 (b)). A dispatch with `proof: true`
+       moves no pin: it only opens a draft PR from `ci/pin-proof-<run id>`
+       with the same token, to show its checks start by themselves; a person
+       closes it after.
      - **A newer pin moves an older Harness** (#5957; no switch of its own,
        it follows `LAMP_HARNESS_AT_ONBOARDING` and the build's default).
        After a reached round, Harness there and recorded `installed` with a
