@@ -3,6 +3,20 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 04:0x GMT+7: nine read #6961; Heron's macOS 14 end buffer
+
+- nine READ-OK #6961 at 529122876c (counted; all ten `unsafe` blocks held).
+- Heron (notes, no marker): on macOS 14.6.1 Intel `speech_resident` ran 30.6 s
+  and failed: the empty end buffer never came. P3s: no autorelease pool, the
+  main thread assumed, the disconnect message, commit 2's drop untested.
+  nine: ~200 idle wakeups a second.
+- New head d4cfc1270f: a line ends at the end buffer or 300 ms after its last
+  buffer (then `stopSpeakingAtBoundary`); shown by ignoring the end buffer in
+  a scratch copy: the test passes in 1.2–1.5 s, 3/3. Idle waits on `recv`
+  (CPU 0.02 s → 0.02 s over 10 s); a pool per line; `MainThreadMarker`
+  enforced; disconnect message. Latency unchanged (14/15/13 ms). 11 `unsafe`
+  blocks. Commit 2's drop still untested, said.
+
 ## 2026-11-14 03:4x GMT+7: nine read #6954, ten read #6971; P3s taken
 
 - nine READ-OK #6954 (899cbf2b76), counted; ten READ-OK #6971 (a5552512b4),
