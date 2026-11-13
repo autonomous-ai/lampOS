@@ -10,6 +10,7 @@ import (
 	"go.autonomous.ai/os/system/beclient"
 	"go.autonomous.ai/os/system/domain"
 	"go.autonomous.ai/os/system/lib/hal"
+	"go.autonomous.ai/os/system/lib/mqtt"
 	"go.autonomous.ai/os/system/lib/runtimereg"
 	"go.autonomous.ai/os/system/lib/syspath"
 	"go.autonomous.ai/os/system/server/config"
@@ -39,6 +40,8 @@ func (s *Service) buildPingPayload(status string) beclient.PingPayload {
 		VoiceInputMode:      s.config.GetVoiceInputMode(),
 		UnsupportedChannels: s.config.ChannelsUnsupported,
 		MQTTTLS:             s.config.MQTTTLSEnabled(),
+		MQTTTLSSwitch:       true,
+		MQTTTLSFailing:      mqtt.TLSFailing(time.Now(), mqttTLSFailingAfter),
 	}
 	if ip, err := s.networkService.GetCurrentIP(); err == nil && ip != apSetupIP {
 		p.LocalIP = ip
@@ -103,6 +106,10 @@ func (s *Service) StartStatusReporter(ctx context.Context) {
 			if payload.LocalIP != "" {
 				lastLocalIP = payload.LocalIP
 			}
+			if payload.MQTTTLSFailing {
+				slog.Warn("TLS connection to the broker not up, reported in ping", "component", "status-reporter",
+					"port", s.config.MQTTPort)
+			}
 			resp := s.beClient.PingSafe(s.config.BackendKey(), payload)
 			dump, _ := json.Marshal(resp)
 			slog.Debug("received response from backend", "component", "status-reporter", "response", string(dump))
@@ -114,22 +121,45 @@ func (s *Service) StartStatusReporter(ctx context.Context) {
 			}
 			// Apply when the broker, port or channels change: moving to the TLS port on
 			// the same broker changes only the port.
-			if resp.HasMQTT() && mqttConfigChanged(resp.GetMQTT(), s.config) {
-				mqttCfg := resp.GetMQTT()
-				slog.Info("received MQTT config from backend", "component", "status-reporter", "endpoint", mqttCfg.Endpoint)
-				s.config.MQTTEndpoint = mqttCfg.Endpoint
-				port, _ := strconv.Atoi(mqttCfg.Port)
-				s.config.MQTTPort = port
-				s.config.MQTTUsername = mqttCfg.Username
-				s.config.MQTTPassword = mqttCfg.Password
-				s.config.FAChannel = mqttCfg.FaChannel
-				s.config.FDChannel = mqttCfg.FdChannel
+			if resp.HasMQTT() && applyPingMQTT(resp.GetMQTT(), s.config) {
+				slog.Info("received MQTT config from backend", "component", "status-reporter",
+					"endpoint", s.config.MQTTEndpoint, "port", s.config.MQTTPort, "tls", s.config.MQTTTLSEnabled())
 				if err := s.config.Save(); err != nil {
 					slog.Error("save MQTT config failed", "component", "status-reporter", "error", err)
 				}
 			}
 		}
 	}
+}
+
+// mqttTLSFailingAfter is how long a TLS client may go without connecting
+// before the ping reports it as failing.
+const mqttTLSFailingAfter = 3 * time.Minute
+
+// applyPingMQTT copies the backend's MQTT config into c and reports whether
+// anything that needs a reconnect changed. TLS changes only when the reply
+// says so; the device never turns it off by itself.
+func applyPingMQTT(m *beclient.MQTTConfig, c *config.Config) bool {
+	tlsChange := m.TLS != nil && *m.TLS != c.MQTTTLS
+	if !tlsChange && !mqttConfigChanged(m, c) {
+		return false
+	}
+	if tlsChange {
+		c.MQTTTLS = *m.TLS
+	}
+	c.MQTTEndpoint = m.Endpoint
+	if port, _ := strconv.Atoi(m.Port); port != 0 {
+		c.MQTTPort = port
+	}
+	c.MQTTUsername = m.Username
+	c.MQTTPassword = m.Password
+	if m.FaChannel != "" {
+		c.FAChannel = m.FaChannel
+	}
+	if m.FdChannel != "" {
+		c.FDChannel = m.FdChannel
+	}
+	return true
 }
 
 // mqttConfigChanged reports whether the backend's MQTT config differs from the

@@ -66,6 +66,7 @@ func defaultClientID() string {
 
 // Connect starts auto-reconnect and returns once the initial handshake completes or ctx expires.
 func (c *MQTT) Connect(ctx context.Context) error {
+	markStart(c.opts.TLS, time.Now())
 	c.mu.Lock()
 	if c.conn != nil {
 		c.mu.Unlock()
@@ -95,6 +96,7 @@ func (c *MQTT) Connect(ctx context.Context) error {
 		ReconnectBackoff:              autopaho.DefaultExponentialBackoff(),
 		Queue:                         memory.New(),
 		OnConnectionUp: func(cm *autopaho.ConnectionManager, _ *paho.Connack) {
+			markConnected(c.opts.TLS, time.Now())
 			c.mu.Lock()
 			subs := c.copySubscriptions()
 			c.mu.Unlock()

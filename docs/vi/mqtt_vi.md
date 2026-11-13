@@ -42,6 +42,22 @@ Khi bật TLS, client:
 
 Khi công tắc bật, body ping có thêm `"mqtt_tls": true`. Khi tắt, key này không có và phần còn lại của ping không đổi.
 
+#### Lệnh chuyển TLS trong phản hồi ping
+
+Thiết bị chạy firmware này thêm `"mqtt_tls_switch": true` vào body ping, nghĩa là thiết bị làm theo lệnh chuyển TLS trong phản hồi.
+
+Object `mqtt` của phản hồi ping có thể có `"mqtt_tls": true` hoặc `false` đi cùng `mqtt_port` tương ứng:
+
+| Phản hồi | Thiết bị |
+|---|---|
+| `"mqtt_tls": true` kèm port TLS | lưu `mqtt_tls: true` và kết nối lại qua TLS |
+| `"mqtt_tls": false` kèm port thường | lưu `mqtt_tls: false` và kết nối lại bằng MQTT thường |
+| không có key `mqtt_tls` | giữ nguyên thiết lập hiện tại; các trường khác áp dụng như trước |
+
+Thiết bị không bao giờ tự tắt TLS. Khi TLS đang bật mà sau 3 phút vẫn chưa có kết nối TLS, body ping có thêm `"mqtt_tls_failing": true` trong khi thiết bị vẫn thử lại bằng TLS. Chỉ phản hồi có `"mqtt_tls": false` mới đưa thiết bị về MQTT thường.
+
+Chỉ gửi lệnh chuyển cho thiết bị có `"mqtt_tls_switch": true` trong ping. Firmware cũ bỏ qua key này nên phải tiếp tục nhận port thường.
+
 ## Topics
 
 | Topic | Hướng | Mô tả |

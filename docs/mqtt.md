@@ -42,6 +42,22 @@ With TLS on, the client:
 
 While the switch is on, the ping body also carries `"mqtt_tls": true`. With the switch off the key is absent and the rest of the ping is unchanged.
 
+#### TLS switch in the ping reply
+
+Devices with this firmware add `"mqtt_tls_switch": true` to the ping body. It means the device acts on a TLS switch in the reply.
+
+The `mqtt` object of the ping reply may carry `"mqtt_tls": true` or `false` together with the matching `mqtt_port`:
+
+| Reply | Device |
+|---|---|
+| `"mqtt_tls": true` with the TLS port | saves `mqtt_tls: true` and reconnects over TLS |
+| `"mqtt_tls": false` with the plain port | saves `mqtt_tls: false` and reconnects over plain MQTT |
+| no `mqtt_tls` key | keeps its current setting; other fields apply as before |
+
+The device never turns TLS off by itself. When TLS is on and no TLS connection has come up for 3 minutes, the ping body carries `"mqtt_tls_failing": true` while the device keeps retrying over TLS. Only a reply with `"mqtt_tls": false` moves it back to plain MQTT.
+
+Send the switch only to devices whose ping carried `"mqtt_tls_switch": true`. Older firmware ignores the key, so it must keep getting the plain port.
+
 ## Topics
 
 | Topic | Direction | Description |
