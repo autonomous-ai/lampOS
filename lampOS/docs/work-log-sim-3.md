@@ -3,6 +3,21 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 04:3x GMT+7: #6961 merged (train 896); #6971 rebased
+
+- **Train 896 (#6998)** merged #6961 at 21:33Z: the resident synthesizer is
+  on lamp-voice (5d8be612f7). #6991 has NEXT TRAIN.
+- **#6971** went CONFLICTING (the usage string) and is rebased onto
+  a9986f13e8 → 7489a42a16, MERGEABLE.
+  - range-diff: commits 2 and 3 are `=`. Commit 1 differs only where it met
+    #6961 (usage string, context lines).
+  - fmt, clippy `--locked`, and the lamp-sim tests pass.
+  - Asked sim-2 to restate and ten for the signed read still owed.
+- **`sim-3/real-voice-local`** restacked on the new #6971 → 31f592baa4
+  (four own commits). Gates pass.
+- My first force-push lease named a wrong full SHA and was refused (stale
+  info). Redone with the real one.
+
 ## 2026-11-14 04:2x GMT+7: #6991 READ-OK; step 4 and step 3's lamp-sim half written
 
 - **#6991** at 19cd31289f: READ-OK (lifts my HOLD).
