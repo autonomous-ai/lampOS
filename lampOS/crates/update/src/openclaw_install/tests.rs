@@ -1384,6 +1384,11 @@ fn the_one_path_shows_the_pushed_skills_without_ns_net_and_off_changes_nothing()
     for skills in [false, true] {
         for tasks in [false, true] {
             let mut before = hermes_install::ns_text(skills, tasks);
+            // A voice make's home lines are Hermes's alone (lamp-voice's
+            // `ns_text`): taken out with `tasks`, as there.
+            if tasks {
+                before = before.replacen(hermes_install::NS_HOME_LINE, "", 1);
+            }
             for (from, to) in ENGINE_EDITS {
                 before = before.replace(from, to);
             }
