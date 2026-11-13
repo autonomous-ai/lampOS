@@ -1211,6 +1211,8 @@ mod tests {
             "home",
             "home/.hermes",
             "home/.hermes/config.yaml",
+            "home/.hermes/installs",
+            "home/.hermes/tools",
             "rules.md",
         ];
         for (files, words, guide) in &seen[..2] {
@@ -1240,6 +1242,8 @@ mod tests {
                 "home",
                 "home/.hermes",
                 "home/.hermes/config.yaml",
+                "home/.hermes/installs",
+                "home/.hermes/tools",
                 "rules.md",
             ]
         );
