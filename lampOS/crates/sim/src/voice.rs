@@ -762,7 +762,8 @@ mod tests {
             Some(&("spd-say", &["--wait", "--pipe-mode"][..]))
         );
         assert_eq!(ENGINES.len(), 4);
-        // A fake `spd-say` that logs how it was called and speaks "for ever".
+        // A fake `spd-say` that logs how it was called and speaks "for ever". It starts slowly (0.6 s before its first
+        // line), as a just-written executable can on macOS: the cancel must wait for that line, not for a fixed time.
         let dir = scratch("spd");
         std::fs::create_dir_all(&dir).unwrap();
         let engine = dir.join("spd-say");
@@ -770,7 +771,7 @@ mod tests {
         std::fs::write(
             &engine,
             format!(
-                "#!/bin/sh\necho \"$@\" >> {}\n[ \"$1\" = --cancel ] && exit 0\ncat > /dev/null\nsleep 30\n",
+                "#!/bin/sh\nsleep 0.6\necho \"$@\" >> {}\n[ \"$1\" = --cancel ] && exit 0\ncat > /dev/null\nsleep 30\n",
                 log.display()
             ),
         )
@@ -782,8 +783,15 @@ mod tests {
         let program = engine.to_str().unwrap();
         let cancelled = Arc::new(AtomicBool::new(false));
         let flag = Arc::clone(&cancelled);
+        let watched = log.clone();
+        // The cancel is raised once the fake has logged its first call (up to 5 s; a fixed wait raced a slow start).
         let late = thread::spawn(move || {
-            thread::sleep(Duration::from_millis(400));
+            let until = std::time::Instant::now() + Duration::from_secs(5);
+            while std::time::Instant::now() < until
+                && !std::fs::read_to_string(&watched).is_ok_and(|text| text.contains('\n'))
+            {
+                thread::sleep(Duration::from_millis(10));
+            }
             flag.store(true, Ordering::SeqCst);
         });
         let began = std::time::Instant::now();
