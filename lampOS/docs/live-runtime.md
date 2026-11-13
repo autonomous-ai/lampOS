@@ -487,6 +487,14 @@ fixed nonblocking queue. Overflow, missing opening frames, cursor gaps, invalid
 privacy/reset lineage, limits, or runtime faults invalidate the recording.
 No PCM is sent to a diagnostic cloud service.
 
+A finite `directed` run refuses `LAMP_VOICE_ROUTE=second` unless
+`LAMP_VOICE_DIRECTED_SECOND=on` (exactly `on`; off unless set) is in its
+environment: then it runs the second route alone as `serve` does, so a test
+kit records these diagnostics on the product's route, and the journal says
+once that it is a diagnostic run that records audio
+([switches.md](switches.md)):
+`LAMP_VOICE_DIRECTED_SECOND=on LAMP_VOICE_ROUTE=second LAMP_VOICE_SECOND_CONFIG=/etc/lampOS/voice/second.json lamp-voice directed /absolute/private/provider.json 45 /new/private/second-run --diagnostics`.
+
 Hardware authority is invalidated and microphone/speaker handles are closed
 before each recorder waits up to 500 ms for its writer. The parent accepts a
 recording only with its matching startup identity, an acknowledged valid finish

@@ -3103,6 +3103,9 @@ pub fn run_directed_session(
     output: &Path,
     options: SessionOptions,
 ) -> Result<()> {
+    if let Ok(second::Routes::SecondOnly(_)) = second::routes_from_environment(false, true) {
+        eprintln!("{}", second::DIRECTED_SECOND_LINE);
+    }
     let termination = Termination::install()?;
     let cues = options
         .cue_socket
@@ -3177,7 +3180,7 @@ pub fn run_serve(config: &Path, output: &Path, options: SessionOptions) -> Resul
             crate::second_config::PRODUCT_PATH
         ),
     }
-    if let second::Routes::SecondOnly(_) = second::routes_from_environment(true)? {
+    if let second::Routes::SecondOnly(_) = second::routes_from_environment(true, true)? {
         eprintln!("{}", second::SECOND_ONLY_LINE);
     }
     second::route_flags_from_environment()?;
@@ -3379,7 +3382,8 @@ fn run_source(
     // Which route answers, when it is the second alone; a wrong value is
     // refused when the workers start (`spawn_rig`).
     if let Ok(routes) = second::routes_from_environment(
-        lifetime.continuous() && matches!(source, ProviderSource::Gemini(_)),
+        lifetime.continuous(),
+        matches!(source, ProviderSource::Gemini(_)),
     ) {
         routes.mark(&mut run_start);
     }
@@ -4726,7 +4730,8 @@ fn spawn_rig(
     // by, or, with `LAMP_VOICE_ROUTE=second`, have it as its only voice in
     // Gemini's place (`run_serve` refused a wrong value before any of this).
     let routes = second::routes_from_environment(
-        lifetime.continuous() && matches!(source, ProviderSource::Gemini(_)),
+        lifetime.continuous(),
+        matches!(source, ProviderSource::Gemini(_)),
     )?;
     // Texts are answered by the second route's worker (#1673): without it,
     // `lamp-cloud` refuses each one, and the journal says why, once.

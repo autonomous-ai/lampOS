@@ -2345,6 +2345,29 @@ fn the_product_keeps_a_cut_answer_as_heard() {
     }
 }
 
+/// A stop said over the lamp's answer is heard (#5032, #5905): everything
+/// heard while the lamp speaks is listened for (`LAMP_STOP_WORDS=heard-always`),
+/// so a short "Stop." stops the answer as the hand does, whether or not it
+/// made the lamp pause; a stop that commits a turn gets the stop line, never
+/// the model (`LAMP_SPOKEN_STOP_ENDS`). Without stop words, 9 of 9 spoken
+/// stops over the answer were lost on lamp-06c1; with `heard`, a 0.5 s
+/// "Stop." that made no pause was lost on lamp-52e6 on 11 November.
+#[test]
+fn the_product_answers_a_stop_said_over_its_answer() {
+    let voice = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-voice.service")
+        .unwrap()
+        .1;
+    let service = section(voice, "Service");
+    for line in [
+        "Environment=LAMP_STOP_WORDS=heard-always",
+        "Environment=LAMP_SPOKEN_STOP_ENDS=on",
+    ] {
+        assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
 /// A person's turn is also told the room's lines of the same conversation
 /// (`LAMP_CONVERSATION_ROOM_LINES_TOLD`, #4339): on lamp-3e83 on 30 Oct a
 /// search answered in the room's thread was unknown to the person's next
