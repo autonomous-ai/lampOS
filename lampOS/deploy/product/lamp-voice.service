@@ -292,12 +292,6 @@ Environment=LAMP_WAIT_KEEPS_ANSWER=on
 Environment=LAMP_STOP_TOLD=on
 Environment=LAMP_ASKER_FIRST=record
 Environment=LAMP_NAMES=checked
-# A known face giving another name is asked before a rename, and only their yes renames it, the old name kept as an
-# alias (#5485, docs/eyes.md): 9 of 9 on lamp-52e6, 9 Nov. Accepted risk, the first builder's on #6594: with no face
-# seen speaking, a voice off camera can start the ask and give the yes; it renames only a face already known, and the
-# new name is said back. Both need LAMP_NAMES=checked and the eyes' who socket.
-Environment=LAMP_NAMES_RENAME_ASKED=on
-Environment=LAMP_NAMES_RENAME_YES=on
 Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on
