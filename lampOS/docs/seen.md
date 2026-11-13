@@ -369,7 +369,8 @@ that one too, aborts a burst under way.
   is at the desk (the gate's presence and stranger lines, whatever the
   opt-in, its said-back line, the privacy or sleep say), from `room/activity`'s `sitting_s`
   when it said one lately, else from now. It ends on `room/stood_up`, and
-  when the gate's lines say nobody or a stranger. Its timers count from the
+  when the gate's lines say nobody or a stranger, except through a pause
+  on a misread (below, "The pause on a misread"). Its timers count from the
   desk arrival until something is seen, and from the last sighting after.
 - **Published**, on the topics `lamp_msgs` declares (`doing.rs`):
   - `humans/doing` (`HumanDoing`): `drank_s_ago`, `ate_s_ago`,
@@ -493,7 +494,8 @@ either's). One frame and one blink can serve both.
   flag and four bits: nothing of the frame or the answer is kept. The
   window is forgotten whenever posture's gate closes, for any reason (the
   privacy, sleep and anything not known included), and on
-  `room/stood_up`.
+  `room/stood_up`, except through a pause on a misread (below), which
+  holds it unsaid for at most 5 s.
 - **Said on `humans/posture`** (`lamp_msgs/HumanPosture` v1:
   `{window_s, bad_share, region}`) every 30 s while posture's gate is
   open and the window holds at least one sample: as soon as the sitting's
@@ -526,6 +528,58 @@ every 30 s costs about 26 ms to scale from 1280×960 on a development Mac,
 an estimated 80–130 ms on a lamp.
 
 **Not done in phase 3:** the posture line's wording awaits the PM.
+
+## The pause on a misread
+
+On a live person, `humans/familiar` flips between known and stranger
+whenever the owner looks down: the recogniser's threshold on a tilted face
+(lamp-06c1, run 2: slouching gave 64 open samples to 54 stranger, upright
+31 to 88). Each flip closed the gate, which forgot the posture window and
+ended the sitting, so `bad_share` stayed 0.0 and a drink seen at 0.91
+never reached `humans/doing`. So a stranger reading on the same tracked
+face **pauses** the gate instead (`pause.rs`, under the Reviewer-lead's
+conditions on #6543):
+
+- **What pauses.** The gate was open on one face at the last step and now
+  closes only because a fresh `humans/familiar` says nobody remembered,
+  said after that face came into view alone. That same passing id is the
+  only face in view, its box has not moved by more than the face's own
+  width, and every other rule of the gate holds.
+- **A pause sends nothing.** The gate stays closed while paused, so no
+  frame is asked of the camera, no mark is asked of the ring, and a burst
+  or pose request under way is aborted, its answer dropped. Nothing kept
+  is published: no `humans/posture`, `humans/doing` or
+  `humans/doing_seen`.
+- **What ends it.** Only a new known reading on that same passing id,
+  said after the stranger one, opens the gate again: time alone never
+  does. The kept window and timers carry on only when the box is then
+  near where it paused (the centre within the face's own width).
+  Otherwise they are wiped and the sitting starts fresh.
+- **What a pause keeps.** The posture window and the doing timers, in
+  memory only. They are wiped after 5 s paused, and at once on a box jump
+  between samples larger than the face's own width, a new id, a second
+  face, no face, the privacy, sleep, the opt-in withdrawn,
+  `room/stood_up`, or anything the gate no longer knows.
+- **The familiar yes is never carried to a new id** (#6602's P2): a new id
+  wipes, and the gate still wants a level said after that face came.
+- **The journal** says `gate paused on a misread (paused N,
+  misread_on_track M)` and `the pause ended: kept` or `wiped`.
+  `diagnostics` adds the counts `paused` and `misread_on_track`. No id and
+  no box is written, and `humans/familiar` is unchanged.
+
+**Why the passing id alone is not enough, and why the pause stands
+without more.** The eyes follow a face by its box alone (`lamp-eyes`
+`bus_out::Ids`: the same id for a box overlapping one seen within 1.5 s by
+at least 0.2 of their union), with no face print. So an id can pass to
+another person who takes the same place within 1.5 s, or swap when two
+faces cross. `humans/familiar` says only a level, not whose. The pause
+does not rely on the id meaning one person. It sends nothing, and only
+the recogniser's own known reading ends it, which is what opens the gate
+anyway. Two faces, or none, wipe at once, before a swap through a crossing
+or an occlusion can matter. What is left is the owner's window and timers,
+unpublished, for at most 5 s, and dropped if the box moved. A face print
+check from the eyes may come later, as its own read, if the 5 s ever
+needs to grow.
 
 ## The product unit
 
