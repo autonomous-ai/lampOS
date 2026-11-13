@@ -91,8 +91,15 @@ Environment=LAMP_SKILLS_DAILY_FILE=/var/lib/lampos-skills-state/daily.json
 # (19 Oct) and would end an older lamp-skills at its start (#2157).
 Environment=LAMP_SKILLS_KNOWN_FILE=/run/lampos-eyes/known
 # Guard mode's tool described off first (#2827, #5752): "I'm back" turns it off; lamp-06c1, 22 Oct, 5 of 5 off
-# and 5 of 5 on. Its names, sounds and turning it on from the app stay off until their own lamp checks.
+# and 5 of 5 on. Its sounds stay off until their own lamp check.
 Environment=LAMP_GUARD_WORDS_V2=on
+# Guard mode on and off from the owner's app (#2562, #6855): its `guard` op taken only from lamp-cloud's unit; the
+# same line in lamp-cloud.service. Passed on lamp-0c89, 22 Oct (build 5666).
+Environment=LAMP_GUARD_FROM_APP=on
+# Guard mode's texts name a known face only on its person's yes, the eyes' `tellable` read as the text goes (#2562,
+# #6855); known with no yes stays unnamed. Passed on lamp-06c1, 22 Oct (build 5898). The yes is asked only with
+# LAMP_WHO_WAS_HERE_NAMES=on in lamp-voice (the eyes' visits_yes), off in the product, so until then nobody is named.
+Environment=LAMP_GUARD_NAMES=on
 # The developer folder: skills a paired computer pushed over lamp-control
 # (#3869, docs/skills.md "Skills pushed from a computer"), loaded after the
 # skills folder and held to the protocol's grants. Read only here; the
