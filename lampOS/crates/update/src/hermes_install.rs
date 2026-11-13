@@ -486,11 +486,11 @@ const WRAPPER_TASKS_EDITS: [(&str, &str); 3] = [
          exec /usr/bin/unshare --map-root-user $N --mount ",
     ),
     (
-        "LAMP_NS_UID LAMP_NS_GID\nunset T\n",
+        "LAMP_NS_UID LAMP_NS_GID\nunset T",
         concat!(
             "LAMP_NS_UID LAMP_NS_GID\n",
             "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n",
-            "unset T\n"
+            "unset T"
         ),
     ),
 ];
