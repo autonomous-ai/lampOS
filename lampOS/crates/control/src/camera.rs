@@ -929,11 +929,12 @@ mod tests {
             std::fs::rename(&next, &sight).unwrap();
         }
         // 10 a second written. Neither doubled by two streams nor halved by
-        // the slow one: under 12 and over 5. The low bound is wide, since a
+        // the slow one: under 15 and over 5. Both bounds are wide, since a
         // loaded runner reads 6.3 (the full gate, 3 Nov) as its sleeps
-        // stretch; the bug it guards would read 20 or 1.
+        // stretch, and 12.6 (train 865's ARM64, 13 Nov) as late frames
+        // bunch; the bug it guards would read 20 or 1.
         let fps = camera.rate.now().expect("measured");
-        assert!((5.0..=12.0).contains(&fps), "{fps}");
+        assert!((5.0..=15.0).contains(&fps), "{fps}");
         // The first frame each sent said none yet: null, never 0.
         let seen = seen.lock().unwrap();
         assert!(seen.iter().any(|event| event["fps_now"].is_null()));
