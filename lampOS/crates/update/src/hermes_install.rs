@@ -495,10 +495,20 @@ pub const AGENT_RUN_ENV: &str = "  # Nobody answers a skill's run: Hermes asks n
   export HERMES_YOLO_MODE
 ";
 
+/// How Hermes takes a skill's run lamp-tasks starts with no Harness
+/// (#6685, the one run path's `agent_task`, `$1` the run's task file): the
+/// task's words read whole (none ends it) and given to `chat -q`, one turn
+/// then its end, as Harness starts the lamp's Hermes with a first prompt
+/// and as lamp-tasks' `skill_task::HermesRunner` (`HERMES_ARGS`) starts
+/// it for a make. Data of Hermes's: only in its wrapper's data block.
+pub const AGENT_TASK: &str = r#"  M=$(cat -- "$1") && [ -n "$M" ] || fail "no task in $1"
+  agent_start chat -q "$M"
+"#;
+
 /// Hermes's data in the one run path's wrapper ([`Shown::one_path`]): its
 /// home [`PLACE`], shown at that path (its checkout's scripts and its
-/// Python name it), its program [`HERMES`], [`AGENT_ENV`] and
-/// [`AGENT_RUN_ENV`].
+/// Python name it), its program [`HERMES`], [`AGENT_ENV`],
+/// [`AGENT_RUN_ENV`] and [`AGENT_TASK`].
 pub fn agent() -> agent_ns::wrapper::Agent {
     agent_ns::wrapper::Agent {
         engine: "hermes".to_owned(),
@@ -506,6 +516,7 @@ pub fn agent() -> agent_ns::wrapper::Agent {
         program: Some(HERMES.to_owned()),
         env: AGENT_ENV.to_owned(),
         run_env: AGENT_RUN_ENV.to_owned(),
+        task: AGENT_TASK.to_owned(),
     }
 }
 

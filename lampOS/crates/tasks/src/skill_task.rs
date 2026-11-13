@@ -27,7 +27,11 @@
 //!   Harness in the run's own folder, whose wrapper reads the run's token
 //!   file once, closed with `harness close --now` at the run's deadline.
 //!   [`HermesRunner`] (`hermes chat -q` started by lamp-tasks itself) is
-//!   kept for #6643's skill make; no `do.task` uses it.
+//!   kept for #6643's skill make; no `do.task` uses it. With
+//!   [`DEFAULT_AGENT_SWITCH`] on and no Harness account (#6685 PR 3,
+//!   [`starts_without_harness`]), lamp-tasks starts the lamp's default
+//!   agent itself, by its wrapper's task entry ([`TASK_ARG`]), the same
+//!   for every agent.
 //! - **The socket** ([`HandOvers`]): with the switch on, `serve` binds
 //!   [`HAND_OVER_SOCKET`] for lamp-skills alone, one line a connection,
 //!   one run at a time (another is refused `busy`).
@@ -38,7 +42,7 @@ use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::UnixStream;
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 /// The switch, `on` exactly; off unless set. lamp-skills reads the same one
@@ -1504,6 +1508,146 @@ pub fn login_finds_wrapper(
     Err(not_set_up(name, &why))
 }
 
+/// The argument a skill's run started with no Harness is given, alone
+/// (#6685 PR 3): the one run path wrapper's task entry
+/// (`lamp_update::agent_ns::wrapper::TASK_ENTRY`), the same for every
+/// agent.
+pub const TASK_ARG: &str = "--lamp-task";
+/// The run's task file in its own folder, the task's words
+/// ([`SkillRun::prompt`]) and nothing else, 0600: what the task entry
+/// gives the agent's `agent_task`.
+pub const TASK_FILE: &str = "task";
+/// The task entry's lines lamp-tasks looks for in the default agent's
+/// wrapper before it starts a run with no Harness: `--lamp-task` taken,
+/// and handed to the agent's own `agent_task`. The same for every agent.
+pub const TASK_ENTRY_LINES: [&str; 2] = [
+    "if [ \"${1-}\" = --lamp-task ]; then\n",
+    "  agent_task \"$Q\"\n",
+];
+/// The line that begins `agent_task` in an agent's data block
+/// (`lamp_update::agent_ns::wrapper::AGENT_TASK_LINE`), there only for an
+/// agent that takes a skill's run with no Harness; looked for before
+/// [`ONE_PATH_RUN_LINE`].
+pub const AGENT_TASK_LINE: &str = "\nagent_task() {\n";
+/// The line that ends an agent's data block and begins the run path
+/// (`lamp_update::agent_ns::wrapper::ONE_PATH_RUN_LINE`).
+pub const ONE_PATH_RUN_LINE: &str = "\n# The run path, the same for every agent:\n";
+
+/// Whether `wrapper` (a one run path wrapper's text) takes a skill's run
+/// with no Harness: the task entry's lines ([`TASK_ENTRY_LINES`]) in it,
+/// and `agent_task` ([`AGENT_TASK_LINE`]) in its agent's data, before the
+/// run path. By what lamp-update wrote, never by the agent's name.
+pub fn wrapper_takes_tasks(wrapper: &str) -> bool {
+    TASK_ENTRY_LINES.iter().all(|line| wrapper.contains(line))
+        && wrapper
+            .find(ONE_PATH_RUN_LINE)
+            .is_some_and(|run| wrapper[..run].contains(AGENT_TASK_LINE))
+}
+
+/// [`default_agent_takes_runs`], and the default agent's wrapper takes a
+/// skill's run with no Harness ([`wrapper_takes_tasks`]): the check before
+/// a run starts on the lamp's own agent with no Harness (#6685 PR 3). A
+/// wrapper an older lamp-update wrote, or an agent whose data has no task
+/// of its own, is refused in words, naming the agent as data.
+pub fn default_agent_takes_tasks(
+    engine: crate::harness::EngineKind,
+    wrapper: Option<&str>,
+    script: Option<&str>,
+) -> Result<(), String> {
+    default_agent_takes_runs(engine, wrapper, script)?;
+    if wrapper.is_some_and(wrapper_takes_tasks) {
+        return Ok(());
+    }
+    let name = engine.argument();
+    Err(format!(
+        "the lamp's default agent ({name}) isn't set up for a skill's run yet (its wrapper {AGENT_WRAPPERS}/{name} takes no skill's run without Harness: lamp-update is older than this build, or this agent has no task entry of its own yet), so nothing was started"
+    ))
+}
+
+/// What lamp-tasks knows of Harness when a skill's run starts (#6685
+/// PR 3), as last read, never asked at the run: `harness auth status`, read
+/// by `serve --set-up-later`'s own looks ([`harness_sign_in_read`]), or no
+/// Harness program at all.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HarnessHere {
+    /// Not read yet, or let go after failed reads.
+    Unknown,
+    /// Signed in, or signed in and offline just now.
+    SignedIn,
+    /// Signed out: no Harness account on this lamp.
+    SignedOut,
+    /// No Harness program on the lamp.
+    Absent,
+}
+
+/// What a read of Harness's sign-in says for a skill's run: signed in or
+/// offline is [`HarnessHere::SignedIn`], signed out
+/// [`HarnessHere::SignedOut`], none (let go) [`HarnessHere::Unknown`].
+pub fn here_of(sign_in: Option<crate::harness::SignIn>) -> HarnessHere {
+    use crate::harness::SignIn;
+    match sign_in {
+        None => HarnessHere::Unknown,
+        Some(SignIn::In | SignIn::Offline) => HarnessHere::SignedIn,
+        Some(SignIn::Out) => HarnessHere::SignedOut,
+    }
+}
+
+/// [`HarnessHere`] as the part's sign-in looks last read it: 0 not known,
+/// 1 signed in, 2 signed out.
+static HARNESS_SIGN_IN: AtomicU8 = AtomicU8::new(0);
+
+/// Kept by `serve --set-up-later` each time Harness's sign-in is read, or
+/// let go (`None`): what [`harness_sign_in`] says at a run's start.
+pub fn harness_sign_in_read(sign_in: Option<crate::harness::SignIn>) {
+    let value = match here_of(sign_in) {
+        HarnessHere::SignedIn => 1,
+        HarnessHere::SignedOut => 2,
+        HarnessHere::Unknown | HarnessHere::Absent => 0,
+    };
+    HARNESS_SIGN_IN.store(value, Ordering::Release);
+}
+
+/// Harness's sign-in as last read ([`harness_sign_in_read`]): no call, no
+/// wait.
+pub fn harness_sign_in() -> HarnessHere {
+    match HARNESS_SIGN_IN.load(Ordering::Acquire) {
+        1 => HarnessHere::SignedIn,
+        2 => HarnessHere::SignedOut,
+        _ => HarnessHere::Unknown,
+    }
+}
+
+/// Whether a skill's run starts on the lamp's own agent with no Harness
+/// (#6685 PR 3): only with [`DEFAULT_AGENT_SWITCH`] on, and only when the
+/// lamp has no Harness program, or Harness is set up here (`harness_set`,
+/// its start's sweep done) and signed out. Signed in (or offline), or not
+/// read yet, the run goes through Harness as before.
+pub fn starts_without_harness(default_agent: bool, here: HarnessHere, harness_set: bool) -> bool {
+    default_agent
+        && match here {
+            HarnessHere::Absent => true,
+            HarnessHere::SignedOut => harness_set,
+            HarnessHere::SignedIn | HarnessHere::Unknown => false,
+        }
+}
+
+/// What a skill's run started with no Harness needs (#6685 PR 3), set by
+/// `runtime::serve` before a run can begin.
+pub struct NoHarness {
+    /// What lamp-tasks knows of Harness now ([`harness_sign_in`] on a
+    /// lamp), read at each run.
+    pub here: Box<dyn Fn() -> HarnessHere + Send + Sync>,
+    /// The lamp's default agent now (`runtime::lamp_default`, else the
+    /// build's first, else the lamp target's own), read at each run.
+    pub default_engine: Box<dyn Fn() -> Option<crate::harness::EngineKind> + Send + Sync>,
+    /// lamp-tasks' `HOME`, the run's `HOME` as the wrapper is started.
+    pub home: PathBuf,
+}
+
+/// Where lamp-tasks puts its [`NoHarness`]; empty, every run goes through
+/// Harness as before.
+pub type NoHarnessSlot = std::sync::Arc<std::sync::OnceLock<NoHarness>>;
+
 /// Where lamp-tasks puts its [`SkillHarness`] once Harness is set up;
 /// empty until then (no Harness program, or the part still starting).
 pub type SkillHarnessSlot = std::sync::Arc<std::sync::OnceLock<SkillHarness>>;
@@ -1521,6 +1665,12 @@ pub type SkillHarnessSlot = std::sync::Arc<std::sync::OnceLock<SkillHarness>>;
 ///   socket, then, live, that `lampos`'s login shell finds that wrapper
 ///   first ([`login_finds_wrapper`]). One that can't take a run is refused in words, journaled,
 ///   and nothing is made or started: no other agent runs it instead.
+/// - **With no Harness account** (#6685 PR 3; the switch on, and Harness
+///   read signed out here, or no Harness program: [`starts_without_harness`]),
+///   the lamp's default agent is started by lamp-tasks itself, with no
+///   Harness ([`HarnessRunner::run_without_harness`]): its wrapper's task
+///   entry, the same for every agent, in the same run folder with the same
+///   token file. Signed in (or offline), or not read yet, as below.
 /// - **Off, always the lamp's Hermes**, whatever the lamp's default engine
 ///   (V2's (b), #1711), the interim: a wrapper that doesn't find a run by
 ///   its folder ([`finds_runs_by_folder`]) is refused in words.
@@ -1590,6 +1740,9 @@ pub struct HarnessRunner {
     /// the run's Hermes and it would outlive a lamp-tasks restart
     /// (Thirteen's P2 on #6684).
     pub stopping: std::sync::OnceLock<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// With [`DEFAULT_AGENT_SWITCH`] on, what a run with no Harness needs
+    /// ([`NoHarness`], #6685 PR 3); empty, every run goes through Harness.
+    pub no_harness: NoHarnessSlot,
 }
 
 impl HarnessRunner {
@@ -1612,7 +1765,194 @@ impl HarnessRunner {
             agent_ns: Some(PathBuf::from(AGENT_NS)),
             login: Some(LoginLookup::lamp(home)),
             stopping: std::sync::OnceLock::new(),
+            no_harness: NoHarnessSlot::default(),
         }
+    }
+
+    /// A skill's run on the lamp's default agent with no Harness (#6685
+    /// PR 3, [`starts_without_harness`]): the one check
+    /// ([`default_agent_takes_tasks`]), then the same run folder
+    /// `skill-<run-id>` (0700) and token file as a run through Harness, the
+    /// task's words in the folder's [`TASK_FILE`] (0600), both written
+    /// before the start; then the agent's wrapper
+    /// ([`AGENT_WRAPPERS`]`/<engine>`) started by lamp-tasks itself as
+    /// `<engine> --lamp-task` in that folder, in a process group of its
+    /// own, its environment cleared to `PATH`, `HOME` and `SHELL` (the
+    /// token only in its file, which the wrapper reads once and deletes).
+    /// Its output goes nowhere. Its end: its exit, the run's deadline or
+    /// lamp-tasks' stop, whichever comes first; then the run's token ended
+    /// with lamp-control, its whole group killed (the wrapper's `unshare
+    /// --kill-child` takes the agent's namespace with it) and reaped, its
+    /// folder and token file removed, however it ends.
+    fn run_without_harness(
+        &self,
+        local: &NoHarness,
+        run: &SkillRun,
+        end_token: &dyn Fn(),
+    ) -> Result<u64, String> {
+        use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+        use std::os::unix::process::CommandExt;
+        use std::process::{Command, Stdio};
+        let began = std::time::Instant::now();
+        let Some(engine) = (local.default_engine)() else {
+            let why = "the lamp has no default agent yet (none chosen in the app and none this build names), so nothing was started";
+            eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+            return Err(why.into());
+        };
+        let Some(wrappers) = &self.wrappers else {
+            return Err("the agents' wrappers aren't known here, so nothing was started".into());
+        };
+        let program = wrappers.join(engine.argument());
+        let read = |path: &Path| std::fs::read_to_string(path).ok();
+        if let Err(why) = default_agent_takes_tasks(
+            engine,
+            read(&program).as_deref(),
+            self.agent_ns.as_deref().and_then(read).as_deref(),
+        ) {
+            eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+            return Err(why);
+        }
+        let token = run
+            .env
+            .iter()
+            .find(|(name, _)| *name == TOKEN_ENV)
+            .map(|(_, secret)| RunToken::new(secret.clone()))
+            .ok_or("the run has no token, so nothing was started")?;
+        if !self.project.is_dir() {
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(&self.project)
+                .map_err(|error| format!("lamp-tasks' Harness project not made: {error}"))?;
+        }
+        let folder = self.project.join(format!("{RUN_FOLDER_PREFIX}{}", run.run));
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&folder)
+            .map_err(|error| format!("the run's folder not made: {error}"))?;
+        let mut local_run = LocalRun {
+            end_token,
+            folder,
+            token: None,
+            child: None,
+        };
+        // Both before the start: the wrapper reads them at its start.
+        local_run.token = Some(crate::run_token_file::RunTokenFile::write(
+            &self.runs, &run.run, &token,
+        )?);
+        drop(token);
+        std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(local_run.folder.join(TASK_FILE))
+            .and_then(|mut file| file.write_all(run.prompt.as_bytes()))
+            .map_err(|error| format!("the run's task file not written: {error}"))?;
+        let child = Command::new(&program)
+            .arg(TASK_ARG)
+            .env_clear()
+            .env("PATH", RUN_PATH)
+            .env("HOME", &local.home)
+            .env("SHELL", "/bin/sh")
+            .current_dir(&local_run.folder)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .process_group(0)
+            .spawn()
+            .map_err(|error| {
+                format!(
+                    "the lamp's default agent ({}) could not be started: {error}",
+                    engine.argument()
+                )
+            })?;
+        let pid = rustix::process::Pid::from_child(&child);
+        local_run.child = Some(child);
+        eprintln!(
+            "[lamp-tasks] skill task {}: started on the lamp's default agent ({}) with no Harness",
+            run.run,
+            engine.argument()
+        );
+        let stopping = self.stopping.get().cloned();
+        let stopped = || {
+            stopping
+                .as_ref()
+                .is_some_and(|stop| stop.load(Ordering::Acquire))
+        };
+        let status = loop {
+            use rustix::process::{WaitId, WaitIdOptions, waitid};
+            // NOWAIT keeps the pid, so the group signal never reaches
+            // another process given it.
+            match waitid(
+                WaitId::Pid(pid),
+                WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+            ) {
+                Ok(Some(status)) => break Some(status.exit_status()),
+                Ok(None) => {}
+                Err(error) if error == rustix::io::Errno::INTR => {}
+                Err(_) => break None,
+            }
+            if began.elapsed() >= run.deadline || stopped() {
+                break None;
+            }
+            std::thread::sleep(RUN_TICK);
+        };
+        // Revoke, then kill (V2's order on #6510), then reap; the guard
+        // removes the folder and the token file.
+        local_run.end();
+        drop(local_run);
+        let agent = "the lamp's default agent";
+        match status {
+            Some(Some(0)) => Ok(0),
+            Some(Some(code)) => Err(format!("{agent} ended with status {code}")),
+            Some(None) => Err(format!("{agent} was ended by a signal")),
+            None if began.elapsed() >= run.deadline => Err(format!(
+                "the run was ended at its deadline, {} s",
+                run.deadline.as_secs()
+            )),
+            None if stopped() => Err("the run was ended as lamp-tasks stops".into()),
+            None => Err(format!("{agent} could not be waited for")),
+        }
+    }
+}
+
+/// A run lamp-tasks started itself with no Harness, undone however it
+/// ends: its token ended with lamp-control first, then its whole process
+/// group killed and the wrapper reaped, then its folder (the task file in
+/// it) removed and its token file deleted (when the wrapper hasn't
+/// already).
+struct LocalRun<'a> {
+    end_token: &'a dyn Fn(),
+    folder: PathBuf,
+    token: Option<crate::run_token_file::RunTokenFile>,
+    child: Option<std::process::Child>,
+}
+
+impl LocalRun<'_> {
+    /// The token ended, then the run's group killed and reaped, once.
+    fn end(&mut self) {
+        (self.end_token)();
+        if let Some(mut child) = self.child.take() {
+            let pid = rustix::process::Pid::from_child(&child);
+            let _ = rustix::process::kill_process_group(pid, rustix::process::Signal::KILL);
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+impl Drop for LocalRun<'_> {
+    fn drop(&mut self) {
+        self.end();
+        if let Err(error) = std::fs::remove_dir_all(&self.folder)
+            && error.kind() != std::io::ErrorKind::NotFound
+        {
+            eprintln!(
+                "[lamp-tasks] skill task: the run's folder {} was not removed: {error}",
+                self.folder.display()
+            );
+        }
+        drop(self.token.take());
     }
 }
 
@@ -1747,6 +2087,18 @@ impl Runner for HarnessRunner {
         use std::os::unix::fs::DirBuilderExt;
         use std::sync::atomic::AtomicBool;
         let began = std::time::Instant::now();
+        // With the switch on and no Harness account (or no Harness), the
+        // lamp's own agent with no Harness (#6685 PR 3), read as last
+        // known: nothing is asked here.
+        if let Some(local) = self.no_harness.get()
+            && starts_without_harness(
+                self.default_agent,
+                (local.here)(),
+                self.harness.get().is_some(),
+            )
+        {
+            return self.run_without_harness(local, run, end_token);
+        }
         let Some(harness) = self.harness.get() else {
             return Err(
                 "Harness isn't set up on this lamp yet, so a skill's run can't be started".into(),
@@ -2043,14 +2395,17 @@ impl HandOvers {
     /// The lamp's: [`HAND_OVER_SOCKET`], [`SKILLS`], lamp-control's tokens
     /// ([`ControlTokens`]), the lamp's Hermes started through Harness
     /// ([`HarnessRunner::lamp`], #6510 Part 1 step 2, with the Harness
-    /// lamp-tasks sets up once it has one: `harness`) and lamp-skills alone
-    /// as caller.
-    pub fn lamp(home: &Path, harness: SkillHarnessSlot) -> Self {
+    /// lamp-tasks sets up once it has one: `harness`; or the lamp's own
+    /// agent with no Harness, by `no_harness`, #6685 PR 3) and lamp-skills
+    /// alone as caller.
+    pub fn lamp(home: &Path, harness: SkillHarnessSlot, no_harness: NoHarnessSlot) -> Self {
+        let mut runner = HarnessRunner::lamp(home, harness);
+        runner.no_harness = no_harness;
         Self {
             socket: PathBuf::from(HAND_OVER_SOCKET),
             skills: PathBuf::from(SKILLS),
             tokens: std::sync::Arc::new(ControlTokens::default()),
-            runner: std::sync::Arc::new(HarnessRunner::lamp(home, harness)),
+            runner: std::sync::Arc::new(runner),
             caller: caller_is_lamp_skills,
         }
     }
@@ -2389,6 +2744,28 @@ pub fn sweep_at_start(harness: SkillHarness, home: &Path, slot: SkillHarnessSlot
         eprintln!("{line}");
     }
     let _ = slot.set(harness);
+}
+
+/// lamp-tasks' start with no Harness program (#6685 PR 3): the runs an
+/// earlier start left ([`leftovers`], by their folders and token files;
+/// no Harness lists a session) undone as [`sweep`] does, each run's token
+/// ended first, before a run with no Harness can begin. A run lamp-tasks
+/// started itself is in lamp-tasks.service's cgroup, which systemd ends with it.
+pub fn sweep_without_harness(home: &Path) {
+    let runner = HarnessRunner::lamp(home, std::sync::Arc::default());
+    let tokens = ControlTokens::default();
+    for line in swept_without_harness(&runner.project, &runner.runs, &|run| tokens.end(run)) {
+        eprintln!("{line}");
+    }
+}
+
+/// [`sweep_without_harness`] in `project` and `runs`, each run's token
+/// ended by `end`: its journal lines.
+pub fn swept_without_harness(project: &Path, runs: &Path, end: &dyn Fn(&str)) -> Vec<String> {
+    let found = leftovers(project, runs, &[]);
+    sweep(project, runs, &found, end, &|_| {
+        Err("no Harness here".to_owned())
+    })
 }
 
 #[cfg(test)]
@@ -3999,5 +4376,376 @@ mod tests {
         assert!(!found_is_wrapper(copy.to_str().unwrap(), &wrapper));
         assert!(!found_is_wrapper("eng", &wrapper), "not a full path");
         assert!(!found_is_wrapper("/no/such/eng", &wrapper));
+    }
+
+    /// #6685 PR 3: the run starts with no Harness only with the switch on,
+    /// and only with no Harness program or Harness set up and signed out;
+    /// signed in (or offline) or not read yet, through Harness.
+    #[test]
+    fn a_run_starts_with_no_harness_only_signed_out_or_with_no_harness() {
+        use HarnessHere::{Absent, SignedIn, SignedOut, Unknown};
+        assert!(starts_without_harness(true, SignedOut, true));
+        assert!(starts_without_harness(true, Absent, false));
+        assert!(
+            !starts_without_harness(true, SignedOut, false),
+            "its sweep first"
+        );
+        assert!(!starts_without_harness(true, SignedIn, true));
+        assert!(!starts_without_harness(true, Unknown, true));
+        for here in [Absent, SignedIn, SignedOut, Unknown] {
+            assert!(!starts_without_harness(false, here, true), "{here:?}");
+        }
+        // As the part's looks read it (the kept value is the part's, shared
+        // with its other tests: only the reading is held here).
+        use crate::harness::SignIn;
+        assert_eq!(here_of(Some(SignIn::Out)), SignedOut);
+        assert_eq!(here_of(Some(SignIn::Offline)), SignedIn);
+        assert_eq!(here_of(Some(SignIn::In)), SignedIn);
+        assert_eq!(here_of(None), Unknown);
+    }
+
+    /// #6685 PR 3: the task entry's lines are lamp-update's own, held to
+    /// its source and its pinned wrappers: Hermes's data has `agent_task`,
+    /// Claude Code's has none yet, and a wrapper without the entry (an
+    /// older lamp-update's) takes no run with no Harness.
+    #[test]
+    fn the_task_entry_is_lamp_updates_own() {
+        assert!(wrapper_takes_tasks(ONE_PATH_HERMES));
+        assert!(
+            !wrapper_takes_tasks(ONE_PATH_CLAUDE),
+            "no agent_task of its own"
+        );
+        for line in TASK_ENTRY_LINES {
+            assert_eq!(ONE_PATH_HERMES.matches(line).count(), 1, "{line:?}");
+            assert_eq!(ONE_PATH_CLAUDE.matches(line).count(), 1, "{line:?}");
+            assert!(!wrapper_takes_tasks(&ONE_PATH_HERMES.replace(line, "")));
+        }
+        assert_eq!(ONE_PATH_HERMES.matches(AGENT_TASK_LINE).count(), 1);
+        assert_eq!(ONE_PATH_HERMES.matches(ONE_PATH_RUN_LINE).count(), 1);
+        // `agent_task` after the run path is no agent's data.
+        let moved = ONE_PATH_HERMES.replacen(AGENT_TASK_LINE, "\n", 1) + "agent_task() {\n:\n}\n";
+        assert!(!wrapper_takes_tasks(&moved));
+        let wrapper_rs = include_str!("../../update/src/agent_ns/wrapper.rs");
+        assert!(wrapper_rs.contains(&format!(
+            "pub const AGENT_TASK_LINE: &str = \"{}\";",
+            AGENT_TASK_LINE[1..].replace('\n', "\\n")
+        )));
+        assert!(wrapper_rs.contains(&format!(
+            "pub const ONE_PATH_RUN_LINE: &str = \"{}\";",
+            ONE_PATH_RUN_LINE[1..].replace('\n', "\\n")
+        )));
+        for line in TASK_ENTRY_LINES {
+            assert_eq!(wrapper_rs.matches(line).count(), 1, "{line:?}");
+        }
+        assert!(wrapper_rs.contains(&format!("if [ \"${{1-}}\" = {TASK_ARG} ]")));
+        assert!(wrapper_rs.contains(&format!("Q=$P/{TASK_FILE}\n")));
+    }
+
+    /// A stand-in for the default agent's one run path wrapper: what the
+    /// checks look for (never run: after `exit`), and `body` run first.
+    fn local_wrapper(body: &str) -> String {
+        format!(
+            "#!/bin/sh\n{ONE_PATH_MARK}E=hermes\n{body}\nexit 0\nagent_task() {{\n  :\n}}{ONE_PATH_RUN_LINE}{}{}{}{}{}{}{}",
+            WRAPPER_RUN_LINES[0],
+            WRAPPER_RUN_LINES[1],
+            AGENT_NS_NET_LINES[0],
+            AGENT_NS_NET_LINES[1],
+            AGENT_NS_NET_LINES[2],
+            TASK_ENTRY_LINES[0],
+            TASK_ENTRY_LINES[1],
+        )
+    }
+
+    /// A lamp's runner in `dir` with the switch `default_agent`, Harness
+    /// as `here` (set up when signed out), Hermes the default agent, its
+    /// wrapper `wrapper` when given, and an agent namespace that takes runs.
+    fn local_runner(
+        dir: &Path,
+        here: HarnessHere,
+        default_agent: bool,
+        wrapper: Option<&str>,
+    ) -> HarnessRunner {
+        use std::os::unix::fs::PermissionsExt;
+        let bin = dir.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        if let Some(text) = wrapper {
+            let place = bin.join("hermes");
+            std::fs::write(&place, text).unwrap();
+            std::fs::set_permissions(&place, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let ns = dir.join("agent-ns");
+        std::fs::write(&ns, ns_with_runs()).unwrap();
+        let harness: SkillHarnessSlot = Default::default();
+        if here == HarnessHere::SignedOut {
+            let _ = harness.set(SkillHarness::new(
+                crate::harness::CliConfig::new(dir.join("no-harness")),
+                "session".into(),
+                Box::new(|| None),
+            ));
+        }
+        let no_harness = NoHarnessSlot::default();
+        let _ = no_harness.set(NoHarness {
+            here: Box::new(move || here),
+            default_engine: Box::new(|| Some(crate::harness::EngineKind::Hermes)),
+            home: dir.to_owned(),
+        });
+        HarnessRunner {
+            project: dir.join("project"),
+            runs: dir.join("runs"),
+            harness,
+            held_by: None,
+            retry: Duration::from_millis(20),
+            default_agent,
+            wrappers: Some(bin),
+            agent_ns: Some(ns),
+            // A run with no Harness starts the wrapper by its full path, so
+            // lampos's login lookup (#6817's P2) is never asked here.
+            login: None,
+            stopping: std::sync::OnceLock::new(),
+            no_harness,
+        }
+    }
+
+    /// Nothing of run `task-1` is left in `dir`: no folder, no token file.
+    fn nothing_left(dir: &Path) {
+        assert!(std::fs::symlink_metadata(dir.join("project/skill-task-1")).is_err());
+        assert!(std::fs::symlink_metadata(dir.join("runs/task-1")).is_err());
+    }
+
+    /// #6685 PR 3: signed out with the switch on, the lamp's default agent
+    /// is started by lamp-tasks itself, with no Harness: its wrapper as
+    /// `<engine> --lamp-task` alone, in the run's own folder, the token
+    /// file and the task file both written before the start, the token in
+    /// no argument and no environment, the run's words in the task file;
+    /// it ends done, its token ended, and nothing is left. With no Harness
+    /// program, the same.
+    #[test]
+    fn signed_out_the_default_agent_starts_with_no_harness_and_leaves_nothing() {
+        for here in [HarnessHere::SignedOut, HarnessHere::Absent] {
+            let dir = tempfile::tempdir().unwrap();
+            let top = std::fs::canonicalize(dir.path()).unwrap();
+            let out = top.join("out");
+            std::fs::create_dir(&out).unwrap();
+            let body = format!(
+                "O={out}\nprintf '%s\\n' \"$0\" \"$@\" > $O/argv\npwd -P > $O/cwd\nenv > $O/env\ncat {runs}/task-1 > $O/token && rm {runs}/task-1\ncat task > $O/task\nls -l task > $O/mode",
+                out = out.display(),
+                runs = top.join("runs").display(),
+            );
+            let runner = local_runner(&top, here, true, Some(&local_wrapper(&body)));
+            let ended = std::cell::Cell::new(0);
+            let run = skill_run("secret-6685", Duration::from_secs(20));
+            assert_eq!(
+                runner.run(&run, &|| ended.set(ended.get() + 1)),
+                Ok(0),
+                "{here:?}"
+            );
+            assert!(ended.get() >= 1, "its token ended");
+            let read = |name: &str| std::fs::read_to_string(out.join(name)).unwrap();
+            let argv = read("argv");
+            assert_eq!(
+                argv.lines().collect::<Vec<_>>(),
+                [top.join("bin/hermes").to_str().unwrap(), TASK_ARG]
+            );
+            assert_eq!(
+                read("cwd").trim(),
+                top.join("project/skill-task-1").to_str().unwrap()
+            );
+            assert_eq!(
+                read("token"),
+                "secret-6685",
+                "the token file before the start"
+            );
+            assert_eq!(read("task"), run.prompt);
+            assert!(read("mode").starts_with("-rw-------"), "{}", read("mode"));
+            let env = read("env");
+            assert!(!env.contains("secret-6685"), "{env}");
+            assert!(!env.contains("CARGO"), "{env}");
+            assert!(env.lines().any(|line| line == format!("PATH={RUN_PATH}")));
+            nothing_left(&top);
+        }
+    }
+
+    /// #6685 PR 3: signed in (or not read yet), the run goes through
+    /// Harness as before, and with the switch off whatever the sign-in:
+    /// the wrapper is never started by lamp-tasks.
+    #[test]
+    fn signed_in_or_switched_off_the_run_goes_through_harness() {
+        for (here, on) in [
+            (HarnessHere::SignedIn, true),
+            (HarnessHere::Unknown, true),
+            (HarnessHere::SignedOut, false),
+            (HarnessHere::Absent, false),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let ran = dir.path().join("ran");
+            let runner = local_runner(
+                dir.path(),
+                here,
+                on,
+                Some(&local_wrapper(&format!("touch {}", ran.display()))),
+            );
+            let said = runner
+                .run(&skill_run("tok", Duration::from_secs(5)), &|| {})
+                .unwrap_err();
+            assert!(!ran.exists(), "{here:?} {on}: not started by lamp-tasks");
+            // Through Harness: none set up here, or the fixture-less CLI.
+            assert!(
+                said.contains("Harness") || said.contains("harness"),
+                "{here:?} {on}: {said}"
+            );
+            nothing_left(dir.path());
+        }
+    }
+
+    /// #6685 PR 3: a default agent whose wrapper lacks the task entry (an
+    /// older lamp-update's, or an agent with no task of its own) is refused
+    /// in words and journaled, and nothing is made or started.
+    #[test]
+    fn a_wrapper_without_the_task_entry_starts_nothing() {
+        for text in [
+            Some(ONE_PATH_HERMES.replace(TASK_ENTRY_LINES[0], "")),
+            Some(ONE_PATH_HERMES.replacen(AGENT_TASK_LINE, "\n", 1)),
+            None,
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let runner = local_runner(dir.path(), HarnessHere::Absent, true, text.as_deref());
+            let said = runner
+                .run(&skill_run("tok", Duration::from_secs(5)), &|| {})
+                .unwrap_err();
+            assert!(
+                said.starts_with(
+                    "the lamp's default agent (hermes) isn't set up for a skill's run yet ("
+                ) && said.ends_with("), so nothing was started"),
+                "{said}"
+            );
+            assert!(!dir.path().join("project").exists(), "nothing made");
+            assert!(!dir.path().join("runs").exists(), "no token file");
+        }
+        // No default agent known: refused, nothing made.
+        let dir = tempfile::tempdir().unwrap();
+        let mut runner = local_runner(
+            dir.path(),
+            HarnessHere::Absent,
+            true,
+            Some(&local_wrapper("true")),
+        );
+        runner.no_harness = NoHarnessSlot::default();
+        let _ = runner.no_harness.set(NoHarness {
+            here: Box::new(|| HarnessHere::Absent),
+            default_engine: Box::new(|| None),
+            home: dir.path().to_owned(),
+        });
+        let said = runner
+            .run(&skill_run("tok", Duration::from_secs(5)), &|| {})
+            .unwrap_err();
+        assert!(said.contains("no default agent yet"), "{said}");
+        assert!(!dir.path().join("project").exists());
+    }
+
+    /// Whether process `pid` is gone, waited for up to two seconds.
+    fn gone(pid: &str) -> bool {
+        let began = std::time::Instant::now();
+        while began.elapsed() < Duration::from_secs(2) {
+            let alive = std::process::Command::new("kill")
+                .args(["-0", pid])
+                .stderr(std::process::Stdio::null())
+                .status()
+                .is_ok_and(|status| status.success());
+            if !alive {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        false
+    }
+
+    /// #6685 PR 3: a run past its deadline, or going as lamp-tasks stops,
+    /// is ended: its token ended, its whole process group killed (a child
+    /// it started too), and its folder and token file gone; an exit status
+    /// other than 0 is said as failed.
+    #[test]
+    fn a_run_with_no_harness_is_ended_at_its_deadline_or_the_stop_and_its_status_said() {
+        for stop in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let top = std::fs::canonicalize(dir.path()).unwrap();
+            let child = top.join("child");
+            let body = format!("sleep 30 &\necho $! > {}\nwait", child.display());
+            let runner = local_runner(&top, HarnessHere::Absent, true, Some(&local_wrapper(&body)));
+            let flag = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            runner.stop_on(flag.clone());
+            let deadline = if stop {
+                Duration::from_secs(20)
+            } else {
+                Duration::from_secs(2)
+            };
+            let ended = std::cell::Cell::new(false);
+            let began = std::time::Instant::now();
+            let said = std::thread::scope(|scope| {
+                if stop {
+                    let (flag, child) = (flag.clone(), child.clone());
+                    // Once the run is going (its child started).
+                    scope.spawn(move || {
+                        let began = std::time::Instant::now();
+                        while !child.exists() && began.elapsed() < Duration::from_secs(5) {
+                            std::thread::sleep(Duration::from_millis(20));
+                        }
+                        flag.store(true, Ordering::Release);
+                    });
+                }
+                runner
+                    .run(&skill_run("tok", deadline), &|| ended.set(true))
+                    .unwrap_err()
+            });
+            assert!(
+                began.elapsed() < Duration::from_secs(10),
+                "{:?}",
+                began.elapsed()
+            );
+            if stop {
+                assert_eq!(said, "the run was ended as lamp-tasks stops");
+            } else {
+                assert!(said.contains("deadline"), "{said}");
+            }
+            assert!(ended.get(), "its token ended");
+            let pid = std::fs::read_to_string(&child).unwrap();
+            assert!(gone(pid.trim()), "the run's child {pid} is killed with it");
+            nothing_left(&top);
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let runner = local_runner(
+            dir.path(),
+            HarnessHere::Absent,
+            true,
+            Some(&local_wrapper("exit 3")),
+        );
+        let said = runner
+            .run(&skill_run("tok", Duration::from_secs(10)), &|| {})
+            .unwrap_err();
+        assert_eq!(said, "the lamp's default agent ended with status 3");
+        nothing_left(dir.path());
+    }
+
+    /// #6685 PR 3: the start's sweep with no Harness takes away what an
+    /// earlier start left, its token ended first.
+    #[test]
+    fn a_start_with_no_harness_sweeps_what_an_earlier_one_left() {
+        let dir = tempfile::tempdir().unwrap();
+        let (project, runs) = (dir.path().join("project"), dir.path().join("runs"));
+        let run = run_id();
+        let folder = project.join(format!("{RUN_FOLDER_PREFIX}{run}"));
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join(TASK_FILE), "words").unwrap();
+        std::fs::create_dir_all(&runs).unwrap();
+        std::fs::write(runs.join(&run), "tok").unwrap();
+        std::fs::write(project.join("keep.txt"), "kept").unwrap();
+        let ended = RefCell::new(Vec::new());
+        let lines = swept_without_harness(&project, &runs, &|run| {
+            ended.borrow_mut().push(run.to_owned())
+        });
+        assert_eq!(*ended.borrow(), std::slice::from_ref(&run));
+        assert!(!folder.exists(), "{lines:?}");
+        assert!(!runs.join(&run).exists(), "{lines:?}");
+        assert!(project.join("keep.txt").exists());
+        assert!(lines[0].contains("no session named for it"), "{lines:?}");
     }
 }

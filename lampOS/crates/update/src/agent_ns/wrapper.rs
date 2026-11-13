@@ -51,6 +51,11 @@
 //! `unshare` into [`NS`]. [`NS`] then takes the agent's home from the
 //! wrapper, checked against the agents' homes ([`OWN_HOMES`],
 //! [`HOMES`]`/<engine>`), and shows it at its own path ([`ONE_PATH_NS_EDITS`]).
+//! A skill's run lamp-tasks starts with no Harness (#6685 PR 3) comes in by
+//! the run path's task entry ([`TASK_ENTRY`], `<engine> --lamp-task` in the
+//! run's folder), the same lines for every agent; how the agent takes the
+//! task's words is its data ([`Agent::task`], `agent_task`), and an agent
+//! with none takes no such run.
 use crate::{
     hermes_install::{self, Shown, holds, on},
     records::write_whole,
@@ -211,6 +216,12 @@ pub struct Agent {
     pub env: String,
     /// Shell lines run after [`Agent::env`] in a skill's run only.
     pub run_env: String,
+    /// Shell lines of `agent_task`, given the run's task file as `$1`
+    /// ([`TASK_ENTRY`], #6685): how this agent takes a skill's run with no
+    /// Harness, ending in `agent_start` with the agent's own arguments.
+    /// Empty: no `agent_task`, and the agent takes no such run (its
+    /// wrapper ends it, and lamp-tasks refuses it before).
+    pub task: String,
 }
 
 /// A plain agent's data: its home [`home_of`]`(engine)`, its program found
@@ -222,6 +233,7 @@ pub fn agent_of(engine: &str) -> Result<Agent, String> {
         program: None,
         env: String::new(),
         run_env: String::new(),
+        task: String::new(),
     })
 }
 
@@ -255,6 +267,34 @@ const ONE_PATH_HEADER: &str = r#"# lampOS/docs/install.md, "One agent namespace 
 /// ([`ONE_PATH_RUN`]) comes after it.
 pub const ONE_PATH_RUN_LINE: &str = "# The run path, the same for every agent:\n";
 
+/// The one run path's task entry ([`ONE_PATH_RUN`], #6685): a skill's run
+/// lamp-tasks starts itself, with no Harness, as `<engine> --lamp-task` in
+/// the run's own folder. Taken only in a run (its token file already read),
+/// with that one argument, from an agent whose data has `agent_task`
+/// ([`Agent::task`]), and with the task file `task` in the run's folder (a
+/// file, never a link): `agent_task` turns that file into the agent's own
+/// arguments and starts it with `agent_start`, the same `unshare` as every
+/// other start. Anything else ends it before the agent runs. The same lines
+/// for every agent; lamp-tasks looks for them
+/// (`lamp_tasks::skill_task::TASK_ENTRY_LINES`) before it starts a run so.
+macro_rules! task_entry {
+    () => {
+        r#"# A skill's run lamp-tasks starts with no Harness (#6685): `--lamp-task` alone, in the run's own folder. The agent's data
+# (agent_task) turns the folder's task file into the agent's own arguments and starts it with agent_start.
+if [ "${1-}" = --lamp-task ]; then
+  [ -n "$R" ] && [ $# -eq 1 ] || fail "--lamp-task is only for a skill's run, started by lamp-tasks in its own folder"
+  case $(command -V agent_task 2>/dev/null) in *function*) ;; *) fail "it takes no skill's task without Harness yet" ;; esac
+  Q=$P/task
+  [ -f "$Q" ] && [ ! -L "$Q" ] || fail "no task at $Q"
+  agent_task "$Q"
+  fail "its data started no task"
+fi
+"#
+    };
+}
+/// [`task_entry`]'s text.
+pub const TASK_ENTRY: &str = task_entry!();
+
 /// The run path of [`one_path_text`], after the agent's data: the same
 /// bytes for every agent, naming none. The caller's token and network
 /// switch are dropped; the run lines ([`hermes_install::ONE_RUN_LINES`])
@@ -264,7 +304,9 @@ pub const ONE_PATH_RUN_LINE: &str = "# The run path, the same for every agent:\n
 /// (its own, or the first on `PATH` that is no lamp-update wrapper);
 /// the hook stand-in's journal line ([`super::HOOK_NOTE`]); and the one
 /// `unshare` into [`NS`], which is given the agent, its program and its
-/// home.
+/// home, in `agent_start`: called with the caller's arguments, or, for a
+/// skill's run lamp-tasks starts with no Harness, by the agent's
+/// `agent_task` through [`TASK_ENTRY`].
 pub const ONE_PATH_RUN: &str = concat!(
     r#"fail() { echo "$E: $1" >&2; exit 1; }
 unset LAMP_CONTROL_TOKEN LAMP_NS_NET
@@ -300,13 +342,25 @@ logger -t "$E" "Harness hooks aren't available inside the lamp's agent namespace
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
 LAMP_NS_ENGINE=$E LAMP_NS_ENGINE_BIN=$X LAMP_NS_HOME=$H
 export LAMP_NS_UID LAMP_NS_GID LAMP_NS_ENGINE LAMP_NS_ENGINE_BIN LAMP_NS_HOME
-exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/agent-ns "$@"
+agent_start() {
+  exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/agent-ns "$@"
+}
+"#,
+    task_entry!(),
+    r#"agent_start "$@"
 "#
 );
 
+/// The line that begins an agent's `agent_task` in its data block
+/// ([`Agent::task`]), only when it has one: what lamp-tasks looks for
+/// (`lamp_tasks::skill_task::AGENT_TASK_LINE`) before it starts a skill's
+/// run with no Harness.
+pub const AGENT_TASK_LINE: &str = "agent_task() {\n";
+
 /// The one run path's wrapper for `agent` (#6685, [`Shown::one_path`]):
 /// `#!/bin/sh`, [`ONE_PATH_MARK`], [`ONE_PATH_HEADER`], the agent's data
-/// (`E`, `H`, `X`, `agent_env`, `agent_run_env`), [`ONE_PATH_RUN_LINE`]
+/// (`E`, `H`, `X`, `agent_env`, `agent_run_env`, and `agent_task` when it
+/// has one), [`ONE_PATH_RUN_LINE`]
 /// and [`ONE_PATH_RUN`]. Refused unless the engine is plain, its home is
 /// [`home_of`] it or its own in [`OWN_HOMES`], its program a plain full
 /// path, and its lines indented.
@@ -330,14 +384,19 @@ pub fn one_path_text(agent: &Agent) -> Result<String, String> {
             agent.engine
         ));
     }
-    if !lines_ok(&agent.env) || !lines_ok(&agent.run_env) {
+    if !lines_ok(&agent.env) || !lines_ok(&agent.run_env) || !lines_ok(&agent.task) {
         return Err(format!(
             "{}: its lines are not indented shell lines",
             agent.engine
         ));
     }
+    let task = if agent.task.is_empty() {
+        String::new()
+    } else {
+        format!("{AGENT_TASK_LINE}{}}}\n", agent.task)
+    };
     Ok(format!(
-        "#!/bin/sh\n{ONE_PATH_MARK}{ONE_PATH_HEADER}E={}\nH={}\nX={}\nagent_env() {{\n{}  :\n}}\nagent_run_env() {{\n{}  :\n}}\n{ONE_PATH_RUN_LINE}{ONE_PATH_RUN}",
+        "#!/bin/sh\n{ONE_PATH_MARK}{ONE_PATH_HEADER}E={}\nH={}\nX={}\nagent_env() {{\n{}  :\n}}\nagent_run_env() {{\n{}  :\n}}\n{task}{ONE_PATH_RUN_LINE}{ONE_PATH_RUN}",
         agent.engine,
         agent.home,
         agent.program.as_deref().unwrap_or(""),

@@ -2557,7 +2557,14 @@ yet on a lamp.
     forwarder token read from lamp-cloud's file (none ends it) and given
     as `LAMP_HERMES_TOKEN` with `HERMES_HOME=/var/lib/lampos-hermes/.hermes`
     and `HERMES_YOLO_MODE` unset, and in a run `HERMES_YOLO_MODE=1`
-    (#6684). A plain agent's are empty;
+    (#6684). And, only for an agent that takes a skill's run with no
+    Harness (#6685 PR 3), `agent_task() { … }` (`Agent::task`): given the
+    run's task file as `$1`, it turns it into the agent's own arguments
+    and ends in `agent_start` with them. Hermes's
+    (`hermes_install::AGENT_TASK`): the file read whole (empty ends it)
+    and `agent_start chat -q "<the task's words>"`, as Harness starts the
+    lamp's Hermes with a first prompt. A plain agent's are empty, and it
+    has no `agent_task`;
   - **the run path**, after `# The run path, the same for every agent:`,
     the same bytes for every agent (a test holds it for Hermes, Claude
     Code and Codex, and pins Hermes's and Claude Code's whole wrappers in
@@ -2567,10 +2574,19 @@ yet on a lamp.
     Hermes's approvals); `agent_env`, then `agent_run_env` in a run; `N=`
     and `[ "${LAMP_NS_NET-}" != run ] || N=--net`; the program (its own,
     resolved by `readlink -f`, or the first on `PATH`); the hook stand-in's
-    journal line tagged `$E`; and `exec /usr/bin/unshare --map-root-user
-    $N --mount --pid --kill-child --mount-proc --propagation private
-    /usr/local/lib/lampos/agent-ns "$@"`, with `LAMP_NS_ENGINE`,
-    `LAMP_NS_ENGINE_BIN` and `LAMP_NS_HOME`.
+    journal line tagged `$E`; `LAMP_NS_ENGINE`, `LAMP_NS_ENGINE_BIN` and
+    `LAMP_NS_HOME` exported; `agent_start() { exec /usr/bin/unshare
+    --map-root-user $N --mount --pid --kill-child --mount-proc
+    --propagation private /usr/local/lib/lampos/agent-ns "$@"; }`; **the
+    task entry** (`wrapper::TASK_ENTRY`, #6685 PR 3): `<engine>
+    --lamp-task`, a skill's run lamp-tasks starts itself with no Harness
+    account, is taken only in a run (its token file already read), with
+    that one argument, from an agent with `agent_task`, and with the run
+    folder's `task` file a file and not a link; then `agent_task
+    "$P/task"`, and anything else ends it ("--lamp-task is only for a
+    skill's run …", "it takes no skill's task without Harness yet", "no
+    task at …") before the namespace; and last `agent_start "$@"` for
+    every other start, Harness's own among them, as before.
 
   `agent-ns` then takes the home from `LAMP_NS_HOME` instead of
   `/var/lib/lampos-agents/$E` (`ONE_PATH_NS_EDITS`), and before anything
@@ -2609,7 +2625,12 @@ replace a file that is not lamp-update's; no token file left when no
 program is found; an engine found before the wrapper (or none found) not
 present; the login lookup's argv; the programs look's argv (bounded,
 fixed text, plain names only), run with a stand-in `PATH` listing only
-the engine's own program, and its output read strictly.
+the engine's own program, and its output read strictly; the one run
+path's task entry the same lines for every agent, `agent_task` only in
+Hermes's data, Hermes started by it as `chat -q` with the task's words
+after the run's token file is read once, and nothing started by it for
+an agent with no `agent_task`, outside a run's folder, with another
+argument, or with no task file or a linked one (#6685 PR 3).
 `agent_ns::rounds::tests`: the switch
 on only for `on`; only installed, plain engines other than Hermes and
 OpenClaw written, a made-up one included; a second round writing nothing
