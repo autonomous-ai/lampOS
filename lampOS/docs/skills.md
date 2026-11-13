@@ -4162,7 +4162,7 @@ grant", as before. Tests: lamp-skills'
 lamp-control's `the_yes_covers_a_skills_service_grants`, the voice's
 `service_grants_are_said_back_plainly_only_on`.
 
-##### Handed to the lamp's agent when DeepSeek fails (`LAMP_MAKE_SKILL_AGENT=on`, on in the product, proposal on #6059)
+##### Handed to the lamp's agent when DeepSeek fails (`LAMP_MAKE_SKILL_AGENT=on`, off in the product again since 13 Nov until its make row passes, proposal on #6059)
 
 A proposal on #6059 (the owner's OK, 11 Nov), with the first builder's
 yes (Queue #6059, 11 Nov 22:44 +07). With the switch, a voice make the
