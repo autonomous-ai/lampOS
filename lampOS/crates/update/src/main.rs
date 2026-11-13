@@ -974,7 +974,20 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // as read above (#6607). On, Hermes is shown lamp-control's control socket
         // alone, read-only.
         let tasks = switches.tasks;
-        let shown = hermes::Shown { skills, tasks };
+        // The one run path (#6685): LAMP_SKILL_DEFAULT_AGENT=on, read only with
+        // LAMP_SKILL_TASKS on. On, Hermes's wrapper is the one every agent has,
+        // with Hermes's data, and runs the one agent namespace.
+        let one_path = tasks
+            && lamp_update::agent_ns::default_agent(
+                std::env::var(lamp_update::agent_ns::DEFAULT_AGENT_SWITCH)
+                    .ok()
+                    .as_deref(),
+            );
+        let shown = hermes::Shown {
+            skills,
+            tasks,
+            one_path,
+        };
         if acts && wanted && harness.is_none() {
             say("Hermes on the lamp: off, as Harness before the sign-in is off");
         }
@@ -1010,16 +1023,12 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             product,
             openclaw::SKILLS_PRODUCT_DEFAULT,
         );
-        // A skill's runs on OpenClaw (#6685): LAMP_SKILL_DEFAULT_AGENT=on with
-        // LAMP_SKILL_TASKS on; the namespace then also shows lamp-control's socket
-        // alone and lamp-tasks' runs' token folder.
-        let tasks = switches.tasks
-            && openclaw::default_agent(
-                std::env::var(openclaw::DEFAULT_AGENT_SWITCH)
-                    .ok()
-                    .as_deref(),
-            );
-        let shown = lamp_update::hermes_install::Shown { skills, tasks };
+        // OpenClaw takes no skill's run yet (#6685: its own fenced path per run
+        // is a later step), so its namespace shows lamp-control's socket to none.
+        let shown = lamp_update::hermes_install::Shown {
+            skills,
+            ..Default::default()
+        };
         if acts && wanted && harness.is_none() {
             say("OpenClaw on the lamp: off, as Harness before the sign-in is off");
         }

@@ -22,6 +22,12 @@
 //! Harness reports (#6510 Part 1, step 1). [`rounds`]: that wrapper
 //! written by a round for each engine Harness says is installed, with
 //! `LAMP_AGENT_NS=on`.
+//!
+//! **The one run path** (#6685, [`DEFAULT_AGENT_SWITCH`]): with it on, every
+//! agent's wrapper is one text, [`wrapper::one_path_text`], with only a
+//! small data block of the agent's own (its name, home, program and
+//! environment lines), Hermes's included; its run lines, `--net` lines and
+//! `unshare` line are the same bytes for every agent.
 pub mod rounds;
 pub mod wrapper;
 
@@ -32,6 +38,19 @@ use std::{
     os::unix::fs::{DirBuilderExt, PermissionsExt},
     path::{Path, PathBuf},
 };
+
+/// The one run path (#6685), in lamp-update's own unit, the switch
+/// lamp-tasks reads too: `on` exactly, read only with
+/// [`crate::hermes_install::TASKS_SWITCH`] on, and every agent's wrapper is
+/// [`wrapper::one_path_text`] with its own data, Hermes's too
+/// ([`crate::hermes_install::Shown::one_path`]); otherwise off. No product
+/// unit sets it.
+pub const DEFAULT_AGENT_SWITCH: &str = "LAMP_SKILL_DEFAULT_AGENT";
+
+/// [`DEFAULT_AGENT_SWITCH`] as read: `on` exactly.
+pub fn default_agent(value: Option<&str>) -> bool {
+    value == Some("on")
+}
 
 /// The folder put first on the `PATH` inside the namespace, root's, 0755,
 /// beside lamp-update's own fixed files. Not hidden there: only `/run`,

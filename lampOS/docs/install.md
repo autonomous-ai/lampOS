@@ -1910,7 +1910,10 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      only in a run (#6684): nobody is there to answer Hermes's approval
      prompt, and its hardline list still holds. With the switch off, the
      wrapper has no run lines, and its own `unset T HERMES_YOLO_MODE`
-     drops the variable for every start. Inside the namespace `/run` is a fresh empty tmpfs, so no
+     drops the variable for every start. With `LAMP_SKILL_DEFAULT_AGENT=on`
+     as well, `/usr/local/bin/hermes` is not this wrapper but the one run
+     path's, with Hermes's data, and `hermes-ns` is taken out ("One agent
+     namespace for every engine", "The one run path"). Inside the namespace `/run` is a fresh empty tmpfs, so no
      namespaced session can read another run's token file; a process
      outside a namespace running as `lampos` still could (a known limit).
      Then:
@@ -2274,24 +2277,13 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      product lamp, read only with `LAMP_OPENCLAW_ON_LAMP` on), as
      `LAMP_HERMES_SKILLS` does for Hermes: on, `openclaw-ns` shows
      `/run/lampos-skills` read-only; off, nothing under `/run`.
-   - **A skill's runs on OpenClaw** behind `LAMP_SKILL_DEFAULT_AGENT=on`
-     (#6685; off unless set, read only with `LAMP_SKILL_TASKS` on, the same
-     switch lamp-tasks reads): `openclaw-ns` also shows lamp-control's
-     `/run/lampos-control/control.sock` alone, read-only (Hermes's own
-     lines), and the gateway's own subfolder of lamp-tasks' runs' token
-     folder, `/run/lampos-tasks/runs/gateway` (`GATEWAY_RUNS`), read-write
-     so a script can delete the file it read; a Hermes run's file, in the
-     folder above, is never shown, both staged
-     before `/run` is hidden and skipped when not there
-     (`openclaw_install::RUNS_EDITS`). The gateway is one process for every
-     session, so any session on it could read an OpenClaw run's file until
-     the run's script does, a model turn at most the
-     run's deadline. The gateway has no `--net`, so such a run has the
-     lamp's open network and sees the person's OpenClaw state (the
-     boundary in docs/tasks.md, "The lamp's default agent", which the
-     first builder rules on before the switch is turned on). The switch lives in the script's text and the
-     record's ask, so turning it on or off has the next round write the
-     script again and restart the gateway.
+   - **No skill's run on OpenClaw yet** (#6685): its one gateway has no
+     wrapper started per run, so it has no part in the one run path ("One
+     agent namespace for every engine"), and `openclaw-ns` never shows
+     lamp-control's socket or lamp-tasks' runs' token folder. With
+     `LAMP_SKILL_DEFAULT_AGENT=on` and OpenClaw the lamp's default,
+     lamp-tasks refuses a skill's run in words (docs/tasks.md, "The lamp's
+     default agent"); OpenClaw's own fenced path per run is a later step.
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
      (the ask) and `openclaw.lock` (one install at a time), beside
      Hermes's in lamp-update's records.
@@ -2480,8 +2472,9 @@ yet on a lamp.
   token file is read and deleted before the program is looked for, so a
   wrapper that finds no program leaves none behind.
 - **Hermes and OpenClaw** keep their own wrappers and namespace scripts
-  ("Hermes on the lamp", "OpenClaw on the lamp") for now; they move onto
-  this one in step 2.
+  ("Hermes on the lamp", "OpenClaw on the lamp") with the one run path
+  off. With it on (below), Hermes's wrapper is the one run path's;
+  OpenClaw's stays its own and takes no skill's run.
 - **Written by a round** (`crates/update/src/agent_ns/rounds.rs`), only
   with `LAMP_AGENT_NS=on` exactly in lamp-update's own unit (no product
   unit sets it; any other value or none is off), by a `serve` with
@@ -2530,7 +2523,57 @@ yet on a lamp.
   is written or taken out: what an earlier round wrote stays. The hook stand-in stays
   while `agent-ns` is there (it is among the namespace scripts Hermes's
   and OpenClaw's removal look for).
+- **The one run path** (#6685, `LAMP_SKILL_DEFAULT_AGENT=on` in
+  lamp-update's own unit, read only with `LAMP_SKILL_TASKS` on; no product
+  unit sets it; lamp-tasks reads the same switch). One way to run a skill
+  for every agent: every agent's wrapper is one text
+  (`wrapper::one_path_text`), Hermes's included, and no agent is named in
+  its run path. It is, in order:
+  - `#!/bin/sh` and the mark line `# lampOS: an agent on the lamp, by the
+    one run path (#6510, #6685). Written by lamp-update.`, then a header
+    naming no agent;
+  - **the agent's data** (`wrapper::Agent`), the only lines that differ
+    from one agent to another: `E=<engine>`; `H=<home>`, its home,
+    `/var/lib/lampos-agents/<engine>` or an installer's own home
+    (`OWN_HOMES`: Hermes's `/var/lib/lampos-hermes`, shown at that path
+    since its checkout's scripts and Python name it); `X=<program>`, its
+    program, or empty to find it on `PATH` as above; `agent_env() { … }`,
+    lines run at every start; `agent_run_env() { … }`, lines run in a
+    skill's run only. Hermes's (`hermes_install::agent`): its program
+    `/var/lib/lampos-hermes/.local/bin/hermes`, at every start its
+    forwarder token read from lamp-cloud's file (none ends it) and given
+    as `LAMP_HERMES_TOKEN` with `HERMES_HOME=/var/lib/lampos-hermes/.hermes`
+    and `HERMES_YOLO_MODE` unset, and in a run `HERMES_YOLO_MODE=1`
+    (#6684). A plain agent's are empty;
+  - **the run path**, after `# The run path, the same for every agent:`,
+    the same bytes for every agent (a test holds it for Hermes, Claude
+    Code and Codex, and pins Hermes's and Claude Code's whole wrappers in
+    `crates/update/src/agent_ns/wrapper/one-path-*.sh`, which lamp-tasks'
+    check is tested against): `unset LAMP_CONTROL_TOKEN LAMP_NS_NET`; the
+    run lines (`hermes_install::ONE_RUN_LINES`: the lines above without
+    Hermes's approvals); `agent_env`, then `agent_run_env` in a run; `N=`
+    and `[ "${LAMP_NS_NET-}" != run ] || N=--net`; the program (its own,
+    resolved by `readlink -f`, or the first on `PATH`); the hook stand-in's
+    journal line tagged `$E`; and `exec /usr/bin/unshare --map-root-user
+    $N --mount --pid --kill-child --mount-proc --propagation private
+    /usr/local/lib/lampos/agent-ns "$@"`, with `LAMP_NS_ENGINE`,
+    `LAMP_NS_ENGINE_BIN` and `LAMP_NS_HOME`.
 
+  `agent-ns` then takes the home from `LAMP_NS_HOME` instead of
+  `/var/lib/lampos-agents/$E` (`ONE_PATH_NS_EDITS`), and before anything
+  is mounted checks it is `/var/lib/lampos-agents/<the same engine>` or one
+  of the installers' own homes, a folder and not a link
+  (`one_path_home_check`; the list is root's text, `lampos` can change
+  neither), and shows it read-write at its own path; the rest (the skills,
+  lamp-skills' and lamp-control's sockets, a run's own network with the
+  model bridge, the pushed skills) is as above. With the switch on, a
+  round writes every other engine's wrapper as the one run path's
+  (`wrapper::text_for`), and Hermes's install writes `/usr/local/bin/hermes`
+  as the one run path's with Hermes's data and `agent-ns`, and takes
+  `hermes-ns` out (`hermes_install::wrapper_for`, `ns_for`; its ask
+  carries `"one_path": true`). Off, every wrapper and namespace script is
+  as before, byte for byte. A wrapper of either text is lamp-update's
+  (`ours`), so turning the switch writes it again.
 Tests (`agent_ns::wrapper::tests`, on any computer): plain names only; the
 mark in the first 512 bytes; no path to the program in the wrapper; the
 token only assigned and exported; the wrapper run with a stand-in

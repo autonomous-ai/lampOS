@@ -109,3 +109,20 @@ fn the_stand_in_is_written_0755_and_taken_out_with_the_last_script() {
     assert!(!on(root, BIN).exists());
     assert_eq!(said, [format!("{HOOK_SHIM} taken out")]);
 }
+
+/// (#6685) The one run path's switch is on only as `on` exactly.
+#[test]
+fn the_one_run_paths_switch_is_on_only_as_on() {
+    assert_eq!(DEFAULT_AGENT_SWITCH, "LAMP_SKILL_DEFAULT_AGENT");
+    assert!(default_agent(Some("on")));
+    for other in [
+        None,
+        Some(""),
+        Some("off"),
+        Some("ON"),
+        Some("1"),
+        Some("on "),
+    ] {
+        assert!(!default_agent(other), "{other:?}");
+    }
+}

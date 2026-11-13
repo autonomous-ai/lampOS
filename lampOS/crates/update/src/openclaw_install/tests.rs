@@ -6,7 +6,7 @@ use std::{cell::RefCell, os::unix::fs::symlink, rc::Rc};
 fn sk(skills: bool) -> Shown {
     Shown {
         skills,
-        tasks: false,
+        ..Shown::default()
     }
 }
 
@@ -1259,71 +1259,31 @@ fn openclaw_finds_the_hook_stand_in_first_on_its_path() {
     assert!(wrapper[..512].contains("Written by lamp-update."));
 }
 
-/// #6685: with a skill's runs on OpenClaw ([`Shown::tasks`]), the gateway's
-/// namespace also shows lamp-control's socket alone, read-only (Hermes's
-/// own lines), and lamp-tasks' runs' token folder, staged before `/run` is
-/// hidden and moved back read-write, its staging taken away; without it,
-/// neither is there.
+/// #6685: OpenClaw takes no skill's run yet (its own fenced path per run is
+/// a later step), so its namespace never shows lamp-tasks' runs' token
+/// folder, whatever it is asked; [`Shown::tasks`] shows lamp-control's
+/// socket alone, read-only (Hermes's own lines), and no round asks for it.
 #[test]
-fn a_skills_runs_on_openclaw_show_the_control_socket_and_the_runs_token_folder() {
+fn openclaws_namespace_never_shows_the_runs_token_folder() {
     for skills in [false, true] {
-        let hermes = hermes_install::ns_text(skills, true);
-        for (from, _) in RUNS_EDITS {
-            assert_eq!(
-                hermes.matches(from).count(),
-                1,
-                "`{from}` once in Hermes's tasks script"
-            );
+        for tasks in [false, true] {
+            let text = ns_text(Shown {
+                skills,
+                tasks,
+                one_path: false,
+            });
+            assert!(!text.contains("/run/lampos-tasks/runs"), "{text}");
+            assert!(!text.to_ascii_lowercase().contains("hermes"), "{text}");
+            assert_eq!(text.contains("L=/run/lampos-control/control.sock"), tasks);
         }
-        let on = ns_text(Shown {
-            skills,
-            tasks: true,
-        });
-        let checked = std::process::Command::new("/bin/sh")
-            .args(["-n", "-c", &on])
-            .output()
-            .unwrap();
-        assert!(checked.status.success(), "{checked:?}");
-        assert!(!on.to_ascii_lowercase().contains("hermes"), "{on}");
-        assert!(on.contains(&format!(" T={RUN_TOKENS} S=/tmp/.lampos-ns\n")));
-        assert!(on.contains("L=/run/lampos-control/control.sock"));
-        let lines: Vec<&str> = on.lines().collect();
-        let at = |needle: &str| {
-            lines
-                .iter()
-                .position(|line| line.contains(needle))
-                .unwrap_or_else(|| panic!("no line with {needle}"))
-        };
-        let staged = at("mount --bind \"$T\" \"$S/t\"");
-        let hidden = at("none /run ||");
-        let moved = at("mount --move \"$S/t\" \"$T\"");
-        let cleaned = at("rmdir \"$S/t\"");
-        let read_only = at("remount,bind,ro,nosuid,nodev,noexec /run");
-        assert!(staged < hidden && hidden < moved && moved < cleaned && cleaned < read_only);
-        assert!(
-            !lines[moved].contains("ro \"$T\""),
-            "read-write: the script deletes its file"
+        assert_eq!(
+            ns_text(Shown {
+                skills,
+                tasks: false,
+                one_path: true,
+            }),
+            ns_text(sk(skills)),
+            "OpenClaw is not on the one run path yet"
         );
-        assert!(
-            lines[staged].contains("else T=; fi"),
-            "skipped when lamp-tasks has none"
-        );
-        let off = ns_text(Shown {
-            skills,
-            tasks: false,
-        });
-        assert!(!off.contains(RUN_TOKENS) && !off.contains("control.sock"));
-        assert_eq!(off, ns_text(sk(skills)));
-    }
-    assert!(default_agent(Some("on")));
-    for other in [
-        None,
-        Some(""),
-        Some("off"),
-        Some("ON"),
-        Some("1"),
-        Some("on "),
-    ] {
-        assert!(!default_agent(other), "{other:?}");
     }
 }

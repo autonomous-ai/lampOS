@@ -304,57 +304,40 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     chối `NOT_FOUND_BY_FOLDER` (`LAMP_SKILL_TASKS` của lamp-update tắt hoặc
     vòng của nó chưa chạy): không tạo hay khởi động gì, nên một lần chạy
     không bao giờ bắt đầu mà không có token trên mạng của đèn.
-  - **Agent mặc định của đèn, với `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685,
-    tắt cho tới khi hàng trên c0a4 đạt và có hai lượt đọc). lamp-tasks đọc
-    engine mặc định của đèn ở mỗi lần chạy (`runtime::lamp_default`, lựa
-    chọn trong app trước; trước khi Harness báo, engine của đích của đèn)
-    và gửi lần chạy tới đó khi nó nhận được (`skill_task::engine_for_run`):
-    Hermes như trên, hoặc OpenClaw khi script namespace
-    `/usr/local/lib/lampos/openclaw-ns` của nó cho thấy socket của
-    lamp-control và thư mục file token của các lần chạy (lamp-update ghi
-    như vậy với cùng switch). Mặc định khác, hay OpenClaw mà script không
-    cho thấy chúng, đi tới Hermes của đèn, kèm một dòng nhật ký nói lý do.
-    Tắt: mọi lần chạy là của Hermes, như trên.
-    - **Gateway duy nhất của OpenClaw** không được khởi động theo từng lần
-      chạy, nên không có wrapper nào đọc token: lần chạy là `harness new
-      openclaw` trong thư mục của nó, và lamp-tasks chỉ ghi file token
-      (0600) khi Harness báo pane đã chạy. `Lamp.connect()` /
-      `Lamp.local()` của script (SDK), khi không có `LAMP_CONTROL_TOKEN`
-      và thư mục làm việc đúng là `…/lamp-tasks/skill-<run-id>`, đọc
-      `/run/lampos-tasks/runs/gateway/<run-id>` một lần (file thường, không bao
-      giờ qua link) rồi xóa nó, kể cả khi kết nối sau đó thất bại; khi file
-      chưa có, nó tìm lại mỗi 0,1 s trong tối đa 10 s.
-    - **Ranh giới (quyết định của lead trên #6685; first builder quyết
-      điểm 1 và 2 trước khi bật switch):**
-      1. **Khoảng hở của token.** Từ lúc ghi file tới lần đọc đầu của
-         script, một phiên khác trên cùng gateway OpenClaw (cùng user,
-         cùng namespace) có thể đọc nó. Khoảng này kéo dài tới khi model
-         chạy script: một lượt của model, không cố định, tối đa tới hạn
-         của lần chạy (`RUN_LIFETIME`). Gateway chỉ thấy thư mục con riêng
-         của nó, `runs/gateway` (0700, lamp-tasks tạo khi khởi động với
-         switch bật, P2 của Heron trên #6767), nên file của một lần chạy
-         Hermes không bao giờ hiện ra với nó; một phiên vẫn có thể đặt file
-         dưới id của lần chạy OpenClaw kế tiếp khiến lần chạy đó bị từ
-         chối. Sau lần
-         đọc file không còn, và token kết thúc cùng lần chạy.
-      2. **Mạng và dữ liệu riêng của OpenClaw.** Gateway của OpenClaw không
-         có network namespace riêng (không `--net`), nên một lần chạy trên
-         nó có mạng mở của đèn, không phải mạng đã rào của Hermes: một
-         script giữ token có thể đọc qua `control.sock` những gì kỹ năng
-         được cấp và gửi thẳng ra ngoài. Cùng gateway đó cũng đọc trạng thái
-         OpenClaw của người dùng (`/var/lib/lampos-openclaw/state`).
-      Hermes vẫn giữ namespace và mạng đã rào riêng cho từng lần chạy.
-    - **Vì sao theo từng engine, và engine tiếp theo tham gia thế nào.**
-      Danh sách engine là những gì bản cài của mỗi engine chứng minh,
-      không phải tên của nó: token chỉ được tới script của đúng lần chạy,
-      và các engine được khởi động theo hai cách. Hermes (và, với PR 2 của
-      #6685, các engine agent-ns bọc) khởi động một tiến trình cho mỗi lần
-      chạy qua wrapper đọc file token khi exec, nên lamp-tasks kiểm tra các
-      dòng run của wrapper. OpenClaw là một gateway sống lâu, nên token chỉ
-      có thể tới từ thư mục của lần chạy, và lamp-tasks kiểm tra script
-      namespace của nó cho thấy thư mục token. Engine tiếp theo tham gia
-      bằng cách bản cài của nó ghi một trong hai cách đó, và lamp-tasks đọc
-      file đó trước khi gửi lần chạy tới.
+  - **Agent mặc định của đèn, theo một đường chạy duy nhất, với
+    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, tắt cho tới khi hàng trên c0a4
+    đạt và có hai lượt đọc). Một cách chạy kỹ năng cho mọi agent trong
+    Harness của đèn: không có code riêng cho từng agent và không có tên
+    engine nào trong đường chạy. lamp-tasks đọc engine mặc định của đèn ở
+    mỗi lần chạy (`runtime::lamp_default`, lựa chọn trong app trước; trước
+    khi Harness báo, engine của đích của đèn) và kiểm tra một lần, như nhau
+    cho mọi engine (`skill_task::default_agent_takes_runs`):
+    - agent chạy trên cloud của nhà làm ra nó (`EngineKind::cloud`, Devin
+      Cloud) không bao giờ chạy trên đèn;
+    - wrapper `/usr/local/bin/<engine>` của nó là wrapper đường chạy duy
+      nhất mà lamp-update ghi cho nó: `ONE_PATH_MARK` ở dòng thứ hai, phần
+      dữ liệu gọi tên nó (`E=<engine>`), các dòng nhận lần chạy
+      (`WRAPPER_RUN_LINES`) và các dòng mạng của đường chạy
+      (`AGENT_NS_NET_LINES`: `LAMP_CONTROL_TOKEN` và `LAMP_NS_NET` của bên
+      gọi bị bỏ, `--net` chỉ trong một lần chạy, một `unshare` duy nhất vào
+      `/usr/local/lib/lampos/agent-ns`);
+    - namespace agent `/usr/local/lib/lampos/agent-ns` lấy thư mục home từ
+      wrapper (`AGENT_NS_HOME_LINE`) và cho thấy socket của lamp-control
+      (`AGENT_NS_TASKS_LINE`, `LAMP_SKILL_TASKS` của lamp-update bật).
+
+    Cùng các dòng đó cho Hermes, Claude Code hay agent nào khác: một test
+    ghim chúng vào các wrapper mà lamp-update ghi cho Hermes và Claude Code
+    (`crates/update/src/agent_ns/wrapper/one-path-*.sh`). Mặc định không
+    qua được kiểm tra bị từ chối bằng lời, có ghi nhật ký: "the lamp's
+    default agent (<engine>) isn't set up for a skill's run yet (<lý do>),
+    so nothing was started", không tạo hay hỏi gì, và không agent nào khác
+    chạy thay. Gateway duy nhất của OpenClaw không có wrapper khởi động theo
+    từng lần chạy, nên khi là mặc định nó bị từ chối như vậy cho tới khi có
+    đường chạy đã rào của riêng nó (một bước sau). File token được ghi
+    trước khi khởi động, như với Hermes, và lần chạy là `harness new
+    <engine>` trong thư mục riêng của nó (bên dưới). Các thông báo sau khi
+    khởi động nói "the lamp's default agent". Tắt: mọi lần chạy là của
+    Hermes của đèn qua wrapper riêng của nó, như trên (giai đoạn tạm).
   - **Thư mục riêng.** lamp-tasks tạo `skill-<run-id>` (0700,
     `RUN_FOLDER_PREFIX`) trong project Harness của nó
     `/var/lib/lampos-tasks/harnesses/lamp-tasks` (tạo 0700 khi chưa có),
@@ -368,8 +351,10 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     mục đó: wrapper của Hermes lấy nó từ `pwd -P` (docs/install.md, "Hermes
     on the lamp"), đọc file token một lần, xoá nó, và cho lần chạy
     `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH` và
-    `LAMP_NS_NET=run`, trước khi namespace bắt đầu. Token không bao giờ
-    nằm trong đối số, môi trường hay trạng thái của Harness.
+    `LAMP_NS_NET=run`, trước khi namespace bắt đầu. Theo đường chạy duy
+    nhất (bên trên) lần chạy là `harness new <engine>` và wrapper đường
+    chạy duy nhất của agent làm đúng như vậy, với cùng các dòng. Token không
+    bao giờ nằm trong đối số, môi trường hay trạng thái của Harness.
   - **Kết thúc.** `harness wait --machine <lamp> <agent> --any --timeout
     600s --json` trên một agent đó, hỏi lại (một `wait` lỗi thì sau 1 s,
     `WAIT_RETRY`) cho tới khi nó kết thúc hoặc hạn chót (14 phút, đời của

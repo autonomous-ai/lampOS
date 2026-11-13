@@ -6,16 +6,19 @@ use std::{cell::RefCell, os::unix::fs::symlink, rc::Rc};
 const OFF: Shown = Shown {
     skills: false,
     tasks: false,
+    one_path: false,
 };
 /// [`SKILLS_SWITCH`] on alone.
 const SKILLS_ON: Shown = Shown {
     skills: true,
     tasks: false,
+    one_path: false,
 };
 /// [`TASKS_SWITCH`] on alone.
 const TASKS_ON: Shown = Shown {
     skills: false,
     tasks: true,
+    one_path: false,
 };
 
 /// What a round asked systemd, in order.
@@ -513,6 +516,7 @@ impl Ask {
             remove: false,
             skills: false,
             tasks: false,
+            one_path: false,
         }
     }
 }
@@ -863,6 +867,7 @@ fn with_the_tasks_switch_on_a_net_run_shows_the_bridge_and_starts_the_relay() {
         Shown {
             skills: true,
             tasks: true,
+            one_path: false,
         },
         true,
     );
@@ -897,6 +902,7 @@ fn with_both_switches_on_the_namespace_script_shows_both_sockets_read_only() {
         Shown {
             skills: true,
             tasks: true,
+            one_path: false,
         },
         false,
     );
@@ -911,7 +917,7 @@ fn with_both_switches_on_the_namespace_script_shows_both_sockets_read_only() {
 /// real unix socket) there; `ip` and the relay (through the `unshare`
 /// stub, which says `ready`) are stubbed too.
 fn stages_the_allowed_and_stops_at_any_failing_step(shown: Shown, net: bool) {
-    let Shown { skills, tasks } = shown;
+    let Shown { skills, tasks, .. } = shown;
     // The run's own network steps only with both.
     let netted = tasks && net;
     let folder = tempfile::tempdir().unwrap();
@@ -1762,6 +1768,7 @@ fn the_switch_off_takes_the_wrapper_out() {
             remove: true,
             skills: false,
             tasks: false,
+            one_path: false,
         })
     );
     let runs = Runs::new(&lamp);
@@ -2486,6 +2493,7 @@ fn openclaw_never_gets_a_net_namespace() {
         let text = crate::openclaw_install::ns_text(Shown {
             skills,
             tasks: false,
+            one_path: false,
         });
         assert!(!text.contains(NET_ENV) && !text.contains("net-relay"));
         assert!(!text.contains(MODEL_SOCKET));
@@ -2606,6 +2614,7 @@ fn turning_the_skills_switch_on_or_off_writes_the_namespace_script_again() {
             remove: false,
             skills: true,
             tasks: false,
+            one_path: false,
         })
     );
     let text = fs::read_to_string(lamp.records().join(ASK)).unwrap();
@@ -3003,4 +3012,64 @@ fn every_engine_wrapper_carries_the_mark_lamp_tasks_looks_for() {
             text.lines().nth(1).unwrap_or_default()
         );
     }
+}
+
+/// #6685: with the one run path ([`Shown::one_path`]), Hermes's wrapper is
+/// the one every agent has, with Hermes's data, and runs the one agent
+/// namespace ([`agent_ns::wrapper::NS`]); Hermes's own namespace script
+/// is taken out; the ask carries it. Off, every text is as before.
+#[test]
+fn with_the_one_path_hermes_runs_through_the_one_agent_namespace() {
+    let one = Shown {
+        skills: true,
+        tasks: true,
+        one_path: true,
+    };
+    for off in [OFF, SKILLS_ON, TASKS_ON] {
+        assert_eq!(wrapper_for(off), wrapper_text(off.tasks));
+        assert_eq!(ns_for(off), (NS, ns_text(off.skills, off.tasks)));
+    }
+    assert_eq!(
+        wrapper_for(one),
+        agent_ns::wrapper::one_path_text(&agent()).unwrap()
+    );
+    assert_eq!(
+        ns_for(one),
+        (agent_ns::wrapper::NS, agent_ns::wrapper::ns_text(one))
+    );
+    let lamp = Lamp::new();
+    lamp.hermes_there();
+    assert!(present(lamp.root(), OFF));
+    assert!(
+        !present(lamp.root(), one),
+        "the one path's texts are not there"
+    );
+    write_entry_points(lamp.root(), one).unwrap();
+    assert_eq!(
+        fs::read_to_string(lamp.at(WRAPPER)).unwrap(),
+        wrapper_for(one)
+    );
+    assert_eq!(
+        fs::read_to_string(lamp.at(agent_ns::wrapper::NS)).unwrap(),
+        agent_ns::wrapper::ns_text(one)
+    );
+    assert!(!lamp.at(NS).exists(), "nothing runs hermes-ns any more");
+    assert!(agent_ns::hook_shim_there(lamp.root()));
+    assert!(present(lamp.root(), one));
+    assert!(!present(lamp.root(), OFF));
+    // Off again: Hermes's own wrapper and script, as before.
+    write_entry_points(lamp.root(), OFF).unwrap();
+    assert!(present(lamp.root(), OFF));
+    assert_eq!(
+        fs::read_to_string(lamp.at(WRAPPER)).unwrap(),
+        wrapper_text(false)
+    );
+    // The ask carries the switch; off, its text is as before.
+    ask(&lamp.records(), false, one).unwrap();
+    assert_eq!(lamp.asked().unwrap().shown(), one);
+    ask(&lamp.records(), false, SKILLS_ON).unwrap();
+    assert_eq!(
+        fs::read_to_string(lamp.records().join(ASK)).unwrap(),
+        "{\"version\":1,\"skills\":true}"
+    );
 }
