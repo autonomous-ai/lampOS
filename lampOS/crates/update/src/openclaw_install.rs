@@ -330,13 +330,35 @@ if [ \"$M\" = on ]; then
 fi
 ";
 
+/// What [`ns_text`] changes with [`Shown::one_path`] and [`Shown::tasks`]
+/// on (the gateway mark's, [`wrapper_text_for`]), after [`ENGINE_EDITS`],
+/// each found exactly once (a test holds it): the pushed skills' folder
+/// (`hermes_install::PUSHED`) is shown read-only whenever it is there, not
+/// only with `LAMP_NS_NET=run`, which the gateway's unit never sets: the
+/// fence agent's `start` runs a pushed skill's script from it inside the
+/// gateway's namespace. Nothing else of `LAMP_NS_NET`'s (no network
+/// namespace, no `model.sock`, no relay) comes with it.
+const RUNS_EDITS: [(&str, &str); 2] = [
+    (
+        "# It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there.\n",
+        "# It also shows the skills the owner's computer pushed, /var/lib/lampOS/skills-dev, read-only, when there, for the\n\
+         # gateway's every turn (#6685: a skill's run is one turn on it, its script under that folder).\n",
+    ),
+    (
+        "if [ \"${LAMP_NS_NET-}\" = run ] && [ -d \"$P\" ]; then mkdir -m 0700",
+        "if [ -d \"$P\" ]; then mkdir -m 0700",
+    ),
+];
+
 /// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills, false)`,
 /// the same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]),
 /// with its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
 /// `shown.skills`, lamp-skills' socket folder is shown read-only too; with
 /// `shown.tasks`, lamp-control's socket alone, read-only (a round asks for
 /// it with the one run path on only: a skill's run on the gateway reaches
-/// the lamp through it, #6685 step 4); neither, as before.
+/// the lamp through it, #6685 step 4); neither, as before. With both
+/// `shown.tasks` and `shown.one_path`, the pushed skills' folder too
+/// ([`RUNS_EDITS`]); otherwise byte for byte as before.
 /// A voice make's home lines ([`hermes_install::NS_HOME_LINE`]) are
 /// Hermes's alone: a make runs Hermes only, so they are taken out.
 pub fn ns_text(shown: Shown) -> String {
@@ -346,6 +368,11 @@ pub fn ns_text(shown: Shown) -> String {
     }
     for (from, to) in ENGINE_EDITS {
         text = text.replace(from, to);
+    }
+    if shown.tasks && shown.one_path {
+        for (from, to) in RUNS_EDITS {
+            text = text.replacen(from, to, 1);
+        }
     }
     text.replacen(RUN_LINE, &format!("{NPM_CI_MODE}{RUN_LINE}"), 1)
 }
