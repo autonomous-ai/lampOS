@@ -138,7 +138,7 @@ and how much sound it made.
 The engine is macOS's `say`, one process a line, rendered whole before the
 first byte: measured on macOS 26 (arm64) through this service, 5 requests each,
 medians, first bytes after 715 ms for "Hi there.", 887 ms for 8 words and
-1,298 ms for 20. Off macOS there is no engine yet (`say` is not found). A
+1,298 ms for 20. Off macOS there is no engine yet: a request is answered 503 with the reason (`say` is not found). A
 resident synthesizer that streams as it speaks is the next step.
 
 The real lamp-voice cannot use it yet: its service URLs must be https and it
