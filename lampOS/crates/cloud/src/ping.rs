@@ -91,6 +91,19 @@ pub struct Reply {
     /// never loses the rest of the reply.
     #[serde(default, deserialize_with = "region_code")]
     pub region: String,
+    /// Where the broker takes MQTT over WSS (#6256, B11), for when its TCP
+    /// port keeps failing (`crate::wss`). Anything not a string reads as
+    /// `""`. Kept in memory only: the first ping goes out at start, before
+    /// TCP has failed [`crate::wss::FAILURES`] times.
+    #[serde(default, deserialize_with = "text")]
+    pub mqtt_ws_url: String,
+}
+
+fn text<'de, D: serde::Deserializer<'de>>(from: D) -> Result<String, D::Error> {
+    Ok(match serde_json::Value::deserialize(from)? {
+        serde_json::Value::String(text) => text.trim().to_owned(),
+        _ => String::new(),
+    })
 }
 
 fn region_code<'de, D: serde::Deserializer<'de>>(from: D) -> Result<String, D::Error> {
@@ -312,6 +325,22 @@ mod tests {
             assert_eq!(
                 (read.region.as_str(), read.device_id.as_str()),
                 ("", "d-43")
+            );
+        }
+    }
+
+    /// #6256 F9: the WSS address, missing or strange, never loses the reply.
+    #[test]
+    fn a_reply_reads_with_its_wss_address_without_one_or_with_a_strange_one() {
+        let with = reply(br#"{"status":"ok","mqtt_ws_url":"wss://b.test/mqtt"}"#).unwrap();
+        assert_eq!(with.mqtt_ws_url, "wss://b.test/mqtt");
+        assert_eq!(reply(br#"{"status":"ok"}"#).unwrap().mqtt_ws_url, "");
+        for strange in ["null", "443", "[\"wss://x\"]", "{}"] {
+            let body = format!(r#"{{"status":"ok","device_id":"d-9","mqtt_ws_url":{strange}}}"#);
+            let read = reply(body.as_bytes()).unwrap();
+            assert_eq!(
+                (read.mqtt_ws_url.as_str(), read.device_id.as_str()),
+                ("", "d-9")
             );
         }
     }
