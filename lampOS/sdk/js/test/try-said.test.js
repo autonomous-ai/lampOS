@@ -21,3 +21,14 @@ test('the try-it lamp has speech (the log shows lamp.said), never camera or micr
   assert.deepEqual(turn.map((c) => c.id), ['turn_start', 'turn_end']);
   assert.throws(() => checked(turn[0].fields, { prompt: '' }), /prompt: 1 to 200 characters/);
 });
+
+test('every done is logged, however close to another: a refusing one must never be thinned away behind the one before it', () => {
+  // lamp-75c9, 13 Nov: a done how=dropped why="refused: the lamp is speaking" is what says a turn did not run.
+  const quiet = new Map();
+  assert.equal(logIt('done', 1000, quiet), true);
+  assert.equal(logIt('done', 1010, quiet), true, 'a done 10 ms after another is still shown');
+  assert.equal(logIt('done', 1011, quiet), true);
+  assert.equal(quiet.has('done'), false, 'and it leaves no thinning window behind');
+  assert.equal(logIt('person.arrived', 1000, quiet), true);
+  assert.equal(logIt('person.arrived', 1100, quiet), false, 'other events are still thinned');
+});

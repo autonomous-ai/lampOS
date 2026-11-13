@@ -430,9 +430,11 @@ export function describe(mode = 'lamp-sim', { grants, flags } = {}) {
 }
 
 // Whether the event log shows this event now: every line the lamp says (lamp.said) is shown, however fast they come
-// (a dropped line would be a line the page never saw); the others are thinned to one in 200 ms per event name.
+// (a dropped line would be a line the page never saw), and so is every `done` (one frame per request, never a stream: a
+// refusing one, how dropped why "refused: the lamp is speaking", thinned away behind another `done` read as a PASS on lamp-75c9);
+// the others are thinned to one in 200 ms per event name.
 export function logIt(event, now, quiet) {
-  if (event === 'lamp.said') return true;
+  if (event === 'lamp.said' || event === 'done') return true;
   if (now - (quiet.get(event) ?? 0) < 200) return false;
   quiet.set(event, now);
   return true;
