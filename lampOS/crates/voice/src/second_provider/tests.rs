@@ -14510,6 +14510,60 @@ async fn a_wordless_call_under_the_bar_is_not_answered_with_the_switch() {
     }
 }
 
+/// #6363, lamp-9adf on 13 Nov: a mail read back, then a line of no words
+/// at the second of the lamp's own arrival move, heard as a call, was
+/// answered as the name, and the one "Yes." after it found the mail dropped
+/// ("the lamp answered request 143 after its read-back with no send"). While
+/// the write waits for its answer such a call is left as a sound; asked as
+/// the name otherwise (here more lines came since), its answer is no other
+/// request. The yes after either sends; a worded line answered with no send
+/// still drops the write.
+#[tokio::test]
+async fn a_wordless_call_between_a_read_back_and_its_yes_keeps_the_write() {
+    use crate::services::{NOTHING_WAITING, Pending, Turn, WRITE};
+    let now = std::time::Instant::now();
+    let waiting = |lines: u32| Pending {
+        began_clear: true,
+        service: "gmail".to_owned(),
+        lines,
+        ..Pending::new("s1", 0, now, "Send a mail.", "ann")
+    };
+    let yes = Turn {
+        heard: true,
+        owner: Some("ann"),
+        sends: true,
+        seen_owner: true,
+        ..Turn::default()
+    };
+    let send = lamp_gemini::ToolCall {
+        id: "c1".to_owned(),
+        name: WRITE.to_owned(),
+        args: json!({"service": "gmail", "send_id": "s1"}),
+    };
+    let sends = |said: &str| {
+        crate::services::lamp_said(1, said, now);
+        let mut pending = crate::services::pending_for_test_take();
+        crate::services::gate(&mut pending, &send, 2, &yes, now)
+    };
+    // The answer awaited: not asked, nothing said, and the yes sends.
+    crate::services::pending_for_test(Some(waiting(0)));
+    let asked = asked_with("", |engine| engine, start(1), true, false).await;
+    assert!(asked.is_empty(), "{asked:?}");
+    assert!(sends("").is_ok(), "the yes after a held call sends");
+    // Two lines since, so no answer awaited: asked as the name, and still
+    // the yes after its answer sends.
+    crate::services::pending_for_test(Some(waiting(2)));
+    let asked = asked_with("", |engine| engine, start(1), true, false).await;
+    assert_eq!(asked[0].last(), Some(&Message::user(super::CALLED_WORDS)));
+    assert!(sends("Yes?").is_ok(), "the yes after a wordless call sends");
+    // A worded line answered with no send drops it, as before.
+    crate::services::pending_for_test(Some(waiting(0)));
+    let asked = asked_with("What time is it?", |engine| engine, start(1), false, false).await;
+    assert_eq!(asked.len(), 1);
+    let refused = sends("It's three.").unwrap_err();
+    assert_eq!(refused["error"], NOTHING_WAITING);
+}
+
 /// A line marked as only the lamp's name (`Called`) whose words came back
 /// as a whole line is asked as it is, without the call's note (lamp-4ace,
 /// 25 Oct: "Nice. And what was my sister's name again?" was told it was only
