@@ -10,7 +10,9 @@
 //! ([`MakeHermes`], the first builder's ruling, 12 Nov 19:14): only Hermes
 //! has a namespace runner today. Held or not, the wrapper and the namespace
 //! script must carry lamp-update's make-home lines ([`WRAPPER_HOME_LINE`],
-//! [`NS_HOME_LINE`]), or the make is refused [`NO_NAMESPACE`].
+//! [`NS_HOME_LINE`]), or, with lamp-update's one run path, the one run
+//! path's ([`ONE_PATH_HOME_LINE`], [`ONE_PATH_NS_MAKE_LINES`]), or the make
+//! is refused [`NO_NAMESPACE`].
 //!
 //! Each make has a fresh home of its own, `make-<run id>/home`, 0700, as
 //! `HOME` and `HERMES_HOME`: empty but for the provider config (its key
@@ -246,6 +248,16 @@ pub const NS: &str = "/usr/local/lib/lampos/hermes-ns";
 pub const WRAPPER_HOME_LINE: &str = "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n";
 /// The namespace script's line for it (`lamp_update::hermes_install::NS_HOME_LINE`).
 pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" || fail \"no make staging\"\n  mount -n --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount -n --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount -n --bind \"$H/.hermes/tools\" \"$X/t\" || fail \"no Hermes tools\"\n  mount -n --bind \"$H/.hermes/installs\" \"$X/i\" || fail \"no Hermes installs\"\n  k=\n  for p in \"$H/.hermes/installs\"/*/.install.lock; do\n    [ -f \"$p\" ] && [ ! -L \"$p\" ] || continue\n    mount -n --bind \"$p\" \"$X/i/${p#\"$H/.hermes/installs/\"}\" || fail \"Hermes install lock not shown\"\n    k=1\n  done\n  [ -n \"$k\" ] || fail \"no Hermes install lock: the lasting Hermes has not run\"\n  for p in \"$H/.hermes/installs\"/*/pm-runtime; do\n    [ -d \"$p\" ] || continue\n    [ -f \"$p/.prepare.lock\" ] && [ ! -L \"$p/.prepare.lock\" ] && mount -n --bind \"$p/.prepare.lock\" \"$X/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\" || fail \"Hermes runtime lock not shown\"\n  done\n  for p in \"$H/.hermes/installs\"/*/environments/*/.lease-managed \"$H/.hermes/installs\"/*/pm-runtime/generations/*/.lease-managed; do\n    [ -f \"$p\" ] || continue\n    g=${p%/.lease-managed}\n    { [ -d \"$g/.leases\" ] || mkdir \"$g/.leases\"; } && [ ! -L \"$g/.leases\" ] && mount -n --bind \"$g/.leases\" \"$X/i/${g#\"$H/.hermes/installs/\"}/.leases\" || fail \"Hermes leases not shown\"\n  done\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount -n --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount -n --move \"$X/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  mkdir \"$H/.hermes/installs\" && mount -n --move \"$X/i\" \"$H/.hermes/installs\" && ro \"$H/.hermes/installs\" || fail \"Hermes installs not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount -n --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X k p g\n";
+/// With lamp-update's one run path (`LAMP_SKILL_DEFAULT_AGENT` on, #6685),
+/// Hermes's wrapper is the one run path's
+/// ([`crate::skill_task::wrapper_takes_runs`]) and runs
+/// [`crate::skill_task::AGENT_NS`]; its data's make-home line
+/// (`lamp_update::hermes_install::ONE_PATH_HOME_LINE`, held equal to it by
+/// a test) hands the make's home on as `LAMP_NS_MAKE`.
+pub const ONE_PATH_HOME_LINE: &str = "  case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_MAKE ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) LAMP_NS_MAKE=$LAMP_NS_HOME HERMES_HOME=\"$LAMP_NS_HOME/.hermes\"; export LAMP_NS_MAKE HERMES_HOME ;; *) unset LAMP_NS_MAKE ;; esac\n";
+/// The one agent namespace's make lines for Hermes
+/// (`lamp_update::hermes_install::ONE_PATH_NS_MAKE_LINES`).
+pub const ONE_PATH_NS_MAKE_LINES: &str = "  F=${LAMP_NS_MAKE%/home} Y=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_MAKE\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_MAKE\"\n  mkdir -m 0700 \"$Y\" \"$Y/f\" \"$Y/c\" \"$Y/t\" \"$Y/i\" || fail \"no make staging\"\n  mount -n --bind \"$F\" \"$Y/f\" || fail \"no $F\"\n  mount -n --bind \"$H/.hermes/hermes-agent\" \"$Y/c\" || fail \"no Hermes checkout\"\n  mount -n --bind \"$H/.hermes/tools\" \"$Y/t\" || fail \"no Hermes tools\"\n  mount -n --bind \"$H/.hermes/installs\" \"$Y/i\" || fail \"no Hermes installs\"\n  k=\n  for p in \"$H/.hermes/installs\"/*/.install.lock; do\n    [ -f \"$p\" ] && [ ! -L \"$p\" ] || continue\n    mount -n --bind \"$p\" \"$Y/i/${p#\"$H/.hermes/installs/\"}\" || fail \"Hermes install lock not shown\"\n    k=1\n  done\n  [ -n \"$k\" ] || fail \"no Hermes install lock: the lasting Hermes has not run\"\n  for p in \"$H/.hermes/installs\"/*/pm-runtime; do\n    [ -d \"$p\" ] || continue\n    [ -f \"$p/.prepare.lock\" ] && [ ! -L \"$p/.prepare.lock\" ] && mount -n --bind \"$p/.prepare.lock\" \"$Y/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\" || fail \"Hermes runtime lock not shown\"\n  done\n  for p in \"$H/.hermes/installs\"/*/environments/*/.lease-managed \"$H/.hermes/installs\"/*/pm-runtime/generations/*/.lease-managed; do\n    [ -f \"$p\" ] || continue\n    g=${p%/.lease-managed}\n    { [ -d \"$g/.leases\" ] || mkdir \"$g/.leases\"; } && [ ! -L \"$g/.leases\" ] && mount -n --bind \"$g/.leases\" \"$Y/i/${g#\"$H/.hermes/installs/\"}/.leases\" || fail \"Hermes leases not shown\"\n  done\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount -n --move \"$Y/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount -n --move \"$Y/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  mkdir \"$H/.hermes/installs\" && mount -n --move \"$Y/i\" \"$H/.hermes/installs\" && ro \"$H/.hermes/installs\" || fail \"Hermes installs not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount -n --move \"$Y/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$Y/f\" \"$Y/c\" \"$Y/t\" \"$Y/i\" \"$Y\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_MAKE\n  unset F Y k p g\n";
 /// Said when Hermes's wrapper or namespace script has no make-home line.
 pub const NO_NAMESPACE: &str = "the lamp's Hermes can't be given a make's own home yet (its wrapper or namespace script has no make-home line: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
 
@@ -497,8 +509,12 @@ pub fn held(value: Option<&str>) -> bool {
 /// make over only when the lamp's agent is Hermes. Before every make,
 /// held or not, its wrapper and namespace script must carry the make-home
 /// lines ([`WRAPPER_HOME_LINE`], [`NS_HOME_LINE`]: lamp-update's, so the
-/// wrapper is its namespacing one, never Hermes's own program), and, held,
-/// the network lines too.
+/// wrapper is its namespacing one, never Hermes's own program), or, with
+/// lamp-update's one run path, the one run path's Hermes wrapper with its
+/// make-home line ([`ONE_PATH_HOME_LINE`]) and the one agent namespace
+/// with Hermes's make lines ([`ONE_PATH_NS_MAKE_LINES`]); and, held, the
+/// network lines too (the one run path holds only a skill's run off the
+/// network, so a held make is refused there).
 pub struct MakeHermes {
     pub hermes: crate::skill_task::HermesRunner,
     /// The work folder the wrapper takes a make's home in ([`MAKE_WORK`]);
@@ -508,6 +524,9 @@ pub struct MakeHermes {
     pub wrapper: PathBuf,
     /// Its namespace script ([`NS`]).
     pub ns: PathBuf,
+    /// The one agent namespace ([`crate::skill_task::AGENT_NS`]), which
+    /// the wrapper runs instead with the one run path.
+    pub agent_ns: PathBuf,
 }
 
 impl Runner for MakeHermes {
@@ -516,9 +535,12 @@ impl Runner for MakeHermes {
         let has = |path: &Path, line: &str| {
             std::fs::read_to_string(path).is_ok_and(|text| text.contains(line))
         };
-        if self.hermes.folder != self.make_work
-            || !(has(&self.wrapper, WRAPPER_HOME_LINE) && has(&self.ns, NS_HOME_LINE))
-        {
+        let own = has(&self.wrapper, WRAPPER_HOME_LINE) && has(&self.ns, NS_HOME_LINE);
+        let one_path = std::fs::read_to_string(&self.wrapper).is_ok_and(|text| {
+            crate::skill_task::wrapper_takes_runs(&text, crate::harness::EngineKind::Hermes)
+                && text.contains(ONE_PATH_HOME_LINE)
+        }) && has(&self.agent_ns, ONE_PATH_NS_MAKE_LINES);
+        if self.hermes.folder != self.make_work || !(own || one_path) {
             return Err(NO_NAMESPACE.into());
         }
         Ok(())
@@ -552,6 +574,7 @@ pub fn lamp_runner(home: &Path, held: bool) -> MakeHermes {
         make_work: PathBuf::from(MAKE_WORK),
         wrapper: PathBuf::from(crate::skill_task::HERMES),
         ns: PathBuf::from(NS),
+        agent_ns: PathBuf::from(crate::skill_task::AGENT_NS),
     }
 }
 
@@ -1395,5 +1418,65 @@ mod tests {
         .start(false, Arc::default())
         .unwrap();
         assert!(off.is_none() && !socket.exists());
+    }
+
+    /// #6643 with #6685's one run path (`LAMP_SKILL_DEFAULT_AGENT` on in
+    /// lamp-update): Hermes's wrapper is the one run path's (lamp-update's
+    /// pinned bytes, with Hermes's make-home line in its data) and runs the
+    /// one agent namespace, which carries Hermes's make lines: a make is
+    /// ready, Hermes's own `hermes-ns` gone. Without either line, or with
+    /// another agent's wrapper, it is refused [`NO_NAMESPACE`]; held, it
+    /// is refused [`NOT_HELD_OFF`], as the one run path holds only a
+    /// skill's run off the network. The lines are lamp-update's own.
+    #[test]
+    fn with_the_one_run_path_a_make_is_ready() {
+        let dir = tempfile::tempdir().unwrap();
+        let hermes = include_str!("../../update/src/agent_ns/wrapper/one-path-hermes.sh");
+        let claude = include_str!("../../update/src/agent_ns/wrapper/one-path-claude.sh");
+        assert!(hermes.contains(ONE_PATH_HOME_LINE));
+        let with_make = format!("#!/bin/sh\nH=${{LAMP_NS_HOME-}} \n{ONE_PATH_NS_MAKE_LINES}");
+        let runner = |held: bool, wrapper: &str, agent_ns: &str| {
+            let (w, n) = (dir.path().join("hermes"), dir.path().join("agent-ns"));
+            std::fs::write(&w, wrapper).unwrap();
+            std::fs::write(&n, agent_ns).unwrap();
+            let mut runner = lamp_runner(Path::new("/var/lib/lampos-tasks"), held);
+            if held {
+                runner.hermes.held_by = Some(w.clone());
+            }
+            runner.wrapper = w;
+            runner.ns = dir.path().join("hermes-ns-gone");
+            runner.agent_ns = n;
+            runner
+        };
+        assert_eq!(runner(false, hermes, &with_make).ready(), Ok(()));
+        let without = hermes.replacen(ONE_PATH_HOME_LINE, "", 1);
+        for (wrapper, agent_ns) in [
+            (without.as_str(), with_make.as_str()),
+            (hermes, "#!/bin/sh\n"),
+            (claude, with_make.as_str()),
+        ] {
+            assert_eq!(
+                runner(false, wrapper, agent_ns).ready(),
+                Err(NO_NAMESPACE.to_owned())
+            );
+        }
+        assert_eq!(
+            runner(true, hermes, &with_make).ready(),
+            Err(NOT_HELD_OFF.to_owned())
+        );
+        assert_eq!(
+            lamp_runner(Path::new("/var/lib/lampos-tasks"), false).agent_ns,
+            Path::new(crate::skill_task::AGENT_NS)
+        );
+        let source = include_str!("../../update/src/hermes_install.rs");
+        for (name, line) in [
+            ("ONE_PATH_HOME_LINE", ONE_PATH_HOME_LINE),
+            ("ONE_PATH_NS_MAKE_LINES", ONE_PATH_NS_MAKE_LINES),
+        ] {
+            assert!(
+                source.contains(&format!("pub const {name}: &str = {line:?};")),
+                "{name}"
+            );
+        }
     }
 }

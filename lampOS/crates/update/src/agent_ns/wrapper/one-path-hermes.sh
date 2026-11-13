@@ -14,6 +14,7 @@ agent_env() {
   LAMP_HERMES_TOKEN=$T HERMES_HOME=/var/lib/lampos-hermes/.hermes
   export LAMP_HERMES_TOKEN HERMES_HOME
   unset T HERMES_YOLO_MODE
+  case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_MAKE ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) LAMP_NS_MAKE=$LAMP_NS_HOME HERMES_HOME="$LAMP_NS_HOME/.hermes"; export LAMP_NS_MAKE HERMES_HOME ;; *) unset LAMP_NS_MAKE ;; esac
   :
 }
 agent_run_env() {
