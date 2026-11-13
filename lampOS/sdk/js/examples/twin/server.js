@@ -92,12 +92,17 @@ const withRing = (state) => {
   return { ...state, lamp: { ...state.lamp, light: { ...state.lamp?.light, shows: { ...ring, ...shows } } } };
 };
 let lastRaw = null;
-await lamp.on('body.state', (raw) => {
-  lastRaw = raw;
-  const state = withRing(raw);
-  last = state;
-  tell({ type: 'state', state });
-});
+// The body's state is drawn only when the pairing holds the body grant: the lamp refuses `body.state` without it (`no_grant`), and a
+// real run paired for speech alone must still start, with the twin drawn at rest. (It used to die here with a stack.)
+const bodyGrant = lamp.grants.includes('body');
+if (bodyGrant) {
+  await lamp.on('body.state', (raw) => {
+    lastRaw = raw;
+    const state = withRing(raw);
+    last = state;
+    tell({ type: 'state', state });
+  });
+}
 if (ringFile) {
   let before = '';
   setInterval(() => {
@@ -110,7 +115,7 @@ if (ringFile) {
     tell({ type: 'state', state: last });
   }, 100).unref();
 }
-console.log(`body.state subscribed on ${options.fake ? 'a simulated body' : 'the paired lamp'}`);
+console.log(bodyGrant ? `body.state subscribed on ${options.fake ? 'a simulated body' : 'the paired lamp'}` : 'no body grant: the twin draws the lamp at rest and its body rows are drawn off');
 
 // One lease at a time, taken at the first drag and given back 3 s after the last.
 let lease = null;
