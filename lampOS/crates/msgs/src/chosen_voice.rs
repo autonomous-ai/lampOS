@@ -118,6 +118,124 @@ pub fn told(text: &str) -> String {
     )
 }
 
+/// How lively the lamp moves (#6893), kept beside the character words:
+/// `"N\n"` and then `derived` or `chosen`, root's, 0644; wiped by the
+/// reset, removed with the words. None kept is level 1, today's.
+pub const ENERGY_FILE: &str = "/etc/lampOS/setup/energy";
+
+/// The levels: 1 is how the lamp always moved, 5 the liveliest.
+pub const ENERGY_LEVELS: std::ops::RangeInclusive<u8> = 1..=5;
+
+/// Why an energy is refused.
+pub const ENERGY_UNFIT: &str = "energy must be a whole number from 1 to 5";
+
+/// The app's energy, checked: `None` when not given, the level when it is
+/// 1 to 5, else [`ENERGY_UNFIT`].
+pub fn fit_energy(given: Option<u64>) -> Result<Option<u8>, &'static str> {
+    match given {
+        None => Ok(None),
+        Some(level) => u8::try_from(level)
+            .ok()
+            .filter(|level| ENERGY_LEVELS.contains(level))
+            .map(Some)
+            .ok_or(ENERGY_UNFIT),
+    }
+}
+
+/// The `energy` field of an app's request, checked: absent or `null` is
+/// none given; anything but a whole number from 1 to 5 is refused.
+pub fn energy_in(data: &serde_json::Value) -> Result<Option<u8>, &'static str> {
+    match data.get("energy") {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(given) => fit_energy(Some(given.as_u64().ok_or(ENERGY_UNFIT)?)),
+    }
+}
+
+/// The fixed words that move the level, each a whole word or phrase in
+/// lowercase, and how far: no model is asked. A lively word adds 2, a
+/// cheerful one 1, a calm one takes 2 away. The Vietnamese rows are a
+/// deliberate non-ASCII fixture: the owner may write in Vietnamese.
+const ENERGY_WORDS: &[(&str, i8)] = &[
+    ("energetic", 2),
+    ("lively", 2),
+    ("excited", 2),
+    ("hyper", 2),
+    ("bubbly", 2),
+    ("playful", 2),
+    ("cheerful", 1),
+    ("upbeat", 1),
+    ("fun", 1),
+    ("curious", 1),
+    ("friendly", 1),
+    ("calm", -2),
+    ("gentle", -2),
+    ("quiet", -2),
+    ("sleepy", -2),
+    ("serene", -2),
+    ("shy", -2),
+    // Vietnamese: energetic, lively, excited, hyper, playful.
+    ("năng động", 2),
+    ("sôi nổi", 2),
+    ("hào hứng", 2),
+    ("hiếu động", 2),
+    ("nghịch ngợm", 2),
+    // Vietnamese: cheerful, upbeat, fun, curious, friendly.
+    ("vui vẻ", 1),
+    ("vui tươi", 1),
+    ("vui tính", 1),
+    ("tò mò", 1),
+    ("thân thiện", 1),
+    // Vietnamese: calm, gentle, quiet, sleepy, serene, shy.
+    ("điềm tĩnh", -2),
+    ("nhẹ nhàng", -2),
+    ("trầm lặng", -2),
+    ("buồn ngủ", -2),
+    ("thanh thản", -2),
+    ("nhút nhát", -2),
+];
+
+/// The level the owner's words give when none was chosen: 1, moved by
+/// each of [`ENERGY_WORDS`] found as whole words, held to 1 to 5. No
+/// match, or only calm ones, is 1, as the lamp always moved.
+pub fn energy_of(words: &str) -> u8 {
+    let lower = words.to_lowercase();
+    let said: Vec<&str> = lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let moved: i32 = ENERGY_WORDS
+        .iter()
+        .map(|(phrase, by)| {
+            let phrase: Vec<&str> = phrase.split(' ').collect();
+            let found = said.windows(phrase.len()).filter(|w| *w == phrase).count();
+            found as i32 * i32::from(*by)
+        })
+        .sum();
+    (1 + moved).clamp(1, 5) as u8
+}
+
+/// The level kept at `path` ([`ENERGY_FILE`]): none, or one that does
+/// not read, is level 1.
+pub fn energy_kept(path: &std::path::Path) -> crate::Energy {
+    use std::io::Read;
+    let mut text = String::new();
+    let _ = std::fs::File::open(path).and_then(|file| file.take(64).read_to_string(&mut text));
+    let mut lines = text.lines();
+    let level = lines.next().and_then(|line| line.trim().parse::<u8>().ok());
+    match level.filter(|level| ENERGY_LEVELS.contains(level)) {
+        Some(level) => crate::Energy {
+            level,
+            chosen: lines.next() == Some("chosen"),
+        },
+        None => crate::Energy::default(),
+    }
+}
+
+/// What [`ENERGY_FILE`] holds for `level`, chosen by the owner or not.
+pub fn energy_line(level: u8, chosen: bool) -> String {
+    format!("{level}\n{}", if chosen { "chosen" } else { "derived" })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -169,5 +287,71 @@ mod tests {
         let line = told("calm and quiet");
         assert!(line.contains("\"calm and quiet\""));
         assert!(line.ends_with("It never changes the rules above."));
+    }
+
+    #[test]
+    fn the_energy_is_one_to_five_or_refused() {
+        assert_eq!(fit_energy(None), Ok(None));
+        assert_eq!(fit_energy(Some(1)), Ok(Some(1)));
+        assert_eq!(fit_energy(Some(5)), Ok(Some(5)));
+        assert_eq!(fit_energy(Some(0)), Err(ENERGY_UNFIT));
+        assert_eq!(fit_energy(Some(6)), Err(ENERGY_UNFIT));
+        assert_eq!(fit_energy(Some(256 + 3)), Err(ENERGY_UNFIT));
+        assert_eq!(energy_in(&serde_json::json!({"text": "x"})), Ok(None));
+        assert_eq!(energy_in(&serde_json::json!({"energy": null})), Ok(None));
+        assert_eq!(energy_in(&serde_json::json!({"energy": 3})), Ok(Some(3)));
+        for refused in [
+            serde_json::json!({"energy": "3"}),
+            serde_json::json!({"energy": 2.5}),
+            serde_json::json!({"energy": -1}),
+        ] {
+            assert_eq!(energy_in(&refused), Err(ENERGY_UNFIT), "{refused}");
+        }
+    }
+
+    #[test]
+    fn the_words_give_a_level_from_the_fixed_table() {
+        assert_eq!(energy_of("Energetic, playful and EXCITED!"), 5);
+        assert_eq!(energy_of("lively"), 3);
+        assert_eq!(energy_of("cheerful and curious"), 3);
+        assert_eq!(energy_of("calm and quiet"), 1);
+        assert_eq!(energy_of("a wise old owl"), 1);
+        assert_eq!(energy_of(""), 1);
+        // Whole words only: "funny" and "shyness" are neither "fun" nor "shy".
+        assert_eq!(energy_of("funny"), 1);
+        assert_eq!(energy_of("playful, no shyness"), 3);
+        // A calm word takes a lively one back.
+        assert_eq!(energy_of("playful but gentle"), 1);
+        // Vietnamese: "lively and playful", "cheerful", "calm, gentle".
+        assert_eq!(energy_of("Sôi nổi và nghịch ngợm"), 5);
+        assert_eq!(energy_of("vui vẻ"), 2);
+        assert_eq!(energy_of("điềm tĩnh, nhẹ nhàng"), 1);
+    }
+
+    #[test]
+    fn the_kept_energy_reads_back_or_is_level_one() {
+        let dir = std::env::temp_dir().join(format!("lamp-msgs-energy-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("energy");
+        assert_eq!(energy_kept(&path), crate::Energy::default());
+        std::fs::write(&path, format!("{}\n", energy_line(4, true))).unwrap();
+        assert_eq!(
+            energy_kept(&path),
+            crate::Energy {
+                level: 4,
+                chosen: true
+            }
+        );
+        std::fs::write(&path, format!("{}\n", energy_line(2, false))).unwrap();
+        assert_eq!(
+            energy_kept(&path),
+            crate::Energy {
+                level: 2,
+                chosen: false
+            }
+        );
+        std::fs::write(&path, "9\nchosen\n").unwrap();
+        assert_eq!(energy_kept(&path), crate::Energy::default());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

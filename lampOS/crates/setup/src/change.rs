@@ -120,8 +120,10 @@ pub enum Change {
     Monitor(bool),
     /// The owner's chosen voice's name; `None` goes back to the default.
     Voice(Option<String>),
-    /// The owner's words for the character; `None` clears them.
-    Character(Option<String>),
+    /// The owner's words for the character; `None` clears them, and the
+    /// energy with them. With them, the energy the owner chose, if any
+    /// (#6893): otherwise worked out from the words when kept.
+    Character(Option<String>, Option<u8>),
     /// One of the owner's yeses from the app (a key of
     /// [`lamp_msgs::consent::FILES`]): kept, or removed.
     Consent(&'static str, bool),
@@ -155,7 +157,7 @@ pub fn fit_name(name: &str) -> Result<String, &'static str> {
 /// The one line `lamp-cloud` sends, checked against `config`: exactly
 /// `{"person_name": s}`, `{"display_name": s}`, `{"timezone": s}`,
 /// `{"language": s}`, `{"voice": s}`, `{"character": s}` (`""` clears
-/// either), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
+/// either; or `{"character": {"text": s, "energy"?: 1..5}}`, #6893), or `{"owner_place": {"name", "lat", "lon", "set_at"}}`
 /// (`null` clears it), or `{"control": bool}`, `{"local_agent": bool}`, `{"monitor": bool}`, or `{"consent": {KEY: bool}}`
 /// with exactly one key of [`lamp_msgs::consent::FILES`].
 pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
@@ -199,10 +201,19 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         "voice" => lamp_msgs::chosen_voice::fit_voice(text.ok_or("voice must be text")?)
             .map(Change::Voice)
             .map_err(Into::into),
+        // `{"text", "energy"?}` (#6893), or the words alone as an older
+        // lamp-cloud sends them.
         "character" => {
-            lamp_msgs::chosen_voice::fit_character(text.ok_or("character must be text")?)
-                .map(Change::Character)
-                .map_err(Into::into)
+            let (words, energy) = match given.as_object() {
+                Some(asked) => (
+                    asked.get("text").and_then(Value::as_str),
+                    lamp_msgs::chosen_voice::energy_in(given)?,
+                ),
+                None => (text, None),
+            };
+            let words =
+                lamp_msgs::chosen_voice::fit_character(words.ok_or("character must be text")?)?;
+            Ok(Change::Character(words, energy))
         }
         // Rounded again here, whatever lamp-cloud sent: root's copy of the
         // rule is the one that writes.
@@ -464,11 +475,26 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             })
         }
         // The journal says only how long the words are, never them.
-        Change::Character(text) => {
+        // The energy is worked out once, here, and kept: it never restarts
+        // the voice, which the words alone shape (#6893).
+        Change::Character(text, chosen) => {
             let path = beside_language(config, "character");
             let changed = keep_line(&path, text.as_deref())?;
+            let level = text.as_deref().map(|words| {
+                let level = chosen.unwrap_or_else(|| lamp_msgs::chosen_voice::energy_of(words));
+                (level, chosen.is_some())
+            });
+            keep_line(
+                &beside_language(config, "energy"),
+                level
+                    .map(|(level, chosen)| lamp_msgs::chosen_voice::energy_line(level, chosen))
+                    .as_deref(),
+            )?;
             Ok(Done {
-                data: json!({"text": text.as_deref().unwrap_or("")}),
+                data: json!({
+                    "text": text.as_deref().unwrap_or(""),
+                    "energy": level.map_or(1, |(level, _)| level),
+                }),
                 restart_schedule: false,
                 restart_voice: changed,
                 restart_control: false,
@@ -647,7 +673,7 @@ pub fn answer_holding(
     let language = enabled
         && matches!(
             parse(line.trim_end_matches(['\n', '\r']), config),
-            Ok(Change::Language(_) | Change::Voice(_) | Change::Character(_))
+            Ok(Change::Language(_) | Change::Voice(_) | Change::Character(..))
         );
     if !language {
         let (reply, done) = answer(line, config, enabled);

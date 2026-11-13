@@ -98,6 +98,8 @@ mod presence;
 pub use presence::*;
 mod account;
 pub use account::*;
+mod energy;
+pub use energy::*;
 mod reports;
 pub use reports::*;
 mod familiar;
@@ -2424,6 +2426,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(presence_topics())
         .chain(reports_topics())
         .chain(account_topics())
+        .chain(energy_topics())
         .chain(familiar_topics())
         .chain(activity_topics())
         .chain(seems_topics())

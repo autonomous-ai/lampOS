@@ -18,12 +18,47 @@ each answered `starting` at once, then `success` or `failure`, as
 | Kind | Data | `success` data |
 |---|---|---|
 | `voice.set` | V1's `tts.set` shape: `{"provider"?, "voice", "language"?, "speed"?}`. `provider` absent or `"elevenlabs"`. `voice` is a name from Backend2's `lamp-2-tts-catalog`; every name there is in the lamp's own table (`lamp_msgs::chosen_voice::ELEVENLABS_VOICES`), which is what is checked. `""` goes back to the default. `language` and `speed` are taken and left alone: the language stays `language.set`'s, the speed 1.0 | `{"provider": "elevenlabs", "voice", "speed": 1.0}` |
-| `character.set` | `{"text"}`: the owner's own words, plain text on one line, at most 200 characters. `""` clears them | `{"text"}` |
-| `voice.get` | `{}`: answered at once, nothing written; `lamp-cloud` reads both files as it reads the language | `{"provider": "elevenlabs", "voice", "text"}`: `""` for none kept, and for a kept value that does not fit the rules (as the voice takes it: the default voice, no words) |
+| `character.set` | `{"text", "energy"?}`: the owner's own words, plain text on one line, at most 200 characters. `""` clears them. `energy` (#6893), a whole number 1 to 5, is how lively the lamp moves; absent or `null`, it is worked out from the words ("Energy" below). 0, 6 or anything else is refused | `{"text", "energy"}`: the level kept, 1 when the words were cleared |
+| `voice.get` | `{}`: answered at once, nothing written; `lamp-cloud` reads the files as it reads the language | `{"provider": "elevenlabs", "voice", "text", "energy"}`: `""` for none kept, and for a kept value that does not fit the rules (as the voice takes it: the default voice, no words); `energy` 1 when none is kept |
 
 A voice the lamp lacks, another provider, or words that break the rules get
 `failure` with the reason, and nothing is written: the voice in use stays.
 The reason never holds the value sent.
+
+`system.info` says `"character_energy_supported": true` whenever
+`character.set` is taken, so the app shows the energy picker only to a lamp
+that keeps it.
+
+## Energy
+
+Issue #6893. One level, 1 to 5, kept with the character words, for the
+body's movement only: the voice and what it says do not change with it.
+**Level 1 is how the lamp always moved, and the default**: no level kept,
+one that does not read, or no `lamp-cloud` is level 1.
+
+The owner may pick it (`"energy"` in `character.set`, kept as `chosen`).
+Otherwise root's helper works it out from the words once, when they are
+kept (`lamp_msgs::chosen_voice::energy_of`, kept as `derived`), from a fixed
+table, no model asked: start at 1, add each word's weight found as a whole
+word or phrase (lowercase), hold to 1 to 5.
+
+| Weight | English | Vietnamese |
+|---|---|---|
+| +2 (lively) | energetic, lively, excited, hyper, bubbly, playful | năng động, sôi nổi, hào hứng, hiếu động, nghịch ngợm |
+| +1 (cheerful) | cheerful, upbeat, fun, curious, friendly | vui vẻ, vui tươi, vui tính, tò mò, thân thiện |
+| −2 (calm) | calm, gentle, quiet, sleepy, serene, shy | điềm tĩnh, nhẹ nhàng, trầm lặng, buồn ngủ, thanh thản, nhút nhát |
+
+So "energetic, playful and excited" is 5, "cheerful and curious" 3, "calm
+and quiet" or "a wise old owl" 1, and "playful but gentle" 1. "funny" is not
+"fun": whole words only.
+
+It is kept in `/etc/lampOS/setup/energy` (644 root): the level on the first
+line, `chosen` or `derived` on the second; removed when the words are
+cleared, wiped by the reset. A change of the energy alone restarts nothing.
+`lamp-cloud` reads the file every 5 s and says it on `character/energy`
+(`lamp_msgs/Energy {level, chosen}`, [msgs.md](msgs.md)); inert data, so no
+switch of its own: the body reads it only with its own switch (#6893's later
+pieces).
 
 ## The character words' rules
 
@@ -59,9 +94,9 @@ language's model. It applies only to ElevenLabs, the product's voice.
 
 ## The reset
 
-The 5 s reset's plan wipes both files
+The 5 s reset's plan wipes both files, and the energy
 (`crates/setup/fixtures/reset-plan-product.json`): the lamp is back to the
-default voice and no words. The language is kept, as before.
+default voice, no words, and level 1. The language is kept, as before.
 
 ## A bad value
 
