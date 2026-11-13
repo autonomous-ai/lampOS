@@ -42,6 +42,12 @@ Environment=LAMP_CONTROL_RUN_SOCKET_USER=lampos
 ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --lease-socket /run/lampos-body/lease.sock --say-socket /run/lampos-say/say.sock --actions-socket /run/lampos-actions/call.sock --manage-socket /run/lampos-skills-manage/manage.sock --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s
+# The local agent's socket file (docs/control.md, "The local agent") is made by lamp-control while the owner's switch is on,
+# in /run/lampos-agent, which is writable here only through the switch's own drop-in (agent.conf). Turning the switch off
+# removes that drop-in, so the next lamp-control cannot remove the old file: it would stay, owned by lampos and listening
+# nowhere. A stop removes it, by root (the `+`: outside this unit's sandbox), and a missing file is no error. A start with
+# the switch on makes it again.
+ExecStopPost=-+/usr/bin/rm -f /run/lampos-agent/agent.sock
 StandardInput=null
 StandardOutput=journal
 StandardError=journal
