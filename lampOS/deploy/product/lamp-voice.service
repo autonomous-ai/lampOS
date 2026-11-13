@@ -486,6 +486,10 @@ Environment=LAMP_REMINDERS_ASKED=on
 # And a line that is only a plain ask for a light scene or a light show calls its skill (lamp-52e6, 9 Nov: "movie
 # light" and "show me a light show" were answered in words and no call, and the light never changed).
 Environment=LAMP_SKILL_ASKED=on
+# And a line that is only an installed skill's name said plainly ("photo booth", "run photo booth") calls it in
+# code as round 1, for a non-core skill that takes no choice or yes-or-no (#6772, #6782, docs/skills.md; lamp-52e6
+# at 12587, 13 Nov: "photo booth" got "I don't have a camera" over the skill it was offered); the second route alone.
+Environment=LAMP_SKILL_NAMED=on
 # A line is a known person's only when their own face was seen speaking it, else the room's (#3437, reviewer-three's
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.
