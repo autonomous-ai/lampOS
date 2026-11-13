@@ -22,6 +22,17 @@
 //!   it plays), `sound` (hearing kinds of sound), and `net` when it
 //!   names a web API, a URL or HTTP (with `LAMP_TASK_NET` on; off, such a
 //!   file is refused, [`NO_NET`]). Each is said back when it goes on.
+//! - **A linked service it uses** (the owner's ruling, 13 Nov: anything
+//!   that touches the connectors goes to the lamp's agent end to end), with
+//!   `LAMP_AGENT_SERVICES` on: `<code>-read` for each service it names
+//!   (Gmail or mail, the calendar, Google Drive, GitHub…), and
+//!   `<code>-write` when a sentence naming it says to send, reply, add or
+//!   create ([`services_read`]), as a voice-made service skill's `do.task`
+//!   carries them. Its run reaches the service only through lamp-control
+//!   under its one-run token (lamp-tasks gives its fresh home
+//!   `lamp-services mcp`), each send only on the owner's spoken yes; the
+//!   grant always keeps its first run's yes. Off, a file naming a service is
+//!   refused ([`NO_SERVICES`]).
 //! - **On at once, or a spoken yes once** (the first builder's 19:14 line):
 //!   it goes on as an uploaded skill does today (#5977, said aloud). With
 //!   grants only of [`AT_ONCE`] (light, speak, body) its task's yes is
@@ -62,6 +73,10 @@ pub const FROM: &str = "a file added in the app";
 /// What a file that names a web API is told with `LAMP_TASK_NET` off.
 pub const NO_NET: &str =
     "it reaches the internet, which a skill's task can't on this lamp (LAMP_TASK_NET is off)";
+/// What a file that uses a linked service is told with
+/// `LAMP_AGENT_SERVICES` off.
+pub const NO_SERVICES: &str = "it uses your linked services, which a skill's task can't on this \
+                               lamp (LAMP_AGENT_SERVICES is off)";
 /// What a file carrying a key or token is told: never the value.
 pub const HAS_SECRET: &str = "it carries what looks like a key or a token; a skill added from a \
                               file can't hold one yet, so add it without the key or token";
@@ -168,7 +183,8 @@ const REACH_WORDS: &[&str] = &[
 ];
 
 /// The grants `text` asks for, in [`crate::skill_task_yes::GRANTS`]'s
-/// order and then `net`: only these five, by plain words, never more.
+/// order, then `net`, then its linked services' with `LAMP_AGENT_SERVICES`
+/// on ([`services_read`]): only these, by plain words, never more.
 pub fn grants_read(text: &str) -> Vec<String> {
     let said = words(text);
     let any = |list: &[&str]| list.iter().any(|word| said.contains(*word));
@@ -213,7 +229,113 @@ pub fn grants_read(text: &str) -> Vec<String> {
     {
         grants.push(crate::skill_task_yes::NET.0);
     }
-    grants.into_iter().map(str::to_owned).collect()
+    let mut grants: Vec<String> = grants.into_iter().map(str::to_owned).collect();
+    if crate::made_skill::agent_services_here() {
+        grants.extend(services_read(text));
+    }
+    grants
+}
+
+/// The words that say a service is written to, in a sentence that names
+/// it ([`services_read`]): a send, a reply, an event or file added.
+const WRITE_WORDS: &[&str] = &[
+    "send",
+    "sends",
+    "sending",
+    "reply",
+    "replies",
+    "replying",
+    "draft",
+    "drafts",
+    "compose",
+    "write",
+    "writes",
+    "create",
+    "creates",
+    "add",
+    "adds",
+    "schedule",
+    "schedules",
+    "book",
+    "post",
+    "posts",
+    "save",
+    "saves",
+    "upload",
+    "uploads",
+    "share",
+    "shares",
+    "forward",
+    "invite",
+    "comment",
+    "update",
+    "updates",
+];
+
+/// The linked services `text` names, by catalog code
+/// ([`crate::made_skill::SERVICE_GRANT_CODES`]'s order): a plain name, or a
+/// word that can only be one ("inbox", "calendar"); a name that is also an
+/// everyday word (Slack, Notion, Linear, Amplitude) only capitalised.
+fn services_named(text: &str) -> Vec<&'static str> {
+    let lower = text.to_lowercase();
+    let said = words(text);
+    let cased: std::collections::BTreeSet<&str> = text
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .collect();
+    let any = |list: &[&str]| list.iter().any(|word| said.contains(*word));
+    crate::made_skill::SERVICE_GRANT_CODES
+        .into_iter()
+        .filter(|code| match *code {
+            "gmail" => any(&[
+                "gmail", "email", "emails", "mail", "mails", "mailbox", "inbox",
+            ]),
+            "google_calendar" => any(&["calendar", "calendars", "gcal"]),
+            "google_drive" => any(&["gdrive"]) || lower.contains("google drive"),
+            "mondaydotcom" => lower.contains("monday.com"),
+            "slack" | "notion" | "linear" | "amplitude" => {
+                let mut name = (*code).to_owned();
+                name[..1].make_ascii_uppercase();
+                cased.contains(name.as_str())
+            }
+            "github" | "figma" | "asana" | "ahrefs" | "facebook" | "hubspot" => any(&[*code]),
+            _ => false,
+        })
+        .collect()
+}
+
+/// The linked services' grants `text` asks for, whatever the switch:
+/// `<code>-read` for each service it names, and `<code>-write` for one a
+/// sentence says to write to ([`WRITE_WORDS`]): one it names, or, naming
+/// none ("reply to the newest one"), the ones the last sentence naming a
+/// service named. Read then write, in
+/// [`crate::made_skill::SERVICE_GRANT_CODES`]' order.
+pub fn services_read(text: &str) -> Vec<String> {
+    let mut written: Vec<&str> = Vec::new();
+    let mut last: Vec<&str> = Vec::new();
+    for sentence in text
+        .replace(". ", "\n")
+        .replace("! ", "\n")
+        .replace("? ", "\n")
+        .lines()
+    {
+        let named = services_named(sentence);
+        if !named.is_empty() {
+            last = named;
+        }
+        let said = words(sentence);
+        if WRITE_WORDS.iter().any(|word| said.contains(*word)) {
+            written.extend(&last);
+        }
+    }
+    let mut grants = Vec::new();
+    for code in services_named(text) {
+        grants.push(format!("{code}-read"));
+        if written.contains(&code) {
+            grants.push(format!("{code}-write"));
+        }
+    }
+    grants
 }
 
 /// Whether a skill with `grants` keeps its spoken yes (the camera, the
@@ -363,6 +485,9 @@ pub fn files(card: &str) -> Result<(Files, Vec<String>), Refused> {
     {
         return Err(Refused::new(NO_NET));
     }
+    if !crate::made_skill::agent_services_here() && !services_read(&card).is_empty() {
+        return Err(Refused::new(NO_SERVICES));
+    }
     let task: String = cut(&description, MOST_TASK_BYTES)
         .chars()
         .map(|c| if c.is_control() { ' ' } else { c })
@@ -411,8 +536,17 @@ fn toml_string(text: &str) -> String {
 /// `install_made`): an installable voice tool, no trigger, `[ask]`,
 /// `[[while]]` or `[permissions]`, one `do.task` step alone whose `run` is
 /// [`INSTRUCTIONS`], and grants each one [`grants_read`] may give, once.
-/// Its version and what it uses.
+/// Its version and what it uses. A linked service's grant with
+/// `LAMP_AGENT_SERVICES` on in this process ([`capped_with`]).
 pub fn capped(text: &str) -> Result<(String, made_skill::Uses), Refused> {
+    capped_with(text, crate::made_skill::agent_services_here())
+}
+
+/// [`capped`] with the lamp's agent's connectors as `services`: on, a
+/// linked service's grant (`gmail-read`, [`services_read`]) is one an agent
+/// skill may carry; off, it is refused [`NO_SERVICES`]. lamp-skills and its
+/// manage helper pass their own switch.
+pub fn capped_with(text: &str, services: bool) -> Result<(String, made_skill::Uses), Refused> {
     let table: toml::Table =
         toml::from_str(text).map_err(|_| Refused::new("its skill.toml can't be read"))?;
     let allowed = ["kind", "version", "needs", "tool", "grants", "do"];
@@ -464,9 +598,14 @@ pub fn capped(text: &str) -> Result<(String, made_skill::Uses), Refused> {
             "camera",
             crate::skill_task_yes::NET.0,
         ];
-        if !known.contains(&grant) || seen.contains(&grant) {
+        let service = made_skill::service_grant(grant).is_some();
+        if service && !services && !seen.contains(&grant) {
+            return Err(Refused::new(NO_SERVICES));
+        }
+        if !(known.contains(&grant) || service) || seen.contains(&grant) {
             return Err(Refused::new(
-                "an agent skill's grants are the camera, the light, its voice, sounds and the internet",
+                "an agent skill's grants are the camera, the light, its voice, sounds, the internet \
+                 and your linked services",
             ));
         }
         if grant == crate::skill_task_yes::NET.0 && !crate::skill_task_yes::net_on() {

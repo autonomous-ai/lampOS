@@ -317,7 +317,7 @@ pub fn agent_from_file(folder: &Path, pushed: bool) -> bool {
             .lines()
             .any(|line| line.trim() == lamp_voice::made_skill::ADDED_FROM_FILE)
         && lamp_voice::upload_agent::is_agent_card(&card)
-        && lamp_voice::upload_agent::capped(&toml).is_ok()
+        && lamp_voice::upload_agent::capped_with(&toml, agent_services_on()).is_ok()
         && package::installed_from(folder).is_some_and(|installed| !installed.from_store)
 }
 
@@ -1170,6 +1170,61 @@ mod tests {
         lamp_voice::skill_task_yes::set_net_here(Some(true));
         assert_eq!(grants_of(&["net".to_owned()]).unwrap(), ["net"]);
         lamp_voice::skill_task_yes::set_net_here(None);
+    }
+
+    /// The owner's ruling (13 Nov): an agent skill added from a file that
+    /// uses a linked service carries that service's grant, as a made
+    /// service skill does, only with LAMP_AGENT_SERVICES on here; off, it
+    /// is neither an agent skill from a file nor loaded.
+    #[test]
+    fn an_agent_skill_from_a_file_carries_a_service_grant_only_with_its_switch() {
+        lamp_voice::upload_agent::set_on_here(Some(true));
+        let toml = format!(
+            "kind = \"installable\"\nversion = \"1.0.0\"\nneeds = [\"voice\"]\n\
+             tool = \"morning_mail\"\ngrants = [\"speak\", \"gmail-read\", \"gmail-write\"]\n\n\
+             [[do]]\ntask = {{ task = \"Reads my new mail.\", run = \"{}\" }}\n",
+            lamp_voice::upload_agent::INSTRUCTIONS
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("morning-mail");
+        fs::create_dir_all(folder.join(SCRIPTS)).unwrap();
+        fs::write(folder.join("skill.toml"), &toml).unwrap();
+        fs::write(
+            folder.join("SKILL.md"),
+            "---\nname: morning-mail\ndescription: \"Reads my new mail.\"\nmade: here\n\
+             made_by: app\nadded: file\nagent: file\n---\n\nAdded from a file in the app.\n",
+        )
+        .unwrap();
+        fs::write(
+            folder.join(lamp_voice::upload_agent::INSTRUCTIONS),
+            "Read my unread Gmail and say how many.\n",
+        )
+        .unwrap();
+        let installed = package::Installed {
+            sha256: "cd".repeat(32),
+            manifest: package::Manifest {
+                format: 1,
+                name: "morning-mail".into(),
+                version: "1.0.0".into(),
+                files: Vec::new(),
+            },
+            from_store: false,
+        };
+        fs::write(
+            folder.join(package::INSTALLED_FROM),
+            serde_json::to_vec(&installed).unwrap(),
+        )
+        .unwrap();
+        set_agent_services_here(Some(true));
+        let skill = crate::load(&folder).unwrap();
+        assert_eq!(skill.grants, ["speak", "gmail-read", "gmail-write"]);
+        assert!(agent_from_file(&folder, false));
+        assert!(origin_refuses(&folder, false).is_none());
+        set_agent_services_here(Some(false));
+        assert!(!agent_from_file(&folder, false));
+        assert!(crate::load(&folder).is_err());
+        set_agent_services_here(None);
+        lamp_voice::upload_agent::set_on_here(None);
     }
 
     /// #6307: a skill the lamp's own model made carries a task only with

@@ -1182,14 +1182,15 @@ pub fn install_made_at(
         && lamp_voice::upload_agent::on()
         && lamp_voice::upload_agent::is_agent_card(&card("SKILL.md"))
     {
-        lamp_voice::upload_agent::capped(&card("skill.toml")).and_then(|_| {
-            lamp_voice::upload_agent::package_files_ok(
-                package
-                    .files
-                    .iter()
-                    .map(|(path, bytes)| (path.as_str(), bytes.as_slice())),
-            )
-        })
+        lamp_voice::upload_agent::capped_with(&card("skill.toml"), crate::task::agent_services_on())
+            .and_then(|_| {
+                lamp_voice::upload_agent::package_files_ok(
+                    package
+                        .files
+                        .iter()
+                        .map(|(path, bytes)| (path.as_str(), bytes.as_slice())),
+                )
+            })
     } else if added {
         lamp_voice::made_skill::capped_added(&card("skill.toml")).map(|_| ())
     } else {

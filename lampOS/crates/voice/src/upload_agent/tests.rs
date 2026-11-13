@@ -386,3 +386,96 @@ Post each strip to {link}.
     }
     switches(false, false);
 }
+
+/// The owner's ruling (13 Nov): a file that uses a linked service goes to
+/// the lamp's agent end to end, with that service's grants as a voice-made
+/// service skill's `do.task` carries them: `-read` for a service it names,
+/// `-write` for one a sentence says to send, reply or add to. Said back
+/// plainly, and its first run keeps the spoken yes.
+#[test]
+fn a_file_that_uses_a_linked_service_gets_its_grants_with_the_switch_on() {
+    switches(true, false);
+    crate::made_skill::set_agent_services_here(Some(true));
+    let card = "---\nname: morning-mail\ndescription: Reads my new mail aloud in the morning.\n\
+                ---\n\nTrigger phrases: \"read my mail\".\n\nRead my unread Gmail from today \
+                and say how many there are and who they are from. Reply to the newest one \
+                saying thanks, I'll read it later.\n";
+    let (made_files, grants) = files(card).unwrap();
+    assert_eq!(grants, ["speak", "gmail-read", "gmail-write"]);
+    assert!(asks_yes(&grants));
+    assert!(
+        made_files
+            .toml
+            .contains("grants = [\"speak\", \"gmail-read\", \"gmail-write\"]"),
+        "{}",
+        made_files.toml
+    );
+    assert!(capped(&made_files.toml).is_ok());
+    assert_eq!(
+        capped_with(&made_files.toml, false).unwrap_err().0,
+        NO_SERVICES
+    );
+    let (root, keeping) = keeping("agent-mail");
+    let made = take(&place(&root), &keeping, None, card, NOW).unwrap();
+    assert_eq!(
+        made_skill::agent_grants(&keeping.directory, &made.sha256).unwrap(),
+        grants
+    );
+    let said = on_line(&made, &grants);
+    assert!(said.contains("reads your Gmail"), "{said}");
+    assert!(said.contains("each sent only on your yes"), "{said}");
+    assert!(said.contains("I'll ask you to agree"), "{said}");
+    let _ = std::fs::remove_dir_all(&root);
+    // Off: a file naming a service is refused in plain words, nothing kept.
+    crate::made_skill::set_agent_services_here(Some(false));
+    assert_eq!(files(card).unwrap_err().0, NO_SERVICES);
+    assert_eq!(grants_read(card), ["speak"]);
+    crate::made_skill::set_agent_services_here(None);
+    switches(false, false);
+}
+
+/// The services are read conservatively: a service named plainly, or a
+/// word that can only be one; a name that is an everyday word only
+/// capitalised; write only where a sentence naming it says to write.
+#[test]
+fn services_are_read_conservatively() {
+    assert!(services_read("Tell me a joke and glow.").is_empty());
+    assert_eq!(
+        services_read("Say my next calendar event."),
+        ["google_calendar-read"]
+    );
+    assert_eq!(
+        services_read("Add a dentist event to my calendar. Then glow."),
+        ["google_calendar-read", "google_calendar-write"]
+    );
+    // Write is per sentence: the send is the chat's, not the mail's.
+    assert_eq!(
+        services_read("Count my inbox. Send the count to the Slack channel."),
+        ["gmail-read", "slack-read", "slack-write"]
+    );
+    assert_eq!(
+        services_read("Save the photo to Google Drive."),
+        ["google_drive-read", "google_drive-write"]
+    );
+    assert_eq!(
+        services_read("List my open GitHub issues and the Notion page."),
+        ["github-read", "notion-read"]
+    );
+    assert_eq!(
+        services_read("Check monday.com boards."),
+        ["mondaydotcom-read"]
+    );
+    // A write naming no service is the last named one's ("reply to it").
+    assert_eq!(
+        services_read("Read my newest email. Reply to it with thanks."),
+        ["gmail-read", "gmail-write"]
+    );
+    assert!(services_read("Send the photo to the image API.").is_empty());
+    for none in [
+        "Take it slack on Monday and drive to work.",
+        "I have a notion to glow in a linear fade.",
+        "Raise the amplitude of the chime.",
+    ] {
+        assert!(services_read(none).is_empty(), "{none}");
+    }
+}
