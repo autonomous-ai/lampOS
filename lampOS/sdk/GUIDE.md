@@ -493,14 +493,14 @@ claude mcp add lamp -- lamp-mcp                       # or any MCP client
 ```
 
 **Tools follow the grants.** A tool is offered only when the pairing has the
-grant it needs. With every grant: 27 tools. With `light` alone: 6
+grant it needs. With every grant: 33 tools. With `light` alone: 6
 (`lamp_state`, `lamp_wait_for`, `lamp_light`, `lamp_ring`, `lamp_events`,
 `lamp_stop`).
 
 | Area | MCP tools | Grant |
 |---|---|---|
 | State and events | `lamp_state`, `lamp_events`, `lamp_wait_for` | none for the lamp's own state; each event's own grant (`person.*` and `hand`: look; `phrase.heard`, `name.heard`: hear; `sound.heard`: sound; `air.changed`: air; `volume.changed`: speak; `body.state`: body; `lamp.said`: speech) |
-| Body | `lamp_gesture`, `lamp_look`, `lamp_joints`, `lamp_move`, `lamp_play` | body (a `look` at a face also needs look) |
+| Body | `lamp_gesture`, `lamp_look`, `lamp_joints`, `lamp_move`, `lamp_move_poses`, `lamp_play` | body (a `look` at a face also needs look) |
 | Body and light | `lamp_express` | body and light |
 | Follow a hand | `lamp_follow_hand`, `lamp_follow_stop` | body and look |
 | Light | `lamp_light`, `lamp_ring` | light |
@@ -510,6 +510,7 @@ grant it needs. With every grant: 27 tools. With `light` alone: 6
 | Listening | `lamp_set_listening` | hear |
 | Camera | `lamp_camera_snapshot` (one picture; a stream is for a program, not a tool) | camera |
 | Skills | `lamp_skill_push`, `lamp_skills`, `lamp_skill_remove` | skills |
+| Speaker | `lamp_play_audio` (a WAV file, 16-bit mono PCM at 16 or 24 kHz, at most 60 s, played in real time; the lamp must serve the speaker, `--speaker on`) | speaker (the app does not offer it: a pairing code made at the lamp itself, or `lamp-control grants` / `set_grants`, adds it; see the grants table above) |
 | Stop | `lamp_stop` | none |
 
 - **Leases.** A body tool takes and lets go of its own body lease around the
@@ -523,7 +524,7 @@ grant it needs. With every grant: 27 tools. With `light` alone: 6
 - **`--verbose`** prints every frame on stderr with the SDK's redaction
   (proofs, keys, nonces and pins never; said text only as its length).
 
-**STATUS:** works with the fake lamp today (lamp-mcp's own 52 tests, and a
+**STATUS:** works with the fake lamp today (lamp-mcp's own tests, and a
 listing run on 9 Nov). On a customer lamp (stable 11091) a tool is refused
 where the lamp refuses its op: `lamp_skill_push` on 11048 and older ("skill push is not on this
 lamp"), `lamp_play` (the customer build: "not routed yet: waits for client packages"; from the next build, a move recorded in a pushed skill),
