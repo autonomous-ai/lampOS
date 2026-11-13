@@ -718,15 +718,21 @@ sau:
      (new) skill", hoặc "create", "build", "write", "set up", "add" thay
      cho "make"; "can you …", "I want you to …", "let's …" đứng trước; hoặc
      "I want / I'd like / I need a skill"), sau lời chào, tên đèn và
-     "please", và nói kỹ năng làm gì sau đó, trong câu đó hoặc câu kế tiếp
-     (`asks_to_make`), có vòng chat đầu tiên được gửi với `tool_choice`
+     "please", nói kỹ năng làm gì sau đó ngay trong câu đó (dấu `:` không kết thúc
+     câu), và đó là câu duy nhất của dòng (`asks_to_make`), có vòng chat đầu tiên được gửi với `tool_choice`
      chỉ tên `make_skill`, chỉ khi `make_skill` được khai báo
      (`LAMP_MAKE_SKILL`). Kỹ năng làm gì, kể cả script, khi đó là việc của
      mô hình tạo kỹ năng và của trình kiểm tra. Chỉ "Make a skill." mà
      không có gì sau, một câu hỏi ("how do I make a skill?", "can you make
      skills?"), yêu cầu nằm sâu hơn trong câu, một lời từ chối đứng trước,
-     một yêu cầu tạo bị rút lại ở bất kỳ đâu trong câu ("never mind",
-     "scratch that": `remember::asked::withdrawn`) và một vòng sau lời gọi
+     một câu thứ hai ("Make a skill? Nah."), một từ ở bất kỳ đâu trong dòng
+     có thể rút lại, làm nghi ngờ hay hoãn yêu cầu ("no", "wait",
+     "actually", "don't", "not", "later", "thought", …: `DOUBT`, P2 của
+     Reviewer-lead trên #6887, vì một kỹ năng không có code được bật ngay
+     mà không cần lời đồng ý; một kỹ năng mà chính lời của nó có một từ
+     như vậy, "… when I don't come back", cũng để mô hình quyết), một yêu
+     cầu tạo bị rút lại ("never mind", "scratch that":
+     `remember::asked::withdrawn`) và một vòng sau lời gọi
      được hỏi như trước, sau yêu cầu gọi tên và yêu cầu nhớ khuôn mặt, và
      trước yêu cầu ghi nhớ, yêu cầu hẹn giờ và yêu cầu kỹ năng. Lúc khởi
      động nói một lần: "a line that plainly asks the lamp to make a skill

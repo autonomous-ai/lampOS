@@ -3355,14 +3355,20 @@ gone ([switches.md](switches.md)). What happens:
      skill", "create", "build", "write", "set up" or "add" in its place;
      "can you …", "I want you to …", "let's …" before it; or "I want / I'd
      like / I need a skill"), past a greeting, the lamp's name and
-     "please", and that says what the skill does after it, in that sentence
-     or the next (`asks_to_make`), has its first chat round sent with
+     "please", that says what the skill does after it in that same sentence
+     (a `:` does not end one), and that is the line's only sentence
+     (`asks_to_make`), has its first chat round sent with
      `tool_choice` naming `make_skill`, only when `make_skill` is declared
      (`LAMP_MAKE_SKILL`). What the skill does, scripts and all, is then the
      making model's and the checker's. "Make a skill." alone, a question
      ("how do I make a skill?", "can you make skills?"), the ask further in,
-     a refusal before it, a make taken back anywhere in the line ("never
-     mind", "scratch that": `remember::asked::withdrawn`) and a round after
+     a refusal before it, a second sentence ("Make a skill? Nah."), a word anywhere in the line
+     that may take it back, doubt it or put it off ("no", "wait",
+     "actually", "don't", "not", "later", "thought", …: `DOUBT`, the
+     Reviewer-lead's P2 on #6887, since a skill with no code goes on at once
+     with no spoken yes; a skill whose own words carry one, "… when I don't
+     come back", is the model's too), a make taken back ("never mind",
+     "scratch that": `remember::asked::withdrawn`) and a round after
      a call are asked as before, after a named ask and a face ask, and
      before a keep ask, a schedule ask and a skill ask. The start says it
      once: "a line that plainly asks the lamp to make a skill must call
