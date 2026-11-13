@@ -223,7 +223,8 @@ async fn run_full(
         )
         .announcing(false)
         .holding_forgets_through_spelling(spelling)
-        .undoing_doubted_keeps(doubt_undoes);
+        .undoing_doubted_keeps(doubt_undoes)
+        .asking_near_heard_words(NEAR_ASKS.with(|on| on.replace(false)));
     if sight.is_some() {
         engine = engine.confirming_forgets_by_sight(eyes.clone(), path.clone());
     }
@@ -336,6 +337,12 @@ async fn run_full(
         calls,
         released,
     }
+}
+
+thread_local! {
+    /// `LAMP_MEMORY_ASK_NEAR_HEARD` ([`Engine::asking_near_heard_words`])
+    /// for the next [`run_full`] on this thread, once.
+    static NEAR_ASKS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 const FACE: &str = crate::known_faces::FORGET;
@@ -2084,4 +2091,142 @@ async fn cut_during_held_face_forget_drops_prior_recall_from_resumed_request() {
 #[tokio::test]
 async fn cut_during_plain_forget_drops_prior_recall_from_resumed_request() {
     cut_during_forget_discards_recalled_round(crate::remember::FORGET, false).await;
+}
+
+/// C37 (lamp-06c1, 5 Nov, `LAMP_MEMORY_ASK_NEAR_HEARD`): "ranunculus" was
+/// heard as "renunculus" and the model's `remember` wrote "ranunculus", so
+/// `LAMP_MEMORY_KEEP_HEARD` kept the heard line while the lamp said the
+/// other word. The keep is held and asked about instead: their yes keeps
+/// the model's sentence, a no or nothing keeps nothing. A sentence of the
+/// words heard, or a word near nothing heard, runs as before; so does every
+/// keep with the switch off, or without the eyes.
+#[tokio::test]
+async fn a_keep_with_a_near_spelling_of_a_heard_word_waits_for_their_yes() {
+    const REMEMBER: &str = crate::remember::REMEMBER;
+    const SAID: &str = "Remember that my favourite flower is a renunculus.";
+    const NEAR: &str = "Their favorite flower is a ranunculus.";
+    const HEARD: &str = "My favourite flower is a renunculus.";
+    const TULIP: &str = "Their favourite flower is a tulip.";
+    const UNASKED: &str = "My favourite flower is a renunculus.";
+    const ASKS_NEAR: Lamp = Lamp::Keeps(NEAR, "Is that ranunculus?");
+    const A: Sight = (&["A"], true);
+    let keep = |text: &str| vec![(REMEMBER.to_owned(), json!({ "text": text }))];
+    /// The turns, their eyes, the switch, the calls run, and the case.
+    type Case<'a> = (
+        &'a [Turn],
+        Option<&'a [Sight]>,
+        bool,
+        Vec<(String, Value)>,
+        &'a str,
+    );
+    let cases: Vec<Case> = vec![
+        (
+            &[("A", SAID, ASKS_NEAR, 0)],
+            Some(&[A]),
+            true,
+            vec![],
+            "asked, not kept silently",
+        ),
+        (
+            &[
+                ("A", SAID, ASKS_NEAR, 0),
+                ("A", "Yes.", Lamp::Says("Kept."), 5),
+            ],
+            Some(&[A, A]),
+            true,
+            keep(NEAR),
+            "their yes keeps ranunculus",
+        ),
+        (
+            &[
+                ("A", SAID, ASKS_NEAR, 0),
+                ("A", "No.", Lamp::Says("Okay, how is it said?"), 5),
+            ],
+            Some(&[A, A]),
+            true,
+            vec![],
+            "their no keeps nothing",
+        ),
+        (
+            &[
+                ("A", SAID, Lamp::Keeps(NEAR, "What a lovely flower."), 0),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            Some(&[A, A]),
+            true,
+            vec![],
+            "an answer that never asked: dropped, nothing kept",
+        ),
+        (
+            &[("A", SAID, Lamp::Keeps(HEARD, "Kept."), 0)],
+            Some(&[A]),
+            true,
+            keep(HEARD),
+            "the words heard: kept at once",
+        ),
+        (
+            &[("A", SAID, Lamp::Keeps(TULIP, "Kept."), 0)],
+            Some(&[A]),
+            true,
+            keep(TULIP),
+            "a word near nothing heard: as before (the heard line, in the memory's route)",
+        ),
+        (
+            &[
+                ("A", UNASKED, ASKS_NEAR, 0),
+                ("A", "Yes.", Lamp::Says("Okay."), 5),
+            ],
+            Some(&[A, A]),
+            true,
+            keep(NEAR),
+            "a keep the line didn't ask for: not held, keep_quietly's",
+        ),
+        (
+            &[("A", SAID, ASKS_NEAR, 0)],
+            Some(&[A]),
+            false,
+            keep(NEAR),
+            "off: as before",
+        ),
+        (
+            &[("A", SAID, ASKS_NEAR, 0)],
+            None,
+            true,
+            keep(NEAR),
+            "without the eyes: as before",
+        ),
+    ];
+    for (at, (turns, sight, near, calls, case)) in cases.into_iter().enumerate() {
+        NEAR_ASKS.with(|on| on.set(near));
+        let ran = run_full(
+            turns,
+            sight,
+            9701 + 10 * at as u64,
+            (false, false),
+            json!({"remembered": true}),
+        )
+        .await;
+        assert_eq!(ran.calls, calls, "{case}");
+        if case == "their yes keeps ranunculus" {
+            // Their "Yes." is a yes to the lamp's question about the
+            // model's sentence, which the memory's route keeps
+            // (`remember::heard::released`).
+            assert_eq!(ran.released, [Some(NEAR.to_owned())], "{case}");
+        }
+        if case.starts_with("a keep the line didn't ask for") {
+            // Not held: the model is never told to ask, and their "Yes."
+            // releases nothing. The call goes on to `keep_quietly::unheard`
+            // (`LAMP_KEEP_QUIETLY`, on in the product), which refuses it:
+            // "ranunculus" was not heard, so nothing is kept.
+            assert_eq!(ran.released, [None], "{case}");
+            assert!(
+                !format!("{:?}", ran.asked).contains("Not kept yet"),
+                "{case}"
+            );
+            assert!(
+                crate::keep_quietly::refused(NEAR, Some(UNASKED), false),
+                "{case}"
+            );
+        }
+    }
 }

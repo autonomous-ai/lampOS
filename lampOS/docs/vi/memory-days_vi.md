@@ -271,6 +271,24 @@ giữ chính câu nghe được, dạng "They said: …" (tối đa 300 byte). M
 đề nghị giữ lần hai giữ câu mà lời đề nghị đầu nói đến (#5276, N6). Chi tiết:
 [memory.md](../memory.md), "What is kept is what was said".
 
+Với `LAMP_MEMORY_ASK_NEAR_HEARD=on` (C37, lamp-06c1, 5/11; tắt nếu không đặt,
+chỉ đường thứ hai), trên câu có yêu cầu ghi nhớ, khi mọi từ khóa trong câu `remember` của mô hình mà không
+nghe thấy đều là cách viết gần với một từ đã nghe (cùng chữ cái đầu, đổi tối đa
+một nửa số chữ, tối đa hai từ như vậy: "ranunculus" thay cho "renunculus" nghe
+được), lamp không giữ ngay. Lệnh được giữ lại chờ lời "có" của cùng người đã
+biết, mắt thấy họ nói, trong 60 giây, và mô hình hỏi một lần "Is that
+ranunculus?". Lời "có" giữ câu của mô hình; "không", câu khác hay im lặng thì
+không giữ gì. Câu có đủ từ đã nghe được giữ ngay; một từ không gần từ nào đã
+nghe thì vẫn giữ câu nghe được như trên. Không áp dụng cho lời sửa
+(`replaces`), khi không biết là ai, hay khi mắt không đọc ai đang nói. Một từ
+chỉ khác từ đã nghe ở biến tố tiếng Anh (-s, -es, -ed, -ing: "likes", "liking"
+cho "like", "peanuts" cho "peanut") hay cách viết Anh-Mỹ ("favorite color" cho
+"favourite colour") được coi là đã nghe, không hỏi gì. Câu không yêu cầu ghi
+nhớ thì không bao giờ bị giữ chờ: với `LAMP_KEEP_QUIETLY`, một từ không nghe
+thấy thì không giữ gì, như trước, nên lời "có" về cách viết không thành sự đồng
+ý ghi nhớ. Trước đây lamp giữ "They said: … renunculus" trong khi nói
+"ranunculus", và không hỏi.
+
 ## Truy xuất theo khoảng ngày
 
 `LAMP_MEMORY_RECALL_V2=on` (#2176; tắt nếu không đặt, chỉ với client Days, cả

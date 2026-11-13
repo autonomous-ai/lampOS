@@ -2059,6 +2059,10 @@ struct Shared {
     /// ([`ask_once_forget`]); `None`, the memory's own
     /// (`remember::one_face_forget_target`). A test's in its place.
     forget_target: Option<ForgetTarget>,
+    /// A keep whose sentence has a near spelling of a heard word is held
+    /// for their yes to that word (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37,
+    /// [`Engine::asking_near_heard_words`]).
+    near_heard_asks: bool,
     remember_speaker: bool,
     enrollment_sight: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
     /// A line is a known person's only when their own face was seen
@@ -4640,6 +4644,7 @@ impl Engine {
                 face_claims: false,
                 doubt_undoes: false,
                 forget_target: None,
+                near_heard_asks: false,
                 remember_speaker: false,
                 enrollment_sight: None,
                 scope_seen: false,
@@ -5208,6 +5213,22 @@ impl Engine {
     pub(crate) fn targeting_one_face_forgets(mut self, target: ForgetTarget) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.forget_target = Some(target);
+        self
+    }
+
+    /// A spoken `remember` whose sentence has a word not heard that is a
+    /// near spelling of one heard ("ranunculus" for a heard "renunculus",
+    /// `remember::heard::near_heard`) is not kept: it is held for the same
+    /// known person's plain yes, seen said, as a carried line's keep is, and
+    /// the model asks once "Is that ranunculus?" (`LAMP_MEMORY_ASK_NEAR_HEARD`,
+    /// C37). Their yes keeps the model's sentence; a no, anything else or
+    /// silence keeps nothing. Needs the held forget's sight
+    /// ([`Self::confirming_forgets_by_sight`]); without it, or for nobody
+    /// known, the keep runs as before (`LAMP_MEMORY_KEEP_HEARD` keeps the
+    /// heard line). Off, as before.
+    pub fn asking_near_heard_words(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.near_heard_asks = on;
         self
     }
 
@@ -12808,6 +12829,12 @@ struct HeldForget {
     /// their yes within `remember::ONE_FACE_FORGET_YES_FOR`, seen said or
     /// in the private room, runs it ([`take_held_forget`]).
     one_face: bool,
+    /// A keep held because a word of its sentence was a near spelling of
+    /// a heard one (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37,
+    /// [`hold_near_heard_keep`]): the line's heard words, so its answer
+    /// counts as asking about it when it offers that word
+    /// ([`settle_held_forget`]). `None` for every other held call.
+    near: Option<String>,
 }
 
 /// The one kept thing of a person's a named forget asks to remove, by its
@@ -13286,6 +13313,86 @@ fn hold_carried_keep(
             serde_json::json!({"remembered": false, "error": crate::remember::HELD_KEEP_REFUSED})
         }
     }
+}
+
+/// A spoken `remember` of `call` whose sentence has words not heard in
+/// `said`, the line's words, each a near spelling of a heard word
+/// (`remember::heard::near_heard`, `LAMP_MEMORY_ASK_NEAR_HEARD`, C37:
+/// heard "renunculus", the model wrote "ranunculus", and the heard line was
+/// kept while the lamp said the other word). Held as a carried line's keep
+/// is ([`hold_carried_keep`]), for the same known person's plain yes seen
+/// said ([`take_held_forget`]), which keeps the model's sentence; anything
+/// else drops it, so nothing is kept. Only when the line asked to keep
+/// (`remember::asked::asks_to_keep`): an unasked keep is
+/// `keep_quietly::unheard`'s, which refuses a word not heard. Not a
+/// correction (`replaces`), only on a spoken turn with the eyes reading speaking, for a known person,
+/// and not after a held call ran this turn. What the model is told, or
+/// `None` when it is not held: then it runs as before. The journal has
+/// counts only.
+fn hold_near_heard_keep(
+    shared: &Shared,
+    (request, said): (u64, &str),
+    heard: bool,
+    call: &net::ToolCall,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<Value> {
+    // Only a line that itself asked to keep: a keep it didn't ask for goes
+    // on to `keep_quietly::unheard`, which keeps nothing with a word not
+    // heard, so a yes about a spelling never becomes consent to keep
+    // (Reviewer-lead on #6850).
+    if !shared.near_heard_asks
+        || !heard
+        || call.name != crate::remember::REMEMBER
+        || call.args.get("replaces").is_some_and(|id| !id.is_null())
+        || !crate::remember::asked::asks_to_keep(said)
+    {
+        return None;
+    }
+    let near = crate::remember::heard::near_heard(call.args["text"].as_str()?, said);
+    if near.is_empty() {
+        return None;
+    }
+    let not = if shared.forget_sight.is_none() {
+        Some("the eyes don't read who speaks")
+    } else {
+        None
+    };
+    let asker = forget_asker(scope);
+    let why = not.or(asker.is_none().then_some("nobody known"));
+    if let Some(why) = why {
+        eprintln!(
+            "lamp-voice second: request {request}: a keep with {} near word(s) not heard is not held: {why} ({})",
+            near.len(),
+            crate::remember::heard::NEAR_ENVIRONMENT
+        );
+        return None;
+    }
+    let asker = asker?;
+    match hold_forget(shared, request, call, asker, (shared.clock)()) {
+        Holding::Held => {}
+        Holding::OneWaits | Holding::Stale => {
+            eprintln!(
+                "lamp-voice second: request {request}: a keep with {} near word(s) not heard is not held: another call is held ({})",
+                near.len(),
+                crate::remember::heard::NEAR_ENVIRONMENT
+            );
+            return None;
+        }
+    }
+    if let Ok(mut hold) = shared.held_forget.lock()
+        && let Some(held) = hold.held.as_mut().filter(|held| held.request == request)
+    {
+        // Their yes keeps the model's sentence: its words are the line
+        // the memory's route holds it against (`heard::released`).
+        held.line = call.args["text"].as_str().map(str::to_owned);
+        held.near = Some(said.to_owned());
+    }
+    eprintln!(
+        "lamp-voice second: request {request}: a keep with {} near word(s) not heard is held for their yes ({})",
+        near.len(),
+        crate::remember::heard::NEAR_ENVIRONMENT
+    );
+    Some(crate::remember::heard::near_held_told(&near))
 }
 
 /// The same-voice check's hook (#4339's follow-up): whether the voice of
@@ -14108,6 +14215,7 @@ fn hold_forget_as(
         line: None,
         asked_again: false,
         one_face,
+        near: None,
     });
     Holding::Held
 }
@@ -14198,7 +14306,12 @@ fn settle_held_forget(shared: &Shared, request: u64, answer: Option<&str>) {
     let why = match answer {
         Some(answer)
             if if held.call.name == crate::remember::REMEMBER {
-                crate::remember::asks_about_keeping(answer)
+                match (&held.near, held.call.args["text"].as_str()) {
+                    (Some(heard), Some(model)) => {
+                        crate::remember::heard::asks_about_near(answer, model, heard)
+                    }
+                    _ => crate::remember::asks_about_keeping(answer),
+                }
             } else {
                 crate::remember::asks_about_forgetting(answer, &held.call.name)
             } =>
@@ -17303,6 +17416,20 @@ async fn answer(
                         lease,
                         person,
                     );
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
+                // A keep with a near spelling of a heard word waits for
+                // their yes to that word (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37).
+                if !held_forget_ran
+                    && let Some(told) = hold_near_heard_keep(
+                        shared,
+                        (request, &carried_line),
+                        heard,
+                        call,
+                        scope.as_ref(),
+                    )
+                {
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }

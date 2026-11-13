@@ -1633,6 +1633,37 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     (likes/like, 5/five, an English sentence for Vietnamese speech, a
     spelling such as "favorite") also keeps what was heard: never less than
     was said.
+  - **With `LAMP_MEMORY_ASK_NEAR_HEARD`: a near spelling is asked about**
+    (C37, lamp-06c1, 5 Nov; off unless set, the second route only). Speech
+    to text heard "renunculus"; the model's `remember` wrote "ranunculus",
+    so the rule above kept "They said: my favorite flower is a renunculus."
+    while the lamp said "Kept: your favorite flower is a ranunculus.", and
+    nobody was asked. With the switch, on a line that asked to keep
+    (`remember::asked::asks_to_keep`), when every key word of the model's
+    sentence that was not heard is a near spelling of a heard word
+    (`remember::heard::near_heard`, the doubted-keep check's
+    `doubted::misheard_as`: the same first letter, at most half the letters
+    changed; at most two such words), the `remember` is not run. A word
+    that differs from a heard one only by an English inflection (-s, -es,
+    -ed, -ing, "likes" or "liking" for "like", "peanuts" for "peanut") or a
+    British spelling ("favorite color" for "favourite colour") counts as
+    heard, never as near, so it asks nothing. It is held
+    as a carried line's keep is (`second_provider::hold_near_heard_keep`):
+    the model is told nothing is kept yet and to ask once, "Is that
+    ranunculus?", and the hold stands only when its answer offers that word
+    or offers to keep (`heard::asks_about_near`). The same known person's
+    plain yes, their face seen saying it, within 60 s keeps the model's
+    sentence; a no, anything else or silence keeps nothing. Every key word
+    heard keeps the model's sentence at once; a word near nothing heard
+    ("tulip" for "renunculus") keeps the heard line as before. Not for a
+    correction (`replaces`), nobody known, or without the eyes' speaking
+    check: then as before. A keep the line didn't ask for is never held:
+    with `LAMP_KEEP_QUIETLY` (`keep_quietly::unheard`) a word not heard
+    keeps nothing, so a yes about a spelling is never consent to keep. The
+    journal says held or why not, with counts only. Tests:
+    `remember::heard::tests::a_near_spelling_of_a_heard_word_is_asked_about`,
+    `remember::heard::tests::an_inflection_or_british_spelling_is_heard_not_near`,
+    `second_provider::tests::held_forget::a_keep_with_a_near_spelling_of_a_heard_word_waits_for_their_yes`.
   - **The lamp's name heard as another word is no name** (#3504 finding
     N4). On lamp-06c1 the name was written "Ramon", "Edeland", "Elan" and
     "Hey, mom"; the lamp called the person by it, and "Edeland, my dog is

@@ -3672,6 +3672,23 @@ pub fn serve(
         }
         engine = engine.undoing_doubted_keeps(by_id);
     }
+    // A keep whose sentence has a near spelling of a heard word is held for
+    // their yes to that word (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37). Only with
+    // `LAMP_MEMORY_KEEP_HEARD`, whose silent keep of the heard line it
+    // replaces.
+    if crate::remember::heard::near_on() {
+        let on = crate::remember::heard::on();
+        eprintln!(
+            "lamp-voice second: {} is on{}",
+            crate::remember::heard::NEAR_ENVIRONMENT,
+            if on {
+                ": a keep with a near spelling of a heard word waits for their yes"
+            } else {
+                ", but LAMP_MEMORY_KEEP_HEARD is not: keeps are as before"
+            }
+        );
+        engine = engine.asking_near_heard_words(on);
+    }
     if reads_back_by_words {
         engine = engine.reading_back_by_words(Arc::new(crate::make_skill_local::read_back_heard));
     }
