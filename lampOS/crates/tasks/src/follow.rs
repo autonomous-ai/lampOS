@@ -3,7 +3,9 @@
 //! [`MOST_FOLLOWED`] at once, beside the CLI worker's one lane. An event
 //! that says the agent settled (`done`, `failed`, `needs_person`, `idle`,
 //! `stopped`) has its task read at once ([`Engine::push`]), as a held
-//! `wait` does (`serve --push-wait`). The watch's own looks stay, as the
+//! `wait` does (`serve --push-wait`). `background` (Harness 0.6.52: idle
+//! with background commands still running, in place of `done`) is work and
+//! reads nothing; its `done` comes once none runs (#5689). The watch's own looks stay, as the
 //! backstop, and a task this does not follow (past the cap, given up, or a
 //! Harness without `watch`) is left to `wait` and the looks.
 use crate::{
@@ -471,6 +473,39 @@ mod tests {
         // Not followed again within FOLLOW_AGAIN.
         follows.tend(&tasks, &BTreeSet::new(), now);
         assert!(!follows.held.contains_key(&2));
+    }
+
+    /// #5689 (Harness 0.6.52): `background`, an idle agent whose
+    /// background commands still run, is work: no read, the watch held.
+    /// Its task is read once, on the `done` after it.
+    #[test]
+    fn a_background_event_reads_nothing_and_the_done_after_it_reads_once() {
+        let lane = Arc::new(Scripted::default());
+        lane.plans.lock().unwrap().insert(
+            "agent-1".into(),
+            (vec![WatchEvent::Working, WatchEvent::Background], None),
+        );
+        lane.plans.lock().unwrap().insert(
+            "agent-2".into(),
+            (
+                vec![
+                    WatchEvent::Background,
+                    WatchEvent::Background,
+                    WatchEvent::Done,
+                ],
+                Some(WatchEnd::Settled),
+            ),
+        );
+        let mut follows = Follows::new(Some(lane.clone()));
+        let tasks = watched(2);
+        let now = Instant::now();
+        settle(&mut follows, &tasks, now, |f| {
+            f.pushes.contains(&2) && f.followed().contains(&1)
+        });
+        assert!(!follows.pushes.contains(&1));
+        assert!(follows.held.contains_key(&1));
+        assert_eq!(follows.pushes, BTreeSet::from([2]));
+        assert!(!WatchEvent::Background.settled());
     }
 
     #[test]

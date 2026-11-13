@@ -5618,14 +5618,160 @@ fn a_watch_line_is_read_for_its_event_only() {
         "idle",
         "failed",
         "stopped",
+        "background",
     ] {
         let read = parse_watch_line(watched_line(event, AGENT).as_bytes(), AGENT).unwrap();
         let WatchLine::Event(read) = read else {
             panic!()
         };
         assert_eq!(read.name(), event);
-        assert_eq!(read.settled(), !matches!(event, "started" | "working"));
+        assert_eq!(
+            read.settled(),
+            !matches!(event, "started" | "working" | "background")
+        );
     }
+}
+
+/// #5689 (Harness 0.6.52, openharness#4229): `watch --json` sends
+/// `background` (idle, `backgroundCommands: N`) in place of `done` while an
+/// idle agent's background commands run, again when N changes, then `done`.
+/// Each is handed on; the watch is held through `background` and killed
+/// only at the `done`.
+#[test]
+fn a_watch_holds_through_background_and_ends_on_the_done_after_it() {
+    let rig = Rig::new();
+    let background = |count: u64| {
+        json!({"event":"background","id":AGENT,"state":"idle","backgroundCommands":count})
+            .to_string()
+    };
+    rig.plan(json!({"watch":{"lines":[
+        {"text":watched_line("working", AGENT)},
+        {"text":background(2),"delay_ms":50},
+        {"text":background(1),"delay_ms":50},
+        {"text":watched_line("done", AGENT),"delay_ms":50},
+    ],"after_output_ms":5000}}));
+    let cancel = AtomicBool::new(false);
+    let mut events = Vec::new();
+    let end = rig
+        .cli()
+        .watch(MACHINE, AGENT, &cancel, &mut |event| events.push(event));
+    assert_eq!(end, WatchEnd::Settled);
+    assert_eq!(
+        events,
+        vec![
+            WatchEvent::Working,
+            WatchEvent::Background,
+            WatchEvent::Background,
+            WatchEvent::Done
+        ]
+    );
+}
+
+/// #5689 (Harness 0.6.52): `show` of an agent idle while background
+/// commands it started still run is read as at work, never done; with none
+/// running, unknown (`null`: Codex, OpenClaw, Windows) or no such field
+/// (Harness before 0.6.52) it is idle, as before. Only an idle agent's
+/// count is read, and one that isn't a whole number is unknown.
+#[test]
+fn an_idle_agent_with_background_commands_running_is_read_as_at_work() {
+    let rig = Rig::new();
+    let cases: [(Option<Value>, &str); 7] = [
+        (Some(json!(2)), "working"),
+        (Some(json!(1)), "working"),
+        (Some(json!(0)), "idle"),
+        (Some(Value::Null), "idle"),
+        (None, "idle"),
+        (Some(json!("2")), "idle"),
+        (Some(json!(-1)), "idle"),
+    ];
+    for (background, state) in cases {
+        let mut reply = shown();
+        if let Some(background) = background.clone() {
+            reply["backgroundCommands"] = background;
+        }
+        rig.show_step(step(reply));
+        let read = rig.cli().observe(MACHINE, AGENT).unwrap();
+        assert_eq!(read.state, state, "{background:?}");
+        assert_eq!(read.answer, "Observed output only");
+    }
+    // Another state is as Harness says, whatever the count.
+    let mut reply = shown();
+    reply["state"] = json!("needs-input");
+    reply["backgroundCommands"] = json!(3);
+    rig.show_step(step(reply));
+    assert_eq!(
+        rig.cli().observe(MACHINE, AGENT).unwrap().state,
+        "needs-input"
+    );
+}
+
+/// #5689: the read just before a close that finds background commands
+/// still running fails with `background_commands`, and no close is run;
+/// with none, unknown or no field, it reads idle and the close goes on.
+#[test]
+fn the_read_before_a_close_finds_background_commands_and_closes_nothing() {
+    let rig = Rig::new();
+    let mut reply = shown();
+    reply["backgroundCommands"] = json!(2);
+    rig.show_step(step(reply));
+    assert_eq!(
+        rig.cli().observe_to_close(MACHINE, AGENT),
+        Err("background_commands".into())
+    );
+    for background in [Some(json!(0)), Some(Value::Null), None] {
+        let mut reply = shown();
+        if let Some(background) = background.clone() {
+            reply["backgroundCommands"] = background;
+        }
+        rig.show_step(step(reply));
+        assert_eq!(
+            rig.cli().observe_to_close(MACHINE, AGENT).unwrap().state,
+            "idle",
+            "{background:?}"
+        );
+    }
+    assert!(rig.calls().iter().all(|call| call["args"][0] == "show"));
+}
+
+/// #5689 (Harness 0.6.52): `close` without `--now` refused because
+/// background commands still run (`N background commands running; --now
+/// closes anyway`, in the `--json` reply or on stderr, under any exit) is
+/// `close_background_commands`, tried again later, never `Refused` for
+/// good; `--now` is never added for it.
+#[test]
+fn a_close_refused_for_background_commands_is_tried_again_and_never_with_now() {
+    let said = "2 background commands running; --now closes anyway";
+    for (exit, out) in [
+        (
+            1,
+            json!({"stdout": format!("{}\n", json!({"ok":false,"error":{"code":"BACKGROUND_COMMANDS","message":said}}))}),
+        ),
+        (1, json!({"stderr": format!("{said}\n")})),
+        (
+            5,
+            json!({"stderr": format!("Error: {}\n", said.to_uppercase())}),
+        ),
+    ] {
+        let rig = Rig::new();
+        let mut close = out;
+        close["exit"] = json!(exit);
+        rig.plan(json!({ "close": close }));
+        assert_eq!(
+            rig.cli().close(MACHINE, AGENT),
+            Err("close_background_commands".into()),
+            "exit {exit}"
+        );
+        let calls = rig.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0]["args"],
+            json!(["close", "--machine", MACHINE, AGENT, "--json"])
+        );
+    }
+    // Any other refusal reads as before.
+    let rig = Rig::new();
+    rig.plan(json!({"close":{"exit":5,"stderr":"NOT_YOURS\n"}}));
+    assert_eq!(rig.cli().close(MACHINE, AGENT), Ok(Closed::Refused));
 }
 
 /// #5978, `LAMP_HERMES_ON_LAMP`: a named hand-over to the lamp's own
