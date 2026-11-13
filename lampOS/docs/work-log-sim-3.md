@@ -3,6 +3,18 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 03:0x GMT+7: the speech stack restacked on e99b6e1ffb
+
+- Train 889 merged (e99b6e1ffb). #6975: sim-2 posted NEXT TRAIN (my macOS
+  read one of two).
+- #6961 conflicted with the tip on `lib.rs` (#6955's `boot_id` next to its
+  `pub mod apple_speech`). Restacked: #6954 → 899cbf2b76 (range-diff all
+  `=`), #6961 → 7415ca3d4c (both sides of the hunk kept), #6971 → a5552512b4
+  (a hunk header only). fmt and clippy clean on each; lamp-sim tests pass but
+  for `spd_say`, which fails the same on the plain tip tonight (2/2): #6975's
+  flake. Pushed with leases; announced on #6811; asked again on #6954 itself.
+- Cleared eight more `test-scratch-spd-*` folders the flake left.
+
 ## 2026-11-14 02:4x GMT+7: #6975 READ-OK (sim-1's spd-say flake fix)
 
 - sim-1 took the spd-say flake: **#6975** (0ede05796e, test only) waits for
