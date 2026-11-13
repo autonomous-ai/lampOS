@@ -871,3 +871,143 @@ async fn after_the_lamp_asks_a_yes_goes_to_the_model() {
         }
     }
 }
+
+/// One spoken `answer` read over a pushed skill whose `asks` are `asks`,
+/// with `history` as the thread gives the turn, after the lamp's written
+/// turn `before`, if any: what ran by the runner, how many chats were
+/// asked, and whether a chat was told a skill was named.
+async fn answered_after(
+    answer: &str,
+    asks: Value,
+    history: Vec<Message>,
+    before: Option<String>,
+) -> (Vec<(String, Value)>, usize, bool) {
+    let dir = asks_folder_with(json!({ "photo_booth": asks }));
+    let reads = Arc::new(crate::skill_named::Heard::new(crate::tools::Settings {
+        skills: Some(dir.clone()),
+        use_skill: true,
+        ..Default::default()
+    }));
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(answer.to_owned())].into()),
+        chats: Mutex::new([vec![text("Okay, on it."), Ok(ChatEvent::Done)]].into()),
+        ..Script::default()
+    });
+    let ran: Calls = Arc::default();
+    let seen = ran.clone();
+    let runner: ToolRunner = Arc::new(move |_, heard, name, args| {
+        seen.lock().unwrap().push((name, args, heard));
+        Box::pin(async { json!({"ok": true}) })
+    });
+    let mut engine = Engine::new(
+        script.clone(),
+        move || Told {
+            text: "SYSTEM".into(),
+            after: None,
+            history: history.clone(),
+        },
+        runner,
+    )
+    .announcing(false)
+    .calling_skills_named(Arc::new(move |heard: &str| reads.heard(heard)));
+    let spoken = if let Some(before) = before {
+        engine.submit(written(1, &before));
+        turn_within(&mut engine, Duration::from_secs(5)).await;
+        2
+    } else {
+        1
+    };
+    engine.submit(start(spoken));
+    engine.submit(audio(spoken, 1));
+    engine.submit(end(spoken));
+    let heard = turn_within(&mut engine, Duration::from_secs(5)).await;
+    std::fs::remove_dir_all(&dir).ok();
+    assert_eq!(heard.last().unwrap(), "complete", "{answer}: {heard:?}");
+    let ran = ran
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(name, args, _)| (name.clone(), args.clone()))
+        .collect();
+    let asked = script.asked.lock().unwrap();
+    let named = asked.iter().flatten().any(|message| {
+        message
+            .words()
+            .is_some_and(|words| words.contains("by its name"))
+    });
+    (ran, asked.len(), named)
+}
+
+/// The skill run by its ask through `use_skill`, as [`answered_after`]
+/// gives the runner's calls.
+fn booth_by_ask() -> Vec<(String, Value)> {
+    vec![(
+        crate::use_skill::NAME.to_owned(),
+        json!({"skill": "photo_booth"}),
+    )]
+}
+
+/// A face added from a photo asked about ("Someone added your face from a
+/// photo, as Lan. Shall I remember you?", the coordinator's written turn,
+/// `photo_faces::turn`), then a lamp line that asks nothing, newest in the
+/// thread: "Yes." is still the photo's answer to judge, a yes held
+/// (`a_yes_held`: the worker marked the ask's turn), so it runs nothing in
+/// code even when a pushed skill's `asks` hold it, and round 1 is the
+/// model's. With nothing asked the same line runs the skill by its ask.
+#[tokio::test]
+async fn a_photo_faces_ask_holds_the_yes_after_another_lamp_line() {
+    let history = vec![
+        Message::assistant(crate::photo_faces::ask_line("Lan")),
+        Message::user("Turn the light on."),
+        Message::assistant("The light is on now."),
+    ];
+    assert!(!crate::remarks::lamp_asked("The light is on now."));
+    let asks = json!(["take a photo", "yes"]);
+    let (ran, chats, named) = answered_after(
+        "Yes.",
+        asks.clone(),
+        history.clone(),
+        Some(crate::photo_faces::turn("Lan", None)),
+    )
+    .await;
+    assert!(ran.is_empty(), "asked: nothing in code: {ran:?}");
+    assert_eq!(chats, 1, "asked: round 1 is the model's");
+    assert!(!named, "asked: no skill was named");
+    let (ran, _, _) = answered_after("Yes.", asks, history, None).await;
+    assert_eq!(ran, booth_by_ask(), "nothing asked: run by its ask");
+}
+
+/// A Vietnamese yes after the lamp asked something ("Mình bắt đầu nhé?",
+/// or "Shall I start it?"): "Được." or "Ừ, làm đi." is the model's to read,
+/// even when a pushed skill's `asks` hold it. After a line that asked
+/// nothing the same line runs the skill by its ask.
+#[tokio::test]
+async fn after_the_lamp_asks_a_vietnamese_yes_goes_to_the_model() {
+    for answer in ["Được.", "Ừ, làm đi."] {
+        for (lamp, asked) in [
+            ("Shall I start it?", true),
+            ("Mình bắt đầu nhé?", true),
+            ("Mình đã bật đèn rồi.", false),
+        ] {
+            assert_eq!(crate::remarks::lamp_asked(lamp), asked, "{lamp}");
+            let history = vec![
+                Message::user("Chụp cho mình một tấm ảnh nhé."),
+                Message::assistant(lamp),
+            ];
+            let (ran, chats, named) = answered_after(
+                answer,
+                json!(["take a photo", "được", "ừ làm đi"]),
+                history,
+                None,
+            )
+            .await;
+            if asked {
+                assert!(ran.is_empty(), "{answer} {lamp}: nothing in code: {ran:?}");
+                assert_eq!(chats, 1, "{answer} {lamp}: round 1 is the model's");
+                assert!(!named, "{answer} {lamp}: no skill was named");
+            } else {
+                assert_eq!(ran, booth_by_ask(), "{answer} {lamp}: run by its ask");
+            }
+        }
+    }
+}
