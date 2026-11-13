@@ -3147,6 +3147,36 @@ gone ([switches.md](switches.md)). What happens:
      SDK with those grants and has no other network, and that the lamp
      says it back and waits for the yes; the brief adds "Or code, as
      above." (still within 1,160 bytes), and an answer may be up to 37 KiB.
+     It names the SDK's real calls (`made_skill::SCRIPT_SDK`, #6749 E):
+     `import asyncio`, `from lampos import Lamp`, `lamp = await
+     Lamp.local()` in `async def main()`, then only `lamp.device()` (its
+     `temperature_c` each sensor's degrees C), `lamp.air()`,
+     `lamp.light(colour, level, for_ms)`, `lamp.say(text)`,
+     `lamp.gesture(name)` and `lamp.close()`, and `asyncio.run(main())`;
+     there is no other lamp module (on lamp-9adf, 13 Nov, the model wrote
+     `from lamp import light` and `light.set_light(…, for="59s")`).
+   - **Offered to the voice** (#6749 B): with the switch on, the
+     `make_skill` function's description (`make_skill_local::CODE_TOLD`)
+     says a made skill may carry its own Python script, run by its task
+     once the person agrees, and never to say the lamp can't run a script;
+     its `request` adds an ask a script answers ("make a skill that checks
+     the processor temperature and sets the light", which on lamp-52e6 was
+     answered "I can't run a script or check a temperature" with no call).
+     With every switch on the description stays within 1,024 bytes with no
+     "yes". Off, the function is as before, word for word.
+   - **Parsed before it is said back** (#6749 E,
+     `made_skill::scripts_parse`): each `.py` it wrote goes, on stdin
+     alone, to `/usr/bin/python3 -I -c 'import ast,sys;
+     ast.parse(sys.stdin.buffer.read())'`, with an empty environment, from
+     `/`, at most 2 s, then killed. Python only parses it: nothing of it
+     runs. One that doesn't parse (`made_skill::SCRIPT_DOESNT_PARSE`) goes
+     back to the repair loop ("a made skill's repair n of 3") told the
+     file, the line, Python's error, the line as written and the SDK's
+     calls; its repairs used up, the person hears `NOT_MADE_TRY` and
+     nothing is kept. A Python that can't be started, doesn't end in time
+     or ends with no parse error is journaled ("… was not parsed: …") and
+     the script is made as before: the person's yes still stands before
+     it runs.
    - **Packed with its two files**, so the package's SHA-256 covers every
      byte of its code: a changed script is another package.
    - **Its task words and grants said back whole** (the code itself is
