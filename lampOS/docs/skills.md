@@ -1798,7 +1798,14 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   keeps nothing, ends the wait and the lamp says it stays off
   (`skill_write_yes::DECLINED_NEXT`); `unclear` keeps nothing and the lamp
   asks once more (`UNCLEAR_NEXT`), and a second `unclear` ends the wait as
-  a `no` (`skill_write_yes::answered`). The journal: "the line after a
+  a `no` (`skill_write_yes::answered`). The forced round is told only
+  `approve_id` and `answer` of `make_skill`'s form, both required
+  (`skill_write_yes::APPROVE_FIELDS`, #6921), so the forced call carries no
+  make or edit beside the answer. A `no` or `unclear` is read before the
+  owner check, so anyone's (a guest's too) ends or re-asks the owner's
+  wait and never keeps a yes; an `answer` outside these three reads as
+  `no`; two answers in one line are taken in call order, each as its own.
+  The journal: "the line after a
   skill's task said back whole: its first round must call make_skill",
   then the approval's lines, or "the answer to NAME's say-back was no:
   nothing kept, it stays off" / "… was unclear: nothing kept, asked once

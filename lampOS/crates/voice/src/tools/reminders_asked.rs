@@ -87,6 +87,7 @@ pub(crate) fn force() -> Force {
         asks_for_reminders(last.words()?).then_some(Forced {
             name: LIST,
             only: None,
+            fields: None,
         })
     })
 }

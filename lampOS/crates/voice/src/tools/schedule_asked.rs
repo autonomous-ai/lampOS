@@ -406,8 +406,11 @@ fn starts_a_time(word: &str) -> bool {
 pub(crate) fn force() -> crate::second_provider::net::Force {
     std::sync::Arc::new(|messages: &[crate::second_provider::net::Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
-        asks_to_set(last.words()?)
-            .map(|name| crate::second_provider::net::Forced { name, only: None })
+        asks_to_set(last.words()?).map(|name| crate::second_provider::net::Forced {
+            name,
+            only: None,
+            fields: None,
+        })
     })
 }
 
