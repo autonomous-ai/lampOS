@@ -123,16 +123,59 @@ fn ask_ends(words: &[String]) -> Option<usize> {
     (words.get(at)? == "skill").then_some(at + 1)
 }
 
-/// Whether what the person said plainly asks the lamp to make a skill: a
-/// sentence opens with the ask ("Lamp, make a skill that checks the
-/// processor temperature and sets the light", "Can you make me a skill
-/// that dims the light at 10 pm?", "I want a skill that nods when I come
-/// back", "Create a new skill: …"), and the line says what it does after
-/// it, in that sentence or the next. Never "make a skill" with nothing
-/// after it (the model asks what), a question about skills ("how do I make
-/// a skill?", "what skills did you make?", "can you make skills?"), the ask
-/// further in ("she said make a skill"), a refusal ("don't make a skill"),
-/// or a make taken back anywhere in the line
+/// A word that, anywhere in the line, may take the make back, put it in
+/// doubt or put it off: "No, wait.", "Actually, don't.", "On second
+/// thought, no.", "Nah.", "but not now", "later" (the Reviewer-lead's P2 on
+/// #6887: a skill with no code goes on at once with no spoken yes, so a
+/// wrong force makes what the person said no to). Words, not phrases, as
+/// `schedule_asked`'s: with one, nothing is forced, and the model answers
+/// as it would without the switch. A skill whose own words carry one ("…
+/// when I don't come back") is the model's too: a missed force costs a
+/// question, a wrong one a skill nobody wanted.
+const DOUBT: &[&str] = &[
+    "don't",
+    "dont",
+    "not",
+    "no",
+    "nah",
+    "nope",
+    "wait",
+    "hold",
+    "cancel",
+    "stop",
+    "never",
+    "nevermind",
+    "scratch",
+    "forget",
+    "bother",
+    "actually",
+    "thought",
+    "instead",
+    "rather",
+    "unless",
+    "maybe",
+    "later",
+    "ignore",
+    "skip",
+    "scrap",
+    "changed",
+    "mind",
+    "wondering",
+    "sure",
+];
+
+/// Whether what the person said plainly asks the lamp to make a skill: the
+/// line is one sentence that opens with the ask ("Lamp, make a skill that
+/// checks the processor temperature and sets the light", "Can you make me
+/// a skill that dims the light at 10 pm?", "I want a skill that nods when
+/// I come back", "Create a new skill: …") and says what it does after it,
+/// in that sentence (a `:` does not end one). Never "make a skill" with
+/// nothing after it (the model asks what), a second sentence after the ask
+/// ("Make a skill? Nah.", "Can you make a skill? Just wondering."), a
+/// question about skills ("how do I make a skill?", "what skills did you
+/// make?", "can you make skills?"), the ask further in ("she said make a
+/// skill"), a refusal ("don't make a skill"), a word of [`DOUBT`] anywhere
+/// in the line, or a make taken back
 /// ([`crate::remember::asked::withdrawn`]: "never mind", "scratch that").
 pub fn asks_to_make(said: &str) -> bool {
     if crate::remember::asked::withdrawn(said) {
@@ -142,12 +185,15 @@ pub fn asks_to_make(said: &str) -> bool {
     let sentences: Vec<Vec<String>> = said
         .split_inclusive(['.', '!', '?', ';'])
         .map(lower_words)
+        .filter(|words| !words.is_empty())
         .collect();
-    sentences.iter().enumerate().any(|(at, words)| {
-        ask_ends(words).is_some_and(|end| {
-            words.len() > end || sentences[at + 1..].iter().any(|next| !next.is_empty())
-        })
-    })
+    let [words] = sentences.as_slice() else {
+        return false;
+    };
+    if words.iter().any(|word| DOUBT.contains(&word.as_str())) {
+        return false;
+    }
+    ask_ends(words).is_some_and(|end| words.len() > end)
 }
 
 /// The force the second route's chat is given with the switch on
@@ -184,10 +230,8 @@ mod tests {
             "I'd like you to make a skill that checks the weather every morning.",
             "Okay, build a new skill: when I come back to my desk, nod at me.",
             "Let's make a skill that hums at noon.",
-            "Lamp, make a skill. It checks the processor temperature and sets the light.",
             "Write a skill that runs a script to read the temperature.",
             "Make a skill: when I come back to my desk, nod at me",
-            "Lamp, make a skill that turns the light off when I don't come back.",
         ] {
             assert!(asks_to_make(said), "{said}");
         }
@@ -208,6 +252,19 @@ mod tests {
             "I like the skill that dims the light.",
             "Lamp, use the skill that dims the light.",
             "Is there a skill that dims the light?",
+            // The Reviewer-lead's probes on #6887: a take-back, a doubt or
+            // a put-off anywhere, or a second sentence after the ask.
+            "Make a skill that dims the light. No, wait.",
+            "Make a skill that dims the light. Actually, don't.",
+            "Make a skill that dims the light. On second thought, no.",
+            "Make a skill? Nah.",
+            "Can you make a skill? Just wondering.",
+            "Could you make a skill? I'm not sure you can.",
+            "I want a skill that dims the light, but not now.",
+            "Make a skill later that dims the light.",
+            "Lamp, make a skill. It checks the processor temperature and sets the light.",
+            // A skill whose own words carry a doubt word is the model's.
+            "Lamp, make a skill that turns the light off when I don't come back.",
         ] {
             assert!(!asks_to_make(said), "{said}");
         }
