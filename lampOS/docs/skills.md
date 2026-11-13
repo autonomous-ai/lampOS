@@ -4753,6 +4753,23 @@ bytes, as above):
   more (`upload_agent::grants_read`). `net` needs `LAMP_TASK_NET=on`;
   off, such a file is refused ("it reaches the internet, which a skill's
   task can't on this lamp").
+- **A linked service it uses gets that service's grant** (the owner's
+  ruling, 13 Nov: anything that touches the connectors goes to the lamp's
+  agent end to end), as a voice-made service skill's `do.task` carries
+  them, with `LAMP_AGENT_SERVICES=on` (`upload_agent::services_read`):
+  `<code>-read` for each service the file names (Gmail, or mail, email or
+  inbox; calendar; Google Drive; monday.com; GitHub, Figma, Asana, Ahrefs,
+  Facebook, HubSpot; Slack, Notion, Linear and Amplitude only
+  capitalised, as they are everyday words too), and `<code>-write` for one
+  a sentence says to send, reply, draft, add, create, schedule, post, save
+  or the like to (a sentence naming no service writes to the last one
+  named: "Read my newest email. Reply to it."). Said back in plain words
+  ("reads your Gmail", "prepares sends with your Gmail, each sent only on
+  your yes"), and a service grant always keeps its first run's spoken
+  yes. `upload_agent::capped_with` and the manage helper hold it with
+  their own `LAMP_AGENT_SERVICES`. Off, a file naming a service is
+  refused ("it uses your linked services, which a skill's task can't on
+  this lamp").
 - **No secret is the lamp's** (the first builder's 19:44 ruling): a key or
   token is never said aloud, asked by voice or kept in the skill's folder.
   Its way in (the app, into root's store as a service's tokens, reaching
@@ -4786,11 +4803,17 @@ bytes, as above):
   package that is not the Store's and not pushed, its card marked and its
   `skill.toml` within the cap (`task::agent_from_file`). Hermes then runs
   it in a fresh home of its own, the person's Hermes data (memories,
-  sessions) hidden, as a make does (`skill_make::fresh_home`).
+  sessions) hidden, as a make does (`skill_make::fresh_home`). Granted a
+  linked service, that home's config carries the lamp's connectors
+  (`lamp-services mcp`, `skill_make::fresh_home_for`), so the agent
+  reaches the service only through lamp-control under the run's one-run
+  token, never with a key of the file's.
 
 Tests: `upload_agent::tests` (the 4 KB photobooth file, the switch off,
 a short light-and-speak file, the first run's yes, no secret written,
-a key refused), `task::tests::an_agent_skill_from_a_file_carries_its_task_only_with_its_switch`.
+a key refused, a linked service's grants, services read conservatively),
+`task::tests::an_agent_skill_from_a_file_carries_its_task_only_with_its_switch`,
+`an_agent_skill_from_a_file_carries_a_service_grant_only_with_its_switch`.
 
 #### Written in the app (`LAMP_SKILL_WRITTEN=on`, off)
 
