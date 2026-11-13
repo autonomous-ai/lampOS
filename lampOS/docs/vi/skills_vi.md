@@ -2206,14 +2206,21 @@ camera, so I can't take photos…" với `calls=none`.
 - **Khi đèn đang chờ một câu trả lời, model đọc câu đó:** khi lời mới nhất
   của đèn đã hỏi điều gì (`remarks::lamp_asked`), hoặc một lần đọc lại, một
   xác nhận hay một lời đồng ý đang giữ bất kỳ đang chờ (giữ hay quên, lưu
-  khuôn mặt lúc cài đặt, đổi tên khuôn mặt, lời đồng ý cho việc ghi hay
+  khuôn mặt lúc cài đặt, đổi tên khuôn mặt, một khuôn mặt thêm từ ảnh đã
+  được hỏi mà chưa trả lời (`photo_faces::is_ask`: worker đánh dấu lượt
+  viết của câu hỏi và giữ lời đồng ý cho nó trong
+  `photo_faces::ANSWER_WITHIN`, 120 giây, tới khi `photo_face_yes` hay
+  `photo_face_no` được gọi, dù sau đó đèn có nói thêm gì), lời đồng ý cho việc ghi hay
   task của một kỹ năng, xung đột của một kỹ năng làm ra, một task cho agent
   chờ `confirm_agent_task`, thư của chính giọng nói hay lần ghi đang giữ
   của một lượt chạy kỹ năng chờ được gửi), không câu nào được đọc để tìm
   kỹ năng theo tên hay theo cụm xin (`lamp_awaits_answer` của
   `second_provider`). Vòng 1 là của model, và nó quyết định theo ngữ cảnh
   "Sounds good." hay "Yes please." là câu trả lời cho đèn hay là lời xin
-  một kỹ năng.
+  một kỹ năng. Một lời đồng ý tiếng Việt ("Được.", "Ừ, làm đi.") cũng được
+  giữ như vậy. `remarks::lamp_asked` chỉ nhận ra một câu hỏi tiếng Việt qua
+  dấu `?` ("Mình bắt đầu nhé?"); câu viết không có dấu đó ("Mình bắt đầu
+  nhé.") không được coi là câu hỏi.
 - **Các chỉ dẫn:** chỉ dẫn có sẵn (`config::CHAT_INSTRUCTION`, và bản có
   camera), thứ đèn sản phẩm chạy (cấu hình provider của nó không nêu
   `instruction_file`), nói "never say you have no arms, legs, body or
@@ -2237,6 +2244,8 @@ camera, so I can't take photos…" với `calls=none`.
   `a_camera_question_is_not_an_ask`,
   `a_held_yes_leaves_yes_please_to_the_held_question`,
   `after_the_lamp_asks_a_yes_goes_to_the_model`,
+  `a_photo_faces_ask_holds_the_yes_after_another_lamp_line`,
+  `after_the_lamp_asks_a_vietnamese_yes_goes_to_the_model`,
   `an_agent_task_waiting_for_its_yes_leaves_the_line_to_it`,
   `a_skill_runs_held_write_leaves_send_it_to_it`,
   `the_voices_own_mail_waiting_leaves_go_for_it_to_it` và

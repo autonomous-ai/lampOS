@@ -63,10 +63,29 @@ pub fn tools() -> Vec<Tool> {
     ]
 }
 
+/// How [`ask_line`] opens.
+const ASK_OPENS: &str = "Someone added your face from a photo, as ";
+/// How [`note`] opens.
+const NOTE_OPENS: &str =
+    "Someone added the face of the person at the lamp from a photo, under the name ";
+/// How long after the ask's turn a yes is still held for it in the
+/// provider's worker ([`is_ask`], `second_provider`'s `a_yes_held`): the
+/// meeting it was asked in, which the eyes end on their own.
+pub const ANSWER_WITHIN: Duration = Duration::from_secs(120);
+
 /// The question, the same words for every photo added: never the name used
 /// as theirs until they agree.
 pub fn ask_line(name: &str) -> String {
-    format!("Someone added your face from a photo, as {name}. Shall I remember you?")
+    format!("{ASK_OPENS}{name}. Shall I remember you?")
+}
+
+/// Whether a written turn is the ask ([`turn`]): its own words in English,
+/// or the note the model words in another language. The provider's worker
+/// never sees the coordinator's [`ASKED`]; the turn is how it learns that
+/// the person's next words may be that answer, with no call to the eyes.
+pub fn is_ask(written: &str) -> bool {
+    crate::onboarding::own_words(written).is_some_and(|words| words.starts_with(ASK_OPENS))
+        || written.starts_with(NOTE_OPENS)
 }
 
 /// What the model is told to say, once: the question in its own words.
@@ -74,7 +93,7 @@ pub fn ask_line(name: &str) -> String {
 /// ([`turn`]).
 pub fn note(name: &str) -> String {
     format!(
-        "Someone added the face of the person at the lamp from a photo, under the name {name}. \
+        "{NOTE_OPENS}{name}. \
          Ask them once, gently, in your own words: \"{}\" \
          If they say yes, call {YES}. If they say no, call {NO}. \
          Don't call them {name} unless they say yes, and don't ask again.",
@@ -364,6 +383,23 @@ mod tests {
         let vietnamese = turn("Walter", Some(crate::language::Language::Vietnamese));
         assert_eq!(vietnamese, note("Walter"));
         assert_eq!(turn("Wal\"ter", None), note("Wal\"ter"));
+    }
+
+    /// The worker knows the ask by its turn alone, in either form, and no
+    /// other written turn is taken for it.
+    #[test]
+    fn the_ask_is_known_by_its_turn_in_either_form() {
+        for name in ["Walter", "Wal\"ter"] {
+            assert!(is_ask(&turn(name, None)), "{name}");
+            assert!(
+                is_ask(&turn(name, Some(crate::language::Language::Vietnamese))),
+                "{name}"
+            );
+        }
+        assert!(!is_ask(&ask_line("Walter")), "the bare line is no turn");
+        assert!(!is_ask(
+            &crate::onboarding::said_as_is("Shall I remember that?").unwrap()
+        ));
     }
 
     /// The face here is asked about, and the person's yes or no goes to the
