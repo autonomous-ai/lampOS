@@ -4596,7 +4596,9 @@ the same code for both writers.
   DeepSeek's one answer, given no repairs, stands as not made", "DeepSeek's
   cannot is one the brief asks for: not handed to the agent", "no agent on
   the lamp: DeepSeek makes it alone"; an agent's repair says "by the
-  agent".
+  agent". For the app's MAKE IT, a make the agent didn't take says "...:
+  DeepSeek gets its repairs, as without the agent" and "not taken by the
+  agent: DeepSeek's repairs".
 - **On in the product** (`deploy/product/lamp-voice.service`, whose second
   route's worker is given it; the install census test
   `the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent`). Off
@@ -4619,8 +4621,18 @@ the same code for both writers.
   skill goes on at once as every MAKE IT does (one with code of its own as
   before, `app_make::put_on_line`), and a skill not made is said and told
   to the app as before; the agent's own `cannot:` is "I couldn't make that
-  one.". With the switch off, no tasks part, no Hermes, no make run, or
-  lamp-tasks `busy` with a voice make, it stays DeepSeek's as before. The
+  one.". With the switch off, no tasks part or no Hermes, it stays
+  DeepSeek's as before, with its repairs. With Hermes but the make not
+  taken by the agent (no make run: no make socket, `no_namespace` or
+  `not_held_off`; lamp-tasks `busy` with a voice make; or no first answer
+  from the agent's run), DeepSeek then gets its repairs, as without the
+  agent, the hand-over's time not counted in their bound
+  (`Agent::repairs_if_untaken`, set by `for_app` alone; Heron's P2 on
+  #6788): an app make DeepSeek gets right on a repair is never said as not
+  made because the agent couldn't take it. A voice make keeps its order:
+  there DeepSeek's one answer stands. Live at merge: the product's
+  lamp-voice unit already sets `LAMP_MAKE_SKILL_AGENT=on` and
+  `LAMP_TASKS_DIR`, so MAKE IT hands its makes over as soon as this lands. The
   time fits: lamp-cloud's `skills.make` waits at most 2 s
   (`make_skill::WAIT`), and the voice answers `{"making": true}` before the
   make begins, on a thread of its own; `skills.made` then reads `making`
@@ -4629,7 +4641,11 @@ the same code for both writers.
   120 s. The coordinator's journal says, as the socket starts, whether its
   makes go to the agent and with the guide. Tests:
   `app_make::tests::an_app_make_goes_to_the_agent_only_with_its_switch`,
-  `make_skill_agent::tests::the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part`.
+  `make_skill_agent::tests::the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part`,
+  `app_make::tests::an_app_make_the_agent_does_not_take_keeps_deepseeks_repairs`
+  (an older lamp-tasks, `no_namespace` and a silent run: DeepSeek's
+  refused answer repaired and on; the voice's agent: its one answer
+  stands).
 - **Tests:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
   `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
   `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`,

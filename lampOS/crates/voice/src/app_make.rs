@@ -1712,7 +1712,10 @@ mod tests {
         for guide in [false, true] {
             let (root, keeping) = keeping(&format!("app-agent-{guide}"));
             let tasks = stub(Some("hermes"), std::sync::Arc::new(|_: &str| Some(good())));
-            let agent = if guide { tasks.guided() } else { tasks.agent() };
+            let agent = crate::make_skill_agent::Agent {
+                repairs_if_untaken: true,
+                ..if guide { tasks.guided() } else { tasks.agent() }
+            };
             let at = now_unix_ms();
             let brief = begin(&keeping.directory, words, "r1", at).unwrap();
             let (url, served) = service(vec![(200, faces())]);
@@ -1768,6 +1771,81 @@ mod tests {
         assert_eq!(told["state"], "on", "{told}");
         assert_eq!(asked.join().unwrap()["install_made"], told["sha256"]);
         on_line(&said);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P2 on #6788: with `LAMP_MAKE_SKILL_AGENT` on (as the
+    /// product's lamp-voice unit has it) but the make not taken by the
+    /// agent (no make socket, an older lamp-tasks; `no_namespace`; or no
+    /// answer from its run), the app's MAKE IT keeps DeepSeek's repairs, as
+    /// without the agent: DeepSeek's refused answer is repaired and goes
+    /// on. A voice make's agent keeps today's order: its one answer stands.
+    #[test]
+    fn an_app_make_the_agent_does_not_take_keeps_deepseeks_repairs() {
+        use crate::make_skill_agent::{Agent, tests::stub};
+        use crate::make_skill_local::tests::{
+            chat_at, faces, good, keeping, manage_helper, service,
+        };
+        let words = "make me a skill that dims the light at 10 pm";
+        for (engine, handed) in [("old", 0), ("no_namespace", 1), ("silent", 1)] {
+            let (root, keeping) = keeping(&format!("app-untaken-{engine}"));
+            let tasks = match engine {
+                "silent" => stub(Some("hermes"), std::sync::Arc::new(|_: &str| None)),
+                engine => stub(Some(engine), std::sync::Arc::new(|_: &str| Some(good()))),
+            };
+            let agent = Agent {
+                repairs_if_untaken: true,
+                ..tasks.agent()
+            };
+            let at = now_unix_ms();
+            let brief = begin(&keeping.directory, words, "r1", at).unwrap();
+            let (url, served) = service(vec![(200, faces()), (200, good())]);
+            let asked = manage_helper(&keeping.manage);
+            let mut said = Vec::new();
+            make_here_with(
+                &keeping,
+                &brief,
+                "r1",
+                at,
+                chat_at(url),
+                |line| said.push(line.to_owned()),
+                || None,
+                Some(&agent),
+            );
+            // DeepSeek's answer and its own repair, after the hand-over.
+            assert_eq!(served.join().unwrap(), 2, "{engine}");
+            assert_eq!(tasks.hand_overs(), handed, "{engine}");
+            let told = status(&keeping.directory, Some("r1"), at);
+            assert_eq!(told["state"], "on", "{engine}: {told}");
+            assert_eq!(told["name"], "evening-dim");
+            assert_eq!(asked.join().unwrap()["install_made"], told["sha256"]);
+            assert!(
+                said.len() == 1 && said[0].starts_with("I made evening dim, and it's on:"),
+                "{engine}: {said:?}"
+            );
+            let _ = fs::remove_dir_all(&root);
+        }
+        // The voice's agent, not taken: DeepSeek's one answer stands.
+        let (root, keeping) = keeping("app-untaken-voice-order");
+        let tasks = stub(Some("old"), std::sync::Arc::new(|_: &str| Some(good())));
+        let agent = tasks.agent();
+        assert!(!agent.repairs_if_untaken);
+        let at = now_unix_ms();
+        let brief = begin(&keeping.directory, words, "r1", at).unwrap();
+        let (url, served) = service(vec![(200, faces())]);
+        make_here_with(
+            &keeping,
+            &brief,
+            "r1",
+            at,
+            chat_at(url),
+            |_| {},
+            || None,
+            Some(&agent),
+        );
+        assert_eq!(served.join().unwrap(), 1);
+        let told = status(&keeping.directory, Some("r1"), at);
+        assert_eq!(told["state"], "not_kept", "{told}");
         let _ = fs::remove_dir_all(&root);
     }
 

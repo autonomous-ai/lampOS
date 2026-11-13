@@ -1889,7 +1889,10 @@ cả hai người viết.
   kept", "the agent (Hermes) made none (no answer within 90 s): DeepSeek's
   one answer, given no repairs, stands as not made", "DeepSeek's cannot is
   one the brief asks for: not handed to the agent", "no agent on the lamp:
-  DeepSeek makes it alone"; lần sửa của agent ghi "by the agent".
+  DeepSeek makes it alone"; lần sửa của agent ghi "by the agent". Với MAKE
+  IT của ứng dụng, một lần tạo agent không nhận ghi "...: DeepSeek gets its
+  repairs, as without the agent" và "not taken by the agent: DeepSeek's
+  repairs".
 - **Bật trong sản phẩm** (`deploy/product/lamp-voice.service`, worker của
   tuyến thứ hai nhận nó; test kiểm kê cài đặt
   `the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent`). Tắt
@@ -1912,9 +1915,19 @@ cả hai người viết.
   lần MAKE IT (kỹ năng có mã riêng như trước, `app_make::put_on_line`), và
   kỹ năng không tạo được vẫn được nói và báo cho ứng dụng như trước;
   `cannot:` riêng của agent là "I couldn't make that one.". Khi công tắc
-  tắt, không có phần tasks, không có Hermes, không có lần chạy tạo, hoặc
-  lamp-tasks `busy` vì một lần tạo bằng giọng nói, nó vẫn do DeepSeek như
-  trước. Thời gian vừa: `skills.make` của lamp-cloud chờ tối đa 2 giây
+  tắt, không có phần tasks hoặc không có Hermes, nó vẫn do DeepSeek như
+  trước, với các lần sửa của nó. Có Hermes nhưng agent không nhận lần tạo
+  (không có lần chạy tạo: không có socket tạo, `no_namespace` hay
+  `not_held_off`; lamp-tasks `busy` vì một lần tạo bằng giọng nói; hoặc
+  lần chạy của agent không cho câu trả lời đầu tiên), thì DeepSeek được các
+  lần sửa của nó như khi không có agent, thời gian của lần giao không tính
+  vào giới hạn của chúng (`Agent::repairs_if_untaken`, chỉ `for_app` đặt;
+  P2 của Heron trên #6788): một lần tạo từ ứng dụng mà DeepSeek làm đúng
+  sau một lần sửa không bao giờ bị nói là không tạo được chỉ vì agent không
+  nhận. Lần tạo bằng giọng nói giữ thứ tự của nó: ở đó một câu trả lời của
+  DeepSeek giữ nguyên. Có hiệu lực ngay khi gộp: unit lamp-voice của sản
+  phẩm đã đặt `LAMP_MAKE_SKILL_AGENT=on` và `LAMP_TASKS_DIR`, nên MAKE IT
+  giao các lần tạo của nó ngay khi thay đổi này vào. Thời gian vừa: `skills.make` của lamp-cloud chờ tối đa 2 giây
   (`make_skill::WAIT`), và giọng nói trả lời `{"making": true}` trước khi
   bắt đầu tạo, trên một luồng riêng; sau đó `skills.made` đọc `making` tới
   30 phút (`app_make::MAKING_LONGEST_MS`, mà `makingLongest` của ứng dụng
@@ -1922,7 +1935,11 @@ cả hai người viết.
   agent. Khi socket khởi động, nhật ký của coordinator ghi các lần tạo của
   nó có giao cho agent không và có hướng dẫn không. Test:
   `app_make::tests::an_app_make_goes_to_the_agent_only_with_its_switch`,
-  `make_skill_agent::tests::the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part`.
+  `make_skill_agent::tests::the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part`,
+  `app_make::tests::an_app_make_the_agent_does_not_take_keeps_deepseeks_repairs`
+  (lamp-tasks cũ, `no_namespace` và một lần chạy im lặng: câu trả lời bị từ
+  chối của DeepSeek được sửa và bật; agent của giọng nói: một câu trả lời
+  của nó giữ nguyên).
 - **Test:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
   `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
   `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`,
