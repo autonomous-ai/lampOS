@@ -3566,7 +3566,7 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
     assert!(out.status.success(), "{out:?}");
     assert_eq!(
         String::from_utf8_lossy(&out.stdout),
-        "lasting: hermes-agent installs tools \nCHECKOUT\nTOOLS\nINSTALLS\nPROGRAM\nlamp: make-task-1 \nWROTE-LOCK\nWROTE-LEASE\nWROTE-PREPARE\nWROTE-RUNTIME-LEASE\nANSWERED\n"
+        "lasting: hermes-agent installs tools \nCHECKOUT\nTOOLS\nINSTALLS\nPROGRAM\nlamp: make-task-1 \nWROTE-PREPARE\nWROTE-RUNTIME-LEASE\nWROTE-LOCK\nWROTE-LEASE\nANSWERED\n"
     );
     // Outside, the make's answer is there and nothing else was touched.
     assert!(make.join("answer.md").exists());
