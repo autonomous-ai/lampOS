@@ -35,7 +35,10 @@ const PUMP: f64 = 0.005;
 /// A line whose last buffer came this long ago is done, even with no empty
 /// end buffer: the synthesizer writes far faster than speech (a 22-word line
 /// whole in about 40 ms here), and on macOS 14 the empty end buffer never
-/// came (Heron's read on #6961), so every line waited out its 30 s.
+/// came (Heron's read on #6961), so every line waited out its 30 s. The
+/// longest gap between two buffers measured on macOS 26 (arm64): 0.7 ms on
+/// three 4,096-character lines (the bound), and 9.6 ms at worst over nine lines
+/// of 432 to 864 words, so 300 ms is over 30 times the widest (nine's P3).
 const QUIET_END: Duration = Duration::from_millis(300);
 
 /// What the synthesizer hands back for a line.
