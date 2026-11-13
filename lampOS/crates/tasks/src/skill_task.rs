@@ -4495,6 +4495,7 @@ mod tests {
             harness,
             held_by: None,
             retry: Duration::from_millis(20),
+            lost_look: LOST_START_LOOK,
             default_agent,
             wrappers: Some(bin),
             agent_ns: Some(ns),
