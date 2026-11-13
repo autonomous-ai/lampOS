@@ -3,6 +3,18 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 20:2x GMT+7: train 882 merged #6929 and #6925
+
+- Train 882 (#6937) merged as lamp-voice 9ea4104f33 with **#6929** (P2,
+  lamp-sim's macOS side and the `sim-macos` job) and **#6925** (`ps`).
+- READ-OKs: sim-2 on #6928 (cafd2922e3) and #6938 (481c16f96f); ten on
+  #6939 (99b787298e).
+- Rebased #6938 to 9132d68612 and #6939 to 4186f204f1, one commit each,
+  patches unchanged (`range-diff` =); the two merge clean together.
+- #6928: cadence line fixed to 10 minutes (be7332d80c), sim-2's note.
+- Asked: sim-1 on #6938, sim-2 on #6939, sim-2 restate and the first
+  builder on #6928, the first builder on #6933.
+
 ## 2026-11-13 20:1x GMT+7: #6939, lamp-body in the macOS job
 
 - ten (on #6931) asked for lamp-body's clippy and tests on a Mac runner.
