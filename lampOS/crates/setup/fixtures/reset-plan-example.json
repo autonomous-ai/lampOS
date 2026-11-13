@@ -54,6 +54,7 @@
     "/etc/lampOS/setup/display-name",
     "/etc/lampOS/setup/voice",
     "/etc/lampOS/setup/character",
+    "/etc/lampOS/setup/energy",
     "/etc/lampOS/person/name",
     "/etc/lampOS/person/place",
     "/etc/systemd/system/lamp-control.service.d/developer.conf",

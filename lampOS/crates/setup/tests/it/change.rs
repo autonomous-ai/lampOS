@@ -39,6 +39,76 @@ fn the_persons_name_is_written_as_setup_writes_it_and_an_empty_one_removes_it() 
     assert_eq!(reply, json!({"done": {"name": ""}}));
 }
 
+/// #6893: the energy is kept beside the words, worked out from them once
+/// when none is chosen, and a change of the energy alone restarts nothing;
+/// clearing the words removes it; 0 and 6 are refused with nothing written.
+#[test]
+fn the_energy_is_kept_with_the_words_and_restarts_nothing() {
+    let root = Root::new();
+    let config = root.config();
+    let energy = change::beside_language(&config, "energy");
+    let kept = || lamp_msgs::chosen_voice::energy_kept(&energy);
+
+    let (reply, done) = answer(r#"{"character": "energetic and playful"}"#, &config, true);
+    assert_eq!(
+        reply,
+        json!({"done": {"text": "energetic and playful", "energy": 5}})
+    );
+    assert!(done.unwrap().restart_voice);
+    assert_eq!(fs::read_to_string(&energy).unwrap(), "5\nderived\n");
+    assert_eq!(mode(&energy), 0o644);
+
+    let (reply, done) = answer(
+        r#"{"character": {"text": "energetic and playful", "energy": 2}}"#,
+        &config,
+        true,
+    );
+    assert_eq!(reply["done"]["energy"], 2);
+    assert!(
+        !done.unwrap().restart_voice,
+        "the energy alone restarts nothing"
+    );
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: 2,
+            chosen: true
+        }
+    );
+
+    for refused in [
+        r#"{"character": {"text": "calm", "energy": 0}}"#,
+        r#"{"character": {"text": "calm", "energy": 6}}"#,
+        r#"{"character": {"text": "calm", "energy": "3"}}"#,
+        r#"{"character": {"energy": 3}}"#,
+    ] {
+        let (reply, done) = answer(refused, &config, true);
+        assert!(reply["refused"].is_string() && done.is_none(), "{refused}");
+    }
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: 2,
+            chosen: true
+        }
+    );
+
+    // The old string form, as an older lamp-cloud sends it: worked out.
+    let (reply, _) = answer(r#"{"character": "calm and quiet"}"#, &config, true);
+    assert_eq!(reply["done"]["energy"], 1);
+    assert_eq!(
+        kept(),
+        lamp_msgs::Energy {
+            level: 1,
+            chosen: false
+        }
+    );
+
+    let (reply, _) = answer(r#"{"character": {"text": ""}}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"text": "", "energy": 1}}));
+    assert!(!energy.exists());
+}
+
 /// #5394: the chosen voice and the character words are kept beside the
 /// language, 0644, one line each, and restart the voice only when they
 /// changed; `""` removes each; an unknown voice or unfit words are refused
@@ -74,7 +144,10 @@ fn the_chosen_voice_and_character_are_kept_beside_the_language() {
     assert!(!voice.exists());
 
     let (reply, done) = answer(r#"{"character": " calm and quiet "}"#, &config, true);
-    assert_eq!(reply, json!({"done": {"text": "calm and quiet"}}));
+    assert_eq!(
+        reply,
+        json!({"done": {"text": "calm and quiet", "energy": 1}})
+    );
     let done = done.unwrap();
     assert!(done.restart_voice);
     assert!(!done.said.contains("calm"), "{}", done.said);
@@ -94,6 +167,7 @@ fn the_chosen_voice_and_character_are_kept_beside_the_language() {
     let (_, done) = answer(r#"{"character": ""}"#, &config, true);
     assert!(done.unwrap().restart_voice);
     assert!(!character.exists());
+    assert!(!change::beside_language(&config, "energy").exists());
     // Off, nothing is taken.
     let (reply, _) = answer(r#"{"voice": "Kanna"}"#, &config, false);
     assert_eq!(reply, json!({"refused": change::OFF}));
@@ -887,6 +961,8 @@ fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     // The chosen voice and character words, beside the language (#5394).
     assert!(wiped(lamp_msgs::chosen_voice::VOICE_FILE));
     assert!(wiped(lamp_msgs::chosen_voice::CHARACTER_FILE));
+    // And the energy kept with the words (#6893).
+    assert!(wiped(lamp_msgs::chosen_voice::ENERGY_FILE));
     // The owner's language is kept, as the zone is (#4473), and with it the
     // voice's record of the language it last announced, so the first start
     // after a reset announces no change it did not make.
@@ -929,6 +1005,10 @@ fn the_products_reset_wipes_the_lamps_name_and_the_unit_runs_the_helper() {
     assert_eq!(
         change::beside_language(&own, "character"),
         std::path::Path::new(lamp_msgs::chosen_voice::CHARACTER_FILE)
+    );
+    assert_eq!(
+        change::beside_language(&own, "energy"),
+        std::path::Path::new(lamp_msgs::chosen_voice::ENERGY_FILE)
     );
     assert!(
         include_str!("../../../../deploy/product/lamp-voice.service")
