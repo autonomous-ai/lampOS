@@ -776,7 +776,9 @@ agent (`lamp_tasks::skill_make`).
   bao giờ là một khóa, cùng bốn thiết lập Hermes của lamp-update,
   `MAKE_CONFIG`, một kiểm thử giữ chúng bằng `hermes_install::CONFIG`:
   không kiểm tra cập nhật, không language server, lần chạy `chat -q` kết
-  thúc cùng lượt của nó), và không có gì từ bộ nhớ, phiên hay trạng thái
+  thúc cùng lượt của nó; thiết lập nào có khối cấp trên cùng đã có trong
+  config nhà cung cấp, `terminal:`, được đặt vào đúng khối đó, vì Hermes từ
+  chối tệp có một khóa hai lần), và không có gì từ bộ nhớ, phiên hay trạng thái
   của Hermes; bên cạnh đó là hai liên kết tới runtime đã chuẩn bị của
   Hermes trong home lâu dài, `home/.hermes/installs` (bản ghi phụ thuộc và
   các môi trường, `installs/<key>/facts.json`) và `home/.hermes/tools` (uv,
