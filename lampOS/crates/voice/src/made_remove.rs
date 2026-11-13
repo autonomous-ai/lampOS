@@ -457,13 +457,15 @@ mod tests {
             .map(|(at, (name, on))| {
                 let package = format!("{name}-1.0.0.tar");
                 std::fs::write(keeping.directory.join(&package), "tar").unwrap();
+                let sha256 = format!("{at:x}").repeat(64);
                 if *on {
                     installed(keeping, name, "installable");
+                    went_on_as(keeping, name, &sha256);
                 }
                 json!({
                     "name": name,
                     "version": "1.0.0",
-                    "sha256": format!("{at:x}").repeat(64),
+                    "sha256": sha256,
                     "description": "",
                     "package": package,
                     "on": on,
@@ -485,6 +487,16 @@ mod tests {
         std::fs::write(
             folder.join("skill.toml"),
             format!("kind = \"{kind}\"\nversion = \"1.0.0\"\n"),
+        )
+        .unwrap();
+    }
+
+    /// The folder `name` on the lamp went on as the package `sha256`, as
+    /// the manage helper's install writes it (`.package.json`).
+    fn went_on_as(keeping: &crate::made_skill::Keeping, name: &str, sha256: &str) {
+        std::fs::write(
+            keeping.installed.join(name).join(".package.json"),
+            json!({"sha256": sha256, "manifest": {"name": name, "version": "1.0.0"}}).to_string(),
         )
         .unwrap();
     }
@@ -790,5 +802,158 @@ mod tests {
         assert!(near(2, "moon-fact"));
         assert!(!near(3, "moon-fact"));
         assert!(!near(1, "dim"));
+    }
+
+    /// Heron's and Thirteen's P2 on #6969: two of theirs equally near but
+    /// of other lengths ("brain alert" is 1 from both) ask which, never
+    /// the shorter or the longer alone.
+    #[test]
+    fn two_as_near_of_other_lengths_ask_which() {
+        yes::clear_for_test();
+        let (root, keeping) = keeping("remove-alike-lengths");
+        made_here(&keeping, &[("rain-alert", true), ("train-alert", true)]);
+        let now = Instant::now();
+        let told = asked(ask("the brain alert skill", 1), &keeping, owner, now);
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("rain alert or train alert"), "{next}");
+        assert!(told.get(yes::APPROVE_ID).is_none(), "{told}");
+        assert!(!yes::awaited(now));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's and Thirteen's P2 on #6969: a shorter made name whose words
+    /// lie inside a near longer one ("moon" in "moon fact") is as near as
+    /// it, so "the moon fax skill" asks which; "moon fact" said whole is
+    /// moon fact alone.
+    #[test]
+    fn a_shorter_name_inside_the_longer_one_meant_asks_which() {
+        yes::clear_for_test();
+        let (root, keeping) = keeping("remove-inside");
+        made_here(&keeping, &[("moon", true), ("moon-fact", true)]);
+        let now = Instant::now();
+        let told = asked(ask("the moon fax skill", 1), &keeping, owner, now);
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("moon or moon fact"), "{next}");
+        assert!(!yes::awaited(now));
+        let told = asked(ask("the moon fact skill", 1), &keeping, owner, now);
+        assert_eq!(told["remove"], "moon-fact", "{told}");
+        let told = asked(ask("moon", 2), &keeping, owner, now);
+        assert_eq!(told["remove"], "moon", "{told}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P3 2 on #6969: a skill they didn't make is named back only
+    /// as it was asked, or to the owner; to anyone else a near name is
+    /// "no skill they made by that name".
+    #[test]
+    fn a_near_name_not_theirs_is_said_to_the_owner_only() {
+        let (root, keeping) = twelves_lamp("remove-near-not-theirs");
+        let now = Instant::now();
+        let told = asked(ask("look for thing", 1), &keeping, || false, now);
+        assert_eq!(told["error"], NO_MADE, "{told}");
+        assert!(!told["next"].as_str().unwrap().contains("look for things"));
+        let told = asked(ask("look for thing", 1), &keeping, owner, now);
+        assert_eq!(told["error"], NOT_MADE, "{told}");
+        let told = asked(ask("faq", 1), &keeping, || false, now);
+        assert_eq!(told["error"], NOT_MADE, "{told}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Heron's P3 1 on #6969: while another yes waits, a remove asked by
+    /// anyone but the owner opens nothing, so it never replaces that wait;
+    /// the owner's does, one wait at a time.
+    #[test]
+    fn a_guests_remove_never_replaces_a_waiting_yes() {
+        let (root, keeping) = twelves_lamp("remove-guest");
+        let now = Instant::now();
+        let other = yes::wait_for_yes(
+            yes::Asks {
+                skill: "leaving-mail".to_owned(),
+                sha256: "ab".repeat(32),
+                writes: Vec::new(),
+                say_back: "mails mai".to_owned(),
+                grants: None,
+                code: false,
+                remove: false,
+            },
+            1,
+            now,
+        );
+        let told = asked(ask("moon fact", 2), &keeping, || false, now);
+        assert!(told["error"].is_string(), "{told}");
+        assert!(told.get(yes::APPROVE_ID).is_none(), "{told}");
+        assert!(yes::waits(&other), "the owner's wait is kept");
+        let told = asked(ask("moon fact", 3), &keeping, owner, now);
+        assert_eq!(told["remove"], "moon-fact", "{told}");
+        assert!(!yes::waits(&other));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Thirteen's P3 1 on #6969: the folder of that name on the lamp is not
+    /// the package made (one from the Store came in under the name after
+    /// the made one was taken off in the app): refused in words, the
+    /// helper never asked, nothing dropped.
+    #[test]
+    fn a_folder_not_the_made_package_is_not_removed() {
+        let (root, keeping) = twelves_lamp("remove-other-folder");
+        went_on_as(&keeping, "moon-fact", &"f".repeat(64));
+        let now = Instant::now();
+        let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
+        yes::lamp_said(1, "Remove moon fact?");
+        let told = yes::approve(&id, 2, true, true, now, |asks| {
+            removed(&keeping, asks, |_| panic!("asked the helper"))
+        });
+        assert!(
+            told["error"].as_str().unwrap().contains("isn't the one"),
+            "{told}"
+        );
+        assert_eq!(names(&keeping.directory), ["moon-fact", "evening-dim"]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// One already taken off in the app (its folder gone, the index still
+    /// saying on) is dropped from the made skills without the helper.
+    #[test]
+    fn one_taken_off_in_the_app_is_dropped_without_the_helper() {
+        let (root, keeping) = twelves_lamp("remove-gone");
+        std::fs::remove_dir_all(keeping.installed.join("moon-fact")).unwrap();
+        let now = Instant::now();
+        let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
+        yes::lamp_said(1, "Remove moon fact?");
+        let told = yes::approve(&id, 2, true, true, now, |asks| {
+            removed(&keeping, asks, |_| panic!("asked the helper"))
+        });
+        assert_eq!(told["removed"], "moon-fact", "{told}");
+        assert_eq!(names(&keeping.directory), ["evening-dim"]);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// Thirteen's P3 4 on #6969: taken off the lamp, but the made skills'
+    /// index not written: told and journaled as just that, never plainly
+    /// "removed".
+    #[test]
+    fn taken_off_but_still_listed_is_told_so() {
+        use std::os::unix::fs::PermissionsExt;
+        let (root, keeping) = twelves_lamp("remove-still-listed");
+        let now = Instant::now();
+        let id = id_of(&asked(ask("moon fact", 1), &keeping, owner, now));
+        yes::lamp_said(1, "Remove moon fact?");
+        let shut = std::fs::Permissions::from_mode(0o555);
+        std::fs::set_permissions(&keeping.directory, shut).unwrap();
+        let mut helper = Vec::new();
+        let told = yes::approve(&id, 2, true, true, now, |asks| {
+            removed(&keeping, asks, |name| {
+                helper.push(name.to_owned());
+                Ok(())
+            })
+        });
+        let open = std::fs::Permissions::from_mode(0o755);
+        std::fs::set_permissions(&keeping.directory, open).unwrap();
+        assert_eq!(helper, ["moon-fact"]);
+        assert_eq!(told["removed"], "moon-fact", "{told}");
+        assert_eq!(told["still_listed"], true, "{told}");
+        let next = told["next"].as_str().unwrap();
+        assert!(next.contains("still listed"), "{next}");
+        let _ = std::fs::remove_dir_all(&root);
     }
 }
