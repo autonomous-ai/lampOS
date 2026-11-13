@@ -191,9 +191,9 @@ eligible() {
       || { once commits$p "#$p left out: its commits can't be listed"; continue; }
     fine commits$p
     # 7 Nov (the PM, after Twelve's table): a Queue READ ASK naming TWO READS asks too (#5647, #5650 merged on one read).
-    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --writers $wf --queue $qf --pr $p --pr-commits $SP/pr-commits.txt $heads)
+    two=$(cat $bf $cf | $PYTHON -I $TOOLS_DIR/reads2.py --always --writers $wf --queue $qf --pr $p --pr-commits $SP/pr-commits.txt $heads)
     if [[ $two == short* ]]; then
-      grep -qx "$p short $head" $told || { say "#$p left out: TWO READS asked, $two on ${head:0:9}" >&2; tell "$p short $head"; }
+      grep -qx "$p short $head" $told || { say "#$p left out: two reads needed, $two on ${head:0:9}" >&2; tell "$p short $head"; }
       continue
     fi
     [[ $two == none || $two == met* ]] || { once reads2$p "#$p left out: reads2.py said '${two}'"; continue; }

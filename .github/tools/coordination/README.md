@@ -17,7 +17,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of a TWO READS ask, or can't be fetched. |
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
 | `markers.py [--writers FILE] [--held] [PR]` | Reads a PR's comments and review bodies as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. With `--held`, a held PR that has a READ-OK prints `<READ-OK sha> <key>=<commit> …`, one per standing HOLD (the train bot logs it once per head), else nothing. With `--ignored`, it prints `READ-OK <sha7> by <login> ignored: not a writer` for each READ-OK skipped because its login isn't a writer (the train bot logs each once per head). `markers.py --merge COMMENTS REVIEWS` merges the two fetches into one list in time order (`lib.sh`). |
-| `reads2.py [--writers FILE] [--queue QUEUE_JSONL --pr N] HEAD_SHA [EARLIER_HEAD...]` | Reads the PR body, comments and review bodies as JSON lines, and the Queue's comments with `--queue`. Prints `none`, `met N` or `short N` for a TWO READS ask. A READ-OK for an earlier head given (the bot gives those with the same patch) counts as one for the head. |
+| `reads2.py [--always] [--writers FILE] [--queue QUEUE_JSONL --pr N] HEAD_SHA [EARLIER_HEAD...]` | Reads the PR body, comments and review bodies as JSON lines, and the Queue's comments with `--queue`. Prints `none`, `met N` or `short N` for a TWO READS ask. A READ-OK for an earlier head given (the bot gives those with the same patch) counts as one for the head. |
 | `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments and review bodies as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
 | `lib.sh` | Sourced by the scripts: the writers list and the fetches, each failing closed, and the build-input and lane tests (`coord_input`, `coord_lane`), read from `lampos-arm64.yml`'s and `lampos-sdk.yml`'s `pull_request` paths. |
 | `lane.sh PR...` | Prints the lane each PR goes to, as the bot decides it. Read-only but for local fetches. |
@@ -174,6 +174,8 @@ A review's state (APPROVED, CHANGES_REQUESTED, ...) is never a read. A review wi
 **Fetches fail closed.** If a PR's head, comments, reviews or body can't be fetched, that PR is not eligible.
 If any Queue issue (#4710, #5385, #6059, #6809 or #6811) can't be fetched, no PR is eligible that round.
 `still-eligible.sh` rechecks the markers, the Queue HOLDs and TWO READS just before a train merges.
+
+**Two readers for every PR (13 Nov, the lead).** The train bot and `still-eligible.sh` call `reads2.py --always`, so every PR needs READ-OKs from two different signed readers on its head, asked or not. A reader who restates is still one reader, and two names on one shared login are two readers. A ONE READ line no longer lowers it.
 
 **Markers.**
 
