@@ -3832,17 +3832,23 @@ after a take-over, but now for every turn:
   **The unplug's acts** (#6457, `Claim::Unplug`): a reply opening with the
   unplug's own acts in the model's words (`action_claim::UNPLUGGED`:
   "I'm preparing to fold — please wait …", "Still preparing …",
-  "Staying on, then — standing back up.", "I'm turning myself off.", "Safe
-  to unplug me now.") stands only when a `prepare_to_unplug` or
-  `stay_plugged_in` ran in the turn, by its name or through `use_skill`
-  naming it, with an answer that is no error (`action_claim::unplug_in`, by
-  the outcomes the turn keeps of its calls; a `use_skill` that ran no skill
-  backs nothing). While the skill's turn-off ask is open (the lamp's last
-  words in the exchanges end with `language::UNPLUG_ASK_OFF`, in English or
-  the owner's language) such words are dropped, never asked again and never
-  the not-done line: the skill says its own exact line for that answer
-  (journal: `its reply claims an unplug action while the skill's ask is
-  open: not said, its N call(s) run (LAMP_ACTION_CLAIM_CHECKED)`). Said in
+  "Staying on, then — standing back up.", "I'm turning myself off.")
+  stands only when a `prepare_to_unplug` or `stay_plugged_in` ran in the
+  turn, by its name or through `use_skill` naming it, with an answer that
+  is no error (`action_claim::unplug_in`, by the outcomes the turn keeps of
+  its calls; a `use_skill` that ran no skill backs nothing). Readiness
+  opening the reply ("Safe to unplug me now.", `Claim::UnplugReady`) no
+  call backs: a `prepare_to_unplug` that ran has only begun the fold, and
+  only the skill's guarded `ready` line says it is safe (Twelve's P2 on
+  #6532). While the skill's turn-off ask is open (the lamp's last words in
+  the exchanges end with `language::UNPLUG_ASK_OFF`, in English or the
+  owner's language; the skill's exact lines are kept as the lamp's own in
+  the thread once played, `coordinator.rs`), or once a `stay_plugged_in`
+  ran (`action_claim::stayed_in`), such words are dropped, never asked
+  again and never the not-done line: the skill says its own exact line for
+  that answer (journal: `its reply claims an unplug action while the
+  skill's ask is open or after a stay ran: not said, its N call(s) run
+  (LAMP_ACTION_CLAIM_CHECKED)`). Said in
   the round that calls an unplug tool, the words ran ahead of it: not said,
   no note, and the next round speaks from its answer. Otherwise the path
   above: asked once with `action_claim::NOTE`, then the not-done line. The
