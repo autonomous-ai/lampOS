@@ -3,6 +3,21 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 23:1x GMT+7: #6961, P4 step 1b (resident synthesizer)
+
+- **#6961** (`sim-3/apple-speech`, 30804d4ffa, stacked on #6954):
+  `apple_speech.rs` (macOS, the only `unsafe` in lamp-sim, 9 blocks each with
+  a SAFETY note) holds the main thread; `speech::ToRoute` resamples 22,050 Hz
+  to 24 kHz; `--engine resident|say`, `--language`. Through the service, 5
+  runs a second apart, medians: first bytes 19 / 13 / 18 ms (2 / 8 / 20
+  words), whole 29 / 32 / 61 ms; `say` started ahead 366 / 511 / 828 ms.
+  whisper base.en wrote back a 15-word line word for word.
+- No new package in Cargo.lock: cpal and lamp-observer already pull in
+  objc2, objc2-foundation, objc2-avf-audio, block2 (+5 lines, edges only).
+  My earlier "14 new packages" was wrong; said so.
+- Gates on this Mac: fmt, clippy, lamp-sim 91+4+1, workspace build.
+  READ ASK to the first builder and sim-2.
+
 ## 2026-11-13 22:5x GMT+7: step 1b (c) yes; the Rust probe works
 
 - The first builder, 21:28: P4 step 1b **(c)**: (b) now (done, #6954), (a)
