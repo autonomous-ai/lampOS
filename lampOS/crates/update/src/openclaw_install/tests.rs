@@ -2,6 +2,14 @@ use super::*;
 use crate::{hermes_install::Carried, judge::UnitState};
 use std::{cell::RefCell, os::unix::fs::symlink, rc::Rc};
 
+/// What the namespace shows with only the skills switch read.
+fn sk(skills: bool) -> Shown {
+    Shown {
+        skills,
+        tasks: false,
+    }
+}
+
 /// What a round asked systemd, in order.
 #[derive(Default)]
 struct Fake {
@@ -278,7 +286,7 @@ fn round(lamp: &Lamp, systemd: &mut Fake, skills: bool, at: u64) -> Option<Openc
     after_round(
         lamp.root(),
         &lamp.records(),
-        skills,
+        sk(skills),
         systemd,
         at,
         Ok(crate::hermes_schedule::Window::Reached),
@@ -309,10 +317,10 @@ fn the_switches_are_on_by_default_on_a_product_lamp_only() {
         assert!(wanted(Some("on"), false, default));
     }
     let lamp = Lamp::new();
-    at_start(lamp.root(), &lamp.records(), true, true, 1);
+    at_start(lamp.root(), &lamp.records(), true, sk(true), 1);
     assert_eq!(lamp.said().unwrap().install, "absent");
     lamp.ask();
-    at_start(lamp.root(), &lamp.records(), false, true, 2);
+    at_start(lamp.root(), &lamp.records(), false, sk(true), 2);
     assert_eq!(lamp.said(), None);
     assert_eq!(lamp.asked(), None);
     let runs = Runs::new(&lamp);
@@ -341,7 +349,8 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
         Some(Ask {
             version: 1,
             remove: false,
-            skills: true
+            skills: true,
+            tasks: false
         })
     );
     assert_eq!(round(&lamp, &mut systemd, true, 11), None, "one at a time");
@@ -410,7 +419,7 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
     );
     for (path, text) in [
         (WRAPPER, wrapper_text()),
-        (NS, ns_text(true)),
+        (NS, ns_text(sk(true))),
         (agent_ns::HOOK_SHIM, agent_ns::HOOK_SHIM_TEXT.to_owned()),
     ] {
         assert_eq!(fs::read_to_string(lamp.at(path)).unwrap(), text);
@@ -434,8 +443,8 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
         "the gateway block only"
     );
     assert_eq!(mode(&lamp.at(CONFIG)), 0o600);
-    assert!(present(lamp.root(), true));
-    assert!(!present(lamp.root(), false), "the other skills text");
+    assert!(present(lamp.root(), sk(true)));
+    assert!(!present(lamp.root(), sk(false)), "the other skills text");
 
     // Again: the token is made once, the config's other keys kept, nothing
     // fetched.
@@ -598,7 +607,7 @@ fn the_namespace_script_is_hermess_for_openclaw() {
         );
     }
     for skills in [false, true] {
-        let with_mode = ns_text(skills);
+        let with_mode = ns_text(sk(skills));
         assert_eq!(with_mode.matches(NPM_CI_MODE).count(), 1);
         assert!(with_mode.ends_with(&format!("{NPM_CI_MODE}{RUN_LINE}")));
         let checked = std::process::Command::new("/bin/sh")
@@ -630,7 +639,7 @@ fn the_namespace_script_is_hermess_for_openclaw() {
         assert!(ours.contains(&format!("only inside the namespace {WRAPPER} makes")));
         assert_eq!(ours.contains(SKILLS_SOCKET), skills);
     }
-    assert!(ns_text(true).contains("# LAMP_OPENCLAW_SKILLS=on (#6226)"));
+    assert!(ns_text(sk(true)).contains("# LAMP_OPENCLAW_SKILLS=on (#6226)"));
     assert_eq!(ALLOWED, [PLACE, WORK, SKILLS]);
 }
 
@@ -810,7 +819,7 @@ fn the_switch_off_stops_the_gateway_and_takes_everything_out() {
     lamp.harness_there();
     fs::write(lamp.unit(), UNIT_TEXT).unwrap();
     fs::write(lamp.at(WRAPPER), wrapper_text()).unwrap();
-    fs::write(lamp.at(NS), ns_text(true)).unwrap();
+    fs::write(lamp.at(NS), ns_text(sk(true))).unwrap();
     let mut systemd = Fake::default();
     assert!(after_round_off(
         lamp.root(),
@@ -1211,7 +1220,7 @@ fn an_ask_from_the_app_tries_a_recent_openclaw_failure_again() {
         after_round(
             lamp.root(),
             &lamp.records(),
-            false,
+            sk(false),
             systemd,
             at,
             Ok(crate::hermes_schedule::Window::Asked),
@@ -1235,7 +1244,7 @@ fn an_ask_from_the_app_tries_a_recent_openclaw_failure_again() {
 #[test]
 fn openclaw_finds_the_hook_stand_in_first_on_its_path() {
     for skills in [false, true] {
-        let text = ns_text(skills);
+        let text = ns_text(sk(skills));
         assert_eq!(text.matches(agent_ns::PATH_LINES).count(), 1);
         let path = text.find(agent_ns::PATH_LINES).unwrap();
         assert!(path < text.rfind(RUN_LINE).unwrap());
@@ -1248,4 +1257,73 @@ fn openclaw_finds_the_hook_stand_in_first_on_its_path() {
     assert_eq!(wrapper.matches(&note).count(), 1);
     assert!(wrapper.find(&note) < wrapper.find("LAMP_NS_UID="));
     assert!(wrapper[..512].contains("Written by lamp-update."));
+}
+
+/// #6685: with a skill's runs on OpenClaw ([`Shown::tasks`]), the gateway's
+/// namespace also shows lamp-control's socket alone, read-only (Hermes's
+/// own lines), and lamp-tasks' runs' token folder, staged before `/run` is
+/// hidden and moved back read-write, its staging taken away; without it,
+/// neither is there.
+#[test]
+fn a_skills_runs_on_openclaw_show_the_control_socket_and_the_runs_token_folder() {
+    for skills in [false, true] {
+        let hermes = hermes_install::ns_text(skills, true);
+        for (from, _) in RUNS_EDITS {
+            assert_eq!(
+                hermes.matches(from).count(),
+                1,
+                "`{from}` once in Hermes's tasks script"
+            );
+        }
+        let on = ns_text(Shown {
+            skills,
+            tasks: true,
+        });
+        let checked = std::process::Command::new("/bin/sh")
+            .args(["-n", "-c", &on])
+            .output()
+            .unwrap();
+        assert!(checked.status.success(), "{checked:?}");
+        assert!(!on.to_ascii_lowercase().contains("hermes"), "{on}");
+        assert!(on.contains(&format!(" T={RUN_TOKENS} S=/tmp/.lampos-ns\n")));
+        assert!(on.contains("L=/run/lampos-control/control.sock"));
+        let lines: Vec<&str> = on.lines().collect();
+        let at = |needle: &str| {
+            lines
+                .iter()
+                .position(|line| line.contains(needle))
+                .unwrap_or_else(|| panic!("no line with {needle}"))
+        };
+        let staged = at("mount --bind \"$T\" \"$S/t\"");
+        let hidden = at("none /run ||");
+        let moved = at("mount --move \"$S/t\" \"$T\"");
+        let cleaned = at("rmdir \"$S/t\"");
+        let read_only = at("remount,bind,ro,nosuid,nodev,noexec /run");
+        assert!(staged < hidden && hidden < moved && moved < cleaned && cleaned < read_only);
+        assert!(
+            !lines[moved].contains("ro \"$T\""),
+            "read-write: the script deletes its file"
+        );
+        assert!(
+            lines[staged].contains("else T=; fi"),
+            "skipped when lamp-tasks has none"
+        );
+        let off = ns_text(Shown {
+            skills,
+            tasks: false,
+        });
+        assert!(!off.contains(RUN_TOKENS) && !off.contains("control.sock"));
+        assert_eq!(off, ns_text(sk(skills)));
+    }
+    assert!(default_agent(Some("on")));
+    for other in [
+        None,
+        Some(""),
+        Some("off"),
+        Some("ON"),
+        Some("1"),
+        Some("on "),
+    ] {
+        assert!(!default_agent(other), "{other:?}");
+    }
 }

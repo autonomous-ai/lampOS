@@ -2252,6 +2252,19 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      product lamp, read only with `LAMP_OPENCLAW_ON_LAMP` on), as
      `LAMP_HERMES_SKILLS` does for Hermes: on, `openclaw-ns` shows
      `/run/lampos-skills` read-only; off, nothing under `/run`.
+   - **A skill's runs on OpenClaw** behind `LAMP_SKILL_DEFAULT_AGENT=on`
+     (#6685; off unless set, read only with `LAMP_SKILL_TASKS` on, the same
+     switch lamp-tasks reads): `openclaw-ns` also shows lamp-control's
+     `/run/lampos-control/control.sock` alone, read-only (Hermes's own
+     lines), and lamp-tasks' runs' token folder `/run/lampos-tasks/runs`,
+     read-write so a script can delete the file it read, both staged
+     before `/run` is hidden and skipped when not there
+     (`openclaw_install::RUNS_EDITS`). The gateway is one process for every
+     session, so any session on it could read a run's file for the few
+     seconds before the run's script does (docs/tasks.md, "The lamp's
+     default agent"). The switch lives in the script's text and the
+     record's ask, so turning it on or off has the next round write the
+     script again and restart the gateway.
    - **Records:** `openclaw-install.json` (the record), `openclaw-ask.json`
      (the ask) and `openclaw.lock` (one install at a time), beside
      Hermes's in lamp-update's records.

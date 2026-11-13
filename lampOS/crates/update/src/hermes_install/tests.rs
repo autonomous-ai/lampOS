@@ -2483,7 +2483,10 @@ fn hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once() {
 #[test]
 fn openclaw_never_gets_a_net_namespace() {
     for skills in [false, true] {
-        let text = crate::openclaw_install::ns_text(skills);
+        let text = crate::openclaw_install::ns_text(Shown {
+            skills,
+            tasks: false,
+        });
         assert!(!text.contains(NET_ENV) && !text.contains("net-relay"));
         assert!(!text.contains(MODEL_SOCKET));
     }
