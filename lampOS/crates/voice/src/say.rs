@@ -296,7 +296,8 @@ impl Answer {
 /// What became of an ask.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
-    /// Said: the turn completed with its audio played whole.
+    /// Said: the turn completed with its audio played whole; a model's
+    /// say played to its end through gaps in its playback too (#6749 D).
     Spoken,
     /// Begun and not said, with why.
     Dropped(String),

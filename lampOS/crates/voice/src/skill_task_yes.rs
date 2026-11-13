@@ -272,9 +272,15 @@ pub fn then_wait(id: &str) -> String {
     )
 }
 
-/// What the model is told once a task's yes is kept.
-pub const APPROVED_NEXT: &str =
-    "Say only, in the conversation's language, that it will now do its task as it said.";
+/// What the model is told once a task's yes is kept: the task runs at the
+/// skill's next trigger, never that it runs now, and a later ask for it is
+/// a new run. #6749 A (lamp-52e6, 13 Nov): told "that it will now do its
+/// task", the model took the task as under way, and on the next "desk
+/// check" called nothing ("already been approved and is running").
+pub const APPROVED_NEXT: &str = "Say only, in the conversation's language, that it'll do its \
+     task the next time it's asked for or triggered. Never say it's running now: nothing runs \
+     yet. (For you to know, not to say: each later ask for it runs its task again, so call that \
+     skill then, as for any skill.)";
 
 /// What the model is told of a task skill read back on a route that can't
 /// take a yes (the Live route): it waits, and no wait starts.

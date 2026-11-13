@@ -98,13 +98,29 @@ pub struct Waiting {
     pub noted: bool,
 }
 
+/// A skill's task, or a made skill's code, just agreed to (#6749 A): its
+/// name, the request the yes came in, and when. Told on the lines after it
+/// ([`waiting_note`]), as this route's history keeps no call's answer.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Agreed {
+    pub skill: String,
+    pub request: u64,
+    pub at: Instant,
+}
+
 #[cfg(not(test))]
 mod kept {
-    use super::Waiting;
+    use super::{Agreed, Waiting};
     use std::sync::Mutex;
     static WAITING: Mutex<Option<Waiting>> = Mutex::new(None);
+    static AGREED: Mutex<Option<Agreed>> = Mutex::new(None);
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
         f(&mut WAITING
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()))
+    }
+    pub fn agreed<R>(f: impl FnOnce(&mut Option<Agreed>) -> R) -> R {
+        f(&mut AGREED
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner()))
     }
@@ -113,13 +129,17 @@ mod kept {
 /// Tests: each test thread has its own.
 #[cfg(test)]
 mod kept {
-    use super::Waiting;
+    use super::{Agreed, Waiting};
     use std::cell::RefCell;
     thread_local! {
         static WAITING: RefCell<Option<Waiting>> = const { RefCell::new(None) };
+        static AGREED: RefCell<Option<Agreed>> = const { RefCell::new(None) };
     }
     pub fn waiting<R>(f: impl FnOnce(&mut Option<Waiting>) -> R) -> R {
         WAITING.with(|cell| f(&mut cell.borrow_mut()))
+    }
+    pub fn agreed<R>(f: impl FnOnce(&mut Option<Agreed>) -> R) -> R {
+        AGREED.with(|cell| f(&mut cell.borrow_mut()))
     }
 }
 
@@ -146,6 +166,7 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
     );
     let count = asks.writes.len();
     let code = asks.code;
+    kept::agreed(|agreed| *agreed = None);
     kept::waiting(|waiting| {
         *waiting = Some(Waiting {
             id: id.clone(),
@@ -187,8 +208,34 @@ fn rand_u32(skill: &str, request: u64, now: Instant) -> u32 {
 /// next line (#6223's row 4 on 9adf, 12 Nov: "a made skill's yes found
 /// nothing waiting" three times). None in the wait's own request, none
 /// waiting, or past [`YES_WITHIN`]; the yes keeps every guard of
-/// [`approve`].
+/// [`approve`]. With nothing waiting, a skill's task or code just agreed
+/// to is noted instead ([`agreed_note`], #6749 A).
 pub fn waiting_note(request: u64, now: Instant) -> Option<String> {
+    waiting_now(request, now).or_else(|| agreed_note(request, now))
+}
+
+/// The note a later heard line `request` is told at `now` of a skill's task
+/// or a made skill's code just agreed to (#6749 A): the yes ran nothing,
+/// and an ask for it now is a new run, so the model calls the skill. On
+/// lamp-52e6 (13 Nov) the model, told the task "will now" run, said on the
+/// next "desk check" that it was "already approved and is running" and
+/// called nothing. Within [`YES_WITHIN`] of the yes, never in its own
+/// request.
+fn agreed_note(request: u64, now: Instant) -> Option<String> {
+    kept::agreed(|agreed| {
+        let agreed = agreed.as_ref().filter(|agreed| {
+            request > agreed.request && now.saturating_duration_since(agreed.at) <= YES_WITHIN
+        })?;
+        Some(format!(
+            "(For you to know, not to answer: the person just agreed to the skill {}. Their yes \
+             ran nothing; it runs at its next trigger. If they ask for it now, call that skill, \
+             as for any skill: each ask runs it again, and it isn't already running.)",
+            crate::made_skill::spoken_name(&agreed.skill)
+        ))
+    })
+}
+
+fn waiting_now(request: u64, now: Instant) -> Option<String> {
     kept::waiting(|waiting| {
         let waiting = waiting.as_ref().filter(|waiting| {
             request > waiting.request && now.saturating_duration_since(waiting.at) <= YES_WITHIN
@@ -209,6 +256,13 @@ pub fn waiting_note(request: u64, now: Instant) -> Option<String> {
             waiting.id
         ))
     })
+}
+
+/// Nothing waits on this test's thread.
+#[cfg(test)]
+pub fn clear_for_test() {
+    kept::waiting(|waiting| *waiting = None);
+    kept::agreed(|agreed| *agreed = None);
 }
 
 /// Whether the wait `id` is the one waiting: a voice make's, a read-back's,
@@ -236,6 +290,33 @@ pub fn awaited(now: Instant) -> bool {
         waiting
             .as_ref()
             .is_some_and(|waiting| now.saturating_duration_since(waiting.at) <= YES_WITHIN)
+    })
+}
+
+/// Whether a line in `request` at `now` would answer a skill's say-back
+/// (#6749 C): a yes is awaited, within [`YES_WITHIN`], `request` is later
+/// than the make's or the read-back's own, and the lamp's newest answer kept
+/// toward it before `request` held the whole say-back uncut, so nothing the
+/// lamp said since stands between them. The second route's worker then
+/// counts its window from the end of that answer as played, not from its
+/// start, and takes the line as an answer to the lamp's own ask: a long
+/// read-back, with a repair, said in a busy room used up the thread's 45 s
+/// from the answer's start, and the "Yes." 8 s after its end was held (9adf,
+/// 13 Nov).
+pub fn answer_awaited(request: u64, now: Instant) -> bool {
+    kept::waiting(|waiting| {
+        waiting.as_ref().is_some_and(|waiting| {
+            request > waiting.request
+                && now.saturating_duration_since(waiting.at) <= YES_WITHIN
+                && waiting
+                    .said
+                    .iter()
+                    .filter(|(id, ..)| *id < request)
+                    .max_by_key(|(id, ..)| *id)
+                    .is_some_and(|(_, said, cut)| {
+                        !cut && crate::services::read_back_said(&waiting.asks.say_back, said)
+                    })
+        })
     })
 }
 
@@ -424,19 +505,35 @@ pub const NOT_SAID_WHOLE: &str =
 /// asking again ends at `make_skill_local::yes_not_here` (App Only's P3 on
 /// #6250).
 pub const NOT_HERE: &str = "Not approved: this live voice can't take that yes. Say plainly that nothing was sent, and that I take that yes only on my other voice: in a normal conversation with me, not this live one.";
-/// What the model is told once approved.
-pub const APPROVED_NEXT: &str =
-    "Say only, in the conversation's language, that it will now send as it said.";
+/// What the model is told once approved: it sends at its next trigger,
+/// never now (#6749 A, as [`crate::skill_task_yes::APPROVED_NEXT`]).
+pub const APPROVED_NEXT: &str = "Say only, in the conversation's language, that it'll send as it \
+     said the next time it's triggered. Never say it's sending now: nothing is sent yet.";
 /// What the model is told once a skill with code of its own is agreed to
-/// and on (#6307).
-pub const CODE_APPROVED_NEXT: &str =
-    "Say only, in the conversation's language, that it's on now and runs as it said.";
+/// and on (#6307): it runs at its next trigger, never now, and a later ask
+/// for it is a new run (#6749 A).
+pub const CODE_APPROVED_NEXT: &str = "Say only, in the conversation's language, that it's on now \
+     and runs as it said the next time it's asked for or triggered. Never say it's running now: \
+     nothing runs yet. (For you to know, not to say: each later ask for it runs it again, so \
+     call that skill then, as for any skill.)";
 
 /// What the model is told once a skill with code of its own is on but its
 /// task wasn't kept (#6307): a skill's tasks off, or its folder's grants
 /// not those said back, so its code runs nowhere.
 pub const CODE_ON_TASK_WAITS_NEXT: &str = "Say only, in the conversation's language, that it's \
      on now, but this lamp doesn't run its code yet.";
+
+/// `skill`'s task or code agreed to in `request` at `now`: noted on the
+/// lines after it ([`agreed_note`]).
+fn agreed_in(skill: &str, request: u64, now: Instant) {
+    kept::agreed(|agreed| {
+        *agreed = Some(Agreed {
+            skill: skill.to_owned(),
+            request,
+            at: now,
+        });
+    });
+}
 
 /// Why a yes is never taken, or `None`.
 fn refused(waiting: &Waiting, request: u64, heard: bool, now: Instant) -> Option<&'static str> {
@@ -527,6 +624,9 @@ pub fn approve(
         // its task kept when the lamp hands tasks over (#6305).
         Ok(result) if waiting.asks.code => {
             let task = result["task"] == true;
+            if task {
+                agreed_in(&waiting.asks.skill, request, now);
+            }
             eprintln!(
                 "lamp-voice: request {request}: a made skill with code of its own is on, on the person's yes (#6307); its task {}",
                 if task { "kept" } else { "not kept" }
@@ -540,6 +640,7 @@ pub fn approve(
         }
         // A skill's task (#6305): its grants and folder kept, as said.
         Ok(_) if waiting.asks.grants.is_some() => {
+            agreed_in(&waiting.asks.skill, request, now);
             eprintln!(
                 "lamp-voice: request {request}: a skill's task approved on the person's yes (#6305)"
             );
@@ -642,6 +743,98 @@ mod tests {
                 .unwrap()
                 .contains("anyone can see what it posts in acme/site")
         );
+    }
+
+    /// #6749 C: a line answers the say-back only while the yes is awaited,
+    /// after the make's own request, and while the lamp's newest answer
+    /// before it held the say-back whole and uncut: an answer of the lamp's
+    /// since, a cut, or the wait past [`YES_WITHIN`] ends it.
+    #[test]
+    fn a_line_answers_the_say_back_only_right_after_it_is_said_whole() {
+        let now = Instant::now();
+        clear_for_test();
+        assert!(!answer_awaited(5, now), "nothing waits");
+        let id = wait_for_yes(asks("leaving-mail", &[mail()]), 4, now);
+        assert!(!answer_awaited(5, now), "not said yet");
+        lamp_said(4, &format!("I made leaving mail: it {SAY_BACK}"));
+        assert!(!answer_awaited(4, now), "the make's own request");
+        assert!(answer_awaited(5, now));
+        assert!(!answer_awaited(
+            5,
+            now + YES_WITHIN + Duration::from_secs(1)
+        ));
+        lamp_said(5, "Sure, it's sunny today.");
+        assert!(
+            !answer_awaited(6, now),
+            "the lamp said something else since"
+        );
+        lamp_said(6, SAY_BACK);
+        assert!(answer_awaited(7, now), "said again whole");
+        lamp_cut(7);
+        assert!(!answer_awaited(8, now), "said again and cut");
+        assert!(waits(&id));
+    }
+
+    /// #6749 A (lamp-52e6, 13 Nov): after a kept yes the model was told the
+    /// task "will now" run, took it as under way, and on the next "desk
+    /// check" called nothing. What it is told after a task's or code's yes
+    /// says it runs at its next trigger and never that it runs now; the
+    /// lines after it are told the yes ran nothing and an ask for it now is
+    /// a new run, so it calls the skill. A write's yes says it sends at its
+    /// next trigger; it notes nothing after.
+    #[test]
+    fn after_a_kept_yes_the_task_runs_at_its_next_trigger() {
+        let now = Instant::now();
+        for next in [crate::skill_task_yes::APPROVED_NEXT, CODE_APPROVED_NEXT] {
+            assert!(
+                next.contains("the next time it's asked for or triggered"),
+                "{next}"
+            );
+            assert!(next.contains("Never say it's running now"), "{next}");
+            assert!(next.contains("each later ask for it runs"), "{next}");
+            assert!(next.contains("call that skill then"), "{next}");
+            assert!(!next.contains("will now"), "{next}");
+        }
+        assert!(APPROVED_NEXT.contains("the next time it's triggered"));
+        assert!(!APPROVED_NEXT.contains("will now"));
+        for (code, said) in [(false, "desk check"), (true, "desk check")] {
+            let task = Asks {
+                grants: Some(vec!["light".to_owned()]),
+                writes: Vec::new(),
+                code,
+                ..asks("desk-check", &[])
+            };
+            let id = wait_for_yes(task, 4, now);
+            lamp_said(4, SAY_BACK);
+            let told = approve(&id, 5, true, true, now, |_| {
+                Ok(json!({"approved": 1, "task": true}))
+            });
+            assert_eq!(told["approved"], true, "{told}");
+            let next = if code {
+                CODE_APPROVED_NEXT
+            } else {
+                crate::skill_task_yes::APPROVED_NEXT
+            };
+            assert_eq!(told["next"], next);
+            assert!(!awaited(now));
+            assert!(waiting_note(5, now).is_none(), "the yes's own request");
+            let note = waiting_note(6, now).unwrap();
+            assert!(note.contains(&format!("the skill {said}")), "{note}");
+            for words in ["ran nothing", "call that skill", "isn't already running"] {
+                assert!(note.contains(words), "{note}");
+            }
+            assert!(waiting_note(6, now + YES_WITHIN + Duration::from_secs(1)).is_none());
+            // A new wait's note replaces it.
+            let id = said_back("leaving-mail", &[mail()], 7, now);
+            let note = waiting_note(8, now).unwrap();
+            assert!(
+                note.contains(&id) && !note.contains("ran nothing"),
+                "{note}"
+            );
+            // A write's yes notes nothing after it.
+            approve(&id, 8, true, true, now, |_| Ok(json!({"public": []})));
+            assert!(waiting_note(9, now).is_none());
+        }
     }
 
     /// #6223's row 4 on 9adf (12 Nov): a voice make's wait, whose id only

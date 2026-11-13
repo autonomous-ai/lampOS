@@ -1563,10 +1563,20 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   Live route never begins such a say ("a task's yes is taken on the second
   route only"). On the yes lamp-control records exactly that folder's
   SHA-256 and those grants, and the task runs at its next trigger, not this
-  one's. Bounds (`task-asks.json` in lamp-skills' `--state-dir`): a
+  one's. The model is told to say just that, never that it runs now
+  (`skill_task_yes::APPROVED_NEXT`; a made skill's code, `CODE_APPROVED_NEXT`;
+  a write, `skill_write_yes::APPROVED_NEXT`), and for `YES_WITHIN` the
+  lines after the yes are told that it ran nothing and that an ask for it
+  now is a new run, so it calls the skill (`skill_write_yes::waiting_note`;
+  #6749 A: on lamp-52e6 on 13 Nov, told the task "will now" run, the model
+  said on the next "desk check" that it was "already approved and is
+  running" and called nothing). In a busy room the yes is heard within the
+  thread's 45 s from the end of the say-back as played, not from its start
+  (#6749 C, docs/second-voice.md). Bounds (`task-asks.json` in lamp-skills' `--state-dir`): a
   folder's SHA-256 said aloud is asked again no sooner than a day later; at
   most 3 asks said across every skill in any 24 hours; one the voice did
-  not say (refused, dropped, expired, the voice not reached) is tried again
+  not say (refused, dropped, expired, the voice not reached; one played to
+  its end through playback gaps is said, #6749 D) is tried again
   no sooner than 10 minutes later, at a later trigger; a changed script is
   another SHA-256 and asks again; one ask at a time a skill; a ledger that
   can't be read asks nothing. The ledger is pruned as it is read, before

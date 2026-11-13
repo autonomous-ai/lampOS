@@ -3351,7 +3351,20 @@ after a take-over, but now for every turn:
       parser; the three-word GOING_ON rule is unchanged. On lamp-4ace on 24 Oct the
       owner's "Lamp.", answered as a call once no line came after it, was
       also let out as the conversation going on and held as a short line
-      (`busy_bar`).
+      (`busy_bar`);
+    - while a skill's yes is awaited (a make's code or writes, a task's;
+      `skill_write_yes::answer_awaited`) and the lamp's newest answer held
+      its say-back whole and uncut, the next line goes on within the
+      thread's 45 s from the end of that answer as played, not from its
+      start, in a busy room too, and with `LAMP_NAME_OR_FOLLOW_UP`; and it
+      is an answer to the lamp's own ask, so `busy_bar` doesn't hold the
+      "Yes." (#6749 C: on lamp-9adf on 13 Nov a 477-char code read-back
+      and a repair used up the 45 s from the answer's start, and the "Yes."
+      8 s after its end was held, "no conversation going on … in a busy
+      room, where it goes on 15 s", then "a busy room"). The journal says
+      "a skill's yes is awaited: the conversation goes on 45 s from the end
+      of its say-back as played (#6749)". People talking past the lamp
+      since it spoke still end it.
 
     In a quiet room it is as on Live, and one more thing: a conversation is
     also going on for 20 s after the end of the lamp's words
