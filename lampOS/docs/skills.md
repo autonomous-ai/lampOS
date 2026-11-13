@@ -5165,7 +5165,7 @@ made skill is refused at install.
    product skills. No new listening, no transcript kept, no phrase matched
    on room sound.
 4. **Said back exactly as it does** (`Said::said_back`): "When you tell me
-   you're busy, I'll turn red." (", at level N" before the stop when a
+   you're busy, I'll turn red." (" at level N" before the stop when a
    level was asked), and it goes on at once, as a made skill does, with
    "I made NAME, and it's on: when you tell me you're busy, I'll turn red,
    using its voice and its light."
