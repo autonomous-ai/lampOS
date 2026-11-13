@@ -604,8 +604,10 @@ with a `lease` event: `{"ev":"lease","lease":"l_81","state":"suspended","why":"c
 
 - **Suspended** (`why: "conversation"`): while someone talks with the lamp, a
   program's hold on the body stands back, so the lamp never turns away from the
-  person it is talking to. A `look` or `joints` asked meanwhile is answered "the
-  body is not held". The lease stays the holder's (nobody else may take it, and
+  person it is talking to. A `look` or `joints` asked meanwhile is refused `busy`:
+  a `look` with "your lease on the body is suspended while someone talks to the
+  lamp: it is yours again when they stop", `joints` with "suspended while someone
+  talks to the lamp". The lease stays the holder's (nobody else may take it, and
   its clock runs), and when the talk ends it is `held` again, with a new `lease`
   event. Shown on a test lamp on the customer build, 9 Nov.
 - **Lost**, with `why`: `hand` (a hand on the lamp), `stop_heard`, `private`
@@ -627,7 +629,7 @@ Reference: [docs/control.md, "Leases"](../docs/control.md#leases).
 | What | Python | JavaScript | MCP | Notes |
 |---|---|---|---|---|
 | Take, renew, release | `async with lamp.lease("body", for_ms=30000, why="…") as lease:` renews itself and releases at the end | `await lamp.withLease(['body'], async (lease) => …, { forMs, why })` | each body tool takes its own lease and lets it go at its `done` | `for_ms` 1–600 000 per take or renewal; renewed in time, there is no ceiling. One computer holds a part at a time: a second take is `busy` |
-| Watch the lease | `lease.state` (`held`, `suspended`, `lost`), `lease.lost_why` | `lease.state`, `lease.lostWhy` | `lamp://lease` resource | a `lease` event says each change |
+| Watch the lease | `lease.state` (`none` before the take, `held`, `suspended`, `lost`, `released` after your release), `lease.lost_why` | `lease.state`, `lease.lostWhy` | `lamp://lease` resource | a `lease` event says each change |
 
 **Who comes first**, from the top:
 
