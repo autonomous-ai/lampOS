@@ -676,7 +676,38 @@ sau:
      rằng mã chỉ tới được đèn qua SDK của đèn với đúng các quyền đó và không
      có mạng nào khác, và rằng đèn đọc lại rồi chờ lời đồng ý; brief thêm
      "Or code, as above." (vẫn trong 1.160 byte), và một câu trả lời có thể
-     dài tới 37 KiB.
+     dài tới 37 KiB. Nó nêu đúng các lời gọi thật của SDK
+     (`made_skill::SCRIPT_SDK`, #6749 E): `import asyncio`,
+     `from lampos import Lamp`, `lamp = await Lamp.local()` trong
+     `async def main()`, rồi chỉ `lamp.device()` (`temperature_c` của nó là
+     độ C của từng cảm biến), `lamp.air()`, `lamp.light(colour, level,
+     for_ms)`, `lamp.say(text)`, `lamp.gesture(name)` và `lamp.close()`, và
+     `asyncio.run(main())`; không có module nào khác của đèn (trên
+     lamp-9adf, 13/11, mô hình đã viết `from lamp import light` và
+     `light.set_light(…, for="59s")`).
+   - **Được mời cho giọng nói** (#6749 B): khi bật công tắc, mô tả của
+     hàm `make_skill` (`make_skill_local::CODE_TOLD`) nói rằng một kỹ năng
+     tự tạo có thể mang script Python riêng, chạy bởi task của nó khi người
+     dùng đồng ý, và không bao giờ nói rằng đèn không chạy được script;
+     `request` của nó thêm một yêu cầu mà script trả lời ("make a skill
+     that checks the processor temperature and sets the light", yêu cầu mà
+     trên lamp-52e6 đã bị trả lời "I can't run a script or check a
+     temperature" và không có lời gọi nào). Khi bật mọi công tắc, mô tả vẫn
+     trong 1.024 byte và không có chữ "yes". Khi tắt, hàm giữ nguyên như
+     cũ, từng chữ.
+   - **Được parse trước khi đọc lại** (#6749 E,
+     `made_skill::scripts_parse`): mỗi tệp `.py` nó viết được đưa, chỉ qua
+     stdin, cho `/usr/bin/python3 -I -c 'import ast,sys;
+     ast.parse(sys.stdin.buffer.read())'`, với môi trường rỗng, từ `/`,
+     tối đa 2 giây, rồi bị kill. Python chỉ parse nó: không phần nào của
+     nó được chạy. Một tệp không parse được
+     (`made_skill::SCRIPT_DOESNT_PARSE`) quay về vòng sửa ("a made skill's
+     repair n of 3"), được nói tệp, dòng, lỗi của Python, dòng như đã viết
+     và các lời gọi của SDK; hết lượt sửa, người dùng nghe `NOT_MADE_TRY`
+     và không gì được giữ lại. Một Python không khởi động được, không xong
+     kịp giờ hay kết thúc mà không có lỗi parse thì được ghi vào journal
+     ("… was not parsed: …") và script được tạo như trước: lời đồng ý của
+     người dùng vẫn đứng trước khi nó chạy.
    - **Được đóng gói cùng hai tệp kia**, nên SHA-256 của package phủ mọi
      byte của mã: một script đã đổi là một package khác.
    - **Lời task và các quyền được đọc lại trọn vẹn** (bản thân mã không
