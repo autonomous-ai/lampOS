@@ -133,6 +133,16 @@ impl AppCheck {
         std::mem::take(&mut self.retries)
     }
 
+    /// A wait ended by the app's check: the owner's retries it carried
+    /// ([`Self::take_retries`]) drop their refusals before the round, with
+    /// either wait. The wait with the first update after setup on
+    /// ([`Self::wait_or`]) once dropped them, so a refused build was never
+    /// retried on a product lamp (#6800).
+    pub fn retry_asked(&mut self, records: &crate::records::Records, say: &mut dyn FnMut(&str)) {
+        let retries = self.take_retries();
+        drop_refusals(records, &retries, say);
+    }
+
     /// Takes every check waiting; whether there was one that reads.
     fn waiting(&mut self) -> bool {
         let Some(checks) = &mut self.checks else {
@@ -503,5 +513,40 @@ mod tests {
         cloud.publish_json(0, &UpdateCheck::default()).unwrap();
         assert!(check.asked(later));
         assert!(check.take_retries().is_empty());
+    }
+
+    /// #6800: with the first update after setup on, the owner's retry wakes
+    /// the wait and drops the build's refusal before the round, as the plain
+    /// wait does. Before, this wait printed the check and kept the refusal.
+    #[test]
+    fn a_retry_with_the_first_update_on_drops_the_refusal_before_the_round() {
+        let root = tempfile::tempdir().unwrap();
+        let folder = tempfile::tempdir().unwrap();
+        let records = crate::records::Records::new(folder.path().to_path_buf());
+        let mut state = records.state(&mut |_| {}).unwrap();
+        let build = crate::records::Build {
+            sequence: 12587,
+            commit: "3f603470845c".into(),
+        };
+        state.refuse(&build, "lamp-setup.service stopped");
+        records.save_state(&state).unwrap();
+        let mut check = AppCheck::new(root.path(), &mut |_| {}).looking_every(LOOK);
+        let mut cloud = cloud(&Bus::new(root.path()).unwrap());
+        let mut ears = Waits::default();
+        cloud
+            .publish_json(0, &UpdateCheck { retry: Some(12587) })
+            .unwrap();
+        let mut due = |_: &mut dyn FnMut(&str)| false;
+        let woken = check.wait_or(&mut ears, Duration::from_secs(2), &mut |_| {}, &mut due);
+        assert!(matches!(woken, Woken::Asked));
+        let mut told = Vec::new();
+        check.retry_asked(&records, &mut |line| told.push(line.to_owned()));
+        let state = records.state(&mut |_| {}).unwrap();
+        assert!(state.refusal(12587).is_none(), "{told:?}");
+        assert!(
+            told.iter()
+                .any(|line| line == "the owner asked to retry build 12587: its refusal is dropped"),
+            "{told:?}"
+        );
     }
 }
