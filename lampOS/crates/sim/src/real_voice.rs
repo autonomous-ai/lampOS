@@ -649,6 +649,7 @@ pub fn environment(
 /// The voice under a watcher shell, as lamp-sim's other parts are (it stops when `owner` is gone, even
 /// killed), that also removes `clean` (the key's folder) once the voice has ended for any reason, and
 /// gets exactly `environment` (the watcher's own `OWNER` and `CLEAN` besides). Its own process group.
+/// The watcher ends with the voice's own status, so lamp-sim's "the real voice ended" says how it did.
 pub fn watched_command(
     launch: &Launch,
     owner: u32,
@@ -660,7 +661,7 @@ pub fn watched_command(
             "-c",
             "\"$@\" & F=$!; \
              while kill -0 \"$OWNER\" 2>/dev/null && kill -0 $F 2>/dev/null; do sleep 1; done; \
-             kill $F 2>/dev/null; wait $F 2>/dev/null; rm -rf -- \"$CLEAN\"",
+             kill $F 2>/dev/null; wait $F 2>/dev/null; S=$?; rm -rf -- \"$CLEAN\"; exit $S",
             "lamp-part",
         ])
         .arg(&launch.program)
@@ -1203,6 +1204,40 @@ mod tests {
             !home.path.exists(),
             "the key's copy is gone once the voice has ended"
         );
+        let _ = (fs::remove_dir_all(&dir), fs::remove_dir_all(&run));
+    }
+
+    /// A voice that fails is said as failed: the watcher ends with its status, after removing the key's copy.
+    #[test]
+    fn the_watcher_ends_with_the_voices_own_status_and_still_removes_the_key() {
+        let _serial = crate::FAKE_PROGRAM
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let dir = folder("status");
+        let run = runtime("status-runtime");
+        let home = key_home(&dir, Some(run.as_os_str()));
+        let bin = dir.join("bin");
+        fs::create_dir_all(&bin).unwrap();
+        let program = bin.join(PROGRAM);
+        fs::write(&program, "#!/bin/sh\nexit 3\n").unwrap();
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+        let launch = prep(
+            &dir,
+            &bin,
+            Path::new("/lamp/bus"),
+            &a_key(FAKE_KEY),
+            DEFAULT_MODEL,
+            "default",
+            7,
+            &home,
+        )
+        .unwrap();
+        let given = environment(&launch, std::iter::empty());
+        let status = watched_command(&launch, std::process::id(), given)
+            .status()
+            .unwrap();
+        assert_eq!(status.code(), Some(3), "{status}");
+        assert!(!home.path.exists(), "the key's copy is gone all the same");
         let _ = (fs::remove_dir_all(&dir), fs::remove_dir_all(&run));
     }
 
