@@ -350,7 +350,8 @@ fn on_with_harness_there_installs_the_pinned_openclaw_as_lampos() {
             version: 1,
             remove: false,
             skills: true,
-            tasks: false
+            tasks: false,
+            one_path: false
         })
     );
     assert_eq!(round(&lamp, &mut systemd, true, 11), None, "one at a time");
@@ -1286,4 +1287,57 @@ fn openclaws_namespace_never_shows_the_runs_token_folder() {
             "OpenClaw is not on the one run path yet"
         );
     }
+}
+
+/// #6685 step 4: with the one run path off, OpenClaw's wrapper is
+/// byte for byte as before; on, it is a gateway agent's: the mark and the
+/// data after `#!/bin/sh`, the rest as before, lamp-update's mark in its
+/// first 512 bytes, and its namespace shows lamp-control's socket alone.
+#[test]
+fn the_one_path_makes_openclaw_a_gateway_agent_and_off_changes_nothing() {
+    for shown in [sk(false), sk(true)] {
+        assert_eq!(wrapper_text_for(shown), wrapper_text());
+    }
+    let on = Shown {
+        skills: true,
+        tasks: true,
+        one_path: true,
+    };
+    let text = wrapper_text_for(on);
+    let head = format!("#!/bin/sh\n{GATEWAY_MARK}{GATEWAY_DATA}");
+    assert!(text.starts_with(&head), "{text}");
+    assert_eq!(&text[head.len()..], &wrapper_text()["#!/bin/sh\n".len()..]);
+    assert!(text[..512].contains(agent_ns::wrapper::MARK));
+    for line in GATEWAY_DATA.lines() {
+        assert!(line.starts_with("#@"), "{line}");
+    }
+    assert!(GATEWAY_DATA.contains(&format!("#@port {PORT}\n")));
+    assert!(GATEWAY_DATA.contains(&format!("#@ns {NS}\n")));
+    assert!(!GATEWAY_DATA.contains("--local"));
+    let ns = ns_text(on);
+    assert!(ns.contains(
+        " L=/run/lampos-control/control.sock B=/run/lampos-tasks/model.sock P=/var/lib/lampOS/skills-dev S=/tmp/.lampos-ns\n"
+    ));
+    assert!(!ns_text(sk(true)).contains("L=/run/lampos-control/control.sock"));
+}
+
+/// The one run path is carried through the one-shot's ask, so its
+/// install writes the wrapper the round looks for.
+#[test]
+fn the_ask_carries_the_one_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let on = Shown {
+        skills: true,
+        tasks: true,
+        one_path: true,
+    };
+    ask(dir.path(), false, on).unwrap();
+    let asked: Ask = serde_json::from_slice(&fs::read(dir.path().join(ASK)).unwrap()).unwrap();
+    assert!(asked.one_path && asked.tasks && asked.skills);
+    ask(dir.path(), false, sk(true)).unwrap();
+    let text = fs::read_to_string(dir.path().join(ASK)).unwrap();
+    assert!(
+        !text.contains("one_path"),
+        "off writes the ask as before: {text}"
+    );
 }

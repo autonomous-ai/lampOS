@@ -222,6 +222,165 @@ pub fn write_guidance(folder: &Path) -> io::Result<bool> {
     crate::hermes_config::write_guidance_text(folder, &guidance())
 }
 
+/// The agent a skill's run is one turn of on OpenClaw's warm gateway
+/// (#6685 step 4; lamp-update's `GATEWAY_DATA` names it as the gateway
+/// agent's `agent`): its fence, written only with
+/// `LAMP_SKILL_DEFAULT_AGENT` on ([`write_skill_run_fence`]).
+pub const SKILL_RUN_AGENT: &str = "lamp-skill-run";
+/// OpenClaw's own default agent's id, listed first when the fence makes
+/// `agents.list`, so the person's spoken tasks keep their agent.
+pub const MAIN_AGENT: &str = "main";
+/// The fence agent's workspace in lamp-tasks' Harness project: its own
+/// folder, never a run's (`skill-*`) nor the lamp's work folder.
+pub const SKILL_RUN_WORKSPACE: &str = "gateway-skill-runs";
+/// OpenClaw's exec approvals, under its `HOME` (OpenClaw's `PLACE`).
+pub const APPROVALS_FILE: &str = ".openclaw/exec-approvals.json";
+
+/// The fence agent's entry in `agents.list`, ours whole: its own
+/// workspace, `exec` its only tool, run on the gateway's host by an
+/// allow-list with no prompt and nothing elevated.
+fn skill_run_agent(workspace: &str) -> Value {
+    json!({
+        "id": SKILL_RUN_AGENT,
+        "workspace": workspace,
+        "sandbox": {"mode": "off"},
+        "tools": {
+            "allow": ["exec"],
+            "elevated": {"enabled": false},
+            "exec": {"host": "gateway", "security": "allowlist", "ask": "off", "safeBins": []},
+        },
+    })
+}
+
+/// `openclaw.json`'s text with the fence agent ([`SKILL_RUN_AGENT`]) set
+/// in `agents.list`, its workspace `workspace`: made with OpenClaw's own
+/// default first ([`MAIN_AGENT`], `default`) when there is no list; one
+/// there kept, our entry set in it. Unchanged text when nothing changes.
+pub fn merge_skill_run_agent(text: &str, workspace: &Path) -> Result<String, Refused> {
+    let workspace = workspace
+        .to_str()
+        .filter(|_| workspace.is_absolute())
+        .ok_or_else(|| Refused("the fence's workspace is not a plain absolute path".into()))?;
+    let was: Value = if text.trim().is_empty() {
+        Value::Object(Map::new())
+    } else {
+        serde_json::from_str(text).map_err(|_| Refused("the file is not plain JSON".into()))?
+    };
+    let mut value = was.clone();
+    let root = value
+        .as_object_mut()
+        .ok_or_else(|| Refused("the file is not an object".into()))?;
+    let agents = object(root, "agents", "agents")?;
+    let list = agents.entry("list").or_insert(Value::Null);
+    if list.is_null() {
+        *list = json!([{"id": MAIN_AGENT, "default": true}]);
+    }
+    let list = list
+        .as_array_mut()
+        .ok_or_else(|| Refused("`agents.list` is not a list".into()))?;
+    let ours = skill_run_agent(workspace);
+    match list
+        .iter_mut()
+        .find(|agent| agent.get("id").and_then(Value::as_str) == Some(SKILL_RUN_AGENT))
+    {
+        Some(agent) => *agent = ours,
+        None => list.push(ours),
+    }
+    if value == was {
+        return Ok(text.to_owned());
+    }
+    let mut out = serde_json::to_string_pretty(&value).expect("a JSON value");
+    out.push('\n');
+    Ok(out)
+}
+
+/// OpenClaw's exec approvals' text with the fence agent's own: an
+/// allow-list of `start` alone (each run's start, `<project>/skill-*/start`),
+/// no prompt, a prompt's fallback denied, no skill's program allowed by
+/// itself. Every other key kept; unchanged text when nothing changes.
+pub fn merge_skill_run_approvals(text: &str, start: &str) -> Result<String, Refused> {
+    let was: Value = if text.trim().is_empty() {
+        json!({"version": 1})
+    } else {
+        serde_json::from_str(text).map_err(|_| Refused("the file is not plain JSON".into()))?
+    };
+    let mut value = was.clone();
+    let root = value
+        .as_object_mut()
+        .ok_or_else(|| Refused("the file is not an object".into()))?;
+    object(root, "agents", "agents")?.insert(
+        SKILL_RUN_AGENT.into(),
+        json!({
+            "security": "allowlist",
+            "ask": "off",
+            "askFallback": "deny",
+            "autoAllowSkills": false,
+            "allowlist": [{"pattern": start}],
+        }),
+    );
+    if value == was && !text.trim().is_empty() {
+        return Ok(text.to_owned());
+    }
+    let mut out = serde_json::to_string_pretty(&value).expect("a JSON value");
+    out.push('\n');
+    Ok(out)
+}
+
+/// The fence for a skill's run on OpenClaw's gateway (#6685 step 4),
+/// only with `LAMP_SKILL_DEFAULT_AGENT` on: the fence agent in
+/// `state_dir`'s `openclaw.json` ([`merge_skill_run_agent`]) with its
+/// workspace made 0700 in `project`, and its approvals in `home`'s
+/// [`APPROVALS_FILE`] ([`merge_skill_run_approvals`]), each written only
+/// when it changes. `true` when either was written.
+pub fn write_skill_run_fence(state_dir: &Path, home: &Path, project: &Path) -> io::Result<bool> {
+    use std::os::unix::fs::DirBuilderExt;
+    let workspace = project.join(SKILL_RUN_WORKSPACE);
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&workspace)?;
+    let start = project.join(format!(
+        "{}*/{}",
+        crate::skill_task::RUN_FOLDER_PREFIX,
+        crate::gateway_run::START_FILE
+    ));
+    let start = start
+        .to_str()
+        .ok_or_else(|| io::Error::other("the project is not a plain path"))?
+        .to_owned();
+    let mut changed = false;
+    for (path, merge) in [
+        (
+            state_dir.join(CONFIG_FILE),
+            &(|text: &str| merge_skill_run_agent(text, &workspace))
+                as &dyn Fn(&str) -> Result<String, Refused>,
+        ),
+        (home.join(APPROVALS_FILE), &|text: &str| {
+            merge_skill_run_approvals(text, &start)
+        }),
+    ] {
+        let text = read_or_empty(&path)?;
+        let merged = merge(&text).map_err(|refused| {
+            io::Error::other(format!(
+                "{} is not merged for a skill's run: {}",
+                path.display(),
+                refused.0
+            ))
+        })?;
+        if merged != text {
+            if let Some(parent) = path.parent() {
+                fs::DirBuilder::new()
+                    .recursive(true)
+                    .mode(0o700)
+                    .create(parent)?;
+            }
+            replace(&path, &merged)?;
+            changed = true;
+        }
+    }
+    Ok(changed)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -433,5 +592,57 @@ mod tests {
             fs::read_to_string(folder.path().join("AGENTS.md")).unwrap(),
             text
         );
+    }
+
+    #[test]
+    fn the_skill_run_fence_keeps_the_main_agent_and_is_idle_twice() {
+        let ws = Path::new("/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs");
+        let once = merge_skill_run_agent(INSTALLED, ws).unwrap();
+        let value: Value = serde_json::from_str(&once).unwrap();
+        let list = value["agents"]["list"].as_array().unwrap();
+        assert_eq!(list[0], json!({"id": MAIN_AGENT, "default": true}));
+        assert_eq!(list[1]["id"], SKILL_RUN_AGENT);
+        assert_eq!(list[1]["tools"]["allow"], json!(["exec"]));
+        assert_eq!(list[1]["tools"]["exec"]["security"], "allowlist");
+        assert_eq!(
+            value["gateway"],
+            serde_json::from_str::<Value>(INSTALLED).unwrap()["gateway"]
+        );
+        assert_eq!(merge_skill_run_agent(&once, ws).unwrap(), once);
+        // A person's own list is kept; ours is set in it.
+        let own = r#"{"agents":{"list":[{"id":"work","default":true}]}}"#;
+        let merged: Value = serde_json::from_str(&merge_skill_run_agent(own, ws).unwrap()).unwrap();
+        assert_eq!(merged["agents"]["list"][0]["id"], "work");
+        assert_eq!(merged["agents"]["list"].as_array().unwrap().len(), 2);
+        assert!(merge_skill_run_agent(r#"{"agents":{"list":3}}"#, ws).is_err());
+        let start = "/p/skill-*/start";
+        let approvals = merge_skill_run_approvals("", start).unwrap();
+        let value: Value = serde_json::from_str(&approvals).unwrap();
+        assert_eq!(
+            value["agents"][SKILL_RUN_AGENT]["allowlist"],
+            json!([{"pattern": start}])
+        );
+        assert_eq!(value["agents"][SKILL_RUN_AGENT]["askFallback"], "deny");
+        assert_eq!(
+            merge_skill_run_approvals(&approvals, start).unwrap(),
+            approvals
+        );
+    }
+
+    #[test]
+    fn the_fence_is_written_once_in_its_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = dir.path().join("state");
+        let project = dir.path().join("project");
+        assert!(write_skill_run_fence(&state, dir.path(), &project).unwrap());
+        assert!(!write_skill_run_fence(&state, dir.path(), &project).unwrap());
+        assert!(project.join(SKILL_RUN_WORKSPACE).is_dir());
+        let approvals = fs::read_to_string(dir.path().join(APPROVALS_FILE)).unwrap();
+        assert!(approvals.contains(&format!("{}/skill-*/start", project.display())));
+        let mode = fs::metadata(state.join(CONFIG_FILE))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600);
     }
 }
