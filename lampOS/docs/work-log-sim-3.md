@@ -3,6 +3,36 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 04:2x GMT+7: #6991 READ-OK; step 4 and step 3's lamp-sim half written
+
+- **#6991** at 19cd31289f: READ-OK (lifts my HOLD).
+  - lamp-voice's own `SttStream::connect`, from a real `second.json` with
+    `LAMP_VOICE_LOOPBACK_SERVICES=on`, streamed a 2.5 s `say` line into
+    `lamp-sim listen` and whisper base.en. Words exact, 101 ms after the line
+    ended.
+  - Unset, `off` or `yes`: refused at load. Ten's test sets pass (269).
+  - Done with a throwaway `#[ignore]` test, since removed.
+- **Step 3 data** to ten: lamp-voice builds on macOS (`cargo check` exits
+  0), and only the speaker is ALSA. The first builder chose (b), the bus
+  speaker. I posted the contract: `speaker1/play`, 24 kHz mono S16LE blocks,
+  the voice's clock.
+- **`sim-3/real-voice-local`** (pushed, no PR; stacked on #6961 and #6971):
+  - `--real-voice=local`: a `[local]` key table (`llm`, `llm_url`,
+    `llm_model`) feeds the configured chat. `speech` and `listen` run as
+    watched children, ready when their tokens are whole. `second.json`
+    names their loopback URLs, and `LAMP_VOICE_LOOPBACK_SERVICES=on` is set.
+  - Run on this Mac with a stand-in lamp-voice: the services come up, the
+    files and environment are right, and the services end with the lamp.
+  - `speech` warms the resident voice before it writes its token. First
+    line 1,548–1,697 ms → 53 ms; later lines 50–62 ms. Startup is about
+    1.7 s longer.
+  - `bus_speaker.rs`: lamp-sim plays `speaker1/play` with the stand-in's
+    player. The local route passes `--speaker-device bus:speaker1`.
+  - Opens when #6991 and ten's voice half are in.
+- **My slips:** one commit ran after a failed test and swept in #6972's
+  staged hunks. It was undone before any push. Commits now run only when
+  the tests pass, with the files named.
+
 ## 2026-11-14 03:4x GMT+7: NEXT TRAIN #6961; the log's times corrected
 
 - NEXT TRAIN #6961 at a44727ef6e (issuecomment-6864479977): READ-OKs from
