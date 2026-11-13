@@ -124,10 +124,15 @@ fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
         .recursive(true)
         .mode(0o700)
         .create(&folder)?;
-    // A killed run leaves its ready say's file behind: the folder is this
-    // service's own, so what is in it at start is stale.
+    // A killed run leaves its ready say's file behind: only the engine's own
+    // files (`say-<pid>-<n>.wav`) are cleared, never anything else a folder of
+    // that name may hold (nine's P3 on #6954).
     for entry in std::fs::read_dir(&folder)?.flatten() {
-        let _ = std::fs::remove_file(entry.path());
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with("say-") && name.ends_with(".wav") {
+            let _ = std::fs::remove_file(entry.path());
+        }
     }
     eprintln!(
         "lamp-sim speech: on http://{} (POST /audio/speech, pcm), token in {}",
