@@ -6835,6 +6835,89 @@ fn a_skill_run_whose_agent_stopped_before_a_session_waits_on_the_live_one_in_its
     }
 }
 
+/// `harness show <AGENT> --json` as Harness answers it, naming `agent`.
+fn skill_shown(agent: &str) -> String {
+    json!({"name":"skill-task-1","id":AGENT,"agent":agent,"machine":"lamp","state":"idle",
+        "startedBy":"you","folder":null,"ask":null,"answer":"","truncated":false,"tools":0,"next":[]})
+    .to_string()
+}
+
+/// #6835 gap 1 (52e6, 12635, 12:42): Hermes exited before it was ready,
+/// Harness kept the run's pane as a shell (agent "Terminal", the same id)
+/// and `wait` read it idle. Such a run is never said done: it may not
+/// have run, its session is closed, nothing is left, and it is never made
+/// again. A run whose `show` names its engine ends as
+/// before; one whose `show` isn't read is judged by Harness's end state
+/// alone, as before.
+#[test]
+fn a_run_harness_kept_as_a_shell_never_started_and_is_not_said_done() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":skill_shown("Terminal")},
+        "close":{"exit":0},
+    }));
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    let ended = std::cell::Cell::new(0);
+    let failed = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {
+            ended.set(ended.get() + 1)
+        })
+        .unwrap_err();
+    assert!(
+        failed.starts_with(
+            "the skill's task may not have run: Harness kept the run's pane as a shell"
+        ),
+        "{failed}"
+    );
+    assert!(ended.get() >= 1, "the token ended");
+    let verbs: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(verbs, ["machines", "new", "wait", "show", "close"]);
+    nothing_left(&rig);
+
+    // Not closed: said so too.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":skill_shown("Terminal")},
+        "close":{"exit":1},
+    }));
+    let failed = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(failed.contains("its session was not closed"), "{failed}");
+    nothing_left(&rig);
+
+    for (show, plan) in [
+        ("Hermes", json!({"stdout":skill_shown("Hermes")})),
+        ("unread", json!({"exit":1})),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true},
+            "wait":{"stdout":waited("idle", AGENT)},
+            "show":plan,
+            "close":{"exit":0},
+        }));
+        assert_eq!(
+            skill_runner(&rig, Some(EngineKind::Hermes))
+                .run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0),
+            "{show}"
+        );
+        nothing_left(&rig);
+    }
+}
+
 /// #6432: `stopped` with no session bound and no live agent in the run's
 /// folder (only the stopped one, and another in another folder) is an
 /// error said plainly, never task 0, within the look's bound; nothing is
