@@ -82,6 +82,9 @@ pub const AFTER_WITHIN: Duration = Duration::from_secs(10);
 /// The least the turn's stop and end have together past the run's
 /// deadline, so cleanup still happens: a run's only overrun.
 pub const AFTER_FLOOR: Duration = Duration::from_secs(3);
+/// How long a call's answer is waited for once its group is killed: a
+/// process outside the group may still hold its stdout open.
+const READ_WITHIN: Duration = Duration::from_secs(2);
 /// The most bytes of a turn's answer read.
 const MOST_ANSWER_BYTES: u64 = 256 * 1024;
 
@@ -510,12 +513,13 @@ fn call(
             })
         });
     let out = child.stdout.take();
-    let reader = std::thread::spawn(move || {
+    let (said_tx, said_rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
         let mut said = String::new();
         if let Some(out) = out {
             let _ = out.take(MOST_ANSWER_BYTES).read_to_string(&mut said);
         }
-        said
+        let _ = said_tx.send(said);
     });
     let began = Instant::now();
     let status = loop {
@@ -523,23 +527,29 @@ fn call(
             WaitId::Pid(pid),
             WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
         ) {
-            Ok(Some(status)) => break Some(status.exit_status()),
+            Ok(Some(status)) => break Ok(Some(status.exit_status())),
             Ok(None) => {}
             Err(error) if error == rustix::io::Errno::INTR => {}
-            Err(_) => break None,
+            Err(error) => break Err(error),
         }
         if began.elapsed() >= within || stop.is_some_and(|stop| stop.load(Ordering::Acquire)) {
-            break None;
+            break Ok(None);
         }
         std::thread::sleep(RUN_TICK);
     };
     let _ = kill_process_group(pid, Signal::KILL);
     let _ = child.kill();
     let _ = child.wait();
-    let said = reader.join().unwrap_or_default();
-    if let Some(writer) = writer {
-        let _ = writer.join();
-    }
+    // Bounded: a reader or writer still held by a process outside the
+    // group is given up, never waited on.
+    let said = said_rx.recv_timeout(READ_WITHIN).unwrap_or_else(|_| {
+        eprintln!("[lamp-tasks] a gateway call's answer was still held open: not read");
+        String::new()
+    });
+    drop(writer);
+    let status = status.map_err(|error| {
+        format!("the default agent's gateway call could not be waited for: {error}")
+    })?;
     Ok(match status {
         Some(Some(code)) => Turn::Done { code, said },
         Some(None) => Turn::Done { code: -1, said },
@@ -1077,6 +1087,26 @@ mod tests {
         );
         assert!(runner.live.lock().unwrap().is_some(), "the stop was cut");
         nothing_left(&rig);
+    }
+
+    #[test]
+    fn a_call_whose_stdout_is_held_outside_its_group_still_ends() {
+        let rig = rig("", false);
+        // A process of its own group keeps the answer's pipe open.
+        std::fs::write(
+            &rig.program,
+            "#!/bin/sh\nperl -e 'setpgrp(0, 0); sleep 30' &\necho '{}'\nexit 0\n",
+        )
+        .unwrap();
+        let runner = runner(&rig);
+        let began = Instant::now();
+        let turn = call(&runner, &["x".into()], Duration::from_secs(5), None, None).unwrap();
+        assert!(matches!(turn, Turn::Done { code: 0, .. }));
+        assert!(
+            began.elapsed() < Duration::from_secs(5) + READ_WITHIN,
+            "{:?}",
+            began.elapsed()
+        );
     }
 
     #[test]
