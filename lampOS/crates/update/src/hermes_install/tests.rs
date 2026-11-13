@@ -2127,6 +2127,28 @@ fn the_made_scripts_switch_is_on_in_the_product() {
     }
 }
 
+/// The walk's few things to try first (#5316) is on in the product: only
+/// `lamp-voice` reads it, which sets it `on` once, and no product file sets
+/// it to anything else.
+#[test]
+fn the_first_tries_switch_is_on_in_the_product() {
+    let name = lamp_voice::onboarding::FIRST_TRIES_ENVIRONMENT;
+    assert_eq!(name, "LAMP_ONBOARDING_FIRST_TRIES");
+    let switch = format!("Environment={name}=on");
+    let setting = format!("{name}=");
+    let product = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/product");
+    let text = fs::read_to_string(product.join("lamp-voice.service")).unwrap();
+    assert_eq!(text.lines().filter(|line| *line == switch).count(), 1);
+    for entry in fs::read_dir(&product).unwrap() {
+        let path = entry.unwrap().path();
+        if let Ok(text) = fs::read_to_string(&path) {
+            for line in text.lines().filter(|line| line.contains(&setting)) {
+                assert_eq!(line, switch, "{}", path.display());
+            }
+        }
+    }
+}
+
 /// [`ns_text`] with [`TASKS_SWITCH`] on: each of [`TASKS_EDITS`] found
 /// once in [`NS_TEXT`] (and once with [`SKILLS_EDITS`] made) and made, so
 /// the text names [`CONTROL_SOCKET`], the file alone, and stages it before
