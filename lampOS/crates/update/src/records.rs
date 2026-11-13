@@ -656,6 +656,12 @@ impl Records {
 
     /// The newest `lines` entry the log holds, newest file first: its event
     /// and lines. A line cut short or broken is passed over (#6266 5b).
+    ///
+    /// It reads the whole log file (at most 1 MiB, then the one before it)
+    /// each time it is asked, and a failing round asks once, every 15
+    /// minutes: nothing at that pace. A faster pace (a round every few
+    /// seconds, or a caller that asks per line) needs the last kept lines in
+    /// memory, as `Run` keeps `lines`, and not this read.
     pub fn last_lines(&self) -> Option<(String, Vec<String>)> {
         for name in ["log.jsonl", "log.jsonl.1"] {
             let Ok(bytes) = fs::read(self.folder.join(name)) else {
