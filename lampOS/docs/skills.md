@@ -4065,21 +4065,29 @@ code (`made_remove::asked`):
   of its words as many as the skill's name has, with the spaces between
   words left out (`made_remove::apart`: "moon-fax" is 2 from `moon-fact`,
   "the moon facts skill" 1), near enough at a quarter of the name's
-  letters or less (`made_remove::near`), the nearest one alone, the longer
-  name first on a tie. Spelling only: no word is judged by what it means.
+  letters or less (`made_remove::near`), the nearest one alone. Several as
+  near, by distance alone whatever their length ("the brain alert skill"
+  is 1 from both `rain-alert` and `train-alert`), are asked which; so is a
+  near longer one whose words hold the nearest's ("the moon fax skill" is
+  0 from `moon` and 2 from `moon-fact`: "moon or moon fact"), unless that
+  longer one is named as it is written too ("the moon fact skill" is
+  `moon-fact`) (Heron's and Thirteen's P2s on #6969). Spelling only: no
+  word is judged by what it means.
   A skill on the lamp they didn't make (core, from the Store, or pushed
   from a computer: a folder in the skills folder or the pushed one that is
   not a made skill's) is refused in words when it is named as it is
   written, or when none of theirs is near and it is: "NAME isn't a skill
   they made, so you can't remove it by voice." (`made_remove::NOT_MADE`);
-  nothing waits, and the manage helper refuses a core one too. Two of
-  theirs as near are asked once, short, which one ("moon fact or noon
-  fact"). None near is said so (`made_remove::NO_MADE`) naming theirs, at
-  most 3, or how many they made. A name other than the very one asked,
-  and their skills' names, are said only when the owner hears
+  nothing waits, and the manage helper refuses a core one too. Those as
+  near are asked once, short, which one ("moon fact or noon fact", three
+  at most, shortest first). None near is said so (`made_remove::NO_MADE`)
+  naming theirs, at most 3, or how many they made. A name other than the
+  very one asked (theirs, or a near one they didn't make), and their
+  skills' names, are said only when the owner hears
   (`services::owner_hears`, asked only then: in the private room always),
   as a read-back's names are; otherwise "there is no skill they made by
-  that name", naming none.
+  that name", naming none. `made.json` keeps no maker, so on a lamp with
+  two owners either may remove a skill the other made.
 - **Asked once, by its name.** The one found waits for the yes as a made
   skill's writes do (`skill_write_yes::wait_for_yes`, its `remove` set, its
   say-back the question) and the model is told to say only, word for word,
@@ -4089,18 +4097,31 @@ code (`made_remove::asked`):
   with the echo judge, the id noted on each later heard line, and the
   owner's yes only, `make_skill_local::not_owners_yes_refused`, told "Not
   removed, and cancelled: …"). The Live route asks nothing ("I can remove
-  NAME only on my other voice"), nor a turn nobody spoke. The person's next
+  NAME only on my other voice"), nor a turn nobody spoke. One wait at a
+  time: while another yes waits, a remove opens only for the owner
+  (`services::owner_hears`), so a guest's never replaces the owner's wait
+  (`made_remove::ANOTHER_WAITS`, Heron's P3 on #6969); with nothing
+  waiting, whose line it was is not asked, as the yes is the owner's
+  only. The person's next
   line has its round 1 forced to `make_skill`
   (`skill_write_yes::approve_force`, as a skill's task's answer is), with
   `approve_id` and `answer` (`yes`, `no` or `unclear`, left out read as
   `unclear`): code decides when, the model what they answered.
-- **Removed only on the yes.** `yes` takes it off: one that is on through
-  the manage helper's own `{"remove": NAME}`, as the app's remove does
-  (lamp-skills drops its camera yes and asks lamp-control to forget its
-  task's yes), then it is dropped from `made.json` with its package
-  (`made_skill::forget_named`); one made and not on is only dropped
-  (`made_remove::removed`), and one the lamp no longer keeps by that name
-  and SHA-256 is said not removed. The lamp says "NAME is removed."
+- **Removed only on the yes.** `yes` takes it off: one that is on, its
+  folder in the skills folder gone on as that very package (its
+  `.package.json`'s SHA-256 the one kept), through the manage helper's own
+  `{"remove": NAME}`, as the app's remove does (lamp-skills drops its
+  camera yes and asks lamp-control to forget its task's yes), then it is
+  dropped from `made.json` with its package
+  (`made_skill::forget_named_checked`); one made and not on, or whose
+  folder is already gone (taken off in the app), is only dropped
+  (`made_remove::removed`). A folder of that name that is not the package
+  made (a Store or pushed skill come in under the name since) is not
+  removed: "the skill called NAME on the lamp now isn't the one they made"
+  (Thirteen's P3 on #6969). One the lamp no longer keeps by that name and
+  SHA-256 is said not removed. Taken off but `made.json` not written, the
+  lamp says NAME "is off the lamp, but still listed among the skills they
+  made", and the journal says so too (`"still_listed"`). The lamp says "NAME is removed."
   (`skill_write_yes::removed_next`). `no` keeps it and ends the wait ("NAME
   stays", `remove_declined_next`); `unclear` asks once more, short, "remove
   NAME, yes or no?" (`remove_unclear_next`), and a second `unclear` keeps it.
@@ -4120,7 +4141,14 @@ Tests: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
 `a_core_or_store_skill_is_refused_in_words`,
 `none_near_is_said_and_names_are_told_the_owner_only`,
 `two_as_near_ask_which`, `nothing_is_asked_unheard_or_on_the_live_route`,
-`nearest_is_spelling_over_the_names_words`; and
+`nearest_is_spelling_over_the_names_words`,
+`two_as_near_of_other_lengths_ask_which`,
+`a_shorter_name_inside_the_longer_one_meant_asks_which`,
+`a_near_name_not_theirs_is_said_to_the_owner_only`,
+`a_guests_remove_never_replaces_a_waiting_yes`,
+`a_folder_not_the_made_package_is_not_removed`,
+`one_taken_off_in_the_app_is_dropped_without_the_helper`,
+`taken_off_but_still_listed_is_told_so`; and
 `second_provider::tests::remove_words`:
 `a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
 `a_no_after_remove_moon_fact_keeps_it`,

@@ -1458,21 +1458,29 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
   nào của nó có số từ bằng tên kỹ năng, bỏ khoảng trắng giữa các từ
   (`made_remove::apart`: "moon-fax" cách `moon-fact` 2, "the moon facts
   skill" cách 1), đủ gần khi tối đa một phần tư số chữ cái của tên
-  (`made_remove::near`), chỉ lấy cái gần nhất, tên dài hơn trước nếu hoà.
-  Chỉ theo chính tả: không từ nào bị phán theo nghĩa. Một kỹ năng trên đèn
+  (`made_remove::near`), chỉ lấy cái gần nhất. Nhiều cái gần như nhau, chỉ
+  xét khoảng cách, bất kể độ dài ("the brain alert skill" cách cả
+  `rain-alert` và `train-alert` 1), thì hỏi là cái nào; một cái dài hơn
+  đủ gần mà các từ của nó chứa các từ của cái gần nhất cũng vậy ("the moon
+  fax skill" cách `moon` 0 và `moon-fact` 2: "moon or moon fact"), trừ khi
+  cái dài hơn đó cũng được gọi đúng tên như viết ("the moon fact skill" là
+  `moon-fact`) (các P2 của Heron và Thirteen trên #6969). Chỉ theo chính
+  tả: không từ nào bị phán theo nghĩa. Một kỹ năng trên đèn
   mà họ không tạo (lõi, từ Store, hoặc đẩy từ máy tính: một thư mục trong
   thư mục kỹ năng hay thư mục đẩy lên mà không phải của kỹ năng đã tạo) bị
   từ chối bằng lời khi được gọi đúng tên như viết, hoặc khi không kỹ năng
   nào của họ gần mà nó gần: "NAME isn't a skill they made, so you can't
   remove it by voice." (`made_remove::NOT_MADE`); không gì chờ, và helper
-  quản lý cũng từ chối kỹ năng lõi. Hai kỹ năng của họ gần như nhau thì hỏi
-  một lần, ngắn, là cái nào ("moon fact or noon fact"). Không cái nào gần
-  thì nói vậy (`made_remove::NO_MADE`), kể tên các kỹ năng của họ, tối đa
-  3, hoặc họ đã tạo bao nhiêu. Một tên khác với đúng tên được hỏi, và tên
-  các kỹ năng của họ, chỉ được nói khi chủ đèn nghe (`services::owner_hears`,
+  quản lý cũng từ chối kỹ năng lõi. Những cái gần như nhau thì hỏi một
+  lần, ngắn, là cái nào ("moon fact or noon fact", tối đa ba, ngắn nhất
+  trước). Không cái nào gần thì nói vậy (`made_remove::NO_MADE`), kể tên
+  các kỹ năng của họ, tối đa 3, hoặc họ đã tạo bao nhiêu. Một tên khác với
+  đúng tên được hỏi (của họ, hay một tên gần mà họ không tạo), và tên các
+  kỹ năng của họ, chỉ được nói khi chủ đèn nghe (`services::owner_hears`,
   chỉ hỏi lúc đó: trong phòng riêng thì luôn luôn), như tên của read-back;
   nếu không thì "there is no skill they made by that name", không kể tên
-  nào.
+  nào. `made.json` không ghi ai đã tạo, nên trên đèn có hai chủ, chủ nào
+  cũng gỡ được kỹ năng người kia đã tạo.
 - **Hỏi một lần, bằng tên của nó.** Kỹ năng tìm được chờ cái "có" như write
   của kỹ năng tự tạo (`skill_write_yes::wait_for_yes`, với `remove` bật,
   câu đọc lại là câu hỏi) và mô hình được dặn chỉ nói, nguyên văn, "Remove
@@ -1482,18 +1490,30 @@ một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong 
   tiếng vọng, id được ghi chú ở mỗi câu nghe sau, và chỉ cái "có" của chủ
   đèn, `make_skill_local::not_owners_yes_refused`, được báo "Not removed,
   and cancelled: …"). Route Live không hỏi gì ("I can remove NAME only on
-  my other voice"), lượt không ai nói cũng vậy. Câu tiếp theo của người
+  my other voice"), lượt không ai nói cũng vậy. Mỗi lúc chỉ một việc chờ:
+  khi một cái "có" khác đang chờ, việc gỡ chỉ mở cho chủ đèn
+  (`services::owner_hears`), nên lời gỡ của khách không bao giờ thay việc
+  chờ của chủ đèn (`made_remove::ANOTHER_WAITS`, P3 của Heron trên #6969);
+  khi không có gì chờ thì không hỏi câu đó là của ai, vì cái "có" chỉ là
+  của chủ đèn. Câu tiếp theo của người
   dùng bị buộc vòng 1 gọi `make_skill` (`skill_write_yes::approve_force`,
   như câu trả lời cho task của kỹ năng), với `approve_id` và `answer`
   (`yes`, `no` hoặc `unclear`, bỏ trống thì đọc là `unclear`): code quyết
   định khi nào, mô hình quyết định họ đã trả lời gì.
-- **Chỉ gỡ khi có "có".** `yes` gỡ nó: cái đang bật qua chính
-  `{"remove": NAME}` của helper quản lý, như nút gỡ của ứng dụng
-  (lamp-skills bỏ cái "có" cho camera của nó và nhờ lamp-control quên cái
-  "có" cho task của nó), rồi bỏ khỏi `made.json` cùng gói của nó
-  (`made_skill::forget_named`); cái đã tạo mà chưa bật thì chỉ bị bỏ khỏi
-  chỉ mục (`made_remove::removed`), và cái đèn không còn giữ theo tên và
-  SHA-256 đó thì được nói là chưa gỡ. Đèn nói "NAME is removed."
+- **Chỉ gỡ khi có "có".** `yes` gỡ nó: cái đang bật, mà thư mục của nó
+  trong thư mục kỹ năng được bật từ đúng gói đó (SHA-256 trong
+  `.package.json` của nó là cái đã giữ), qua chính `{"remove": NAME}` của
+  helper quản lý, như nút gỡ của ứng dụng (lamp-skills bỏ cái "có" cho
+  camera của nó và nhờ lamp-control quên cái "có" cho task của nó), rồi bỏ
+  khỏi `made.json` cùng gói của nó (`made_skill::forget_named_checked`);
+  cái đã tạo mà chưa bật, hay thư mục đã mất (đã gỡ trong ứng dụng), thì
+  chỉ bị bỏ khỏi chỉ mục (`made_remove::removed`). Một thư mục cùng tên mà
+  không phải gói đã tạo (một kỹ năng từ Store hay được đẩy lên đã vào dưới
+  tên đó) thì không bị gỡ: "the skill called NAME on the lamp now isn't the
+  one they made" (P3 của Thirteen trên #6969). Cái đèn không còn giữ theo
+  tên và SHA-256 đó thì được nói là chưa gỡ. Đã gỡ khỏi đèn mà không ghi
+  được `made.json` thì đèn nói NAME "is off the lamp, but still listed
+  among the skills they made", và journal cũng ghi vậy (`"still_listed"`). Đèn nói "NAME is removed."
   (`skill_write_yes::removed_next`). `no` giữ nó và kết thúc việc chờ
   ("NAME stays", `remove_declined_next`); `unclear` hỏi lại một lần, ngắn,
   "remove NAME, yes or no?" (`remove_unclear_next`), và `unclear` lần hai
@@ -1514,7 +1534,14 @@ Kiểm thử: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact
 `a_core_or_store_skill_is_refused_in_words`,
 `none_near_is_said_and_names_are_told_the_owner_only`,
 `two_as_near_ask_which`, `nothing_is_asked_unheard_or_on_the_live_route`,
-`nearest_is_spelling_over_the_names_words`; và
+`nearest_is_spelling_over_the_names_words`,
+`two_as_near_of_other_lengths_ask_which`,
+`a_shorter_name_inside_the_longer_one_meant_asks_which`,
+`a_near_name_not_theirs_is_said_to_the_owner_only`,
+`a_guests_remove_never_replaces_a_waiting_yes`,
+`a_folder_not_the_made_package_is_not_removed`,
+`one_taken_off_in_the_app_is_dropped_without_the_helper`,
+`taken_off_but_still_listed_is_told_so`; và
 `second_provider::tests::remove_words`:
 `a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
 `a_no_after_remove_moon_fact_keeps_it`,
