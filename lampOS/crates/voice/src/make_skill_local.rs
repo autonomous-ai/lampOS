@@ -19,10 +19,9 @@
 //!
 //! [`made_skill::MAKE`] is the voice's own, whether or not a tasks part is
 //! there: a computer's agent is never handed a skill to make. With
-//! `LAMP_MAKE_SKILL_AGENT=on` (off in the product again since 13 Nov, until
-//! its make row passes) a voice make the lamp's model didn't make goes to
-//! the lamp's own agent when it is Hermes, the one engine with a namespace
-//! runner for a make today
+//! `LAMP_MAKE_SKILL_AGENT=on` (on in the product's lamp-voice) a voice make the
+//! lamp's model didn't make goes to the lamp's own agent when it is
+//! Hermes, the one engine with a namespace runner for a make today
 //! ([`crate::make_skill_agent`]): DeepSeek
 //! then gets one try and no repairs, and the agent gets them.
 use crate::made_skill::{self, Keeping, Made, Refused};
