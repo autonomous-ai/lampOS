@@ -47,7 +47,10 @@
 //!   after a lead-in, closing at the sentence's end, never on a '?'. Only an
 //!   outcome backs it ([`Claim::Unplug`], [`unplug_in`]): a
 //!   `prepare_to_unplug` or `stay_plugged_in` call, by its name or through
-//!   `use_skill` naming it ([`unplug_tool`]), whose answer is no error. While
+//!   `use_skill` naming it ([`unplug_tool`]), whose answer is no error.
+//!   Words beside a stay that ran are not said, as the skill says its own
+//!   stay line ([`stayed_in`]); "safe to unplug" no call backs
+//!   ([`Claim::UnplugReady`]): a fold begun is not a fold confirmed. While
 //!   the skill's turn-off ask is open (the lamp's last line is
 //!   `language::UNPLUG_ASK_OFF`, [`asked_to_turn_off`]) such words are
 //!   dropped, with no ask again and no [`NOT_DONE_LINE`]: the skill says its
@@ -260,8 +263,14 @@ pub enum Claim {
     /// The unplug's own acts said ([`UNPLUGGED`]: "I'm preparing to fold.",
     /// "Staying on, then — standing back up."): only a `prepare_to_unplug`
     /// or `stay_plugged_in` that ran ([`unplug_in`]) makes it, never a call
-    /// by its name.
+    /// by its name. Words a stay backs are not said ([`stayed_in`]): the
+    /// skill says its own stay line (Twelve's P3 on #6532).
     Unplug,
+    /// The lamp said safe to unplug in the model's words ("Safe to unplug
+    /// me now."): no call backs it, since a `prepare_to_unplug` that ran has
+    /// only begun the fold; readiness is the skill's guarded `ready` line
+    /// alone (Twelve's P2 on #6532).
+    UnplugReady,
 }
 
 impl Claim {
@@ -292,7 +301,7 @@ impl Claim {
             }
             // Only by its outcome ([`unplug_in`]): a `use_skill` that ran no
             // skill backs nothing (#6457, case B).
-            Self::Unplug => false,
+            Self::Unplug | Self::UnplugReady => false,
         }
     }
 
@@ -309,6 +318,7 @@ impl Claim {
             Self::Made => "a skill made",
             Self::OffOrDown => "turning something off or down",
             Self::Unplug => "preparing to be unplugged, staying on or turning off",
+            Self::UnplugReady => "the lamp made safe to unplug",
         }
     }
 
@@ -325,6 +335,7 @@ impl Claim {
             Self::Made => "made",
             Self::OffOrDown => "off or down",
             Self::Unplug => "unplug",
+            Self::UnplugReady => "unplug ready",
         }
     }
 }
@@ -611,7 +622,8 @@ pub fn claim_on(reply: &str, ended: bool, worded: bool, forget: bool) -> Option<
 /// `statuses` (`after_forget::status`): a forget said done
 /// ([`Claim::Forgot`]) only when a forget removed something ([`forgot_in`]),
 /// an unplug's act ([`Claim::Unplug`]) only when an unplug call ran
-/// ([`unplug_in`]).
+/// ([`unplug_in`]) and no stay did ([`stayed_in`]), readiness
+/// ([`Claim::UnplugReady`]) never.
 pub fn stands_on<'a>(
     kind: Claim,
     reply: &str,
@@ -621,7 +633,8 @@ pub fn stands_on<'a>(
 ) -> bool {
     match kind {
         Claim::Forgot => forgot_in(statuses),
-        Claim::Unplug => unplug_in(statuses),
+        Claim::Unplug => unplug_in(statuses) && !stayed_in(statuses),
+        Claim::UnplugReady => false,
         _ => stands(kind, reply, read, calls),
     }
 }
@@ -648,11 +661,21 @@ pub fn unplug_tool(name: &str, args: &serde_json::Value) -> Option<&'static str>
 /// a `prepare_to_unplug` or [`STAY_TOOL`] whose answer is no error and no
 /// `ok` false. lamp-skills sends every refusal as an error.
 pub fn unplug_in(statuses: &[serde_json::Value]) -> bool {
+    ran_in(statuses, &[crate::without_a_tool::UNPLUG_TOOL, STAY_TOOL])
+}
+
+/// Whether a [`STAY_TOOL`] ran in the turn, as [`unplug_in`] reads it: the
+/// skill then says its own stay line, so the model's words are not said.
+pub fn stayed_in(statuses: &[serde_json::Value]) -> bool {
+    ran_in(statuses, &[STAY_TOOL])
+}
+
+fn ran_in(statuses: &[serde_json::Value], tools: &[&str]) -> bool {
     statuses.iter().any(|status| {
         let outcome = &status["outcome"];
         status["tool"]
             .as_str()
-            .is_some_and(|tool| unplug_tool(tool, &serde_json::Value::Null).is_some())
+            .is_some_and(|tool| tools.contains(&tool))
             && outcome.get("error").is_none()
             && outcome["ok"] != false
     })
@@ -2050,9 +2073,9 @@ const UNPLUGGED: [(&str, Claim); 36] = [
     ("i'll turn|switch|shut myself off|down $", Claim::Unplug),
     ("i will turn|switch|shut myself off|down $", Claim::Unplug),
     ("i'm|now shutting down $", Claim::Unplug),
-    ("safe to unplug $", Claim::Unplug),
-    ("safe to unplug me $", Claim::Unplug),
-    ("safe to unplug me now $", Claim::Unplug),
+    ("safe to unplug $", Claim::UnplugReady),
+    ("safe to unplug me $", Claim::UnplugReady),
+    ("safe to unplug me now $", Claim::UnplugReady),
 ];
 
 /// A reminder said as snoozed (C68), read as [`WORDED`]'s runs are, bare or
@@ -2572,10 +2595,13 @@ pub(crate) mod tests {
             "Okay, I'll stay plugged in.",
             "I'm turning myself off.",
             "Standing back up.",
-            "Safe to unplug me now.",
         ] {
             assert_eq!(claim(reply, true), Some(Some(Claim::Unplug)), "{reply}");
         }
+        assert_eq!(
+            claim("Safe to unplug me now.", true),
+            Some(Some(Claim::UnplugReady))
+        );
         for reply in [
             "Should I fold?",
             "I can't turn myself off.",
@@ -2619,12 +2645,25 @@ pub(crate) mod tests {
             STAY_TOOL,
             serde_json::json!({"ok": false})
         )]));
-        let ran = [status(STAY_TOOL, serde_json::json!({}))];
-        assert!(stands_on(Claim::Unplug, reply, false, [], &ran));
-        assert!(unplug_in(&[status(
+        // A stay that ran backs the kind, but its words are not said: the
+        // skill says its own stay line.
+        let stayed = [status(STAY_TOOL, serde_json::json!({}))];
+        assert!(unplug_in(&stayed) && stayed_in(&stayed));
+        assert!(!stands_on(Claim::Unplug, reply, false, [], &stayed));
+        let folding = [status(
             crate::without_a_tool::UNPLUG_TOOL,
-            serde_json::json!({"ok": true})
-        )]));
+            serde_json::json!({"ok": true}),
+        )];
+        assert!(unplug_in(&folding) && !stayed_in(&folding));
+        assert!(stands_on(Claim::Unplug, reply, false, [], &folding));
+        // A fold begun never backs readiness (Twelve's P2 on #6532).
+        assert!(!stands_on(
+            Claim::UnplugReady,
+            "Safe to unplug me now.",
+            false,
+            [(crate::without_a_tool::UNPLUG_TOOL, &none)],
+            &folding
+        ));
         // Its name, direct or through `use_skill`; never another skill.
         let named = |skill: &str| serde_json::json!({"skill": skill});
         assert_eq!(unplug_tool(STAY_TOOL, &none), Some(STAY_TOOL));
