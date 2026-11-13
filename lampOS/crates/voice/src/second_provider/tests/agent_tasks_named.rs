@@ -441,6 +441,9 @@ fn named_answered_by_an_own_tool_runs_none_and_is_asked_again_once() {
     assert_eq!(went.said, said(&["Hermes is on it."]), "{went:?}");
     assert_eq!(went.ran, [crate::agent_tasks::START.to_owned()], "{went:?}");
     assert!(went.told, "{went:?}");
+    // Asked again only once the join window passed, as the calls-empty
+    // catch (the Reviewer-lead's P3 on #6786).
+    assert!(went.took >= JOIN_WITHIN, "{went:?}");
     assert_eq!(
         went.journal,
         [
@@ -469,4 +472,33 @@ fn an_own_tool_with_no_agent_named_runs_as_before() {
     assert_eq!(went.ran, ["weather".to_owned()], "{went:?}");
     assert!(!went.told, "{went:?}");
     assert!(went.journal.is_empty(), "{:?}", went.journal);
+}
+
+/// The Reviewer-lead's P1 on #6786: the agent named beside an agent-task
+/// tool. "Hermes, go ahead and run it" answered with `confirm_agent_task`,
+/// and "ask Hermes to check on my task" with `check_agent_task`: each runs
+/// as called, nothing is asked again, and no new task is started.
+#[test]
+fn an_agent_task_tool_with_the_agent_named_runs_as_called() {
+    for (heard, tool) in [
+        ("Hermes, go ahead and run it.", crate::agent_tasks::CONFIRM),
+        ("Ask Hermes to check on my task.", crate::agent_tasks::CHECK),
+        (
+            "Hermes, check what my tasks are doing.",
+            crate::agent_tasks::NOW,
+        ),
+    ] {
+        let went = went(
+            heard,
+            vec![
+                Ok(ChatEvent::ToolCalls(vec![call("t0", tool, json!({}))])),
+                Ok(ChatEvent::Done),
+            ],
+            vec![saying("Done.")],
+            false,
+        );
+        assert_eq!(went.ran, [tool.to_owned()], "{heard}: {went:?}");
+        assert!(!went.told, "{heard}: {went:?}");
+        assert!(went.journal.is_empty(), "{heard}: {:?}", went.journal);
+    }
 }
