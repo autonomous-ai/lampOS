@@ -1036,15 +1036,11 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // as read above (#6607). On, Hermes is shown lamp-control's control socket
         // alone, read-only.
         let tasks = switches.tasks;
-        // The one run path (#6685): LAMP_SKILL_DEFAULT_AGENT=on, read only with
-        // LAMP_SKILL_TASKS on. On, Hermes's wrapper is the one every agent has,
-        // with Hermes's data, and runs the one agent namespace.
-        let one_path = tasks
-            && lamp_update::agent_ns::default_agent(
-                std::env::var(lamp_update::agent_ns::DEFAULT_AGENT_SWITCH)
-                    .ok()
-                    .as_deref(),
-            );
+        // The one run path (#6685): LAMP_SKILL_DEFAULT_AGENT, as read above
+        // (#6607), and only with LAMP_SKILL_TASKS on. On, Hermes's wrapper is
+        // the one every agent has, with Hermes's data, and runs the one agent
+        // namespace.
+        let one_path = switches.one_path;
         let shown = hermes::Shown {
             skills,
             tasks,
@@ -1091,13 +1087,7 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // (LAMP_SKILL_GATEWAY_RUNS=on, #6882, as lamp-tasks reads it): then its
         // wrapper carries its gateway data and its namespace shows lamp-control's
         // socket alone and the pushed skills. Otherwise, as before: none of these.
-        let one_path = switches.tasks
-            && lamp_update::agent_ns::default_agent(
-                std::env::var(lamp_update::agent_ns::DEFAULT_AGENT_SWITCH)
-                    .ok()
-                    .as_deref(),
-            );
-        let shown = openclaw::shown(skills, one_path, switches.gateway_runs);
+        let shown = openclaw::shown(skills, switches.one_path, switches.gateway_runs);
         if acts && wanted && harness.is_none() {
             say("OpenClaw on the lamp: off, as Harness before the sign-in is off");
         }
