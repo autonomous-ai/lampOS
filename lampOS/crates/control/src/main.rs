@@ -520,6 +520,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         Some(_) => return Err("--remote is on or off".to_owned()),
     };
     shared.set_remote(remote);
+    shared.set_listening(door_on);
     shared.set_features(features);
     eprintln!(
         "lamp-control: {}",
