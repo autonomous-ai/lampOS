@@ -3,6 +3,18 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 19:4x GMT+7: P4 step 1, latency first
+
+- Quiet check: nothing new for sim-3.
+- macOS `say -o … LEI16@24000`, 5 runs, medians: 2 words 700 ms (604 ms
+  of audio), 8 words 839 ms (2.2 s), 20 words 1,149 ms (5.9 s), 45 words
+  1,712 ms (12.4 s). Launch ~380 ms (`say -v ?` 372, empty text 389),
+  first synthesis ~290 ms, then ~23 ms a word.
+- Plan posted on #6811: a resident `AVSpeechSynthesizer` (objc2, Rust,
+  on-device) streaming buffers to `/audio/speech`; `say` per request as
+  the fallback. Target under 250 ms request to first audio bytes. No code
+  before P2 and P3 merge.
+
 ## 2026-11-13 19:3x GMT+7: the first builder's yeses; #6931 read; #6933, #6938
 
 - The first builder, 18:44 on #6811: no body on macOS, yes for now; sim-3-P3
