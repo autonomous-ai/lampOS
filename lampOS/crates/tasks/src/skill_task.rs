@@ -4483,7 +4483,14 @@ mod tests {
         let hermes = shell("printf '%s\\n' \"$0\" \"$@\" > argv", dir.path());
         let write = WriteHandOver::parse(&line, skills()).unwrap();
         let token = RunToken::new("tok".into());
-        let run = SkillRun::of(&write.skill, prompt, &write.folder, &run_id, &token);
+        let run = SkillRun::of(
+            &write.skill,
+            prompt,
+            &write.folder,
+            (PathBuf::new(), String::new()),
+            &run_id,
+            &token,
+        );
         assert_eq!(hermes.run(&run, &|| {}), Ok(0));
         let argv = std::fs::read_to_string(dir.path().join("argv")).unwrap();
         for word in private {
@@ -4492,7 +4499,14 @@ mod tests {
         assert!(argv.contains(&run_id), "{argv}");
         // `Debug` prints no run's words.
         let words = "words-of-a-run-6879";
-        let run = SkillRun::of("arrive-mail", words.into(), &write.folder, "task-1", &token);
+        let run = SkillRun::of(
+            "arrive-mail",
+            words.into(),
+            &write.folder,
+            (PathBuf::new(), String::new()),
+            "task-1",
+            &token,
+        );
         let debug = format!("{run:?}");
         assert!(!debug.contains(words), "{debug}");
         assert!(debug.contains("arrive-mail"), "{debug}");
