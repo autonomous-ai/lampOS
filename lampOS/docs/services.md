@@ -2257,9 +2257,10 @@ whole):
 
 The owner's ruling (13 Nov, here in chat; the first builder's task asked on
 Queue #6809): everything that touches a linked service runs through the
-lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`;
-on in the product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services` units, each once (the owner's ruling, 13 Nov)), and `LAMP_AGENT_SERVICES=on`, a made skill's fixed write is
-sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
+lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`; on in the
+product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services`
+units, each once), and `LAMP_AGENT_SERVICES=on`, a made skill's fixed write
+is sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
 
 - **lamp-skills** never calls this program for it. It hands the write to
   lamp-tasks on the `do.task` socket as
@@ -2537,8 +2538,9 @@ never through an open socket.
   owner's plain spoken yes (#6558's wait); only then does this program send
   it, counted in the skills' bounds (3 a day a skill, 10 across them). A
   made skill's fixed write run through the agent (`LAMP_SKILL_WRITE_AGENT`,
-  on in the product) is the one write sent on a run's call, and only as the owner's kept
-  yes has it, once ("A made skill's write", "Through the lamp's agent").
+  on in the product) is the one write sent on a run's call, and only as the
+  owner's kept yes has it, once ("A made skill's write", "Through the
+  lamp's agent").
 - **The journal** gets a refusal's length only from the server; the parts it
   calls journal the service and the `what` or `action`, never the text, an
   address or a subject.
