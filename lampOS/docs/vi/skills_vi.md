@@ -2187,30 +2187,33 @@ camera, so I can't take photos…" với `calls=none`.
   bên cạnh `dance` của đèn), bị bỏ khỏi tệp tools và bị giọng nói bỏ qua;
   các tên vẫn chạy. Khớp tối đa 8 từ, của tên hay của cụm. Tuyến Live
   không đổi.
-- **Một cụm xin không bao giờ là lời nói thường** (P1 và các P2 của
-  Thirteen, P2 của Reviewer-lead trên #6842): `skill_named::ask_refused`,
+- **Một cụm xin được kiểm tra theo hình thức của nó** (các P2 của
+  Thirteen và P2 của Reviewer-lead trên #6842): `skill_named::ask_refused`,
   mà bước kiểm tra khi nạp gọi và giọng nói chạy lại khi khớp, từ chối một
-  cụm là hoặc chứa một lời đồng ý, một lời từ chối hay lời của một sự đồng
-  thuận ("yes please", "no thanks", "never mind", "forget that",
-  "remember that", "not now"), một từ phủ định hay từ hỏi ("what time is
-  it", "is there a camera"), một lệnh dừng ("stop it", "stop the music"),
-  lời của chính đèn cho việc nó tự làm ("turn off the light", "good
-  night", "remind me in ten minutes", đèn, âm thanh, giấc ngủ, nhắc nhở và
-  hẹn giờ của nó) hay một cụm của các luật vòng đầu của nó
-  (`LAMP_MEMORY_KEEP_ASKED`, `LAMP_SCHEDULE_ASKED`, `LAMP_REMINDERS_ASKED`,
-  `LAMP_SKILL_ASKED`: "light show", "what reminders do I have"), chỉ gồm
-  những từ được nói quanh một lời xin ("hey lamp"), hoặc không có gì của
-  riêng kỹ năng bên cạnh chúng ("turn on the light", "play some music").
-  Một kỹ năng làm tại đèn, bằng giọng nói hay từ ứng dụng, không bao giờ
-  mang `asks`: `made_skill::tidied` gỡ chúng ra, và giới hạn từ chối cái
-  nó không gỡ được (`made_skill::MADE_ASKS`).
-- **Một lời đồng ý đang giữ đi trước:** khi một lời đồng ý bất kỳ đang chờ
-  câu trả lời của người (giữ hay quên, lưu khuôn mặt lúc cài đặt, đổi tên
-  khuôn mặt, lời đồng ý cho việc ghi hay task của một kỹ năng, xung đột
-  của một kỹ năng làm ra), hoặc câu đó đã được nhận là một lời đồng ý,
-  không câu nào được đọc để tìm kỹ năng theo tên hay theo cụm xin
-  (`a_yes_held` của `second_provider`): "Yes, please." là câu trả lời cho
-  câu hỏi đang giữ.
+  cụm có từ phủ định hay từ hỏi ("not now", "what time is it"), một lệnh
+  dừng ("stop it", "stop the music"), lời của chính đèn cho việc nó tự làm
+  ("turn off the light", "good night", "remind me in ten minutes") hay một
+  cụm của các luật vòng đầu của nó (`LAMP_MEMORY_KEEP_ASKED`,
+  `LAMP_SCHEDULE_ASKED`, `LAMP_REMINDERS_ASKED`, `LAMP_SKILL_ASKED`: "light
+  show", "remember that", "what reminders do I have"), chỉ gồm những từ
+  được nói quanh một lời xin ("hey lamp"), hoặc không có gì của riêng kỹ
+  năng bên cạnh chúng ("turn on the light", "play some music"). Không danh
+  sách từ nào phán xét một cụm có nghĩa là đồng ý hay không (phán quyết của
+  chủ sở hữu trên #6842): "yes please" vẫn nạp được. Một kỹ năng làm tại
+  đèn, bằng giọng nói hay từ ứng dụng, không bao giờ mang `asks`:
+  `made_skill::tidied` gỡ chúng ra, và giới hạn từ chối cái nó không gỡ
+  được (`made_skill::MADE_ASKS`).
+- **Khi đèn đang chờ một câu trả lời, model đọc câu đó:** khi lời mới nhất
+  của đèn đã hỏi điều gì (`remarks::lamp_asked`), hoặc một lần đọc lại, một
+  xác nhận hay một lời đồng ý đang giữ bất kỳ đang chờ (giữ hay quên, lưu
+  khuôn mặt lúc cài đặt, đổi tên khuôn mặt, lời đồng ý cho việc ghi hay
+  task của một kỹ năng, xung đột của một kỹ năng làm ra, một task cho agent
+  chờ `confirm_agent_task`, thư của chính giọng nói hay lần ghi đang giữ
+  của một lượt chạy kỹ năng chờ được gửi), không câu nào được đọc để tìm
+  kỹ năng theo tên hay theo cụm xin (`lamp_awaits_answer` của
+  `second_provider`). Vòng 1 là của model, và nó quyết định theo ngữ cảnh
+  "Sounds good." hay "Yes please." là câu trả lời cho đèn hay là lời xin
+  một kỹ năng.
 - **Các chỉ dẫn:** chỉ dẫn có sẵn (`config::CHAT_INSTRUCTION`, và bản có
   camera), thứ đèn sản phẩm chạy (cấu hình provider của nó không nêu
   `instruction_file`), nói "never say you have no arms, legs, body or
@@ -2232,9 +2235,13 @@ camera, so I can't take photos…" với `calls=none`.
   `a_skills_own_ask_phrases_call_it_in_code` ("take a photo" và "photo
   booth" của Seventh từ #6413, hai câu của Sixth từ #5749) và
   `a_camera_question_is_not_an_ask`,
-  `a_held_yes_leaves_yes_please_to_the_held_question` và
-  `ordinary_speech_given_as_asks_goes_to_the_model` (các câu thử của cả
-  hai lượt đọc); trong `skill_named::tests`:
+  `a_held_yes_leaves_yes_please_to_the_held_question`,
+  `after_the_lamp_asks_a_yes_goes_to_the_model`,
+  `an_agent_task_waiting_for_its_yes_leaves_the_line_to_it`,
+  `a_skill_runs_held_write_leaves_send_it_to_it`,
+  `the_voices_own_mail_waiting_leaves_go_for_it_to_it` và
+  `ordinary_speech_given_as_asks_goes_to_the_model` (các câu thử của các
+  lượt đọc); trong `skill_named::tests`:
   `an_ask_that_is_ordinary_speech_is_refused_and_runs_nothing`,
   `an_ask_holding_any_installed_skills_name_is_dropped` và
   `an_ask_that_is_another_skills_name_leaves_that_name_running`;

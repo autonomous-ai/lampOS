@@ -49,7 +49,7 @@ const REFUSED: &[&str] = &["no", "not", "never", "don't", "dont", "stop"];
 /// A keep taken back anywhere in the line ("…, but do not save that",
 /// "Actually, don't keep it", "Never mind"): reviewer-two's and Third's P2
 /// on #3463. Matched as words in a row, wherever they are.
-pub(crate) const WITHDRAWN: &[&[&str]] = &[
+const WITHDRAWN: &[&[&str]] = &[
     &["don't", "save"],
     &["dont", "save"],
     &["do", "not", "save"],
