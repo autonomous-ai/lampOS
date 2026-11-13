@@ -16,20 +16,20 @@ use std::fmt;
 extern crate self as lamp_body;
 
 pub mod ask;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(unix, test))]
 pub mod body;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(unix, test))]
 pub mod bus_out;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(unix, test))]
 pub mod exit_report;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(unix, test))]
 pub mod expression_in;
 pub mod hold_in;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(unix, test))]
 pub mod inspection;
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub mod linux;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(unix, test))]
 pub mod name_in;
 pub mod night_in;
 pub mod pause_in;
@@ -48,7 +48,7 @@ pub mod gesture;
 pub mod idle;
 pub mod lease;
 pub mod moves;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(unix, test))]
 pub mod poses;
 pub mod protocol;
 pub mod readback;
