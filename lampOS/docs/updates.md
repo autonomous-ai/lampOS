@@ -1639,6 +1639,22 @@ build could carry it units or settings.
    checked its signature, and it has read `state.json` under the lock; then
    `self.json` goes. A binary that cannot reach the channel or refuses the
    manifest waits and tries again every 30 s, and doesn't confirm.
+   Phase 1's `exec` replaces only the process whose round moved the link: a
+   `lamp-update once` run by hand beside `serve` (lamp-52e6, 13 Nov, #6898)
+   switched and confirmed while `serve` went on in the old build, whose
+   rounds then saw `update/current` already on the new binary and never
+   switched again, until a restart. So `serve` itself checks, at its start
+   (after the confirmation above) and after each round, that
+   `/proc/self/exe` is `update/current`'s binary (`own::reexec`, both
+   resolved). When it is another build's and no `self.json` waits, it
+   `exec`s that binary in its own place, with the same options and
+   `LAMP_UPDATE_REEXECED=<sha256>`, saying `this program is not
+   /opt/lampOS/update/current's build B: it starts that one in its place`.
+   The records' lock is not held there and is close-on-exec, as in phase 1.
+   A binary started so that still is not `update/current`'s never goes
+   again for that build (`… still runs another build than … after starting
+   it in its place: it serves on`). An `exec` that fails is said, and this
+   build serves on.
 3. **Back.** `lamp-update-back` is a copy of the installed build's
    `lamp-update` at `/usr/local/lib/lampos/lamp-update-back`. It is outside
    `lamp-update.service`'s `ReadWritePaths`, so no round writes it itself.

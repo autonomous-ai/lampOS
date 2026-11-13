@@ -4,7 +4,11 @@
 //! 1. Once a round's parts run a build whose `lamp-update` is not the one
 //!    `update/current` names, the round installs it beside, writes
 //!    `self.json` (the build named before and the new one) and moves the
-//!    link; `serve` then `exec`s the new binary in its own place.
+//!    link; `serve` then `exec`s the new binary in its own place. That
+//!    `exec` replaces only the process whose round switched: a `serve`
+//!    beside a `once` that switched would run on in the old build, so
+//!    `serve` also checks its own binary against `update/current` at its
+//!    start and after each round ([`reexec`], #6898).
 //! 2. The new binary confirms itself only when it has read the channel's
 //!    manifest and checked its signature, a dry round: then `self.json`
 //!    goes. Until then no round acts.
@@ -597,8 +601,36 @@ pub enum Reexec {
 /// lamp) with `update/current`'s under `root`. `marker` is the build this
 /// process was started in place for already ([`REEXECED`]).
 pub fn reexec(root: &Path, self_exe: &Path, records: &Path, marker: Option<&str>) -> Reexec {
-    let _ = (root, self_exe, records, marker);
-    Reexec::Same
+    // Both resolved: the link's target, and the file this process runs.
+    let (Ok(running), Ok(wanted)) = (
+        self_exe.canonicalize(),
+        on_root(root, CURRENT).join(BINARY).canonicalize(),
+    ) else {
+        return Reexec::Same;
+    };
+    if running == wanted {
+        return Reexec::Same;
+    }
+    let Some(build) = wanted
+        .parent()
+        .and_then(Path::file_name)
+        .map(|name| name.to_string_lossy().into_owned())
+        .filter(|name| is_build(name))
+    else {
+        return Reexec::Same;
+    };
+    // Mid-switch (phase 1 done, phase 2 not): the process that switched
+    // runs its phases; this one goes only to a confirmed link.
+    if !matches!(waiting(records), Ok(None)) {
+        return Reexec::Waits;
+    }
+    if marker == Some(build.as_str()) {
+        return Reexec::Looped(build);
+    }
+    Reexec::To {
+        program: wanted,
+        build,
+    }
 }
 
 #[cfg(test)]
