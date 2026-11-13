@@ -3522,13 +3522,13 @@ Tests: `skill_task::tests::the_net_grant_keeps_the_network_and_no_grant_holds_it
 `an_agent_run_follows_its_file_in_a_fresh_home_with_no_key`,
 `an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 
-### A run's keys, read once (`LAMP_SKILL_SECRETS`, off)
+### A run's keys, read once (`LAMP_SKILL_SECRETS`, on in the product)
 
 The first builder's ruling (12 Nov 19:44 on #6059): a skill's keys reach
 its run only as an environment file read once (docs/skills.md, "Its keys,
 given in the app"). With `LAMP_SKILL_SECRETS=on` in lamp-tasks
-(`skill_keys::SWITCH`, set in no unit), each hand-over, before its token
-is minted (`skill_task::answer_with`, `Agent::keys`):
+(`skill_keys::SWITCH`, on in the product's `lamp-tasks.service`), each
+hand-over, before its token is minted (`skill_task::answer_with`, `Agent::keys`):
 
 - **Asked of lamp-services** (`skill_keys::ServicesKeys`): one line on
   its tools socket, `/run/lampos-services/tools/call.sock`,

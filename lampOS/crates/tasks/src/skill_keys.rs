@@ -1,5 +1,5 @@
-//! A skill's keys for its run (`LAMP_SKILL_SECRETS`, off unless `on`, set
-//! in no unit; the first builder's ruling, 12 Nov 19:44 on #6059: a file's
+//! A skill's keys for its run (`LAMP_SKILL_SECRETS`, off unless `on`, on
+//! in the product; the first builder's ruling, 12 Nov 19:44 on #6059: a file's
 //! secrets "go in through the app, into root's store like service tokens,
 //! and reach the run only as an environment file read once").
 //!

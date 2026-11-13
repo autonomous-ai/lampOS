@@ -5036,23 +5036,28 @@ a key refused, a linked service's grants, services read by their names),
 `task::tests::an_agent_skill_from_a_file_carries_its_task_only_with_its_switch`,
 `an_agent_skill_from_a_file_carries_a_service_grant_only_with_its_switch`.
 
-###### Its keys, given in the app (`LAMP_SKILL_SECRETS=on`, off)
+###### Its keys, given in the app (`LAMP_SKILL_SECRETS=on`, on in the product)
 
 The first builder's ruling (12 Nov 19:44 on #6059): "A file's secrets (an
 API key, a bot token) are never said aloud and never kept in the skill
 folder. They go in through the app, into root's store like service
 tokens, and reach the run only as an environment file read once. The
-agent never asks for one by voice." Off unless `LAMP_SKILL_SECRETS=on`,
-set in no unit; it is read by `lamp-voice` (passed to the provider and
-second routes), `lamp-cloud`, `lamp-services` and `lamp-tasks serve`, so a
-lamp turns it on with a drop-in on each of the four. `lamp-skills` takes a
-`secrets` list either way, so a skill kept with it on still loads with it
-off. Off, a file that names a key or token's variable (the same
-`names_in`) is refused at the upload in plain words, "it needs a key or
-token, which a skill added from a file can't be given on this lamp yet
-(LAMP_SKILL_SECRETS is off)" (`upload_agent::NEEDS_SECRETS`), never with
-the name: its run could never be given one, so it is said then, not left
-to fail at the run (the first builder on #6911, 14 Nov).
+agent never asks for one by voice." Off unless `LAMP_SKILL_SECRETS=on`;
+it is read by `lamp-voice` (passed to the provider and second routes),
+`lamp-cloud`, `lamp-services` and `lamp-tasks serve`, and the product sets
+it in those four units alone (#6686, the install census test
+`the_product_takes_a_skills_keys_in_the_app`), so a drop-in setting it
+off on each of the four turns it off. An uploaded file's names reach its
+`skill.toml` only as an agent skill (`LAMP_UPLOAD_TO_AGENT`, still off);
+until then the switch serves a Store or pushed skill whose `do.task`
+names its `secrets`. `lamp-skills` takes a `secrets` list either way, so a
+skill kept with it on still loads with it off. Off, a file that names a
+key or token's variable (the same `names_in`) is refused at the upload in
+plain words, "it needs a key or token, which a skill added from a file
+can't be given on this lamp yet (LAMP_SKILL_SECRETS is off)"
+(`upload_agent::NEEDS_SECRETS`), never with the name: its run could never
+be given one, so it is said then, not left to fail at the run (the first
+builder on #6911, 14 Nov).
 
 - **Names in the file, values in the app.** The upload reads the names of
   the variables the file's run needs (`lamp_services::skill_secrets::names_in`):

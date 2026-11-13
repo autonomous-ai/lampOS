@@ -1,5 +1,5 @@
 //! An uploaded skill's secrets (an API key, a bot token), given in the app
-//! (`LAMP_SKILL_SECRETS`, off unless `on`, set in no unit; the first
+//! (`LAMP_SKILL_SECRETS`, off unless `on`, on in the product; the first
 //! builder's ruling, 12 Nov 19:44 on #6059: "never said aloud and never
 //! kept in the skill folder. They go in through the app, into root's store
 //! like service tokens, and reach the run only as an environment file read

@@ -452,6 +452,9 @@ Environment=LAMP_SKILL_WRITES=on
 # A Store or pushed skill's `do.task` (#6305, docs/skills.md "A skill's task"): its task and each grant said back,
 # and the person's yes recorded by lamp-control (task_yes_record); passed to the provider and second routes.
 Environment=LAMP_SKILL_TASKS=on
+# A skill's keys given in the app (#6686, docs/skills.md "Its keys, given in the app"): an agent skill's tool says to add a
+# missing key in the app, never by voice; passed to the provider and second routes.
+Environment=LAMP_SKILL_SECRETS=on
 # A made skill's code of its own (#6307, docs/skills.md "Made by voice"): the making model may write up to 4
 # scripts/ files run by one task step, said back with its grants; on only at the person's later yes to that package's
 # SHA-256, never at once; passed to both routes. The same line in lamp-skills and lamp-skills-manage@.
