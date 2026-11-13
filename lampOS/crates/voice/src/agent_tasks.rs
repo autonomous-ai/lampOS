@@ -612,16 +612,18 @@ fn on_the_lamp_now(args: &Value, there: bool, unpaired: bool) -> bool {
 
 /// [`on_the_lamp_now`] with the lamp's `engines` given: a name said in
 /// `who` is the lamp's own engine when it is one of them.
-fn on_the_lamp_with(args: &Value, there: bool, unpaired: bool, engines: &[String]) -> bool {
+fn on_the_lamp_with(args: &Value, there: bool, _unpaired: bool, engines: &[String]) -> bool {
     let said = |key: &str| {
         args.get(key)
             .and_then(Value::as_str)
             .map(str::trim)
             .filter(|said| !said.is_empty())
     };
+    // With none paired, a computer's `where` never goes to the lamp: such
+    // a call is refused before this ([`asks_a_computer`], #6547).
     match said("where") {
         Some(LAMP_TARGET) => true,
-        Some(_) => there && unpaired,
+        Some(_) => false,
         None => match said("who") {
             None => there,
             Some(who) => {
@@ -630,6 +632,31 @@ fn on_the_lamp_with(args: &Value, there: bool, unpaired: bool, engines: &[String
                     || (there && lamp_engine_called(engines, who).is_some())
             }
         },
+    }
+}
+
+/// What a [`START`] call asking for a computer is told when none is paired
+/// (#6547, V2's P1 on 12587): nothing was started, and the person decides.
+pub const NO_COMPUTER_PAIRED: &str = "Nothing was started: no computer is paired with the lamp. Tell the person so, and ask whether the lamp's own agent should do it here instead.";
+
+/// Whether a [`START`] call asks for a computer: `where` names one, or
+/// `who` names someone who is neither the lamp nor one of its `engines`
+/// ("Claude Code" on a lamp with Hermes alone). With none paired such a
+/// call is refused, never run on the lamp (#6547).
+fn asks_a_computer(args: &Value, engines: &[String]) -> bool {
+    let said = |key: &str| {
+        args.get(key)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|said| !said.is_empty())
+    };
+    match said("where") {
+        Some(LAMP_TARGET) => false,
+        Some(_) => true,
+        None => said("who").is_some_and(|who| {
+            let bare = who.trim_start_matches("the ").trim();
+            !bare.eq_ignore_ascii_case(LAMP_TARGET) && lamp_engine_called(engines, who).is_none()
+        }),
     }
 }
 
@@ -4262,11 +4289,19 @@ fn run_for_asked(
             // by default while the tasks part has it, unless the person
             // named their computer or an agent on it; never a staff member,
             // so never looked for among them.
-            let on_the_lamp = on_the_lamp_now(
-                &call.args,
-                lamp_there() || declared_with_the_lamp(),
-                place.who && staff.is_empty(),
-            );
+            let unpaired = place.who && staff.is_empty();
+            let there = lamp_there() || declared_with_the_lamp();
+            // A computer asked for with none paired while the lamp has its
+            // own target (#6547, V2's P1 on 12587): refused, nothing
+            // prepared, never quietly the lamp's. Without the lamp's target
+            // it goes to the configured target as before.
+            if unpaired && there && asks_a_computer(&call.args, &lamp_engines()) {
+                eprintln!(
+                    "lamp-voice provider: request {request}: a computer was asked for and none is paired: refused, nothing prepared"
+                );
+                return (json!({"error": NO_COMPUTER_PAIRED}), true);
+            }
+            let on_the_lamp = on_the_lamp_now(&call.args, there, unpaired);
             let member = if on_the_lamp {
                 None
             } else {
@@ -12183,19 +12218,22 @@ pub(crate) mod tests {
         assert_eq!(paired["enum"], json!(["lamp", "computer"]));
         assert_eq!(paired["description"], where_description(HERMES, true));
         let computer = json!({"where":"computer"});
-        assert!(on_the_lamp_now(&computer, true, true));
+        // Refused before this with none paired (`asks_a_computer`): never
+        // the lamp's (V2's P1 on 12587).
+        assert!(!on_the_lamp_now(&computer, true, true));
         assert!(!on_the_lamp_now(&computer, true, false));
         assert!(!on_the_lamp_now(&computer, false, true));
         assert!(on_the_lamp_now(&json!({"where":"lamp"}), true, true));
     }
 
-    /// #6547 (1c), through the hand-over: no computer paired (the switch
-    /// on, no staff, the lamp's target only). The heard words "on my
-    /// computer, make a doc" set `where` `"computer"`, and a model sending
-    /// `where` `"computer"` alone does too; either way the task is prepared
-    /// on the lamp and said as the lamp's, never sent to a computer.
+    /// #6547, V2's P1 on 12587 (Fifth's row-6547: claude, garbled, doc
+    /// and mac): no computer paired (the switch on, no staff, the lamp's
+    /// target only). An ask the heard words or the model send to a
+    /// computer, or to someone who is neither the lamp nor its engine, is
+    /// refused with nothing prepared, never run on the lamp's Hermes. One
+    /// for the lamp, or naming no place, is still prepared on the lamp.
     #[test]
-    fn no_computer_paired_a_computer_named_goes_to_the_lamp() {
+    fn no_computer_paired_a_computer_asked_for_is_refused_never_the_lamps() {
         let _one = ONE_AT_A_TIME
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -12235,7 +12273,25 @@ pub(crate) mod tests {
                 return line;
             }
         };
-        // The heard words name the computer; the model sent no place.
+        let refused = |told: &Value, line: &str| {
+            assert_eq!(told["error"], NO_COMPUTER_PAIRED, "{line}: {told}");
+            assert!(told.get("where").is_none(), "{line}: {told}");
+        };
+        // claude: the words name Claude Code; the model sent it as who.
+        let told = run_with(
+            Some("Ask Claude Code to fix my repo."),
+            json!({"task":"Fix my repo","who":"Claude Code"}),
+            3,
+        );
+        refused(&told, "claude");
+        // garbled: "cloud code" names nobody; the model sent Claude Code.
+        let told = run_with(
+            Some("Ask cloud code to fix my repo."),
+            json!({"task":"Fix my repo","who":"Claude Code"}),
+            4,
+        );
+        refused(&told, "garbled");
+        // doc: the heard words name the computer; the model sent no place.
         assert_eq!(
             named_in(
                 "On my computer, make a doc.",
@@ -12245,16 +12301,39 @@ pub(crate) mod tests {
             .place,
             Some(NamedPlace::Computer)
         );
-        let heard = run_with(
+        let told = run_with(
             Some("On my computer, make a doc."),
             json!({"task":"Make a doc"}),
-            3,
+            5,
         );
-        assert_eq!(heard["where"], "Hermes on the lamp", "{heard}");
-        assert_eq!(prepare()["target"], "lamp");
+        refused(&told, "doc");
+        // mac: "on my Mac", and the model sent the lamp.
+        let told = run_with(
+            Some("On my Mac, sort my downloads."),
+            json!({"task":"Sort my downloads","where":"lamp"}),
+            6,
+        );
+        refused(&told, "mac");
         // The model sent the computer, nothing heard.
-        let sent = run_with(None, json!({"task":"Make a doc","where":"computer"}), 4);
-        assert_eq!(sent["where"], "Hermes on the lamp", "{sent}");
+        let told = run_with(None, json!({"task":"Make a doc","where":"computer"}), 7);
+        refused(&told, "where computer");
+        // Nothing was asked of the tasks part for any of them: the first
+        // prepare seen is the lamp's below.
+        // fruits: no place named: the lamp's, as before.
+        let lamp = run_with(
+            Some("Write a file called fruits.md with five good fruits."),
+            json!({"task":"Write a file called fruits.md with five good fruits"}),
+            8,
+        );
+        assert_eq!(lamp["where"], "Hermes on the lamp", "{lamp}");
+        assert_eq!(prepare()["target"], "lamp");
+        // Hermes named: the lamp's engine, prepared on the lamp.
+        let hermes = run_with(
+            Some("Ask Hermes to write a poem about tea into tea.md."),
+            json!({"task":"Write a poem about tea into tea.md","who":"Hermes"}),
+            9,
+        );
+        assert_eq!(hermes["where"], "Hermes on the lamp", "{hermes}");
         assert_eq!(prepare()["target"], "lamp");
         *PENDING.lock().unwrap() = None;
         std::fs::remove_dir_all(directory).unwrap();

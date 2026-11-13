@@ -782,7 +782,13 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   và journal ghi `request N: named agent, no start_agent_task: asked
   again`, rồi kết quả (`…: asked again: start_agent_task called`, `…: still
   no call, said it wasn't done`, hoặc `…: called <tên>, not start_agent_task`).
-  Chỉ hỏi lại khi cửa sổ nối câu (`JOIN_WITHIN`, 3 s tính từ lúc bắt đầu
+  Nếu vòng 1 chỉ gọi các công cụ riêng của đèn ("Hermes, look up the
+  weather" được trả lời bằng `weather`: P1 của V2 trên 12587), không công
+  cụ nào được chạy: mỗi lệnh gọi được trả lời là không chạy, lời không được
+  nói, lượt được hỏi lại một lần với cùng ghi chú, và journal ghi `request
+  N: named agent, called <tên> not start_agent_task: none run, asked again`
+  (`agent_tasks_named::named_answered_by_an_own_tool_runs_none_and_is_asked_again_once`;
+  khi không nêu agent nào, công cụ riêng chạy như trước). Chỉ hỏi lại khi cửa sổ nối câu (`JOIN_WITHIN`, 3 s tính từ lúc bắt đầu
   trả lời, khoảng cuối câu nói) đã qua mà không có câu mới nào bắt đầu:
   nửa sau của một lời nhờ có ngắt nghỉ, bắt đầu trong cửa sổ đó, được nối
   vào nửa đầu (`LAMP_JOIN_CUT_WORDS`), và nửa đầu không bao giờ bị hỏi lại
@@ -876,16 +882,20 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   chưa ghép máy tính nào (không có staff: cùng phép thử mà phần mô tả đã
   dùng), `enum` của `where` chỉ còn `["lamp"]` và phần mô tả của nó không
   nhắc tới máy tính; khi có máy ghép đôi thì `["lamp", "computer"]` như
-  trước. Một `where` `"computer"` vẫn đến trong trạng thái đó (hoặc do lời
-  nghe được đặt từ "on my computer") được chạy trên đèn khi đèn có target
-  riêng, không bao giờ gửi tới máy tính không có; khi công tắc
+  trước. Một lần giao việc vẫn nhắm tới máy tính trong trạng thái đó
+  (`where` `"computer"`, do lời nghe được đặt từ "on my computer", "on my
+  Mac" hay tên một agent của máy tính, hoặc một `who` không phải đèn cũng
+  không phải engine của đèn) bị từ chối, không chuẩn bị gì, và model được
+  báo là chưa ghép máy tính nào, hãy hỏi người dùng có muốn agent của đèn
+  làm không: không bao giờ lặng lẽ thành việc của đèn (P1 của V2 trên
+  12587, row-6547 của Fifth: claude, garbled, doc, mac); khi công tắc
   `LAMP_TASKS_WHO` tắt, nơi staff không bao giờ được đọc, nó đi tới target
   đã cấu hình như trước. Khi chưa có lần đọc staff nào trả về (chưa đọc
   lần nào, hoặc mọi lần đến giờ đều lỗi), staff rỗng, tức là coi như chưa
   ghép máy nào: `computer` bị bỏ khỏi `where`. Một lần đọc lỗi sau đó giữ
   staff của lần đọc gần nhất. Test:
   `agent_tasks::tests::where_offers_no_computer_without_a_pairing`,
-  `agent_tasks::tests::no_computer_paired_a_computer_named_goes_to_the_lamp`,
+  `agent_tasks::tests::no_computer_paired_a_computer_asked_for_is_refused_never_the_lamps`,
   `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
 - **Khởi động** như Harness khởi động OpenClaw:
   `openclaw tui --session harness-<agentId> --message "<prompt>"`, không có
