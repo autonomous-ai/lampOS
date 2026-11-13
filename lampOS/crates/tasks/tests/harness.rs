@@ -6632,6 +6632,7 @@ fn skill_runner_with(
         default_agent: false,
         wrappers: None,
         agent_ns: None,
+        login: None,
     }
 }
 
@@ -6771,13 +6772,16 @@ fn one_path_runner(
     wrappers: &[(&str, &str)],
     ns: Option<&str>,
 ) -> HarnessRunner {
+    use std::os::unix::fs::PermissionsExt;
     let mut runner = skill_runner_with(rig, Some(EngineKind::Hermes), Some(default));
     let bin = rig.root.path().join("bin");
     fs::create_dir_all(&bin).unwrap();
     for (name, text) in wrappers {
         fs::write(bin.join(name), text).unwrap();
+        fs::set_permissions(bin.join(name), fs::Permissions::from_mode(0o755)).unwrap();
     }
     runner.default_agent = true;
+    runner.login = Some(login_lookup(rig, &format!("PATH={}\n", bin.display())));
     runner.wrappers = Some(bin);
     runner.agent_ns = ns.map(|text| {
         let path = rig.root.path().join("agent-ns");
@@ -6785,6 +6789,144 @@ fn one_path_runner(
         path
     });
     runner
+}
+
+/// A login-shell lookup as the lamp's ([`skill_task::LoginLookup`]), with
+/// `/bin/sh` and a home of the rig's whose `.profile` is `profile`.
+fn login_lookup(rig: &Rig, profile: &str) -> skill_task::LoginLookup {
+    let home = rig.root.path().join("login-home");
+    fs::create_dir_all(&home).unwrap();
+    fs::write(home.join(".profile"), profile).unwrap();
+    skill_task::LoginLookup {
+        shell: PathBuf::from("/bin/sh"),
+        home,
+        user: "lampos".into(),
+        path: skill_task::LOGIN_PATH.into(),
+        within: Duration::from_secs(2),
+    }
+}
+
+/// #6685 (the reviewer's P2 on #6817): with the switch on, the `<engine>`
+/// lampos's login shell finds at the run's start must be the wrapper.
+/// An engine's own program earlier on that `PATH` is refused in words,
+/// with nothing asked of Harness and no token file written; a link to the
+/// wrapper earlier is the wrapper and passes; a lookup that fails or runs
+/// past its bound is refused, never passed.
+#[test]
+fn a_skill_run_needs_the_login_shell_to_find_the_wrapper_first() {
+    use std::os::unix::fs::{PermissionsExt, symlink};
+    let ns = ns_with_runs();
+    let refused = |rig: &Rig, runner: HarnessRunner, why: &str| {
+        let began = Instant::now();
+        let said = runner
+            .run(&skill_run(Duration::from_secs(20)), &|| {})
+            .unwrap_err();
+        assert!(began.elapsed() < Duration::from_secs(4), "bounded");
+        assert!(
+            said.starts_with(
+                "the lamp's default agent (claude) isn't set up for a skill's run yet ("
+            ),
+            "{said}"
+        );
+        assert!(said.contains(why), "{said}");
+        assert!(rig.calls().is_empty(), "nothing asked");
+        assert!(!rig.root.path().join("project").exists());
+        assert!(!rig.root.path().join("runs").exists(), "no token file");
+    };
+    let early_profile = |rig: &Rig| {
+        let early = rig.root.path().join("early");
+        fs::create_dir_all(&early).unwrap();
+        let bin = rig.root.path().join("bin");
+        (
+            early.clone(),
+            format!("PATH={}:{}\nexport PATH\n", early.display(), bin.display()),
+        )
+    };
+    // The engine's own program earlier on lampos's login PATH.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        Some(&ns),
+    );
+    let (early, profile) = early_profile(&rig);
+    fs::write(early.join("claude"), "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(early.join("claude"), fs::Permissions::from_mode(0o755)).unwrap();
+    runner.login = Some(login_lookup(&rig, &profile));
+    refused(
+        &rig,
+        runner,
+        &format!(
+            "finds {} before its wrapper",
+            early.join("claude").display()
+        ),
+    );
+    // A link to the wrapper earlier is the wrapper.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        Some(&ns),
+    );
+    let (early, profile) = early_profile(&rig);
+    symlink(rig.root.path().join("bin/claude"), early.join("claude")).unwrap();
+    runner.login = Some(login_lookup(&rig, &profile));
+    assert_eq!(
+        runner.run(&skill_run(Duration::from_secs(20)), &|| {}),
+        Ok(0)
+    );
+    nothing_left(&rig);
+    // A login shell past its bound.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        Some(&ns),
+    );
+    let mut slow = login_lookup(&rig, "sleep 5\n");
+    slow.within = Duration::from_millis(300);
+    runner.login = Some(slow);
+    refused(&rig, runner, "gave no answer within 0.3 s");
+    // A login shell that fails, or can't be started.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        Some(&ns),
+    );
+    runner.login = Some(login_lookup(&rig, "exit 3\n"));
+    refused(&rig, runner, "lampos's login shell ended 3");
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        Some(&ns),
+    );
+    let mut gone = login_lookup(&rig, "");
+    gone.shell = rig.root.path().join("no-shell");
+    runner.login = Some(gone);
+    refused(&rig, runner, "lampos's login shell can't be asked");
+    // No lookup at all is a refusal too.
+    let rig = Rig::new();
+    skill_ok_plan(&rig, "stopped");
+    let mut runner = one_path_runner(
+        &rig,
+        EngineKind::Claude,
+        &[("claude", ONE_PATH_CLAUDE)],
+        Some(&ns),
+    );
+    runner.login = None;
+    refused(&rig, runner, "can't be asked");
 }
 
 /// #6685: with the switch on, a skill's run is `harness new <default>` in

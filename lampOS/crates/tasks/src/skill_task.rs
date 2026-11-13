@@ -1068,7 +1068,11 @@ pub fn ns_takes_runs(script: &str) -> bool {
 /// every engine, by what its install wrote, never by its name: an agent in
 /// its maker's cloud never runs on the lamp, and any other needs
 /// [`wrapper_takes_runs`] and [`ns_takes_runs`]. Refused in words, naming
-/// the engine as data: nothing goes to another agent instead.
+/// the engine as data: nothing goes to another agent instead. A wrapper
+/// lamp-update wrote ([`WRAPPER_MARK`]) with no per-run start in it
+/// (not all of [`WRAPPER_RUN_LINES`]) is an agent with no fenced run path
+/// yet, said so whatever lamp-update's switch: lamp-update writes such a
+/// wrapper with the switch on too.
 pub fn default_agent_takes_runs(
     engine: crate::harness::EngineKind,
     wrapper: Option<&str>,
@@ -1078,9 +1082,19 @@ pub fn default_agent_takes_runs(
     let why = if engine.cloud() {
         format!("{name} runs in its maker's cloud, never on the lamp")
     } else if !wrapper.is_some_and(|text| wrapper_takes_runs(text, engine)) {
-        format!(
-            "its wrapper {AGENT_WRAPPERS}/{name} isn't lamp-update's one run path for it: lamp-update's {DEFAULT_AGENT_SWITCH} is off or its round hasn't run"
-        )
+        match wrapper {
+            Some(text)
+                if lamp_updates(text)
+                    && !WRAPPER_RUN_LINES.iter().all(|line| text.contains(line)) =>
+            {
+                format!(
+                    "its wrapper {AGENT_WRAPPERS}/{name} isn't lamp-update's one run path for it but its own with no per-run start in it: this agent has no fenced run path for a skill's run yet"
+                )
+            }
+            _ => format!(
+                "its wrapper {AGENT_WRAPPERS}/{name} isn't lamp-update's one run path for it: lamp-update's {DEFAULT_AGENT_SWITCH} is off or its round hasn't run"
+            ),
+        }
     } else if !script.is_some_and(ns_takes_runs) {
         format!(
             "the agent namespace {AGENT_NS} doesn't show lamp-control's socket: lamp-update's {SWITCH} is off or its round hasn't run"
@@ -1088,9 +1102,226 @@ pub fn default_agent_takes_runs(
     } else {
         return Ok(());
     };
-    Err(format!(
+    Err(not_set_up(name, &why))
+}
+
+/// The words of every refusal of the lamp's default agent `name` for a
+/// skill's run, with `why`.
+fn not_set_up(name: &str, why: &str) -> String {
+    format!(
         "the lamp's default agent ({name}) isn't set up for a skill's run yet ({why}), so nothing was started"
-    ))
+    )
+}
+
+/// The mark every wrapper lamp-update writes carries in its first
+/// [`WRAPPER_MARK_WITHIN`] bytes (`lamp_update::agent_ns::wrapper::MARK`).
+pub const WRAPPER_MARK: &str = "Written by lamp-update.";
+/// How far into a wrapper [`WRAPPER_MARK`] is looked for
+/// (`lamp_update::agent_ns::wrapper::MARK_WITHIN`).
+pub const WRAPPER_MARK_WITHIN: usize = 512;
+
+/// Whether `wrapper` (a wrapper's text) is one lamp-update wrote: a
+/// `#!/bin/sh` script with [`WRAPPER_MARK`] in its first
+/// [`WRAPPER_MARK_WITHIN`] bytes.
+fn lamp_updates(wrapper: &str) -> bool {
+    let head = &wrapper.as_bytes()[..wrapper.len().min(WRAPPER_MARK_WITHIN)];
+    wrapper.starts_with("#!/bin/sh\n")
+        && head
+            .windows(WRAPPER_MARK.len())
+            .any(|window| window == WRAPPER_MARK.as_bytes())
+}
+
+/// The longest the login-shell lookup ([`LoginLookup`]) may take at a
+/// run's start; past it the run is refused, never passed.
+pub const LOGIN_LOOKUP_WITHIN: Duration = Duration::from_secs(2);
+
+/// The `PATH` the lookup's login shell starts with, before its rc files:
+/// lamp-tasks' own (its unit's), which is also Debian's default for a
+/// login.
+pub const LOGIN_PATH: &str = "/usr/local/bin:/usr/bin:/bin";
+
+/// The command the lookup runs, lamp-update's own
+/// (`lamp_update::agent_ns::wrapper::login_lookup_argv`): how Harness
+/// finds an engine. `engine` is plain (`a-z`, `0-9`, `-`), one word.
+pub fn login_command(engine: &str) -> String {
+    format!("command -v {engine}")
+}
+
+/// How lamp-tasks asks, at a run's start, which `<engine>` Harness would
+/// start: lamp-update's lookup ([`login_command`] in `lampos`'s login
+/// shell, its environment cleared to `HOME`, `SHELL`, `USER`, `LOGNAME`
+/// and `PATH` as `runuser -l` clears it), run as lamp-tasks' own user,
+/// `lampos`, Harness's user. lamp-update asks as root through `runuser -l
+/// lampos`; lamp-tasks is `lampos` already (and runs with
+/// `NoNewPrivileges`), so it starts the login shell itself, with the shell
+/// and home Harness's daemon has: [`crate::hold::LAUNCH_SHELL`] (Harness
+/// reads an engine's launch environment through `SHELL`, `lampos`'s own
+/// being `/usr/sbin/nologin`) and Harness's home, where its installer's
+/// `~/.local/bin` is. Bounded by [`LoginLookup::within`]; a lookup that
+/// can't be run, fails, prints something else or runs past it is a
+/// refusal.
+#[derive(Clone, Debug)]
+pub struct LoginLookup {
+    /// The login shell, started with `-l` so it reads its rc files
+    /// (`/etc/profile`, then `~/.profile`).
+    pub shell: PathBuf,
+    /// Its `HOME` and working folder (`/` when not a folder).
+    pub home: PathBuf,
+    /// Its `USER` and `LOGNAME`.
+    pub user: String,
+    /// Its `PATH` before the rc files ([`LOGIN_PATH`] on a lamp).
+    pub path: String,
+    /// The longest it may take ([`LOGIN_LOOKUP_WITHIN`] on a lamp).
+    pub within: Duration,
+}
+
+impl LoginLookup {
+    /// The lamp's: [`crate::hold::LAUNCH_SHELL`], Harness's home `home`
+    /// (lamp-tasks' own), `lampos`, [`LOGIN_PATH`], [`LOGIN_LOOKUP_WITHIN`].
+    pub fn lamp(home: &Path) -> Self {
+        Self {
+            shell: PathBuf::from(crate::hold::LAUNCH_SHELL),
+            home: home.to_owned(),
+            user: "lampos".into(),
+            path: LOGIN_PATH.into(),
+            within: LOGIN_LOOKUP_WITHIN,
+        }
+    }
+
+    /// What the login shell finds for `engine`: the one line it prints, or
+    /// why nothing is known. Refused unless `engine` is plain.
+    pub fn finds(&self, engine: &str) -> Result<String, String> {
+        use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
+        use std::io::Read;
+        use std::os::unix::process::CommandExt;
+        use std::process::{Command, Stdio};
+        if engine.is_empty()
+            || !engine
+                .bytes()
+                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        {
+            return Err(format!("{engine:?} is not a plain engine name"));
+        }
+        let folder = if self.home.is_dir() {
+            self.home.as_path()
+        } else {
+            Path::new("/")
+        };
+        let mut child = Command::new(&self.shell)
+            .args(["-l", "-c", &login_command(engine)])
+            .env_clear()
+            .env("HOME", &self.home)
+            .env("SHELL", &self.shell)
+            .env("USER", &self.user)
+            .env("LOGNAME", &self.user)
+            .env("PATH", &self.path)
+            .current_dir(folder)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .process_group(0)
+            .spawn()
+            .map_err(|error| format!("lampos's login shell can't be asked: {error}"))?;
+        let pid = Pid::from_child(&child);
+        let (said, heard) = std::sync::mpsc::channel();
+        if let Some(mut out) = child.stdout.take() {
+            std::thread::spawn(move || {
+                let mut text = Vec::new();
+                let _ = out.read_to_end(&mut text);
+                let _ = said.send(text);
+            });
+        }
+        let began = std::time::Instant::now();
+        let status = loop {
+            // NOWAIT keeps the pid, so the group signal below never reaches
+            // another process given it.
+            match waitid(
+                WaitId::Pid(pid),
+                WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
+            ) {
+                Ok(Some(status)) => break Some(status.exit_status()),
+                Ok(None) => {}
+                Err(error) if error == rustix::io::Errno::INTR => {}
+                Err(_) => break None,
+            }
+            if began.elapsed() >= self.within {
+                break None;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        };
+        // Whatever the shell left in its group goes with it, so its output
+        // ends.
+        let _ = kill_process_group(pid, Signal::KILL);
+        let _ = child.kill();
+        let _ = child.wait();
+        let secs = self.within.as_secs_f32();
+        let text = match status {
+            Some(Some(0)) => heard
+                .recv_timeout(
+                    self.within
+                        .saturating_sub(began.elapsed())
+                        .max(Duration::from_millis(100)),
+                )
+                .map_err(|_| format!("lampos's login shell gave no answer within {secs} s"))?,
+            Some(Some(1)) => return Err(format!("lampos's login shell finds no {engine}")),
+            Some(Some(code)) => return Err(format!("lampos's login shell ended {code}")),
+            Some(None) => return Err("lampos's login shell was stopped".into()),
+            None => {
+                return Err(format!(
+                    "lampos's login shell gave no answer within {secs} s"
+                ));
+            }
+        };
+        let text = String::from_utf8(text)
+            .map_err(|_| "lampos's login shell said something that is not text".to_owned())?;
+        let found = text.trim();
+        if found.is_empty() || found.contains('\n') {
+            return Err(format!(
+                "lampos's login shell said {found:?}, not one program for {engine}"
+            ));
+        }
+        Ok(found.to_owned())
+    }
+}
+
+/// Whether `found` (what the login shell finds) is the file `wrapper` is:
+/// both full paths resolved as `readlink -f` resolves them, so a link to
+/// the wrapper counts and any other file does not.
+pub fn found_is_wrapper(found: &str, wrapper: &Path) -> bool {
+    found.starts_with('/')
+        && matches!(
+            (std::fs::canonicalize(found), std::fs::canonicalize(wrapper)),
+            (Ok(found), Ok(wrapper)) if found == wrapper
+        )
+}
+
+/// At a run's start only (never on the voice's turn), after
+/// [`default_agent_takes_runs`]: whether the `<engine>` Harness would start
+/// ([`LoginLookup::finds`], asked live, so a program installed after
+/// lamp-update's last round is seen) is the wrapper in `wrappers`
+/// ([`found_is_wrapper`]). An engine's own program earlier on that `PATH`
+/// (`~/.local/bin/<engine>`) would run with no namespace and the lamp's
+/// network, so the run is refused in words, and nothing is written or
+/// started; so is a lookup that fails or runs past its bound.
+pub fn login_finds_wrapper(
+    lookup: &LoginLookup,
+    engine: crate::harness::EngineKind,
+    wrappers: &Path,
+) -> Result<(), String> {
+    let name = engine.argument();
+    let wrapper = wrappers.join(name);
+    let why = match lookup.finds(name) {
+        Ok(found) if found_is_wrapper(&found, &wrapper) => return Ok(()),
+        Ok(found) => format!(
+            "lampos's login shell finds {found} before its wrapper {}, which Harness would start with no agent namespace",
+            wrapper.display()
+        ),
+        Err(why) => format!(
+            "{why}, so its wrapper {} isn't known to be what Harness starts",
+            wrapper.display()
+        ),
+    };
+    Err(not_set_up(name, &why))
 }
 
 /// Where lamp-tasks puts its [`SkillHarness`] once Harness is set up;
@@ -1107,7 +1338,8 @@ pub type SkillHarnessSlot = std::sync::Arc<std::sync::OnceLock<SkillHarness>>;
 ///   one run path** (#6685): whatever the engine, one check
 ///   ([`default_agent_takes_runs`]): its wrapper is lamp-update's one run
 ///   path wrapper for it and the agent namespace shows lamp-control's
-///   socket. One that can't take a run is refused in words, journaled,
+///   socket, then, live, that `lampos`'s login shell finds that wrapper
+///   first ([`login_finds_wrapper`]). One that can't take a run is refused in words, journaled,
 ///   and nothing is made or started: no other agent runs it instead.
 /// - **Off, always the lamp's Hermes**, whatever the lamp's default engine
 ///   (V2's (b), #1711), the interim: a wrapper that doesn't find a run by
@@ -1161,6 +1393,11 @@ pub struct HarnessRunner {
     /// With [`DEFAULT_AGENT_SWITCH`] on, the agent namespace's script, read
     /// with the wrapper ([`AGENT_NS`] on a lamp).
     pub agent_ns: Option<PathBuf>,
+    /// With [`DEFAULT_AGENT_SWITCH`] on, how the `<engine>` Harness would
+    /// start is looked up at each run's start ([`login_finds_wrapper`],
+    /// [`LoginLookup::lamp`] on a lamp). `None` with [`Self::wrappers`]
+    /// given refuses every run.
+    pub login: Option<LoginLookup>,
     /// lamp-tasks' stop ([`Runner::stop_on`]): set, a run being waited on
     /// is ended as at its deadline (revoke, `close --now`, its folder and
     /// token file removed), since Harness's daemon, not lamp-tasks, holds
@@ -1186,6 +1423,7 @@ impl HarnessRunner {
             default_agent: std::env::var(DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on"),
             wrappers: Some(PathBuf::from(AGENT_WRAPPERS)),
             agent_ns: Some(PathBuf::from(AGENT_NS)),
+            login: Some(LoginLookup::lamp(home)),
             stopping: std::sync::OnceLock::new(),
         }
     }
@@ -1293,7 +1531,16 @@ impl Runner for HarnessRunner {
                     engine,
                     read(&wrappers.join(engine.argument())).as_deref(),
                     self.agent_ns.as_deref().and_then(read).as_deref(),
-                ),
+                )
+                // Live, here at the run's start: what Harness would start
+                // is the wrapper, before any token file is written.
+                .and_then(|()| match &self.login {
+                    Some(login) => login_finds_wrapper(login, engine, wrappers),
+                    None => Err(not_set_up(
+                        engine.argument(),
+                        "lampos's login shell can't be asked",
+                    )),
+                }),
                 // Tests with no wrapper: a cloud agent is still refused.
                 None if engine.cloud() => default_agent_takes_runs(engine, None, None),
                 None => Ok(()),
@@ -3256,6 +3503,26 @@ mod tests {
         );
         refused(Hermes, Some(ONE_PATH_CLAUDE), Some(&ns), "(hermes)");
         refused(Openclaw, None, Some(&ns), "/usr/local/bin/openclaw");
+        // OpenClaw's own wrapper, as lamp-update writes it with its switch
+        // on too: lamp-update's, with no per-run start, so no fenced run
+        // path yet, never "the switch is off".
+        let openclaw_rs = include_str!("../../update/src/openclaw_install.rs");
+        let openclaw = openclaw_rs
+            .split_once("pub const WRAPPER_TEXT: &str = r#\"")
+            .and_then(|(_, rest)| rest.split_once("\"#;"))
+            .unwrap()
+            .0;
+        let said = default_agent_takes_runs(Openclaw, Some(openclaw), Some(&ns)).unwrap_err();
+        assert!(said.contains("with no per-run start in it: this agent has no fenced run path for a skill's run yet"), "{said}");
+        assert!(!said.contains(DEFAULT_AGENT_SWITCH), "{said}");
+        // Hermes's own wrapper (lamp-update's switch off) has a per-run
+        // start: that one is the switch.
+        let own = format!(
+            "#!/bin/sh\n# lampOS: Hermes on the lamp. Written by lamp-update.\n{}{}",
+            WRAPPER_RUN_LINES[0], WRAPPER_RUN_LINES[1]
+        );
+        let said = default_agent_takes_runs(Hermes, Some(&own), Some(&ns)).unwrap_err();
+        assert!(said.contains(DEFAULT_AGENT_SWITCH), "{said}");
         refused(
             Claude,
             Some(ONE_PATH_CLAUDE),
@@ -3274,6 +3541,12 @@ mod tests {
             Some(&ns),
             "maker's cloud",
         );
+        // The mark and its reach are lamp-update's own.
+        let wrapper_rs = include_str!("../../update/src/agent_ns/wrapper.rs");
+        assert!(wrapper_rs.contains(&format!("pub const MARK: &str = \"{WRAPPER_MARK}\";")));
+        assert!(wrapper_rs.contains(&format!(
+            "pub const MARK_WITHIN: usize = {WRAPPER_MARK_WITHIN};"
+        )));
         assert!(
             ended_as("failed", "the lamp's default agent")
                 .unwrap_err()
@@ -3284,5 +3557,36 @@ mod tests {
                 .unwrap_err()
                 .starts_with("the lamp's Hermes stopped")
         );
+    }
+
+    /// The reviewer's P2 on #6817: the login-shell lookup is lamp-update's
+    /// own command, a plain engine name only, and a found program is the
+    /// wrapper only as the same file (`readlink -f`): a link to it is, a
+    /// copy of it is not.
+    #[test]
+    fn the_login_lookup_is_lamp_updates_and_finds_the_wrapper_by_its_file() {
+        use std::os::unix::fs::symlink;
+        let wrapper_rs = include_str!("../../update/src/agent_ns/wrapper.rs");
+        assert!(wrapper_rs.contains(".chain([format!(\"command -v {engine}\")])"));
+        assert_eq!(login_command("claude"), "command -v claude");
+        let lookup = LoginLookup::lamp(Path::new("/var/lib/lampos-tasks"));
+        assert_eq!(lookup.shell, Path::new(crate::hold::LAUNCH_SHELL));
+        assert_eq!(lookup.within, LOGIN_LOOKUP_WITHIN);
+        assert!(LOGIN_LOOKUP_WITHIN <= Duration::from_secs(2));
+        for bad in ["", "a b", "x;id", "Claude", "$(id)"] {
+            assert!(lookup.finds(bad).is_err(), "{bad:?}");
+        }
+        let folder = tempfile::tempdir().unwrap();
+        let wrapper = folder.path().join("eng");
+        std::fs::write(&wrapper, "#!/bin/sh\n").unwrap();
+        let link = folder.path().join("link");
+        symlink(&wrapper, &link).unwrap();
+        let copy = folder.path().join("copy");
+        std::fs::write(&copy, "#!/bin/sh\n").unwrap();
+        assert!(found_is_wrapper(wrapper.to_str().unwrap(), &wrapper));
+        assert!(found_is_wrapper(link.to_str().unwrap(), &wrapper));
+        assert!(!found_is_wrapper(copy.to_str().unwrap(), &wrapper));
+        assert!(!found_is_wrapper("eng", &wrapper), "not a full path");
+        assert!(!found_is_wrapper("/no/such/eng", &wrapper));
     }
 }

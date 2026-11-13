@@ -184,11 +184,13 @@ pub fn wrapper_text(engine: &str) -> Result<String, String> {
 pub const ONE_PATH_MARK: &str =
     "# lampOS: an agent on the lamp, by the one run path (#6510, #6685). Written by lamp-update.\n";
 
-/// The homes of the agents with an installer of their own, each shown at
-/// its own path by [`NS`] with the one run path (their programs and
-/// scripts name it): Hermes's [`hermes_install::PLACE`]. Data, beside
-/// [`HOMES`]`/<engine>`, the home of every other agent.
-pub const OWN_HOMES: [&str; 1] = [hermes_install::PLACE];
+/// The homes of the agents with an installer of their own, each as
+/// `(engine, home)` and shown at its own path by [`NS`] with the one run
+/// path (their programs and scripts name it): Hermes's
+/// [`hermes_install::PLACE`], for Hermes only. Data, beside
+/// [`HOMES`]`/<engine>`, the home of every other agent; each home is its
+/// engine's alone, never another agent's.
+pub const OWN_HOMES: [(&str, &str); 1] = [("hermes", hermes_install::PLACE)];
 
 /// One agent's data in its one run path wrapper ([`one_path_text`]): the
 /// only part of the wrapper that differs from one agent to another.
@@ -306,11 +308,13 @@ exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc
 /// `#!/bin/sh`, [`ONE_PATH_MARK`], [`ONE_PATH_HEADER`], the agent's data
 /// (`E`, `H`, `X`, `agent_env`, `agent_run_env`), [`ONE_PATH_RUN_LINE`]
 /// and [`ONE_PATH_RUN`]. Refused unless the engine is plain, its home is
-/// [`home_of`] it or one of [`OWN_HOMES`], its program a plain full path,
-/// and its lines indented.
+/// [`home_of`] it or its own in [`OWN_HOMES`], its program a plain full
+/// path, and its lines indented.
 pub fn one_path_text(agent: &Agent) -> Result<String, String> {
     plain(&agent.engine)?;
-    if agent.home != home_of(&agent.engine)? && !OWN_HOMES.contains(&agent.home.as_str()) {
+    if agent.home != home_of(&agent.engine)?
+        && !OWN_HOMES.contains(&(agent.engine.as_str(), agent.home.as_str()))
+    {
         return Err(format!(
             "{}: {} is not one of the agents' homes",
             agent.engine, agent.home
@@ -420,8 +424,8 @@ pub const NS_EDITS: [(&str, &str); 8] = [
 /// ([`super::with_ns_path`]; once only, when Hermes's text already has it).
 /// It names no engine. With [`Shown::one_path`], [`ONE_PATH_NS_EDITS`] and
 /// the home check ([`one_path_home_check`]) too: the home is the wrapper's,
-/// and the agents' homes list ([`OWN_HOMES`]) is the only path in it that
-/// is an installer's own.
+/// and the agents' homes list ([`OWN_HOMES`], each with its engine) is the
+/// only path in it that is an installer's own.
 pub fn ns_text(shown: Shown) -> String {
     let mut text = hermes_install::ns_text(shown.skills, shown.tasks);
     text = text.replacen(hermes_header(), NS_HEADER, 1);
@@ -473,13 +477,19 @@ pub const ONE_PATH_NS_EDITS: [(&str, &str); 3] = [
 const ONE_PATH_HOME_ANCHOR: &str = "[ -f \"$X\" ] || fail \"no program at $X\"\n";
 
 /// [`ONE_PATH_HOME_ANCHOR`] and the home check after it: the home the
-/// wrapper names is [`HOMES`]`/<engine>` or one of [`OWN_HOMES`] (data,
-/// root's text: `lampos` can change neither), a folder, not a link.
+/// wrapper names is [`HOMES`]`/<engine>` or the engine's own in
+/// [`OWN_HOMES`], matched as `<engine>:<home>` so an own home is taken
+/// for its engine only (data, root's text: `lampos` can change neither),
+/// a folder, not a link.
 pub fn one_path_home_check() -> String {
+    let own: Vec<String> = OWN_HOMES
+        .iter()
+        .map(|(engine, home)| format!("{engine}:{home}"))
+        .collect();
     format!(
-        "{ONE_PATH_HOME_ANCHOR}case $H in {HOMES}/\"$E\"|{}) ;; *) fail \"LAMP_NS_HOME is not one of the agents' homes\" ;; esac\n\
+        "{ONE_PATH_HOME_ANCHOR}case $E:$H in \"$E\":{HOMES}/\"$E\"|{}) ;; *) fail \"LAMP_NS_HOME is not one of the agents' homes\" ;; esac\n\
          [ -d \"$H\" ] && [ ! -L \"$H\" ] || fail \"no home at $H\"\n",
-        OWN_HOMES.join("|")
+        own.join("|")
     )
 }
 
