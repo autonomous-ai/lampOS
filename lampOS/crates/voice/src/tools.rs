@@ -1568,6 +1568,28 @@ pub fn skill_whens(settings: &Settings) -> std::collections::BTreeMap<String, St
     whens
 }
 
+/// Each skill's ask phrases, by its tool, from the first skills folder
+/// whose tools file gives them (`asks`, `lamp_skills::tools_file`, from its
+/// `skill.toml`'s `asks`, #6772): what [`crate::skill_named`] matches a
+/// heard line against beside the tool's name. Empty from an older file.
+pub fn skill_asks(settings: &Settings) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut asks = std::collections::BTreeMap::new();
+    for file in tools_files(settings) {
+        if let Some(given) = file["asks"].as_object() {
+            for (tool, phrases) in given {
+                let phrases: Vec<String> = phrases
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|phrase| phrase.as_str().map(str::to_owned))
+                    .collect();
+                asks.entry(tool.clone()).or_insert(phrases);
+            }
+        }
+    }
+    asks
+}
+
 /// Each skills folder's tools file that can be read, in order.
 fn tools_files(settings: &Settings) -> Vec<Value> {
     let mut files = Vec::new();
