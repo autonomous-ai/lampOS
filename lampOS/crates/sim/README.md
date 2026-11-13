@@ -143,9 +143,12 @@ HTTP side runs on another thread), writing each line to buffers made into
 (arm64) through this service, 5 requests each a second apart, medians, first
 bytes after 19 ms for "Hi there.", 13 ms for 8 words and 18 ms for 20 (the
 whole line after 29, 32 and 61 ms); the first line after start about 290 ms;
-whisper.cpp (`base.en`) wrote back a 15-word line's output word for word. It is
+whisper.cpp (`base.en`) wrote back a 15-word line's output word for word. A
+line ends at the synthesizer's empty end buffer, or 300 ms after its last
+buffer if that never comes (it did not on macOS 14, Heron's read on #6961);
+at rest the main thread waits on the channel and runs no run loop. It is
 the only `unsafe` in lamp-sim: one module, `#[allow(unsafe_code)]` on it alone,
-a SAFETY note on each call (the first builder's conditions, #6811 21:28); its
+a SAFETY note on each of its 11 blocks (the first builder's conditions, #6811 21:28); its
 `objc2` packages are macOS-only dependencies (MIT, or Zlib/Apache/MIT).
 
 `--engine say` (and any system other than macOS) uses macOS's `say` instead,
