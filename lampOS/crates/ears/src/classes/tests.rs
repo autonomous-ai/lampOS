@@ -442,6 +442,9 @@ fn a_patch_near_the_quiet_skips_the_model_and_a_loud_one_runs_it() {
     let (sent, received) = mpsc::channel();
     let worker = {
         let (gate, stop, runs) = (gate.clone(), stop.clone(), runs.clone());
+        // The count read as each patch is sent, on the worker: read later on
+        // the test thread, it can already hold the next patch's run.
+        let counted = runs.clone();
         thread::spawn(move || {
             serve(
                 intake,
@@ -458,7 +461,10 @@ fn a_patch_near_the_quiet_skips_the_model_and_a_loud_one_runs_it() {
                         footsteps: 0.0,
                     })
                 }),
-                |classified| sent.send(classified).unwrap(),
+                |classified| {
+                    sent.send((classified, counted.load(Ordering::SeqCst)))
+                        .unwrap()
+                },
                 || true,
             )
         })
@@ -482,9 +488,9 @@ fn a_patch_near_the_quiet_skips_the_model_and_a_loud_one_runs_it() {
     }
     let mut scored = Vec::new();
     while scored.len() < 2 {
-        let classified = received.recv_timeout(Duration::from_secs(5)).unwrap();
+        let (classified, runs) = received.recv_timeout(Duration::from_secs(5)).unwrap();
         if let SoundClasses::Scored { scores, .. } = classified.classes {
-            scored.push((scores, runs.load(Ordering::SeqCst)));
+            scored.push((scores, runs));
         }
     }
     assert_eq!(scored[0], (QUIET, 0), "the quiet patch ran the model");
