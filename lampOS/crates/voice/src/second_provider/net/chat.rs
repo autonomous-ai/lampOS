@@ -177,11 +177,35 @@ pub type Force = Arc<dyn Fn(&[Message]) -> Option<Forced> + Send + Sync>;
 /// its string parameters may take, if any: that parameter is then told
 /// only that value and is required (`LAMP_TASKS_NAMED_ASK`: `who` is the
 /// agent the words name, #1722). A function without that parameter is
-/// told as declared.
+/// told as declared. With `fields`, the function is told only those
+/// parameters, all required (the approve round of
+/// `LAMP_SKILL_WRITE_YES`: `approve_id` and `answer`, #6921).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Forced {
     pub name: &'static str,
     pub only: Option<(&'static str, &'static str)>,
+    pub fields: Option<&'static [&'static str]>,
+}
+
+/// `tool`'s parameters cut to `fields`, each required; a field it does
+/// not declare is left out.
+fn kept_fields(tool: &mut lamp_gemini::Tool, fields: &[&str]) {
+    let Some(parameters) = tool.parameters.as_mut() else {
+        return;
+    };
+    let Some(properties) = parameters
+        .get_mut("properties")
+        .and_then(Value::as_object_mut)
+    else {
+        return;
+    };
+    properties.retain(|name, _| fields.contains(&name.as_str()));
+    let kept: Vec<Value> = fields
+        .iter()
+        .filter(|field| properties.contains_key(**field))
+        .map(|field| json!(field))
+        .collect();
+    parameters["required"] = Value::Array(kept);
 }
 
 /// `tool`'s parameters with `parameter` told only `value`, and required,
@@ -482,13 +506,15 @@ impl Chat {
             .then(|| self.force.get().and_then(|force| force(messages)))
             .flatten()
             .filter(|forced| declared.iter().any(|tool| tool.name == forced.name));
-        if let Some(Forced {
-            name,
-            only: Some(only),
-        }) = forced
+        if let Some(Forced { name, only, fields }) = forced
             && let Some(tool) = declared.iter_mut().find(|tool| tool.name == name)
         {
-            pinned(tool, only);
+            if let Some(fields) = fields {
+                kept_fields(tool, fields);
+            }
+            if let Some(only) = only {
+                pinned(tool, only);
+            }
         }
         let tools = functions(&declared);
         if !tools.is_empty() {

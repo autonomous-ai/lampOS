@@ -206,6 +206,7 @@ pub fn force() -> Force {
         asks_to_make(last.words()?).then_some(Forced {
             name: crate::made_skill::MAKE,
             only: None,
+            fields: None,
         })
     })
 }

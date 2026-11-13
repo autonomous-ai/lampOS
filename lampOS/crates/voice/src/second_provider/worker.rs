@@ -5164,10 +5164,12 @@ pub(crate) fn named_asks(place: crate::agent_tasks::Place) -> crate::second_prov
             [agent] => Some(crate::second_provider::net::Forced {
                 name: crate::agent_tasks::START,
                 only: Some((crate::agent_tasks::WHO, agent)),
+                fields: None,
             }),
             _ => Some(crate::second_provider::net::Forced {
                 name: crate::agent_tasks::START,
                 only: None,
+                fields: None,
             }),
         }
     })
@@ -5199,6 +5201,7 @@ pub(crate) fn remember_asks() -> crate::second_provider::net::Force {
             crate::second_provider::net::Forced {
                 name: crate::known_faces::REMEMBER,
                 only: None,
+                fields: None,
             },
         )
     })
@@ -5227,6 +5230,7 @@ pub(crate) fn rename_asks(
         .then_some(crate::second_provider::net::Forced {
             name: crate::known_faces::REMEMBER,
             only: None,
+            fields: None,
         })
     })
 }
@@ -30582,7 +30586,11 @@ mod memory_observer {
                     .last()
                     .and_then(Message::words)
                     .is_some_and(|words| words.contains(word))
-                    .then_some(Forced { name, only: None })
+                    .then_some(Forced {
+                        name,
+                        only: None,
+                        fields: None,
+                    })
             })
         };
         let both = crate::second_provider::worker::first_force(
