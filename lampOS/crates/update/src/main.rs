@@ -782,6 +782,50 @@ fn config(
     ))
 }
 
+/// A `serve` whose own binary is not `update/current`'s (#6898: a `once`
+/// switched and confirmed beside it) starts that one in its own place, with
+/// the same options, at most once per build ([`own::REEXECED`], and `tried`
+/// for an `exec` that failed). No records' lock is held here, and it is
+/// close-on-exec anyway, as in phase 1. An `exec` that fails is said, and
+/// this build serves on.
+fn onto_current(config: &Config, tried: &mut Option<String>) {
+    let marker = tried.clone().or_else(|| std::env::var(own::REEXECED).ok());
+    match own::reexec(
+        &config.root,
+        &config.on(own::SELF_EXE),
+        &config.on(&config.records),
+        marker.as_deref(),
+    ) {
+        own::Reexec::To { program, build } => {
+            eprintln!(
+                "lamp-update: this program is not {}'s build {}: it starts that one in its place",
+                own::CURRENT,
+                &build[..12]
+            );
+            *tried = Some(build.clone());
+            let error = Command::new(&program)
+                .args(std::env::args_os().skip(1))
+                .env(own::REEXECED, &build)
+                .exec();
+            eprintln!(
+                "lamp-update: {} cannot be started: {error}; this build serves on",
+                program.display()
+            );
+        }
+        own::Reexec::Looped(build) => {
+            if tried.as_deref() != Some(build.as_str()) {
+                eprintln!(
+                    "lamp-update: still runs another build than {}'s {} after starting it in its place: it serves on",
+                    own::CURRENT,
+                    &build[..12]
+                );
+                *tried = Some(build);
+            }
+        }
+        own::Reexec::Same | own::Reexec::Waits => {}
+    }
+}
+
 /// The folder this binary runs from, as the lamp names it under `root`:
 /// `/opt/lampOS/update/<sha256>/` on a product lamp.
 fn running_folder(root: &Path) -> Option<String> {
@@ -896,6 +940,11 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             }
             let _ = ears.listen(Duration::from_secs(30));
         }
+    }
+    // At serve's start, after its own confirmation (#6898).
+    let mut reexec_tried = None;
+    if command == "serve" {
+        onto_current(&config, &mut reexec_tried);
     }
     let mut last = String::new();
     let records = config.on(&config.records);
@@ -1358,6 +1407,9 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 Err(error) => eprintln!("lamp-update: its own program is not known: {error}"),
             }
         }
+        // After each round: `update/current` may have moved and been
+        // confirmed by another lamp-update meanwhile (#6898).
+        onto_current(&config, &mut reexec_tried);
         // A round that says what the one before said is not said again.
         if text != last {
             eprintln!("lamp-update: {text}");
