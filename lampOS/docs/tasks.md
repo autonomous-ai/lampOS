@@ -2667,56 +2667,39 @@ for each run, and is answered once the run ends
     refused `NOT_FOUND_BY_FOLDER` (lamp-update's `LAMP_SKILL_TASKS` off or
     its round not run): nothing is made or started, so a run never starts
     with no token on the lamp's network.
-  - **The lamp's default agent, with `LAMP_SKILL_DEFAULT_AGENT=on`
-    (#6685, off until c0a4's row and two reads).** lamp-tasks reads the
-    lamp's default engine at each run (`runtime::lamp_default`, the app's
-    choice first; before Harness has said, the lamp target's engine) and
-    sends the run there when it can take one (`skill_task::engine_for_run`):
-    Hermes as above, or OpenClaw when its namespace script
-    `/usr/local/lib/lampos/openclaw-ns` shows lamp-control's socket and the
-    runs' token folder (lamp-update writes it so with the same switch).
-    Any other default, or an OpenClaw whose script doesn't show them, goes
-    to the lamp's Hermes, with a journal line saying why. Off, every run is
-    Hermes's, as above.
-    - **OpenClaw's one gateway** is not started per run, so no wrapper
-      reads the token: the run is `harness new openclaw` in its folder, and
-      lamp-tasks writes the token file (0600) only once Harness says the
-      pane is under way. The script's `Lamp.connect()` / `Lamp.local()`
-      (the SDK) then, with no `LAMP_CONTROL_TOKEN` and its working folder
-      exactly `…/lamp-tasks/skill-<run-id>`, reads
-      `/run/lampos-tasks/runs/gateway/<run-id>` once (a regular file, never through
-      a link) and deletes it, even when the connection then fails; while
-      the file isn't there yet it looks again every 0.1 s for up to 10 s.
-    - **The boundary (the lead's call on #6685; the first builder rules
-      on 1 and 2 before the switch is turned on):**
-      1. **The token's window.** From the file's write to the script's
-         first read, any other session on the same OpenClaw gateway (same
-         user, same namespace) could read it. That lasts until the model
-         runs the script: a model turn, not a fixed time, at most the run's
-         deadline (`RUN_LIFETIME`). The gateway sees only its own
-         subfolder of the runs folder, `runs/gateway` (0700, made by
-         lamp-tasks at its start with the switch on, Heron's P2 on #6767),
-         so a Hermes run's file is never shown to it; a session could still
-         put a file under the next OpenClaw run's id so that run is
-         refused. After the read the file is gone,
-         and the token is ended with the run (its end or its deadline).
-      2. **The network and OpenClaw's own data.** OpenClaw's gateway has no
-         network namespace of its own (no `--net`), so a run on it has the
-         lamp's open network, not Hermes's fenced one: a script holding a
-         run's token could read through `control.sock` what its skill is
-         granted and send it out directly. The same gateway also reads the
-         person's OpenClaw state (`/var/lib/lampos-openclaw/state`).
-      Hermes keeps its per-run namespace and fenced network.
-    - **Why per engine, and how the next one joins.** The engine list is
-      what each engine's install proves, not its name: a run's token must
-      reach only that run's script, and the engines are started two ways.
-      Hermes (and, with #6685's PR 2, the engines agent-ns wraps) start a
-      process per run through a wrapper that reads the run's token file at
-      exec, so lamp-tasks checks the wrapper's run lines. OpenClaw is one
-      long-lived gateway, so the token can only come from the run's folder,
-      and lamp-tasks checks that its namespace script shows the runs'
-      token folder. A next engine joins by its install writing one of those
-      two, and lamp-tasks reading that file before it sends a run there.
+  - **The lamp's default agent, by the one run path, with
+    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, off until c0a4's row and two
+    reads). One way to run a skill for every agent in the lamp's Harness:
+    no per-agent code and no engine name in the run path. lamp-tasks reads
+    the lamp's default engine at each run (`runtime::lamp_default`, the
+    app's choice first; before Harness has said, the lamp target's engine)
+    and makes one check for whichever it is
+    (`skill_task::default_agent_takes_runs`):
+    - an agent in its maker's cloud (`EngineKind::cloud`, Devin Cloud) never
+      runs on the lamp;
+    - its wrapper `/usr/local/bin/<engine>` is lamp-update's one run path
+      wrapper for it: `ONE_PATH_MARK` as its second line, its data naming
+      it (`E=<engine>`), the run lines (`WRAPPER_RUN_LINES`) and the one
+      path's network lines (`AGENT_NS_NET_LINES`: the caller's
+      `LAMP_CONTROL_TOKEN` and `LAMP_NS_NET` unset, `--net` only in a run,
+      the one `unshare` into `/usr/local/lib/lampos/agent-ns`);
+    - the agent namespace `/usr/local/lib/lampos/agent-ns` takes the home
+      from the wrapper (`AGENT_NS_HOME_LINE`) and shows lamp-control's
+      socket (`AGENT_NS_TASKS_LINE`, lamp-update's `LAMP_SKILL_TASKS` on).
+
+    The same lines for Hermes, Claude Code or any other agent: a test pins
+    them to the wrappers lamp-update writes for Hermes and Claude Code
+    (`crates/update/src/agent_ns/wrapper/one-path-*.sh`). A default that
+    fails the check is refused in words, journaled: "the lamp's default
+    agent (<engine>) isn't set up for a skill's run yet (<why>), so nothing
+    was started", with nothing made or asked, and no other agent runs it
+    instead. OpenClaw's one gateway has no wrapper started per run, so as
+    the default it is refused this way until it has a fenced path of its
+    own (a later step). The token file is written before the launch, as for
+    Hermes, and the run is `harness new <engine>` in its own folder (below).
+    Messages after the launch say "the lamp's default agent". Off, every
+    run is the lamp's Hermes through its own wrapper, as above (the
+    interim).
   - **Its own folder.** lamp-tasks makes `skill-<run-id>` (0700,
     `RUN_FOLDER_PREFIX`) in its Harness project
     `/var/lib/lampos-tasks/harnesses/lamp-tasks` (made 0700 when missing),
@@ -2731,7 +2714,9 @@ for each run, and is answered once the run ends
     Hermes's wrapper takes it from `pwd -P` (docs/install.md, "Hermes on
     the lamp"), reads the token file once, deletes it, and gives the run
     `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH` and
-    `LAMP_NS_NET=run`, before its namespace starts. The token is never in
+    `LAMP_NS_NET=run`, before its namespace starts. By the one run path
+    (above) the run is `harness new <engine>` and the agent's one run path
+    wrapper does the same, with the same lines. The token is never in
     Harness's arguments, environment or state.
   - **Its end.** `harness wait --machine <lamp> <agent> --any --timeout
     600s --json` on the one agent, asked again (a failed `wait` after 1 s,

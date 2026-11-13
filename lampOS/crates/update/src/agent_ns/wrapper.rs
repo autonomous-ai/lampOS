@@ -35,11 +35,22 @@
 //! ([`super::with_ns_path`]). The lampos SDK (#6507) is under `/usr`, which
 //! the namespace leaves as it is.
 //!
-//! Hermes and OpenClaw keep their own wrappers and namespace scripts for
-//! now ([`crate::hermes_install`], [`crate::openclaw_install`]); they move
-//! onto this one in step 2. A round calls [`write_engine`] for every other
-//! engine Harness says is installed, with `LAMP_AGENT_NS=on`
-//! ([`super::rounds`]).
+//! Hermes and OpenClaw keep their own wrappers and namespace scripts with
+//! the one run path off ([`crate::hermes_install`], [`crate::openclaw_install`]).
+//! A round calls [`write_engine`] for every other engine Harness says is
+//! installed, with `LAMP_AGENT_NS=on` ([`super::rounds`]).
+//!
+//! **The one run path** (#6685, [`super::DEFAULT_AGENT_SWITCH`] on,
+//! [`Shown::one_path`]): every agent's wrapper is [`one_path_text`], one
+//! text for every agent, Hermes's too ([`crate::hermes_install::agent`]):
+//! a header, then a small data block of the agent's own ([`Agent`]: its
+//! name, its home, its program, its environment lines at every start and
+//! in a skill's run only), then the run path, the same bytes for every
+//! agent and naming none: the run lines
+//! ([`hermes_install::ONE_RUN_LINES`]), the `--net` lines and the
+//! `unshare` into [`NS`]. [`NS`] then takes the agent's home from the
+//! wrapper, checked against the agents' homes ([`OWN_HOMES`],
+//! [`HOMES`]`/<engine>`), and shows it at its own path ([`ONE_PATH_NS_EDITS`]).
 use crate::{
     hermes_install::{self, Shown, holds, on},
     records::write_whole,
@@ -166,6 +177,181 @@ pub fn wrapper_text(engine: &str) -> Result<String, String> {
     ))
 }
 
+/// The line after `#!/bin/sh` of every one run path wrapper
+/// ([`one_path_text`]), [`MARK`] in it, naming no agent: what lamp-tasks
+/// looks for (`lamp_tasks::skill_task::ONE_PATH_MARK`) before a run goes
+/// to the lamp's default agent.
+pub const ONE_PATH_MARK: &str =
+    "# lampOS: an agent on the lamp, by the one run path (#6510, #6685). Written by lamp-update.\n";
+
+/// The homes of the agents with an installer of their own, each shown at
+/// its own path by [`NS`] with the one run path (their programs and
+/// scripts name it): Hermes's [`hermes_install::PLACE`]. Data, beside
+/// [`HOMES`]`/<engine>`, the home of every other agent.
+pub const OWN_HOMES: [&str; 1] = [hermes_install::PLACE];
+
+/// One agent's data in its one run path wrapper ([`one_path_text`]): the
+/// only part of the wrapper that differs from one agent to another.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Agent {
+    /// The engine, a plain name ([`engine_ok`]): the wrapper's name and the
+    /// journal's tag.
+    pub engine: String,
+    /// Its `HOME` in the namespace, shown read-write at its own path:
+    /// [`home_of`]`(engine)`, or one of [`OWN_HOMES`].
+    pub home: String,
+    /// Its program, a full path; `None`: the first `<engine>` on the
+    /// caller's `PATH` that is not a lamp-update wrapper.
+    pub program: Option<String>,
+    /// Shell lines (each indented two spaces) run at every start, after a
+    /// run's token file is read and before `unshare`: the agent's own
+    /// environment. Empty for most.
+    pub env: String,
+    /// Shell lines run after [`Agent::env`] in a skill's run only.
+    pub run_env: String,
+}
+
+/// A plain agent's data: its home [`home_of`]`(engine)`, its program found
+/// on `PATH`, no environment lines of its own.
+pub fn agent_of(engine: &str) -> Result<Agent, String> {
+    Ok(Agent {
+        engine: engine.to_owned(),
+        home: home_of(engine)?,
+        program: None,
+        env: String::new(),
+        run_env: String::new(),
+    })
+}
+
+/// A full path of plain bytes (`A-Z`, `a-z`, `0-9`, `/`, `.`, `_`, `-`),
+/// no `..` in it: one word in a script.
+fn plain_path(path: &str) -> bool {
+    path.starts_with('/')
+        && path.split('/').all(|part| part != "..")
+        && path
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'/' | b'.' | b'_' | b'-'))
+}
+
+/// Shell lines of an agent's own: each line indented two spaces, the last
+/// ending the text.
+fn lines_ok(lines: &str) -> bool {
+    lines.is_empty() || (lines.ends_with('\n') && lines.lines().all(|line| line.starts_with("  ")))
+}
+
+/// What comes before an agent's data in [`one_path_text`]: the same for
+/// every agent.
+const ONE_PATH_HEADER: &str = r#"# lampOS/docs/install.md, "One agent namespace for every engine". It runs the agent below, as its caller (lampos,
+# Harness's user), in a user, mount and PID namespace (/usr/local/lib/lampos/agent-ns) with its own home: no lamp
+# service's files or sockets, no camera, mic or serial device, no lamp process. A skill's run, started by lamp-tasks
+# in its own folder, gets its one-run token and a network namespace of its own. Only the agent's data differs from
+# one agent to another; the run path after it is the same for every agent.
+# The agent's data:
+"#;
+
+/// The line that ends an agent's data in [`one_path_text`]; the run path
+/// ([`ONE_PATH_RUN`]) comes after it.
+pub const ONE_PATH_RUN_LINE: &str = "# The run path, the same for every agent:\n";
+
+/// The run path of [`one_path_text`], after the agent's data: the same
+/// bytes for every agent, naming none. The caller's token and network
+/// switch are dropped; the run lines ([`hermes_install::ONE_RUN_LINES`])
+/// read a run's token file first, so a wrapper that fails later leaves
+/// none behind; then the agent's own lines (`agent_env`, and
+/// `agent_run_env` in a run); `--net` only in a run; the agent's program
+/// (its own, or the first on `PATH` that is no lamp-update wrapper);
+/// the hook stand-in's journal line ([`super::HOOK_NOTE`]); and the one
+/// `unshare` into [`NS`], which is given the agent, its program and its
+/// home.
+pub const ONE_PATH_RUN: &str = concat!(
+    r#"fail() { echo "$E: $1" >&2; exit 1; }
+unset LAMP_CONTROL_TOKEN LAMP_NS_NET
+"#,
+    hermes_install::one_run_lines!(),
+    r#"agent_env
+[ -z "$R" ] || agent_run_env
+N=
+[ "${LAMP_NS_NET-}" != run ] || N=--net
+if [ -n "$X" ]; then
+  r=$(readlink -f "$X") && [ -f "$r" ] && [ -x "$r" ] || fail "no program at $X"
+  X=$r
+else
+  I=$(readlink -f "$0") || fail "this wrapper is not found"
+  o=$IFS
+  set -f
+  IFS=:
+  for d in ${PATH-}; do
+    IFS=$o
+    case $d in /*) ;; *) continue ;; esac
+    [ -f "$d/$E" ] && [ -x "$d/$E" ] || continue
+    r=$(readlink -f "$d/$E") || continue
+    [ "$r" != "$I" ] || continue
+    head -c 512 "$r" | grep -qF "Written by lamp-update." && continue
+    X=$r
+    break
+  done
+  IFS=$o
+  set +f
+  [ -n "$X" ] || fail "no $E on PATH besides lamp-update's wrappers"
+fi
+logger -t "$E" "Harness hooks aren't available inside the lamp's agent namespace yet (openharness#4194)" 2>/dev/null || :
+LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
+LAMP_NS_ENGINE=$E LAMP_NS_ENGINE_BIN=$X LAMP_NS_HOME=$H
+export LAMP_NS_UID LAMP_NS_GID LAMP_NS_ENGINE LAMP_NS_ENGINE_BIN LAMP_NS_HOME
+exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/agent-ns "$@"
+"#
+);
+
+/// The one run path's wrapper for `agent` (#6685, [`Shown::one_path`]):
+/// `#!/bin/sh`, [`ONE_PATH_MARK`], [`ONE_PATH_HEADER`], the agent's data
+/// (`E`, `H`, `X`, `agent_env`, `agent_run_env`), [`ONE_PATH_RUN_LINE`]
+/// and [`ONE_PATH_RUN`]. Refused unless the engine is plain, its home is
+/// [`home_of`] it or one of [`OWN_HOMES`], its program a plain full path,
+/// and its lines indented.
+pub fn one_path_text(agent: &Agent) -> Result<String, String> {
+    plain(&agent.engine)?;
+    if agent.home != home_of(&agent.engine)? && !OWN_HOMES.contains(&agent.home.as_str()) {
+        return Err(format!(
+            "{}: {} is not one of the agents' homes",
+            agent.engine, agent.home
+        ));
+    }
+    if agent
+        .program
+        .as_deref()
+        .is_some_and(|path| !plain_path(path))
+    {
+        return Err(format!(
+            "{}: its program is not a plain full path",
+            agent.engine
+        ));
+    }
+    if !lines_ok(&agent.env) || !lines_ok(&agent.run_env) {
+        return Err(format!(
+            "{}: its lines are not indented shell lines",
+            agent.engine
+        ));
+    }
+    Ok(format!(
+        "#!/bin/sh\n{ONE_PATH_MARK}{ONE_PATH_HEADER}E={}\nH={}\nX={}\nagent_env() {{\n{}  :\n}}\nagent_run_env() {{\n{}  :\n}}\n{ONE_PATH_RUN_LINE}{ONE_PATH_RUN}",
+        agent.engine,
+        agent.home,
+        agent.program.as_deref().unwrap_or(""),
+        agent.env,
+        agent.run_env,
+    ))
+}
+
+/// `engine`'s wrapper for `shown`: with [`Shown::one_path`], the one run
+/// path's ([`one_path_text`] of [`agent_of`]); else [`wrapper_text`].
+pub fn text_for(engine: &str, shown: Shown) -> Result<String, String> {
+    if shown.one_path {
+        one_path_text(&agent_of(engine)?)
+    } else {
+        wrapper_text(engine)
+    }
+}
+
 /// Hermes's namespace header ([`hermes_install::NS_TEXT`] before its first
 /// command), replaced whole by [`NS_HEADER`].
 fn hermes_header() -> &'static str {
@@ -232,7 +418,10 @@ pub const NS_EDITS: [(&str, &str); 8] = [
 /// [`NS_EDITS`], its messages as `agent-ns` and its words about the engine
 /// made general, and the hook stand-in first on its `PATH`
 /// ([`super::with_ns_path`]; once only, when Hermes's text already has it).
-/// It names no engine.
+/// It names no engine. With [`Shown::one_path`], [`ONE_PATH_NS_EDITS`] and
+/// the home check ([`one_path_home_check`]) too: the home is the wrapper's,
+/// and the agents' homes list ([`OWN_HOMES`]) is the only path in it that
+/// is an installer's own.
 pub fn ns_text(shown: Shown) -> String {
     let mut text = hermes_install::ns_text(shown.skills, shown.tasks);
     text = text.replacen(hermes_header(), NS_HEADER, 1);
@@ -246,11 +435,52 @@ pub fn ns_text(shown: Shown) -> String {
             "The skills switch on (#6128)",
         )
         .replace("Hermes", "the engine");
+    if shown.one_path {
+        for (from, to) in ONE_PATH_NS_EDITS {
+            text = text.replacen(from, to, 1);
+        }
+        text = text.replacen(ONE_PATH_HOME_ANCHOR, &one_path_home_check(), 1);
+    }
     if text.contains(super::PATH_LINES) {
         text
     } else {
         super::with_ns_path(&text)
     }
+}
+
+/// What [`ns_text`] changes with [`Shown::one_path`], after [`NS_EDITS`],
+/// each found exactly once (a test holds it): the agent's home taken from
+/// its wrapper (`LAMP_NS_HOME`, checked against the agents' homes,
+/// [`one_path_home_check`]) instead of [`HOMES`]`/<engine>`, its variable
+/// unset with the rest, and the header saying so.
+pub const ONE_PATH_NS_EDITS: [(&str, &str); 3] = [
+    (
+        "# home /var/lib/lampos-agents/<engine>, its own program (read-only),",
+        "# home (the one its wrapper names, an agents' home), its own program (read-only),",
+    ),
+    (
+        "E=${LAMP_NS_ENGINE-} X=${LAMP_NS_ENGINE_BIN-}\nH=/var/lib/lampos-agents/$E ",
+        "E=${LAMP_NS_ENGINE-} X=${LAMP_NS_ENGINE_BIN-}\nH=${LAMP_NS_HOME-} ",
+    ),
+    (
+        "unset LAMP_NS_UID LAMP_NS_GID LAMP_NS_ENGINE LAMP_NS_ENGINE_BIN\n",
+        "unset LAMP_NS_UID LAMP_NS_GID LAMP_NS_ENGINE LAMP_NS_ENGINE_BIN LAMP_NS_HOME\n",
+    ),
+];
+
+/// The line of [`ns_text`] the home check ([`one_path_home_check`]) goes
+/// after, with [`Shown::one_path`]: the program's own check.
+const ONE_PATH_HOME_ANCHOR: &str = "[ -f \"$X\" ] || fail \"no program at $X\"\n";
+
+/// [`ONE_PATH_HOME_ANCHOR`] and the home check after it: the home the
+/// wrapper names is [`HOMES`]`/<engine>` or one of [`OWN_HOMES`] (data,
+/// root's text: `lampos` can change neither), a folder, not a link.
+pub fn one_path_home_check() -> String {
+    format!(
+        "{ONE_PATH_HOME_ANCHOR}case $H in {HOMES}/\"$E\"|{}) ;; *) fail \"LAMP_NS_HOME is not one of the agents' homes\" ;; esac\n\
+         [ -d \"$H\" ] && [ ! -L \"$H\" ] || fail \"no home at $H\"\n",
+        OWN_HOMES.join("|")
+    )
 }
 
 /// Whether the file at `place` is a regular file (not a link) carrying
@@ -288,8 +518,9 @@ fn folder(root: &Path, path: &str, mode: u32) -> Result<(), String> {
 /// `engine`'s entry points under `root`, for what the namespace shows:
 /// [`HOMES`] (root's, 0755) and the engine's home in it (`owner`'s, 0700:
 /// `lampos`'s uid and gid), [`NS`], the hook stand-in
-/// ([`super::write_hook_shim`]), then the wrapper last, each root's, 0755,
-/// written whole beside and renamed in, so `lampos` never finds a wrapper
+/// ([`super::write_hook_shim`]), then the wrapper last ([`text_for`]
+/// `shown`), each root's, 0755, written whole beside and renamed in, so
+/// `lampos` never finds a wrapper
 /// before what it runs. A file at the wrapper's place without [`MARK`]
 /// (the engine's own program, or anyone else's) is refused, never
 /// replaced. Refused unless `engine` is plain.
@@ -312,19 +543,29 @@ pub fn write_engine(
     write_whole(&on(root, NS), ns_text(shown).as_bytes(), 0o755)
         .map_err(|error| format!("{NS}: {error}"))?;
     super::write_hook_shim(root)?;
-    write_whole(&place, wrapper_text(engine)?.as_bytes(), 0o755)
+    write_whole(&place, text_for(engine, shown)?.as_bytes(), 0o755)
         .map_err(|error| format!("{wrapper}: {error}"))
 }
 
 /// Whether the file at `engine`'s [`wrapper_path`] under `root` is a
-/// regular file (not a link) holding exactly [`wrapper_text`]`(engine)`:
-/// one this build wrote, and nothing else. Refused unless `engine` is
+/// regular file (not a link) holding exactly [`wrapper_text`]`(engine)`
+/// or the one run path's ([`text_for`] with [`Shown::one_path`]): one
+/// this build wrote, and nothing else. Refused unless `engine` is
 /// plain.
 pub fn ours(root: &Path, engine: &str) -> bool {
-    match (wrapper_path(engine), wrapper_text(engine)) {
-        (Ok(wrapper), Ok(text)) => holds(root, &wrapper, &text),
-        _ => false,
-    }
+    let Ok(wrapper) = wrapper_path(engine) else {
+        return false;
+    };
+    [false, true].into_iter().any(|one_path| {
+        text_for(
+            engine,
+            Shown {
+                one_path,
+                ..Shown::default()
+            },
+        )
+        .is_ok_and(|text| holds(root, &wrapper, &text))
+    })
 }
 
 /// The engines whose wrapper under `root` is [`ours`]: each plain name in
@@ -475,15 +716,17 @@ pub fn found_first(engine: &str, found: Option<&str>) -> bool {
 }
 
 /// `engine`'s entry points there as this build writes them for `shown`:
-/// the wrapper and [`NS`] with this build's text, the hook stand-in, and
+/// the wrapper ([`text_for`]) and [`NS`] with this build's text, the hook stand-in, and
 /// the engine's home a folder, and the wrapper the `engine` `lampos`'s
 /// login shell finds (`found`, [`found_first`]). Anything else is the
 /// engine missing: written again, and not offered while something else
 /// is found first.
 pub fn present(root: &Path, engine: &str, shown: Shown, found: Option<&str>) -> bool {
-    let (Ok(wrapper), Ok(text), Ok(home)) =
-        (wrapper_path(engine), wrapper_text(engine), home_of(engine))
-    else {
+    let (Ok(wrapper), Ok(text), Ok(home)) = (
+        wrapper_path(engine),
+        text_for(engine, shown),
+        home_of(engine),
+    ) else {
         return false;
     };
     found_first(engine, found)

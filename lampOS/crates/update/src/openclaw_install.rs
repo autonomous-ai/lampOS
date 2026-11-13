@@ -96,17 +96,6 @@ pub const PRODUCT_DEFAULT: bool = true;
 /// [`SKILLS_PRODUCT_DEFAULT`].
 pub const SKILLS_SWITCH: &str = "LAMP_OPENCLAW_SKILLS";
 
-/// A skill's run on the lamp's default agent (#6685), the switch lamp-tasks
-/// reads too: `on` exactly, with [`hermes_install::TASKS_SWITCH`] on, and
-/// OpenClaw's namespace also shows lamp-control's socket and
-/// [`RUN_TOKENS`] ([`Shown::tasks`]); otherwise off. Off until c0a4's row
-/// passes and its boundary has two reads (the first builder, #6059).
-pub const DEFAULT_AGENT_SWITCH: &str = "LAMP_SKILL_DEFAULT_AGENT";
-
-/// [`DEFAULT_AGENT_SWITCH`] as read: `on` exactly.
-pub fn default_agent(value: Option<&str>) -> bool {
-    value == Some("on")
-}
 /// On by default on a product lamp, as Hermes's skills switch is.
 pub const SKILLS_PRODUCT_DEFAULT: bool = true;
 
@@ -341,58 +330,14 @@ if [ \"$M\" = on ]; then
 fi
 ";
 
-/// The gateway's own subfolder of lamp-tasks' runs' token files
-/// (`lamp_tasks::run_token_file::GATEWAY_RUNS`, 0700, `lampos`'s): shown to
-/// OpenClaw's gateway, read-write, with [`Shown::tasks`], so a skill's
-/// script in a run's folder reads its run's token once and deletes it (the
-/// SDK's `_run_token`, #6685). Only this subfolder: a Hermes run's file,
-/// in the folder above, is never shown to a gateway session (Heron's P2 on
-/// #6767).
-pub const RUN_TOKENS: &str = "/run/lampos-tasks/runs/gateway";
-
-/// What [`ns_text`] adds for [`Shown::tasks`] after Hermes's
-/// `TASKS_EDITS` (lamp-control's socket alone, read-only): [`RUN_TOKENS`]
-/// staged before `/run` is hidden (skipped when it is not there) and moved
-/// back read-write, so the script can delete the file it read. OpenClaw's
-/// one gateway is not started per run, so no wrapper reads the token for
-/// it: any session on the gateway could read a run's file between
-/// lamp-tasks writing it and the script's first read (the boundary the
-/// lead accepted on #6685, kept as short as lamp-tasks makes it).
-const RUNS_EDITS: [(&str, &str); 4] = [
-    (
-        " S=/tmp/.lampos-ns\n",
-        " T=/run/lampos-tasks/runs/gateway S=/tmp/.lampos-ns\n",
-    ),
-    (
-        "else L=; fi\n",
-        "else L=; fi\n\
-         if [ -d \"$T\" ]; then mkdir -m 0700 \"$S/t\" && mount --bind \"$T\" \"$S/t\" || fail \"no $T\"; else T=; fi\n",
-    ),
-    (
-        "&& mount --move \"$S/l\" \"$L\" && ro \"$L\" || fail \"$L not shown\"; fi\n",
-        "&& mount --move \"$S/l\" \"$L\" && ro \"$L\" || fail \"$L not shown\"; fi\n\
-         if [ -n \"$T\" ]; then mkdir -p \"$T\" && mount --move \"$S/t\" \"$T\" || fail \"$T not shown\"; fi\n",
-    ),
-    (
-        "rm -f \"$S/r\" \"$S/l\" \"$S/b\" &&",
-        "rm -f \"$S/r\" \"$S/l\" \"$S/b\" && { [ -z \"$T\" ] || rmdir \"$S/t\"; } &&",
-    ),
-];
-
 /// [`NS`]'s text: Hermes's ([`hermes_install::ns_text`]`(skills, false)`,
 /// the same allow-list, the same steps) for OpenClaw ([`ENGINE_EDITS`]),
 /// with its install mode ([`NPM_CI_MODE`]) before OpenClaw runs. With
 /// `shown.skills`, lamp-skills' socket folder is shown read-only too; with
-/// `shown.tasks` (a skill's runs on OpenClaw, #6685), lamp-control's socket
-/// alone, read-only, and [`RUN_TOKENS`] ([`RUNS_EDITS`]); neither, as
-/// before.
+/// `shown.tasks`, lamp-control's socket alone, read-only (no round asks
+/// for it: OpenClaw takes no skill's run yet, #6685); neither, as before.
 pub fn ns_text(shown: Shown) -> String {
     let mut text = hermes_install::ns_text(shown.skills, shown.tasks);
-    if shown.tasks {
-        for (from, to) in RUNS_EDITS {
-            text = text.replacen(from, to, 1);
-        }
-    }
     for (from, to) in ENGINE_EDITS {
         text = text.replace(from, to);
     }
@@ -558,7 +503,8 @@ struct Ask {
     remove: bool,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     skills: bool,
-    /// [`Shown::tasks`]: a skill's runs on OpenClaw (#6685).
+    /// [`Shown::tasks`]: lamp-control's socket shown (no round asks for it
+    /// yet, #6685).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     tasks: bool,
 }
@@ -1053,6 +999,7 @@ fn install_with(
             Shown {
                 skills: asked.skills,
                 tasks: asked.tasks,
+                one_path: false,
             },
         );
         if said.install == "failed" {
@@ -1324,12 +1271,10 @@ fn steps(
     }
     let shown = match (shown.skills, shown.tasks) {
         (true, true) => {
-            "its own folder, its work folder, the skills, lamp-skills' socket, lamp-control's socket and the runs' token folder"
+            "its own folder, its work folder, the skills, lamp-skills' socket and lamp-control's socket"
         }
         (true, false) => "its own folder, its work folder, the skills and lamp-skills' socket",
-        (false, true) => {
-            "its own folder, its work folder, the skills, lamp-control's socket and the runs' token folder"
-        }
+        (false, true) => "its own folder, its work folder, the skills and lamp-control's socket",
         (false, false) => "its own folder, its work folder and the skills",
     };
     say(&format!(

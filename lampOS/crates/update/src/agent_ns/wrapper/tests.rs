@@ -9,18 +9,22 @@ const SHOWN: [Shown; 4] = [
     Shown {
         skills: false,
         tasks: false,
+        one_path: false,
     },
     Shown {
         skills: true,
         tasks: false,
+        one_path: false,
     },
     Shown {
         skills: false,
         tasks: true,
+        one_path: false,
     },
     Shown {
         skills: true,
         tasks: true,
+        one_path: false,
     },
 ];
 
@@ -148,6 +152,11 @@ struct Lamp {
 const TOKEN: &str = "s3cret-token-0123456789";
 
 fn lamp(engine: &str) -> Lamp {
+    lamp_of(engine, &wrapper_text(engine).unwrap())
+}
+
+/// [`lamp`] with `text` as the wrapper.
+fn lamp_of(engine: &str, text: &str) -> Lamp {
     let folder = tempfile::tempdir().unwrap();
     let top = fs::canonicalize(folder.path()).unwrap();
     for dir in [
@@ -169,8 +178,7 @@ fn lamp(engine: &str) -> Lamp {
     )
     .unwrap();
     fs::set_permissions(&stub, fs::Permissions::from_mode(0o755)).unwrap();
-    let text = wrapper_text(engine)
-        .unwrap()
+    let text = text
         .replace(RUNS, top.join("runs").to_str().unwrap())
         .replace(
             hermes_install::RUN_FOLDERS,
@@ -619,4 +627,313 @@ fn programs_in_passes_over_other_lines() {
         ["/home/lampos/.local/bin/codex", "/opt/x/codex"]
     );
     assert!(programs_in("codex", "").is_empty());
+}
+
+/// The agents the one run path is tried with: Hermes (its own data) and
+/// two plain ones.
+fn one_path_agents() -> Vec<Agent> {
+    vec![
+        hermes_install::agent(),
+        agent_of("claude").unwrap(),
+        agent_of("codex").unwrap(),
+    ]
+}
+
+/// #6685: the one run path's wrapper is the same bytes for every agent but
+/// its data block: the header before it and the run path after it (the run
+/// lines, the `--net` lines and the `unshare` line among them) are equal
+/// for Hermes, Claude Code and Codex, and name no agent.
+#[test]
+fn the_one_run_path_is_the_same_bytes_for_every_agent() {
+    let texts: Vec<String> = one_path_agents()
+        .iter()
+        .map(|agent| one_path_text(agent).unwrap())
+        .collect();
+    let split = |text: &str| {
+        let data = text.find("\nE=").unwrap() + 1;
+        let run = text.find(ONE_PATH_RUN_LINE).unwrap();
+        (text[..data].to_owned(), text[run..].to_owned())
+    };
+    let (header, run) = split(&texts[0]);
+    assert_eq!(run, format!("{ONE_PATH_RUN_LINE}{ONE_PATH_RUN}"));
+    for text in &texts {
+        assert_eq!(split(text), (header.clone(), run.clone()));
+        assert!(text.starts_with(&format!("#!/bin/sh\n{ONE_PATH_MARK}")));
+        assert!(text[..MARK_WITHIN].contains(MARK));
+        assert_eq!(text.matches(hermes_install::ONE_RUN_LINES).count(), 1);
+        sh_n(text);
+    }
+    let lower = format!("{header}{run}").to_lowercase();
+    for name in ["hermes", "claude", "codex", "openclaw", "yolo"] {
+        assert!(!lower.contains(name), "{name} in the shared lines");
+    }
+    for line in [
+        "unset LAMP_CONTROL_TOKEN LAMP_NS_NET\n",
+        "N=\n[ \"${LAMP_NS_NET-}\" != run ] || N=--net\n",
+        "exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/agent-ns \"$@\"\n",
+        hermes_install::ONE_RUN_LINES,
+    ] {
+        assert_eq!(run.matches(line).count(), 1, "{line}");
+    }
+    assert!(run.contains(&format!("\"{}\"", super::super::HOOK_NOTE)));
+    // Hermes's approvals are its own data, set only in a skill's run.
+    assert!(!hermes_install::ONE_RUN_LINES.contains("HERMES"));
+    assert!(texts[0].contains(&format!(
+        "\nE=hermes\nH={}\nX={}\nagent_env() {{\n{}  :\n}}\nagent_run_env() {{\n{}  :\n}}\n",
+        hermes_install::PLACE,
+        hermes_install::HERMES,
+        hermes_install::AGENT_ENV,
+        hermes_install::AGENT_RUN_ENV
+    )));
+    assert!(texts[1].contains(
+        "\nE=claude\nH=/var/lib/lampos-agents/claude\nX=\nagent_env() {\n  :\n}\nagent_run_env() {\n  :\n}\n"
+    ));
+    // The pinned texts lamp-tasks checks its capability check against.
+    assert_eq!(texts[0], include_str!("one-path-hermes.sh"));
+    assert_eq!(texts[1], include_str!("one-path-claude.sh"));
+}
+
+/// An agent's data is refused unless plain: the engine's name, its home
+/// (its own under [`HOMES`] or one of [`OWN_HOMES`], never another lamp
+/// service's state), its program and its lines.
+#[test]
+fn the_one_path_refuses_data_that_is_not_plain() {
+    let good = agent_of("claude").unwrap();
+    assert!(one_path_text(&good).is_ok());
+    let refused = |change: &dyn Fn(&mut Agent)| {
+        let mut agent = good.clone();
+        change(&mut agent);
+        assert!(one_path_text(&agent).is_err(), "{agent:?}");
+    };
+    refused(&|agent| agent.engine = "Claude".into());
+    refused(&|agent| agent.engine = "a b".into());
+    refused(&|agent| agent.home = "/var/lib/lampos-cloud".into());
+    refused(&|agent| agent.home = "/var/lib/lampos-agents/codex".into());
+    refused(&|agent| agent.home = "/var/lib/lampos-agents/claude/..".into());
+    refused(&|agent| agent.program = Some("bin/claude".into()));
+    refused(&|agent| agent.program = Some("/opt/a b/claude".into()));
+    refused(&|agent| agent.program = Some("/opt/../claude".into()));
+    refused(&|agent| agent.program = Some("/opt/$(id)".into()));
+    refused(&|agent| agent.env = "X=1\n".into());
+    refused(&|agent| agent.run_env = "  X=1".into());
+    let mut hermes_home = good.clone();
+    hermes_home.home = hermes_install::PLACE.into();
+    assert!(
+        one_path_text(&hermes_home).is_ok(),
+        "one of the agents' homes"
+    );
+    assert_eq!(
+        text_for("claude", SHOWN[0]).unwrap(),
+        wrapper_text("claude").unwrap()
+    );
+    let on = Shown {
+        one_path: true,
+        ..SHOWN[3]
+    };
+    assert_eq!(
+        text_for("claude", on).unwrap(),
+        one_path_text(&good).unwrap()
+    );
+}
+
+/// (#6685) A plain agent on the one run path does as before: a run's token
+/// file read once and deleted, the token in its environment only, `--net`
+/// in a run alone, the program the first on `PATH` that is no wrapper,
+/// and its home given to the namespace.
+#[test]
+fn a_plain_agent_on_the_one_path_reads_its_runs_token_once() {
+    let text = one_path_text(&agent_of("eng").unwrap()).unwrap();
+    let lamp = lamp_of("eng", &text);
+    let file = lamp.token_file("run-1");
+    let folder = lamp.folder("run-1");
+    let out = lamp.run_in(&folder, &[("HERMES_YOLO_MODE", "1")], &lamp.path());
+    assert!(out.status.success(), "{out:?}");
+    assert!(!file.exists());
+    let argv = lamp.read("argv").unwrap();
+    assert!(!argv.contains(TOKEN));
+    assert!(argv.lines().any(|line| line == "--net"));
+    let env = lamp.read("env").unwrap();
+    let lines: Vec<&str> = env.lines().collect();
+    for line in [
+        format!("{TOKEN_ENV}={TOKEN}"),
+        "LAMP_NS_NET=run".to_owned(),
+        "LAMP_NS_ENGINE=eng".to_owned(),
+        "LAMP_NS_HOME=/var/lib/lampos-agents/eng".to_owned(),
+        format!("LAMP_NS_ENGINE_BIN={}", lamp.real.display()),
+    ] {
+        assert!(lines.contains(&line.as_str()), "{line}: {env}");
+    }
+    let again = lamp.run_in(&folder, &[], &lamp.path());
+    assert!(!again.status.success());
+    assert!(String::from_utf8_lossy(&again.stderr).contains("eng: no token for run run-1"));
+    // Not a run's folder: no token, no `--net`, whatever the caller says.
+    let out = lamp.run(
+        &[(TOKEN_ENV, "given"), ("LAMP_NS_NET", "run")],
+        &lamp.path(),
+    );
+    assert!(out.status.success(), "{out:?}");
+    assert!(!lamp.read("argv").unwrap().contains("--net"));
+    let env = lamp.read("env").unwrap();
+    assert!(
+        !env.contains(TOKEN_ENV) && !env.contains("LAMP_NS_NET"),
+        "{env}"
+    );
+}
+
+/// (#6685) Hermes on the one run path: its own program and home from its
+/// data, its forwarder token and `HERMES_HOME` at every start (none ends
+/// it, the run's token file already gone), and `HERMES_YOLO_MODE` set in
+/// a skill's run only, an inherited one dropped elsewhere.
+#[test]
+fn hermes_on_the_one_path_has_its_data_and_approvals_off_only_in_a_run() {
+    let folder = tempfile::tempdir().unwrap();
+    let top = fs::canonicalize(folder.path()).unwrap();
+    let place = top.join("hermes-home");
+    let program = place.join(".local/bin/hermes");
+    fs::create_dir_all(program.parent().unwrap()).unwrap();
+    fs::write(&program, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    let forwarder = top.join("hermes-token");
+    fs::write(&forwarder, "tok_forwarder\n").unwrap();
+    let text = one_path_text(&hermes_install::agent())
+        .unwrap()
+        .replace(hermes_install::TOKEN, forwarder.to_str().unwrap())
+        .replace(hermes_install::PLACE, place.to_str().unwrap());
+    let lamp = lamp_of("hermes", &text);
+    let file = lamp.token_file("run-1");
+    let out = lamp.run_in(&lamp.folder("run-1"), &[], "/usr/bin:/bin");
+    assert!(out.status.success(), "{out:?}");
+    assert!(!file.exists());
+    let env = lamp.read("env").unwrap();
+    let lines: Vec<&str> = env.lines().collect();
+    for line in [
+        format!("{TOKEN_ENV}={TOKEN}"),
+        "HERMES_YOLO_MODE=1".to_owned(),
+        "LAMP_HERMES_TOKEN=tok_forwarder".to_owned(),
+        format!("HERMES_HOME={}/.hermes", place.display()),
+        format!("LAMP_NS_HOME={}", place.display()),
+        format!("LAMP_NS_ENGINE_BIN={}", program.display()),
+        "LAMP_NS_ENGINE=hermes".to_owned(),
+    ] {
+        assert!(lines.contains(&line.as_str()), "{line}: {env}");
+    }
+    assert!(
+        lamp.read("argv")
+            .unwrap()
+            .lines()
+            .any(|line| line == "--net")
+    );
+    let out = lamp.run(&[("HERMES_YOLO_MODE", "1")], "/usr/bin:/bin");
+    assert!(out.status.success(), "{out:?}");
+    let env = lamp.read("env").unwrap();
+    assert!(!env.contains("HERMES_YOLO_MODE"), "{env}");
+    assert!(env.contains("LAMP_HERMES_TOKEN=tok_forwarder"));
+    // No forwarder token: nothing runs, and a run's file is gone first.
+    fs::remove_file(&forwarder).unwrap();
+    let file = lamp.token_file("run-2");
+    let out = lamp.run_in(&lamp.folder("run-2"), &[], "/usr/bin:/bin");
+    assert!(!out.status.success());
+    assert!(lamp.read("argv").is_none());
+    assert!(!file.exists());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("hermes: no forwarder token"));
+}
+
+/// (#6685) With the one run path, the namespace script takes the agent's
+/// home from its wrapper: every edit found once for every switch, the home
+/// checked against the agents' homes (its own under [`HOMES`], or one of
+/// [`OWN_HOMES`]) before anything is mounted, and the only agent's word in
+/// it the homes' list. Off, it is as before.
+#[test]
+fn the_one_path_namespace_takes_the_home_from_the_wrapper_and_checks_it() {
+    for shown in SHOWN {
+        let off = ns_text(shown);
+        let on = Shown {
+            one_path: true,
+            ..shown
+        };
+        for (from, _) in ONE_PATH_NS_EDITS {
+            assert_eq!(off.matches(from).count(), 1, "{shown:?}: {from}");
+        }
+        assert_eq!(off.matches(ONE_PATH_HOME_ANCHOR).count(), 1);
+        let text = ns_text(on);
+        assert_ne!(text, off);
+        assert!(text.contains("\nH=${LAMP_NS_HOME-} W="));
+        assert!(!text.contains("H=/var/lib/lampos-agents/$E "));
+        assert!(text.contains(&one_path_home_check()));
+        assert!(text.contains(" LAMP_NS_HOME\n"));
+        assert!(text.find("LAMP_NS_HOME is not").unwrap() < text.find("mount -t tmpfs").unwrap());
+        let named: Vec<&str> = text
+            .lines()
+            .filter(|line| line.to_lowercase().contains("hermes"))
+            .collect();
+        assert_eq!(named, [one_path_home_check().lines().nth(1).unwrap()]);
+        assert_eq!(text.contains("control.sock"), shown.tasks);
+        sh_n(&text);
+    }
+    // The check itself, run with the homes moved under a folder.
+    let folder = tempfile::tempdir().unwrap();
+    let top = fs::canonicalize(folder.path()).unwrap();
+    let homes = top.join("agents");
+    let own = top.join("own");
+    fs::create_dir_all(homes.join("claude")).unwrap();
+    fs::create_dir_all(&own).unwrap();
+    symlink(&own, homes.join("linked")).unwrap();
+    let check = one_path_home_check()
+        .replace(HOMES, homes.to_str().unwrap())
+        .replace(OWN_HOMES[0], own.to_str().unwrap());
+    let check = check.split_once('\n').unwrap().1.to_owned();
+    let ok = |engine: &str, home: &Path| {
+        Command::new("/bin/sh")
+            .args([
+                "-c",
+                &format!(
+                    "fail() {{ echo \"$1\"; exit 1; }}\nE={engine} H={}\n{check}",
+                    home.display()
+                ),
+            ])
+            .output()
+            .unwrap()
+            .status
+            .success()
+    };
+    assert!(ok("claude", &homes.join("claude")));
+    assert!(ok("claude", &own), "an installer's own home");
+    assert!(!ok("codex", &homes.join("claude")), "another agent's home");
+    assert!(!ok("linked", &homes.join("linked")), "a link");
+    assert!(!ok("claude", &top), "no agent's home");
+    assert!(!ok("claude", &homes.join("claude/..")));
+    assert!(!ok("missing", &homes.join("missing")), "not there");
+}
+
+/// (#6685) A round with the one run path writes it for a plain agent, and
+/// the namespace script with it; either text this build writes is ours,
+/// so turning the switch either way writes the wrapper again.
+#[test]
+fn write_engine_writes_the_one_path_with_its_switch() {
+    let root = root();
+    let on = Shown {
+        one_path: true,
+        ..SHOWN[3]
+    };
+    let found = Some("/usr/local/bin/eng");
+    write_engine(root.path(), "eng", me(), on).unwrap();
+    assert_eq!(
+        fs::read_to_string(on_path(root.path(), "/usr/local/bin/eng")).unwrap(),
+        one_path_text(&agent_of("eng").unwrap()).unwrap()
+    );
+    assert_eq!(
+        fs::read_to_string(on_path(root.path(), NS)).unwrap(),
+        ns_text(on)
+    );
+    assert!(present(root.path(), "eng", on, found));
+    assert!(!present(root.path(), "eng", SHOWN[3], found));
+    assert!(ours(root.path(), "eng"));
+    assert_eq!(ours_written(root.path()), ["eng"]);
+    write_engine(root.path(), "eng", me(), SHOWN[3]).unwrap();
+    assert!(present(root.path(), "eng", SHOWN[3], found));
+    assert!(ours(root.path(), "eng"));
+}
+
+fn on_path(root: &Path, path: &str) -> PathBuf {
+    on(root, path)
 }

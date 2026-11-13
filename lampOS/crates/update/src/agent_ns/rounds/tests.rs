@@ -6,6 +6,7 @@ use std::{fs, os::unix::fs::MetadataExt, path::Path};
 const SHOWN: Shown = Shown {
     skills: true,
     tasks: false,
+    one_path: false,
 };
 
 fn engine(state: &str) -> EngineInstall {
@@ -187,6 +188,7 @@ fn a_round_writes_each_engine_and_again_only_when_not_there() {
     let other = Shown {
         skills: false,
         tasks: true,
+        one_path: false,
     };
     let written = after_round(
         root.path(),
