@@ -1560,7 +1560,15 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   (`services::answered_in_place`, `Pending.in_place`, as the lamp asking
   once more is not): on a tester's lamp on 11 Nov a 0-word noise cut the
   lamp's answer to the yes, was answered in its place, and the next yes
-  dropped the write. A line with words of its own answered in a held line's
+  dropped the write. So is a line of no words heard as a call and asked as
+  the name ("Lamp."), unless said by the name just before; and while the
+  write waits for the answer its read-back asked for, such a call is not
+  answered at all but left as a sound (`services::awaits_an_answer`,
+  journal "only the lamp's name, and no words of it came back, while a
+  write waits for its answer: not answered as a call"): on a tester's lamp
+  on 13 Nov a line of no words at the second of the lamp's own arrival move
+  was answered as the name, and the one "Yes." after it found the mail
+  dropped (#6363). A line with words of its own answered in a held line's
   place (a real question cut short) still counts as another request (the
   Reviewer-lead's P3 on #6367).
 - **The lamp's own echo is no line of the person's** (#5846). A line the
