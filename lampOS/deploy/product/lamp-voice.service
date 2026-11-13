@@ -364,6 +364,10 @@ Environment=LAMP_TASKS_WHO=on
 # Work goes only to the agent named: one named who isn't set up is said so, never given to another (#1722; the
 # 27 Oct demo, where "have Hermes do it" went to Claude Code unsaid, #3504). Checked on lamp-75c9 on 22 Oct.
 Environment=LAMP_TASKS_NAMED_ONLY=on
+# After a read-back, "no, I said tea" prepares the corrected ask in place of the one waiting, and only a later yes starts
+# it (#2838, #6857). Played on lamp-75c9 at 12728, 13 Nov: the correction then yes started only the corrected ask; a plain
+# no, a reworded repeat and "yes, and also" each started nothing.
+Environment=LAMP_TASKS_CORRECT=on
 # Harness signed in from the owner's app by its 8-digit code (#5198), with the voice's own sign-in under it (#1676),
 # which the app's needs; in the voice the code is said digit by digit, and a sign-in the app started is never said.
 # lamp-tasks.service runs with --sign-in-by-code --app-socket, lamp-cloud.service with the same switch. The PM's
