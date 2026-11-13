@@ -1,8 +1,8 @@
 name: lampOS Harness pin
 
 # The Harness pin follows Harness's releases by itself (#5957 part 1; the
-# first builder, 10 Nov 23:14 on #6059: the workflow file alone, opened with
-# the workflow's own token).
+# first builder, 10 Nov 23:14 on #6059: the workflow file alone; its PR is
+# opened with the pin App's token, below).
 #
 # Once a day, it reads Harness's CDN manifest. When its `cli.version` is newer
 # than the build's pin (`product::VERSION`), it:
@@ -22,15 +22,30 @@ name: lampOS Harness pin
 # `docs/lamp-runs.md` passes ("Each Harness pin move", #5957 (b)), and it reaches
 # stable only on a promote after that.
 #
-# A PR opened with this workflow's own GITHUB_TOKEN starts no `pull_request`
-# workflows, so step 3 runs here, before the PR is opened. The PR's own CI
-# (ARM64, clippy) starts on its first push by a person (an empty commit will do).
+# The branch is pushed and the PR opened with a token of the pin GitHub App
+# (secrets LAMPOS_PIN_APP_ID and LAMPOS_PIN_APP_KEY), minted just before, so the
+# PR's own CI (ARM64, clippy) starts by itself (#5957). A push or a PR made with
+# the workflow's own GITHUB_TOKEN would start no workflows; the checkout keeps
+# no credentials, so nothing pushes with it. Step 3 still runs here, before the
+# PR is opened.
+#
+# A dispatch with `proof: true` proves that token and nothing else: it skips
+# Harness's manifests and the open-PR check, and opens a DRAFT PR from
+# `ci/pin-proof-<run id>` that adds one note under lampOS/docs/ (so the doc
+# links check starts on it). It never touches a `ci/harness-pin-*` branch or
+# closes a pin PR. Close the draft, with its branch, once its checks started.
+#   gh workflow run lampos-harness-pin.yml --ref lamp-voice -f proof=true
 #
 # Scheduled workflows run from the default branch (lamp-voice).
 on:
   schedule:
     - cron: '0 1 * * *'
   workflow_dispatch:
+    inputs:
+      proof:
+        description: 'Open a draft proof PR with the pin App token; no pin move'
+        type: boolean
+        default: false
 
 concurrency:
   group: lampos-harness-pin
@@ -50,9 +65,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: lamp-voice
+          # The push uses the pin App's token, never this run's GITHUB_TOKEN.
+          persist-credentials: false
 
       - name: Read Harness's manifests; copy a newer pin
         id: pin
+        if: ${{ !inputs.proof }}
         run: |
           python3 -I - <<'PY'
           import datetime, hashlib, json, os, pathlib, re, sys, urllib.request
@@ -301,10 +319,20 @@ jobs:
               su harness-on -s /bin/sh -c "~/.local/bin/harness --help" >/dev/null
             '
 
+      # Minted here, not at the start: an App token lasts one hour, and the
+      # steps above can take longer.
+      - name: Mint the pin App's token
+        id: app
+        if: steps.pin.outputs.changed == 'true' || inputs.proof
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ secrets.LAMPOS_PIN_APP_ID }}
+          private-key: ${{ secrets.LAMPOS_PIN_APP_KEY }}
+
       - name: Open the pin PR
         if: steps.pin.outputs.changed == 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           PINNED: ${{ steps.pin.outputs.pinned }}
           NEWEST: ${{ steps.pin.outputs.newest }}
           NO_ARCH: ${{ steps.pin.outputs.no_arch }}
@@ -322,7 +350,7 @@ jobs:
           git add -A lampOS/deploy/harness lampOS/crates/update/src/harness_install/product.rs \
             lampOS/docs/install.md
           git commit -q -m "lampOS: the Harness pin moves to $NEWEST, copied by CI (#5957)"
-          git push -q origin "$branch"
+          git push -q "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" "$branch"
           body=$(cat <<EOF
           The Harness pin moves from $PINNED to $NEWEST, copied by \`lampos-harness-pin.yml\` (#5957 part 1).
 
@@ -335,7 +363,7 @@ jobs:
           - the pinned install on ARM64 from those copies on 127.0.0.1: \`harness version\` says $NEWEST, and \`harness --help\` runs.
 
           **Before it merges:**
-          - this PR was opened with the workflow's own token, so its own CI hasn't started yet: a push (an empty commit will do) starts ARM64 and clippy;
+          - its own CI (ARM64, clippy) passes: it starts by itself, as this PR was opened with the pin App's token;
           - a reader's READ-OK;
           - **its lamp row passes:** "Each Harness pin move" in \`docs/lamp-runs.md\` (#5957 (b)). The lamp moves from $PINNED to $NEWEST in one update round, its sign-in still holds, and one hand-over and one follow-up go through.
 
@@ -353,3 +381,24 @@ jobs:
               gh pr close "$older" --comment "Superseded by the pin PR for Harness $NEWEST." \
                 --delete-branch
             done
+
+      - name: Open a draft proof PR (dispatch with proof)
+        if: inputs.proof
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          # Never a ci/harness-pin-* branch: a proof run can't touch a pin PR.
+          branch="ci/pin-proof-$GITHUB_RUN_ID"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          note=lampOS/docs/harness-pin-proof.md
+          printf '# Harness pin proof\n\nOpened by %s to show that a PR opened with the pin App token starts its own checks (#5957). Not for merging.\n' "$RUN" > "$note"
+          git add "$note"
+          git commit -q -m "lampOS CI: a proof that the pin App's PR starts its own checks (#5957)"
+          git push -q "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" "$branch"
+          gh pr create --draft --base lamp-voice --head "$branch" \
+            --title "[proof] lampOS: the Harness pin PR opens with the pin App's token (#5957)" \
+            --body "Opened by $RUN with the pin App's token. PASS: its checks (the doc links check) start with no push by a person. Close it, with its branch, once they have. Part of #5957"
