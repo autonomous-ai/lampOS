@@ -113,8 +113,8 @@ way to add one to a paired computer. For each grant:
 | `speaker` | the same, with `speaker` in the list | the grant alone is not enough: the stream is off unless `lamp-control` runs `--speaker on` (`LAMP_CONTROL_SPEAKER`), which no unit sets; the pairing screen says it "can play any sound through the lamp's speaker, not only its own voice"; the app does not offer it |
 | `notes` | the same (a code made on the lamp) | not on the app's screen either, per App Only's list of nine |
 
-Asking for one without it is refused `no_grant`: "not granted: camera (the app does not
-grant it yet: only a pairing code made on the lamp itself carries it)". Hand-editing a
+Asking for one without it is refused `no_grant`: "not granted: camera (only the owner can add it:
+with a new pairing code that names it, or by changing the grants of this computer)". Hand-editing a
 pairing's file is not a way: it skips the owner's consent. Whether the app will offer
 `camera` and `microphone` is the first builder's decision (it widens what a developer computer can
 take from the room); the proposal, with the owner's switch for the microphone, is on #6059.
@@ -217,8 +217,8 @@ refusals in the lamp's own words, and its status.
   so. *Planned* means it is named in the protocol but nothing serves it yet.
 - **Every op but `pair` and `hello`** needs `hello` first on the connection (`no_hello`,
   "say hello first"). A missing grant is always `no_grant`, "not granted: …" with the grant's
-  name; for `camera` and `microphone` it adds "(the app does not grant it yet: only a pairing code made on the lamp itself carries it)",
-  since the app does not offer these two (the fakes say the same).
+  name; for `camera` and `microphone` it adds "(only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)",
+  since the owner can add them with a new pairing code or by changing the computer's grants (the fakes say the same).
 - **The rates are off by default** on customer lamps (`limits.rates` is `"off"`). The rates in
   the Limits column hold only where the lamp's `--rates default` is set, except the phrase
   cap and "refused actions: 20 a second", which always hold.

@@ -51,7 +51,7 @@ test('a row the lamp did not grant is REFUSED (as designed), exit 0; a refusal f
   assert.equal(grantRefusal('no_grant: not granted: speak, hear', ['body', 'speak']), true, 'one of a list is missing');
   assert.equal(grantRefusal('no_grant: not granted: speak', ['body', 'speak']), false, 'the pairing HAS it: that is a real refusal');
   // The lamp's own long line for the camera and the microphone names the grant first and goes on.
-  const long = 'no_grant: not granted: camera (the app does not grant it yet: only a pairing code made on the lamp itself carries it)';
+  const long = 'no_grant: not granted: camera (only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)';
   assert.equal(grantRefusal(long, ['body', 'speak']), true, 'a pairing without camera: refused as designed');
   assert.equal(grantRefusal(long, ['body', 'camera']), false, 'a pairing WITH camera and the same answer is a real FAIL');
   assert.equal(grantRefusal('refused: spoken', ['body']), false);

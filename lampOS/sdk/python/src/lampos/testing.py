@@ -494,7 +494,7 @@ def _not_granted(missing: list[str]) -> str:
     says the way out."""
     said = f"not granted: {', '.join(missing)}"
     if any(g in ("camera", "microphone") for g in missing):
-        return f"{said} (the app does not grant it yet: only a pairing code made on the lamp itself carries it)"
+        return f"{said} (only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)"
     return said
 
 

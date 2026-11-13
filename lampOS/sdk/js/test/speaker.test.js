@@ -103,7 +103,7 @@ test('a sample rate the lamp does not take is refused', async () => {
 
 test('without the speaker grant the lamp says the way out, as for the camera', async () => {
   await withLamp({ grants: ['body'] }, async (lamp, fake) => {
-    await assert.rejects(lamp.speakerStream(), (e) => e instanceof byCode.no_grant && /^not granted: speaker \(the app does not grant it yet/.test(e.why));
+    await assert.rejects(lamp.speakerStream(), (e) => e instanceof byCode.no_grant && /^not granted: speaker \(only the owner can add it/.test(e.why));
     assert.equal(fake.speaker, null);
   });
 });

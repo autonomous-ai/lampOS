@@ -1878,11 +1878,10 @@ fn refused_by_lease(re: u64, refusal: Refusal) -> Outcome {
     reply_refused(Some(re), error)
 }
 
-/// What a refusal for a missing grant says. For `camera` and `microphone` it adds the honest way out: the app
-/// does not offer these two (App Only, 11 Nov), only a pairing code made on the lamp itself carries them (a
-/// developer who needed them, #6257's author, edited the pairing by hand).
-pub(crate) const APP_DOES_NOT_GRANT_HINT: &str =
-    "the app does not grant it yet: only a pairing code made on the lamp itself carries it";
+/// What a refusal for a missing grant says. For `camera` and `microphone` it adds the honest way out: only the
+/// owner can add them, with a new pairing code that names them or by changing the computer's grants
+/// (`set_grants`, `lamp-control grants`, #6277); a developer's own edit of the pairing file is no way.
+pub(crate) const APP_DOES_NOT_GRANT_HINT: &str = "only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer";
 
 fn not_granted(missing: &[String]) -> String {
     let said = format!("not granted: {}", missing.join(", "));
@@ -2644,7 +2643,7 @@ mod tests {
         assert_eq!(code_of(&refused), Some("no_grant"));
         assert_eq!(
             reply(&refused)["error"]["why"],
-            "not granted: camera (the app does not grant it yet: only a pairing code made on the lamp itself carries it)"
+            "not granted: camera (only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)"
         );
         let refused = send(
             &mut door,
@@ -2654,7 +2653,7 @@ mod tests {
         );
         assert_eq!(
             reply(&refused)["error"]["why"],
-            "not granted: microphone (the app does not grant it yet: only a pairing code made on the lamp itself carries it)"
+            "not granted: microphone (only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)"
         );
         let refused = send(
             &mut door,
