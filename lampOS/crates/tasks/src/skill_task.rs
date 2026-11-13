@@ -909,6 +909,21 @@ pub const WRAPPER_RUN_LINES: [&str; 2] = [
 /// Said when the wrapper lacks [`WRAPPER_RUN_LINES`]: nothing is started.
 pub const NOT_FOUND_BY_FOLDER: &str = "the lamp's Hermes can't take a skill's run through Harness yet (its wrapper doesn't find a run by its folder: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
 
+/// Said instead of why a run wasn't started through Harness when Harness
+/// says it isn't signed in (the first builder's 10:44 on the Queue, until
+/// #6685's PR 3 starts a run without Harness): lamp-skills' journal line
+/// for the skill's `do.task` carries it ([`unless_signed_out`]).
+pub const SIGNED_OUT: &str = "This skill's task can't run yet: Harness isn't signed in on this lamp. Sign in to Harness from the app to let it run.";
+
+/// `why` a run wasn't started, or [`SIGNED_OUT`] when Harness's own
+/// `auth status` says it isn't signed in; a sign-in not read keeps `why`.
+pub fn unless_signed_out(why: String, sign_in: Result<crate::harness::SignIn, String>) -> String {
+    match sign_in {
+        Ok(crate::harness::SignIn::Out) => SIGNED_OUT.into(),
+        _ => why,
+    }
+}
+
 /// Whether `wrapper` (a wrapper's text) carries [`WRAPPER_RUN_LINES`] and
 /// [`WRAPPER_NET_LINES`].
 pub fn finds_runs_by_folder(wrapper: &str) -> bool {
@@ -1206,11 +1221,19 @@ impl Runner for HarnessRunner {
                 "Harness isn't set up on this lamp yet, so a skill's run can't be started".into(),
             );
         };
+        // Signed out, a run Harness can't start says so ([`SIGNED_OUT`]),
+        // asked only once the run is refused.
+        let signed_out = |why: String| {
+            let sign_in = Cli::new(harness.config.clone(), harness.session.clone())
+                .map_err(|error| error.to_string())
+                .and_then(|cli| cli.signed_in());
+            unless_signed_out(why, sign_in)
+        };
         let Some(lamp) = (harness.lamp)() else {
-            return Err(
+            return Err(signed_out(
                 "the lamp has no Harness target of its own yet (Hermes on the lamp is off, or Harness hasn't looked), so nothing was started"
                     .into(),
-            );
+            ));
         };
         // The lamp's default agent when it can take a run and the switch is
         // on (#6685), else the lamp's own Hermes on the lamp's machine (V2's
@@ -1297,7 +1320,10 @@ impl Runner for HarnessRunner {
                 return Err("Harness didn't start the run at once, so it was given up".into());
             }
             LaunchOutcome::NotSent { code } | LaunchOutcome::Uncertain { code } => {
-                return Err(format!("Harness didn't start the run ({code})"));
+                return Err(unless_signed_out(
+                    format!("Harness didn't start the run ({code})"),
+                    cli.signed_in(),
+                ));
             }
         };
         started.agent = Some(agent.clone());
@@ -2720,6 +2746,27 @@ mod tests {
         assert!(environment.contains(&format!("{PYTHONPATH_ENV}={SDK_PYTHONPATH}")));
         // Nothing of lamp-tasks' own environment is passed on.
         assert!(!environment.contains("CARGO"), "{environment}");
+    }
+
+    /// The first builder's 10:44 on the Queue: a run Harness can't start
+    /// says why in the person's words when Harness is signed out; signed
+    /// in, offline or a sign-in not read keeps its own words.
+    #[test]
+    fn a_run_refused_with_harness_signed_out_says_so() {
+        use crate::harness::SignIn;
+        let why = || "Harness didn't start the run (new_failed)".to_owned();
+        assert_eq!(
+            unless_signed_out(why(), Ok(SignIn::Out)),
+            "This skill's task can't run yet: Harness isn't signed in on this lamp. \
+             Sign in to Harness from the app to let it run."
+        );
+        for sign_in in [
+            Ok(SignIn::In),
+            Ok(SignIn::Offline),
+            Err("auth_status_failed".to_owned()),
+        ] {
+            assert_eq!(unless_signed_out(why(), sign_in), why());
+        }
     }
 
     #[test]

@@ -288,7 +288,18 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     tên (#6506). Socket điều khiển, SDK và bridge trong namespace của các
     engine khác là bước 2b. Không có đích của đèn, hay Harness chưa sẵn sàng (không
     có chương trình Harness, hay phần này đang khởi động), cũng bị từ chối
-    bằng lời. Một `/usr/local/bin/hermes` thiếu các dòng nhận lần chạy
+    bằng lời. Khi không có đích của đèn, hay Harness không khởi động lần
+    chạy (`harness new` không gửi được hoặc không chắc), lamp-tasks đọc
+    trạng thái đăng nhập của Harness một lần (`harness auth status
+    --json`); nếu chưa đăng nhập, lời từ chối nói lý do bằng lời cho người
+    dùng (`skill_task::SIGNED_OUT`, theo yêu cầu 10:44 ngày 13/11 của
+    builder đầu tiên, cho tới khi PR 3 của #6685 chạy được mà không cần
+    Harness): "This skill's task can't run yet: Harness isn't signed in on
+    this lamp. Sign in to Harness from the app to let it run." Lời này được
+    trả về lamp-skills với mã `run_failed`, và dòng nhật ký của lamp-skills
+    cho `do.task` của kỹ năng mang nó; giọng nói và app chưa nói nó. Khi đã
+    đăng nhập, offline hay không đọc được trạng thái, lời vẫn như trước.
+    Một `/usr/local/bin/hermes` thiếu các dòng nhận lần chạy
     (`WRAPPER_RUN_LINES`) hay các dòng mạng (`WRAPPER_NET_LINES`) bị từ
     chối `NOT_FOUND_BY_FOLDER` (`LAMP_SKILL_TASKS` của lamp-update tắt hoặc
     vòng của nó chưa chạy): không tạo hay khởi động gì, nên một lần chạy
