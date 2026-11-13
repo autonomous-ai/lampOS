@@ -620,3 +620,32 @@ fn set_up_later_runs_with_no_harness_and_no_targets_and_refuses_with_why() {
             .any(|pair| pair.key == "handovers_off" && pair.value == "no_harness")
     );
 }
+
+/// #6685 PR 3, the first builder's ask: the product unit starts lamp-tasks on
+/// a lamp with no Harness program, so it runs as the test above does (hand-overs
+/// off, each refused as `no_harness`, its health ok) and a skill's run can still
+/// go to the lamp's own agent. Only setup's marker holds it back.
+#[test]
+fn the_product_unit_starts_the_part_with_no_harness_program() {
+    let unit = include_str!("../../../deploy/product/lamp-tasks.service");
+    let conditions: Vec<&str> = unit
+        .lines()
+        .filter(|line| line.starts_with("Condition"))
+        .collect();
+    assert_eq!(
+        conditions,
+        ["ConditionPathExists=/var/lib/lampos-setup/done"],
+        "only setup's marker"
+    );
+    let exec = unit
+        .lines()
+        .find(|line| line.starts_with("ExecStart="))
+        .expect("the unit's ExecStart");
+    let args: Vec<&str> = exec.split_whitespace().collect();
+    assert!(args.contains(&"--set-up-later"), "{exec}");
+    assert!(
+        args.windows(2)
+            .any(|pair| pair == ["--harness", "/usr/local/bin/harness"]),
+        "{exec}"
+    );
+}

@@ -1415,6 +1415,20 @@ harness-on` left the part failing at every start (`tasks: No such file or
 directory (os error 2)`) until systemd stopped restarting it. Every file
 error at start names its path, e.g. `tasks:
 /var/lib/lampos-tasks/targets.json: No such file or directory (os error 2)`.
+**No Harness program at all** (#6685 PR 3, the first builder's ask): the
+product unit no longer has `ConditionPathExists=/usr/local/bin/harness`
+(it had since #811), so systemd starts the part on such a lamp too; only
+setup's marker holds it back. With no program at `--harness`, the part
+runs with hand-overs off: each one is refused as `no_harness` (the voice
+says `agent_tasks::NO_HARNESS`, "I can't hand work on to another computer
+yet: that isn't set up on this lamp. It can be set up later."), and its
+health item is ok, "Harness is not installed on this lamp; hand-overs are
+off until it is". A Harness installed later is used once lamp-update's
+install restarts the part. Tests:
+`set_up_later_runs_with_no_harness_and_no_targets_and_refuses_with_why` and
+`the_product_unit_starts_the_part_with_no_harness_program`
+(`crates/tasks/tests/runtime_failures.rs`).
+
 The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
 (`crates/update/tests/install.rs`):
 
@@ -3407,8 +3421,10 @@ the lamp listed ten machines, the lamp itself among them ("current").
 `crates/voice/src/agent_tasks.rs`, off unless the voice's unit sets
 `LAMP_TASKS_DIR` (the directory holding `request.sock` and `voice.sock`;
 `LAMP_TASKS_TARGET` names the alias, `office` unless set). On a home lamp
-without Harness the tasks part is not started (its unit's
-`ConditionPathExists`, #811). With `LAMP_TASKS_NEEDS=/usr/local/bin/harness`
+without Harness the tasks part was not started (its unit's
+`ConditionPathExists`, #811); since #6685 PR 3 it starts and refuses each
+hand-over as `no_harness`, told as `NO_HARNESS` ("Before the lamp is set
+up for hand-overs", above). With `LAMP_TASKS_NEEDS=/usr/local/bin/harness`
 (the product voice unit; `--tasks-needs` to the provider worker), a call that
 cannot reach the part while that file is missing is answered in light words
 the model can say, "I can't hand work on to another computer yet: that isn't
