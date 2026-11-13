@@ -191,6 +191,12 @@ pub struct Supervisor<C: Clock = SystemClock> {
     exit: Option<ExitStatus>,
     failure: Option<String>,
     clock: C,
+    /// Tests only: the inhibit deadline a clean-stop test waits for. A test
+    /// child is a re-executed test binary on a possibly loaded host, so it gets
+    /// longer than the production bound; the production build always uses
+    /// `INHIBIT_DEADLINE_US` (20 ms), unchanged.
+    #[cfg(test)]
+    inhibit_deadline_us: u64,
 }
 impl Supervisor {
     /// Spawn a dedicated executable, no shell/config search. Setup may fork/open
@@ -293,7 +299,21 @@ impl<C: Clock + Copy> Supervisor<C> {
             exit: None,
             failure: None,
             clock,
+            #[cfg(test)]
+            inhibit_deadline_us: INHIBIT_DEADLINE_US,
         })
+    }
+    /// How long after a stop the child may take to acknowledge the inhibit:
+    /// `INHIBIT_DEADLINE_US` in every build but a test that widened it.
+    fn inhibit_deadline_us(&self) -> u64 {
+        #[cfg(test)]
+        {
+            self.inhibit_deadline_us
+        }
+        #[cfg(not(test))]
+        {
+            INHIBIT_DEADLINE_US
+        }
     }
     /// Explicit replacement only after the exact old child has been reaped.
     /// This creates an idle instance; no authority, qualification observation or
@@ -459,7 +479,7 @@ impl<C: Clock + Copy> Supervisor<C> {
             return;
         }
         if let Some(start) = self.stop_at {
-            if !self.inhibited && n.saturating_sub(start) >= INHIBIT_DEADLINE_US {
+            if !self.inhibited && n.saturating_sub(start) >= self.inhibit_deadline_us() {
                 self.fail("motor inhibit acknowledgement timed out", n)
             } else if self
                 .inhibited_received
