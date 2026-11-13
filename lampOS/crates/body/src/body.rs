@@ -370,17 +370,6 @@ pub fn strain_guard_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
-/// `LAMP_BODY_ENERGY=on` (#6893): each step of a gesture is stretched so
-/// no joint asks more than `Limits::servo_speed`, and the pose follower's
-/// acceleration slews at a bounded rate (an S-curve) (`Limits::energy`).
-/// Off: the body as before.
-pub const ENERGY: &str = "LAMP_BODY_ENERGY";
-
-/// Whether a value of [`ENERGY`] turns it on: only the exact value `on`.
-pub fn energy_switch(value: Option<&str>) -> bool {
-    value == Some("on")
-}
-
 /// One step of the pose follower: the joint's new velocity, critically
 /// damped toward a goal `gap` counts away, its acceleration at most
 /// `limits.acceleration` and its speed at most `limits.speed`. Under
@@ -1144,7 +1133,8 @@ pub struct Limits {
     pub strain_guard: Option<StrainGuard>,
     /// `LAMP_BODY_ENERGY=on` (#6893): gestures stretched to `servo_speed`
     /// ([`Limits::clip_ceiling`]) and the pose follower jerk-limited
-    /// ([`follow_step`]). Off: as before.
+    /// ([`follow_step`]). Off: as before. Read by the one reader of the
+    /// switch, [`crate::energy_in::enabled`], as the level is.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub energy: bool,
     /// A load above this on `load_steps` steps in a row makes the joint give
