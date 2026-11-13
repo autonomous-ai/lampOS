@@ -95,32 +95,28 @@ impl Pace {
 }
 
 /// The source's rate, for `fps_now`: when each new frame of the eyes was
-/// first seen, whichever stream saw it, and the last one's time on the file,
-/// so a frame two streams see counts once, and a slow stream's skipped
-/// frames still count.
+/// first seen, whichever stream saw it, with the frame's time on the file,
+/// so a frame two streams see counts once, however late one of them notes
+/// it, and a slow stream's skipped frames still count.
 #[derive(Default)]
-pub struct Rate(
-    std::sync::Mutex<(
-        std::collections::VecDeque<std::time::Instant>,
-        Option<SystemTime>,
-    )>,
-);
+pub struct Rate(std::sync::Mutex<std::collections::VecDeque<(std::time::Instant, SystemTime)>>);
 
 impl Rate {
-    /// A frame written at `modified` seen at `at`: counted once.
+    /// A frame written at `modified` seen at `at`: counted once. A stream
+    /// that read the frame's time and was descheduled before it got here
+    /// notes it after the other has noted the next frame; the frames of the
+    /// last [`RATE_OVER`] are all remembered, so that is not a second count.
     fn saw(&self, modified: SystemTime, at: std::time::Instant) {
         if let Ok(mut held) = self.0.lock() {
-            let (times, last) = &mut *held;
-            if *last == Some(modified) {
+            if held.iter().any(|(_, seen)| *seen == modified) {
                 return;
             }
-            *last = Some(modified);
-            times.push_back(at);
-            while times
+            held.push_back((at, modified));
+            while held
                 .front()
-                .is_some_and(|first| at.duration_since(*first) > RATE_OVER)
+                .is_some_and(|(first, _)| at.duration_since(*first) > RATE_OVER)
             {
-                times.pop_front();
+                held.pop_front();
             }
         }
     }
@@ -129,9 +125,9 @@ impl Rate {
     /// before two were seen in it.
     pub fn now(&self) -> Option<f64> {
         let held = self.0.lock().ok()?;
-        let times = &held.0;
-        let fresh: Vec<_> = times
+        let fresh: Vec<_> = held
             .iter()
+            .map(|(at, _)| at)
             .filter(|at| at.elapsed() <= RATE_OVER)
             .collect();
         let (first, last) = (fresh.first()?, fresh.last()?);
@@ -879,6 +875,27 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_frame_noted_late_by_a_stalled_stream_still_counts_once() {
+        let rate = Rate::default();
+        let t0 = std::time::Instant::now() - Duration::from_millis(1500);
+        let m = |ms: u64| SystemTime::UNIX_EPOCH + Duration::from_millis(ms);
+        // The eyes write a frame every 100 ms: 10 a second. Two streams look.
+        // Now and then one of them read a frame's time, stalled, and notes it
+        // only after the other has noted the NEXT frame.
+        for i in 0..15u64 {
+            let at = t0 + Duration::from_millis(100 * i);
+            rate.saw(m(1000 + 100 * i), at);
+            if i % 3 == 2 {
+                // The stalled stream's note of frame i - 1, then the other's of i again.
+                rate.saw(m(1000 + 100 * (i - 1)), at + Duration::from_millis(30));
+                rate.saw(m(1000 + 100 * i), at + Duration::from_millis(31));
+            }
+        }
+        let fps = rate.now().expect("measured");
+        assert!((9.5..=10.5).contains(&fps), "{fps}");
     }
 
     #[test]
