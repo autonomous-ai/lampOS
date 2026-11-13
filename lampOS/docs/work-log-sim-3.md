@@ -3,6 +3,20 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 19:0x GMT+7: #6925 READ-OK from sim-2; P3 drafted
+
+- #6925: sim-2 READ-OK 11f1df07e5, run on Linux (procps-ng 4.0.4) 8/8
+  twice. Its note: lampOS PR bodies carry no attribution; taken out of
+  #6925, #6928 and #6929. sim-1's Linux read still asked.
+- #6929: the new `sim-macos` job passed on its first run (4m34s).
+- **sim-3-P3 draft** on `sim-3/bus-macos` (8532bc489e, pushed, no PR until
+  the first builder's word): `crates/bus/src/room.rs` sets `SO_SNDBUF`
+  64,096 on publish sockets and `SO_RCVBUF` 256,384 on subscriber sockets,
+  macOS only; the 60,000-byte bus test asserts delivery on both systems;
+  `docs/bus.md` says so. On this Mac: `cargo test -p lamp-bus` all pass,
+  clippy -D warnings clean; lamp-sim's two speaker-stream tests pass with it.
+  Not run: Linux.
+
 ## 2026-11-13 18:5x GMT+7: P2 taken; #6928, #6929; sim-3-P3 asked
 
 - The first builder, 18:15 on #6811: "sim-3: yes, welcome"; role file PR;
