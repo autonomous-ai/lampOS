@@ -7851,6 +7851,7 @@ fn the_v2_image_keeps_cloudflare_and_google_and_never_names_chinas_servers() {
 }
 
 #[test]
+#[ignore = "PARKED (#6386): install no longer sets the name and time servers; re-enable when China is scheduled and stable's lamp-update carries #6810"]
 fn a_lamp_placed_in_china_lists_chinas_name_and_time_servers_after_the_routers() {
     let mut lamp = Lamp::new(188, &[]);
     fs::create_dir_all(lamp.on("/etc")).unwrap();
@@ -7929,6 +7930,7 @@ fn any_other_lamp_keeps_its_fallback_and_gets_no_time_drop_in() {
 }
 
 #[test]
+#[ignore = "PARKED (#6386): install no longer sets the name and time servers; re-enable when China is scheduled and stable's lamp-update carries #6810"]
 fn a_lamp_no_longer_placed_in_china_gets_the_images_fallback_back() {
     let mut lamp = Lamp::new(188, &[]);
     fs::create_dir_all(lamp.on("/etc")).unwrap();
@@ -7965,6 +7967,7 @@ fn a_lamp_no_longer_placed_in_china_gets_the_images_fallback_back() {
 }
 
 #[test]
+#[ignore = "PARKED (#6386): lamp-region's units are out of the product; re-enable when China is scheduled and stable's lamp-update carries #6810"]
 fn the_region_units_run_lamp_update_region_as_root_at_boot_and_on_a_change() {
     let unit = |name: &str| {
         install::PRODUCT
@@ -7986,4 +7989,26 @@ fn the_region_units_run_lamp_update_region_as_root_at_boot_and_on_a_change() {
     ] {
         assert!(service.lines().any(|kept| kept == line), "{line}");
     }
+}
+
+/// PARKED (#6386): a lamp-update before #6810 (stable 12587's, 12635's)
+/// refuses a build when a unit it would add starts through a `current`
+/// link that is there and that no installed part's unit starts through
+/// ("{link_path} is there, and no unit of this lamp starts through it").
+/// On a product lamp every part's link is owned by its unit except
+/// `update/current`, which only lamp-update's own unit (never added, never
+/// counted as a part) starts through. So no product unit but that one may
+/// start through `update/current`, or the fleet cannot take the build.
+#[test]
+fn no_product_unit_an_old_updater_would_add_starts_through_update_current() {
+    let through_update: Vec<&str> = PRODUCT
+        .iter()
+        .filter(|(name, _)| *name != lamp_update::round::OWN_UNIT)
+        .filter(|(_, text)| {
+            lamp_update::unit::linked(text)
+                .is_some_and(|(builds, _)| builds == lamp_update::own::FOLDER)
+        })
+        .map(|(name, _)| *name)
+        .collect();
+    assert_eq!(through_update, Vec::<&str>::new());
 }

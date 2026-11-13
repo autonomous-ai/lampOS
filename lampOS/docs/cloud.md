@@ -117,7 +117,7 @@ against lamp-06c1.
   the same folder (`/var/lib/lampos-cloud/region`, 0644, written whole and
   renamed into place) and the journal says `the backend places the lamp in
   region "CN"`. It is kept across boots and read at start, so only a change
-  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256). A failing ping is said once, and
+  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256); PARKED (#6386): that unit is out of the product until China is scheduled and stable's lamp-update carries #6810. A failing ping is said once, and
   once when it answers again. When the lamp's address moves, the HTTP
   client is made afresh, as V1 drops its idle connections.
 
