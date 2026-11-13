@@ -225,10 +225,15 @@ what's in front of me right now, but nothing is recorded or stored." on
 the second route (deepseek-flash): no text told the model it has one, and
 the built-in instruction's "Do not pretend to see" read as having none.
 Both built-in instructions (`config::CHAT_INSTRUCTION`,
-`CAMERA_CHAT_INSTRUCTION`) and this file now say the true thing: its eye
-is a camera that sees what is in front of it now and records and keeps
-nothing; asked whether it has a camera, it says yes, its eye is one, and
-never that it has none. "Do not pretend to see" is now "Do not pretend to
+`CAMERA_CHAT_INSTRUCTION`) and this file now say only the true thing:
+"Your eye is a camera: it sees what is in front of you now. It keeps no
+video or pictures; it remembers a face only when that person asks, and
+shows a picture to the model only when someone asks what you see." Asked
+whether it has a camera, it says yes, its eye is one, and never that it
+has none. Never "nothing is recorded or kept": the lamp keeps a face
+print when asked (`remember_my_face`), sends a picture to the chat model
+when asked what it sees, and with the face-expressions consent keeps how
+people looked (the Reviewer-lead's privacy hold on #6782). "Do not pretend to see" is now "Do not pretend to
 see what you were not shown". No guard rewrites a reply: the words are
 streamed as they come. Not yet heard on a lamp.
 
