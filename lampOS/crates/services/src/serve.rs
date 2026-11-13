@@ -4407,6 +4407,17 @@ mod tests {
         )));
         assert_eq!(answer["result"]["quoted"], json!([]), "{answer}");
         assert!(answer["result"].get("nothing_found_why").is_none());
+        // Files found but every one left out for length: found, so no key.
+        let files = json!({"service":"google_drive","what":"files","query":"Sunday"});
+        let cut = json!({"source":"Google Drive","quoted":[],"left_out":2,
+                         "left_out_why":"to keep the answer short"});
+        let told = reads::drive_none_told("google_drive", &files, cut.clone());
+        assert_eq!(told, cut);
+        let none = json!({"source":"Google Drive","quoted":[]});
+        assert_eq!(
+            reads::drive_none_told("google_drive", &files, none)["nothing_found_why"],
+            reads::DRIVE_ONLY_OWN
+        );
     }
 
     /// A Drive link with no scope that makes files is refused at the first
