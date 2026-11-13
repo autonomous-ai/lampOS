@@ -45,6 +45,12 @@ pub const NO_TOKEN: &str = "no token for this run";
 /// skills' own part defines where the yes lives.
 pub trait SkillYes: Send + Sync {
     fn grants(&self, skill: &str) -> Result<BTreeSet<Grant>, String>;
+    /// Whether `skill`'s token is for its fixed write alone, run through the
+    /// lamp's agent (`LAMP_SKILL_WRITE_AGENT`, `task_yes::KeptYes`): its
+    /// run's service calls then say so to lamp-services ([`Run::fixed_write`]).
+    fn fixed_write(&self, _skill: &str) -> bool {
+        false
+    }
 }
 
 /// A lamp that keeps no such yes yet: every mint is refused in words.
@@ -121,6 +127,10 @@ pub struct Run {
     pub until_us: u64,
     /// Which mint this is, so an old timeout cannot end a newer token.
     pub serial: u64,
+    /// Minted for a skill's fixed write ([`SkillYes::fixed_write`]): its
+    /// `service.write` goes to lamp-services with its run's id, held there
+    /// to the owner's kept yes for that content, once a run.
+    pub fixed_write: bool,
 }
 
 /// The live runs, by the digest of their token (the token itself is not kept).
@@ -156,9 +166,19 @@ impl Runs {
             grants,
             until_us: now_us.saturating_add(for_ms.saturating_mul(1000)),
             serial: self.serial,
+            fixed_write: false,
         };
         self.by_token.insert(token_key(token), live.clone());
         Ok(live)
+    }
+
+    /// Marks live run `run` as a skill's fixed write's ([`Run::fixed_write`]).
+    pub fn mark_fixed_write(&mut self, run: &str) {
+        for live in self.by_token.values_mut() {
+            if live.run == run {
+                live.fixed_write = true;
+            }
+        }
     }
 
     /// The run `token` holds now, if it is one.

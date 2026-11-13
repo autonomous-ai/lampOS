@@ -2014,6 +2014,15 @@ impl Skill {
         })
     }
 
+    /// Its write to a linked service, if it has one ([`service_write`],
+    /// #6066): a skill's only step.
+    pub fn write_step(&self) -> Option<&service_write::WriteStep> {
+        self.steps.iter().find_map(|(_, step)| match step {
+            Step::Call(Call::ServiceWrite(write)) => Some(write.as_ref()),
+            _ => None,
+        })
+    }
+
     pub fn is_routine(&self) -> bool {
         self.limits.is_some()
             || self

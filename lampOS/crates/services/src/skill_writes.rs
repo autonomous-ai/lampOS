@@ -61,6 +61,31 @@ use std::{
 pub const ENVIRONMENT: &str = "LAMP_SKILL_WRITES";
 /// The function `lamp-skills` calls on the tools socket.
 pub const FUNCTION: &str = "skill_write";
+/// A made skill's fixed write run through the lamp's agent (the owner's
+/// ruling, 13 Nov: everything that touches a linked service runs through
+/// it): `on` only, here, in `lamp-skills`, `lamp-tasks` and `lamp-control`,
+/// on in no product unit. On, `lamp-skills` hands the write to `lamp-tasks`
+/// as a skill's run with its one write grant, and the run's `service_write`
+/// is held here to [`Services::skill_write`](crate::serve::Services::skill_write)'s
+/// checks, once a run (`serve::Services::run_tool`).
+pub const AGENT_ENVIRONMENT: &str = "LAMP_SKILL_WRITE_AGENT";
+/// The key `lamp-control` adds to a run's call when its token was minted
+/// for a skill's fixed write ([`AGENT_ENVIRONMENT`]): that run's id.
+pub const FIXED_WRITE_RUN: &str = "fixed_write_run";
+/// What a fixed write's run is told at a second send: one a run.
+pub const ONCE_A_RUN: &str =
+    "not sent: a skill's fixed write is sent once a run, and this run sent it already";
+
+/// The grant a skill's run holds for a write to `code`: `<code>-write`,
+/// a service with two ways in named as one (`gmail-app` as `gmail`,
+/// [`crate::serve::RUN_PAIRS`]), as `lamp-control` names it.
+pub fn run_grant(code: &str) -> String {
+    let code = crate::serve::RUN_PAIRS
+        .iter()
+        .find_map(|(own, other)| (*other == code).then_some(*own))
+        .unwrap_or(code);
+    format!("{code}-write")
+}
 /// The voice's call, on its owner's yes: approve a skill's writes.
 pub const APPROVE: &str = "skill_write_approve";
 /// The voice's call: the owner's sent-log.

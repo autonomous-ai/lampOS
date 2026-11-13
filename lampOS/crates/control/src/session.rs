@@ -680,6 +680,12 @@ impl Door {
         Ok(live)
     }
 
+    /// Marks live run `run` as a skill's fixed write's
+    /// ([`crate::runs::Run::fixed_write`]).
+    pub fn mark_fixed_write(&mut self, run: &str) {
+        self.runs.mark_fixed_write(run);
+    }
+
     /// Ends run `run` (and, when `serial` is given, only if it is still that
     /// mint): the run, if it was going. Its client is gone from the door.
     pub fn end_run(&mut self, run: &str, serial: Option<u64>) -> Option<crate::runs::Run> {
@@ -1023,16 +1029,21 @@ impl Door {
             // Its grant is held (above); and it is a skill run's, by the run
             // socket, whose run is still going: sent on to lamp-services,
             // which answers off the door's lock.
-            let skill = self
+            // A fixed write's run (LAMP_SKILL_WRITE_AGENT) names its run,
+            // so lamp-services holds it to the owner's kept yes, once.
+            let run = self
                 .runs
                 .of_client(&client, now_us)
                 .filter(|_| session.run_socket)
-                .map(|run| run.skill.clone());
-            let (Some(skill), Some(services)) = (skill, self.services.clone()) else {
+                .map(|run| (run.skill.clone(), run.fixed_write.then(|| run.run.clone())));
+            let (Some((skill, fixed_write)), Some(services)) = (run, self.services.clone()) else {
                 return refuse(ErrorCode::NoGrant, crate::services::RUNS_ONLY.to_owned());
             };
             let write = matches!(op, Op::ServiceWrite { .. });
-            let line = crate::services::Services::line(&skill, write, service, args);
+            let mut line = crate::services::Services::line(&skill, write, service, args);
+            if let Some(run) = fixed_write {
+                line = crate::services::Services::fixed_write(&line, &run);
+            }
             return Outcome {
                 later: Some(Later {
                     re,
@@ -4054,6 +4065,45 @@ mod tests {
         door.end_run("r1", None);
         let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
         assert!(outcome.later.is_none(), "{outcome:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// LAMP_SKILL_WRITE_AGENT: a run minted for a skill's fixed write names
+    /// its run beside its write, so lamp-services holds it to the owner's
+    /// kept yes, once; any other run's write goes as before.
+    #[test]
+    fn a_fixed_writes_run_names_its_run_to_lamp_services() {
+        use std::io::{BufRead as _, Write as _};
+        let dir =
+            std::env::temp_dir().join(format!("lamp-control-run-fixed-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let socket = dir.join("call.sock");
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let mut lines = Vec::new();
+            for _ in 0..2 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                writeln!(stream, r#"{{"ok":true,"result":{{"sent":true}}}}"#).unwrap();
+                lines.push(serde_json::from_str::<Value>(&line).unwrap());
+            }
+            lines
+        });
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], Some(socket));
+        let outcome = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        outcome.later.expect("answered off the lock").reply();
+        door.mark_fixed_write("r1");
+        let outcome = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        outcome.later.expect("answered off the lock").reply();
+        let lines = served.join().unwrap();
+        assert!(lines[0].get("fixed_write_run").is_none(), "{}", lines[0]);
+        assert_eq!(lines[1]["fixed_write_run"], "r1", "{}", lines[1]);
+        assert_eq!(lines[1]["args"], lines[0]["args"]);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

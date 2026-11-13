@@ -77,6 +77,22 @@ chối và không token nào được cấp. Lời đồng ý được giữ mà
 lời đồng ý: token của nó không nêu quyền nào (`"grants": []`), nên lần chạy
 chỉ `hello` được, mọi thao tác cần quyền đều bị từ chối `no_grant`.
 
+**Lượt chạy của một lệnh ghi cố định** (`LAMP_SKILL_WRITE_AGENT=on` trong
+lamp-control, đúng `on`, không bật trong unit sản phẩm nào; quyết định của
+chủ đèn, 13/11): khi cấp token cho một skill không có lời đồng ý task nào mà
+bước `[[do]]` duy nhất là một lệnh ghi cố định
+(`lamp_skills::service_write::fixed_write_of`, đọc từ thư mục của nó), token
+nêu một quyền duy nhất, `-write` của dịch vụ của lệnh ghi
+(`task_yes::KeptYes::fixed_write_grant`), và lượt chạy được đánh dấu
+(`runs::Run::fixed_write`). Ở đây không đọc lời đồng ý nào: lời đồng ý của
+chủ cho lệnh ghi là của lamp-services, khớp đúng nội dung lúc gửi.
+`service.write` của lượt chạy đó mang `"fixed_write_run": "<run id>"` bên
+cạnh (`services::Services::fixed_write`), nên lamp-services chỉ gửi như lời
+đồng ý đó, một lần mỗi lượt chạy, không bao giờ giữ chờ. Tắt thì việc cấp
+token cho skill như vậy là "the owner hasn't said yes to this skill's task",
+như trước. Test: `a_fixed_writes_run_is_minted_its_one_write_grant`,
+`a_fixed_writes_run_names_its_run_to_lamp_services`.
+
 ## Ai thắng
 
 Giới hạn an toàn của thân đèn, rồi người (tay trên đầu, công tắc riêng tư,

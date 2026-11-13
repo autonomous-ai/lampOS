@@ -263,15 +263,19 @@ impl Shared {
             Ok(grants) => grants,
             Err(why) => return json!({"error": why}),
         };
+        let fixed_write = yes.fixed_write(skill);
         let Some(token) = crate::runs::new_token(&ring::rand::SystemRandom::new()) else {
             return json!({"error": "no token could be made"});
         };
-        let live = match self
-            .door
-            .lock()
-            .expect("door")
-            .mint_run(&token, run, skill, grants, for_ms, now)
-        {
+        let minted = {
+            let mut door = self.door.lock().expect("door");
+            let minted = door.mint_run(&token, run, skill, grants, for_ms, now);
+            if fixed_write && minted.is_ok() {
+                door.mark_fixed_write(run);
+            }
+            minted
+        };
+        let live = match minted {
             Ok(live) => live,
             Err(why) => {
                 eprintln!("lamp-control: run {run} of skill {skill}: no token made: {why}");
