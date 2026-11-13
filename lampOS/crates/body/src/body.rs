@@ -204,9 +204,18 @@ const GLANCE: f32 = 36.0;
 /// 31 s, a head's and then a base's about a minute, inside the 90 s
 /// systemd allows a service to say it is ready.
 pub const WAKE_REACH: u16 = 400;
+/// How far from home a joint found at power-up may be and still be brought
+/// home by waking (#5693, the hardware lead on lamp-dbda, 13 Nov): anywhere
+/// in its servo's range. A person moves an unplugged lamp wherever it goes;
+/// plugged in, it comes back to rest slowly from there, each step under
+/// the wake's and the fold's load stops, and stands from rest. The
+/// factory's own poses keep [`WAKE_REACH`].
+pub const RECOVER_REACH: u16 = 4_095;
 /// The fastest a joint moves while it wakes, counts a second: two fifths of
 /// the body's own 50, under two degrees a second.
 const WAKE_SPEED: f32 = 20.0;
+// (With `--recover-speed` the wake moves at that instead, never slower
+// than this; #5693, the hardware lead's 2x on the bench.)
 /// A wake begins with a stir of at most this many counts toward home, more
 /// than [`WAKE_COUNTS`] so that a servo starts for it, and then a pause.
 const WAKE_STIR: f32 = 24.0;
@@ -256,6 +265,45 @@ const WAKE_SWAY: u16 = 15;
 /// systemd allows a service to say it is ready. The wake's own 20 would
 /// take 44 s for the shoulder alone.
 const ARM_LOWER_SPEED: f32 = 40.0;
+/// How far above folded an arm joint may be for the arm to be let go for a
+/// hand (#2940): no higher, it rests by its own weight (at or under folded
+/// it leans on the base); raised more, let go it would fall, so it is held
+/// where it is (#5693, the hardware lead's rule: never torque off a raised
+/// arm).
+const ARM_LET_GO_NEAR: u16 = 150;
+
+/// Whether the arm at `arm` (shoulder, elbow) rests by its own weight: each
+/// joint no more than `ARM_LET_GO_NEAR` above its folded count, and neither
+/// round past the end of its range (`WRAP_UNDER_FOLD`).
+fn arm_rests(arm: [u16; 2], folded: [u16; 2]) -> bool {
+    (0..2).all(|index| {
+        arm[index] <= folded[index].saturating_add(ARM_LET_GO_NEAR)
+            && folded[index].saturating_sub(arm[index]) <= WRAP_UNDER_FOLD
+    })
+}
+/// An arm joint read this far under its folded count is round past the end
+/// of its range (#5693, lamp-dbda, 13 Nov: five hand poses recorded with
+/// torque off). The arm cannot fold through the base, so a reading far
+/// under folded is the joint pushed back past 4,095 and counting on from 0:
+/// dbda's elbow read 196, 255 and 668 with its shoulder far back, and its
+/// shoulder 167 with the arm back past its stand. In position mode a goal
+/// across that seam drives the joint the long way round, through the arm,
+/// so it is never given one: it is held where it lies, giving way to a
+/// hand, until a hand brings it back across the seam to folded.
+const WRAP_UNDER_FOLD: u16 = 600;
+/// While a wrapped arm is held for a hand, a joint carried this far from
+/// its goal is held again where it is now, a step at a time: the hand meets
+/// a step of resistance, never a push back, and an arm sinking under its
+/// weight creeps instead of falling.
+const WRAP_FOLLOW: u16 = 12;
+/// A held arm joint reading over this load for `GIVE_WAY_READS` reads in a
+/// row while it waits for a hand is being pushed: its force limit is
+/// lowered to `GIVE_WAY_FORCE` so the hand can move it, and put back once
+/// the load has eased for `GIVE_WAY_EASED_READS` reads.
+const GIVE_WAY_LOAD: u16 = 200;
+const GIVE_WAY_READS: u8 = 2;
+const GIVE_WAY_FORCE: u16 = 120;
+const GIVE_WAY_EASED_READS: u8 = 5;
 /// The pause between one move of a fold and the next (#5693), seconds: a
 /// breath, not the wake's second, so the fold reads less like a machine
 /// homing one axis after another (El's P3 on #5703, Rule 8).
@@ -981,6 +1029,18 @@ pub struct Limits {
     /// lamp may stand. `None`: nothing is written and each keeps what it
     /// holds, which on lamp-4ace is all of it.
     pub force: Option<u16>,
+    /// The force limit while the lamp recovers at power-up (#5693): written
+    /// before anything is taken hold of or moved, since register 48 starts
+    /// again from the servo's EEPROM limit (1,000 on the lamps) after a
+    /// power cut; `force` is written once the lamp is folded. `None`: the
+    /// run's `force`.
+    pub recover_force: Option<u16>,
+    /// The arm's load stop during the recovery; `None`: the standing load.
+    pub recover_load: Option<u16>,
+    /// How fast the recovery moves, counts a second: the arm's fold
+    /// (`ARM_LOWER_SPEED` unless given) and the head's and base's wake
+    /// (`WAKE_SPEED` unless given). One knob, so a bench may double both.
+    pub recover_speed: Option<f32>,
     /// Write torque on at start to a joint found without it, which this
     /// body would otherwise refuse, its goal first set to where it is: a
     /// servo whose torque went off keeps an old goal, and on lamp-52e6 those
@@ -1113,6 +1173,16 @@ impl Tuning {
 }
 
 impl Limits {
+    /// How fast the arm folds during the recovery, counts a second.
+    pub fn fold_speed(&self) -> f32 {
+        self.recover_speed.unwrap_or(ARM_LOWER_SPEED)
+    }
+
+    /// How fast the head and the base wake, counts a second.
+    pub fn wake_speed(&self) -> f32 {
+        self.recover_speed.unwrap_or(WAKE_SPEED)
+    }
+
     /// The folded limits with another reach and speed, each within its cap.
     /// Whatever the reach, the head's pitch keeps its absolute window.
     pub fn folded_with(tuning: Tuning) -> Result<Self, &'static str> {
@@ -1187,6 +1257,9 @@ impl Limits {
         temperature_steps: 50,
         start_reach: 60,
         force: None,
+        recover_force: None,
+        recover_load: None,
+        recover_speed: None,
         torque_on: false,
         wake: false,
         give_way: None,
@@ -1560,6 +1633,11 @@ pub struct BodyReport {
     pub lowered: Option<Woke>,
     /// The goals written to stop pushing, when the run ended on a surprise.
     pub held_at: Option<[u16; 3]>,
+    /// The start's recovery (take-hold, fold or wake) stopped and the lamp
+    /// was held where it was, torque kept on all five (#5693): let go, a
+    /// raised arm falls, so the run's end does not let it go.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub kept_holding: bool,
     pub last: Option<[Sample; 5]>,
     /// The pose it was given to stand in and still had when it ran.
     pub standing: Option<Standing>,
@@ -1651,11 +1729,12 @@ pub struct Woke {
 /// wake from `from` to `to`, and whether the wake is over. First a stir of
 /// up to [`WAKE_STIR`] counts ([`WAKE_LIFT_LEAD`] for a head that lifts),
 /// then [`WAKE_PAUSE`], then the rest of the way, each eased at both ends
-/// and timed so that the joint with the farthest to go moves at
-/// [`WAKE_SPEED`] at most. Every joint only ever moves from where it was
-/// found toward where it goes.
-fn wake_pose(from: [u16; 3], to: [u16; 3], elapsed: f32) -> ([f32; 3], bool) {
-    let (stir, rest, first, last) = wake_legs(from, to);
+/// and timed so that the joint with the farthest to go moves at `speed`
+/// counts a second at most (`Limits::recover_speed`; [`WAKE_SPEED`] is the
+/// least). Every joint only ever moves from where it was found toward
+/// where it goes.
+fn wake_pose(from: [u16; 3], to: [u16; 3], elapsed: f32, speed: f32) -> ([f32; 3], bool) {
+    let (stir, rest, first, last) = wake_legs(from, to, speed);
     let share = |time: f32, length: f32| {
         if length > 0.0 {
             smooth(time / length)
@@ -1675,7 +1754,8 @@ fn wake_pose(from: [u16; 3], to: [u16; 3], elapsed: f32) -> ([f32; 3], bool) {
 
 /// A wake's stir and rest from `from` to `to`, and how long each takes
 /// ([`wake_pose`]).
-fn wake_legs(from: [u16; 3], to: [u16; 3]) -> ([f32; 3], [f32; 3], f32, f32) {
+fn wake_legs(from: [u16; 3], to: [u16; 3], speed: f32) -> ([f32; 3], [f32; 3], f32, f32) {
+    let speed = speed.max(WAKE_SPEED);
     let way: [f32; 3] = std::array::from_fn(|index| f32::from(to[index]) - f32::from(from[index]));
     let stir: [f32; 3] = std::array::from_fn(|index| {
         let most = if leads(from, to, index) {
@@ -1687,21 +1767,20 @@ fn wake_legs(from: [u16; 3], to: [u16; 3]) -> ([f32; 3], [f32; 3], f32, f32) {
     });
     let rest: [f32; 3] = std::array::from_fn(|index| way[index] - stir[index]);
     // An eased move peaks at one and a half times its mean speed.
-    let length =
-        |moves: [f32; 3]| 1.5 * moves.iter().fold(0.0f32, |m, d| m.max(d.abs())) / WAKE_SPEED;
+    let length = |moves: [f32; 3]| 1.5 * moves.iter().fold(0.0f32, |m, d| m.max(d.abs())) / speed;
     (stir, rest, length(stir), length(rest))
 }
 
 /// How long [`wake`] takes from `from` to `to`, seconds: the head's leg and
 /// then the base's, each its stir, [`WAKE_PAUSE`] and the rest of the way,
 /// and the half second each may wait to settle.
-fn wake_seconds(from: [u16; 3], to: [u16; 3]) -> f32 {
+fn wake_seconds(from: [u16; 3], to: [u16; 3], speed: f32) -> f32 {
     let head_first = [to[0], to[1], from[2]];
     [(from, head_first), (head_first, to)]
         .into_iter()
         .filter(|(from, to)| from != to)
         .map(|(from, to)| {
-            let (_, _, first, last) = wake_legs(from, to);
+            let (_, _, first, last) = wake_legs(from, to, speed);
             first + WAKE_PAUSE + last + SETTLE_SECONDS
         })
         .sum()
@@ -1793,6 +1872,43 @@ fn force_write(joint: Joint, value: u16) -> [u8; 9] {
     packet[8] = checksum(&packet[2..8]);
     packet
 }
+/// Write `force` (register 48) to the joints that carry the lamp, the
+/// base's turn always and the arm of a lamp that may stand, and read it
+/// back; the report says how many writes and the limit read back.
+fn write_force<P: PortIo, R: Runtime>(
+    bus: &mut Bus<'_, P, R>,
+    report: &mut BodyReport,
+    standing: Option<Standing>,
+    force: u16,
+) -> Result<(), Stop> {
+    let mut carrying = vec![Joint::BaseYaw];
+    if standing.is_some() {
+        carrying.extend(ARM);
+    }
+    for joint in &carrying {
+        report.force_writes += 1;
+        // Written before a latched overload is cleared: an acknowledgement
+        // that carries the flag is still one.
+        if let Err(detail) = bus.write_acknowledged(*joint, &force_write(*joint, force), true) {
+            return Err(Stop::Bus {
+                detail: format!("force limit of {joint}: {detail}"),
+            });
+        }
+    }
+    match bus.force_limits(&carrying) {
+        Ok(now) if now.iter().all(|held| *held == force) => {
+            report.force = Some(force);
+            Ok(())
+        }
+        Ok(now) => Err(Stop::Bus {
+            detail: format!("force limit read back as {now:?}"),
+        }),
+        Err(detail) => Err(Stop::Bus {
+            detail: format!("force limit read back: {detail}"),
+        }),
+    }
+}
+
 /// One sync write of the goal position of all five joints: the three of
 /// the head and base, then the shoulder and the elbow.
 fn all_goals_write(goals: [u16; 3], arm: [u16; 2]) -> [u8; 23] {
@@ -1925,6 +2041,10 @@ struct Bus<'a, P, R> {
     runtime: &'a mut R,
     /// Each arm joint's window (`arm_windows`).
     arm_windows: [(u16, u16); 2],
+    /// The last start waited for a hand to fold the arm (#5693): the next
+    /// start is the same recovery, and brings the head and the base home
+    /// from anywhere (`RECOVER_REACH`) as a start that folded the arm does.
+    after_arm_wait: bool,
     /// Each head and base joint's window, by `Joint::index`: 0..=4095, or
     /// with `Limits::own_ranges` its own (`own_window`).
     windows: [(u16, u16); 5],
@@ -1990,6 +2110,7 @@ impl<'a, P: PortIo, R: Runtime> Bus<'a, P, R> {
             io,
             runtime,
             arm_windows: arm_windows(standing),
+            after_arm_wait: false,
             windows: [(0, 4_095); 5],
             ranges: [(0, 4_095); 5],
             refused: None,
@@ -2136,7 +2257,10 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         let reach = u128::from(READ_JUMP) * steps;
         for (index, sample) in samples.iter_mut().enumerate() {
             let read = sample.position;
-            let off = |from: u16| u128::from(read.abs_diff(from)) > reach;
+            // A jump of nearly a whole turn is the joint carried across the
+            // 0/4095 seam by a hand (#5693), not a bad read.
+            let seam = |from: u16| u128::from(read.abs_diff(from)) >= u128::from(4_096 - READ_JUMP);
+            let off = |from: u16| u128::from(read.abs_diff(from)) > reach && !seam(from);
             let bad = read > 4_095
                 || self.good[index]
                     .is_some_and(|good| off(good) && self.goals[index].is_none_or(off));
@@ -2421,6 +2545,35 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
     /// (`hold_refused`), as `write_goal`'s is (#3558).
     fn send_holds(&mut self, goals: [u16; 3], arm: Option<[u16; 2]>) -> Result<(), String> {
         self.write_goals(goals, arm, Self::hold_refused)
+    }
+
+    /// A hold of all five where they are after the start's recovery
+    /// stopped (#5693): nothing moves, so each goal is judged by its servo's
+    /// own stored range, never by the arm's window; a raised arm that sank
+    /// past its window is held there, not let go. An arm goal is still one
+    /// the servo can be trusted with: a step from its last goal, or a
+    /// reading it has held still (`steady`), never one bad read.
+    fn send_holds_where_they_are(&mut self, goals: [u16; 3], arm: [u16; 2]) -> Result<(), String> {
+        self.write_goals(goals, Some(arm), Self::range_refused)
+    }
+
+    /// Whether a hold where `joint` is may be written (`send_holds_where_they_are`).
+    fn range_refused(&self, joint: Joint, goal: u16) -> Option<Stop> {
+        let (low, high) = self.ranges[joint.index()];
+        let trusted = !ARM.contains(&joint) || {
+            let read = self.good[joint.index()];
+            let from = self.goals[joint.index()].or(read);
+            from.is_none_or(|from| goal.abs_diff(from) <= ARM_GOAL_STEP)
+                || (self.steady[joint.index()] && read == Some(goal))
+        };
+        (!((low..=high).contains(&goal) && trusted)).then(|| Stop::Window {
+            joint: joint.id(),
+            goal,
+            window: (low, high),
+            from: self.goals[joint.index()]
+                .or(self.good[joint.index()])
+                .unwrap_or(goal),
+        })
     }
 
     fn write_goals(
@@ -2755,7 +2908,12 @@ fn wake<P: PortIo, R: Runtime>(
             ));
             return Err(Stop::Cancelled);
         }
-        let (pose, over_now) = wake_pose(leg.0, leg.1, TICK.as_secs_f32() * done as f32);
+        let (pose, over_now) = wake_pose(
+            leg.0,
+            leg.1,
+            TICK.as_secs_f32() * done as f32,
+            limits.wake_speed(),
+        );
         let goals = pose.map(|goal| goal.round() as u16);
         let outcome = if goals == written {
             Ok(())
@@ -2897,53 +3055,68 @@ fn wake<P: PortIo, R: Runtime>(
     }
 }
 
-/// Fold one arm joint, `joint` (the shoulder or the elbow), from where it
-/// is found onto its folded count, eased at both ends at
-/// [`ARM_LOWER_SPEED`] at most, the head and the base held at `head` and
-/// the other arm joint where it is found. Every step it reads all five
-/// joints: a changed status byte; the head, the base or the other arm
-/// joint over its load bound (`Limits::load`, or that arm joint's standing
-/// load) for `Limits::load_steps` steps, or more than `Limits::tracking`
-/// from where it was found for `Limits::tracking_steps` reads in a row (a
-/// single read off is taken as where it was found); `joint` over its load
-/// for `Limits::load_steps` steps or farther than `Standing::TRACKING`
-/// from its goal for `Standing::TRACKING_STEPS`, or a wire that fails for
-/// half a second ends it. Once its goal is folded it waits for the joint
-/// to come within `Standing::FOUND_SLACK`; one that stops farther away for
-/// half a second ends it too. With `watching`, as in [`wake`], each step
-/// read is a step of the run and is watched: a body already running tells
-/// systemd it is alive every step, and this takes some 22 s, over
-/// `WatchdogSec=5`. What it did is added to the report's `lowered`.
+/// Fold the arm joints `moving` (the shoulder, the elbow, or both together,
+/// #5693) from where they are found onto their folded counts, each along
+/// the same eased share so that they arrive together, at
+/// `Limits::recover_speed` at most for the one that travels farthest, the
+/// head and the base held at `head` and an arm joint not moving where it is
+/// found. Every step it reads all five joints: a changed status byte; a
+/// held joint over its load bound (`Limits::load`, or the arm's
+/// `Limits::recover_load` else its standing load) for `Limits::load_steps`
+/// steps, or more than `Limits::tracking` from where it was found for
+/// `Limits::tracking_steps` reads in a row (a single read off is taken as
+/// where it was found); a moving joint over its load for `load_steps`
+/// steps or farther than `Standing::TRACKING` from its goal for
+/// `Standing::TRACKING_STEPS`, or a wire that fails for half a second ends
+/// it. Once its goals are folded it waits for each moving joint to come
+/// within `Standing::FOUND_SLACK`; one that stops farther away for half a
+/// second ends it too. With `watching`, as in [`wake`], each step read is
+/// a step of the run and is watched. What it did is added to the report's
+/// `lowered`.
 #[allow(clippy::too_many_arguments)]
-fn fold_joint<P: PortIo, R: Runtime>(
+fn fold_joints<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
     report: &mut BodyReport,
     limits: &Limits,
     up: Standing,
-    joint: Joint,
+    moving: &[Joint],
     head: [u16; 3],
     found: [Sample; 5],
     mut watching: Option<Watching<'_>>,
 ) -> Result<[Sample; 5], Stop> {
-    let moving = ARM.iter().position(|arm| *arm == joint).unwrap_or(0);
-    let other = ARM[1 - moving];
-    let kept = found[other.index()].position;
-    let arm_goals = |goal: u16| {
-        let mut goals = [kept; 2];
-        goals[moving] = goal;
-        goals
+    // By arm index: whether each of the shoulder and the elbow moves.
+    let moves: [bool; 2] = std::array::from_fn(|index| moving.contains(&ARM[index]));
+    let from: [u16; 2] = std::array::from_fn(|index| found[ARM[index].index()].position);
+    let to: [u16; 2] = std::array::from_fn(|index| {
+        if moves[index] {
+            up.folded[index]
+        } else {
+            from[index]
+        }
+    });
+    let way: [f32; 2] = std::array::from_fn(|index| f32::from(to[index]) - f32::from(from[index]));
+    let farthest = way[0].abs().max(way[1].abs());
+    let length = 1.5 * farthest / limits.fold_speed();
+    let arm_load = |index: usize| limits.recover_load.unwrap_or(up.load[index]);
+    let arm_goals = |share: f32| -> [u16; 2] {
+        std::array::from_fn(|index| (f32::from(from[index]) + way[index] * share).round() as u16)
     };
-    let (from, to) = (found[joint.index()].position, up.folded[moving]);
-    let way = f32::from(to) - f32::from(from);
-    let length = 1.5 * way.abs() / ARM_LOWER_SPEED;
+    let names = || -> String {
+        moving
+            .iter()
+            .map(|joint| arm_part(*joint))
+            .collect::<Vec<_>>()
+            .join(" and ")
+    };
     let started = bus.runtime.now();
     let (mut ticks, mut done, mut misses) = (0u32, 0u32, 0u8);
-    let (mut written, mut over, mut off, mut still) = (from, 0u8, 0u8, 0u8);
+    let mut written = from;
+    let (mut over, mut off, mut still) = ([0u8; 2], [0u8; 2], [0u8; 2]);
     // The held joints, judged as the run judges them: steps in a row over
     // their load bound, and off where they were found by more than
     // `limits.tracking`.
     let (mut held_over, mut drifted) = ([0u8; 5], [0u8; 5]);
-    let mut closest = u16::MAX;
+    let mut closest = [u16::MAX; 2];
     let outcome = loop {
         ticks += 1;
         let due = started + TICK * ticks;
@@ -2951,12 +3124,12 @@ fn fold_joint<P: PortIo, R: Runtime>(
             break Err(Stop::Cancelled);
         }
         let share = smooth(TICK.as_secs_f32() * done as f32 / length.max(TICK.as_secs_f32()));
-        let goal = (f32::from(from) + way * share).round() as u16;
-        let sent = if goal == written && done > 0 {
+        let goals = arm_goals(share);
+        let sent = if goals == written && done > 0 {
             Ok(())
         } else {
-            bus.send_goals(head, Some(arm_goals(goal))).map(|()| {
-                written = goal;
+            bus.send_goals(head, Some(goals)).map(|()| {
+                written = goals;
                 report.goal_writes += 1;
                 report.moved = true;
             })
@@ -2968,7 +3141,7 @@ fn fold_joint<P: PortIo, R: Runtime>(
                 misses += 1;
                 if misses >= WIRE_STEPS || bus.refused.is_some() {
                     break Err(bus.refused.take().unwrap_or(Stop::Bus {
-                        detail: format!("folding the {}: {detail}", arm_part(joint)),
+                        detail: format!("folding the {}: {detail}", names()),
                     }));
                 }
                 bus.sleep_until(due);
@@ -2987,17 +3160,19 @@ fn fold_joint<P: PortIo, R: Runtime>(
                     now: is.status,
                 });
             }
-            if held == joint {
+            if moving.contains(&held) {
                 continue;
             }
             // Its load, kept with the run's peaks, so a run shows how near
             // the held joints came to their bounds while the arm came
             // down (the reviewer on #1115).
+            let arm_index = ARM.iter().position(|arm| *arm == held);
             match COMMANDED.iter().position(|commanded| *commanded == held) {
                 Some(at) => report.peak_load[at] = report.peak_load[at].max(is.load),
                 None => {
-                    report.arm_peak_load[1 - moving] =
-                        report.arm_peak_load[1 - moving].max(is.load);
+                    if let Some(index) = arm_index {
+                        report.arm_peak_load[index] = report.arm_peak_load[index].max(is.load);
+                    }
                 }
             }
             // A hand pressing a held joint without moving it, as the run
@@ -3005,7 +3180,10 @@ fn fold_joint<P: PortIo, R: Runtime>(
             let bound = COMMANDED
                 .iter()
                 .position(|commanded| *commanded == held)
-                .map_or(up.load[1 - moving], |index| limits.load[index]);
+                .map_or_else(
+                    || arm_load(arm_index.unwrap_or(0)),
+                    |index| limits.load[index],
+                );
             let index = held.index();
             held_over[index] = if is.load > bound {
                 held_over[index].saturating_add(1)
@@ -3040,48 +3218,53 @@ fn fold_joint<P: PortIo, R: Runtime>(
         if let Some((watch, glimpse)) = watching.as_mut() {
             report.steps += 1;
             let template = Glimpse {
-                arm_goals: arm_goals(written),
+                arm_goals: written,
                 ..*glimpse
             };
             watch(&glimpse_of(template, report.steps, &now, head));
         }
-        let is = now[joint.index()];
-        report.arm_peak_load[moving] = report.arm_peak_load[moving].max(is.load);
-        over = if is.load > up.load[moving] {
-            over + 1
-        } else {
-            0
-        };
-        let apart = written.abs_diff(is.position);
-        off = if apart > Standing::TRACKING {
-            off + 1
-        } else {
-            0
-        };
         let over_now = share >= 1.0;
-        if apart + WAKE_MOVED <= closest || !over_now {
-            (closest, still) = (apart, 0);
-        } else {
-            still += 1;
-        }
-        if over >= limits.load_steps.max(1) {
-            surprise.get_or_insert(Stop::Load {
-                joint: joint.id(),
-                load: is.load,
-            });
-        } else if off >= Standing::TRACKING_STEPS
-            || (still >= WAKE_STILL_STEPS && apart > Standing::FOUND_SLACK)
-        {
-            surprise.get_or_insert(Stop::Tracking {
-                joint: joint.id(),
-                goal: written,
-                position: is.position,
-            });
+        let mut arrived = true;
+        for index in (0..2).filter(|index| moves[*index]) {
+            let joint = ARM[index];
+            let is = now[joint.index()];
+            report.arm_peak_load[index] = report.arm_peak_load[index].max(is.load);
+            over[index] = if is.load > arm_load(index) {
+                over[index] + 1
+            } else {
+                0
+            };
+            let apart = written[index].abs_diff(is.position);
+            off[index] = if apart > Standing::TRACKING {
+                off[index] + 1
+            } else {
+                0
+            };
+            if apart + WAKE_MOVED <= closest[index] || !over_now {
+                (closest[index], still[index]) = (apart, 0);
+            } else {
+                still[index] += 1;
+            }
+            if over[index] >= limits.load_steps.max(1) {
+                surprise.get_or_insert(Stop::Load {
+                    joint: joint.id(),
+                    load: is.load,
+                });
+            } else if off[index] >= Standing::TRACKING_STEPS
+                || (still[index] >= WAKE_STILL_STEPS && apart > Standing::FOUND_SLACK)
+            {
+                surprise.get_or_insert(Stop::Tracking {
+                    joint: joint.id(),
+                    goal: written[index],
+                    position: is.position,
+                });
+            }
+            arrived &= apart <= Standing::FOUND_SLACK;
         }
         if let Some(surprise) = surprise {
             break Err(surprise);
         }
-        if over_now && apart <= Standing::FOUND_SLACK {
+        if over_now && arrived {
             break Ok(now);
         }
         if !over_now {
@@ -3096,11 +3279,13 @@ fn fold_joint<P: PortIo, R: Runtime>(
         settled: Vec::new(),
         seconds: 0.0,
     });
-    lowered.joints.push(joint.name());
-    lowered.from.push(from);
-    lowered.to.push(written);
-    if let Some(last) = report.last {
-        lowered.settled.push(last[joint.index()].position);
+    for index in (0..2).filter(|index| moves[*index]) {
+        lowered.joints.push(ARM[index].name());
+        lowered.from.push(from[index]);
+        lowered.to.push(written[index]);
+        if let Some(last) = report.last {
+            lowered.settled.push(last[ARM[index].index()].position);
+        }
     }
     lowered.seconds += bus.runtime.now().saturating_sub(started).as_secs_f32();
     outcome
@@ -3123,6 +3308,17 @@ fn arm_part(joint: Joint) -> &'static str {
 struct Fold {
     head_to: Option<u16>,
     joints: Vec<Joint>,
+    order: FoldOrder,
+}
+
+/// How the arm folds (`fold_plan`): the shoulder and the elbow together,
+/// along one eased line from where they were found to folded (V1's shape,
+/// #5693: the elbow's lever shortens from the first tick), or one after
+/// the other in `Fold::joints`' order, where together would tip the lamp.
+#[derive(Clone, Debug, PartialEq)]
+enum FoldOrder {
+    Together,
+    InTurn,
 }
 
 /// Why a lamp that is to fold before it wakes may not (`fold_plan`).
@@ -3131,6 +3327,9 @@ enum NoFold {
     /// A joint stands against it: torque off, a flag, warm, outside its
     /// window, or a head too far down to lift.
     Refused(String),
+    /// An arm joint round past the end of its range (`WRAP_UNDER_FOLD`):
+    /// no goal may be given to it; a hand brings it back.
+    Wrapped(String),
     /// The anti-tip gate: the path would take the centre of gravity farther
     /// off the base's axis than where it was found or rests folded.
     Tips(String),
@@ -3139,24 +3338,35 @@ enum NoFold {
 impl NoFold {
     fn why(&self) -> &str {
         match self {
-            Self::Refused(why) | Self::Tips(why) => why,
+            Self::Refused(why) | Self::Tips(why) | Self::Wrapped(why) => why,
         }
     }
 }
 
 /// What a fold does, for the journal: "it folds first: its head lifted to
-/// 2030, then its elbow, then its shoulder".
+/// 2030, then its elbow and shoulder together" or "..., then its elbow,
+/// then its shoulder".
 fn fold_said(fold: &Fold) -> String {
     let mut moves: Vec<String> = fold
         .head_to
         .map(|pitch| format!("its head lifted to {pitch}"))
         .into_iter()
         .collect();
-    moves.extend(
-        fold.joints
-            .iter()
-            .map(|joint| format!("its {}", arm_part(*joint))),
-    );
+    match fold.order {
+        FoldOrder::Together if fold.joints.len() > 1 => moves.push(format!(
+            "its {} together",
+            fold.joints
+                .iter()
+                .map(|joint| arm_part(*joint))
+                .collect::<Vec<_>>()
+                .join(" and ")
+        )),
+        _ => moves.extend(
+            fold.joints
+                .iter()
+                .map(|joint| format!("its {}", arm_part(*joint))),
+        ),
+    }
     format!("it folds first: {}", moves.join(", then "))
 }
 
@@ -3212,7 +3422,7 @@ fn fold_arm<P: PortIo, R: Runtime>(
         let to = [pitch, from[1], from[2]];
         let arm = ARM.map(|joint| now[joint.index()].position);
         if unready {
-            extend_start(bus, wake_seconds(from, to));
+            extend_start(bus, wake_seconds(from, to, limits.wake_speed()));
         }
         let watch = watching
             .as_mut()
@@ -3224,16 +3434,27 @@ fn fold_arm<P: PortIo, R: Runtime>(
         now = lifted?;
         moved = true;
     }
-    for joint in &fold.joints {
+    // Together: one move of every joint that folds. In turn: one each.
+    let moves: Vec<Vec<Joint>> = match fold.order {
+        FoldOrder::Together => vec![fold.joints.clone()],
+        FoldOrder::InTurn => fold.joints.iter().map(|joint| vec![*joint]).collect(),
+    };
+    for joints in &moves {
         if bus.runtime.recovery_inhibited() || !matches!(bus.runtime.cancelled(), Ok(false)) {
             return Err(Stop::Cancelled);
         }
         if unready {
-            let index = usize::from(*joint == Joint::ElbowPitch);
-            let way = now[joint.index()].position.abs_diff(up.folded[index]);
+            let way = joints
+                .iter()
+                .map(|joint| {
+                    let index = usize::from(*joint == Joint::ElbowPitch);
+                    now[joint.index()].position.abs_diff(up.folded[index])
+                })
+                .max()
+                .unwrap_or(0);
             extend_start(
                 bus,
-                FOLD_PAUSE + 1.5 * f32::from(way) / ARM_LOWER_SPEED + SETTLE_SECONDS,
+                FOLD_PAUSE + 1.5 * f32::from(way) / limits.fold_speed() + SETTLE_SECONDS,
             );
         }
         pause(bus, moved);
@@ -3241,7 +3462,7 @@ fn fold_arm<P: PortIo, R: Runtime>(
         let watch = watching
             .as_mut()
             .map(|(watch, glimpse)| (&mut **watch as &mut dyn FnMut(&Glimpse), *glimpse));
-        now = fold_joint(bus, report, limits, up, *joint, head, now, watch)?;
+        now = fold_joints(bus, report, limits, up, joints, head, now, watch)?;
         moved = true;
     }
     Ok(now)
@@ -3486,24 +3707,31 @@ fn fold_plan(
 ) -> Option<Result<Fold, NoFold>> {
     let slack = Standing::FOUND_SLACK;
     let arm = ARM.map(|joint| found[joint.index()]);
+    for (index, joint) in ARM.iter().enumerate() {
+        let at = arm[index].position;
+        if up.folded[index].saturating_sub(at) > WRAP_UNDER_FOLD {
+            return Some(Err(NoFold::Wrapped(format!(
+                "the {} at {at} is round past the end of its range ({} under folded {}): a hand brings it back",
+                arm_part(*joint),
+                up.folded[index] - at,
+                up.folded[index]
+            ))));
+        }
+    }
     let (_, offs) = on_the_way(up, arm.map(|sample| sample.position));
     if !head_far && offs.iter().all(|off| *off <= f32::from(slack)) {
         return None;
     }
-    let windows = arm_windows(Some(up));
+    // An arm joint anywhere in its servo's range folds from there (#5693):
+    // the run's arm window reaches to where it was found for the fold.
     for (index, joint) in ARM.iter().enumerate() {
-        let (sample, (low, high)) = (arm[index], windows[index]);
+        let sample = arm[index];
         let why = if profiles[index].0 != 1 {
             Some(format!("{joint} torque is not on"))
         } else if sample.status != 0 {
             Some(format!("{joint} status is {:#04x}", sample.status))
         } else if sample.temperature >= Standing::TEMPERATURE {
             Some(format!("{joint} is at {} already", sample.temperature))
-        } else if !(low..=high).contains(&sample.position) {
-            Some(format!(
-                "{joint} at {} is outside its window {low}..={high}",
-                sample.position
-            ))
         } else {
             None
         };
@@ -3514,9 +3742,9 @@ fn fold_plan(
     let pitch = found[Joint::WristPitch.index()].position;
     let edge = limits.pitch_window.1;
     let head_to = (pitch > edge).then_some(edge);
-    if pitch.saturating_sub(edge) > WAKE_REACH {
+    if pitch.saturating_sub(edge) > RECOVER_REACH {
         return Some(Err(NoFold::Refused(format!(
-            "head pitch {pitch} is {} counts past its folded window's edge {edge}, more than waking lifts it ({WAKE_REACH})",
+            "head pitch {pitch} is {} counts past its folded window's edge {edge}, more than waking lifts it ({RECOVER_REACH})",
             pitch - edge
         ))));
     }
@@ -3549,38 +3777,80 @@ fn fold_plan(
     if head_to.is_none() && joints.is_empty() {
         return None;
     }
-    // The poses the fold goes through, one move after another, by
-    // `Joint::index`.
+    // The poses the fold goes through, by `Joint::index`: the head's lift
+    // first if any, then the arm; and the farthest off the base's axis the
+    // centre of gravity goes along them, sampled (`FOLD_SAMPLES`) between
+    // corners, against where it was found or rests folded.
     let start = found.map(|sample| f32::from(sample.position));
-    let mut corners = vec![start];
-    let mut at = start;
+    let mut lifted = start;
     if let Some(pitch) = head_to {
-        at[Joint::WristPitch.index()] = f32::from(pitch);
-        corners.push(at);
+        lifted[Joint::WristPitch.index()] = f32::from(pitch);
     }
-    for joint in &joints {
-        let index = usize::from(*joint == Joint::ElbowPitch);
-        at[joint.index()] = f32::from(up.folded[index]);
-        corners.push(at);
-    }
-    let bound = cog::off_axis_mm(start).max(cog::off_axis_mm(at)) + FOLD_LEAN_SLACK;
-    let mut worst = 0.0f64;
-    for pair in corners.windows(2) {
-        for step in 0..=FOLD_SAMPLES {
-            let share = f32::from(step) / f32::from(FOLD_SAMPLES);
-            let pose = std::array::from_fn(|index| {
-                pair[0][index] + (pair[1][index] - pair[0][index]) * share
-            });
-            worst = worst.max(cog::off_axis_mm(pose));
+    let folded_at = {
+        let mut at = lifted;
+        for joint in &joints {
+            at[joint.index()] = f32::from(up.folded[usize::from(*joint == Joint::ElbowPitch)]);
         }
+        at
+    };
+    let bound = cog::off_axis_mm(start).max(cog::off_axis_mm(folded_at)) + FOLD_LEAN_SLACK;
+    let lean = |corners: &[[f32; 5]]| -> f64 {
+        let mut worst = 0.0f64;
+        for pair in corners.windows(2) {
+            for step in 0..=FOLD_SAMPLES {
+                let share = f32::from(step) / f32::from(FOLD_SAMPLES);
+                let pose = std::array::from_fn(|index| {
+                    pair[0][index] + (pair[1][index] - pair[0][index]) * share
+                });
+                worst = worst.max(cog::off_axis_mm(pose));
+            }
+        }
+        worst
+    };
+    let head_first: Vec<[f32; 5]> = if head_to.is_some() {
+        vec![start, lifted]
+    } else {
+        vec![start]
+    };
+    // Together first: one line from found to folded. Then one after the
+    // other, elbow first as the shoulder's lowering did, then shoulder
+    // first. The first that keeps the lamp's balance is the fold.
+    let mut together = head_first.clone();
+    together.push(folded_at);
+    let worst = lean(&together);
+    if worst <= bound {
+        return Some(Ok(Fold {
+            head_to,
+            joints,
+            order: FoldOrder::Together,
+        }));
     }
-    if worst > bound {
-        return Some(Err(NoFold::Tips(format!(
-            "folding it from here takes its centre of gravity {worst:.0} mm off its base's axis, farther than found or folded ({:.0} mm)",
-            bound - FOLD_LEAN_SLACK
-        ))));
+    let mut worst_in_turn = worst;
+    for order in [
+        joints.clone(),
+        joints.iter().rev().copied().collect::<Vec<_>>(),
+    ] {
+        let mut corners = head_first.clone();
+        let mut at = lifted;
+        for joint in &order {
+            at[joint.index()] = f32::from(up.folded[usize::from(*joint == Joint::ElbowPitch)]);
+            corners.push(at);
+        }
+        let worst = lean(&corners);
+        if worst <= bound {
+            return Some(Ok(Fold {
+                head_to,
+                joints: order,
+                order: FoldOrder::InTurn,
+            }));
+        }
+        worst_in_turn = worst_in_turn.min(worst);
     }
-    Some(Ok(Fold { head_to, joints }))
+    Some(Err(NoFold::Tips(format!(
+        "folding it from here takes its centre of gravity {:.0} mm off its base's axis, farther than found or folded ({:.0} mm)",
+        worst.min(worst_in_turn),
+        bound - FOLD_LEAN_SLACK
+    ))))
 }
 
 /// Where a shoulder and an elbow at `arm` are on the way between folded
@@ -3899,6 +4169,9 @@ const PROPPED: &str = "My head is tipped up too far, and I am holding it so it d
 /// folded (#2940, El's lamp-06c1 case): the lamp lets go of its arm, holds
 /// its head, and starts again once a hand has folded the arm.
 const ARM_FOLD: &str = "My arm is not folded all the way down. Please fold it gently down, and I will start by myself.";
+/// Said when an arm joint is round past the end of its range (#5693): the
+/// lamp holds its arm, gives way to a hand, and cannot bring it back itself.
+const ARM_WRAPPED: &str = "My arm is bent back too far for me to move it. Please bring it gently forward and fold it down, and I will start by myself.";
 /// How long the lamp asks before it stops (#2938): after this nobody has
 /// set it straight, and it stays let go, reads every `WAIT_READ_LATE` and
 /// says `STOPPED_ASKING` instead. Counted from the first time it let go in
@@ -3923,6 +4196,13 @@ struct PoseWait {
     /// the arm to be folded (#2940, #5693): each within
     /// `Standing::FOUND_SLACK` of its own, too.
     arm: Option<[u16; 2]>,
+    /// The arm is held, not let go (#5693, a joint round past its range):
+    /// torque stays on all five; a joint a hand carries off its goal is
+    /// held again where it is (`WRAP_FOLLOW`), and one pushed without
+    /// moving has its force lowered so the hand can move it
+    /// (`GIVE_WAY_LOAD`). The force to put back is `follow_force`.
+    follow_arm: bool,
+    follow_force: Option<u16>,
 }
 
 /// The pose `found` (pitch, roll, yaw) as the start's own checks in
@@ -3938,7 +4218,7 @@ fn pose_wait(
     home: [u16; 3],
     home_found: [f32; 3],
     found: [u16; 3],
-    (beside_base, may_wake): (bool, bool),
+    (beside_base, may_wake, wake_reach): (bool, bool, u16),
     stands: bool,
 ) -> Option<PoseWait> {
     let window = limits.pitch_home.0..=limits.pitch_home.1;
@@ -3951,7 +4231,7 @@ fn pose_wait(
         limits.start_reach.max(150)
     };
     let reach = f32::from(if may_wake {
-        allowed.max(WAKE_REACH)
+        allowed.max(wake_reach)
     } else {
         allowed
     });
@@ -3987,6 +4267,8 @@ fn pose_wait(
         joints,
         say: if propped { PROPPED } else { SET_STRAIGHT[out] },
         arm: None,
+        follow_arm: false,
+        follow_force: None,
     })
 }
 
@@ -4001,6 +4283,86 @@ fn pose_wait(
 /// fails for `WIRE_STEPS` reads ends it as a run's would. From `asked_since`
 /// plus `WAIT_ASKING` on it reads every `WAIT_READ_LATE` and says
 /// `STOPPED_ASKING`, still let go and still starting once set straight.
+/// One read of a held arm waiting for a hand (#5693): a joint carried more
+/// than `WRAP_FOLLOW` from its goal is held again toward where it is, a
+/// goal step (`ARM_GOAL_STEP`) at most from the last, so a fast hand is
+/// chased in steps and no write is refused for its size; one pushed over
+/// `GIVE_WAY_LOAD` for `GIVE_WAY_READS` reads without moving has its force
+/// limit lowered to `GIVE_WAY_FORCE` so the hand can move it, and the limit
+/// `force` is put back once its load has eased for `GIVE_WAY_EASED_READS`
+/// reads. The head's goals stay as they are. A refused hold leaves the last
+/// goal, and never ends the run.
+fn follow_hand<P: PortIo, R: Runtime>(
+    bus: &mut Bus<'_, P, R>,
+    report: &mut BodyReport,
+    force: Option<u16>,
+    now: &[Sample; 5],
+    pose: [u16; 3],
+    (pushed, yielding, eased): (&mut [u8; 2], &mut [bool; 2], &mut [u8; 2]),
+) {
+    let carried = ARM.iter().any(|joint| {
+        let at = now[joint.index()].position;
+        bus.goals[joint.index()].is_none_or(|goal| goal.abs_diff(at) > WRAP_FOLLOW)
+    });
+    if carried {
+        let head: [u16; 3] =
+            std::array::from_fn(|index| bus.goals[COMMANDED[index].index()].unwrap_or(pose[index]));
+        let arm = ARM.map(|joint| {
+            let at = now[joint.index()].position;
+            match bus.goals[joint.index()] {
+                Some(goal) if goal.abs_diff(at) > ARM_GOAL_STEP => {
+                    if at > goal {
+                        goal + ARM_GOAL_STEP
+                    } else {
+                        goal - ARM_GOAL_STEP
+                    }
+                }
+                _ => at,
+            }
+        });
+        if bus.send_holds_where_they_are(head, arm).is_ok() {
+            report.goal_writes += 1;
+        } else {
+            bus.refused = None;
+        }
+    }
+    let Some(force) = force else { return };
+    for (index, joint) in ARM.iter().enumerate() {
+        let load = now[joint.index()].load;
+        if load > GIVE_WAY_LOAD {
+            pushed[index] = pushed[index].saturating_add(1);
+            eased[index] = 0;
+        } else {
+            pushed[index] = 0;
+            eased[index] = eased[index].saturating_add(1);
+        }
+        let want = if yielding[index] {
+            eased[index] < GIVE_WAY_EASED_READS
+        } else {
+            pushed[index] >= GIVE_WAY_READS
+        };
+        if want != yielding[index] {
+            let to = if want { GIVE_WAY_FORCE } else { force };
+            if bus
+                .write_acknowledged(*joint, &force_write(*joint, to), true)
+                .is_ok()
+            {
+                report.force_writes += 1;
+                yielding[index] = want;
+                eprintln!(
+                    "lamp-body: the {} {} (load {load}): force {to}",
+                    arm_part(*joint),
+                    if want {
+                        "gives way to a hand"
+                    } else {
+                        "is held again"
+                    }
+                );
+            }
+        }
+    }
+}
+
 fn wait_in_range<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
     report: &mut BodyReport,
@@ -4013,9 +4375,18 @@ fn wait_in_range<P: PortIo, R: Runtime>(
     ),
     watch: &mut impl FnMut(&Glimpse),
 ) -> Result<(), Stop> {
-    let mut holding = wait.joints.clone();
+    // A followed arm is never let go: nothing to write torque off to.
+    let mut holding = if wait.follow_arm {
+        Vec::new()
+    } else {
+        wait.joints.clone()
+    };
     let (mut misses, mut in_range) = (0u8, 0u8);
     let mut before: Option<[u16; 5]> = None;
+    // Giving way (#5693): reads in a row each arm joint has been pushed
+    // over `GIVE_WAY_LOAD`, whether its force is lowered now, and reads in
+    // a row its load has eased since.
+    let (mut pushed, mut yielding, mut eased) = ([0u8; 2], [false; 2], [0u8; 2]);
     // Steps in a row a commanded joint still held (a head tipped up,
     // #2938) has read over its load bound, and at its temperature bound.
     let (mut held_over, mut held_hot) = ([0u8; 3], [0u8; 3]);
@@ -4072,6 +4443,16 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                     }
                 }
                 let pose = COMMANDED.map(|joint| now[joint.index()].position);
+                if wait.follow_arm {
+                    follow_hand(
+                        bus,
+                        report,
+                        wait.follow_force,
+                        &now,
+                        pose,
+                        (&mut pushed, &mut yielding, &mut eased),
+                    );
+                }
                 watch(&Glimpse {
                     waiting: Some(say),
                     ..glimpse_of(Glimpse::default(), report.steps, &now, pose)
@@ -4096,6 +4477,20 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                     });
                 in_range = if inside { in_range + 1 } else { 0 };
                 if in_range >= IN_RANGE_READS && !bus.runtime.recovery_inhibited() {
+                    // The force a yielding joint was lowered to goes back
+                    // before the run takes the arm as its own.
+                    if let Some(force) = wait.follow_force {
+                        for (index, joint) in ARM.iter().enumerate() {
+                            if yielding[index]
+                                && bus
+                                    .write_acknowledged(*joint, &force_write(*joint, force), true)
+                                    .is_ok()
+                            {
+                                report.force_writes += 1;
+                                yielding[index] = false;
+                            }
+                        }
+                    }
                     match take_hold(bus, report, &wait.joints, &now) {
                         Ok(_) => return Ok(()),
                         // Let go again, and waited for again.
@@ -4454,10 +4849,12 @@ pub(crate) fn run_told(
     let mut report = run_until_stopped(
         io, runtime, limits, home, standing, looking, news, asked, watch,
     );
-    if !matches!(
-        report.stop,
-        Stop::Cancelled | Stop::Refused { .. } | Stop::Overload { .. }
-    ) {
+    if !report.kept_holding
+        && !matches!(
+            report.stop,
+            Stop::Cancelled | Stop::Refused { .. } | Stop::Overload { .. }
+        )
+    {
         let_go_at_end(&mut Bus::new(io, runtime, None), &mut report);
     }
     report
@@ -4582,6 +4979,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         lowered: None,
         peak_temperature: [0; 3],
         held_at: None,
+        kept_holding: false,
         last: None,
         standing: None,
         standing_refused: None,
@@ -4620,6 +5018,50 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             return report;
         }
     };
+    // The arm's windows for this run: the way between folded and stood up
+    // and a margin. For the power-up recovery only (#5693, `limits.wake`),
+    // each reaches to where its joint was found, so that an arm a hand left
+    // anywhere in its servo's range is taken hold of and folded from there;
+    // the run's own windows are put back once the arm is folded.
+    let run_windows = arm_windows(standing);
+    bus.arm_windows = run_windows;
+    if limits.wake && standing.is_some() {
+        for (index, joint) in ARM.iter().enumerate() {
+            let at = found[joint.index()].position;
+            let (low, high) = run_windows[index];
+            bus.arm_windows[index] = (low.min(at), high.max(at));
+        }
+    }
+    // The most the joints that carry the lamp may push with, if one was
+    // chosen: a lamp that meets a hand or an edge gives way sooner, and
+    // cannot push with more than this while this program is being slow to
+    // notice. Written before anything is taken hold of or moved (#5693):
+    // register 48 starts again from the servo's EEPROM limit after a power
+    // cut, 1,000 on the lamps, and the power-up recovery once ran at that.
+    let start_force = limits.recover_force.or(limits.force);
+    if let Some(force) = start_force
+        && let Err(stop) = write_force(bus, &mut report, standing, force)
+    {
+        report.stop = stop;
+        return report;
+    }
+    if limits.wake && standing.is_some() {
+        let at = found.map(|sample| sample.position);
+        eprintln!(
+            "lamp-body: recovering from yaw {} shoulder {} elbow {} roll {} pitch {} at force {} load {} speed {}",
+            at[Joint::BaseYaw.index()],
+            at[Joint::BasePitch.index()],
+            at[Joint::ElbowPitch.index()],
+            at[Joint::WristRoll.index()],
+            at[Joint::WristPitch.index()],
+            start_force.map_or("the servo's own".to_owned(), |force| force.to_string()),
+            limits
+                .recover_load
+                .or(standing.map(|up| up.load[0]))
+                .map_or("-".to_owned(), |load| load.to_string()),
+            limits.fold_speed()
+        );
+    }
     // One glitch on the first read must not let go of a lamp, which may be
     // standing: a joint found hot is read again until two reads in a row
     // agree within `TEMPERATURE_JUMP`, and heat is acted on only if both
@@ -4954,13 +5396,75 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             && limits.refused_let_go
             && arm_off.iter().all(|off| *off)
         {
-            eprintln!("lamp-body: {}", tips_said(&found, why));
+            // A raised arm is not let go (#5693): it is held, gives way to
+            // the hand and follows it, as a wrapped one is.
+            let rests = arm_rests(ARM.map(|joint| found[joint.index()].position), up.folded);
+            eprintln!(
+                "lamp-body: {}{}",
+                tips_said(&found, why),
+                if rests {
+                    ""
+                } else {
+                    " (held, giving way to the hand)"
+                }
+            );
+            if !rests
+                && let Err(stop) = take_hold(bus, &mut report, &ARM, &found)
+                && !matches!(stop, Stop::Refused { .. })
+            {
+                report.stop = stop;
+                return report;
+            }
             report.pose_wait = Some(PoseWait {
                 ranges: [(0, 4_095); 3],
                 joints: ARM.to_vec(),
                 say: ARM_FOLD,
                 arm: Some(up.folded),
+                follow_arm: !rests,
+                follow_force: start_force,
             });
+            bus.after_arm_wait = true;
+            report.kept_holding = !rests;
+            report.stop = refused(format!("the arm is not folded: {why}"));
+            return report;
+        }
+        // An arm joint round past the end of its range (#5693): no goal can
+        // bring it back, so nothing is asked of the arm. It is held where it
+        // lies (taken hold of if found without torque), the lamp asks for a
+        // hand, gives way to it and follows it until the arm is folded; then
+        // it starts. Torque is never written off.
+        if let Some(Err(NoFold::Wrapped(why))) = &plan
+            && limits.refused_let_go
+        {
+            eprintln!(
+                "lamp-body: found shoulder {} elbow {} head pitch {}: {why}: it holds its arm and waits for a hand to bring it back",
+                found[Joint::BasePitch.index()].position,
+                found[Joint::ElbowPitch.index()].position,
+                found[Joint::WristPitch.index()].position
+            );
+            let without: Vec<Joint> = ARM
+                .into_iter()
+                .zip(arm_off)
+                .filter(|(joint, off)| *off && !bus.left[joint.index()])
+                .map(|(joint, _)| joint)
+                .collect();
+            if !without.is_empty()
+                && let Err(stop) = take_hold(bus, &mut report, &without, &found)
+                && !matches!(stop, Stop::Refused { .. })
+            {
+                report.stop = stop;
+                return report;
+            }
+            report.pose_wait = Some(PoseWait {
+                ranges: [(0, 4_095); 3],
+                joints: ARM.to_vec(),
+                say: ARM_WRAPPED,
+                arm: Some(up.folded),
+                follow_arm: true,
+                follow_force: start_force,
+            });
+            bus.after_arm_wait = true;
+            report.kept_holding = true;
             report.stop = refused(format!("the arm is not folded: {why}"));
             return report;
         }
@@ -4997,22 +5501,32 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     if let Some(last) = report.last {
                         let at = |joint: Joint| last[joint.index()].position;
                         let hold = COMMANDED.map(at);
-                        if bus.send_holds(hold, Some(ARM.map(at))).is_ok() {
+                        if bus.send_holds_where_they_are(hold, ARM.map(at)).is_ok() {
                             report.goal_writes += 1;
                             report.held_at = Some(hold);
+                        } else {
+                            // The last goals stay held; the refusal must
+                            // not end the run later.
+                            bus.refused = None;
                         }
                     }
                     // An arm joint stopped short of folded (#2940): with
                     // `--refused-let-go` a hand can fold it, so the lamp is
                     // let go and waits for that, the head judged again when
-                    // it starts. Anything else ends the run, as before.
+                    // it starts. Only an arm resting near folded (#5693,
+                    // `ARM_LET_GO_NEAR`): farther up, let go it would fall.
+                    // Anything else ends the run held where it is.
                     let short = match stop {
                         Stop::Tracking { joint, .. } => {
                             ARM.into_iter().find(|arm| arm.id() == joint)
                         }
                         _ => None,
                     };
+                    let near_folded = report.last.is_some_and(|last| {
+                        arm_rests(ARM.map(|joint| last[joint.index()].position), up.folded)
+                    });
                     if limits.refused_let_go
+                        && near_folded
                         && let Some(joint) = short
                     {
                         // Only the arm is let go: it rests folded by its
@@ -5024,15 +5538,20 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                             joints: ARM.to_vec(),
                             say: ARM_FOLD,
                             arm: Some(up.folded),
+                            follow_arm: false,
+                            follow_force: None,
                         });
+                        bus.after_arm_wait = true;
                         report.stop = refused(format!(
                             "the {} stopped short of folded while lowered: {stop:?}",
                             arm_part(joint)
                         ));
                         return report;
                     }
-                    // A hold refused is not written; the run ends on what
-                    // ended it.
+                    // The run ends on what ended it, the lamp held where it
+                    // stopped with torque on all five: nothing falls, and
+                    // the next start takes it from there.
+                    report.kept_holding = true;
                     report.stop = stop;
                     return report;
                 }
@@ -5048,6 +5567,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             };
             (lift, offs) = on_the_way(up, ARM.map(|joint| found[joint.index()].position));
         }
+        // The recovery is over: the run's own arm windows from here.
+        bus.arm_windows = run_windows;
         let mut why = None;
         let mut warm = None;
         let mut otherwise = false;
@@ -5113,7 +5634,15 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
     }
     // Folded on waking, the head and the base are judged from where the
-    // fold left them.
+    // fold left them; and brought home from anywhere (#5693): the lamp is
+    // folded and holds them, so nothing can fall. One found folded keeps
+    // the hand's help for a head or base far off (#2602, `WAKE_REACH`).
+    let wake_reach = if folded_pose.is_some() || bus.after_arm_wait {
+        RECOVER_REACH
+    } else {
+        WAKE_REACH
+    };
+    bus.after_arm_wait = false;
     let found_pose = folded_pose.unwrap_or(found_pose);
     if let Some(why) = &refusal {
         fold_for = fold_for.or(Some(refused(why.clone())));
@@ -5149,7 +5678,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             home,
             home_of(standing, stand),
             found_pose,
-            (beside_base, may_wake),
+            (beside_base, may_wake, wake_reach),
             standing.is_some(),
         );
     }
@@ -5200,7 +5729,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         } else {
             limits.start_reach.max(150)
         };
-        if may_wake && apart > f32::from(allowed.max(WAKE_REACH)) {
+        if may_wake && apart > f32::from(allowed.max(wake_reach)) {
             // `--limp on`: a head roll or a base that a hand left far off,
             // as after the lamp slumped, is taken hold of where it lies, as
             // V1 did, and it runs from there: its home moved there. Never
@@ -5214,7 +5743,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 continue;
             }
             report.stop = refused(format!(
-                "{joint} is {apart:.0} counts from its home, more than waking brings back ({WAKE_REACH})"
+                "{joint} is {apart:.0} counts from its home, more than waking brings back ({wake_reach})"
             ));
             return report;
         }
@@ -5406,39 +5935,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
     }
 
-    // The most the joints that carry the lamp may push with, if one was
-    // chosen: a lamp that meets a hand or an edge gives way sooner, and
-    // cannot push with more than this while this program is being slow to
-    // notice. Written before anything moves, and read back.
-    if let Some(force) = limits.force {
-        let mut carrying = vec![Joint::BaseYaw];
-        if standing.is_some() {
-            carrying.extend(ARM);
-        }
-        for joint in &carrying {
-            report.force_writes += 1;
-            if let Err(detail) = bus.write_checked(*joint, &force_write(*joint, force)) {
-                report.stop = Stop::Bus {
-                    detail: format!("force limit of {joint}: {detail}"),
-                };
-                return report;
-            }
-        }
-        match bus.force_limits(&carrying) {
-            Ok(now) if now.iter().all(|held| *held == force) => report.force = Some(force),
-            Ok(now) => {
-                report.stop = Stop::Bus {
-                    detail: format!("force limit read back as {now:?}"),
-                };
-                return report;
-            }
-            Err(detail) => {
-                report.stop = Stop::Bus {
-                    detail: format!("force limit read back: {detail}"),
-                };
-                return report;
-            }
-        }
+    // The run's own force limit, if the recovery ran under another.
+    if let Some(force) = limits.force.filter(|force| Some(*force) != start_force)
+        && let Err(stop) = write_force(bus, &mut report, standing, force)
+    {
+        report.stop = stop;
+        return report;
     }
 
     // Woken from wherever it was found: brought home slowly, the way
@@ -5446,7 +5948,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let found_pose = if to_wake {
         let to = home_found.map(|count| count.round() as u16);
         if !watched {
-            extend_start(bus, wake_seconds(found_pose, to));
+            extend_start(bus, wake_seconds(found_pose, to, limits.wake_speed()));
         }
         match wake(
             bus,
@@ -5502,14 +6004,26 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 goals
             }
             Err(stop) => {
-                // Stop pushing: each goal becomes where its joint is now.
+                // Stop pushing: each goal becomes where its joint is now,
+                // the arm's too, and a lamp that may stand is held there
+                // (#5693): let go, a raised arm falls.
                 if let Some(last) = report.last {
                     let hold = COMMANDED.map(|joint| last[joint.index()].position);
-                    if bus.send_holds(hold, standing.map(|_| arm_written)).is_ok() {
+                    let written = match standing {
+                        Some(_) => bus.send_holds_where_they_are(
+                            hold,
+                            ARM.map(|joint| last[joint.index()].position),
+                        ),
+                        None => bus.send_holds(hold, None),
+                    };
+                    if written.is_ok() {
                         report.goal_writes += 1;
                         report.held_at = Some(hold);
+                    } else {
+                        bus.refused = None;
                     }
                 }
+                report.kept_holding = standing.is_some();
                 report.stop = stop;
                 return report;
             }
@@ -8315,6 +8829,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         let fold = Fold {
                             head_to: None,
                             joints: vec![Joint::BasePitch],
+                            order: FoldOrder::InTurn,
                         };
                         fold_arm(
                             bus,

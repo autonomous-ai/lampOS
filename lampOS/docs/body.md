@@ -733,7 +733,7 @@ is found is its home and there is nothing to wake to):
   counts of a 286-count wake),
   a second's pause,
   then the rest of the way, each eased at both ends and timed so that the
-  joint with the farthest to go moves at 20 counts a second at most, two
+  joint with the farthest to go moves at 20 counts a second at most (`--recover-speed` when given), two
   fifths of the body's own speed. Every goal starts where the joint is, so
   nothing jumps; each joint only ever moves from where it was found toward
   its home, so the head found on the base only ever rises away from it.
@@ -901,6 +901,63 @@ head stays where it settled once its goal is its position, nor whether a head pr
 under the start load bound (170), which waking does not relax; nor how the
 wake looks to somebody beside the lamp. Folded with its torque switched off
 by hand, lamp-52e6's head did not droop in 10 s; it drooped in the cut.
+
+### Power-up recovery from any pose (#5693)
+
+A person unplugs the lamp, moves it by hand into any shape its servos allow,
+and plugs it in. With `--wake on` and `--stand`, the body brings it back to
+rest by itself and then stands as ever:
+
+1. **Force first.** Before anything is taken hold of or moved, the force limit
+   (register 48) is written to the base and the arm: `--recover-force` while it
+   recovers (the run's `--force-limit` unless given), the run's own once the
+   lamp is folded. Register 48 is RAM: after a power cut the servo starts from
+   its EEPROM limit (1,000 on the lamps), and the recovery once ran at that.
+   The journal says `recovering from yaw S shoulder S elbow S roll S pitch S at
+   force N load N speed N`.
+2. **Hold where found.** Each joint found without torque gets its goal where it
+   is, then torque on (`--torque on`).
+3. **The arm folds, together.** A drooped head (pitch past its folded window's
+   edge) is lifted to the edge first. Then the shoulder and the elbow fold
+   together along one eased line, at `--recover-speed` (40) counts a second for
+   the one that travels farther, each goal a count or two from the last: V1's
+   shape, which shortens the elbow's lever from the first tick. Where that
+   would take the centre of gravity farther off the base's axis than where it
+   was found or rests folded ([`cog::off_axis_mm`]), the elbow folds first, or
+   the shoulder first, whichever keeps the balance; where none does, the lamp
+   holds its arm and asks for a hand (`ARM_FOLD`). The arm's window reaches to
+   where each joint was found for this fold only, and the run's own windows
+   come back once the lamp is folded.
+4. **Then the head and the base wake home** from anywhere in their range
+   (`RECOVER_REACH`), as [Waking](#waking) says: 20 counts a second, or
+   `--recover-speed` when given, so a bench may double the whole recovery. A lamp found folded
+   keeps the hand's help for a head or base far off (`WAKE_REACH`, #2602).
+5. **A stop holds; nothing falls.** A load, tracking, status or drift stop
+   inside the recovery holds all five where they are, torque kept on
+   (`kept_holding` in the report), and the run ends there: the next start
+   takes it from where it stopped. The arm is let go for a hand only within
+   `ARM_LET_GO_NEAR` (150) of folded; raised, let go, it would fall. The load
+   stop while folding is `--recover-load` (the standing load unless given).
+6. **A joint round past the end of its range.** An arm joint read more than
+   `WRAP_UNDER_FOLD` (600) under its folded count is round past 4,095 and
+   counting on from 0 (lamp-dbda, 13 Nov: the elbow read 196–668 with the
+   shoulder pushed far back; the shoulder 167 with the arm back past its
+   stand). A position-mode goal across that seam would drive it the long way
+   round, through the arm, so it is never given one. The lamp holds the arm
+   where it lies, says `ARM_WRAPPED`, and waits for a hand: a joint carried
+   off its goal is held again where it is (`WRAP_FOLLOW`, a goal step at a
+   time); one pushed over `GIVE_WAY_LOAD` for two reads without moving has its
+   force lowered to `GIVE_WAY_FORCE` so the hand can move it, put back once the
+   load eases. A read that jumps nearly a whole turn is the seam crossed, not a
+   bad read. Folded and still for a second, it takes hold and starts; the
+   head and the base then wake home from anywhere, as after a fold.
+   Multi-turn self-recovery (angle limits 0/0) is not done: a later
+   `--recover-wrap` may add it after a bench proof.
+
+On the bench (the hardware lead's rules): `--force-limit 300 --recover-force
+300 --recover-load 300 --recover-speed 20` through `$BODY_EXTRA` in a drop-in,
+hands off confirmed before any start, and lamp-body masked while a person
+handles the lamp.
 
 ## Standing up
 
@@ -3253,7 +3310,7 @@ under 0.3 s; a hand holding a joint reads 94 to 100%
   left with a flag ends the run. Then the head, its roll and the base are
   brought home along the `--wake` path, whether or not `--wake` was given,
   exactly as after a power cut ("Waking"): a stir, a pause, then the rest
-  at 20 counts a second at most, never away from home; a head that drooped
+  at 20 counts a second at most (`--recover-speed` when given), never away from home; a head that drooped
   and must lift has its goal led up to 80 counts ahead of it, may lag up
   to 100 on the way, and one that stops within 50 counts of home is woken
   where it settles, the run then starting from there with its home moved

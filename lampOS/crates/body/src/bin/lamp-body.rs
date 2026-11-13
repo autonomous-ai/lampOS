@@ -4,14 +4,14 @@
 use lamp_body::{calibration::UnitId, moves::Asker};
 use std::{ffi::OsString, path::PathBuf};
 
-const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH [--gaze YAW,PITCH] [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--head-stall-load LOAD] [--force-limit N] [--arm-strain-load LOAD] [--arm-strain-seconds N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off [--folded-arm SHOULDER,ELBOW]] [--refused-let-go on|off] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off] [--caller-caps on|off] [--lease-socket ABSOLUTE_PATH] [--hold-from ABSOLUTE_FILE]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. --gaze-socket without --gaze (a lamp whose gaze is not measured yet), --gaze-reach given or\nnot, runs with gaze off and says so once. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window (a let-go run, --let-go-at-stop on with no --home\nand no --torque on, found outside it with --folded-arm given alone and its shoulder and elbow\neach within 20 counts of those is let go at once, torque off only, no goal written; the folded\ncounts must come from a read the person confirmed was folded, never from this run's own read of\nwhere the arm is now); one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --refused-let-go\non (the default; off is the body as before), a lamp found folded whose start is refused only because\nthe head or the base is out of where it may start is let go instead (torque off on the three, and on\nthe shoulder and the elbow with --stand), says on the bus what it asks of a person (\"My head is tipped\ntoo far...\"), reads the joints ten times a second, and once they have been in range for a second takes\nhold where they are and starts as it would have; a head found tipped up out of range (pitch under\nits range, against its weight) keeps its torque so that it does not drop, and says so; after ten\nminutes nobody has set it straight it stops asking, stays let go and reads twice a second; a lamp\nfound up is refused as before. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most, never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way, or up on it with its head pitched farther than that, is folded first, elbow then shoulder. By default --give-way return and --limp on
+const USAGE: &str = "lamp-body exit-report < LINE_OR_JOURNAL\n\nReads the newest exit report the body printed ({\"port\":...,\"body\":{...}}, e.g. from\n`journalctl -u lamp-body -o short-iso`) on stdin and prints it as plain lines: when (the journal\nprefix), the stop, stood and steps, per joint bad_temperatures, temperature_flaps and bad_reads,\nthe settles, the peak temperatures and goal_writes; a field older bodies lack says so. Exits 0 when\nthe newest was read, 1 when stdin holds none, 3 when the newest cannot be read (cut short: said,\nwith the previous readable one after it, labelled) and 4 when stdin cannot be read. It never\nopens the port.\n\nlamp-body --device ABSOLUTE_PATH --unit-id EXPLICIT_ID --lock-directory PRIVATE_ABSOLUTE_DIRECTORY --mood-socket ABSOLUTE_PATH [--home PITCH,ROLL,YAW] [--reach UP,DOWN,ROLL,YAW] [--speed COUNTS_PER_SECOND] [--servo-speed N] [--servo-acceleration N] [--stand PITCH,ROLL,YAW,SHOULDER,ELBOW --folded-arm SHOULDER,ELBOW [--stand-share PERCENT] [--stand-seconds N] [--awake-seconds N] [--arm-load SHOULDER,ELBOW] [--idle on|off]] [--gaze-socket ABSOLUTE_PATH [--gaze YAW,PITCH] [--gaze-reach YAW,PITCH]] [--stand-roll COUNTS] [--head-stall-load LOAD] [--force-limit N] [--recover-force N] [--recover-load N] [--recover-speed N] [--arm-strain-load LOAD] [--arm-strain-seconds N] [--torque on|off] [--wake on|off] [--give-way return|stay|off] [--limp on|off] [--overload release] [--let-go-at-stop on|off [--folded-arm SHOULDER,ELBOW]] [--refused-let-go on|off] [--rest-glance on|off] [--pitch-window LOW,HIGH] [--look-at-name on|off] [--moves ABSOLUTE_DIR] [--arbitration on|off] [--caller-caps on|off] [--lease-socket ABSOLUTE_PATH] [--hold-from ABSOLUTE_FILE]\n\nOwns the servo port and moves head pitch, head roll and base yaw a few degrees around\na home pose (the one given, in encoder counts, or else where they are found), for the mood\nit is told on the socket. Without --stand it never touches the shoulder or the elbow, and\nwithout --stand or --torque on it writes torque only off, on all five, as a run ends on a surprise\nor a start is refused for heat or load. With --stand (which needs --home and --folded-arm) it also raises the shoulder and\nthe elbow to that pose when a mood other than rest arrives, folds them down again\n--awake-seconds after the last one, and writes torque once to a shoulder or elbow found\nwith an old overload latched. With --gaze-socket and --gaze it takes where a face is from\nlamp-eyes on that socket ({\"face\":{...}} or {\"face\":null}) and, while the lamp listens\nor speaks, turns the head to it in small corrections: --gaze is the counts of base yaw and of\nhead pitch, signed, that bring a face from the right and from the bottom edge of the picture\nto its middle. --gaze-socket without --gaze (a lamp whose gaze is not measured yet), --gaze-reach given or\nnot, runs with gaze off and says so once. Refuses to start unless the three joints have torque on, a clear\nstatus and the head is inside its start window (a let-go run, --let-go-at-stop on with no --home\nand no --torque on, found outside it with --folded-arm given alone and its shoulder and elbow\neach within 20 counts of those is let go at once, torque off only, no goal written; the folded\ncounts must come from a read the person confirmed was folded, never from this run's own read of\nwhere the arm is now); one found as hot or as loaded as a run stops\nat is refused with torque off on all five, so that nothing pushes on until the next start. With --refused-let-go\non (the default; off is the body as before), a lamp found folded whose start is refused only because\nthe head or the base is out of where it may start is let go instead (torque off on the three, and on\nthe shoulder and the elbow with --stand), says on the bus what it asks of a person (\"My head is tipped\ntoo far...\"), reads the joints ten times a second, and once they have been in range for a second takes\nhold where they are and starts as it would have; a head found tipped up out of range (pitch under\nits range, against its weight) keeps its torque so that it does not drop, and says so; after ten\nminutes nobody has set it straight it stops asking, stays let go and reads twice a second; a lamp\nfound up is refused as before. With --torque on it first takes hold of a\njoint found without torque (the three always, the shoulder and the elbow with --stand):\nits goal is written as where it is, then torque on, and if it then moves more than 12 counts\nit does not start. With --wake on and --home, a joint found outside where it may start\n(the head out of its start window, or a joint farther from home than it may be found) but within\n400 counts of home is not refused: before anything else it is brought home slowly, a small stir,\na pause, then an eased rise at 20 counts a second at most (--recover-speed when given), never away from home, the head\nfirst and the base once the head is up; an arm found off\nits way, or up on it with its head pitched farther than that, is folded first, elbow then shoulder. By default --give-way return and --limp on
 (--give-way off is the body as it was before them, and --limp off keeps giving way without the
 slump). With --give-way, a joint that pushes at its goal without moving for\n1.5 s is told to stop (its goal becomes where it is; torque is never written off); with\n--give-way stay, a head or base joint that gave way and is moved more than 15 counts by\na hand for over a second stays where it was put. With --limp on as well, as the old runtime
 did, a head or base joint that a hand stops and still pushes a second later makes the head
 and base let go (torque off on those three; the shoulder and the elbow keep holding, so a
 standing lamp stays up), held again 5 s later where they lie (an overload: all five, 120 s);
 a hand never ends the run, and a head roll or base found beyond 400 counts of home at start is
-taken hold of where it lies. With --overload release, any joint that\nreads a load of 800 of 1000 (80% of --force-limit for a joint held to one) for 1.5 s has\ntorque switched off on all five, so the lamp slumps; 120 s later each is held where it is\n(its goal, then torque on) and the head is brought home as --wake does; a shoulder left\nup over an elbow that fell is first lowered folded, and otherwise the arm waits where it\nslumped until the lamp is next asked to stand; a second time within ten\nminutes ends the run with torque off. With --rest-glance on, a lamp at rest takes what\nExpression asks of the head (50 counts of pitch, 25 of roll at most, never the base or the arm)\nand comes back to rest when it runs out. --pitch-window is this lamp's own window for the\nhead's pitch while it is beside the base (by default lamp-4ace's, 1740,2030): never under\nthe head's floor (1670), around --home's pitch, and inside the servo's own limits or it does\nnot start. With --look-at-name on, the lamp's name heard on the bus\n(name/heard) while it does not speak is taken as being spoken to for two seconds: it rises,\nlooks up and turns to a face at once; with nobody in view it glances a little to one side and\nthe other once it stands, and lets it go. At most once in ten seconds. Stops at the first surprise, holding\nwhere it is, then, as the old runtime did, lets go: torque off on all five. Ends on SIGINT or SIGTERM after easing back to where it started, still holding (one asked while a slumped lamp's shoulder is being lowered holds where it is instead, and the next start lowers it); with\n--let-go-at-stop on (the factory's, off unless given) a lamp that got down, its head home and\nits arm folded, is then let go, torque off on all five, so that it can be read at rest.\nThe mood socket takes datagrams of JSON: {\"mood\":\"resting|listening|thinking|speaking\",\"level\":0..255}.\nA lamp standing at its full height also makes a gesture asked for there: {\"gesture\":\"nod\"}\n(nod, headshake, greeting, laugh, shy, stretching); a folded one with --stand stands up for it\nfirst, unless paused, held by a hand or slumped, and the journal says why each was taken or dropped. With --moves, the moves in that folder\n(NAME.json, docs/body.md) are read at start and asked for by name the same way; one this body\ncannot play is refused with why, and a folder that cannot be read leaves the body's own.\nA skill sends its own move whole, {\"move\":{\"name\":...,\"step_ms\":...,\"frames\":[...]}}, held to the same\nbounds and played the same way; one it cannot play is dropped with why.\nWith --arbitration on (off unless given), a gesture or a move may also say who asks,\n\"source\" (free text) and \"priority\" (person, safety, conversation, skill or idle;\nconversation without one). One asked while another plays ends it if asked higher, easing\nout as a dropped gesture does, and is dropped otherwise (\"dropped: busy, conversation\");\na hand on the lamp drops any (\"dropped: held by a hand\"). Off, \"source\" and\n\"priority\" are read and not weighed, so a caller may always say them. Either way, a\nskill's or idle gesture playing ends, eased out, when a conversation begins or a hand holds the head;\nwith LAMP_GESTURE_PAUSE=on, listening only pauses it: it ends when the lamp answers or after 3 s, and\ngoes on where it was if the lamp rests again sooner. A gesture or move lamp-control sends with \"replace\":true\n(a paired computer's) ends a skill's or idle one playing, eased out, and plays after it; never while someone\nis talking with the lamp or over a gesture paused for that talk (\"dropped: the person is using the lamp\").\nWith --caller-caps on (off unless given; phase 0 of the lamp programming protocol, #3504), the kernel names\nwho sent each datagram, never the datagram: a gesture or a move is held to the most its systemd unit\nmay ask at, run as that unit's user (lamp-voice person; lamp-cloud and lamp-actions conversation;\nlamp-skills and lamp-control skill; lamp-addons and lamp-expression idle; root's other helpers what they\nask; anyone else idle), its source is that unit's name before what it said, and a cut is said once a\nminute per unit; the gaze socket takes a sight only from lamp-eyes, lamp-skills or root, and drops\nany other, said once a minute.\nWith --lease-socket (the product unit passes /run/lampos-body/lease.sock; #3504, phase 0), lamp-control may hold the body for a\nwhile so that the lamp's own life stands back: one holder at a time, lamp-control.service as lampos or root,\nnamed by the kernel; lines of JSON, {\"hold\":{\"for_ms\":1..30000}} or {\"let_go\":true}, each answered, and\na change said unasked: {\"lease\":\"held\"}, {\"lease\":\"suspended\",\"why\":\"conversation\"}, {\"lease\":\"lost\",\"why\":\nhand|slumped|private|paused|asleep|lapsed}, {\"lease\":\"free\"} or {\"lease\":\"refused\",\"why\":...}. While held, no shift at rest\nand nothing from Expression; a hold not renewed lapses, and its holder gone ends it. While held, the holder\nmay say where the head looks, {\"look\":{\"yaw\":Y,\"pitch\":P}} in degrees from the pose (or with \"from\":\"home\",\nfrom the found home, the pose's offset taken off, inside the body's own bounds) or {\"look\":\"ahead\"}, inside the reach from the pose,\nanswered once {\"look\":\"there\",...} or {\"look\":\"cut_short\",\"why\":...}; and {\"limp\":true} lets base yaw go\n(torque off, for a move recorded by hand) until {\"limp\":false} or any end of the hold takes it back where it lies, and the head goes back when the lease ends.\nWith LAMP_BODY_OWN_RANGES=on, each joint's own stored limits are read at start: a home, folded arm,\nstand or pitch window outside them does not start, and a head or base goal outside them (less 20)\nends the run; a joint storing 0..=4095 keeps its guard as before.\nWith LAMP_BODY_STRAIN_GUARD=on, a standing shoulder or elbow over --arm-strain-load (450) for\n--arm-strain-seconds (30) sits the lamp down, a joint 8 degrees warmer within 5 min while under 55 is\nsaid on the bus, and a second hot or strained sit-down within an hour seats it, its arm let go, until\na head pad or button is held a second, a self-test starts or it is started again; each joint's\nhighest load and temperature each day are kept in /var/lib/lampos-body/peaks/ for 30 days.\nWith LAMP_NIGHT_STAYS_FOLDED=on, while Expression says asleep (expression/state) and the lamp is folded,\nthe night's sleep is latched: the voice listening or thinking alone, or its name heard but not taken by Expression, leaves it folded;\na tap, a face, an answer or Expression waking stand it as ever, and the latch lets go once Expression has not said asleep for 120 s with the voice at rest.\n--hold-from FILE is for tests on a lamp only: while FILE's first word is held, the head's pitch is\ntaken as held by a hand (its goal kept where it is, torque and giving way untouched), and the\njournal says the hand is from a test input; free, another word or no file is no hand. No product unit passes it.\nPrints one JSON report when it ends.\n";
+taken hold of where it lies. With --overload release, any joint that\nreads a load of 800 of 1000 (80% of --force-limit for a joint held to one) for 1.5 s has\ntorque switched off on all five, so the lamp slumps; 120 s later each is held where it is\n(its goal, then torque on) and the head is brought home as --wake does; a shoulder left\nup over an elbow that fell is first lowered folded, and otherwise the arm waits where it\nslumped until the lamp is next asked to stand; a second time within ten\nminutes ends the run with torque off. With --rest-glance on, a lamp at rest takes what\nExpression asks of the head (50 counts of pitch, 25 of roll at most, never the base or the arm)\nand comes back to rest when it runs out. --pitch-window is this lamp's own window for the\nhead's pitch while it is beside the base (by default lamp-4ace's, 1740,2030): never under\nthe head's floor (1670), around --home's pitch, and inside the servo's own limits or it does\nnot start. With --look-at-name on, the lamp's name heard on the bus\n(name/heard) while it does not speak is taken as being spoken to for two seconds: it rises,\nlooks up and turns to a face at once; with nobody in view it glances a little to one side and\nthe other once it stands, and lets it go. At most once in ten seconds. Stops at the first surprise, holding\nwhere it is, then, as the old runtime did, lets go: torque off on all five. Ends on SIGINT or SIGTERM after easing back to where it started, still holding (one asked while a slumped lamp's shoulder is being lowered holds where it is instead, and the next start lowers it); with\n--let-go-at-stop on (the factory's, off unless given) a lamp that got down, its head home and\nits arm folded, is then let go, torque off on all five, so that it can be read at rest.\nThe mood socket takes datagrams of JSON: {\"mood\":\"resting|listening|thinking|speaking\",\"level\":0..255}.\nA lamp standing at its full height also makes a gesture asked for there: {\"gesture\":\"nod\"}\n(nod, headshake, greeting, laugh, shy, stretching); a folded one with --stand stands up for it\nfirst, unless paused, held by a hand or slumped, and the journal says why each was taken or dropped. With --moves, the moves in that folder\n(NAME.json, docs/body.md) are read at start and asked for by name the same way; one this body\ncannot play is refused with why, and a folder that cannot be read leaves the body's own.\nA skill sends its own move whole, {\"move\":{\"name\":...,\"step_ms\":...,\"frames\":[...]}}, held to the same\nbounds and played the same way; one it cannot play is dropped with why.\nWith --arbitration on (off unless given), a gesture or a move may also say who asks,\n\"source\" (free text) and \"priority\" (person, safety, conversation, skill or idle;\nconversation without one). One asked while another plays ends it if asked higher, easing\nout as a dropped gesture does, and is dropped otherwise (\"dropped: busy, conversation\");\na hand on the lamp drops any (\"dropped: held by a hand\"). Off, \"source\" and\n\"priority\" are read and not weighed, so a caller may always say them. Either way, a\nskill's or idle gesture playing ends, eased out, when a conversation begins or a hand holds the head;\nwith LAMP_GESTURE_PAUSE=on, listening only pauses it: it ends when the lamp answers or after 3 s, and\ngoes on where it was if the lamp rests again sooner. A gesture or move lamp-control sends with \"replace\":true\n(a paired computer's) ends a skill's or idle one playing, eased out, and plays after it; never while someone\nis talking with the lamp or over a gesture paused for that talk (\"dropped: the person is using the lamp\").\nWith --caller-caps on (off unless given; phase 0 of the lamp programming protocol, #3504), the kernel names\nwho sent each datagram, never the datagram: a gesture or a move is held to the most its systemd unit\nmay ask at, run as that unit's user (lamp-voice person; lamp-cloud and lamp-actions conversation;\nlamp-skills and lamp-control skill; lamp-addons and lamp-expression idle; root's other helpers what they\nask; anyone else idle), its source is that unit's name before what it said, and a cut is said once a\nminute per unit; the gaze socket takes a sight only from lamp-eyes, lamp-skills or root, and drops\nany other, said once a minute.\nWith --lease-socket (the product unit passes /run/lampos-body/lease.sock; #3504, phase 0), lamp-control may hold the body for a\nwhile so that the lamp's own life stands back: one holder at a time, lamp-control.service as lampos or root,\nnamed by the kernel; lines of JSON, {\"hold\":{\"for_ms\":1..30000}} or {\"let_go\":true}, each answered, and\na change said unasked: {\"lease\":\"held\"}, {\"lease\":\"suspended\",\"why\":\"conversation\"}, {\"lease\":\"lost\",\"why\":\nhand|slumped|private|paused|asleep|lapsed}, {\"lease\":\"free\"} or {\"lease\":\"refused\",\"why\":...}. While held, no shift at rest\nand nothing from Expression; a hold not renewed lapses, and its holder gone ends it. While held, the holder\nmay say where the head looks, {\"look\":{\"yaw\":Y,\"pitch\":P}} in degrees from the pose (or with \"from\":\"home\",\nfrom the found home, the pose's offset taken off, inside the body's own bounds) or {\"look\":\"ahead\"}, inside the reach from the pose,\nanswered once {\"look\":\"there\",...} or {\"look\":\"cut_short\",\"why\":...}; and {\"limp\":true} lets base yaw go\n(torque off, for a move recorded by hand) until {\"limp\":false} or any end of the hold takes it back where it lies, and the head goes back when the lease ends.\nWith LAMP_BODY_OWN_RANGES=on, each joint's own stored limits are read at start: a home, folded arm,\nstand or pitch window outside them does not start, and a head or base goal outside them (less 20)\nends the run; a joint storing 0..=4095 keeps its guard as before.\nWith LAMP_BODY_STRAIN_GUARD=on, a standing shoulder or elbow over --arm-strain-load (450) for\n--arm-strain-seconds (30) sits the lamp down, a joint 8 degrees warmer within 5 min while under 55 is\nsaid on the bus, and a second hot or strained sit-down within an hour seats it, its arm let go, until\na head pad or button is held a second, a self-test starts or it is started again; each joint's\nhighest load and temperature each day are kept in /var/lib/lampos-body/peaks/ for 30 days.\nWith LAMP_NIGHT_STAYS_FOLDED=on, while Expression says asleep (expression/state) and the lamp is folded,\nthe night's sleep is latched: the voice listening or thinking alone, or its name heard but not taken by Expression, leaves it folded;\na tap, a face, an answer or Expression waking stand it as ever, and the latch lets go once Expression has not said asleep for 120 s with the voice at rest.\n--hold-from FILE is for tests on a lamp only: while FILE's first word is held, the head's pitch is\ntaken as held by a hand (its goal kept where it is, torque and giving way untouched), and the\njournal says the hand is from a test input; free, another word or no file is no hand. No product unit passes it.\nAt power-up, with --wake on and --stand, the arm's force limit is --recover-force (--force-limit unless given) from before\nanything is taken hold of until the lamp is folded (register 48 starts from the servo's own limit after a power cut),\nits load stop --recover-load (the standing load unless given), its fold at --recover-speed (40) counts a second and\nits wake at the same when given (20 otherwise); a stop\ninside that recovery holds all five where they are, torque kept on, and the arm is let go for a hand only within 150\ncounts of folded (#5693).\nPrints one JSON report when it ends.\n";
 
 #[derive(Debug)]
 struct Arguments {
@@ -34,6 +34,11 @@ struct Arguments {
     /// `--head-stall-load`: this lamp's head pitch stall bound.
     head_stall_load: Option<u16>,
     force_limit: Option<u16>,
+    /// `--recover-force`, `--recover-load` and `--recover-speed` (#5693):
+    /// the power-up recovery's force limit, arm load stop and fold speed.
+    recover_force: Option<u16>,
+    recover_load: Option<u16>,
+    recover_speed: Option<u16>,
     /// `--arm-strain-load` and `--arm-strain-seconds` (#4501): the strain
     /// guard's bounds, taken under `LAMP_BODY_STRAIN_GUARD=on` only.
     arm_strain_load: Option<u16>,
@@ -71,7 +76,7 @@ struct Arguments {
 /// updated is the safe failure, not one that moves on bounds it knows to be
 /// incomplete (the first builder on #2071, 20 Oct 06:28; #1680's one
 /// exception, a safety rule).
-const OPTIONS: [&str; 39] = [
+const OPTIONS: [&str; 42] = [
     "--arbitration",
     "--arm-load",
     "--arm-strain-load",
@@ -99,6 +104,9 @@ const OPTIONS: [&str; 39] = [
     "--overload",
     "--pitch-window",
     "--reach",
+    "--recover-force",
+    "--recover-load",
+    "--recover-speed",
     "--refused-let-go",
     "--rest-glance",
     "--servo-acceleration",
@@ -191,6 +199,7 @@ fn parse_with(
     let mut stand_roll = None;
     let mut head_stall_load = None;
     let mut force_limit = None;
+    let (mut recover_force, mut recover_load, mut recover_speed) = (None, None, None);
     let (mut arm_strain_load, mut arm_strain_seconds) = (None, None);
     let mut torque = None;
     let mut wake = None;
@@ -231,6 +240,9 @@ fn parse_with(
                 || stand_roll.is_some()
                 || head_stall_load.is_some()
                 || force_limit.is_some()
+                || recover_force.is_some()
+                || recover_load.is_some()
+                || recover_speed.is_some()
                 || arm_strain_load.is_some()
                 || arm_strain_seconds.is_some()
                 || torque.is_some()
@@ -375,6 +387,36 @@ fn parse_with(
                         .map(|value| value[0])
                         .filter(|force| (300..=1_000).contains(force))
                         .ok_or("--force-limit is a whole number from 300 to 1000")?,
+                );
+            }
+            Some("--recover-force") if recover_force.is_none() => {
+                recover_force = Some(
+                    value
+                        .to_str()
+                        .and_then(counts_of::<1>)
+                        .map(|value| value[0])
+                        .filter(|force| (300..=1_000).contains(force))
+                        .ok_or("--recover-force is a whole number from 300 to 1000")?,
+                );
+            }
+            Some("--recover-load") if recover_load.is_none() => {
+                recover_load = Some(
+                    value
+                        .to_str()
+                        .and_then(counts_of::<1>)
+                        .map(|value| value[0])
+                        .filter(|load| (100..=1_000).contains(load))
+                        .ok_or("--recover-load is a whole number from 100 to 1000")?,
+                );
+            }
+            Some("--recover-speed") if recover_speed.is_none() => {
+                recover_speed = Some(
+                    value
+                        .to_str()
+                        .and_then(counts_of::<1>)
+                        .map(|value| value[0])
+                        .filter(|speed| (5..=120).contains(speed))
+                        .ok_or("--recover-speed is a whole number from 5 to 120 counts a second")?,
                 );
             }
             Some("--arm-strain-load") if arm_strain_load.is_none() => {
@@ -573,6 +615,18 @@ fn parse_with(
     {
         return Err("--arm-load must be under --force-limit");
     }
+    if let (Some(force), Some(load)) = (recover_force.or(force_limit), recover_load)
+        && load >= force
+    {
+        return Err("--recover-load must be under --recover-force (or --force-limit)");
+    }
+    if (recover_force.is_some() || recover_load.is_some() || recover_speed.is_some())
+        && (stand.is_none() || wake != Some(true))
+    {
+        return Err(
+            "--recover-force, --recover-load and --recover-speed need --stand and --wake on",
+        );
+    }
     // `--folded-arm` alone is a let-go run's (#1682): with `--let-go-at-stop
     // on`, no `--home` and no `--torque on`, nothing else of standing. Its
     // counts are ones a person confirmed folded, never this run's read.
@@ -640,6 +694,9 @@ fn parse_with(
         stand_roll,
         head_stall_load,
         force_limit,
+        recover_force,
+        recover_load,
+        recover_speed,
         arm_strain_load,
         arm_strain_seconds,
         torque_on: torque.unwrap_or(false),
@@ -1471,6 +1528,9 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         arguments.stand_roll,
         arguments.head_stall_load,
         arguments.force_limit,
+        arguments.recover_force,
+        arguments.recover_load,
+        arguments.recover_speed,
         arguments.arm_strain_load,
         arguments.arm_strain_seconds,
         arguments.torque_on,
@@ -1803,6 +1863,9 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         stand_roll: arguments.stand_roll.map_or(folded.stand_roll, f32::from),
         head_stall_load: arguments.head_stall_load.unwrap_or(limits.head_stall_load),
         force: arguments.force_limit,
+        recover_force: arguments.recover_force,
+        recover_load: arguments.recover_load,
+        recover_speed: arguments.recover_speed.map(f32::from),
         torque_on: arguments.torque_on,
         wake: arguments.wake,
         give_way: arguments.give_way.map(|choice| match choice {
@@ -2745,6 +2808,7 @@ mod tests {
                     "@BODY_POSES@" | "$BODY_POSES" => {
                         SEATED.split_whitespace().map(str::to_owned).collect()
                     }
+                    "$BODY_EXTRA" => Vec::new(),
                     "@SERVO_DEVICE@" => vec!["/dev/ttyACM0".to_owned()],
                     "@MOTOR_LOCK_DIR@" => vec!["/var/lib/lampos-locks/motor".to_owned()],
                     "@UNIT_ID@" | "%H" => vec!["lamp-a63e".to_owned()],
@@ -2943,6 +3007,72 @@ mod tests {
         );
         assert!(standing(&["--force-limit", "600", "--arm-load", "500,600"]).is_err());
         assert!(standing(&["--arm-load", "900,950", "--force-limit", "600"]).is_err());
+    }
+
+    /// The power-up recovery's own force, load stop and speed (#5693): each
+    /// a whole number in its range, only with `--stand` and `--wake on`,
+    /// and a load stop under the force it runs at.
+    #[test]
+    fn the_recovery_flags_are_numbers_in_range_and_need_stand_and_wake() {
+        let with = |more: &[&'static str]| parse(args(&[&FULL[..], more].concat()));
+        let stand = [
+            "--home",
+            "1950,2043,2015",
+            "--stand",
+            "1772,2045,2015,2657,2602",
+            "--folded-arm",
+            "2048,2047",
+            "--wake",
+            "on",
+        ];
+        let standing = |more: &[&'static str]| with(&[&stand[..], more].concat());
+        let parsed = standing(&[]).unwrap().unwrap();
+        assert_eq!(
+            (
+                parsed.recover_force,
+                parsed.recover_load,
+                parsed.recover_speed
+            ),
+            (None, None, None)
+        );
+        let parsed = standing(&[
+            "--recover-force",
+            "300",
+            "--recover-load",
+            "250",
+            "--recover-speed",
+            "20",
+        ])
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            (
+                parsed.recover_force,
+                parsed.recover_load,
+                parsed.recover_speed
+            ),
+            (Some(300), Some(250), Some(20))
+        );
+        for refused in [
+            &["--recover-force", "299"][..],
+            &["--recover-force", "1001"],
+            &["--recover-load", "99"],
+            &["--recover-speed", "4"],
+            &["--recover-speed", "121"],
+            &["--recover-speed", "twenty"],
+            // The load stop must sit under the force the recovery runs at.
+            &["--recover-force", "300", "--recover-load", "300"],
+            &["--force-limit", "400", "--recover-load", "400"],
+            &["--recover-force", "300", "--recover-force", "400"],
+        ] {
+            assert!(standing(refused).is_err(), "{refused:?}");
+        }
+        // Without a stand, or without waking, there is no recovery to tune.
+        assert!(with(&["--recover-force", "300"]).is_err());
+        assert!(
+            with(&[&stand[..6], &["--recover-speed", "20"]].concat()).is_err(),
+            "needs --wake on"
+        );
     }
 
     /// Taking hold of a joint found without torque is off unless asked for.
@@ -4013,6 +4143,8 @@ mod tests {
                 .split_whitespace()
                 .skip(1)
                 .flat_map(|word| match word {
+                    // Empty in the product; a bench drop-in may fill it (#5693).
+                    "$BODY_EXTRA" => Vec::new(),
                     "$BODY_POSES" => poses.split_whitespace().map(str::to_owned).collect(),
                     "%H" => vec!["lamp-a63e".to_owned()],
                     word => vec![word.to_owned()],
