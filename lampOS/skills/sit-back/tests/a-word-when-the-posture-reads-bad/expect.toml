@@ -1,0 +1,16 @@
+# As a-word-after-ten-minutes-leaned-in, with lamp-seen's humans/posture
+# every 30 s (#6543), bad_share 0.7: a word at minute 13, as there, the same
+# words, never of the body.
+clock = "11:00"
+
+[[expect]]
+at = "13m"
+within = "1m"
+call = "body.gaze"
+args = { look_at = "face" }
+
+[[expect]]
+at = "13m"
+within = "1m"
+call = "say"
+args = { note = "They have been leaning in toward the desk for a while. In one short, kind line, the way a friend would, say it might be a good moment to sit back for a bit. Say nothing about their body, back, neck or looks, and nothing about health." }

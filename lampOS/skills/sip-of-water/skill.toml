@@ -15,7 +15,7 @@ most_a_day = 3
 # a turn toward the face and its light. It says one short line, worded by the voice (the owner, 25 Oct).
 [permissions]
 speak = true             # one short line, worded by the voice (the owner, 25 Oct: a lamp that talks to you, not only hints)
-topics = ["humans/faces/tracked", "voice/state", "room/activity"]
+topics = ["humans/faces/tracked", "voice/state", "room/activity", "humans/doing"]
 body = true
 light = true
 
@@ -52,6 +52,11 @@ topic = "room/activity"   # begins again when someone else sits down, has lasted
 field = "sitting_s"       # too, not only a face in the chair. Without the eyes' room/activity
 above = 5399           # (LAMP_ACTIVITY off) the topic says nothing and it runs as before.
 unknown = "holds"
+[[while]]                 # a drink not seen in the last 90 minutes (#6543; the PM: what is seen only
+topic = "humans/doing"    # holds the nudge, never a word of its own). lamp-seen counts drank_s_ago
+field = "drank_s_ago"     # from the desk arrival when it saw nothing, so it holds as the sitting
+above = 5399              # does. Without lamp-seen, or with it gone quiet, the topic is never said
+unknown = "holds_stale"   # or has run out, and it runs as before.
 
 [active]                  # only in the day's working hours
 from = "10:00"
@@ -127,6 +132,11 @@ topic = "room/activity"
 field = "sitting_s"
 above = 2999
 unknown = "holds"
+[[present.while]]         # and no drink seen in the last 50 minutes, as above
+topic = "humans/doing"
+field = "drank_s_ago"
+above = 2999
+unknown = "holds_stale"
 
 [present.active]          # the waking day: the quiet hours hold the rest
 from = "08:00"
