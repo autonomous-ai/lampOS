@@ -3398,9 +3398,10 @@ gone ([switches.md](switches.md)). What happens:
      With every switch on the description stays within 1,024 bytes with no
      "yes". Off, the function is as before, word for word.
    - **A plain ask to make one calls it** (`LAMP_MAKE_SKILL_ASKED=on`,
-     `tools::make_skill_asked`, the second route, off and in no product
-     unit; #6835 gap 3): on lamp-52e6 on 13 Nov (build 12635, #6755's words
-     in the description), the same ask was still answered "I can't read my
+     `tools::make_skill_asked`, the second route, on in the product
+     unit, only where `LAMP_MAKE_SKILL` is; #6835 gap 3): on lamp-52e6
+     on 13 Nov (build 12635, #6755's words in the description), the same
+     ask was still answered "I can't read my
      own processor temperature, so I can't make that happen on my own. A
      skill can, though… Want me to make one?" with no call. With the
      switch, a line whose sentence opens with a make ("make (me) a (new)
