@@ -172,6 +172,7 @@ eligible() {
     # 31 Oct 03:1x: a PR whose comments ask "TWO READS" (privacy, safety, data loss) waits for READ-OKs on this head
     # from two different readers (reads2.py). #4633 and #4656 went in trains on one READ-OK where two were named.
     # 3 Nov 15:4x: only "none" or "met N" carries it; a fetch or a reads2.py error leaves it out.
+    # 13 Nov (the lead): --always asks two different signed readers of every PR, asked or not, so "none" no longer comes.
     # 12 Nov (#6556 C): the body is kept under the same key as the comments.
     if (( hit )) && [[ -s $ck/$p.b ]]; then cp $ck/$p.b $bf
     else
@@ -198,11 +199,8 @@ eligible() {
     fi
     [[ $two == none || $two == met* ]] || { once reads2$p "#$p left out: reads2.py said '${two}'"; continue; }
     fine reads2$p
-    # 4 Nov 23:4x (Thirteen's P3 on #5305); 7 Nov (#5635): a body that names TWO READS but opts out with a ONE READ line
-    # is said once per head, so an opt-out is seen before a train merges it on one read.
-    if [[ $two == none && $($PYTHON -I $TOOLS_DIR/reads2.py --unasked < $bf) == unasked ]]; then
-      grep -qx "$p unasked $head" $told || { say "#$p: its body names TWO READS but opts out with ONE READ, so one READ-OK carries ${head:0:9}" >&2; tell "$p unasked $head"; }
-    fi
+    # 13 Nov: with --always no PR rides on one read, so a ONE READ opt-out (4 Nov, #5305; 7 Nov, #5635) no longer lowers
+    # it, and its once-a-head line is gone with it.
     # 30 Oct 15:0x (the Reviewer-lead's 14:58): a PR whose own ARM64 run on this head is red sits out. #4507's run was red
     # at 14:17 before trains 407 and 408 carried it; both failed in lamp-update, and the bot held #4524 and #4530 instead.
     # 3 Nov 16:4x (Thirteen's P3 on #5068): a run list gh can't fetch holds the PR (fail closed), not skips the check.
