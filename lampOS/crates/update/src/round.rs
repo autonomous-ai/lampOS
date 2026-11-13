@@ -3058,7 +3058,10 @@ impl Run<'_, '_> {
                 }
             };
             let health = if done { self.world.ears.health() } else { None };
+            // Read after the states: setup writes its marker, then ends.
+            let setup_done = crate::setup_lifecycle::done(&self.config.root);
             for watch in watches.iter_mut() {
+                watch.setup_done(setup_done);
                 let state = states
                     .iter()
                     .find(|state| state.unit == watch.unit)
