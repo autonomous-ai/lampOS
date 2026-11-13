@@ -3,6 +3,16 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 19:2x GMT+7: quiet check; P4 step 2 sized
+
+- No new comments for sim-3. #6929: Linux clippy, Linux `sim` and
+  `sim-macos` pass; ARM64 pending.
+- P4 step 2 sized on #6811: the route's Nova-3 subset is `/v1/listen`
+  linear16 16 kHz in, `Finalize`/`CloseStream`, out `Results`
+  (`is_final`, `speech_final`, `from_finalize`) and `SpeechStarted`; the
+  coordinator ends the line and sends `Finalize`, so recognition can run on
+  the held utterance then. Latency to measure: `Finalize` to final.
+
 ## 2026-11-13 19:1x GMT+7: sim-3-P4 (the person's proposal), asked
 
 - **sim-3-P4** on #6811: a macOS voice for the virtual lamp where the
