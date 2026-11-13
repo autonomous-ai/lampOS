@@ -3,17 +3,15 @@
 //! topic's kept value at most once a second. A level outside 1 to 5 or a
 //! message that does not read is not taken; a publisher gone keeps the last
 //! level taken, not 1. Off, or nothing said yet: level 1, today.
-//!
-//! Only `level` is read from `{"level": 1..5, "chosen": bool}`; the typed
-//! message (`lamp_msgs`) is added beside the publisher.
+//! The message is `lamp_msgs::Energy`, said by `lamp-cloud`.
 
 use lamp_bus::{Bus, Message};
-use serde::Deserialize;
+use lamp_msgs::Energy;
 use std::time::{Duration, Instant};
 
 /// The switch, the body's alone: off unless exactly `on`.
 pub const SWITCH: &str = "LAMP_BODY_ENERGY";
-pub const TOPIC: &str = "character/energy";
+pub const TOPIC: &str = Energy::TOPIC;
 const LOOK_EVERY: Duration = Duration::from_secs(1);
 
 /// Whether the switch's value turns it on: only `on`.
@@ -25,15 +23,10 @@ pub fn enabled_from_environment() -> bool {
     enabled(std::env::var(SWITCH).ok().as_deref())
 }
 
-#[derive(Deserialize)]
-struct Said {
-    level: u8,
-}
-
 /// The level `message` says, if it says one from 1 to 5.
 pub fn level_in(message: &Message) -> Option<u8> {
     message
-        .parse::<Said>()
+        .parse::<Energy>()
         .ok()
         .map(|said| said.level)
         .filter(|level| (1..=5).contains(level))
@@ -101,7 +94,7 @@ mod tests {
         }
     }
 
-    /// Nothing said is 1; a level said is taken; one outside 1 to 5 or
+    /// not a `lamp_msgs::Energy` leaves the last one taken.
     /// unreadable leaves the last one taken.
     #[test]
     fn a_said_level_is_taken_and_a_bad_one_keeps_the_last() {
@@ -117,8 +110,8 @@ mod tests {
         };
         assert_eq!(say(serde_json::json!({"level": 4, "chosen": true})), 4);
         for bad in [
-            serde_json::json!({"level": 0}),
-            serde_json::json!({"level": 6}),
+            serde_json::json!({"level": 0, "chosen": true}),
+            serde_json::json!({"level": 6, "chosen": false}),
             serde_json::json!({"chosen": true}),
         ] {
             assert_eq!(say(bad), 4);
