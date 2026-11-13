@@ -965,7 +965,11 @@ it wins over `LAMP_CONVERSATION_CARRIED_SAVES`. It never forgets, retires or
 changes: no forget of any kind, no correction (`replaces`), no rule kept,
 listed or forgotten and no yes runs on it, and the lamp is told to ask them
 to look at it and say it again (`ScopeLease::forgets_need_mouth`,
-`second_provider::one_face_refused`); it holds no forget for a yes. Its
+`second_provider::one_face_refused`); it holds no forget for a yes. One
+exception, with `LAMP_NAMES_RENAME_YES`: a face rename asked on it is held
+for P, and P's yes on it runs a rename held for P
+(`held_rename::carried_one_face`, docs/eyes.md; the memory owner's OK on 13
+Nov, #6859). Its
 exchange is still kept out of the journal, the rolling summary and talk
 notes (`ScopeLease::reads_carried`). It needs the one-face rule's tracker
 (`LAMP_PERSON_SCOPE_ONE_FACE` on and acting) showing no other voice in the
