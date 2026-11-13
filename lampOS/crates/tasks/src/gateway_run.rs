@@ -34,14 +34,14 @@
 //! However it ends, the token is ended with lamp-control first, then the
 //! turn's process group is killed, the turn stopped and its session
 //! removed on the gateway (each bounded), then the run's folder removed.
+use std::collections::BTreeMap;
 use std::io::{Read, Write};
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
@@ -340,8 +340,7 @@ pub struct GatewayRunner {
 
 /// [`GatewayRunner::live`] of each program, kept for lamp-tasks' life.
 fn live_for(program: &Path) -> Arc<Mutex<Option<String>>> {
-    static LIVE: Mutex<BTreeMap<PathBuf, Arc<Mutex<Option<String>>>>> =
-        Mutex::new(BTreeMap::new());
+    static LIVE: Mutex<BTreeMap<PathBuf, Arc<Mutex<Option<String>>>>> = Mutex::new(BTreeMap::new());
     LIVE.lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .entry(program.to_owned())
