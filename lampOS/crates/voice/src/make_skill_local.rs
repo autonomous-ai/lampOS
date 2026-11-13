@@ -686,7 +686,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     // lamp (#6593, [`crate::made_clash`]): its id and the choice, alone.
     parameters["properties"][crate::made_clash::CLASH_ID] = json!({
         "type": "string",
-        "description": "Only when a skill you just made clashes with one on the lamp and the person then chooses: its clash_id, given with choice alone, with no request."
+        "description": "Only when a skill you just made clashes with one or more on the lamp and the person then chooses: its clash_id, given with choice alone, with no request."
     });
     // A made skill removed by voice (#6960, [`crate::made_remove`]): the
     // name as heard, matched in code to the person's own made skills.
@@ -697,7 +697,7 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
         "enum": crate::made_clash::CHOICES,
-        "description": "With clash_id only: replace the other skill, keep both (they may take turns), or cancel, as the person chose in any words."
+        "description": "With clash_id only: replace the other skill or skills, keep them all (they may take turns), or cancel, as the person chose in any words."
     });
     if code {
         let request = format!(
@@ -987,17 +987,18 @@ fn make_with_by(
         .and_then(|made| made_skill::needs_link(&made.uses, linked));
     // A skill made by voice that clashes with one on the lamp (#6593: the
     // same trigger, both using the light or both moving the head) is not
-    // put on: the person is asked to replace the other, keep both or
-    // cancel ([`crate::made_clash`]). One with code of its own waits for
-    // its yes as it did.
+    // put on: the person is asked, of every skill it clashes with, to
+    // replace them, keep them or cancel ([`crate::made_clash`]). One with
+    // code of its own waits for its yes as it did.
     if made_in != 0
         && let Ok(made) = &made
         && !made.uses.code
-        && let Some(clash) = crate::made_clash::found(keeping, made)
+        && let clashes = crate::made_clash::found(keeping, made)
+        && !clashes.is_empty()
     {
-        MADE_LINE.with(|kept| kept.replace(Some(crate::made_clash::cut_line(made, &clash))));
+        MADE_LINE.with(|kept| kept.replace(Some(crate::made_clash::cut_line(made, &clashes))));
         let told =
-            crate::made_clash::asked(keeping, made, &clash, made_in, std::time::Instant::now());
+            crate::made_clash::asked(keeping, made, &clashes, made_in, std::time::Instant::now());
         if let Some(asked) = asked {
             asked.made(&made.name, &told, now_unix_ms);
         }
