@@ -3238,7 +3238,9 @@ as a Harness task with the agent's own tools
   `prepare_runtime`) with its generations' `.leases`, while `facts.json`,
   `pm-runtime/selected.json`, the environments and `tools` stay
   read-only; no install lock at all (the lasting Hermes never started)
-  ends it before Hermes runs. These lines mount with `mount -n`: they run
+  ends it before Hermes runs, and none of these is reached through a
+  link (a link at a key, `pm-runtime` or generation folder skips that
+  lock or ends the make). These lines mount with `mount -n`: they run
   after `/run` is read-only, where util-linux cannot write its utab. It leaves Hermes's folder and the work
   folder read-only, and hides the rest of the work folder's `lamp` under
   another tmpfs, the make's own folder alone moved back, read-write

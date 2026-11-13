@@ -3469,6 +3469,43 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         "{lines:?}"
     );
     fs::write(&prepare, "").unwrap();
+    // Heron's P3 on #6977: nothing is reached through a link, which root
+    // would follow. A generation folder that is a link ends it before the
+    // lasting home is hidden; so does an `installs/<key>` that is a link
+    // (its install lock skipped, its `pm-runtime` refused).
+    let installs = base.join("h/.hermes/installs");
+    let g1 = installs.join("k/environments/g1");
+    fs::rename(&g1, installs.join("k/environments/g1-real")).unwrap();
+    std::os::unix::fs::symlink("g1-real", &g1).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Hermes leases not shown"));
+    assert!(
+        !lines.iter().any(|line| line.contains("tmpfs")),
+        "{lines:?}"
+    );
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("environments/g1/.leases")),
+        "{lines:?}"
+    );
+    fs::remove_file(&g1).unwrap();
+    fs::rename(installs.join("k/environments/g1-real"), &g1).unwrap();
+    let linked = installs.join("lk");
+    std::os::unix::fs::symlink("k", &linked).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Hermes runtime lock not shown"));
+    assert!(
+        !lines
+            .iter()
+            .any(|line| line.contains("tmpfs") || line.contains("/lk/")),
+        "{lines:?}"
+    );
+    fs::remove_file(&linked).unwrap();
     // A home outside the work folder's `lamp`, or missing, is refused
     // before anything is mounted.
     let other = base.join("other/make-task-1/home");
