@@ -2908,11 +2908,12 @@ async fn a_token_is_minted_only_from_the_owners_yes() {
     );
     let none = mint(&lamp, "nothing", "r1").await;
     assert_eq!(none["error"], "no such skill", "{none}");
+    // A yes kept with no grant (a skill whose code uses nothing of the
+    // lamp's) is a yes: its token names none (more in
+    // a_kept_yes_with_no_grants_mints_a_token_that_may_use_nothing).
     let empty = mint(&lamp, "empty", "r1").await;
-    assert!(
-        empty["error"].as_str().unwrap().contains("no grant"),
-        "{empty}"
-    );
+    assert_eq!(empty["grants"], json!([]), "{empty}");
+    assert!(empty["token"].as_str().is_some(), "{empty}");
     // Names that could carry a path or a space are refused.
     for (skill, run) in [("../x", "r"), ("booth", "a b"), ("booth", "")] {
         let bad = mint(&lamp, skill, run).await;
@@ -2925,6 +2926,45 @@ async fn a_token_is_minted_only_from_the_owners_yes() {
     )
     .await;
     assert_eq!(said["grants"], json!(["light"]), "{said}");
+}
+
+/// A yes the owner kept with no grant (#6307's made code skill, a pushed
+/// skill that uses nothing of the lamp's): its run gets a token that names
+/// none, so it may say hello and nothing that needs a grant.
+#[tokio::test]
+async fn a_kept_yes_with_no_grants_mints_a_token_that_may_use_nothing() {
+    let lamp = lamp("run-empty").await;
+    let path = run_socket(&lamp, my_uid(&lamp)).await;
+    let minted = mint(&lamp, "empty", "r1").await;
+    assert_eq!(minted["grants"], json!([]), "{minted}");
+    assert_eq!(minted["run"], "r1", "{minted}");
+    let token = minted["token"].as_str().unwrap().to_owned();
+    assert_eq!(token.len(), 43, "{token}");
+    let mut socket = agent_connect(&path).await.unwrap();
+    let hello = run_hello(&mut socket, Some(&token)).await;
+    assert_eq!(hello["ok"], true, "{hello}");
+    assert_eq!(hello["grants"], json!([]), "{hello}");
+    // Every call that needs a grant is refused it.
+    for (id, call) in [
+        (
+            2,
+            json!({"op": "light", "colour": "warm", "level": 2, "for_ms": 1000}),
+        ),
+        (3, json!({"op": "camera.snapshot"})),
+        (4, json!({"op": "subscribe", "events": ["sound.heard"]})),
+    ] {
+        let mut call = call;
+        call["id"] = json!(id);
+        socket.send(Message::text(call.to_string())).await.unwrap();
+        let refused = agent_next(&mut socket).await.unwrap();
+        assert_eq!(refused["error"]["code"], "no_grant", "{call} {refused}");
+    }
+    // A yes that isn't there, or one whose skill changed, is still refused.
+    for skill in ["nothing", "changed"] {
+        let refused = mint(&lamp, skill, "r2").await;
+        assert!(refused.get("token").is_none(), "{refused}");
+        assert!(refused["error"].is_string(), "{refused}");
+    }
 }
 
 #[tokio::test]

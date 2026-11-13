@@ -71,7 +71,11 @@ mục của skill được đẩy lên `/var/lib/lampOS/skills-dev/<skill>`
 thay chỗ nó; lamp-skills và lamp-tasks giữ cùng quy tắc đó. Một thư mục là
 liên kết thì không bao giờ được băm. Token chỉ nêu các quyền khi
 `task-yes.json` giữ lời đồng ý của chủ đèn cho đúng mã SHA-256 đó và các
-quyền đó.
+quyền đó. Không có lời đồng ý, hay thư mục đã đổi từ khi đồng ý, thì bị từ
+chối và không token nào được cấp. Lời đồng ý được giữ mà không có quyền nào
+(một skill có mã không dùng gì của đèn, như skill mã do #6307 tạo) vẫn là
+lời đồng ý: token của nó không nêu quyền nào (`"grants": []`), nên lần chạy
+chỉ `hello` được, mọi thao tác cần quyền đều bị từ chối `no_grant`.
 
 ## Ai thắng
 
