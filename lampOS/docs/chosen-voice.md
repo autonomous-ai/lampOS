@@ -48,6 +48,10 @@ word or phrase (lowercase), hold to 1 to 5.
 | +1 (cheerful) | cheerful, upbeat, fun, curious, friendly | vui vẻ, vui tươi, vui tính, tò mò, thân thiện |
 | −2 (calm) | calm, gentle, quiet, sleepy, serene, shy | điềm tĩnh, nhẹ nhàng, trầm lặng, buồn ngủ, thanh thản, nhút nhát |
 
+The Vietnamese words are kept pending the first builder's answer on #6893
+(English-only keyword table?): a separate list (`VI_WORDS`) dropped in one
+line if the table is English only.
+
 So "energetic, playful and excited" is 5, "cheerful and curious" 3, "calm
 and quiet" or "a wise old owl" 1, and "playful but gentle" 1. "funny" is not
 "fun": whole words only.

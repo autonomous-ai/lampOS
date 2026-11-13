@@ -153,8 +153,7 @@ pub fn energy_in(data: &serde_json::Value) -> Result<Option<u8>, &'static str> {
 
 /// The fixed words that move the level, each a whole word or phrase in
 /// lowercase, and how far: no model is asked. A lively word adds 2, a
-/// cheerful one 1, a calm one takes 2 away. The Vietnamese rows are a
-/// deliberate non-ASCII fixture: the owner may write in Vietnamese.
+/// cheerful one 1, a calm one takes 2 away.
 const ENERGY_WORDS: &[(&str, i8)] = &[
     ("energetic", 2),
     ("lively", 2),
@@ -173,6 +172,12 @@ const ENERGY_WORDS: &[(&str, i8)] = &[
     ("sleepy", -2),
     ("serene", -2),
     ("shy", -2),
+];
+
+/// Vietnamese words kept pending the first builder's answer on #6893
+/// (English-only keyword table?). A deliberate non-ASCII fixture; dropped
+/// in one line, the `chain` in [`energy_of`].
+const VI_WORDS: &[(&str, i8)] = &[
     // Vietnamese: energetic, lively, excited, hyper, playful.
     ("năng động", 2),
     ("sôi nổi", 2),
@@ -195,8 +200,8 @@ const ENERGY_WORDS: &[(&str, i8)] = &[
 ];
 
 /// The level the owner's words give when none was chosen: 1, moved by
-/// each of [`ENERGY_WORDS`] found as whole words, held to 1 to 5. No
-/// match, or only calm ones, is 1, as the lamp always moved.
+/// each of [`ENERGY_WORDS`] (and [`VI_WORDS`]) found as whole words, held
+/// to 1 to 5. No match, or only calm ones, is 1, as the lamp always moved.
 pub fn energy_of(words: &str) -> u8 {
     let lower = words.to_lowercase();
     let said: Vec<&str> = lower
@@ -205,6 +210,7 @@ pub fn energy_of(words: &str) -> u8 {
         .collect();
     let moved: i32 = ENERGY_WORDS
         .iter()
+        .chain(VI_WORDS)
         .map(|(phrase, by)| {
             let phrase: Vec<&str> = phrase.split(' ').collect();
             let found = said.windows(phrase.len()).filter(|w| *w == phrase).count();
@@ -322,7 +328,8 @@ mod tests {
         assert_eq!(energy_of("playful, no shyness"), 3);
         // A calm word takes a lively one back.
         assert_eq!(energy_of("playful but gentle"), 1);
-        // Vietnamese: "lively and playful", "cheerful", "calm, gentle".
+        // Vietnamese (VI_WORDS, pending #6893): "lively and playful",
+        // "cheerful", "calm, gentle".
         assert_eq!(energy_of("Sôi nổi và nghịch ngợm"), 5);
         assert_eq!(energy_of("vui vẻ"), 2);
         assert_eq!(energy_of("điềm tĩnh, nhẹ nhàng"), 1);
