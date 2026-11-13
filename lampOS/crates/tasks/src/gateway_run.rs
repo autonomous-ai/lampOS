@@ -39,7 +39,8 @@ use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::Arc;
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
@@ -323,6 +324,22 @@ pub struct GatewayRunner {
     pub env: Vec<(String, String)>,
     /// lamp-tasks' stop: set, the turn is ended as at its deadline.
     pub stopping: Option<Arc<AtomicBool>>,
+    /// The session of an earlier run whose stop was not confirmed: it may
+    /// still be live on the gateway, so no run starts until a stop of it
+    /// succeeds. Shared by every runner of the same program
+    /// ([`Self::lamp`]), since the runner is made per run.
+    pub live: Arc<Mutex<Option<String>>>,
+}
+
+/// [`GatewayRunner::live`] of each program, kept for lamp-tasks' life.
+fn live_for(program: &Path) -> Arc<Mutex<Option<String>>> {
+    static LIVE: Mutex<BTreeMap<PathBuf, Arc<Mutex<Option<String>>>>> =
+        Mutex::new(BTreeMap::new());
+    LIVE.lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .entry(program.to_owned())
+        .or_default()
+        .clone()
 }
 
 impl GatewayRunner {
@@ -330,6 +347,7 @@ impl GatewayRunner {
     /// project, the gateway looked at on loopback.
     pub fn lamp(program: PathBuf, project: PathBuf, agent: GatewayAgent) -> Self {
         Self {
+            live: live_for(&program),
             program,
             project,
             agent,
@@ -353,28 +371,45 @@ struct Made<'a> {
     sent: bool,
 }
 
-impl Made<'_> {
-    fn after(&self, template: &[String]) {
-        let args = self
-            .runner
-            .agent
-            .fill(template, &self.name, "", AFTER_WITHIN);
-        match call(self.runner, &args, AFTER_WITHIN, None, None) {
-            Ok(Turn::Done { code: 0, .. }) => {}
+impl GatewayRunner {
+    /// `template` (the turn's stop or end) for the session `name`, bounded
+    /// by `within`: whether it was confirmed (the call ended with status
+    /// 0, which the gateway's stop also gives for a session with no run).
+    /// A failure is logged.
+    fn after(&self, template: &[String], name: &str, within: Duration) -> bool {
+        let args = self.agent.fill(template, name, "", within);
+        match call(self, &args, within, None, None) {
+            Ok(Turn::Done { code: 0, .. }) => return true,
             Ok(Turn::Done { code, .. }) => {
                 eprintln!(
-                    "[lamp-tasks] skill task {}: the gateway's {} ended with status {code}",
-                    self.name,
+                    "[lamp-tasks] skill task {name}: the gateway's {} ended with status {code}",
                     args.get(2).map_or("call", String::as_str)
                 );
             }
             Ok(Turn::Cut) => eprintln!(
-                "[lamp-tasks] skill task {}: a gateway call ran past {} s and was killed",
-                self.name,
-                AFTER_WITHIN.as_secs()
+                "[lamp-tasks] skill task {name}: a gateway call ran past {} ms and was killed",
+                within.as_millis()
             ),
-            Err(why) => eprintln!("[lamp-tasks] skill task {}: {why}", self.name),
+            Err(why) => eprintln!("[lamp-tasks] skill task {name}: {why}"),
         }
+        false
+    }
+
+    /// No run while an earlier one may be live: the earlier session's stop
+    /// tried again, bounded by `within`, and the run refused in words when
+    /// it still is not confirmed.
+    fn none_live(&self, within: Duration) -> Result<(), String> {
+        let mut live = self
+            .live
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(name) = live.clone() {
+            if !self.after(&self.agent.stop, &name, within.min(AFTER_WITHIN)) {
+                return Err("an earlier skill's run may still be live on the gateway, so nothing was started".into());
+            }
+            *live = None;
+        }
+        Ok(())
     }
 }
 
@@ -382,8 +417,16 @@ impl Drop for Made<'_> {
     fn drop(&mut self) {
         (self.end_token)();
         if self.sent {
-            self.after(&self.runner.agent.stop.clone());
-            self.after(&self.runner.agent.end.clone());
+            let runner = self.runner;
+            let stopped = runner.after(&runner.agent.stop, &self.name, AFTER_WITHIN);
+            runner.after(&runner.agent.end, &self.name, AFTER_WITHIN);
+            if !stopped {
+                // Kept: the next run tries the stop again first.
+                *runner
+                    .live
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(self.name.clone());
+            }
         }
         if let Err(error) = std::fs::remove_dir_all(&self.folder)
             && error.kind() != std::io::ErrorKind::NotFound
@@ -547,6 +590,7 @@ impl GatewayRunner {
             );
         }
         let began = Instant::now();
+        self.none_live(run.deadline)?;
         let token = run
             .env
             .iter()
@@ -670,7 +714,6 @@ impl GatewayRunner {
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
-    use std::sync::Mutex;
 
     /// lamp-update's own gateway agent data (OpenClaw's wrapper with the
     /// one run path on), read from its source.
@@ -764,10 +807,13 @@ mod tests {
                  approvals.get) cat {fence} 2>/dev/null || printf '%s\\n' '{{\"version\":1,\"agents\":{{\"main\":{{}}}}}}'; exit 0;;\n\
                  approvals.set) [ -e {refuse} ] && exit 1; cat > {fence}; exit 0;;\n\
                  esac\n\
+                 case $3 in chat.abort) [ -e {stopslow} ] && sleep 30; [ -e {stopfail} ] && exit 1;; esac\n\
                  case $3 in agent)\n{turn}\n;; esac\nexit 0\n",
                 log = log.display(),
                 fence = dir.path().join("fence").display(),
                 refuse = dir.path().join("refuse").display(),
+                stopslow = dir.path().join("stopslow").display(),
+                stopfail = dir.path().join("stopfail").display(),
             ),
         )
         .unwrap();
@@ -801,6 +847,7 @@ mod tests {
             interpreter: "/bin/sh".into(),
             env: vec![("PATH".into(), RUN_PATH.into())],
             stopping: None,
+            live: Default::default(),
         }
     }
 
@@ -943,6 +990,33 @@ mod tests {
             "{calls}"
         );
         nothing_left(&rig);
+    }
+
+    #[test]
+    fn a_failed_stop_blocks_the_next_run_until_a_stop_succeeds() {
+        let rig = rig(r#"{"status":"error"}"#, false);
+        std::fs::write(rig.dir.path().join("stopfail"), "").unwrap();
+        let (_, end) = ended();
+        let runner = runner(&rig);
+        let said = runner
+            .run(&skill_run(&rig, Duration::from_secs(20)), &end)
+            .unwrap_err();
+        assert!(said.contains("its gateway says error"), "{said}");
+        assert_eq!(runner.live.lock().unwrap().as_deref(), Some("skill-task-1"));
+        let turns = |rig: &Rig| calls(rig).matches("gateway call agent ").count();
+        assert_eq!(turns(&rig), 1);
+        let said = runner
+            .run(&skill_run(&rig, Duration::from_secs(20)), &end)
+            .unwrap_err();
+        assert!(said.contains("may still be live on the gateway"), "{said}");
+        assert_eq!(turns(&rig), 1, "no second turn");
+        std::fs::remove_file(rig.dir.path().join("stopfail")).unwrap();
+        let said = runner
+            .run(&skill_run(&rig, Duration::from_secs(20)), &end)
+            .unwrap_err();
+        assert!(said.contains("its gateway says error"), "{said}");
+        assert_eq!(turns(&rig), 2, "a good stop freed it");
+        assert!(runner.live.lock().unwrap().is_none());
     }
 
     #[test]
