@@ -2708,7 +2708,23 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   (`skill_task_yes::unsaid`; P3 của SubDarren trên #6619). Test:
   `unheard_or_live_or_no_task_starts_no_wait`.
   Cái "có" được nhận như cái "có" cho việc ghi của kỹ năng tự tạo
-  (`skill_write_yes`). Giọng nói đọc lại kỹ năng qua manage helper, và chỉ
+  (`skill_write_yes`). Câu nói lại chưa được nghe trọn thì được nói lại
+  trước khi nhận bất kỳ cái "có" nào (#6715): một câu "Yes." nói chồng lên
+  câu đọc lại làm nó bị cắt, câu trả lời bị cắt không tính là câu nói lại,
+  và cái "có" bị từ chối (`skill_write_yes::NOT_SAID_WHOLE`), kèm toàn bộ
+  câu nói lại để nói lại đúng từng từ, cùng `approve_id` đó. Nên hỏi lại
+  thì kiểu nào nó cũng được nói lại: một `read_back` mới bắt đầu lượt chờ
+  mới và đưa câu nói lại đầy đủ, còn một `make_skill` mà mô hình gọi ngay
+  với `approve_id` đang chờ thì bị từ chối lần nữa và cũng được đưa câu
+  nói lại. Một cái "có" nói chồng lên lần nói lại đó vẫn bị từ chối; chỉ
+  cái "có" sau một câu trả lời chứa mọi từ của câu nói lại, không bị cắt,
+  mới được nhận. Journal ghi những gì đã giữ: "a made skill's yes not
+  taken: its say-back was not heard whole (kept: r6 cut=true 28 words;
+  first missing word in r6: 29 of 34)", mỗi câu trả lời đã giữ theo
+  request, bị cắt hay không và số từ, rồi chỗ câu chứa được nhiều nhất bắt
+  đầu thiếu (chỉ số đếm và vị trí, không bao giờ là một từ). Test:
+  `a_cut_task_read_back_is_said_again_whole_before_its_yes_is_taken`.
+  Giọng nói đọc lại kỹ năng qua manage helper, và chỉ
   khi thư mục vẫn đúng SHA-256 và các grant đã nói lại thì mới nhờ
   lamp-control ghi nhận (`task_yes_record` trên socket chủ đèn
   `/run/lampos-control/admin.sock`, chỉ nhận từ cgroup của giọng nói).
