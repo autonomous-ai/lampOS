@@ -3902,7 +3902,9 @@ fn the_tasks_part_waits_for_harness_rather_than_failing() {
         .unwrap()
         .1;
     let unit = section(tasks, "Unit");
-    assert!(unit.contains(&format!("ConditionPathExists={}", install::HARNESS).as_str()));
+    // Started without Harness too (#6685 PR 3): `--set-up-later` runs it with
+    // hand-overs off, so its unit no longer waits for the file.
+    assert!(!unit.contains(&format!("ConditionPathExists={}", install::HARNESS).as_str()));
     let exec = section(tasks, "Service")
         .into_iter()
         .find(|line| line.starts_with("ExecStart="))

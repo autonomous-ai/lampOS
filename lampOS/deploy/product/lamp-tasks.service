@@ -7,9 +7,10 @@ Description=lampOS tasks (lamp-tasks serve)
 PartOf=lampos.target
 # Not before setup has finished (#806). The target's own condition holds back none of its parts.
 ConditionPathExists=/var/lib/lampos-setup/done
-# Not without Harness (#811, from lamp-06c1): systemd skips the part, a condition not met, rather
-# than letting it fail and restart. Installed later, it starts at the next boot or start.
-ConditionPathExists=/usr/local/bin/harness
+# Started without Harness too (#6685 PR 3, the first builder's ask): with no program at --harness,
+# --set-up-later runs the part with hand-overs off, each refused as no_harness and said in light
+# words (docs/tasks.md), so a skill's run can still go to the lamp's own agent. Harness installed
+# later is used once lamp-update's install restarts the part. (Before, #811 skipped the part here.)
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=600
