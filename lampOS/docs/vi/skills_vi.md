@@ -966,8 +966,8 @@ sau:
    được giữ là đã nhận. Journal ghi `SKILL sent nothing: its group's hour,
    cooldown, day's count and rest are given back`. Test:
    `a_write_waiting_for_the_owners_yes_spends_nothing`. **Qua tác tử của
-   đèn** (`LAMP_SKILL_WRITE_AGENT=on` cùng `LAMP_AGENT_SERVICES=on`, tắt,
-   không bật trong unit sản phẩm nào; quyết định của chủ đèn, 13/11):
+   đèn** (`LAMP_SKILL_WRITE_AGENT=on` cùng `LAMP_AGENT_SERVICES=on`,
+   bật trong các unit `lamp-skills`, `lamp-tasks`, `lamp-control` và `lamp-services` của sản phẩm, mỗi unit một lần; quyết định của chủ đèn, 13/11):
    `lamp-skills` không bao giờ gọi `lamp-services` cho lệnh ghi đó, mà trao
    nó cho lamp-tasks qua socket của `do.task` (`--tasks-socket`) như một
    lượt chạy của kỹ năng với một quyền duy nhất, `<code>-write`, và đúng nội

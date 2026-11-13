@@ -66,6 +66,10 @@ Environment=LAMP_MADE_SCRIPTS=on
 # <code>-read / <code>-write (task::grants_of), said back plainly and kept in the owner's yes. The same line in
 # lamp-tasks, lamp-skills-manage@, lamp-voice and lamp-control. On in the product (owner, 13 Nov).
 Environment=LAMP_AGENT_SERVICES=on
+# A made skill's fixed write through the lamp's agent (#6824, docs/services.md "Through the lamp's agent"): handed
+# to lamp-tasks as a skill's run with its one write grant, sent straight only when the agent couldn't take it.
+# The same line in lamp-tasks, lamp-control and lamp-services. On in the product (owner, 13 Nov).
+Environment=LAMP_SKILL_WRITE_AGENT=on
 # The owner's typed setup name, for a made skill's read (#5288). A blank fallback when there is none, so the read
 # is skipped ("no owner's face enrolled"), never the unit refused (SetCredential= is LoadCredential='s default,
 # systemd 252). One newline, never empty: an empty SetCredential= in a unit file fails the start at CREDENTIALS

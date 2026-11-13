@@ -2141,6 +2141,55 @@ fn the_product_leaves_the_one_run_path_off() {
     assert!(carried.lines().any(|line| line == "LAMP_SKILL_TASKS=on"));
 }
 
+/// A made skill's fixed write runs through the lamp's agent in the product
+/// (#6824): the owner's ruling on 13 Nov. `LAMP_SKILL_WRITE_AGENT=on` in
+/// the four units that read it, `lamp-skills` (hands the write to
+/// lamp-tasks, the direct send its fallback), `lamp-tasks` (runs it on the
+/// lamp's Hermes), `lamp-control` (mints its one write grant's token and
+/// gives its call the write by it, never the agent's words) and
+/// `lamp-services` (sends it only through `skill_write`, once a run), each
+/// once, and no other product unit names it. lamp-skills and lamp-tasks
+/// hand it over only with the agent's connectors on too.
+#[test]
+fn the_product_runs_a_made_skills_fixed_write_through_the_lamps_agent() {
+    let name = lamp_skills::service_write::AGENT_ENVIRONMENT;
+    assert_eq!(name, "LAMP_SKILL_WRITE_AGENT");
+    let switch = format!("Environment={name}=on");
+    let owners = [
+        "lamp-skills.service",
+        "lamp-tasks.service",
+        "lamp-control.service",
+        "lamp-services.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains(name))
+            .count();
+        assert_eq!(on, usize::from(owners.contains(unit)), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+    for owner in ["lamp-skills.service", "lamp-tasks.service"] {
+        let text = install::PRODUCT
+            .iter()
+            .find(|(unit, _)| *unit == owner)
+            .unwrap()
+            .1;
+        assert!(
+            section(text, "Service").contains(&"Environment=LAMP_AGENT_SERVICES=on"),
+            "{owner} lacks LAMP_AGENT_SERVICES"
+        );
+    }
+}
+
 /// A skill added from a file in the app, on at once (#5080, #5977): the
 /// switch is on in both parts that read it, `lamp-cloud` (the kind, with
 /// the skills page) and `lamp-voice` (the app-make socket, with the maker

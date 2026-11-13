@@ -428,7 +428,7 @@ fn folder_ok(skill: &str, folder: &Path, skills: &Path) -> Result<(), &'static s
 /// A made skill's fixed write run through the lamp's agent (the owner's
 /// ruling, 13 Nov: everything that touches a linked service runs through
 /// it): `on` exactly, here and in lamp-skills, lamp-control and
-/// lamp-services; on in no product unit. Off, a `skill_write` line is
+/// lamp-services; on in the product's four units. Off, a `skill_write` line is
 /// refused as any line that is not a task's, as before.
 pub const WRITE_SWITCH: &str = "LAMP_SKILL_WRITE_AGENT";
 /// The most bytes of a fixed write's content, as JSON.

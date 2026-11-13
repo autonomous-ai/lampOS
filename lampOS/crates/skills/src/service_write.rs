@@ -22,8 +22,8 @@
 //! - **The journal**: the outcome only, never a recipient or a text.
 //! - **Through the lamp's agent** (the owner's ruling, 13 Nov: everything
 //!   that touches a linked service runs through it): with
-//!   `LAMP_SKILL_WRITE_AGENT=on` ([`AGENT_ENVIRONMENT`], on in no product
-//!   unit) and `LAMP_AGENT_SERVICES=on` ([`agent`]), this program never
+//!   `LAMP_SKILL_WRITE_AGENT=on` ([`AGENT_ENVIRONMENT`], on in the
+//!   product's four units) and `LAMP_AGENT_SERVICES=on` ([`agent`]), this program never
 //!   calls `lamp-services` for the write: it hands it to `lamp-tasks` as a
 //!   skill's run on the `do.task` socket ([`hand`]), with its one grant
 //!   (`<code>-write`, [`WriteStep::grant`]) and its exact content, which
