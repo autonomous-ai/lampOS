@@ -2187,6 +2187,9 @@ fn second_route_worker_environment(
         crate::second_config::DEEPSEEK_BASE_URL_ENV,
         crate::second_config::SPEECH_BASE_URL_ENV,
         crate::second_config::LISTENING_BASE_URL_ENV,
+        // A desktop-only switch (never in a product unit): plain loopback
+        // addresses for the two addresses above, checked by the worker.
+        crate::second_config::LOOPBACK_SERVICES_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
         // The owner's language (#4473): the worker's speech and character.
@@ -3522,6 +3525,8 @@ mod tests {
                     || name == crate::second_config::LISTENING_BASE_URL_ENV
                 {
                     "https://near.example.invalid/ai"
+                } else if name == crate::second_config::LOOPBACK_SERVICES_ENV {
+                    "on"
                 } else if name == crate::second_config::SPEECH_MODEL_ENV {
                     "gemini-3.8-flash-lite-tts"
                 } else if name == crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT {
@@ -3872,6 +3877,7 @@ mod tests {
                     "LAMP_UNTIED_ANSWER_GRACE=on",
                     "LAMP_UNTIED_CALLER_SPEAKING=on",
                     "LAMP_UNTIED_GOING_ON=on",
+                    "LAMP_VOICE_LOOPBACK_SERVICES=on",
                     "LAMP_WINDOW_FROM_START=on",
                 ],
             ),
