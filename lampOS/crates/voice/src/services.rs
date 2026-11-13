@@ -1797,6 +1797,18 @@ pub(crate) fn owners_yes_now(
     })
 }
 
+/// Whether the heard line `request` is in the owner's voice (the lamp's
+/// first owner) by the second route's judge, at
+/// `same_voice::SERVICES_SAME_FROM` or over: for the private room, where
+/// any heard line counts as the owner's seen ([`owner_seen_saying`]), a yes
+/// that must be theirs (seen activity's, #6543). No judge (the Live route)
+/// or no likeness is no.
+pub(crate) fn owners_voice_now(request: u64) -> bool {
+    let owner = crate::person::owner_ids().into_iter().next();
+    owner_likeness(judge().as_ref(), request, owner.as_deref())
+        .is_some_and(|alike| alike >= crate::same_voice::SERVICES_SAME_FROM)
+}
+
 /// Whether a heard line (`heard`: someone spoke it) is the owner's own,
 /// seen: in the private room (`private_room`) any heard line; outside it,
 /// the owner (`owner`, [`owner_of`]) seen saying it (`seen`, the eyes'

@@ -591,7 +591,6 @@ fn app_yes_stands(path: &Path, step: &str) -> bool {
 /// whoever gave it. Only the answer and its time, never words, sound or a
 /// face.
 fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Result<()> {
-    use std::os::unix::fs::PermissionsExt;
     let path = &consent_path(paths, step);
     let Some(at) = kept_yes(progress, step) else {
         if app_yes_stands(path, step) {
@@ -605,10 +604,27 @@ fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Res
     if !new {
         return Ok(());
     }
+    // Not kept is no to the reader, the safe side; the progress stands.
+    if let Err(error) = keep_yes(path, step, at, paths.room_sounds_group) {
+        eprintln!(
+            "lamp-voice: the {step} yes was not kept at {}: {error}",
+            path.display()
+        );
+    }
+    Ok(())
+}
+
+/// `key`'s yes kept at `path`, whole, as given by voice at `at`:
+/// `{"version":1,KEY:"yes","at_unix_s":AT,"by":"voice"}`, written beside
+/// it and renamed into place, 0640 and `group`'s (0600 with no group). The
+/// onboarding steps' yeses ([`consent`]) and seen activity's
+/// (`crate::seen_yes`, #6543) alike. A write that fails leaves no yes.
+pub(crate) fn keep_yes(path: &Path, key: &str, at: u64, group: Option<u32>) -> io::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
     let folder = path
         .parent()
         .ok_or_else(|| io::Error::other("a consent file has no folder"))?;
-    let bytes = lamp_msgs::consent::bytes(step, at, lamp_msgs::consent::BY_VOICE);
+    let bytes = lamp_msgs::consent::bytes(key, at, lamp_msgs::consent::BY_VOICE);
     let next = path.with_extension("storage-next");
     let _ = fs::remove_file(&next);
     let result = (|| {
@@ -617,13 +633,9 @@ fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Res
             .write(true)
             .open(&next)?;
         // The voice's UMask=0077 would leave it 0600: set after create.
-        let mode = if paths.room_sounds_group.is_some() {
-            0o640
-        } else {
-            0o600
-        };
+        let mode = if group.is_some() { 0o640 } else { 0o600 };
         file.set_permissions(fs::Permissions::from_mode(mode))?;
-        if let Some(group) = paths.room_sounds_group {
+        if let Some(group) = group {
             std::os::unix::fs::fchown(&file, None, Some(group))?;
         }
         file.write_all(&bytes)?;
@@ -631,15 +643,10 @@ fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Res
         fs::rename(&next, path)?;
         fs::File::open(folder)?.sync_all()
     })();
-    // Not kept is no to the reader, the safe side; the progress stands.
-    if let Err(error) = result {
+    if result.is_err() {
         let _ = fs::remove_file(next);
-        eprintln!(
-            "lamp-voice: the {step} yes was not kept at {}: {error}",
-            path.display()
-        );
     }
-    Ok(())
+    result
 }
 fn execute(paths: &Paths, operation: Operation) -> io::Result<Update> {
     let mut update = Update::default();

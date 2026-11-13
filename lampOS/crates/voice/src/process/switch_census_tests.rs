@@ -117,6 +117,14 @@ const NOT_PASSED: &[(&str, &str)] = &[
         "LAMP_SLEEP_ASKED",
         "the coordinator's, given as an argument (--sleep-asked, #3748)",
     ),
+    (
+        "LAMP_SEEN_ACTIVITY",
+        "the coordinator's, given as an argument (--seen-activity, #6543)",
+    ),
+    (
+        "LAMP_SEEN_POSTURE",
+        "the coordinator's, given as an argument (--seen-posture, #6543)",
+    ),
     // `thread::arguments_from_environment`, the same way.
     (
         "LAMP_THREAD_FILE",

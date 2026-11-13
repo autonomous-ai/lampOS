@@ -3957,13 +3957,11 @@ impl ToolDesk {
         }
         // Requested recordings never run after the model declined their
         // spoken request. Keep the existing non-recording behavior when off;
-        // report-consent withdrawal retains its separate route.
+        // report-consent withdrawal retains its separate route, and so does
+        // seen activity's (the Reviewer-lead's P3 on #6912).
         if (self.settings.requested_audio
             && self.declined == Some(request)
-            && !matches!(
-                crate::tools::route(&self.settings, &call.name),
-                Route::ReportsStop(_)
-            ))
+            && !withdraws(&crate::tools::route(&self.settings, &call.name), &call.name))
             || (held
                 && matches!(
                     crate::tools::route(&self.settings, &call.name),
@@ -3978,6 +3976,7 @@ impl ToolDesk {
                         | Route::Onboarding(_)
                         | Route::ReportsStop(_)
                         | Route::Sleep
+                        | Route::SeenActivity(_)
                 ))
         {
             let (sent, sent_us) = tell(&crate::tools::declined());
@@ -4154,7 +4153,8 @@ impl ToolDesk {
             | Route::Faces(..)
             | Route::Mark(_)
             | Route::Onboarding(_)
-            | Route::ReportsStop(_))
+            | Route::ReportsStop(_)
+            | Route::SeenActivity(_))
                 if self.waiting < lamp_gemini::MAX_TOOL_CALLS =>
             {
                 self.run(provider, lineage, call, route, called_us, memory, false);
@@ -4170,6 +4170,7 @@ impl ToolDesk {
             | Route::Mark(_)
             | Route::Onboarding(_)
             | Route::ReportsStop(_)
+            | Route::SeenActivity(_)
             | Route::Nobody => {
                 let (sent, sent_us) = tell(&crate::tools::unavailable());
                 self.line(
@@ -4221,6 +4222,7 @@ impl ToolDesk {
                     | Route::Faces(..)
                     | Route::Mark(_)
                     | Route::ReportsStop(_)
+                    | Route::SeenActivity(_)
             )
         {
             self.acted = Some(request);
@@ -6404,6 +6406,9 @@ impl InputHandoff {
                 }
                 // A new line is not the sentence unless it is said to be.
                 crate::thread::count_only(None);
+                // An offer of seen activity is answered only in the line
+                // right after it (#6543).
+                crate::seen_yes::turn_began(request.get());
                 let expected = SessionId::new(session)?;
                 // Read before the line is sent, so it is bound to the face
                 // the eyes named as it began, never a later one.
@@ -6934,6 +6939,38 @@ fn rise_in(
         .filter(|(at, _)| (began..=until).contains(at))
         .map(|(_, rise)| *rise)
         .reduce(f32::max)
+}
+
+/// A withdrawal of a consent, never declined with its request: reports'
+/// stop, and seen activity's stop (`seen_yes::STOP`, the Reviewer-lead's
+/// P3 on #6912).
+fn withdraws(route: &crate::tools::Route, name: &str) -> bool {
+    matches!(route, crate::tools::Route::ReportsStop(_))
+        || (matches!(route, crate::tools::Route::SeenActivity(_)) && name == crate::seen_yes::STOP)
+}
+
+#[cfg(test)]
+mod withdraws_tests {
+    /// A declined request's "stop looking" still runs, as reports' stop
+    /// does; the seen activity offer and yes are declined with it.
+    #[test]
+    fn a_declined_requests_stop_looking_still_runs() {
+        use crate::tools::Route;
+        assert!(super::withdraws(&Route::ReportsStop(false), "stop_reports"));
+        assert!(super::withdraws(
+            &Route::SeenActivity(false),
+            crate::seen_yes::STOP
+        ));
+        assert!(!super::withdraws(
+            &Route::SeenActivity(false),
+            crate::seen_yes::LOOK
+        ));
+        assert!(!super::withdraws(
+            &Route::SeenActivity(false),
+            crate::seen_yes::OFFER
+        ));
+        assert!(!super::withdraws(&Route::Clock, crate::seen_yes::STOP));
+    }
 }
 
 /// What a request's note says once the staff's `part` takes the place of

@@ -6624,6 +6624,9 @@ impl Engine {
                 heard_of_cut,
                 ..
             } => {
+                // An offer of seen activity is answered only in the line
+                // right after it (#6543).
+                crate::seen_yes::turn_began(request);
                 if self.shared.wordless_resumes
                     && let Ok(mut kept) = self.shared.heard_of_cut.lock()
                 {

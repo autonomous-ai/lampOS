@@ -69,17 +69,10 @@ fn supervise_with_installed_skill(
     supervise_with_checkpoint(trace, cues, termination, paths, wait, active)
 }
 
-/// [`crate::onboarding::ROOM_SOUNDS_GROUP`]'s id. Not known: the yes is
-/// root's alone (0600), which lamp-ears reads as no, said once here.
+/// [`crate::onboarding::ROOM_SOUNDS_GROUP`]'s id
+/// ([`crate::onboarding::consent_group`]).
 fn room_sounds_group() -> Option<u32> {
-    let name = crate::onboarding::ROOM_SOUNDS_GROUP;
-    let id = std::fs::read_to_string("/etc/group")
-        .ok()
-        .and_then(|groups| crate::say::group_id(&groups, name));
-    if id.is_none() {
-        eprintln!("lamp-voice: the group {name:?} is not known; a room sounds yes is root's alone");
-    }
-    id
+    crate::onboarding::consent_group()
 }
 
 pub(super) fn storage_failed(trace: &mut SessionState, error: impl std::fmt::Display) {

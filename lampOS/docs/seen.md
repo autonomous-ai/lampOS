@@ -606,7 +606,7 @@ product is unchanged.
 
 | Item | What | When |
 |---|---|---|
-| Giving the yes | The voice's spoken yes writing `seen-activity.json`, the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`, removal on every forget (Fourteen's design on #6543) | before the switch goes on |
+| Giving the yes | Built in #6912 (onboarding.md "Seen activity"): the voice's offer naming the server, counted only when played whole and uncut, then only the owner's spoken yes in the very next turn writes `seen-activity.json`; the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`; removal on every forget and "stop looking" (Fourteen's design on #6543; the PM's wording). Owed: the backend's written retention confirmation behind "deleted once they're checked" | before the switch goes on, with #6912's reads and that confirmation |
 | Posture's on line wording | The posture line (`said_back::POSTURE_ON_LINE`, above) is gated in code but awaits the PM's wording | before `LAMP_SEEN_POSTURE` is on anywhere |
 | Posture at 320×240 | A slump read on `humans/posture` from frames sent at 320×240 (every frame is, above) against V1's 640×480, to see whether the 3D lifter's scale changes RULA (above) | with the lamp rows |
 | The frame size | Every frame is sent at 320×240, scaled down from the eyes' link at any larger size (`--full-look` included). Measure the labels at 320×240 on a lamp against V1's 640×480 before the switch goes on | before the switch goes on |

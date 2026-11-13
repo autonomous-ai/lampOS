@@ -7377,7 +7377,8 @@ pub struct DaysClient {
     known: Mutex<Option<PathBuf>>,
     /// The household's room sounds yes ([`crate::onboarding::ROOM_SOUNDS_PATH`]),
     /// removed by any forget of everything (#2110), and the face expressions
-    /// yes beside it.
+    /// yes beside it; and the owner's seen activity yes beside them, removed
+    /// by any forget (#6543).
     room_sounds: PathBuf,
     /// [`JOURNAL_RESUMES_ENVIRONMENT`], read when the client is made.
     resumes: AtomicBool,
@@ -10424,6 +10425,12 @@ impl DaysClient {
             // it is written after it, and what the writer has in hand is
             // let finish first, within a little of the call's time.
             if matches!(call.name.as_str(), FORGET | FORGET_EVERYTHING) {
+                // Any forget, whoever asked, takes back the owner's yes to
+                // seen activity (#6543), the app's too, before the memory
+                // is asked; with none kept, nothing changes.
+                crate::seen_yes::forgotten(&crate::onboarding::seen_activity_beside(
+                    &self.room_sounds,
+                ));
                 // Their service record changes still waiting go before
                 // forget everything is sent (`LAMP_SERVICE_RECORDS`,
                 // Jarvis's P2 on #6073); the memory refuses one asked
@@ -18397,8 +18404,12 @@ mod tests {
         assert_eq!(told["forgotten"], false, "{told}");
         // The household's room sounds yes goes with it (#2110), and the
         // face expressions yes beside it, the owner's from the app as well
-        // (`"by":"app"`, #5500): whoever gave it.
-        let consent = socket.with_extension("room-sounds.json");
+        // (`"by":"app"`, #5500): whoever gave it. In a folder of this
+        // test's own, so no other test's files are beside them.
+        let folder = socket.with_extension("consent");
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir(&folder).unwrap();
+        let consent = folder.join("room-sounds.json");
         std::fs::write(
             &consent,
             lamp_msgs::consent::bytes("room_sounds", 9, lamp_msgs::consent::BY_APP),
@@ -18408,6 +18419,14 @@ mod tests {
         std::fs::write(
             &face,
             lamp_msgs::consent::bytes("face_expressions", 9, lamp_msgs::consent::BY_APP),
+        )
+        .unwrap();
+        // And the owner's seen activity yes beside them (#6543), told to
+        // nobody: lamp-seen says its own off line.
+        let seen = crate::onboarding::seen_activity_beside(&consent);
+        std::fs::write(
+            &seen,
+            lamp_msgs::consent::bytes("seen_activity", 9, lamp_msgs::consent::BY_VOICE),
         )
         .unwrap();
         let mut client = client;
@@ -18422,6 +18441,9 @@ mod tests {
         assert_eq!(told["forgotten"], false, "{told}");
         assert!(!consent.exists());
         assert!(!face.exists());
+        assert!(!seen.exists());
+        assert!(told.get("seen_activity_consent_result").is_none(), "{told}");
+        std::fs::remove_dir_all(&folder).unwrap();
         let read = served.join().unwrap();
         assert_eq!(read, [json!({"op":"forget_all","person":MINH})]);
         drop(client);
@@ -18430,8 +18452,26 @@ mod tests {
         // Off: an id is passed over and the last kept thing goes, as before;
         // forget_everything isn't the memory's.
         let (socket, served) = memory("forget-all-off", 1, |_| json!({"ok":true,"removed":null}));
-        let client = DaysClient::new(socket.clone()).unwrap();
+        let mut client = DaysClient::new(socket.clone()).unwrap();
         assert!(!client.forget_all.load(Ordering::Acquire));
+        // Any forget, not only of everything, takes the seen activity yes
+        // (#6543), the app's too; the two other yeses stay.
+        let folder = socket.with_extension("consent");
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir(&folder).unwrap();
+        let consent = folder.join("room-sounds.json");
+        std::fs::write(
+            &consent,
+            lamp_msgs::consent::bytes("room_sounds", 9, lamp_msgs::consent::BY_APP),
+        )
+        .unwrap();
+        let seen = crate::onboarding::seen_activity_beside(&consent);
+        std::fs::write(
+            &seen,
+            lamp_msgs::consent::bytes("seen_activity", 9, lamp_msgs::consent::BY_APP),
+        )
+        .unwrap();
+        client.room_sounds = consent.clone();
         client.run_at(
             &call(FORGET, json!({"source_id":8})),
             FIRST_READ,
@@ -18443,6 +18483,9 @@ mod tests {
             served.join().unwrap()[0],
             json!({"op":"forget_last","kind":"kept"})
         );
+        assert!(!seen.exists());
+        assert!(consent.exists());
+        std::fs::remove_dir_all(&folder).unwrap();
         assert!(!is_tool(FORGET_EVERYTHING));
         drop(client);
         std::fs::remove_file(&socket).unwrap();
