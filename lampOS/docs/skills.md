@@ -3966,25 +3966,35 @@ gone ([switches.md](switches.md)). What happens:
     showed only some of the time). A voice make, once kept and before it
     is put on, is held to every skill on the lamp (`made_clash::found`):
     the skills folder and the pushed one beside it, each by its
-    `skill.toml`, then the made skills kept and on, by the `"clash"` kept
-    with each in `made.json` (`made_clash::signature`). A clash is the
+    `skill.toml` in folder order, then the made skills kept and on, by the
+    `"clash"` kept with each in `made.json` (`made_clash::signature`).
+    Every skill it clashes with is found, not only the first (lamp-9adf,
+    13 Nov: with `blink-green-twice`, `glow-green-on-return` and
+    `green-blink-on-return` on one arrival, only the first was named and
+    replaced, and the other two still clashed). A clash is the
     same trigger (its topic, and its `field`, `when`, `equals`, `above`,
     `below`, `present` and `changes`; never its pace or window, so two on
     one arrival clash whatever their cooldown) and both using the light,
     or both moving the head (a `[[do]]` step with `light`, or with
     `body`). Another trigger, or the same one with no shared output, is no
-    clash. On a clash nothing is put on: the model is told the other's
-    spoken name (`clashes_with`), what both use (`shares`), a `clash_id`,
-    and to say word for word "NEW would start at the same moment as
+    clash. On a clash nothing is put on: the model is told the others'
+    spoken names (`clashes_with`, short: up to three, then "and N more",
+    as "a, b, c and 2 more", `made_clash::spoken_list`), what they use
+    (`shares`: the light, the head, or both, all told), a `clash_id`, and
+    to say word for word, with one, "NEW would start at the same moment as
     OTHER, which is on the lamp, and both use the light. Shall I replace
-    OTHER, keep both (they may take turns), or cancel?". Keep promises no
-    winner (Heron's P2 on #6614): the ring shows the newest claim of equal
+    OTHER, keep both (they may take turns), or cancel?", and with more,
+    "NEW would start at the same moment as A, B and C, which are on the
+    lamp, and they all use the light. Shall I replace them all, keep them
+    all (they may take turns), or cancel?". Keep promises no winner (Heron's P2 on #6614): the ring shows the newest claim of equal
     priority (`ring_requests`), and lamp-skills starts the runs of one
     event in its folders' name order, each on a thread of its own, so
     nothing makes the newer one's claim come last. A turn cut before that
     is said "I made NAME, but didn't put it on: OTHER starts at the same
     moment and uses the light. Ask me again to replace it or to keep
-    both." (`made_clash::cut_line`). The answer comes back as `make_skill`
+    both.", with more "I made NAME, but didn't put it on: A, B and C start
+    at the same moment and use the light. Ask me again to replace them or
+    to keep them all." (`made_clash::cut_line`). The answer comes back as `make_skill`
     with `clash_id` and `choice` (`replace`, `keep` or `cancel`) alone, so
     `request` is no longer required (`made_clash::chosen`); a make with no
     `request`, or a `choice` with no `clash_id`, makes nothing and is told
@@ -4012,13 +4022,19 @@ gone ([switches.md](switches.md)). What happens:
     (`made_clash::lamp_said`, `made_clash::lamp_cut`), held the whole
     question; before that the model is told to ask it again whole and the
     clash waits on. **Replace** puts the new one on first by its SHA-256
-    (`made_skill::put_on_within`), then asks the manage helper's own
-    `{"remove": NAME}`, as the app's remove does, and drops a made one
-    from `made.json`. If the put-on fails nothing is taken off ("OTHER
-    stays as it was"); if the remove fails (a core skill is refused
-    there), both are on and the lamp says "NEW is on, but OTHER wasn't
-    removed: … Both are on." **Keep** puts the new one on beside it and
-    says "Both are on." **Cancel** puts nothing on, and the made one is
+    (`made_skill::put_on_within`), then, for each skill it clashes with in
+    turn, asks the manage helper's own `{"remove": NAME}`, as the app's
+    remove does, and drops a made one from `made.json`; the result lists
+    those taken off (`replaced`) and any not (`not_removed`), and says
+    "Done: NEW is on, and I removed OTHER." If the put-on fails nothing
+    is taken off ("OTHER stays as it was", "A, B and C stay as they
+    were"); a remove that fails (a core skill is refused there) leaves
+    that one on and the others' removes as they were: with none removed
+    the lamp says "NEW is on, but OTHER wasn't removed: … Both are on."
+    ("… weren't removed: … All are on." with more), with some "NEW is on,
+    and I removed A, but B wasn't removed: … B is still on." **Keep** puts
+    the new one on beside them and says "Both are on." ("All are on." with
+    more). **Cancel** puts nothing on, and the made one is
     dropped from `made.json` with its package
     (`made_skill::forget_unput`), as is one whose clash got no choice in 5
     minutes (dropped at the next heard line) or was followed by a newer
@@ -4029,6 +4045,8 @@ gone ([switches.md](switches.md)). What happens:
     `replace_keep_and_cancel_each_do_what_they_say`,
     `an_echoed_unsaid_or_live_replace_is_refused`,
     `replace_never_leaves_both_off`,
+    `a_make_clashing_with_three_names_and_replaces_all_three`,
+    `many_clashes_are_named_short_and_each_is_removed_on_its_own`,
     `cancel_and_expiry_forget_the_made_one`,
     `a_make_with_no_request_is_refused_plainly`,
     `the_waiting_note_shows_only_while_a_clash_waits`,
