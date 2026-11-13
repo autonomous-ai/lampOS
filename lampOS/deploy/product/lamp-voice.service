@@ -325,6 +325,9 @@ Environment=LAMP_HEAD_TOUCH=on
 # #6028): the speech cache's kept line at the hold's 2 s mark, the breath in the quiet hours (22:00 to 07:00) or
 # while the line is not kept yet. The mute comes once the cue has played, at most 6 s after the hold.
 Environment=LAMP_SLEEP_LINE=on
+# "Lamp, go to sleep" asks the same sleep the 3 s hold asks, with the same kept line (#3748, controls.md): played on
+# lamp-52e6 on 2 Nov 09:18-09:24, PASS, and the one-breath fix 4/4 there (#4886). On in the product for #6853.
+Environment=LAMP_SLEEP_ASKED=on
 Environment=LAMP_RESTORED_MUTE=on
 # The privacy slide is the lamp's sleep and wake (migrate-P4, #5182): closing it lays the lamp down, and open for 1 s
 # it wakes as at a tap, with no touch; a POWER mute stays. The lead's yes on 6 Nov, after lamp-e82d's row at 10441.
