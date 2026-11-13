@@ -1290,7 +1290,7 @@ sau:
    tên đã có một tên trống trước khi đóng gói, ở trên), hoặc bị từ chối vì lý do khác ("the lamp's check
    didn't let it on"). Không bao giờ chạy khi chưa bật `LAMP_MAKE_SKILL`.
    Việc gỡ một kỹ năng đã tạo (gỡ trong ứng dụng, hoặc `{"off": NAME}`) vẫn
-   như cũ.
+   như cũ; bằng giọng nói, xem "Gỡ bằng giọng nói" bên dưới.
 9. **Thời gian chờ** (P3 của Reviewer-lead trên #4914): lời gọi giữ lượt tối
    đa 30 giây một lần hỏi, với một lần thử lại sau lỗi; các lần sửa sau khi
    bị từ chối chỉ bắt đầu khi thêm một lần hỏi vẫn kết thúc trong
@@ -1437,7 +1437,88 @@ lamp test event … It waits for you to agree" với `calls=none`, và không k�
 năng nào được tạo. "I made a mistake." và "I made a mistake: …" không phải lời nói đã làm. Kiểm
 thử: `action_claim::tests::a_skill_said_made_is_a_claim_only_a_make_backs`.
 
-Gỡ một kỹ năng tạo ra bằng giọng nói sẽ đến sau.
+**Gỡ bằng giọng nói** (#6960, ba lần thử của Twelve trên lamp-c0a4, 12843:
+"delete the skill called moon fact" đi tới `lamp_help`, mà ghi chú của nó
+nói đèn không gỡ kỹ năng bằng giọng nói được, còn "remove the moon fact
+skill" đi tới một read-back không tìm thấy "moon-fax", vì `make_skill`
+không có gì nói tới việc gỡ và read-back chỉ nhận đúng tên). Kỹ năng do
+người dùng tạo được gỡ qua chính `make_skill`, chỉ với `remove`: tên như đã
+nghe (`made_remove::REMOVE`). Đó là một tham số của hàm giọng nói đã có,
+không bao giờ là một hàm riêng, vì giọng nói đã ở mức 48 hàm
+(`lamp_gemini::MAX_TOOLS`). Một câu có xin gỡ kỹ năng hay không là do mô
+hình phán đoán, theo mô tả của hàm ("When asked to delete or remove a
+skill, call it with remove alone, saying nothing first."), không bao giờ là
+một danh sách từ (phán quyết của chủ đèn, 13/11). Sau đó, trong code
+(`made_remove::asked`):
+- **Chỉ của chính người dùng.** Tên được so với các kỹ năng họ đã tạo, chỉ
+  chỉ mục kỹ năng đã tạo (`made.json`) (`made_remove::found`): các từ của
+  nó viết như tên một kỹ năng (`made_skill::name_asked`, mỗi từ chỉ số viết
+  thành chữ số, `made_skill::name_digits`), rồi số chữ cái ít nhất phải
+  đổi, thêm hay bỏ, trên cả tên được hỏi hoặc trên bất kỳ dãy từ liền nhau
+  nào của nó có số từ bằng tên kỹ năng, bỏ khoảng trắng giữa các từ
+  (`made_remove::apart`: "moon-fax" cách `moon-fact` 2, "the moon facts
+  skill" cách 1), đủ gần khi tối đa một phần tư số chữ cái của tên
+  (`made_remove::near`), chỉ lấy cái gần nhất, tên dài hơn trước nếu hoà.
+  Chỉ theo chính tả: không từ nào bị phán theo nghĩa. Một kỹ năng trên đèn
+  mà họ không tạo (lõi, từ Store, hoặc đẩy từ máy tính: một thư mục trong
+  thư mục kỹ năng hay thư mục đẩy lên mà không phải của kỹ năng đã tạo) bị
+  từ chối bằng lời khi được gọi đúng tên như viết, hoặc khi không kỹ năng
+  nào của họ gần mà nó gần: "NAME isn't a skill they made, so you can't
+  remove it by voice." (`made_remove::NOT_MADE`); không gì chờ, và helper
+  quản lý cũng từ chối kỹ năng lõi. Hai kỹ năng của họ gần như nhau thì hỏi
+  một lần, ngắn, là cái nào ("moon fact or noon fact"). Không cái nào gần
+  thì nói vậy (`made_remove::NO_MADE`), kể tên các kỹ năng của họ, tối đa
+  3, hoặc họ đã tạo bao nhiêu. Một tên khác với đúng tên được hỏi, và tên
+  các kỹ năng của họ, chỉ được nói khi chủ đèn nghe (`services::owner_hears`,
+  chỉ hỏi lúc đó: trong phòng riêng thì luôn luôn), như tên của read-back;
+  nếu không thì "there is no skill they made by that name", không kể tên
+  nào.
+- **Hỏi một lần, bằng tên của nó.** Kỹ năng tìm được chờ cái "có" như write
+  của kỹ năng tự tạo (`skill_write_yes::wait_for_yes`, với `remove` bật,
+  câu đọc lại là câu hỏi) và mô hình được dặn chỉ nói, nguyên văn, "Remove
+  moon fact?" (`made_remove::question`), rồi `approve_id` của nó: mọi cổng
+  của cái "có" cho kỹ năng tự tạo đều giữ (nói trọn và không bị cắt trước,
+  một câu nghe được sau đó, giữ tiếng vọng, `YES_WITHIN`, route có bộ phán
+  tiếng vọng, id được ghi chú ở mỗi câu nghe sau, và chỉ cái "có" của chủ
+  đèn, `make_skill_local::not_owners_yes_refused`, được báo "Not removed,
+  and cancelled: …"). Route Live không hỏi gì ("I can remove NAME only on
+  my other voice"), lượt không ai nói cũng vậy. Câu tiếp theo của người
+  dùng bị buộc vòng 1 gọi `make_skill` (`skill_write_yes::approve_force`,
+  như câu trả lời cho task của kỹ năng), với `approve_id` và `answer`
+  (`yes`, `no` hoặc `unclear`, bỏ trống thì đọc là `unclear`): code quyết
+  định khi nào, mô hình quyết định họ đã trả lời gì.
+- **Chỉ gỡ khi có "có".** `yes` gỡ nó: cái đang bật qua chính
+  `{"remove": NAME}` của helper quản lý, như nút gỡ của ứng dụng
+  (lamp-skills bỏ cái "có" cho camera của nó và nhờ lamp-control quên cái
+  "có" cho task của nó), rồi bỏ khỏi `made.json` cùng gói của nó
+  (`made_skill::forget_named`); cái đã tạo mà chưa bật thì chỉ bị bỏ khỏi
+  chỉ mục (`made_remove::removed`), và cái đèn không còn giữ theo tên và
+  SHA-256 đó thì được nói là chưa gỡ. Đèn nói "NAME is removed."
+  (`skill_write_yes::removed_next`). `no` giữ nó và kết thúc việc chờ
+  ("NAME stays", `remove_declined_next`); `unclear` hỏi lại một lần, ngắn,
+  "remove NAME, yes or no?" (`remove_unclear_next`), và `unclear` lần hai
+  giữ nó.
+- **Không thêm vòng mạng nào.** Việc so khớp đọc hai thư mục cục bộ và chỉ
+  mục kỹ năng đã tạo; chỉ cái "có" mới hỏi helper quản lý, qua socket cục
+  bộ của nó. Journal chỉ ghi loại tìm được ("one made skill by the nearest
+  name"), không bao giờ ghi tên được hỏi.
+- Ghi chú của `lamp_help` nói điều này: "Ask me to remove a skill you made
+  and I ask first: only your yes removes it." Không có công tắc riêng: nó
+  thuộc `make_skill`, bật ở mọi nơi `LAMP_MAKE_SKILL` bật.
+
+Kiểm thử: `made_remove::tests::twelves_three_lines_each_ask_remove_moon_fact`,
+`make_skill_is_offered_for_a_remove_within_the_bounds`,
+`the_yes_removes_it_through_the_helper`, `a_no_or_twice_unclear_keeps_it`,
+`a_visitors_yes_removes_nothing`,
+`a_yes_before_the_question_was_said_removes_nothing`,
+`a_core_or_store_skill_is_refused_in_words`,
+`none_near_is_said_and_names_are_told_the_owner_only`,
+`two_as_near_ask_which`, `nothing_is_asked_unheard_or_on_the_live_route`,
+`nearest_is_spelling_over_the_names_words`; và
+`second_provider::tests::remove_words`:
+`a_yes_after_remove_moon_fact_is_forced_and_removes_it`,
+`a_no_after_remove_moon_fact_keeps_it`,
+`no_force_before_the_question_is_said_whole`.
 
 Kiểm thử: `make_skill_local::tests` (kể cả
 `a_good_answer_is_kept_and_put_on_with_no_yes`,
@@ -2612,8 +2693,10 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   của read-back, đủ mọi cổng: nói trọn trước, một câu nghe được sau đó, giữ
   tiếng vọng, `YES_WITHIN`, `approve_id` được ghi chú ở các câu nghe sau, và
   chỉ cái "có" của chủ đèn. Câu của người ngay sau đó bị buộc vòng 1 gọi
-  `make_skill` (`tool_choice`, `skill_write_yes::approve_force`, khi
-  `make_skill` được khai báo và công tắc bật, trước mọi lực buộc khác), mà
+  `make_skill` (`tool_choice`, `skill_write_yes::approve_force`, ở mọi nơi
+  `make_skill` được khai báo, trước mọi lực buộc khác: công tắc tắt thì nó
+  chỉ buộc câu trả lời cho việc gỡ một kỹ năng đã tạo, "Gỡ bằng giọng
+  nói"), mà
   form `approve_id` của nó nhận thêm `answer`: `yes`, `no` hoặc `unclear` (bỏ trống: `yes` với
   thao tác ghi hay code của kỹ năng tự tạo, như trước; `unclear` với task
   của kỹ năng, để một lời gọi bị ép mà không có câu trả lời không bao giờ
@@ -2621,7 +2704,7 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   (#6835 khoảng trống 2, phương án (b) của first builder trên #6811; trên
   lamp-52e6 ngày 13/11, sau một `use_skill` mô hình tự bắt đầu, mô hình trả
   lời câu "Yes." của chủ đèn bằng "Want me to go ahead with that?" và không
-  gọi gì). Lực buộc chỉ giữ khi việc chờ của một tác vụ (không bao giờ là
+  gọi gì). Lực buộc chỉ giữ khi việc chờ của một tác vụ hay việc gỡ một kỹ năng đã tạo (không bao giờ là
   write hay code của kỹ năng tự tạo) còn trong `YES_WITHIN` và câu trả lời
   mới nhất của đèn được giữ cho nó chứa trọn câu đọc lại, không bị cắt: nên
   chỉ cho đúng một vòng đó, không bao giờ sau câu đọc lại bị cắt hay thiếu,

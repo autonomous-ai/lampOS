@@ -189,8 +189,7 @@ holds = ["Share", "reviews"]
 [[ask]]
 said = "Can you delete a skill for me?"
 topic = "skills"
-cannot = true
-holds = ["can't remove a skill by voice"]
+holds = ["remove a skill you made", "only your yes removes it", "I don't remove by voice"]
 never = ["I remove it", "say remove"]
 
 [[ask]]

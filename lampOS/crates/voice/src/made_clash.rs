@@ -478,7 +478,7 @@ pub fn helper_hands() -> Hands<'static> {
     }
 }
 
-fn remove_by_helper(socket: &Path, name: &str) -> Result<(), String> {
+pub(crate) fn remove_by_helper(socket: &Path, name: &str) -> Result<(), String> {
     match crate::tools::reached(socket, &json!({ "remove": name }), HELPER_WAIT) {
         None => Err("the lamp's skills couldn't be reached".into()),
         Some(None) => Err("the lamp didn't say in time whether it is off".into()),
