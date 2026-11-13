@@ -597,21 +597,25 @@ pub fn tool() -> lamp_gemini::Tool {
         .to_owned();
     // A made skill read back (`LAMP_SKILL_WRITES`): what it sends, and
     // its wait for the person's agreement again.
-    if writes {
-        description.push_str(READ_BACK_TOLD);
-    }
     // A skill's task read back (`LAMP_SKILL_TASKS`, #6305): what its
-    // script uses, and its wait for the person's agreement.
+    // script uses, and its wait for the person's agreement. Both on, one
+    // sentence says both, so a remove fits within the link's 1,024 bytes.
     let tasks = crate::skill_task_yes::on();
-    if tasks {
-        description.push_str(TASKS_READ_BACK_TOLD);
-    }
+    description.push_str(match (writes, tasks) {
+        (true, true) => BOTH_READ_BACK_TOLD,
+        (true, false) => READ_BACK_TOLD,
+        (false, true) => TASKS_READ_BACK_TOLD,
+        (false, false) => "",
+    });
     // A made skill with code of its own (#6307): not on until the person
     // agrees to its say-back.
     let code = made_skill::scripts_on();
     if code {
         description.push_str(CODE_TOLD);
     }
+    // A made skill removed by voice (#6960): the same function, its
+    // `remove` alone; whether a line asks it is the model's judgment.
+    description.push_str(REMOVE_TOLD);
     lamp_gemini::Tool {
         name: made_skill::MAKE.into(),
         description,
@@ -636,6 +640,12 @@ const CODE_REQUEST_TOLD: &str = " A made skill's own script may check what the l
      act on it (\"make a skill that checks the processor temperature and sets the light\"): \
      pass such an ask whole.";
 
+/// What [`tool`]'s description adds for a remove (#6960): on lamp-c0a4
+/// "delete the skill called moon fact" went to `lamp_help` and "remove the
+/// moon fact skill" to a read-back, since nothing here named a remove.
+pub const REMOVE_TOLD: &str = " When asked to delete or remove a skill, call it with remove \
+     alone, saying nothing first.";
+
 /// What [`tool`]'s description adds with a made skill's writes on.
 pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
      what a skill they made sends or to hear one read back, saying nothing before it.";
@@ -643,6 +653,13 @@ pub const READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the p
 /// What [`tool`]'s description adds with a skill's tasks on (#6305).
 pub const TASKS_READ_BACK_TOLD: &str = " Call it with read_back alone too when the person \
      asks what a skill on the lamp uses, saying nothing before it.";
+
+/// What [`tool`]'s description adds with a made skill's writes and a
+/// skill's tasks both on: [`READ_BACK_TOLD`] and [`TASKS_READ_BACK_TOLD`]
+/// in one sentence.
+pub const BOTH_READ_BACK_TOLD: &str = " Call it too, with read_back alone, when the person asks \
+     what a skill they made sends or what a skill on the lamp uses, or to hear one read back, \
+     saying nothing first.";
 
 /// The function's parameters: the request, and with a made skill's writes
 /// (#6066) or code (#6307) on, the yes to one that waits for it,
@@ -670,6 +687,12 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
     parameters["properties"][crate::made_clash::CLASH_ID] = json!({
         "type": "string",
         "description": "Only when a skill you just made clashes with one on the lamp and the person then chooses: its clash_id, given with choice alone, with no request."
+    });
+    // A made skill removed by voice (#6960, [`crate::made_remove`]): the
+    // name as heard, matched in code to the person's own made skills.
+    parameters["properties"][crate::made_remove::REMOVE] = json!({
+        "type": "string",
+        "description": "Only when the person asks to delete or remove a skill: its name as they said it, given alone with no request."
     });
     parameters["properties"][crate::made_clash::CHOICE] = json!({
         "type": "string",
@@ -1233,6 +1256,7 @@ fn asks_of(directory: &std::path::Path, made: &Made) -> Option<crate::skill_writ
         say_back,
         grants: None,
         code: false,
+        remove: false,
     })
 }
 
@@ -1254,6 +1278,7 @@ fn code_asks(made: &Made) -> crate::skill_write_yes::Asks {
         .to_owned(),
         grants: Some(made.uses.grants.clone()),
         code: true,
+        remove: false,
     }
 }
 
@@ -1339,12 +1364,20 @@ pub fn not_owners_yes_refused(id: &str, owners_yes: impl FnOnce() -> bool) -> Op
     if !crate::skill_write_yes::waits(id) || owners_yes() {
         return None;
     }
+    let remove = crate::skill_write_yes::removes(id);
     crate::skill_write_yes::drop_wait(id);
     eprintln!(
         "lamp-voice: a made skill's yes not the owner's: its wait dropped, nothing approved (#6066, #6307)"
     );
+    // A remove's (#6960): nothing removed, never "not sent".
+    if remove {
+        return Some(json!({ "error": NOT_OWNERS_REMOVE }));
+    }
     Some(json!({ "error": crate::services::OTHER_VOICE }))
 }
+
+/// What a remove's yes not the owner's is told (#6960): nothing removed.
+pub const NOT_OWNERS_REMOVE: &str = "Not removed, and cancelled: only the lamp's owner can agree to removing a skill they made. Say nothing was removed.";
 
 /// The person's yes to a made skill with code of its own (#6307), once its
 /// say-back was heard whole: its package put on by the SHA-256 said back
@@ -1512,6 +1545,7 @@ fn code_task_kept(
         say_back: asks.say_back.clone(),
         grants: Some(task.grants),
         code: false,
+        remove: false,
     };
     match task_yes(&kept) {
         Ok(_) => true,
@@ -2661,6 +2695,9 @@ pub fn answer(
             crate::services::sends_here(),
             std::time::Instant::now(),
             |asks| match (asks.code, &asks.grants) {
+                // A remove (#6960): the made skill taken off by the manage
+                // helper, then dropped from the made skills.
+                _ if asks.remove => crate::made_remove::removed_here(asks),
                 // Code of its own (#6307): that package put on, by its
                 // SHA-256, then its task's yes recorded by lamp-control for
                 // the folder as it went on; nothing is asked of
@@ -2683,6 +2720,11 @@ pub fn answer(
                 ),
             },
         );
+    }
+    // A skill the person made, removed by voice (#6960): matched in code
+    // to their own made skills, asked once by its name, removed on the yes.
+    if let Some(name) = call.args[crate::made_remove::REMOVE].as_str() {
+        return crate::made_remove::asked_here(name, request, heard, lease);
     }
     // A made skill read back by voice (`LAMP_SKILL_WRITES`): what it
     // sends, and its yes awaited again when it waits for one. Or a skill on
@@ -2789,6 +2831,7 @@ pub(crate) mod tests {
             say_back: SAID.to_owned(),
             grants: None,
             code: false,
+            remove: false,
         };
         let never = |_: &yes::Asks| -> Result<Value, String> { panic!("approved") };
         let id = yes::wait_for_yes(asks(), 4, now);
@@ -6725,6 +6768,7 @@ printf 'tar of %s' \"$name\" > \"$3/$name-1.0.0.tar\"\n",
             say_back: made_skill::code_said(&["camera".to_owned()]),
             grants: Some(vec!["camera".to_owned()]),
             code: true,
+            remove: false,
         };
         let folder = "cd".repeat(32);
         let never = |_: &crate::skill_write_yes::Asks| -> Result<Value, String> {
