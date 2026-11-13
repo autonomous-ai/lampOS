@@ -18152,13 +18152,17 @@ fn energy_level_one_is_the_unit_exactly() {
     assert_eq!(crate::energy::stand_seconds(6.0, 1), 6.0);
     let lively = unit.at(5);
     assert_eq!((lively.speed, lively.acceleration), (800.0, 4_800.0));
-    // Only the speed and its acceleration change.
+    assert_eq!(lively.stand_roll, 200.0);
+    assert_eq!(unit.at(3).stand_roll, 120.0);
+    assert_eq!(unit.at(2).stand_roll, unit.stand_roll);
+    // Only the speed, its acceleration and the roll standing change.
     assert_eq!(
         format!(
             "{:?}",
             Limits {
                 speed: unit.speed,
                 acceleration: unit.acceleration,
+                stand_roll: unit.stand_roll,
                 ..lively
             }
         ),
@@ -18316,4 +18320,440 @@ fn the_follower_is_as_before_off_and_its_acceleration_slews_under_energy() {
     }
     assert!(!Limits::FOLDED.energy && limits.clip_ceiling().is_none());
     assert_eq!(energy.clip_ceiling(), Some(1_000.0));
+}
+
+/// A step of [`listening_at`]: when, the head's and the arm's goals, the stand.
+type Listened = (Duration, [u16; 3], [u16; 2], f32);
+
+/// A standing lamp listening from the start for 14 s at an energy `level`
+/// (asked from the start), with the lamp changed first: each step's head
+/// and arm goals, and the stand.
+fn listening_at(level: u8, prepare: impl FnOnce(&mut Lamp)) -> (BodyReport, Vec<Listened>) {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    prepare(&mut lamp);
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let seen_at = clock.time.clone();
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Listening, 60)),
+        move || Asked {
+            energy: level,
+            ..Asked::default()
+        },
+        |glimpse| {
+            seen.push((
+                seen_at.get(),
+                glimpse.goals,
+                glimpse.arm_goals,
+                glimpse.stand,
+            ))
+        },
+    );
+    (report, seen)
+}
+
+/// The stand pose's shoulder and elbow (`standing`).
+const STOOD_ARM: [u16; 2] = [2_650, 2_600];
+
+/// The farthest the head's roll goal went from home over `seen`, counts.
+fn rolled(seen: &[Listened]) -> u16 {
+    seen.iter()
+        .map(|step| step.1[1].abs_diff(HOME[1]))
+        .max()
+        .unwrap()
+}
+
+/// #6893 with #6891: listening, level 1 is today exactly (and as nothing
+/// said): the head's roll within its 1 count, the arm at its stand. Level 5
+/// tilts the head about 170 counts (0.85 of its 200 standing) and leans the
+/// shoulder and the elbow in by 25 and 30.
+#[test]
+fn listening_at_level_five_tilts_and_leans_in_and_level_one_is_today() {
+    let (report, today) = listening_at(0, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(listening_at(1, |_| {}).1, today);
+    assert!(rolled(&today) <= 1, "{}", rolled(&today));
+    // Stood and listening, before it folds at the end.
+    let late = |seen: &[Listened]| {
+        seen.iter()
+            .rfind(|step| step.0 < Duration::from_secs(12))
+            .unwrap()
+            .2
+    };
+    assert_eq!(late(&today), STOOD_ARM);
+    let (report, lively) = listening_at(5, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(report.retreats.is_empty(), "{:?}", report.retreats);
+    assert!(
+        (160..=175).contains(&rolled(&lively)),
+        "{}",
+        rolled(&lively)
+    );
+    let leant = late(&lively);
+    assert_eq!(
+        [
+            i32::from(leant[0]) - i32::from(STOOD_ARM[0]),
+            i32::from(leant[1]) - i32::from(STOOD_ARM[1])
+        ],
+        [-25, -30],
+        "{leant:?}"
+    );
+    // Eased in, never in a leap: three counts a step at most once stood.
+    for pair in lively
+        .windows(2)
+        .filter(|pair| pair[0].3 >= 1.0 && pair[0].0 < Duration::from_secs(12))
+    {
+        for index in 0..2 {
+            assert!(pair[1].2[index].abs_diff(pair[0].2[index]) <= 3, "{pair:?}");
+        }
+    }
+}
+
+/// What each mood leans toward: speaking and reading `LEAN` at every
+/// level, listening only from level 3, resting and thinking never.
+#[test]
+fn a_moods_lean_follows_the_energy_level_only_while_listening() {
+    for level in 0..=6 {
+        assert_eq!(mood_lean(Mood::Speaking, level), LEAN);
+        assert_eq!(mood_lean(Mood::Reading, level), LEAN);
+        assert_eq!(mood_lean(Mood::Resting, level), [0.0; 2]);
+        assert_eq!(mood_lean(Mood::Thinking, level), [0.0; 2]);
+    }
+    for level in [0, 1, 2, 6] {
+        assert_eq!(mood_lean(Mood::Listening, level), [0.0; 2]);
+    }
+    assert_eq!(mood_lean(Mood::Listening, 3), [-10.0, -15.0]);
+    assert_eq!(mood_lean(Mood::Listening, 5), [-25.0, -30.0]);
+}
+
+/// A hand on the head while it listens at level 5 gives way as ever, and
+/// the listening lean is let go while it does: never into a hand.
+#[test]
+fn a_hand_on_a_listening_lamp_at_level_five_lets_its_lean_go() {
+    let ms = Duration::from_millis;
+    let (report, seen) = listening_at(5, |lamp| {
+        lamp.strains = vec![(ms(9_000), ms(9_200), YAW, 300)];
+    });
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.eased[2], 1, "{report:?}");
+    let at = |when: Duration| seen.iter().rfind(|step| step.0 < when).unwrap().2;
+    assert_eq!(at(ms(8_900)), [2_625, 2_570]);
+    let let_go = seen
+        .iter()
+        .filter(|step| (ms(9_000)..ms(12_000)).contains(&step.0))
+        .map(|step| step.2)
+        .max()
+        .unwrap();
+    assert!(
+        let_go[0] >= STOOD_ARM[0] - 3 && let_go[1] >= STOOD_ARM[1] - 3,
+        "{let_go:?}"
+    );
+}
+
+/// An arm that strains while it listens at level 5 sits the lamp down as
+/// ever: the lean goes with the stand.
+#[test]
+fn an_arm_straining_at_level_five_still_sits_the_lamp_down() {
+    let ms = Duration::from_millis;
+    let (report, seen) = listening_at(5, |lamp| {
+        lamp.strains = vec![(ms(9_000), ms(14_000), 1, 990)];
+    });
+    assert!(!report.retreats.is_empty(), "{report:?}");
+    assert!(seen.last().unwrap().3 < 1.0, "{:?}", seen.last());
+}
+
+/// No `--stand`: nothing to tilt standing, so every level keeps the roll
+/// it was given, the body runs, and says so once.
+#[test]
+fn without_a_stand_every_energy_level_keeps_the_heads_roll_as_given() {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(4));
+    let mut rolls = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap(),
+        Some(HOME),
+        None,
+        None,
+        || Some((Mood::Listening, 60)),
+        || Asked {
+            energy: 5,
+            ..Asked::default()
+        },
+        |glimpse| rolls.push(glimpse.goals[1].abs_diff(HOME[1])),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert!(rolls.iter().all(|roll| *roll <= 1), "{rolls:?}");
+}
+
+/// Listening on a lamp stood at V1's anti-tip line (the stand pose behind
+/// it, as `a_lamp_is_not_stood_up_farther_back_than_v1s_line`): the rule
+/// still holds every goal to 22 mm at level 5, and the lean, which would
+/// lean it back past that, is cut whole: the arm stays where level 1's is.
+#[test]
+fn at_v1s_anti_tip_line_a_listening_lean_at_level_five_adds_nothing() {
+    let run = |level: u8| {
+        let (mut lamp, mut clock) = folded(Duration::from_secs(10));
+        lamp.arm_moves = true;
+        lamp.overload_clears = 1;
+        let pose = [1_900, 2_044, 2_015, 1_800, 2_047];
+        let up = Standing::new([2_050, 2_047], pose, 100, 4, 60, [950, 950]).unwrap();
+        let mut steps = Vec::new();
+        let report = run_alive(
+            &mut lamp,
+            &mut clock,
+            Limits::folded_with(Tuning {
+                reach: [150, 15, 1, 250],
+                speed: 120,
+                servo_speed: 1_000,
+                servo_acceleration: 60,
+            })
+            .unwrap(),
+            Some(HOME),
+            Some(up),
+            None,
+            || Some((Mood::Listening, 60)),
+            move || Asked {
+                energy: level,
+                ..Asked::default()
+            },
+            |glimpse| steps.push((glimpse.goals, glimpse.arm_goals)),
+        );
+        assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+        steps
+    };
+    let back = |(head, arm): &([u16; 3], [u16; 2])| {
+        crate::cog::lean_back_mm([head[2], arm[0], arm[1], head[1], head[0]].map(f32::from))
+    };
+    let most = |steps: &[([u16; 3], [u16; 2])]| steps.iter().map(back).fold(0.0, f64::max);
+    let (today, lively) = (run(1), run(5));
+    assert!(most(&lively) <= 22.0, "{}", most(&lively));
+    assert!(
+        most(&lively) <= most(&today) + 0.05,
+        "{} {}",
+        most(&lively),
+        most(&today)
+    );
+    // Stood at the line, its arm where level 1's is: the lean is cut whole.
+    let arm = |steps: &[([u16; 3], [u16; 2])]| steps[steps.len() - 150].1;
+    assert_eq!(arm(&lively), arm(&today));
+}
+
+/// Its name alone (`--look-at-name`): a standing lamp at rest, a person
+/// heard until 7 s, is spoken to for a moment from 9 s, but at level 5 does
+/// not lean in as for a person heard.
+#[test]
+fn its_name_alone_at_level_five_does_not_lean_it_in() {
+    let ms = Duration::from_millis;
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        look_at_name: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let (time, mood_at, seen_at) = (clock.time.clone(), clock.time.clone(), clock.time.clone());
+    let mut arm = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        move || {
+            Some(if mood_at.get() < ms(7_000) {
+                (Mood::Listening, 60)
+            } else {
+                (Mood::Resting, 0)
+            })
+        },
+        move || Asked {
+            called: (ms(9_000)..ms(9_100)).contains(&time.get()),
+            energy: 5,
+            ..Asked::default()
+        },
+        |glimpse| arm.push((seen_at.get(), glimpse.arm_goals)),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.calls, 1, "{report:?}");
+    let at = |when: Duration| arm.iter().rfind(|step| step.0 < when).unwrap().1;
+    // The person heard leant it in; at rest it came back.
+    assert_eq!(at(ms(6_900)), [2_625, 2_570]);
+    for (when, goals) in arm
+        .iter()
+        .filter(|step| (ms(8_900)..ms(11_500)).contains(&step.0))
+    {
+        assert_eq!(*goals, STOOD_ARM, "{when:?}");
+    }
+}
+
+/// Speaking at `level`, Expression asking `pitch` counts of the head from
+/// 8 s to 9.5 s (`None`: nothing): each step's head pitch goal.
+fn nodded(level: u8, pitch: Option<f32>) -> Vec<(Duration, u16)> {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(12));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 120,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let (time, seen_at) = (clock.time.clone(), clock.time.clone());
+    let mut seen = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Speaking, 60)),
+        move || Asked {
+            expression: pitch
+                .filter(|_| {
+                    (Duration::from_secs(8)..Duration::from_millis(9_500)).contains(&time.get())
+                })
+                .map(|pitch| [pitch, 0.0, 0.0]),
+            energy: level,
+            ..Asked::default()
+        },
+        |glimpse| seen.push((seen_at.get(), glimpse.goals[0])),
+    );
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    seen
+}
+
+/// The farthest Expression's ask took the head's pitch from where it was
+/// without it, between 8 s and 10 s.
+fn nod_of(level: u8, pitch: f32) -> u16 {
+    let (with, without) = (nodded(level, Some(pitch)), nodded(level, None));
+    with.iter()
+        .zip(&without)
+        .filter(|(step, _)| (Duration::from_secs(8)..Duration::from_secs(10)).contains(&step.0))
+        .map(|(step, plain)| step.1.abs_diff(plain.1))
+        .max()
+        .unwrap()
+}
+
+/// Speaking, a nod Expression asks is as asked at level 1 (and as nothing
+/// said), 1.4 times it at level 5, and never past Expression's reach.
+#[test]
+fn a_spoken_nod_grows_with_the_energy_level_inside_expressions_reach() {
+    assert_eq!(nodded(1, Some(30.0)), nodded(0, Some(30.0)));
+    let today = nod_of(0, 30.0);
+    assert!((28..=30).contains(&today), "{today}");
+    let lively = nod_of(5, 30.0);
+    assert!((40..=42).contains(&lively), "{lively}");
+    let most = nod_of(5, 55.0);
+    assert!(most <= EXPRESSION_REACH[0] as u16 && most >= 58, "{most}");
+}
+
+/// A gesture's head roll at `level` with `LAMP_BODY_ENERGY=on`: a step of
+/// 130 counts in 100 ms (1,300 a second, `FASTEST`'s) asked at 8 s while it
+/// speaks; each step's head roll goal.
+fn rolled_in_a_gesture(level: u8) -> (BodyReport, Vec<u16>) {
+    static TILT: Clip = Clip {
+        name: "tilt",
+        step_ms: 100,
+        frames: &[
+            [0, 0, 0, 0, 0],
+            [0, 130, 0, 0, 0],
+            [0, 130, 0, 0, 0],
+            [0, 0, 0, 0, 0],
+        ],
+    };
+    let (mut lamp, mut clock) = folded(Duration::from_secs(11));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits {
+        energy: true,
+        ..Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed: 120,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap()
+    };
+    let time = clock.time.clone();
+    let mut asked = false;
+    let mut rolls = Vec::new();
+    let report = run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        || Some((Mood::Speaking, 60)),
+        move || {
+            let due = !asked && time.get() >= Duration::from_secs(8);
+            asked |= due;
+            Asked {
+                gesture: due.then_some(&TILT),
+                energy: level,
+                ..Asked::default()
+            }
+        },
+        |glimpse| rolls.push(glimpse.goals[1]),
+    );
+    (report, rolls)
+}
+
+/// Level 5 unlocks a gesture's head roll (its `stand_roll` over the unit's
+/// 1 count), played no faster than the servo's 1,000 counts a second (20 a
+/// 20 ms step); level 1 drops it as today.
+#[test]
+fn a_gestures_roll_at_level_five_plays_under_the_servos_speed() {
+    let (report, today) = rolled_in_a_gesture(1);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.gestures, 1, "{report:?}");
+    assert!(
+        today.iter().all(|roll| roll.abs_diff(HOME[1]) <= 1),
+        "{today:?}"
+    );
+    let (report, lively) = rolled_in_a_gesture(5);
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.gestures, 1, "{report:?}");
+    let farthest = lively
+        .iter()
+        .map(|roll| roll.abs_diff(HOME[1]))
+        .max()
+        .unwrap();
+    assert!(farthest >= 120, "{farthest}");
+    let fastest = lively
+        .windows(2)
+        .map(|pair| pair[1].abs_diff(pair[0]))
+        .max()
+        .unwrap();
+    assert!(fastest <= 21, "{fastest}");
 }
