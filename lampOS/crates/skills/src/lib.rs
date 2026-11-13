@@ -5470,6 +5470,12 @@ fn budget_group_in(folder: &Path) -> Option<String> {
 /// The computer a pushed skill's [`PUSHED_FROM`] names, read without
 /// following a link and at most 1 KiB; "a computer" when it says none.
 pub(crate) fn pushed_by(folder: &Path) -> String {
+    pushed_computer(folder).unwrap_or_else(|| "a computer".to_owned())
+}
+
+/// The computer a pushed skill's [`PUSHED_FROM`] names, as [`pushed_by`]
+/// reads it; none when the file is missing, unreadable or names nobody.
+pub(crate) fn pushed_computer(folder: &Path) -> Option<String> {
     use std::{io::Read, os::unix::fs::OpenOptionsExt};
     #[derive(Deserialize)]
     struct From {
@@ -5491,7 +5497,6 @@ pub(crate) fn pushed_by(folder: &Path) -> String {
                 .collect::<String>()
         })
         .filter(|name| !name.trim().is_empty())
-        .unwrap_or_else(|| "a computer".to_owned())
 }
 
 /// The topics a pushed skill may read: presence, the protocol's `look`
@@ -11276,6 +11281,32 @@ mod tests {
             task::folder_of(&root, Some(&dev), "pushed-booth", true),
             Some(dev.join("pushed-booth"))
         );
+    }
+
+    /// #6715: a pushed skill's task is said to come from "your computer"
+    /// and its name when its pushed-from file names one, and from "your
+    /// computer" alone when none does, never "your computer a computer":
+    /// a read-back that says it as a person would ("from your computer,
+    /// and") then holds every say-back word, and the first yes is taken.
+    #[test]
+    fn a_pushed_task_with_no_computer_named_comes_from_your_computer_once() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("skills");
+        let dev = dir.path().join("dev");
+        std::fs::create_dir_all(&root).unwrap();
+        let folder = task_skill(&dev, "pushed-booth", PHOTO_BOOTH);
+        task::set_on_here(Some(true));
+        let from =
+            || package::task_asks(&root, Some(&dev), "pushed-booth").unwrap()["from"].clone();
+        assert_eq!(from(), "your computer");
+        std::fs::write(folder.join(PUSHED_FROM), r#"{"computer":"desk-mac"}"#).unwrap();
+        assert_eq!(from(), "your computer desk-mac");
+        // A pushed-from file naming nobody is as none.
+        std::fs::write(folder.join(PUSHED_FROM), r#"{"computer":"  "}"#).unwrap();
+        assert_eq!(from(), "your computer");
+        // The skill list still says who pushed it, "a computer" for none.
+        assert_eq!(pushed_by(&folder), "a computer");
+        task::set_on_here(None);
     }
 
     /// #6305: the manage helper reads a skill's task back for the voice,

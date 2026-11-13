@@ -1426,8 +1426,9 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
 - **First kind only.** A skill with a `do.task` loads only when its script
   came from the Skills Store (its `.package.json` says `from_store`) or was
   pushed by the owner's own paired computer (the developer folder,
-  `/var/lib/lampOS/skills-dev`). One put on by hand from a folder or a file,
-  or marked `made: here` or `added: file`, does not load, and the journal
+  `/var/lib/lampOS/skills-dev`; said back as coming from "your computer
+  NAME", or "your computer" when its `.pushed.json` names none, #6715).
+  One put on by hand from a folder or a file, or marked `made: here` or `added: file`, does not load, and the journal
   says why. The made cap (`made_skill::put_on_cap`) refuses an added skill
   with `grants` or a `task` step outright, and a made one unless
   `LAMP_MADE_SCRIPTS=on`: model-written scripts are #6307's, behind a
