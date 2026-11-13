@@ -482,13 +482,20 @@ fn call(
     })
 }
 
-/// What a turn's answer comes to: its JSON's `status` (`ok`, or none) is
-/// a run that ended well; any other is said.
-fn answered(said: &str) -> Result<u64, String> {
+/// What a turn's answer comes to, failing closed: the run's token file
+/// still there (`token_left`) means its start never ran, whatever the turn
+/// said; else only the JSON's `status` `ok` (`agent --expect-final
+/// --json`'s final answer) is a run that ended well; a missing or other
+/// status is said.
+fn answered(said: &str, token_left: bool) -> Result<u64, String> {
+    if token_left {
+        return Err("the default agent never started the skill's script".to_owned());
+    }
     let value: Value = serde_json::from_str(said.trim())
         .map_err(|_| "the default agent's gateway answered with no JSON".to_owned())?;
     match value.get("status").and_then(Value::as_str) {
-        None | Some("ok") => Ok(0),
+        Some("ok") => Ok(0),
+        None => Err("the default agent's turn ended with no status from its gateway".to_owned()),
         Some(status) => Err(format!(
             "the default agent's turn ended as its gateway says {status}"
         )),
@@ -636,7 +643,10 @@ impl GatewayRunner {
         );
         let turn = call(self, &args, left, self.stopping.as_deref(), None)?;
         match turn {
-            Turn::Done { code: 0, said } => answered(&said),
+            Turn::Done { code: 0, said } => answered(
+                &said,
+                std::fs::symlink_metadata(folder.join(TOKEN_FILE)).is_ok(),
+            ),
             Turn::Done { code, .. } => Err(format!(
                 "the default agent's turn on its gateway ended with status {code}"
             )),
@@ -739,10 +749,11 @@ mod tests {
         } else {
             format!(
                 "S=$(printf '%s\\n' \"$*\" | grep -o '/[^ `]*/skill-[a-z0-9-]*/start' | head -n 1)\n\
-                 \"$S\" > /dev/null 2>&1\n\
-                 \"$S\" > /dev/null 2>&1 && echo second >> {seen}\n\
+                 [ -e {nostart} ] || \"$S\" > /dev/null 2>&1\n\
+                 [ -e {nostart} ] || {{ \"$S\" > /dev/null 2>&1 && echo second >> {seen}; }}\n\
                  printf '%s\\n' '{answer}'",
-                seen = seen.display()
+                seen = seen.display(),
+                nostart = dir.path().join("nostart").display(),
             )
         };
         std::fs::write(
@@ -882,6 +893,34 @@ mod tests {
         assert!(said.contains("its gateway says error"), "{said}");
         assert!(*count.lock().unwrap() >= 1);
         nothing_left(&rig);
+    }
+
+    #[test]
+    fn a_turn_is_a_success_only_with_status_ok_and_its_start_run() {
+        let rig = rig(r#"{"result":{}}"#, false);
+        let (_, end) = ended();
+        let said = runner(&rig)
+            .run(&skill_run(&rig, Duration::from_secs(20)), &end)
+            .unwrap_err();
+        assert!(said.contains("no status"), "{said}");
+        nothing_left(&rig);
+        let rig = rig_ok_no_start();
+        let said = runner(&rig)
+            .run(&skill_run(&rig, Duration::from_secs(20)), &end)
+            .unwrap_err();
+        assert!(said.contains("never started the skill's script"), "{said}");
+        assert!(!rig.seen.exists(), "the script never ran");
+        nothing_left(&rig);
+        assert_eq!(answered(r#"{"status":"ok"}"#, false), Ok(0));
+        assert!(answered(r#"{"status":"ok"}"#, true).is_err());
+        assert!(answered("{}", false).is_err());
+    }
+
+    /// A rig whose turn answers `ok` but never runs the start.
+    fn rig_ok_no_start() -> Rig {
+        let rig = rig(r#"{"status":"ok"}"#, false);
+        std::fs::write(rig.dir.path().join("nostart"), "").unwrap();
+        rig
     }
 
     #[test]
