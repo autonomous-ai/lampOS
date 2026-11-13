@@ -505,3 +505,84 @@ fn a_camera_question_is_not_an_ask() {
         assert_eq!(went.chats, 1, "{heard}");
     }
 }
+
+/// A skill's own ask said with the lamp's name, as the name's wait
+/// (`LAMP_SECOND_NAME_CARRIES`) answers it, as for its name (Thirteen's
+/// line 1 on #6782's row): in one line, the speech to text's full stop
+/// after the name, with the coordinator's `Called` or without it, and as
+/// the line after a bare "Hey, Lamp.". Each calls the pushed photo booth in
+/// code as round 1, with no model call.
+#[tokio::test(start_paused = true)]
+async fn a_skills_ask_on_the_names_wait_calls_it_in_code() {
+    for (lines, called) in [
+        (&["Hey, Lamp. Take a photo."][..], true),
+        (&["Hey, Lamp. Take a photo."][..], false),
+        (&["Hey, Lamp.", "Take a photo."][..], true),
+        (&["Hey, Lamp.", "Take a photo."][..], false),
+    ] {
+        let dir = asks_folder();
+        let reads = Arc::new(crate::skill_named::Heard::new(crate::tools::Settings {
+            skills: Some(dir.clone()),
+            use_skill: true,
+            ..Default::default()
+        }));
+        let script = Arc::new(Script {
+            heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
+            chats: Mutex::new(
+                lines
+                    .iter()
+                    .map(|_| vec![text("Smile."), Ok(ChatEvent::Done)])
+                    .collect(),
+            ),
+            ..Script::default()
+        });
+        let (engine, ran, now) = scripted(script.clone());
+        let mut engine = engine
+            .announcing(false)
+            .carrying_the_name(true)
+            .calling_skills_named(Arc::new(move |heard: &str| reads.heard(heard)));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        if called {
+            engine.submit(ProviderInput::Called {
+                request: 1,
+                privacy_generation: 1,
+            });
+        }
+        engine.submit(end(1));
+        if lines.len() > 1 {
+            let after = Duration::from_millis(1_200);
+            tokio::time::sleep(after).await;
+            *now.lock().unwrap() += after;
+            engine.submit(start(2));
+            engine.submit(audio(2, 1));
+            engine.submit(end(2));
+        }
+        let heard = turn_within(&mut engine, Duration::from_secs(5)).await;
+        std::fs::remove_dir_all(&dir).ok();
+        assert_eq!(
+            heard.last().unwrap(),
+            "complete",
+            "{lines:?} {called}: {heard:?}"
+        );
+        let ran: Vec<(String, Value)> = ran
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(name, args, _)| (name.clone(), args.clone()))
+            .collect();
+        assert_eq!(
+            ran,
+            [(
+                crate::use_skill::NAME.to_owned(),
+                json!({"skill": "photo_booth"})
+            )],
+            "{lines:?} {called}: called in code by its ask"
+        );
+        assert_eq!(
+            script.asked.lock().unwrap().len(),
+            1,
+            "{lines:?} {called}: round 1 asks no chat"
+        );
+    }
+}
