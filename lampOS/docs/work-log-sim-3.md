@@ -3,6 +3,19 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 00:5x GMT+7: #6971, P4 step 2 (lamp-sim listen)
+
+- **#6971** (`sim-3/listen`, b07d87bf7b, stacked on #6954): `listen.rs` and
+  `lamp-sim listen DIR [--listen] [--whisper]`: a loopback WebSocket in the
+  route's Deepgram subset, `Token`/`Bearer` auth, linear16 16 kHz only,
+  `SpeechStarted` from an energy gate, one final `Results` from finalize at
+  each `Finalize`, the line to the developer's whisper-server (loopback only).
+  tungstenite 0.30 already locked (+1 edge, no new package).
+- Through the protocol (Python websockets client, 20 ms blocks), whisper.cpp
+  1.9.2 base.en warm, 6 runs: `Finalize` → words 45 ms (1.2 s line), 72 ms
+  (5 s line), words exact. lamp-sim 94+4 pass; clippy, workspace build pass.
+  READ ASK to sim-1, sim-2; asked again for #6954's first read.
+
 ## 2026-11-14 00:3x GMT+7: #6955 merged; #6965 READ-OK; #6966 READ-OK
 
 - Train 886 (#6963) merged as 7cc8c754a with **#6955** (one boot id on
