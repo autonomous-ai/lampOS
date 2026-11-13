@@ -13561,6 +13561,21 @@ fn not_theirs(line: Option<&HeldAsker>, held: &HeldAsker) -> Option<&'static str
     }
 }
 
+/// A one-face yes's lateness, then its person ([`not_theirs`]): a late yes
+/// reads as late, whoever the line is theirs by by then (Thirteen's row on
+/// #5627, 42 s after the hold, journaled as "not the same person").
+fn late_or_not_theirs(
+    late: bool,
+    line: Option<&HeldAsker>,
+    held: &HeldAsker,
+) -> Option<&'static str> {
+    if late {
+        Some("too late")
+    } else {
+        not_theirs(line, held)
+    }
+}
+
 /// What became of a held forget on a turn ([`take_held_forget`]).
 enum Taken {
     /// Nothing held, or dropped: nothing runs and nothing is told.
@@ -13720,13 +13735,11 @@ fn take_held_forget(
             Some("not a later turn")
         } else if !crate::known_faces::plain_agreement_to_forget(said) {
             Some("not a plain yes")
-        } else if now.saturating_duration_since(held.at) > crate::remember::ONE_FACE_FORGET_YES_FOR
-        {
-            // Before the person: a late yes reads as late, whoever the
-            // line is theirs by by then (Thirteen's row on #5627, 42 s
-            // after the hold, journaled as "not the same person").
-            Some("too late")
-        } else if let Some(why) = not_theirs(line_person, &held.asker) {
+        } else if let Some(why) = late_or_not_theirs(
+            now.saturating_duration_since(held.at) > crate::remember::ONE_FACE_FORGET_YES_FOR,
+            line_person,
+            &held.asker,
+        ) {
             Some(why)
         } else if seen || (by_one_face && crate::person::private_room()) {
             None
