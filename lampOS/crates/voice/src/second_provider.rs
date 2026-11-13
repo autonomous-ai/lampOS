@@ -15047,6 +15047,9 @@ async fn answer(
     // first sentence that it is kept ("Your goldfish's name, Pip, is
     // kept.") is a keep claim too (lamp-06c1, 6 Nov, S14 req 363).
     let yes_line = heard && crate::remember::heard::only_a_yes(&said);
+    // The heard words, kept for a hand-over made in code when an agent
+    // they name is still given no `start_agent_task` (#6547 cause 3).
+    let named_words = named_agent.is_some().then(|| said.clone());
     let question = match picture {
         Some(jpeg) => Message::user_seeing(said, &jpeg),
         None => Message::user(said),
@@ -16471,7 +16474,31 @@ async fn answer(
                     ));
                 }
             } else if let Some(what) = catch_owed.take() {
-                let came = if calls.iter().any(|call| call.name == start) {
+                // An agent named for the work and still no call once asked
+                // again (#6547 cause 3, the first builder's yes): code calls
+                // `start_agent_task` itself with the heard words as the task
+                // and nothing else, so the tasks part sets the agent and its
+                // place from those words as for a model's call (a computer
+                // named with none paired is refused the same way, #6786).
+                // The call only prepares: its answer goes to the next round,
+                // which says the task back and asks for the person's yes;
+                // their no cancels it. This round's words are not said.
+                let handed = (what == "named agent" && calls.is_empty())
+                    .then_some(named_agent.as_deref())
+                    .flatten();
+                let came = if let Some(agent) = handed {
+                    calls.push(net::ToolCall {
+                        id: format!("handed-{request}"),
+                        name: start.to_owned(),
+                        args: serde_json::json!({ "task": named_words.as_deref().unwrap_or_default() }),
+                        extra: None,
+                    });
+                    decline_held = None;
+                    text.clear();
+                    format!(
+                        "still no call: the heard words are handed over in code to {agent}, said back for a yes"
+                    )
+                } else if calls.iter().any(|call| call.name == start) {
                     format!("{start} called")
                 } else if calls.is_empty() {
                     "still no call, said it wasn't done".to_owned()
