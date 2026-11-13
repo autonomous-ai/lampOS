@@ -46,6 +46,11 @@ const QUIET_FRAMES: usize = 15;
 const FRAME_SAMPLES: usize = 320;
 /// How long whisper-server may take for one line.
 const WHISPER_WAIT: Duration = Duration::from_secs(5);
+/// How long a caller may take to open its socket, and to send anything once
+/// open (the route sends a `KeepAlive` every 5 s while quiet): past these the
+/// socket is let go, so callers that send nothing cannot hold every slot.
+const OPEN_WAIT: Duration = Duration::from_secs(5);
+const IDLE_WAIT: Duration = Duration::from_secs(30);
 
 /// What turns a line's audio into words.
 pub trait Recognizer: Send + Sync {
@@ -155,14 +160,27 @@ impl Callback for Admit<'_> {
 
 /// One socket: its audio held, a line's words at each `Finalize`.
 fn one(stream: TcpStream, token: &str, recognizer: &dyn Recognizer) -> io::Result<()> {
+    stream.set_read_timeout(Some(OPEN_WAIT))?;
     let mut socket = tungstenite::accept_hdr(stream, Admit(token))
         .map_err(|error| io::Error::other(format!("opening: {error}")))?;
-    let mut line = Line::default();
+    socket.get_ref().set_read_timeout(Some(IDLE_WAIT))?;
+    let mut line = Line::new();
     loop {
         let message = match socket.read() {
             Ok(message) => message,
             Err(tungstenite::Error::ConnectionClosed | tungstenite::Error::AlreadyClosed) => {
                 return Ok(());
+            }
+            Err(tungstenite::Error::Io(error))
+                if matches!(
+                    error.kind(),
+                    io::ErrorKind::WouldBlock | io::ErrorKind::TimedOut
+                ) =>
+            {
+                return Err(io::Error::other(format!(
+                    "nothing for {} s: the socket is let go",
+                    IDLE_WAIT.as_secs()
+                )));
             }
             Err(error) => return Err(io::Error::other(format!("reading: {error}"))),
         };
@@ -227,6 +245,15 @@ struct Line {
 }
 
 impl Line {
+    /// A socket's first line. Its opening counts as quiet, so speech in its
+    /// first 0.3 s still says `SpeechStarted`.
+    fn new() -> Self {
+        Self {
+            quiet: QUIET_FRAMES,
+            ..Self::default()
+        }
+    }
+
     /// Takes in audio; the time speech began, if a frame of it just did.
     fn hear(&mut self, bytes: &[u8]) -> Option<f64> {
         let mut started = None;
@@ -548,6 +575,33 @@ mod tests {
     }
 
     #[test]
+    fn speech_in_a_sockets_first_moment_says_speech_started() {
+        let address = start(Arc::new(Fixed("x", Mutex::default())));
+        let mut socket = open(address, PATH, Some("Token t0ken")).unwrap();
+        socket.send(Message::binary(tone(0.2, 8_000))).unwrap();
+        let started = next(&mut socket);
+        assert_eq!(started["type"], "SpeechStarted");
+        assert_eq!(started["timestamp"], 0.0);
+    }
+
+    #[test]
+    fn a_connection_that_never_opens_its_socket_is_let_go() {
+        let address = start(Arc::new(Fixed("x", Mutex::default())));
+        let mut idle = TcpStream::connect(address).unwrap();
+        idle.set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        let asked = Instant::now();
+        let mut buffer = [0u8; 64];
+        // The server gives up after OPEN_WAIT: the read sees the close (or a reset).
+        let _ = idle.read(&mut buffer);
+        let took = asked.elapsed();
+        assert!(
+            took >= OPEN_WAIT - Duration::from_millis(200) && took < Duration::from_secs(9),
+            "{took:?}"
+        );
+    }
+
+    #[test]
     fn a_failed_recognizer_answers_an_empty_final_not_nothing() {
         struct Broken;
         impl Recognizer for Broken {
@@ -561,6 +615,8 @@ mod tests {
         socket
             .send(Message::text(r#"{"type":"Finalize"}"#))
             .unwrap();
+        // Speech from the first moment says SpeechStarted first.
+        assert_eq!(next(&mut socket)["type"], "SpeechStarted");
         let results = next(&mut socket);
         assert_eq!(results["from_finalize"], true);
         assert_eq!(results["channel"]["alternatives"][0]["transcript"], "");
