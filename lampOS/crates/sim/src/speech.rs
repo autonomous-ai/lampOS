@@ -379,6 +379,50 @@ impl Drop for Say {
     }
 }
 
+/// Float samples at any rate made into 24 kHz S16LE, piece by piece: linear
+/// between neighbours, the position carried across pieces so a line split
+/// anywhere comes out the same. Good enough for a voice on a developer's
+/// speaker (the resident synthesizer speaks at 22,050 Hz).
+pub struct ToRoute {
+    /// Input samples per output sample.
+    step: f64,
+    /// Where the next output sample falls, in input samples from `last`.
+    at: f64,
+    /// The last input sample of the piece before.
+    last: f32,
+}
+
+impl ToRoute {
+    pub fn new(from_rate: f64) -> Self {
+        Self {
+            step: from_rate / f64::from(SAMPLE_RATE),
+            at: 1.0,
+            last: 0.0,
+        }
+    }
+
+    /// The 24 kHz S16LE bytes for `samples`, the next piece of the line.
+    pub fn piece(&mut self, samples: &[f32]) -> Vec<u8> {
+        let mut out = Vec::with_capacity((samples.len() as f64 / self.step) as usize * 2 + 4);
+        // Input index i - 1 is `last` (i = 0), i is samples[i - 1].
+        let sample = |i: usize| if i == 0 { self.last } else { samples[i - 1] };
+        while self.at <= samples.len() as f64 {
+            let left = self.at.floor() as usize;
+            let frac = (self.at - left as f64) as f32;
+            let right = (left + 1).min(samples.len());
+            let value = sample(left) + (sample(right) - sample(left)) * frac;
+            let clipped = (value.clamp(-1.0, 1.0) * 32767.0).round() as i16;
+            out.extend_from_slice(&clipped.to_le_bytes());
+            self.at += self.step;
+        }
+        if let Some(&last) = samples.last() {
+            self.last = last;
+            self.at -= samples.len() as f64;
+        }
+        out
+    }
+}
+
 /// The samples of a WAV file: the bytes of its `data` chunk.
 pub fn pcm_of_wav(wav: &[u8]) -> io::Result<&[u8]> {
     let bad = |why: &str| io::Error::new(io::ErrorKind::InvalidData, format!("WAV: {why}"));
@@ -616,6 +660,37 @@ mod tests {
             assert_eq!(error.kind(), io::ErrorKind::InvalidInput, "{address}");
         }
         assert!(bind("127.0.0.1:0".parse().unwrap()).is_ok());
+    }
+
+    #[test]
+    fn floats_at_22050_hz_come_out_at_24_khz_and_split_pieces_come_out_the_same() {
+        let input: Vec<f32> = (0..22_050).map(|i| (i as f32 * 0.01).sin() * 0.5).collect();
+        let whole = ToRoute::new(22_050.0).piece(&input);
+        // One second in is one second out, within a sample.
+        assert!(
+            (whole.len() as i64 / 2 - 24_000).abs() <= 1,
+            "{}",
+            whole.len() / 2
+        );
+        let mut split = ToRoute::new(22_050.0);
+        let mut parts = Vec::new();
+        for chunk in input.chunks(777) {
+            parts.extend(split.piece(chunk));
+        }
+        assert_eq!(parts, whole);
+        // A steady level stays that level; beyond full scale it is clipped.
+        let steady = ToRoute::new(22_050.0).piece(&[0.25; 441]);
+        assert!(
+            steady
+                .chunks(2)
+                .skip(1)
+                .all(|b| i16::from_le_bytes([b[0], b[1]]) == 8_192)
+        );
+        let loud = ToRoute::new(24_000.0).piece(&[2.0, -2.0]);
+        assert_eq!(
+            loud,
+            [32_767i16.to_le_bytes(), (-32_767i16).to_le_bytes()].concat()
+        );
     }
 
     #[test]

@@ -27,5 +27,16 @@ zune-jpeg = "=0.4.21"
 jpeg-encoder = "=0.7.1"
 rustix = { version = "=1.1.5", features = ["fs", "pty", "termios", "event", "process"] }
 
+# The resident speech synthesizer on macOS (apple_speech.rs, sim-3-P4 step 1b,
+# the first builder on #6811, 13 Nov 21:28): Apple's AVFAudio through the objc2
+# bindings, macOS only, so a Linux build and every product crate pull none of
+# them. Licences: objc2, objc2-encode, block2, objc2-foundation MIT; the
+# generated framework crates "Zlib OR Apache-2.0 OR MIT".
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "=0.6.5"
+block2 = "=0.6.2"
+objc2-foundation = { version = "=0.3.2", default-features = false, features = ["std", "NSDate", "NSObjCRuntime", "NSRunLoop", "NSString"] }
+objc2-avf-audio = { version = "=0.3.2", default-features = false, features = ["std", "block2", "AVAudioBuffer", "AVAudioFormat", "AVAudioTypes", "AVSpeechSynthesis"] }
+
 [lints]
 workspace = true
