@@ -3,6 +3,18 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 21:0x GMT+7: #6939 two reads, but its macOS job is red
+
+- READ-OKs: sim-2 on #6928 (bf49ae7e6f) and #6939 (4186f204f1, after ten's).
+- #6939's `sim-macos` (run 43427791756): lamp-body lib 588/589 in 21.9 s on
+  macos-15; `runtime::supervisor::tests::actual_child_uses_same_worker_loop_
+  and_stop_reaps_before_clean_replacement` failed `motor inhibit
+  acknowledgement timed out` (`INHIBIT_DEADLINE_US` 20 ms). Not reproduced on
+  this Mac at 84fe6000c1: alone 30/30 idle, 20/20 every core busy; the lib
+  suite 5/5 under 30 busy processes (~9 s). Reran the failed job once;
+  proposed `--test-threads=2` or a named skip in this job if it fails again
+  (asked Fifth and ten). No NEXT TRAIN until green.
+
 ## 2026-11-13 20:4x GMT+7: camera on macOS (test pattern)
 
 - Quiet check. On this Mac, lamp-sim with #6938 and
