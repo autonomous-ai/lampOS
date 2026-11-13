@@ -2764,6 +2764,37 @@ impl Cli {
         self.close_with(machine, agent_id, within, true)
     }
 
+    /// The agent `harness show <id> --json` names for one harness of this
+    /// lamp's (its `agent`, as "Hermes" or "Terminal"): read after a skill's
+    /// run ends, since Harness keeps a pane whose engine exited before it
+    /// was ready as a shell, the same id with agent "Terminal", and `wait`
+    /// then reads it idle (OpenHarness, #6835 gap 1). `Err` is a show that
+    /// wasn't answered or names another id or no agent.
+    pub fn shown_agent(&self, machine: &str, agent_id: &str) -> Result<String, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        if !self::agent_id(agent_id) {
+            return Err("invalid_agent_id".into());
+        }
+        let reply = self
+            .run(
+                &[
+                    "show".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    agent_id.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("show_failed".into());
+        }
+        shown_agent(&reply.stdout, agent_id).ok_or_else(|| "show_invalid_reply".into())
+    }
+
     /// `harness close`, with `--now` only when asked ([`Cli::close_now`]).
     fn close_with(
         &self,
@@ -4778,6 +4809,27 @@ fn shown_row(bytes: &[u8], id: &str, kept: &Value) -> Option<Value> {
         .or_else(|| kept["name"].as_str())
         .unwrap_or_default();
     Some(serde_json::json!({"id": id, "name": name, "state": state}))
+}
+
+/// The `agent` of `harness show <id> --json`'s answer of `id`: plain
+/// letters, digits, spaces and `-`, at most 32; `None` for another id, a
+/// refusal, or none.
+pub fn shown_agent(bytes: &[u8], id: &str) -> Option<String> {
+    let shown = serde_json::from_slice::<Value>(bytes).ok()?;
+    if shown["ok"] == false || !shown["error"].is_null() || shown["id"] != id {
+        return None;
+    }
+    shown["agent"]
+        .as_str()
+        .map(str::trim)
+        .filter(|agent| {
+            !agent.is_empty()
+                && agent.len() <= 32
+                && agent
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b' ' | b'-'))
+        })
+        .map(str::to_owned)
 }
 
 /// Whether a refused `harness show` says the session is no longer there:
