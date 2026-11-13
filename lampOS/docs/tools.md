@@ -382,7 +382,7 @@ and none of the skills' own (`crate::use_skill`):
   look its answer asks for), and the model words the result; see
   [skills.md](skills.md#a-skill-asked-for-by-its-name-runs-in-code-6772).
 - **A plain ask to make a skill** (`LAMP_MAKE_SKILL_ASKED=on`, the second
-  route, off; #6835): a line that is one sentence, opens with "make (me) a (new) skill" or the
+  route, on in the product unit; #6835): a line that is one sentence, opens with "make (me) a (new) skill" or the
   like, says what it does, and has no word that may take it back, doubt it
   or put it off ("no", "wait", "actually", "not", "later", …) has its first chat round sent
   with `tool_choice` naming `make_skill`, when `make_skill` is declared
