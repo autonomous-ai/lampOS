@@ -29,8 +29,14 @@ use std::{
 
 /// The longest a line may take to be spoken whole.
 const LINE_WAIT: Duration = Duration::from_secs(30);
-/// How long the main thread's run loop runs between looks for a new line.
+/// How long the main thread's run loop runs between looks while a line is
+/// written.
 const PUMP: f64 = 0.005;
+/// A line whose last buffer came this long ago is done, even with no empty
+/// end buffer: the synthesizer writes far faster than speech (a 22-word line
+/// whole in about 40 ms here), and on macOS 14 the empty end buffer never
+/// came (Heron's read on #6961), so every line waited out its 30 s.
+const QUIET_END: Duration = Duration::from_millis(300);
 
 /// What the synthesizer hands back for a line.
 enum Piece {
@@ -82,7 +88,10 @@ impl Engine for Resident {
                 }
                 Ok(Piece::End) => return Ok(()),
                 Ok(Piece::Failed(why)) => return Err(io::Error::other(why)),
-                Err(_) => {
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err(io::Error::other("the synthesizer has stopped"));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
                     return Err(io::Error::other(format!(
                         "no whole line from the synthesizer in {} s",
                         LINE_WAIT.as_secs()
@@ -96,20 +105,26 @@ impl Engine for Resident {
 /// Owns the main thread: one synthesizer, each line written to buffers, and
 /// the run loop kept running so their callbacks come. Returns when every
 /// sender is gone.
-pub fn serve_on_main_thread(lines: mpsc::Receiver<Line>, language: &str) {
+pub fn serve_on_main_thread(lines: mpsc::Receiver<Line>, language: &str) -> io::Result<()> {
+    // The SAFETY notes below rely on this being the main thread: refuse otherwise.
+    if objc2::MainThreadMarker::new().is_none() {
+        return Err(io::Error::other(
+            "the resident synthesizer runs on the main thread only",
+        ));
+    }
     // SAFETY: `new` makes a fresh synthesizer; it is used on this thread only.
     let synthesizer = unsafe { AVSpeechSynthesizer::new() };
     // SAFETY: a plain class method taking a valid NSString; it returns a voice
     // or nil, and nil (no such language) leaves the system's default voice.
     let voice =
         unsafe { AVSpeechSynthesisVoice::voiceWithLanguage(Some(&NSString::from_str(language))) };
-    loop {
-        match lines.try_recv() {
-            Ok(line) => speak_line(&synthesizer, voice.as_deref(), line),
-            Err(mpsc::TryRecvError::Empty) => pump(),
-            Err(mpsc::TryRecvError::Disconnected) => return,
-        }
+    // Idle, the thread waits on the channel: callbacks come only while a line
+    // is written, so the run loop is run only then (no wakeups at rest). Each
+    // line in an autorelease pool of its own, so what it makes is let go.
+    while let Ok(line) = lines.recv() {
+        objc2::rc::autoreleasepool(|_| speak_line(&synthesizer, voice.as_deref(), line));
     }
+    Ok(())
 }
 
 /// Runs the main thread's run loop for a moment, so callbacks come.
@@ -140,6 +155,10 @@ fn speak_line(
     unsafe { utterance.setVoice(voice) };
     let (done, finished) = mpsc::channel::<()>();
     let out = line.out.clone();
+    // When the last buffer with samples came, in microseconds from `began`; 0: none yet.
+    let began = Instant::now();
+    let last_buffer = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let last_seen = std::sync::Arc::clone(&last_buffer);
     let block = RcBlock::new(move |buffer: NonNull<AVAudioBuffer>| {
         // SAFETY: AVFoundation passes a valid buffer, alive for this call.
         let buffer: &AVAudioBuffer = unsafe { buffer.as_ref() };
@@ -175,6 +194,8 @@ fn speak_line(
             }
         };
         let _ = out.send(Piece::Samples { rate, samples });
+        let at = began.elapsed().as_micros().max(1) as u64;
+        last_seen.store(at, std::sync::atomic::Ordering::SeqCst);
     });
     // SAFETY: `block` is a valid heap block and the utterance is valid; the
     // synthesizer retains (copies) the block for as long as it may call it, so
@@ -184,6 +205,17 @@ fn speak_line(
         synthesizer.writeUtterance_toBufferCallback(&utterance, &*block as *const _ as *mut _);
     }
     while finished.try_recv().is_err() {
+        let last = last_buffer.load(std::sync::atomic::Ordering::SeqCst);
+        if last != 0 && began.elapsed().saturating_sub(Duration::from_micros(last)) >= QUIET_END {
+            // Samples came and then nothing: the line is done. The synthesizer
+            // is told to stop, so the next line starts clean.
+            // SAFETY: stops the synthesizer this thread owns, at once.
+            unsafe {
+                synthesizer.stopSpeakingAtBoundary(objc2_avf_audio::AVSpeechBoundary::Immediate);
+            }
+            let _ = line.out.send(Piece::End);
+            return;
+        }
         if Instant::now() >= line.until {
             // SAFETY: stops the synthesizer this thread owns, at once.
             unsafe {
