@@ -1396,8 +1396,9 @@ fn a_restart_before_the_morning_still_greets_with_it() {
 
 /// #2602: each due chance Welcome back drops says one journal line naming
 /// its gate: an absence under its 300 s (once through a face that flickers
-/// past its gap) and its cooldown. Its 60 s wait for the voice running out
-/// is #3007's `chance dropped` line, not one of these: said once.
+/// past its gap) and its cooldown. A chance kept for the voice says so as
+/// its 60 s wait begins (#6592), once; that wait running out is #3007's
+/// `chance dropped` line, not one of these: said once.
 #[test]
 fn welcome_back_says_each_dropped_chance_once_with_its_gate() {
     let root = private_root();
@@ -1440,6 +1441,7 @@ fn welcome_back_says_each_dropped_chance_once_with_its_gate() {
             "welcome-back not run: away 0 s, under its 300 s",
             "welcome-back not run: away 215 s, under its 300 s",
             "welcome-back not run: in its cooldown, 14 min left",
+            "welcome-back not run: its while did not hold: kept up to 60 s for it (held by voice/state state was speaking)",
         ]
     );
 }

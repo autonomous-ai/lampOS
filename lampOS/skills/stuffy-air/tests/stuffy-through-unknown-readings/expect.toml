@@ -1,0 +1,27 @@
+# lamp-52e6 on build 12295 (#6592): stuffy (2,230 to 2,290 ppm) from the
+# program's first reading, a reading every 5 s as the air part sends them,
+# and its sensor not knowing its CO2 (`co2_ppm` null, `feel` unknown) for
+# 90 s in every 4 minutes. The unknown readings are passed over: they
+# neither end the spell nor begin its 10 minutes again, so the lamp droops,
+# dims and says its line once, at 600 s, and not again while the air stays
+# stuffy. Before the fix each 90 s ended the spell past its 1-minute gap,
+# and nothing at all was done or said in the 40 minutes.
+clock = "14:00"
+
+[[expect]]
+at = "600s"
+within = "5s"
+call = "body.gesture"
+args = { gesture = "sleepy" }
+
+[[expect]]
+at = "600s"
+within = "5s"
+call = "light"
+args = { dim = 1, until = "ends" }
+
+[[expect]]
+at = "600s"
+within = "5s"
+call = "say"
+args = { note = "The air at the desk has turned stuffy. In one short line, suggest letting some fresh air in, such as opening a window or a door." }
