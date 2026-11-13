@@ -845,15 +845,29 @@ pub fn approve(
     }
     match approve(&waiting.asks) {
         // A remove (#6960): the made skill taken off and dropped.
-        Ok(_) if remove => {
+        Ok(result) if remove => {
             eprintln!(
-                "lamp-voice: request {request}: a made skill removed on the person's yes (#6960)"
+                "lamp-voice: request {request}: a made skill removed on the person's yes (#6960){}",
+                if result["still_listed"] == true {
+                    ": off the lamp, still listed among the made skills"
+                } else {
+                    ""
+                }
             );
-            json!({
+            // Taken off but still listed (#6969): its own words, as it is.
+            let next = result["next"].as_str().map_or_else(
+                || removed_next(&crate::made_skill::spoken_name(&waiting.asks.skill)),
+                str::to_owned,
+            );
+            let mut told = json!({
                 "approved": true,
                 "removed": waiting.asks.skill,
-                "next": removed_next(&crate::made_skill::spoken_name(&waiting.asks.skill)),
-            })
+                "next": next,
+            });
+            if result["still_listed"] == true {
+                told["still_listed"] = json!(true);
+            }
+            told
         }
         Err(why) if remove => {
             eprintln!("lamp-voice: request {request}: a made skill's remove failed: {why}");
