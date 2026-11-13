@@ -3,6 +3,12 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 06:3x GMT+7: #6961 restated by Heron and nine
+
+- Heron and nine restated READ-OK on #6961 at a44727ef6e (range-diff `=`).
+  Checks: macOS, clippy and the rest pass; ARM64 build/release pending at the
+  check. NEXT TRAIN once ARM64 is green.
+
 ## 2026-11-14 06:2x GMT+7: #6954 merged
 
 - Train 894 (#6993) merged as 7b4b4c35c6 with **#6954** (`lamp-sim speech`,
