@@ -448,6 +448,7 @@ before synthesis; valid requests acknowledge `starting`, then `success` or
 | `system.info` | Aggregate snapshot: versions + network + host | _(none)_ |
 | `system.version` | Component versions only (cheaper than `system.info`) | _(none)_ |
 | `system.network` | network facts of the default-route interface only | _(none)_ |
+| `system.stats` | CPU load, memory, disk, temperature and the state of the HAL service | _(none)_ |
 | `system.reboot` | Queue HAL's cue-aware OS reboot | _(none)_ |
 | `system.shutdown` | Queue HAL's cue- and servo-aware OS shutdown | _(none)_ |
 | `system.ota_versions` | Per-component OTA versions + what bootstrap is installing now (the web Versions card's data) | _(none)_ |
@@ -568,6 +569,17 @@ returns just the `network` block. Version probes: `os-server` from the ldflags b
 var, `bootstrap` via `bootstrap-server --version`, `hal` over HTTP from the
 local HAL `/version` endpoint, `openclaw` from the agent monitor's cached probe
 (`openclaw_detected` distinguishes "not installed" from "installed but unparseable").
+
+`system.stats` exists to diagnose a device whose HAL is down, when `system.info` can only
+say the HAL version is missing. `data` carries `cpu` (`load1/5/15`, `cores`), `mem`
+(`total_mb`, `available_mb`, `used_percent`, swap), `disk` (root filesystem), `temp_c`, and
+`hal`: the systemd `active_state`/`sub_state`/`result`/`exec_main_status`/`restarts`, `health`
+(`ok`, or the error from probing HAL's `/health`) and `recent_errors`. `recent_errors` are the
+newest structural error lines of HAL's journal, at most 15 lines of 300 bytes: systemd's own
+`hal.service:` exit and restart messages (fixed forms only), traceback locations (file, line,
+function), the name of a missing module, and exception type names with their message dropped. Lines are never matched by keyword, because
+HAL logs what users say and a warning can quote it. `kernel_oom` lists the last three kernel out-of-memory kill lines. Every probe has a
+3 s limit and a failed one leaves its field at the zero value.
 
 #### `system.ota_versions` / `system.software_update`
 
@@ -1899,6 +1911,7 @@ There is no `ota` case in the os-server MQTT router: the message is logged as `u
 | `system/server/device/delivery/mqtt/mcp_connector_writer.go` | Special stdio MCP writer (`figma-api`): token file + local-wrapper `openclaw.json` MCP entry |
 | `system/server/device/delivery/mqtt/connector_refresh.go` | Connector token refresh loop (`/connector/refresh-token`) |
 | `system/server/device/delivery/mqtt/system_info_handler.go` | Handle `data` kinds `system.info`/`system.version`/`system.network` |
+| `system/server/device/delivery/mqtt/system_stats_handler.go` | Handle `data` kind `system.stats` (host load + HAL service state) |
 | `system/server/device/delivery/mqtt/system_ota_handler.go` | Handle `data` kinds `system.ota_versions`/`system.software_update` (+ completion watcher) |
 | `system/ota/ota.go` | Shared bootstrap OTA client (versions, updating, force-update, per-target rate limit) behind both the MQTT kinds and `/api/system/ota-*` + `software-update` |
 | `system/server/device/delivery/mqtt/channel_refresh_handler.go` | Handle `data` kind `channel.refresh_config` (async re-apply of a channel's config block) |
