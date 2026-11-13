@@ -133,10 +133,10 @@ async fn carry(local: TcpStream, url: &str) {
     ) else {
         return;
     };
-    if let Ok(stream) = TlsConnector::from(Arc::new(config))
-        .connect(name, tcp)
-        .await
-    {
+    // Each step of the handshake is bounded: a server that takes the TCP
+    // connection and then stalls must not hold the bridge's one slot.
+    let tls = TlsConnector::from(Arc::new(config)).connect(name, tcp);
+    if let Ok(Ok(stream)) = tokio::time::timeout(CONNECT, tls).await {
         pump(local, request, stream).await;
     }
 }
@@ -146,7 +146,9 @@ async fn pump<S: AsyncRead + AsyncWrite + Unpin>(
     request: tokio_tungstenite::tungstenite::handshake::client::Request,
     stream: S,
 ) {
-    let Ok((ws, _)) = tokio_tungstenite::client_async(request, stream).await else {
+    let Ok(Ok((ws, _))) =
+        tokio::time::timeout(CONNECT, tokio_tungstenite::client_async(request, stream)).await
+    else {
         return;
     };
     let (mut sink, mut frames) = ws.split();
