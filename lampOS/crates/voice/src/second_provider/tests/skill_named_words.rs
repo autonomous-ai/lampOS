@@ -326,3 +326,88 @@ fn a_wait_beside_a_skills_name_goes_to_the_model() {
         );
     }
 }
+
+/// Thirteen's line 1 on #6782's row (lamp-c0a4, 13:18): "Hey, Lamp.
+/// Dance.", the speech to text's own full stop after the name, goes down
+/// the name's wait (`LAMP_SECOND_NAME_CARRIES`, "only the lamp's name: its
+/// answer waits … for the line after it", then "no line came after its
+/// name: answered as a call"). The words that wait answers are read for a
+/// skill's name all the same, so an installed skill that takes nothing
+/// runs in code: in one line with the coordinator's `Called` or without
+/// it, and said as the line after a bare "Hey, Lamp.". The lamp's own
+/// `dance` is a core skill with a choice and a flag, so on a lamp it stays
+/// the model's: here an installed `dance` taking nothing stands for any.
+#[tokio::test(start_paused = true)]
+async fn a_skill_named_on_the_names_wait_runs_in_code() {
+    for (lines, called) in [
+        (&["Hey, Lamp. Dance."][..], true),
+        (&["Hey, Lamp. Dance."][..], false),
+        (&["Hey, Lamp.", "Dance."][..], true),
+        (&["Hey, Lamp.", "Dance."][..], false),
+    ] {
+        let script = Arc::new(Script {
+            heard: Mutex::new(lines.iter().map(|line| Ok((*line).to_owned())).collect()),
+            chats: Mutex::new(
+                lines
+                    .iter()
+                    .map(|_| vec![text("Here I go."), Ok(ChatEvent::Done)])
+                    .collect(),
+            ),
+            ..Script::default()
+        });
+        let (engine, ran, now) = scripted(script.clone());
+        let mut engine = engine
+            .announcing(false)
+            .carrying_the_name(true)
+            .calling_skills_named(Arc::new(|heard: &str| {
+                crate::skill_named::named(heard, &["dance", "photo_booth"])
+                    .map(|function| crate::skill_named::call(true, function))
+            }));
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        if called {
+            engine.submit(ProviderInput::Called {
+                request: 1,
+                privacy_generation: 1,
+            });
+        }
+        engine.submit(end(1));
+        if lines.len() > 1 {
+            let after = Duration::from_millis(1_200);
+            tokio::time::sleep(after).await;
+            *now.lock().unwrap() += after;
+            engine.submit(start(2));
+            engine.submit(audio(2, 1));
+            engine.submit(end(2));
+        }
+        let heard = turn_within(&mut engine, Duration::from_secs(5)).await;
+        assert_eq!(
+            heard.last().unwrap(),
+            "complete",
+            "{lines:?} {called}: {heard:?}"
+        );
+        let ran: Vec<(String, Value)> = ran
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|(name, args, _)| (name.clone(), args.clone()))
+            .collect();
+        assert_eq!(
+            ran,
+            [(crate::use_skill::NAME.to_owned(), json!({"skill": "dance"}))],
+            "{lines:?} {called}: run in code by its name"
+        );
+        let asked = script.asked.lock().unwrap().clone();
+        assert_eq!(asked.len(), 1, "{lines:?} {called}: round 1 asks no chat");
+        assert!(
+            asked[0].iter().any(|message| message.role == "system"
+                && message
+                    .content
+                    .as_ref()
+                    .and_then(Value::as_str)
+                    .is_some_and(|note| note.contains("asked for dance by its name"))),
+            "{lines:?} {called}: {:?}",
+            asked[0]
+        );
+    }
+}
