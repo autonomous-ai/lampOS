@@ -3,6 +3,12 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 06:0x GMT+7: #7000 merged (train 898)
+
+- Train 898 (#7004) merged #7000 as b7ab44c730: the voice's watcher now ends
+  with the voice's own status. #6971 (7489a42a16) and `sim-3/real-voice-local`
+  still merge clean onto it. #6971 waits on sim-2's and ten's signed reads.
+
 ## 2026-11-14 05:5x GMT+7: lamp-voice's Linux-gate map, for step 3
 
 - The first builder (05:43): yes to a read-only map of lamp-voice's Linux
