@@ -708,5 +708,40 @@ class IgnoredReads(unittest.TestCase):
             os.unlink(wf)
 
 
+class Always(unittest.TestCase):
+    """13 Nov (the lead): with --always every PR needs two signed readers, asked or not."""
+    def test_one_read_on_an_unasked_pr_is_short(self):
+        items = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00")]
+        self.assertEqual(two_reads(items, HEAD, W), "none")
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "short 1")
+
+    def test_one_reader_restating_is_still_one(self):
+        items = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00"),
+                 c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 19:16")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "short 1")
+
+    def test_two_signed_readers_on_one_login_meet_it(self):
+        items = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00"),
+                 c("writer-a", "READ-OK " + HEAD + "\n\nSixth, 18:30")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "met 2")
+
+    def test_a_one_read_opt_out_does_not_lower_it(self):
+        items = [{"login": "", "body": "ONE READ: docs only", "pr_body": True},
+                 c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "short 1")
+
+    def test_the_cli_flag(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("writer-a\n"); path = f.name
+        try:
+            line = json.dumps(c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00")) + "\n"
+            run = lambda *a: subprocess.run([sys.executable, "-I", os.path.join(HERE, "reads2.py"), "--writers", path, *a, HEAD],
+                                            input=line, capture_output=True, text=True).stdout.strip()
+            self.assertEqual(run(), "none")
+            self.assertEqual(run("--always"), "short 1")
+        finally:
+            os.unlink(path)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)
