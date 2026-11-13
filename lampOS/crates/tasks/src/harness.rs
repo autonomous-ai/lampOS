@@ -2711,7 +2711,7 @@ impl Cli {
         timeout: Duration,
     ) -> Result<Observation, String> {
         let bytes = self.show_within(machine, agent_id, timeout)?;
-        parse_observation(&bytes, agent_id).map_err(str::to_string)
+        parse_reading(&bytes, agent_id).map_err(str::to_string)
     }
 
     /// `harness show --json` of one agent, its stdout once it exits 0.
@@ -5504,15 +5504,32 @@ fn background_running(reply: &ShowReply) -> Option<u64> {
         .filter(|count| *count > 0)
 }
 
+/// The state [`Cli::observe`] gives an agent `idle` while background
+/// commands it started still run (#5689). Only the engine reads it: it
+/// holds such a read as `working` for a while, then as `idle`
+/// (`engine::BACKGROUND_HOLD_MS`). It is never stored.
+pub const BACKGROUND_STATE: &str = "background";
+
 /// `show` read as an [`Observation`] (#5689): an agent `idle` while
 /// background commands it started still run (Harness 0.6.52,
 /// openharness#4229) has not finished, so it is read as `working`: never
-/// settled, never told, never closed, and stored as any reading at work.
-/// Unknown (`null`) or absent (Harness before 0.6.52) is read as before.
+/// settled, never asked a reply. Unknown (`null`) or absent (Harness
+/// before 0.6.52) is read as before.
 pub(crate) fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'static str> {
+    let mut observation = parse_reading(bytes, expected)?;
+    if observation.state == BACKGROUND_STATE {
+        observation.state = "working".into();
+    }
+    Ok(observation)
+}
+
+/// [`parse_observation`] for the engine's reads ([`Cli::observe`]): an
+/// agent idle with background commands running is [`BACKGROUND_STATE`],
+/// so the engine can bound how long it holds the answer.
+pub(crate) fn parse_reading(bytes: &[u8], expected: &str) -> Result<Observation, &'static str> {
     let (mut observation, background) = parse_show(bytes, expected)?;
     if background.is_some() {
-        observation.state = "working".into();
+        observation.state = BACKGROUND_STATE.into();
     }
     Ok(observation)
 }
@@ -5579,12 +5596,6 @@ struct PsRow {
     about: Option<String>,
 }
 
-/// `harness close`'s exit code (Harness 0.4.18's CLI): 0 closed, 5 refused
-/// (`NOT_YOURS`, `SPAWN_LIMIT`, `TURNED_OFF`; do not retry). Everything else
-/// is exit 1, with only a message in the `--json` reply: a harness working or
-/// waiting for the person (`WORKING`), one that changed while closing
-/// (`AGENT_CHANGED`) or one already gone alike. So none is told apart here:
-/// it failed this time, and the next try reads the agent again first.
 /// The read before a close found the agent idle with background commands
 /// still running (#5689): `observe_background_commands` once the close
 /// prefixes it.
@@ -5606,6 +5617,12 @@ pub fn background_refusal(stdout: &[u8], stderr: &[u8]) -> bool {
     })
 }
 
+/// `harness close`'s exit code (Harness 0.4.18's CLI): 0 closed, 5 refused
+/// (`NOT_YOURS`, `SPAWN_LIMIT`, `TURNED_OFF`; do not retry). Everything else
+/// is exit 1, with only a message in the `--json` reply: a harness working or
+/// waiting for the person (`WORKING`), one that changed while closing
+/// (`AGENT_CHANGED`) or one already gone alike. So none is told apart here:
+/// it failed this time, and the next try reads the agent again first.
 pub fn closed(code: Option<i32>) -> Result<Closed, String> {
     match code {
         Some(0) => Ok(Closed::Closed),

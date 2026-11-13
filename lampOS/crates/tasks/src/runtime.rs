@@ -2,7 +2,7 @@
 use crate::{
     engine::{
         CLOSE_TRIES, Clock as ClockSample, CloseJob, Engine, Error as EngineError, LaunchJob,
-        ObservationJob, Watched, background_code,
+        ObservationJob, Watched,
     },
     follow::{CliWatch, Follows, WatchLane},
     harness::{
@@ -1226,12 +1226,14 @@ fn close_told(adapter: &impl Adapter, job: &CloseJob) -> Result<Closed, String> 
 
 /// The journal's line for one close: which task's harness, which try of
 /// [`CLOSE_TRIES`], and how it went. The last try failing says so, and that
-/// the harness is left open on the computer: it is never asked again.
-fn close_line(job: &CloseJob, result: &Result<Closed, String>) -> String {
+/// the harness is left open on the computer: it is never asked again. A
+/// try the engine doesn't count (`uncounted`, #5689) says background
+/// commands still run.
+fn close_line(job: &CloseJob, result: &Result<Closed, String>, uncounted: bool) -> String {
     let id = job.task_id;
     let tries = job.tries;
     match result {
-        Err(code) if background_code(code) => format!(
+        Err(code) if uncounted => format!(
             "tasks: closing task {id}'s harness: try {tries} not done ({code}); \
              background commands still run, tried again in a minute, read first"
         ),
@@ -1840,7 +1842,8 @@ fn owner<C: Clock>(
                 Outcome::Close(job, result) => {
                     // One line a close, so the journal says which harness
                     // the lamp closed and how it went ([`close_line`]).
-                    eprintln!("{}", close_line(&job, &result));
+                    let uncounted = engine.close_uncounted(&job, &result, &now);
+                    eprintln!("{}", close_line(&job, &result, uncounted));
                     engine.finish_close(&job, result, &now)
                 }
                 Outcome::Machines(read) => {
@@ -5075,21 +5078,31 @@ mod tests {
             tries: 1,
         };
         let failed = Err("observe_timeout".to_string());
-        let line = close_line(&job, &failed);
+        let line = close_line(&job, &failed, false);
         assert!(
             line.contains("try 1 of 3 failed (observe_timeout)"),
             "{line}"
         );
         assert!(line.contains("tried again"), "{line}");
         job.tries = CLOSE_TRIES;
-        let line = close_line(&job, &failed);
+        let line = close_line(&job, &failed, false);
         assert!(
             line.contains("giving up, the harness is left open"),
             "{line}"
         );
         assert_eq!(
-            close_line(&job, &Ok(Closed::Closed)),
+            close_line(&job, &Ok(Closed::Closed), false),
             "tasks: closing task 7's harness: try 3: Closed"
+        );
+        // Background commands (#5689): the line follows whether the engine
+        // counted the try, so a counted last one still gives up.
+        let background = Err("close_background_commands".to_string());
+        let line = close_line(&job, &background, true);
+        assert!(line.contains("background commands still run"), "{line}");
+        let line = close_line(&job, &background, false);
+        assert!(
+            line.contains("giving up, the harness is left open"),
+            "{line}"
         );
     }
 

@@ -5668,7 +5668,8 @@ fn a_watch_holds_through_background_and_ends_on_the_done_after_it() {
 }
 
 /// #5689 (Harness 0.6.52): `show` of an agent idle while background
-/// commands it started still run is read as at work, never done; with none
+/// commands it started still run is read as `background`, which the engine
+/// holds as at work for a while (`BACKGROUND_HOLD_MS`); with none
 /// running, unknown (`null`: Codex, OpenClaw, Windows) or no such field
 /// (Harness before 0.6.52) it is idle, as before. Only an idle agent's
 /// count is read, and one that isn't a whole number is unknown.
@@ -5676,8 +5677,8 @@ fn a_watch_holds_through_background_and_ends_on_the_done_after_it() {
 fn an_idle_agent_with_background_commands_running_is_read_as_at_work() {
     let rig = Rig::new();
     let cases: [(Option<Value>, &str); 7] = [
-        (Some(json!(2)), "working"),
-        (Some(json!(1)), "working"),
+        (Some(json!(2)), "background"),
+        (Some(json!(1)), "background"),
         (Some(json!(0)), "idle"),
         (Some(Value::Null), "idle"),
         (None, "idle"),
