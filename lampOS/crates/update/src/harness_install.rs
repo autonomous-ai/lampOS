@@ -430,6 +430,17 @@ pub fn after_round_when(
                 say,
             ));
         }
+        // Installed with no move due: no move is held back, so a kept
+        // hold's time is let go, or a later pin move would find it old and
+        // skip its hold at once (the one-shot finding Harness already at
+        // the pin leaves it, #6656's lamp row). A retry still waited for
+        // (`installing`, or `failed` within its wait) keeps it.
+        if before
+            .as_ref()
+            .is_some_and(|said| said.install == "installed")
+        {
+            let _ = fs::remove_file(records.join(DEFERRED));
+        }
         // A pinned install that left another version stays `version`
         // while Harness is there: it is not the pinned one. A move under
         // way, or one that failed and put the older one back, stays too.
