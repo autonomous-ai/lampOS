@@ -114,11 +114,8 @@ jobs:
         run: bash lampOS/tools/lamp-sim-conformance.sh "$GITHUB_WORKSPACE/lampOS/target/release"
 
   # lamp-sim's own side on macOS arm64 (sim-3-P2, the first builder on #6811, 13 Nov 18:15): it
-  # builds, is clippy-clean under macOS's cfg, and its tests pass there; lamp-body's too. Not the whole lamp yet:
-  # lamp-body's serial runtime now builds on macOS (#6931, #6953 and the run() step after them), but nothing
-  # yet runs the whole lamp there, so no tour runs here. The two
-  # speaker-stream tests are skipped until the bus takes datagrams over 2048 bytes on macOS
-  # (sim-3-P3: SO_SNDBUF and SO_RCVBUF on the bus's sockets; the sysctl's default is 2048).
+  # builds, is clippy-clean under macOS's cfg, and its tests pass there; lamp-body's too; and the whole lamp
+  # runs, the real lamp-body on lamp-sim's pty (no SDK tour here yet).
   # Free on this public repository.
   sim-macos:
     name: lampOS virtual lamp — lamp-sim builds and tests on macOS arm64
@@ -155,6 +152,21 @@ jobs:
       - name: lamp-sim's tests
         working-directory: lampOS
         run: |
-          cargo test --locked -p lamp-sim -- \
-            --skip voice::tests::a_speaker_stream_is_opened_counted_told_in_stats_and_ends_when_the_door_closes \
-            --skip voice::tests::a_player_that_never_reads_holds_neither_the_stats_nor_the_doors_closing_and_is_waited_for
+          cargo test --locked -p lamp-sim
+      # The whole lamp on macOS, the real lamp-body on lamp-sim's pty (ten's portable body, #6965; the bus's
+      # buffers, #6933): up within 30 s, the body read its servos and may stand, and still up 20 s later
+      # with no body restart. No tour yet (the SDKs are not installed in this job).
+      - name: the whole lamp runs on macOS with the real body
+        working-directory: lampOS
+        run: |
+          dir="$HOME/.lampsim/ci"; mkdir -p -m 700 "$HOME/.lampsim"
+          LAMP_SIM_SPEAKER=silent target/debug/lamp-sim run "$dir" --bin-dir target/debug --listen 127.0.0.1:7799 > sim.log 2>&1 &
+          sim=$!
+          for i in $(seq 1 60); do grep -q 'lamp-sim: up on' sim.log && break; sleep 0.5; done
+          grep -q 'lamp-sim: up on' sim.log || { cat sim.log; exit 1; }
+          sleep 20
+          kill -0 "$sim" || { echo "lamp-sim ended"; cat sim.log; exit 1; }
+          grep -q 'lamp-body: it may stand' sim.log || { echo "the body never said it may stand"; cat sim.log; exit 1; }
+          if grep -q 'lamp-body started again\|lamp-body ended' sim.log; then cat sim.log; exit 1; fi
+          kill "$sim"; wait "$sim" || true
+          tail -n 20 sim.log
