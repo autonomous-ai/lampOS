@@ -2799,6 +2799,64 @@ for each run, and is answered once the run ends
     Messages after the launch say "the lamp's default agent". Off, every
     run is the lamp's Hermes through its own wrapper, as above (the
     interim).
+  - **With no Harness account: the lamp's own agent, started by
+    lamp-tasks itself** (#6685 PR 3, with `LAMP_SKILL_DEFAULT_AGENT=on`).
+    A customer with no Harness account still gets a skill's tasks: the
+    lamp's own agent is the product. When it is used
+    (`skill_task::starts_without_harness`): the switch on, and Harness read
+    signed out by the part's own sign-in looks (`harness auth status`,
+    `serve --set-up-later`, kept by `skill_task::harness_sign_in_read`;
+    signed out only once Harness is set up here and its start's sweep is
+    done), or no Harness program at all (after a sweep of the folders and
+    token files an earlier start left, `skill_task::sweep_without_harness`;
+    the product unit's `ConditionPathExists=/usr/local/bin/harness` still
+    keeps lamp-tasks off on such a lamp). Signed in, signed in and offline,
+    or not read yet: through Harness as above. Nothing is asked at the
+    run's start: the sign-in is the last one read, so the start waits on
+    no network and no Harness call. The default agent is the same
+    (`runtime::lamp_default`), else the build's first switched on
+    (`runtime::lamp_order`), else the lamp target's engine; none is
+    refused ("the lamp has no default agent yet …").
+    - **One check, then one start for every agent**
+      (`skill_task::default_agent_takes_tasks`): the one run path check
+      above, and the wrapper's task entry (`TASK_ENTRY_LINES`: `if [
+      "${1-}" = --lamp-task ]` and `agent_task "$Q"`, the same lines for
+      every agent) with `agent_task` in its agent's data, before the run
+      path (`AGENT_TASK_LINE`). A wrapper without them (an older
+      lamp-update, or an agent with no task of its own) is refused in
+      words and journaled: "the lamp's default agent (<engine>) isn't set
+      up for a skill's run yet (its wrapper /usr/local/bin/<engine> takes
+      no skill's run without Harness: …), so nothing was started", with
+      nothing made or started. Today Hermes's data has `agent_task`
+      (`chat -q` with the task's words, as Harness and a make start it);
+      Claude Code's and the other plain agents' have none yet; OpenClaw
+      has no one run path wrapper at all, so it is refused as above.
+    - **The same folder and token file.** `skill-<run-id>` (0700) in the
+      same Harness project, the run's token file written before the start
+      (`RunTokenFile`), and the task's words in the folder's `task` file
+      (0600, `TASK_FILE`). lamp-tasks then starts the agent's wrapper
+      itself: `/usr/local/bin/<engine> --lamp-task` in that folder, its
+      environment cleared to `PATH`, `HOME` and `SHELL`, stdin, stdout and
+      stderr null, in a process group of its own. The wrapper reads the
+      token file once and deletes it, gives the run its token, socket, SDK
+      and `--net` (the same run lines), and its `agent_task` turns the task
+      file into the agent's own arguments, started by the same `unshare`
+      into `agent-ns` (docs/install.md, "The one run path"). The token is
+      in no argument and in no environment lamp-tasks gives.
+    - **Its end.** The wrapper's exit, the run's deadline (14 minutes) or
+      lamp-tasks' stop, whichever comes first, looked at every 50 ms
+      (`RUN_TICK`). Exit 0 is `{"ok":true,"id":0}`; any other status is
+      `run_failed` "the lamp's default agent ended with status <n>"; the
+      deadline "the run was ended at its deadline, 840 s"; the stop "the
+      run was ended as lamp-tasks stops". However it ends, its guard ends
+      the token with lamp-control first, then kills the run's whole process
+      group (the wrapper's `unshare --kill-child` takes the agent's
+      namespace with it) and reaps it, then removes the folder (its task
+      file too) and the token file. Nothing the run printed is kept. Its
+      processes stay in `lamp-tasks.service`'s cgroup and caps. Tests:
+      `signed_out_the_default_agent_starts_with_no_harness_and_leaves_nothing`,
+      `a_run_with_no_harness_is_ended_at_its_deadline_or_the_stop_and_its_status_said`,
+      `signed_in_a_skill_run_still_goes_through_harness`.
   - **Its own folder.** lamp-tasks makes `skill-<run-id>` (0700,
     `RUN_FOLDER_PREFIX`) in its Harness project
     `/var/lib/lampos-tasks/harnesses/lamp-tasks` (made 0700 when missing),
