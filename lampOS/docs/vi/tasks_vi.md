@@ -225,8 +225,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 - **Câu trả lời:** `{"ok":true,"id":N}` khi lần chạy đã kết thúc, hoặc
   `{"ok":false,"error","message"}`: `off` (công tắc không phải `on`),
   `bad_request`, `too_long` (quá 8192 byte), `no_token` (lamp-control không
-  cấp token một lần chạy), `run_failed`, hoặc `busy` (việc của một kỹ năng
-  khác đang chạy: mỗi lúc chỉ chạy một việc).
+  cấp token một lần chạy), `run_failed`, hoặc `busy` (việc của
+  một kỹ năng khác đang chạy: mỗi lúc chỉ chạy một việc).
 - **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên
   #6071): với mỗi lần chạy, lamp-tasks xin lamp-control (#6304, PR #6408)
   một token trên socket quản trị `/run/lampos-control/admin.sock`
@@ -423,6 +423,34 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     (`Cli::close_now`) và là `run_failed` "the run was ended at its
     deadline, 840 s". `new` không khởi động được (`not_sent`, `uncertain`,
     hay một lần tạo `pending`) cũng là `run_failed`.
+  - **Lần chạy không tới được agent của nó** (#6835 gap 1). Khi engine
+    thoát trước khi sẵn sàng, Harness giữ pane của lần chạy làm một shell:
+    cùng agent id, agent "Terminal", và `wait` đọc nó là `idle` trong vài
+    giây. Vì vậy khi `wait` kết thúc (và phiên không `closed` hay `gone`),
+    lamp-tasks hỏi `harness show --machine <lamp> <agent> --json`
+    (`Cli::shown_agent`); không hỏi lại khi `show` của chính lần kết thúc
+    `stopped` (#6432) đã thấy phiên được gắn, tức agent đã bắt đầu.
+    Agent "Terminal" nghĩa là Harness không thấy tiến
+    trình của engine, không phải agent đã không làm gì: lần chạy không bao
+    giờ là `{"ok":true}`. Token của nó được kết thúc và phiên được đóng, và
+    nó là `run_failed` "the skill's task may not have run: Harness kept the
+    run's pane as a shell (agent Terminal, not hermes) …", nói thành lời,
+    thêm "its session was not closed" khi đóng phiên thất bại. Nó không bao
+    giờ được tạo lần thứ hai, vì một Hermes có thể đã bắt đầu nó (first
+    builder, #6811), và việc ghi cố định của nó không bao giờ là
+    `not_started`: agent của nó có thể đã bắt đầu (`SkillRun::started`).
+    Một `show` nêu đúng
+    engine, hay không được trả lời, để lần chạy được xét theo kết thúc của
+    `wait` như trước. Kiểm thử:
+    `a_run_harness_kept_as_a_shell_never_started_and_is_not_said_done`,
+    `a_run_harness_kept_as_a_shell_is_run_failed_and_never_run_again`.
+  - **Một dòng nhật ký cho mỗi lần chạy**: `[lamp-tasks] skill task
+    <run-id>: ended, Harness says <state>, after <n> s; its agent: started
+    (Hermes)`, hoặc `never started (Harness shows a shell, agent
+    Terminal)`, hoặc `not known (<why>)` (`show` không được trả lời, phiên
+    đã mất, hay việc chờ kết thúc ở hạn chót hoặc khi dừng, ghi `Harness
+    says none`). Kiểm thử:
+    `a_runs_journal_line_says_its_end_its_time_and_whether_its_agent_started`.
   - **Dù kết thúc thế nào**, guard của nó trước hết nhờ lamp-control kết
     thúc token của lần chạy (`{"end":{"run"}}`, một lần), rồi đóng phiên
     (`close --now`, một lần; không đóng phiên Harness báo đã `closed` hay

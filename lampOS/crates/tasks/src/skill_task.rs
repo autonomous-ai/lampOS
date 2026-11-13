@@ -31,6 +31,15 @@
 //! - **The socket** ([`HandOvers`]): with the switch on, `serve` binds
 //!   [`HAND_OVER_SOCKET`] for lamp-skills alone, one line a connection,
 //!   one run at a time (another is refused `busy`).
+//! - **A run that never reached its agent** (#6835 gap 1): Harness keeps a
+//!   pane whose engine exited before it was ready as a shell (agent
+//!   "Terminal", the same id), and `wait` reads it idle. After the end,
+//!   [`HarnessRunner`] asks `harness show` (unless a `stopped` end's own
+//!   show found the session bound); "Terminal" is never said done:
+//!   its session is closed and the run is `run_failed` "may not have run",
+//!   never made a second time. One journal line a run says Harness's end
+//!   state, the run's time and whether its agent was seen to start
+//!   ([`run_line`]).
 use crate::protocol::refusal;
 use serde::Deserialize;
 use serde_json::{Value, json};
@@ -1743,7 +1752,7 @@ impl Runner for HarnessRunner {
     }
 
     fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
-        use crate::harness::{Cli, EngineKind, Launch, LaunchOutcome, Target};
+        use crate::harness::{Cli, Closed, EngineKind, Launch, LaunchOutcome, Target};
         use std::os::unix::fs::DirBuilderExt;
         use std::sync::atomic::AtomicBool;
         let began = std::time::Instant::now();
@@ -1890,6 +1899,10 @@ impl Runner for HarnessRunner {
                 .as_ref()
                 .is_some_and(|stop| stop.load(Ordering::Acquire))
         };
+        // Whether a `stopped` end's own `show` already found the session
+        // bound (#6432's [`after_stop`]): its agent started, so the end
+        // need not be shown again (#6835 gap 1).
+        let bound = std::cell::Cell::new(false);
         let ended = std::thread::scope(|scope| {
             let (done, wakes) = std::sync::mpsc::channel::<()>();
             let cancel = &cancel;
@@ -1937,7 +1950,10 @@ impl Runner for HarnessRunner {
                             self.lost_look,
                             cancel,
                         ) {
-                            AfterStop::Bound => break Some(Ok(ended.state)),
+                            AfterStop::Bound => {
+                                bound.set(true);
+                                break Some(Ok(ended.state));
+                            }
                             // Waited on in its place, and closed by the guard.
                             AfterStop::Moved(live) => {
                                 eprintln!(
@@ -1969,16 +1985,56 @@ impl Runner for HarnessRunner {
             drop(done);
             ended
         });
+        let took = began.elapsed().as_secs();
         match ended {
             Some(Ok(state)) => {
                 // Already closed or gone: nothing left for the guard to close.
                 if matches!(state.as_str(), "closed" | "gone") {
                     started.agent = None;
                 }
+                // Harness keeps a pane whose engine exited before it was
+                // ready as a shell, the same id with agent "Terminal", and
+                // `wait` reads it idle: asked, so such a run is never said
+                // done (#6835 gap 1).
+                let seen = if bound.get() {
+                    AgentSeen::Started(agent.to_string())
+                } else {
+                    AgentSeen::of(
+                        started
+                            .agent
+                            .as_deref()
+                            .map(|agent| cli.shown_agent(&lamp.machine_id, agent)),
+                    )
+                };
+                eprintln!("{}", run_line(&run.run, &state, took, &seen));
+                if seen == AgentSeen::NeverStarted {
+                    // Never success, and never made again: Harness says it
+                    // never saw the engine's process, not that the agent did
+                    // nothing (a Hermes that took its task may have begun
+                    // it). `started` is set, so a fixed write is never handed
+                    // back to be sent directly (`run_failed`, not
+                    // `NOT_STARTED`).
+                    let why = format!(
+                        "the skill's task may not have run: Harness kept the run's pane as a shell (agent Terminal, not {agent}) and says {state}"
+                    );
+                    return Err(match started.close() {
+                        Some(Ok(Closed::Closed | Closed::Gone)) => why,
+                        _ => format!("{why}; its session was not closed"),
+                    });
+                }
                 ended_as(&state, agent)
             }
             Some(Err(why)) => Err(why),
             None => {
+                eprintln!(
+                    "{}",
+                    run_line(
+                        &run.run,
+                        "none",
+                        took,
+                        &AgentSeen::NotKnown("not asked: the wait was ended".into())
+                    )
+                );
                 started.close();
                 if began.elapsed() >= run.deadline {
                     Err(format!(
@@ -1991,6 +2047,45 @@ impl Runner for HarnessRunner {
             }
         }
     }
+}
+
+/// Whether a run's agent was seen to start, from `harness show`'s `agent`
+/// after the run ended ([`crate::harness::Cli::shown_agent`]).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum AgentSeen {
+    /// The agent Harness names, the run's engine.
+    Started(String),
+    /// "Terminal": the engine exited before it was ready, and Harness kept
+    /// its pane as a shell.
+    NeverStarted,
+    /// Not asked or not answered, with why: the run is judged by Harness's
+    /// end state alone, as before.
+    NotKnown(String),
+}
+
+impl AgentSeen {
+    /// What `shown` (none: not asked, the session already gone) says.
+    pub fn of(shown: Option<Result<String, String>>) -> Self {
+        match shown {
+            Some(Ok(agent)) if agent.eq_ignore_ascii_case("terminal") => Self::NeverStarted,
+            Some(Ok(agent)) => Self::Started(agent),
+            Some(Err(why)) => Self::NotKnown(format!("harness show: {why}")),
+            None => Self::NotKnown("not asked: the session is gone".into()),
+        }
+    }
+}
+
+/// The one journal line a run through Harness ends with: Harness's end
+/// state, the run's whole time and whether its agent was seen to start.
+pub fn run_line(run: &str, state: &str, took_secs: u64, seen: &AgentSeen) -> String {
+    let seen = match seen {
+        AgentSeen::Started(agent) => format!("started ({agent})"),
+        AgentSeen::NeverStarted => "never started (Harness shows a shell, agent Terminal)".into(),
+        AgentSeen::NotKnown(why) => format!("not known ({why})"),
+    };
+    format!(
+        "[lamp-tasks] skill task {run}: ended, Harness says {state}, after {took_secs} s; its agent: {seen}"
+    )
 }
 
 /// lamp-tasks' hand-over socket, in its own runtime folder (`lampos`'s,
@@ -2493,6 +2588,73 @@ mod tests {
             seen: RefCell::default(),
             starts: true,
         }
+    }
+
+    /// #6835 gap 1: a run whose agent may not have run (Harness kept its
+    /// pane as a shell) is `run_failed` in words, never "its run ended",
+    /// and never made a second time; a fixed write's is never handed back
+    /// [`NOT_STARTED`] (its agent may have begun, [`SkillRun::started`]).
+    #[test]
+    fn a_run_harness_kept_as_a_shell_is_run_failed_and_never_run_again() {
+        let never = || {
+            Err("the skill's task may not have run: Harness kept the run's pane as a shell (agent Terminal, not hermes) and says idle".to_owned())
+        };
+        let tokens = FakeTokens::default();
+        let ran = runner(&tokens, never());
+        let said = answer(&line(|_| {}), true, skills(), &tokens, &ran);
+        assert_eq!(said["ok"], false);
+        assert_eq!(said["error"], "run_failed");
+        assert!(
+            said["message"]
+                .as_str()
+                .unwrap()
+                .contains("may not have run"),
+            "{said}"
+        );
+        assert_eq!(ran.seen.borrow().len(), 1, "no second run");
+        assert_eq!(tokens.minted.borrow().len(), 1);
+        assert_eq!(tokens.ended.borrow().len(), 1);
+        assert!(tokens.live.borrow().is_empty());
+    }
+
+    /// #6835 gap 1: what `harness show` names says whether the agent
+    /// started, and the run's one journal line says it with Harness's end
+    /// state and the run's time.
+    #[test]
+    fn a_runs_journal_line_says_its_end_its_time_and_whether_its_agent_started() {
+        assert_eq!(
+            AgentSeen::of(Some(Ok("Hermes".into()))),
+            AgentSeen::Started("Hermes".into())
+        );
+        assert_eq!(
+            AgentSeen::of(Some(Ok("Terminal".into()))),
+            AgentSeen::NeverStarted
+        );
+        assert_eq!(
+            AgentSeen::of(Some(Ok("terminal".into()))),
+            AgentSeen::NeverStarted
+        );
+        assert_eq!(
+            AgentSeen::of(Some(Err("show_failed".into()))),
+            AgentSeen::NotKnown("harness show: show_failed".into())
+        );
+        assert_eq!(
+            AgentSeen::of(None),
+            AgentSeen::NotKnown("not asked: the session is gone".into())
+        );
+        assert_eq!(
+            run_line("task-1", "idle", 6, &AgentSeen::NeverStarted),
+            "[lamp-tasks] skill task task-1: ended, Harness says idle, after 6 s; its agent: never started (Harness shows a shell, agent Terminal)"
+        );
+        assert_eq!(
+            run_line(
+                "task-1",
+                "stopped",
+                16,
+                &AgentSeen::Started("Hermes".into())
+            ),
+            "[lamp-tasks] skill task task-1: ended, Harness says stopped, after 16 s; its agent: started (Hermes)"
+        );
     }
 
     fn skills() -> &'static Path {
