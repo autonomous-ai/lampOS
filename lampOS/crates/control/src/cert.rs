@@ -32,6 +32,12 @@ impl Identity {
     pub fn pin_bytes(&self) -> [u8; 32] {
         Sha256::digest(&self.cert).into()
     }
+
+    /// The pin's first 8 characters, what the lamp says aloud at pairing: all the journal keeps, so a
+    /// reader of the journal can tell which certificate is meant without being handed the whole pin.
+    pub fn pin_for_log(&self) -> &str {
+        self.pin.get(..8).unwrap_or(&self.pin)
+    }
 }
 
 /// The pin of a certificate's DER.
@@ -100,6 +106,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let made = load_or_make(&dir, "lamp-test").unwrap();
         assert_eq!(made.pin.len(), 64);
+        assert_eq!(made.pin_for_log(), &made.pin[..8]);
         assert_eq!(made.pin, pin_of(&made.cert));
         assert_eq!(
             std::fs::metadata(dir.join("key.der"))
