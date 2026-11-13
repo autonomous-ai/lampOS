@@ -606,6 +606,34 @@ pub const CAMERA_NOT_ALLOWED: &str =
 /// body runs without `--gaze`, and would not turn, saying nothing).
 pub const CANNOT_TURN: &str = "I can't turn toward it: my turn isn't measured yet. Say so in a few words and ask them to move it in front of you; never search for it.";
 
+/// What the model is told, before why, of a call that would move the body
+/// while the body is down (#6834: a customer lamp's body stopped, every
+/// gesture dropped, and the voice still said it was dancing).
+pub const CANNOT_MOVE: &str = "I can't move right now, so I did nothing. Say so in a few words; never say you are moving or dancing. Why:";
+
+/// Why the body can't move a skill's gesture, move or stand now, if it
+/// can't: the lamp's `health` says its body has stopped, is let go asking
+/// for a hand, has gone quiet or never came up; or the body says on
+/// `body/limits` that it does not stand this run (`stands`), which drops
+/// every gesture. Unknown (no fresh health, no limits) is not down.
+pub fn body_down(health: Option<&lamp_msgs::Health>, stands: Option<bool>) -> Option<String> {
+    use lamp_msgs::Level;
+    if let Some(health) = health {
+        if health.missing.iter().any(|part| part == "body") {
+            return Some("my body has not started.".into());
+        }
+        if let Some(body) = health.items.iter().find(|item| item.name == "body") {
+            match body.level {
+                Level::Error if !body.message.is_empty() => return Some(body.message.clone()),
+                Level::Error => return Some("my body has stopped.".into()),
+                Level::Stale => return Some("my body is not running.".into()),
+                Level::Ok | Level::Warn => {}
+            }
+        }
+    }
+    (stands == Some(false)).then(|| "my arm can't stand this time.".into())
+}
+
 /// The most looks a search may say it takes: a living thing looks at a few
 /// places and lets it go (CLAUDE.md's rule 8).
 pub const SEARCH_LOOKS_AT_MOST: u32 = 8;
