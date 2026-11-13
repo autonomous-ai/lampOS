@@ -756,7 +756,12 @@ takes in no more than the receive buffer, 4,096 (`recvspace`), so every
 speaker, microphone and camera block was refused there. A publisher's socket
 gets 64,096 bytes to send with and a subscriber's 256,384 to take in (four
 longest datagrams, about Linux's default); both are the socket's own and need
-no privilege. The test of a 60,000-byte message asserts delivery on both. Before
+no privilege. If the system refuses to raise one (a `kern.ipc.maxsockbuf` set
+below them, say), the trouble comes at once, not at the first long message: a
+subscriber is not made (`receive buffer of <its socket>: <why>`), and a
+publisher makes no socket for that subscriber, which gets nothing, and says so
+once on the publish, as it does any root it cannot use (the first builder's P3
+on #6933). The test of a 60,000-byte message asserts delivery on both. Before
 that change, a subscriber on a Mac that did not read held 25 messages of 141
 bytes, or 5 pieces of sound, before the next was dropped; with the larger
 receive buffer it holds more, and how many has not been measured. Each subscriber is sent to from a socket of its own
