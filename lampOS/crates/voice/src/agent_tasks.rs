@@ -3092,6 +3092,35 @@ fn may_confirm(pending: &Pending, request: u64, heard: bool, now: Instant) -> bo
         && now.duration_since(pending.at) <= CONFIRM_WITHIN
 }
 
+/// Whether a task prepared and read back waits for `confirm_agent_task`
+/// at `now`, within [`CONFIRM_WITHIN`]: a line said then is never read for
+/// a skill by its name or its asks ([`crate::skill_named`], Heron's P2 on
+/// #6842: "Sounds good." is the task's yes). A test reads only what its own
+/// thread set ([`awaits_yes_here`]): [`PENDING`] is shared by every test.
+pub fn awaits_yes(now: Instant) -> bool {
+    #[cfg(test)]
+    let at = AWAITS_IN_TEST.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    let at = PENDING
+        .lock()
+        .ok()
+        .and_then(|pending| pending.as_ref().map(|pending| pending.at));
+    at.is_some_and(|at| now.saturating_duration_since(at) <= CONFIRM_WITHIN)
+}
+
+#[cfg(test)]
+thread_local! {
+    /// When a task was prepared, for [`awaits_yes`] on this test's thread.
+    static AWAITS_IN_TEST: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) };
+}
+
+/// Tests: a task prepared at `at` (or none) for [`awaits_yes`] on this
+/// thread.
+#[cfg(test)]
+pub fn awaits_yes_here(at: Option<Instant>) {
+    AWAITS_IN_TEST.with(|cell| cell.set(at));
+}
+
 /// What `confirm_agent_task` answers with nothing prepared, with
 /// [`ONE_YES_FLAG`] (#5169): the model read the task back in words without
 /// calling `start_agent_task`, so it prepares it now and confirms again.

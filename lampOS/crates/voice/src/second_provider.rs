@@ -13365,11 +13365,37 @@ enum Taken {
 /// ([`Taken::AskAgain`]); it runs nothing. Any other turn drops it,
 /// running nothing. The journal never has the words.
 #[allow(clippy::too_many_arguments)]
+/// Whether the lamp waits for an answer: a yes of any kind is held for it
+/// (`held`: [`a_yes_held`] read before the holds took the line, or the
+/// holds took it as one), or the lamp's newest words in `messages` (the
+/// turn's history, as round 1 is asked it) asked something
+/// ([`crate::remarks::lamp_asked`]). A line then is never read for a skill
+/// by its name or its asks: whether it is that answer or a skill's ask is
+/// the model's to judge, in context (the owner's ruling on #6842).
+/// "Sounds good." after "Shall I start it?" is the model's, whatever a
+/// skill's `asks` say.
+fn lamp_awaits_answer(held: bool, messages: &[Message]) -> bool {
+    held || messages
+        .iter()
+        .rev()
+        .filter(|message| message.role == "assistant")
+        .find_map(|message| {
+            message
+                .words()
+                .filter(|words| words.chars().any(char::is_alphanumeric))
+        })
+        .is_some_and(crate::remarks::lamp_asked)
+}
+
 /// Whether a yes of any kind is held for the person's next words: a keep or
 /// a forget ([`HeldForget`]), a setup face save ([`HeldSave`]), a face
 /// rename held or asked ([`held_rename::waits`]), a skill's write or task
 /// yes (`skill_write_yes::awaited`, which `skill_task_yes` waits through),
-/// or a made skill's clash waiting for their choice. A line said then is
+/// a made skill's clash waiting for their choice, an agent task read back
+/// for `confirm_agent_task` (`agent_tasks::awaits_yes`), or a write waiting
+/// for its send: the voice's own mail read back (#6009) or a skill run's
+/// held write (`run_write_yes`, `services::write_waits`; Heron's P2 on
+/// #6842). A line said then is
 /// never read for a skill by its name or its asks
 /// ([`crate::skill_named`], Thirteen's P1 on #6842).
 fn a_yes_held(shared: &Shared) -> bool {
@@ -13382,6 +13408,8 @@ fn a_yes_held(shared: &Shared) -> bool {
         || held_rename::waits(shared)
         || crate::skill_write_yes::awaited(now)
         || crate::made_clash::awaited(now)
+        || crate::agent_tasks::awaits_yes(now)
+        || crate::services::write_waits(now)
 }
 
 fn take_held_forget(
@@ -14738,9 +14766,9 @@ async fn answer(
     // model (#6772: on lamp-52e6 at 12587 the model answered "I don't have
     // a camera" over the pushed photo-booth skill, with no call). Never
     // beside a read-back: a question about a skill is not an ask to run it.
-    // Never while a yes is held for these words, nor when the holds above
-    // took them as one (a keep or forget, a face save or rename, a face
-    // question asked): the line is the held question's answer.
+    // Whether the holds above took these words as a yes (a keep or forget,
+    // a face save or rename, a face question asked): then, as while a yes
+    // is held, the lamp awaits an answer ([`lamp_awaits_answer`]).
     let yes_taken = held_forget_runs.is_some()
         || unseen_yes.is_some()
         || held_save_runs.is_some()
@@ -14754,7 +14782,7 @@ async fn answer(
             shared
                 .skill_named
                 .as_ref()
-                .filter(|_| read_back_named.is_none() && !yes_held && !yes_taken)
+                .filter(|_| read_back_named.is_none())
                 .and_then(|named| named(&said))
         })
         .flatten();
@@ -15303,8 +15331,13 @@ async fn answer(
         // walked on: Twelve's P1 2). The model words its answer in round 2,
         // told so beside the request. Its answer, once run, for a model's
         // call of the same skill after it.
+        // Never while the lamp waits for an answer (the owner's ruling on
+        // #6842): its last words asked something, or a yes is held
+        // ([`lamp_awaits_answer`]); the model reads the line in context.
         let mut named_call: Option<net::ToolCall> = skill_named
-            .filter(|_| !forgot_before_question)
+            .filter(|_| {
+                !forgot_before_question && !lamp_awaits_answer(yes_held || yes_taken, &messages)
+            })
             .map(|(name, args)| net::ToolCall {
                 extra: None,
                 id: crate::skill_named::CALL_ID.into(),
