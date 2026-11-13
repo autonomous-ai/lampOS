@@ -8,7 +8,7 @@ publish.workspace = true
 # What the lamp sees for its proactive skills, from the cloud perception
 # service, on the owner's opt-in (#6543, docs/seen.md). Phase 1: the frame
 # client, the opt-in, the "no frames" gate, V1's encryption, the 503
-# backoff and V1's wire as types. No server call: no frame leaves the lamp.
+# backoff and V1's wire as types. Phase 2: activity's bursts on V1's wire.
 [[bin]]
 name = "lamp-seen"
 path = "src/main.rs"
@@ -30,6 +30,21 @@ aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "a
 rand_core = { version = "0.6", features = ["getrandom", "std"] }
 base64 = "0.22"
 zeroize = "1"
+# Activity's bursts (phase 2): the WebSocket, TLS and HTTPS clients the
+# other lampOS clients use, pinned as lamp-gemini and lamp-voice pin them
+# (docs/reuse-decisions.md): rustls with the ring provider, no OpenSSL. The
+# lock gains no package.
+tokio = { version = "=1.53.1", features = ["rt", "net", "time", "sync", "macros"] }
+tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["connect", "handshake", "rustls-tls-webpki-roots"] }
+futures-util = { version = "=0.3.34", default-features = false, features = ["std", "sink"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+# The frame scaled to 320x240 before it is sent (scale.rs): the pure Rust
+# JPEG decoder and encoder lamp-eyes pins (MIT OR Apache-2.0 OR Zlib, and
+# (MIT OR Apache-2.0) AND IJG), so the lock gains no package.
+zune-jpeg = "=0.4.21"
+jpeg-encoder = "=0.7.1"
 
 [lints]
 workspace = true

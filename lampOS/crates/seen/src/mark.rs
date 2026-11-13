@@ -8,7 +8,9 @@
 //! [`Marked`] wraps the frames' [`Sink`] at its boundary, so it holds for
 //! every sink, phase 1's [`crate::frames::Discard`] too:
 //!
-//! - **Before each request** ([`Sink::ready`]) the mark is asked for, and
+//! - **Before each request** ([`Sink::ready`]), once the sink inside wants
+//!   a frame (its own `ready`; between activity's bursts it wants none, and
+//!   the ring is not asked), the mark is asked for, and
 //!   no frame is asked of the camera until the ring said it drew it after
 //!   that ask. Not drawn within [`WAIT_US`]: still no frame, and the mark is
 //!   asked again. It fails closed: no ring, no word from it, its ceiling at
@@ -110,6 +112,15 @@ impl<R: Ring, S: Sink> Marked<R, S> {
         self.counts
     }
 
+    /// The sink inside.
+    pub fn inner(&self) -> &S {
+        &self.inner
+    }
+
+    pub fn inner_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
+
     /// The ring, for tests.
     #[cfg(test)]
     pub(crate) fn ring_mut(&mut self) -> &mut R {
@@ -140,11 +151,16 @@ fn inside_blink(asked_us: u64, drawn_us: u64, captured_us: u64) -> bool {
 
 impl<R: Ring, S: Sink> Sink for Marked<R, S> {
     fn ready(&mut self, now_us: u64) -> bool {
+        // No mark is asked for while the sink inside wants no frame (between
+        // activity's bursts): the ring blinks only for a frame on its way.
+        if !self.inner.ready(now_us) {
+            return false;
+        }
         if let Some(asked) = self.asked_at_us {
             match self.drawn(now_us) {
                 // A frame captured now would be inside the blink.
                 Some((_, drawn)) if now_us <= asked.saturating_add(BLINK_US) => {
-                    return now_us >= drawn.saturating_add(FRESH_US) && self.inner.ready(now_us);
+                    return now_us >= drawn.saturating_add(FRESH_US);
                 }
                 Some(_) => self.counts.missed = self.counts.missed.saturating_add(1),
                 None if now_us.saturating_sub(asked) < WAIT_US => return false,
