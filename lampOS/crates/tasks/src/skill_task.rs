@@ -1726,9 +1726,7 @@ pub fn default_agent_takes_runs(
                 if lamp_updates(text)
                     && !WRAPPER_RUN_LINES.iter().all(|line| text.contains(line)) =>
             {
-                format!(
-                    "its wrapper {AGENT_WRAPPERS}/{name} isn't lamp-update's one run path for it but its own with no per-run start in it: this agent has no fenced run path for a skill's run yet"
-                )
+                no_fenced_run_path(name)
             }
             _ => format!(
                 "its wrapper {AGENT_WRAPPERS}/{name} isn't lamp-update's one run path for it: lamp-update's {DEFAULT_AGENT_SWITCH} is off or its round hasn't run"
@@ -1751,6 +1749,42 @@ pub fn default_agent_takes_runs(
 pub fn wrapper_is_gateway(wrapper: &str) -> bool {
     lamp_updates(wrapper)
         && crate::gateway_run::GatewayAgent::of(wrapper).is_some_and(|data| data.is_ok())
+}
+
+/// A skill's run on a gateway agent (#6685 step 4, [`AgentRun::Gateway`]):
+/// `on` exactly, lamp-tasks' own; off unless set. Off, a default agent
+/// whose wrapper is a gateway agent's is refused as before the gateway
+/// path, in the same words ([`no_fenced_run_path`]), and no fence is
+/// written at start; per-run agents are unaffected either way.
+pub const GATEWAY_RUNS_SWITCH: &str = "LAMP_SKILL_GATEWAY_RUNS";
+
+/// [`GATEWAY_RUNS_SWITCH`] in lamp-tasks' environment: `on` exactly.
+pub fn gateway_runs_on() -> bool {
+    std::env::var(GATEWAY_RUNS_SWITCH).is_ok_and(|value| value == "on")
+}
+
+/// `kind` as the run's way, with [`GATEWAY_RUNS_SWITCH`] `on` or not: a
+/// gateway agent's is refused in words with it off, as before the gateway
+/// path; a per-run agent's is as it is either way.
+pub fn gateway_runs_allowed(kind: AgentRun, on: bool, name: &str) -> Result<AgentRun, String> {
+    match kind {
+        AgentRun::Gateway(_) if !on => Err(not_set_up(
+            name,
+            &format!(
+                "{}; lamp-tasks' {GATEWAY_RUNS_SWITCH} is off",
+                no_fenced_run_path(name)
+            ),
+        )),
+        kind => Ok(kind),
+    }
+}
+
+/// Why an agent `name` whose wrapper has no per-run start can't take a
+/// skill's run: no fenced run path yet.
+fn no_fenced_run_path(name: &str) -> String {
+    format!(
+        "its wrapper {AGENT_WRAPPERS}/{name} isn't lamp-update's one run path for it but its own with no per-run start in it: this agent has no fenced run path for a skill's run yet"
+    )
 }
 
 /// The words of every refusal of the lamp's default agent `name` for a
@@ -2619,8 +2653,11 @@ impl Runner for HarnessRunner {
                             )),
                         },
                         // Harness starts nothing: lamp-tasks runs the
-                        // wrapper itself, by its full path.
-                        gateway @ AgentRun::Gateway(_) => Ok(gateway),
+                        // wrapper itself, by its full path; only with
+                        // LAMP_SKILL_GATEWAY_RUNS on, else refused as before.
+                        gateway @ AgentRun::Gateway(_) => {
+                            gateway_runs_allowed(gateway, gateway_runs_on(), engine.argument())
+                        }
                     })
                 }
                 // Tests with no wrapper: a cloud agent is still refused.
@@ -5208,6 +5245,52 @@ mod tests {
         );
         let said = default_agent_takes_runs(Claude, None, Some(&shown)).unwrap_err();
         assert!(said.ends_with("so nothing was started"), "{said}");
+    }
+
+    /// #6882: with LAMP_SKILL_GATEWAY_RUNS off, a gateway default agent is
+    /// refused in the words from before the gateway path, naming the
+    /// switch; on, it runs as one turn on its gateway. A per-run agent is
+    /// as it is either way.
+    #[test]
+    fn a_gateway_default_runs_only_with_the_gateway_runs_switch() {
+        use crate::harness::EngineKind::Openclaw;
+        let openclaw_rs = include_str!("../../update/src/openclaw_install.rs");
+        let between = |from: &str| {
+            openclaw_rs
+                .split_once(from)
+                .and_then(|(_, rest)| rest.split_once("\"#;"))
+                .unwrap()
+                .0
+                .to_owned()
+        };
+        let own = between("pub const WRAPPER_TEXT: &str = r#\"");
+        let data = between("pub const GATEWAY_DATA: &str = r#\"");
+        let gateway = format!(
+            "#!/bin/sh\n{}{data}{}",
+            crate::gateway_run::GATEWAY_MARK,
+            own.strip_prefix("#!/bin/sh\n").unwrap()
+        );
+        assert!(wrapper_is_gateway(&gateway));
+        assert!(!wrapper_is_gateway(&own));
+        let shown = format!("#!/bin/sh\n{AGENT_NS_TASKS_LINE}");
+        let kind = default_agent_takes_runs(Openclaw, Some(&gateway), Some(&shown)).unwrap();
+        let said = gateway_runs_allowed(kind.clone(), false, "openclaw").unwrap_err();
+        assert!(
+            said.contains("this agent has no fenced run path for a skill's run yet"),
+            "{said}"
+        );
+        assert!(said.contains(GATEWAY_RUNS_SWITCH), "{said}");
+        assert!(said.ends_with("so nothing was started"), "{said}");
+        assert!(matches!(
+            gateway_runs_allowed(kind, true, "openclaw"),
+            Ok(AgentRun::Gateway(_))
+        ));
+        for on in [false, true] {
+            assert_eq!(
+                gateway_runs_allowed(AgentRun::PerRun, on, "hermes"),
+                Ok(AgentRun::PerRun)
+            );
+        }
     }
 
     /// The reviewer's P2 on #6817: the login-shell lookup is lamp-update's

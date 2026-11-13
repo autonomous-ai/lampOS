@@ -3037,7 +3037,8 @@ pub fn default_is_gateway_agent(engine: Option<EngineKind>, wrappers: &Path) -> 
 }
 
 /// At lamp-tasks' start: the fence ([`set_up_skill_run_fence`]) with
-/// `default_agent` (`LAMP_SKILL_DEFAULT_AGENT` on) and the lamp's default
+/// `default_agent` (`LAMP_SKILL_DEFAULT_AGENT` and
+/// `LAMP_SKILL_GATEWAY_RUNS` both on) and the lamp's default
 /// agent `engine` a gateway agent ([`default_is_gateway_agent`]), its
 /// journal line; else nothing is written and `None`.
 pub fn skill_run_fence_at_start(
@@ -4364,13 +4365,15 @@ pub fn serve<C: Clock>(
             "{}",
             set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
         );
-        // #6685 step 4: with LAMP_SKILL_DEFAULT_AGENT on and the lamp's
+        // #6685 step 4: with LAMP_SKILL_DEFAULT_AGENT and
+        // LAMP_SKILL_GATEWAY_RUNS on and the lamp's
         // default agent a gateway agent (its wrapper's own data), the
         // fence a skill's run on its warm gateway is held to. Otherwise
         // (Hermes the default, say) nothing here is written; a default
         // changed later is fenced at lamp-tasks' next start.
         if let Some(line) = skill_run_fence_at_start(
-            std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on"),
+            std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on")
+                && crate::skill_task::gateway_runs_on(),
             lamp_default(side),
             Path::new(crate::skill_task::AGENT_WRAPPERS),
             Path::new(OPENCLAW_STATE_DIR),
