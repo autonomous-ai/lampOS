@@ -3590,3 +3590,189 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
         "the PM runtime record"
     );
 }
+
+/// #6643 with #6685's one run path (`LAMP_SKILL_DEFAULT_AGENT` on): Hermes's
+/// one run path wrapper hands a make's home on ([`ONE_PATH_HOME_LINE`],
+/// [`WRAPPER_HOME_LINE`]'s semantics, as [`MAKE_ENV`]) and the one agent
+/// namespace runs Hermes's make lines ([`ONE_PATH_NS_MAKE_LINES`],
+/// [`NS_HOME_LINE`]'s steps) for it, its program `X` untouched; a home
+/// outside `make-*/home`, or with `..`, is unset in the wrapper and refused
+/// in the namespace, and another agent is refused one. Off, none of it.
+#[test]
+fn with_the_one_path_a_make_still_runs_in_its_own_home() {
+    let one = Shown {
+        skills: true,
+        tasks: true,
+        one_path: true,
+    };
+    // The namespace's lines are NS_HOME_LINE's, with the make's own names,
+    // and its unset line but for the home (unset after the make's block).
+    let (body, unset) = NS_HOME_LINE
+        .split_once("then\n")
+        .and_then(|(_, rest)| rest.rsplit_once("fi\n"))
+        .unwrap();
+    let derived = body
+        .replace(HOME_ENV, MAKE_ENV)
+        .replace("X=/tmp/.lampos-mk", "Y=/tmp/.lampos-mk")
+        .replace("\"$X", "\"$Y")
+        + "  "
+        + &unset
+            .replacen(&format!("unset {HOME_ENV} "), "unset ", 1)
+            .replacen(" X ", " Y ", 1);
+    assert!(!derived.contains("$X"));
+    assert_eq!(ONE_PATH_NS_MAKE_LINES, derived);
+    let wrapper = wrapper_for(one);
+    assert_eq!(wrapper.matches(ONE_PATH_HOME_LINE).count(), 1);
+    let at = |text: &str, line: &str| text.find(line).unwrap();
+    assert!(at(&wrapper, ONE_PATH_HOME_LINE) < at(&wrapper, "LAMP_NS_HOME=$H\n"));
+    let (path, ns) = ns_for(one);
+    assert_eq!(path, agent_ns::wrapper::NS);
+    assert_eq!(ns.matches(ONE_PATH_NS_MAKE_LINES).count(), 1);
+    assert!(!ns.contains(NS_HOME_LINE));
+    assert!(at(&ns, "HOME=$H\n") < at(&ns, ONE_PATH_NS_MAKE_LINES));
+    assert!(at(&ns, ONE_PATH_NS_MAKE_LINES) < at(&ns, "unset LAMP_NS_UID"));
+    // Off: nothing of it, in either script.
+    for off in [OFF, SKILLS_ON, TASKS_ON] {
+        assert!(!wrapper_for(off).contains(MAKE_ENV));
+        assert!(!ns_for(off).1.contains(MAKE_ENV));
+        assert!(!agent_ns::wrapper::ns_text(off).contains(MAKE_ENV));
+    }
+
+    // The wrapper's line, run.
+    let make = format!(
+        "{}/make-task-1/home",
+        MAKE_HOME_GLOB.split_once("/make-").unwrap().0
+    );
+    let wrapped = |home: Option<&str>, preset: bool| {
+        let mut command = std::process::Command::new("/bin/sh");
+        command.arg("-c").arg(format!(
+            "HERMES_HOME=/lasting\n{ONE_PATH_HOME_LINE}echo \"${{LAMP_NS_MAKE-none}} $HERMES_HOME\""
+        ));
+        match home {
+            Some(home) => command.env(HOME_ENV, home),
+            None => command.env_remove(HOME_ENV),
+        };
+        if preset {
+            command.env(MAKE_ENV, &make);
+        } else {
+            command.env_remove(MAKE_ENV);
+        }
+        String::from_utf8(command.output().unwrap().stdout).unwrap()
+    };
+    assert_eq!(
+        wrapped(Some(&make), false),
+        format!("{make} {make}/.hermes\n")
+    );
+    let up = make.replace("make-task-1", "make-x/../../..");
+    for (home, preset) in [
+        (None, false),
+        (None, true),
+        (Some(PLACE), true),
+        (Some(up.as_str()), false),
+        (Some("/elsewhere/lamp/make-1/home"), false),
+        (Some(&format!("{make}/x")), false),
+    ] {
+        assert_eq!(wrapped(home, preset), "none /lasting\n", "{home:?}");
+    }
+
+    // The namespace's lines, run with stand-ins for mount and the rest.
+    let folder = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(folder.path()).unwrap();
+    let b = base.display().to_string();
+    // Hermes's lasting home with its install lock, which the lines bind
+    // back read-write, and the make's folder.
+    let made = a_lamp_with_a_make(&base).join("home");
+    let stubs = base.join("stubs");
+    fs::create_dir_all(&stubs).unwrap();
+    let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n";
+    for name in ["mount", "findmnt", "mkdir", "rmdir"] {
+        let path = stubs.join(name);
+        fs::write(&path, stub).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let helpers: String = ns
+        .lines()
+        .filter(|line| line.starts_with("fail() ") || line.starts_with("ro() "))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    assert_eq!(helpers.lines().count(), 2);
+    let block = agent_ns::wrapper::one_path_make_home()
+        .replace(MAKE_HOME_GLOB, &format!("{b}/w/lamp/make-*/home"))
+        .replace("/tmp/.lampos-mk", &format!("{b}/x"));
+    assert!(ns.contains(&agent_ns::wrapper::one_path_make_home()));
+    let script = base.join("make-lines");
+    fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\n{helpers}H={b}/h W={b}/w X=/the/program\n{block}\
+             echo \"HOME=$HOME X=$X MAKE=${{LAMP_NS_MAKE-none}} PWD=$(pwd -P)\"\n"
+        ),
+    )
+    .unwrap();
+    let log = base.join("log");
+    let run = |engine: &str, home: Option<&Path>| {
+        let _ = fs::remove_file(&log);
+        let mut command = std::process::Command::new("/bin/sh");
+        command
+            .arg(&script)
+            .current_dir(&base)
+            .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+            .env("LOG", &log)
+            .env("E", engine)
+            .env("LAMP_NS_UID", "1")
+            .env("LAMP_NS_GID", "1");
+        match home {
+            Some(home) => command.env(MAKE_ENV, home),
+            None => command.env_remove(MAKE_ENV),
+        };
+        let out = command.output().unwrap();
+        let mounted = fs::read_to_string(&log).unwrap_or_default();
+        (out, mounted)
+    };
+    let (out, mounted) = run("hermes", Some(&made));
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!(
+            "HOME={} X=/the/program MAKE=none PWD={b}/w/lamp/make-task-1\n",
+            made.display()
+        )
+    );
+    assert!(
+        mounted.contains(&format!("none {b}/h/.hermes\n")),
+        "{mounted}"
+    );
+    assert!(mounted.contains(&format!("none {b}/w/lamp\n")), "{mounted}");
+    assert!(
+        mounted.contains(&format!(
+            "mount -n --bind {b}/h/.hermes/installs/k/.install.lock {b}/x/i/k/.install.lock\n"
+        )),
+        "{mounted}"
+    );
+    // No make: none of it, the agent's own home.
+    let (out, mounted) = run("hermes", None);
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!("HOME={b}/h X=/the/program MAKE=none PWD={b}\n")
+    );
+    assert!(mounted.is_empty());
+    // Refused before anything is mounted: `..`, a home elsewhere, or a
+    // make's home for an agent whose data has none.
+    let other = base.join("other/make-task-1/home");
+    fs::create_dir_all(&other).unwrap();
+    for (engine, home) in [
+        (
+            "hermes",
+            base.join("w/lamp/make-task-1/../make-task-1/home"),
+        ),
+        ("hermes", other),
+        ("claude", made.clone()),
+    ] {
+        let (out, mounted) = run(engine, Some(&home));
+        assert!(!out.status.success(), "{engine} {home:?}");
+        assert!(out.stdout.is_empty());
+        assert!(mounted.is_empty(), "{mounted}");
+    }
+}

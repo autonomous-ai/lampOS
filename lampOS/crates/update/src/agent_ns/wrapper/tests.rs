@@ -701,10 +701,11 @@ fn the_one_run_path_is_the_same_bytes_for_every_agent() {
     // Hermes's approvals are its own data, set only in a skill's run.
     assert!(!hermes_install::ONE_RUN_LINES.contains("HERMES"));
     assert!(texts[0].contains(&format!(
-        "\nE=hermes\nH={}\nX={}\nagent_env() {{\n{}  :\n}}\nagent_run_env() {{\n{}  :\n}}\n",
+        "\nE=hermes\nH={}\nX={}\nagent_env() {{\n{}{}  :\n}}\nagent_run_env() {{\n{}  :\n}}\n",
         hermes_install::PLACE,
         hermes_install::HERMES,
         hermes_install::AGENT_ENV,
+        hermes_install::ONE_PATH_HOME_LINE,
         hermes_install::AGENT_RUN_ENV
     )));
     assert!(texts[1].contains(
@@ -892,7 +893,22 @@ fn the_one_path_namespace_takes_the_home_from_the_wrapper_and_checks_it() {
             .lines()
             .filter(|line| line.to_lowercase().contains("hermes"))
             .collect();
-        assert_eq!(named, [one_path_home_check().lines().nth(1).unwrap()]);
+        // The only agent's words: the homes' list, and (with the tasks
+        // switch, where a make's home is taken) the make homes' data.
+        let mut data = vec![one_path_home_check().lines().nth(1).unwrap().to_owned()];
+        if shown.tasks {
+            for (engine, glob, lines) in MAKE_HOMES {
+                data.push(format!("{engine}:{glob})"));
+                data.extend(
+                    lines
+                        .lines()
+                        .filter(|line| line.to_lowercase().contains("hermes"))
+                        .map(str::to_owned),
+                );
+            }
+        }
+        assert_eq!(named, data);
+        assert_eq!(text.contains(&one_path_make_home()), shown.tasks);
         assert_eq!(text.contains("control.sock"), shown.tasks);
         sh_n(&text);
     }

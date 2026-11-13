@@ -3227,6 +3227,23 @@ as a Harness task with the agent's own tools
   (`MAKE_WORK`), the one the wrapper takes a make's home in. Until a
   lamp-update round has rewritten the wrapper and the script, every make
   is refused so and stays DeepSeek's.
+- **With the one run path (`LAMP_SKILL_DEFAULT_AGENT` on in lamp-update):**
+  `/usr/local/bin/hermes` is the one run path's wrapper and runs
+  `/usr/local/lib/lampos/agent-ns`, with `hermes-ns` taken out; the run
+  path sets `LAMP_NS_HOME` to the agent's own home there, so Hermes's
+  wrapper data carries the make's home on as `LAMP_NS_MAKE`
+  (`hermes_install::ONE_PATH_HOME_LINE`: the same glob, `..` and anything
+  else left unset, `HERMES_HOME` under it), and `agent-ns` runs Hermes's
+  make lines (`hermes_install::ONE_PATH_NS_MAKE_LINES`, `NS_HOME_LINE`'s
+  steps) only for an agent and home in its data list
+  (`agent_ns::wrapper::MAKE_HOMES`, matched as `<engine>:<home>` like
+  `OWN_HOMES`); any other non-empty `LAMP_NS_MAKE`, or another agent
+  given one, ends it before the agent runs. lamp-tasks then takes the
+  wrapper as ready when it is the one run path's for Hermes
+  (`skill_task::wrapper_takes_runs`) with `ONE_PATH_HOME_LINE`, and
+  `agent-ns` carries `ONE_PATH_NS_MAKE_LINES`. The one run path holds only
+  a skill's run off the network, so a `held` make is refused
+  `not_held_off` there.
 - **Its network (`LAMP_MAKE_AGENT_NET`, set in no unit):** kept by default,
   as V1's agent had it (the owner's ask, 12 Nov; the first builder's ruling,
   12 Nov 19:14). The model is then reached at lamp-cloud's

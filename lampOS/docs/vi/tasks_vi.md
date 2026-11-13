@@ -826,6 +826,22 @@ agent (`lamp_tasks::skill_make`).
   (`MAKE_WORK`), nơi wrapper nhận home của lần tạo, cũng vậy. Cho tới khi một
   vòng lamp-update viết lại wrapper và script, mọi lần tạo đều bị từ chối
   như vậy và vẫn là của DeepSeek.
+- **Với đường chạy chung (`LAMP_SKILL_DEFAULT_AGENT` bật trong lamp-update):**
+  `/usr/local/bin/hermes` là wrapper của đường chạy chung và chạy
+  `/usr/local/lib/lampos/agent-ns`, `hermes-ns` bị gỡ bỏ; đường chạy đặt
+  `LAMP_NS_HOME` thành home riêng của agent ở đó, nên dữ liệu wrapper của
+  Hermes chuyển home của lần tạo đi tiếp dưới tên `LAMP_NS_MAKE`
+  (`hermes_install::ONE_PATH_HOME_LINE`: cùng mẫu đường dẫn, có `..` hay
+  giá trị khác thì không đặt, `HERMES_HOME` nằm dưới nó), và `agent-ns`
+  chạy các dòng tạo của Hermes (`hermes_install::ONE_PATH_NS_MAKE_LINES`,
+  các bước của `NS_HOME_LINE`) chỉ cho agent và home có trong danh sách dữ
+  liệu (`agent_ns::wrapper::MAKE_HOMES`, so khớp dạng `<engine>:<home>` như
+  `OWN_HOMES`); mọi `LAMP_NS_MAKE` khác không rỗng, hay một agent khác được
+  đưa một home, đều kết thúc trước khi agent chạy. Khi đó lamp-tasks coi
+  wrapper là sẵn sàng khi nó là wrapper đường chạy chung cho Hermes
+  (`skill_task::wrapper_takes_runs`) có `ONE_PATH_HOME_LINE`, và `agent-ns`
+  có `ONE_PATH_NS_MAKE_LINES`. Đường chạy chung chỉ cách ly mạng cho lần
+  chạy kỹ năng, nên lần tạo `held` bị từ chối `not_held_off` ở đó.
 - **Mạng của nó (`LAMP_MAKE_AGENT_NET`, không unit nào đặt):** mặc định giữ
   mạng, như agent của V1 (yêu cầu của chủ sở hữu, 12/11; quyết định của first
   builder, 12/11 19:14). Khi đó mô hình được gọi qua bộ chuyển
