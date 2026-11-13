@@ -3,6 +3,26 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 19:3x GMT+7: the first builder's yeses; #6931 read; #6933, #6938
+
+- The first builder, 18:44 on #6811: no body on macOS, yes for now; sim-3-P3
+  yes (the bus is the first builder's; readers the first builder and Heron);
+  sim-3-P4 steps 1, 2 and 4 yes after P2 and P3, latency first; step 3 is
+  ten's after the portable body.
+- #6929: sim-2 READ-OK 09778ce263 (Linux run, 83 pass). sim-1's read asked.
+- **#6931** (ten, body macOS step 1): READ-OK 03c6126ca3, native macOS
+  clippy clean, tests 594+44+2+9+3+1+125 pass. Mac probe of a pty slave:
+  1 Mbaud reads back, flock works, **TIOCEXCL accepted but not enforced**
+  (a second process opens the slave). Told ten for PR 3.
+- **#6933** sim-3-P3 (`sim-3/bus-macos`, c01e43077f, rebased on d1915de028):
+  READ ASK to the first builder and Heron.
+- **#6938** no body off Linux (`sim-3/no-body`, 481c16f96f, stacked on
+  #6929): lamp stays up; light ok; gesture refused by lamp-control's
+  "the body did not take it"; CI smoke step. READ ASK to sim-1, sim-2.
+- Seen: `say(wait=True)` timed out at 8 s; macOS `say` to the speakers did
+  not return in 12 s from this agent's shell (sandbox audio, likely); to a
+  file 685 ms. Not claimed; to check from a normal terminal.
+
 ## 2026-11-13 19:2x GMT+7: quiet check; P4 step 2 sized
 
 - No new comments for sim-3. #6929: Linux clippy, Linux `sim` and
