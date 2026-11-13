@@ -98,24 +98,39 @@ fn one(stream: &mut TcpStream, token: &str, engine: &dyn Engine) -> io::Result<(
         Ok(text) => text,
         Err(why) => return answer(stream, 400, &why),
     };
-    stream.write_all(
-        b"HTTP/1.1 200 OK\r\nContent-Type: audio/pcm\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
-    )?;
+    // The 200 goes with the first sound, so an engine that fails before any
+    // (none on this system, say) is a 503 with its reason, not a broken stream.
     let mut first: Option<Duration> = None;
     let mut bytes = 0usize;
     let spoken = engine.speak(&text, &mut |piece| {
         if piece.is_empty() {
             return Ok(());
         }
-        first.get_or_insert_with(|| asked.elapsed());
+        if first.is_none() {
+            first = Some(asked.elapsed());
+            stream.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Type: audio/pcm\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n",
+            )?;
+        }
         bytes += piece.len();
         write!(stream, "{:x}\r\n", piece.len())?;
         stream.write_all(piece)?;
         stream.write_all(b"\r\n")
     });
-    // A failed engine ends the answer short (no last chunk): the caller sees
-    // a broken stream, not a whole line of silence.
-    spoken?;
+    match (spoken, first) {
+        (Err(error), None) => {
+            return answer(
+                stream,
+                503,
+                &format!("no speech from this host's engine: {error}"),
+            );
+        }
+        // A failure after some sound ends the answer short (no last chunk):
+        // the caller sees a broken stream, not a whole line of silence.
+        (Err(error), Some(_)) => return Err(error),
+        (Ok(()), None) => return answer(stream, 503, "the engine made no sound for this line"),
+        (Ok(()), Some(_)) => {}
+    }
     stream.write_all(b"0\r\n\r\n")?;
     stream.flush()?;
     eprintln!(
@@ -438,6 +453,35 @@ mod tests {
             );
         }
         assert!(engine.1.lock().unwrap().is_empty());
+    }
+
+    /// An engine that fails before any sound, as `say` does where there is none.
+    struct Absent;
+    impl Engine for Absent {
+        fn speak(&self, _: &str, _: &mut dyn FnMut(&[u8]) -> io::Result<()>) -> io::Result<()> {
+            Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "No such file or directory",
+            ))
+        }
+    }
+
+    #[test]
+    fn an_engine_that_fails_before_any_sound_is_a_503_with_its_reason() {
+        let listener = bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let address = listener.local_addr().unwrap();
+        std::thread::spawn(move || serve(listener, "t0ken".to_owned(), Arc::new(Absent)));
+        let raw = ask(
+            address,
+            &post(
+                "/audio/speech",
+                Some("t0ken"),
+                r#"{"input":"Hi.","response_format":"pcm"}"#,
+            ),
+        );
+        let text = String::from_utf8_lossy(&raw);
+        assert!(text.starts_with("HTTP/1.1 503"), "{text}");
+        assert!(text.contains("No such file or directory"), "{text}");
     }
 
     #[test]
