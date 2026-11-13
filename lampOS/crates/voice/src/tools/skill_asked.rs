@@ -51,7 +51,7 @@ pub const HELP: &str = "lamp_help";
 /// its SKILL.md says it) and a light show (light-show's SKILL.md).
 // ponytail: two skills' asks named here, not read from the skills; a
 // skill-declared list of asks when a third skill needs one.
-const ASKS: &[(&[&str], &str)] = &[
+pub(crate) const ASKS: &[(&[&str], &str)] = &[
     (&["reading", "light"], SCENE),
     (&["focus", "light"], SCENE),
     (&["relax", "light"], SCENE),
@@ -68,7 +68,7 @@ const ASKS: &[(&[&str], &str)] = &[
 /// Only [`AROUND`] words may stand beside one, and no request: "do you know
 /// who made you" or "who made you sad" is the model's.
 // ponytail: questions named here, not read from the skill, as [`ASKS`].
-const QUESTIONS: &[(&[&str], &str)] = &[
+pub(crate) const QUESTIONS: &[(&[&str], &str)] = &[
     (&["who", "made", "you"], HELP),
     (&["who", "makes", "you"], HELP),
     (&["who", "built", "you"], HELP),
