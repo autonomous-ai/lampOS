@@ -1,0 +1,8 @@
+   Compiling lamp-voice v0.1.0 (/private/tmp/third-forget-send-ledger-1110/lampOS/crates/voice)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.99s
+   Doc-tests lamp_voice
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

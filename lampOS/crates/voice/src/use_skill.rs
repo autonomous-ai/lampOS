@@ -13,6 +13,7 @@
 //! each is given the name the skill's own parameter has.
 use lamp_gemini::{Tool, ToolCall};
 use serde_json::{Value, json};
+use std::collections::{BTreeMap, BTreeSet};
 
 /// The function.
 pub const NAME: &str = "use_skill";
@@ -30,10 +31,15 @@ pub fn arguments(value: Option<&str>) -> Vec<String> {
         Vec::new()
     }
 }
-/// The most the skills' lines may take of the instruction: one past it is
-/// listed by its name alone, and one past even that is left out of the
-/// lines (it can still be named, if the model knows it).
+/// The most the skills' lines may take of the instruction. Past it a core
+/// skill's line is kept whole first, every other skill is given a short
+/// line ([`SHORT_MOST_BYTES`]), then one past that is named alone, and one
+/// past even that is left out of the lines (it can still be named, if the
+/// model knows it).
 pub const SECTION_MOST_BYTES: usize = 4_096;
+/// The most of a short line's description: its first sentence, cut at a
+/// word's end past this.
+pub const SHORT_MOST_BYTES: usize = 200;
 
 /// Of `skills`, those `use_skill` offers: as many as its parameters can
 /// name within the link's bound (`lamp_gemini::MAX_TOOL_JSON_BYTES`), so a
@@ -128,41 +134,227 @@ pub(crate) fn told_through(wrapped: bool, skill: &str, mut told: Value) -> Value
 }
 
 /// The instruction's lines for `skills`: one each, its name, when to use it,
-/// and its choice and yes-or-no, within [`SECTION_MOST_BYTES`]. Empty when
-/// there is no skill.
-pub fn section(skills: &[Tool]) -> String {
-    lines(skills).0
+/// and its choice and yes-or-no, within [`SECTION_MOST_BYTES`], in
+/// `skills`' order. Past the bound the lines of `core`'s skills (the tools
+/// file's `core`, `crate::tools::core_skills`) are kept whole first, and
+/// every other skill is given a short line ([`short_line`]), each made
+/// whole again, in order, while there is room. Empty when there is no
+/// skill.
+pub fn section(skills: &[Tool], core: &BTreeSet<String>) -> String {
+    lines(skills, core, &BTreeMap::new()).0
 }
 
-/// Of `skills`' lines ([`section`]), the skills named alone and those left
-/// out, past [`SECTION_MOST_BYTES`]: for the setup line (the reviewer on
-/// #1696).
-pub fn cut(skills: &[Tool]) -> (Vec<String>, Vec<String>) {
-    let (_, named, left) = lines(skills);
-    (named, left)
+/// [`section`], where a skill whose tools file gives it a `when` line
+/// (`lamp_skills`' `LAMP_USE_SKILL_SUMMARY`, #6218) is told that line in
+/// place of its description ([`when_line`]): when to call it, when not,
+/// and what to say or not as it does. The rest of its words come with its
+/// call's answer ([`now`]). With no `when`, the same as [`section`].
+pub fn section_told(
+    skills: &[Tool],
+    core: &BTreeSet<String>,
+    whens: &BTreeMap<String, String>,
+) -> String {
+    lines(skills, core, whens).0
 }
 
-fn lines(skills: &[Tool]) -> (String, Vec<String>, Vec<String>) {
-    let (mut named_alone, mut left_out) = (Vec::new(), Vec::new());
-    if skills.is_empty() {
-        return (String::new(), named_alone, left_out);
+/// Of `skills`' lines ([`section`]), past [`SECTION_MOST_BYTES`]: the
+/// skills given a short line, those named alone and those left out, for
+/// the setup line (the reviewer on #1696).
+pub fn cut(skills: &[Tool], core: &BTreeSet<String>) -> Cut {
+    lines(skills, core, &BTreeMap::new()).1
+}
+
+/// [`cut`] of [`section_told`]'s lines.
+pub fn cut_told(skills: &[Tool], core: &BTreeSet<String>, whens: &BTreeMap<String, String>) -> Cut {
+    lines(skills, core, whens).1
+}
+
+/// The skills whose lines [`section`] made less than whole.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Cut {
+    pub shortened: Vec<String>,
+    pub named_alone: Vec<String>,
+    pub left_out: Vec<String>,
+}
+
+impl Cut {
+    /// Every line was whole.
+    pub fn is_empty(&self) -> bool {
+        self.shortened.is_empty() && self.named_alone.is_empty() && self.left_out.is_empty()
     }
-    let mut told = String::from(
-        "\n\nYour skills\nEach is used through use_skill, by its name, when what someone asks is what its line says:\n",
-    );
-    for skill in skills {
-        let whole = format!("- {}\n", line(skill));
-        let named = format!("- {}\n", skill.name);
-        if told.len() + whole.len() <= SECTION_MOST_BYTES {
-            told.push_str(&whole);
-        } else if told.len() + named.len() <= SECTION_MOST_BYTES {
-            told.push_str(&named);
-            named_alone.push(skill.name.clone());
-        } else {
-            left_out.push(skill.name.clone());
+}
+
+const HEAD: &str = "\n\nYour skills\nEach is used through use_skill, by its name, when what someone asks is what its line says:\n";
+
+fn lines(
+    skills: &[Tool],
+    core: &BTreeSet<String>,
+    whens: &BTreeMap<String, String>,
+) -> (String, Cut) {
+    let mut cut = Cut::default();
+    if skills.is_empty() {
+        return (String::new(), cut);
+    }
+    // A skill's `when` line is its whole line and its short one.
+    let when = |skill: &Tool| whens.get(&skill.name).map(|when| when_line(skill, when));
+    let whole: Vec<String> = skills
+        .iter()
+        .map(|skill| format!("- {}\n", when(skill).unwrap_or_else(|| line(skill))))
+        .collect();
+    if HEAD.len() + whole.iter().map(String::len).sum::<usize>() <= SECTION_MOST_BYTES {
+        return (HEAD.to_owned() + &whole.concat(), cut);
+    }
+    let short: Vec<String> = skills
+        .iter()
+        .map(|skill| format!("- {}\n", when(skill).unwrap_or_else(|| short_line(skill))))
+        .collect();
+    let named: Vec<String> = skills
+        .iter()
+        .map(|skill| format!("- {}\n", skill.name))
+        .collect();
+    // Which line each skill is given, `None` for none: the core skills'
+    // first, whole while it fits; then the others', short while it fits;
+    // then, in order, the others made whole again while there is room.
+    let mut given: Vec<Option<&String>> = vec![None; skills.len()];
+    let mut used = HEAD.len();
+    let is_core = |index: usize| core.contains(&skills[index].name);
+    for core_first in [true, false] {
+        for index in (0..skills.len()).filter(|index| is_core(*index) == core_first) {
+            let tried = if core_first {
+                [&whole[index], &short[index], &named[index]]
+            } else {
+                [&short[index], &named[index], &named[index]]
+            };
+            if let Some(fits) = tried
+                .into_iter()
+                .find(|line| used + line.len() <= SECTION_MOST_BYTES)
+            {
+                used += fits.len();
+                given[index] = Some(fits);
+            }
         }
     }
-    (told, named_alone, left_out)
+    for index in (0..skills.len()).filter(|index| !is_core(*index)) {
+        if given[index] == Some(&short[index])
+            && used - short[index].len() + whole[index].len() <= SECTION_MOST_BYTES
+        {
+            used = used - short[index].len() + whole[index].len();
+            given[index] = Some(&whole[index]);
+        }
+    }
+    let mut told = HEAD.to_owned();
+    for (index, skill) in skills.iter().enumerate() {
+        let Some(line) = given[index] else {
+            cut.left_out.push(skill.name.clone());
+            continue;
+        };
+        told.push_str(line);
+        if *line == whole[index] {
+            // Whole: nothing cut.
+        } else if *line == short[index] {
+            cut.shortened.push(skill.name.clone());
+        } else {
+            cut.named_alone.push(skill.name.clone());
+        }
+    }
+    (told, cut)
+}
+
+/// A skill's short line, past the bound ([`section`]): its name and its
+/// description's first sentence, at most [`SHORT_MOST_BYTES`] of it
+/// ([`first_sentence`]), then its choice's name and words and its
+/// yes-or-no's name, without what they say of them, so a call can still
+/// give them.
+fn short_line(skill: &Tool) -> String {
+    let mut line = format!(
+        "{}: {}",
+        skill.name,
+        first_sentence(skill.description.trim(), SHORT_MOST_BYTES)
+    );
+    if let Some((name, words, _)) = choice(skill) {
+        line.push_str(&format!(
+            " Its choice is {name}, one of {}.",
+            words.join(", ")
+        ));
+    }
+    if let Some((name, _)) = flag(skill) {
+        line.push_str(&format!(" Its yes-or-no is {name}."));
+    }
+    line.replace('\n', " ")
+}
+
+/// A skill's line from its tools file's `when` ([`section_told`]): its name
+/// and `when`, then its choice's name and words and its yes-or-no's name,
+/// as on a short line, so a call can give them.
+fn when_line(skill: &Tool, when: &str) -> String {
+    let mut line = format!("{}: {}", skill.name, when.trim());
+    if let Some((name, words, _)) = choice(skill) {
+        line.push_str(&format!(
+            " Its choice is {name}, one of {}.",
+            words.join(", ")
+        ));
+    }
+    if let Some((name, _)) = flag(skill) {
+        line.push_str(&format!(" Its yes-or-no is {name}."));
+    }
+    line.replace('\n', " ")
+}
+
+/// The key of a skill's whole words in its answer through `use_skill`
+/// ([`now`]).
+pub const NOW: &str = "now";
+
+/// A skill told by its `when` line ([`section_told`]) has the rest of its
+/// words in its call's answer, under [`NOW`]: its whole line, as
+/// [`section`] would have told it, read on the turn it acts on them
+/// (#6218). An error, or an answer that is not an object, is left as it is.
+pub fn now(skill: &Tool, told: &mut Value) {
+    if let Some(answer) = told.as_object_mut()
+        && !answer.contains_key("error")
+    {
+        answer.insert(
+            NOW.to_owned(),
+            Value::String(format!(
+                "Now, as {}'s own words say: {}",
+                skill.name,
+                line(skill)
+            )),
+        );
+    }
+}
+
+/// `text`'s first sentence (to a '.', '!' or '?' before a space or the
+/// end), whole when it is at most `most` bytes; past that, cut at the last
+/// word's end, on a char's boundary, and ended "…", within `most` bytes.
+fn first_sentence(text: &str, most: usize) -> String {
+    const MORE: &str = "…";
+    let end = text
+        .char_indices()
+        .find(|&(at, c)| {
+            matches!(c, '.' | '!' | '?')
+                && text[at + c.len_utf8()..]
+                    .chars()
+                    .next()
+                    .is_none_or(char::is_whitespace)
+        })
+        .map_or(text.len(), |(at, c)| at + c.len_utf8());
+    let sentence = &text[..end];
+    if sentence.len() <= most {
+        return sentence.to_owned();
+    }
+    let within = &sentence[..sentence.floor_char_boundary(most.saturating_sub(MORE.len()))];
+    // Its last word whole, or left out when the cut is inside it.
+    let words = if sentence[within.len()..].starts_with(char::is_whitespace) {
+        within
+    } else {
+        within
+            .rfind(char::is_whitespace)
+            .map_or(within, |space| &within[..space])
+    };
+    format!(
+        "{}{MORE}",
+        words.trim_end_matches([',', ';', ':', '-', ' '])
+    )
 }
 
 /// One skill's line: its name and description, then its choice and its
@@ -451,8 +643,8 @@ mod tests {
 
     #[test]
     fn the_instruction_lists_each_skill_with_its_choice_and_its_yes_or_no() {
-        assert_eq!(section(&[]), "");
-        let told = section(&installed());
+        assert_eq!(section(&[], &none()), "");
+        let told = section(&installed(), &none());
         assert!(told.starts_with("\n\nYour skills\n"), "{told}");
         assert!(told.contains(
             "- dance: When someone asks the lamp to dance. Its choice is style, one of calm, upbeat, jazz: The mood of the dance. Its yes-or-no is long: True when they asked for a long dance.\n"
@@ -465,22 +657,161 @@ mod tests {
         assert!(told.contains("- show_verdict: Call only after check_my_work. Its choice is verdict, one of right, wrong: Always give one.\n"));
     }
 
-    /// Past the section's bound a skill is named alone, and past even that
-    /// it is left out of the lines.
+    fn none() -> BTreeSet<String> {
+        BTreeSet::new()
+    }
+
+    /// Past the section's bound a core skill's line is kept whole, every
+    /// other skill is given a short line, past that one is named alone, and
+    /// past even that it is left out of the lines.
     #[test]
     fn the_skills_lines_keep_within_their_bound() {
         let long = "x".repeat(1_000);
-        let many: Vec<Tool> = (0..400)
+        let mut many: Vec<Tool> = (0..399)
             .map(|n| skill(&format!("skill_{n}"), &long, None))
             .collect();
-        let told = section(&many);
+        let core_line = "y".repeat(900);
+        many.push(skill("skill_399", &core_line, None));
+        let core = BTreeSet::from(["skill_399".to_owned()]);
+        let told = section(&many, &core);
         assert!(told.len() <= SECTION_MOST_BYTES, "{}", told.len());
-        assert!(told.contains("- skill_0: x"));
         assert!(
-            told.contains("- skill_4\n"),
-            "named alone once the lines are full"
+            told.contains(&format!("- skill_399: {core_line}\n")),
+            "a core skill's line whole, though it comes last"
         );
-        assert!(!told.contains("- skill_399"), "left out past the bound");
+        let short = format!("- skill_0: {}…\n", "x".repeat(SHORT_MOST_BYTES - 3));
+        assert!(told.contains(&short), "{told}");
+        assert!(
+            told.contains("- skill_14\n"),
+            "named alone once the short lines are full"
+        );
+        assert!(!told.contains("- skill_398"), "left out past the bound");
+        let cut = cut(&many, &core);
+        assert_eq!(cut.shortened.len(), 14, "{cut:?}");
+        assert_eq!(cut.shortened.first().map(String::as_str), Some("skill_0"));
+        assert_eq!(
+            cut.named_alone.first().map(String::as_str),
+            Some("skill_14")
+        );
+        assert_eq!(
+            cut.shortened.len() + cut.named_alone.len() + cut.left_out.len(),
+            399
+        );
+    }
+
+    /// The product's skills and the Skills Store's nine packages, as
+    /// `lamp_skills::tools_file` wrote them on lamp-voice (90525c3717), the
+    /// product's light skills installed off (`PRODUCT_SKILLS_OFF`) and
+    /// prepare-unplug left out (`LAMP_UNPLUG` off).
+    fn store_installed() -> (Vec<Tool>, BTreeSet<String>) {
+        let file: Value =
+            serde_json::from_str(include_str!("../fixtures/use-skill-store-tools.json")).unwrap();
+        let tools: Vec<Tool> = serde_json::from_value(file["tools"].clone()).unwrap();
+        let core: BTreeSet<String> = serde_json::from_value(file["core"].clone()).unwrap();
+        (tools, core)
+    }
+
+    /// The product's own skills fit whole: their lines are as before, byte
+    /// for byte (each whole line, in the tools file's order).
+    #[test]
+    fn the_products_own_skills_lines_are_whole_as_before() {
+        let (all, core) = store_installed();
+        let product: Vec<Tool> = all
+            .into_iter()
+            .filter(|tool| core.contains(&tool.name))
+            .collect();
+        assert_eq!(product.len(), 4);
+        let told = section(&product, &core);
+        let before: String = product
+            .iter()
+            .map(|skill| format!("- {}\n", line(skill)))
+            .collect();
+        assert_eq!(told, format!("{HEAD}{before}"));
+        assert!(told.len() < SECTION_MOST_BYTES, "{}", told.len());
+        assert!(cut(&product, &core).is_empty());
+        // As without a core skill named: what fits is not reordered.
+        assert_eq!(section(&product, &none()), told);
+    }
+
+    /// The Store audit on lamp-voice 90525c3717: with the nine Store
+    /// packages installed beside the product's skills, `set_pose` and
+    /// `wellbeing_nudges` (core) were named alone, and `study_buddy` and
+    /// `who_was_here` too. Now every core skill's line is whole, every
+    /// skill has at least a short line, and the section keeps its bound.
+    #[test]
+    fn with_the_stores_skills_the_core_lines_stay_whole_and_none_is_named_alone() {
+        let (all, core) = store_installed();
+        assert_eq!(all.len(), 12);
+        let told = section(&all, &core);
+        assert!(told.len() <= SECTION_MOST_BYTES, "{}", told.len());
+        for skill in &all {
+            if core.contains(&skill.name) {
+                assert!(
+                    told.contains(&format!("- {}\n", line(skill))),
+                    "{} whole: {told}",
+                    skill.name
+                );
+            } else {
+                assert!(
+                    told.contains(&format!("- {}: ", skill.name)),
+                    "{} has a line: {told}",
+                    skill.name
+                );
+            }
+        }
+        for name in ["set_pose", "wellbeing_nudges"] {
+            assert!(core.contains(name), "{name}");
+        }
+        let cut = cut(&all, &core);
+        assert!(
+            cut.named_alone.is_empty() && cut.left_out.is_empty(),
+            "{cut:?}"
+        );
+        assert!(!cut.shortened.is_empty(), "{cut:?}");
+        for name in &cut.shortened {
+            assert!(!core.contains(name), "{name}");
+        }
+        // Still in the tools file's order.
+        let at = |name: &str| told.find(&format!("- {name}:")).unwrap();
+        assert!(at("dance") < at("focus_timer") && at("focus_timer") < at("who_was_here"));
+    }
+
+    /// A short line is its description's first sentence, cut past
+    /// `SHORT_MOST_BYTES` at a word's end on a char's boundary.
+    #[test]
+    fn a_short_line_is_the_first_sentence_cut_at_a_words_end() {
+        assert_eq!(
+            first_sentence("Call when asked. Then more.", 200),
+            "Call when asked."
+        );
+        assert_eq!(
+            first_sentence("Say \"where are my keys?\", or so. More.", 200),
+            "Say \"where are my keys?\", or so."
+        );
+        assert_eq!(first_sentence("No end at all", 200), "No end at all");
+        // Multi-byte: "đèn" is 5 bytes, "ơi" 3; a cut never splits a char.
+        let text = "Bật đèn ơi ".repeat(30);
+        for most in 10..=200 {
+            let short = first_sentence(&text, most);
+            assert!(short.len() <= most, "{most}: {short}");
+            assert!(short.ends_with('…'), "{most}: {short}");
+            let words = short.trim_end_matches('…');
+            assert!(text.starts_with(words), "{most}: {short}");
+            assert!(
+                text[words.len()..].starts_with(' '),
+                "a word's end at {most}: {short}"
+            );
+        }
+        // One word longer than the bound: cut on a char's boundary.
+        let one = "ơ".repeat(100);
+        let short = first_sentence(&one, 50);
+        assert!(short.len() <= 50 && short.starts_with("ơơ"), "{short}");
+        // The short line keeps the choice's words and the yes-or-no's name.
+        let dance = &installed()[0];
+        assert_eq!(
+            short_line(dance),
+            "dance: When someone asks the lamp to dance. Its choice is style, one of calm, upbeat, jazz. Its yes-or-no is long."
+        );
     }
 
     #[test]
@@ -587,11 +918,17 @@ mod tests {
         let wordy: Vec<Tool> = (0..400)
             .map(|n| skill(&format!("skill_{n}"), &long, None))
             .collect();
-        let (named, left) = cut(&wordy);
-        assert_eq!(named.first().map(String::as_str), Some("skill_3"));
-        assert!(left.contains(&"skill_399".to_owned()));
-        assert_eq!(named.len() + left.len() + 3, 400);
-        assert_eq!(cut(&installed()), (Vec::new(), Vec::new()));
+        let cut_of = cut(&wordy, &none());
+        assert_eq!(
+            cut_of.shortened.first().map(String::as_str),
+            Some("skill_0")
+        );
+        assert!(cut_of.left_out.contains(&"skill_399".to_owned()));
+        assert_eq!(
+            cut_of.shortened.len() + cut_of.named_alone.len() + cut_of.left_out.len(),
+            400
+        );
+        assert!(cut(&installed(), &none()).is_empty());
     }
 
     #[test]

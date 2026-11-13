@@ -1,0 +1,404 @@
+name: lampOS Harness pin
+
+# The Harness pin follows Harness's releases by itself (#5957 part 1; the
+# first builder, 10 Nov 23:14 on #6059: the workflow file alone; its PR is
+# opened with the pin App's token, below).
+#
+# Once a day, it reads Harness's CDN manifest. When its `cli.version` is newer
+# than the build's pin (`product::VERSION`), it:
+#   1. copies the CLI manifest, Harness's installer and the four manifests the
+#      installer reads (the Node runtime, tmux, grid and hn) into
+#      `lampOS/deploy/harness/`, after checking every linux-arm64 file they
+#      name against its sha256 (and size, where the manifest gives one);
+#   2. updates `harness_install/product.rs`'s `include_bytes!` paths and
+#      constants, and the pinned version's lines in `docs/install.md`;
+#   3. runs lamp-update's `harness_install` tests (the constants against their
+#      files), then installs that pinned Harness in an ARM64 container from
+#      those copies served on 127.0.0.1, as a lamp's one-shot does, and checks
+#      `harness version` and `harness --help`;
+#   4. opens one PR onto lamp-voice for a reader, closing an older pin PR it
+#      opened before.
+# It never merges anything. The PR merges only after its lamp row in
+# `docs/lamp-runs.md` passes ("Each Harness pin move", #5957 (b)), and it reaches
+# stable only on a promote after that.
+#
+# The branch is pushed and the PR opened with a token of the pin GitHub App
+# (secrets LAMPOS_PIN_APP_ID and LAMPOS_PIN_APP_KEY), minted just before, so the
+# PR's own CI (ARM64, clippy) starts by itself (#5957). A push or a PR made with
+# the workflow's own GITHUB_TOKEN would start no workflows; the checkout keeps
+# no credentials, so nothing pushes with it. Step 3 still runs here, before the
+# PR is opened.
+#
+# A dispatch with `proof: true` proves that token and nothing else: it skips
+# Harness's manifests and the open-PR check, and opens a DRAFT PR from
+# `ci/pin-proof-<run id>` that adds one note under lampOS/docs/ (so the doc
+# links check starts on it). It never touches a `ci/harness-pin-*` branch or
+# closes a pin PR. Close the draft, with its branch, once its checks started.
+#   gh workflow run lampos-harness-pin.yml --ref lamp-voice -f proof=true
+#
+# Scheduled workflows run from the default branch (lamp-voice).
+on:
+  schedule:
+    - cron: '0 1 * * *'
+  workflow_dispatch:
+    inputs:
+      proof:
+        description: 'Open a draft proof PR with the pin App token; no pin move'
+        type: boolean
+        default: false
+
+concurrency:
+  group: lampos-harness-pin
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  pin:
+    if: github.repository == 'autonomous-ai/lampOS'
+    name: lampOS — move the Harness pin to Harness's newest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: lamp-voice
+          # The push uses the pin App's token, never this run's GITHUB_TOKEN.
+          persist-credentials: false
+
+      - name: Read Harness's manifests; copy a newer pin
+        id: pin
+        if: ${{ !inputs.proof }}
+        run: |
+          python3 -I - <<'PY'
+          import datetime, hashlib, json, os, pathlib, re, sys, urllib.request
+
+          ROOT = pathlib.Path("lampOS")
+          PRODUCT = ROOT / "crates/update/src/harness_install/product.rs"
+          INSTALL_RS = ROOT / "crates/update/src/install.rs"
+          DEPLOY = ROOT / "deploy/harness"
+          DOC = ROOT / "docs/install.md"
+          INCLUDE = "../../../../deploy/harness/"
+          ARCH = "linux-arm64"
+          src = PRODUCT.read_text()
+
+          def out(**values):
+              with open(os.environ["GITHUB_OUTPUT"], "a") as file:
+                  for key, value in values.items():
+                      file.write(f"{key}={value}\n")
+
+          def fail(why):
+              print(f"::error::{why}")
+              sys.exit(1)
+
+          def const(name):
+              found = re.search(rf'pub const {name}: &str =\s*"([^"]+)";', src)
+              if not found:
+                  fail(f"product.rs has no {name}")
+              return found.group(1)
+
+          def plain(version):
+              found = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version)
+              return tuple(map(int, found.groups())) if found else None
+
+          def fetch(url, most):
+              if not url.startswith("https://"):
+                  fail(f"not https: {url}")
+              # cdn.autonomous.ai answers Python's own User-Agent
+              # ("Python-urllib/3.x") with 403, so name the workflow instead.
+              asked = urllib.request.Request(
+                  url, headers={"User-Agent": "lampos-harness-pin/1 (GitHub Actions)"})
+              with urllib.request.urlopen(asked, timeout=120) as answer:
+                  data = answer.read(most + 1)
+              if len(data) > most:
+                  fail(f"over {most} bytes: {url}")
+              return data
+
+          def sha(data):
+              return hashlib.sha256(data).hexdigest()
+
+          def checked(what, entry):
+              # A file a manifest names: fetched and held to its sha256 (and size).
+              data = fetch(entry["url"], 256 << 20)
+              if sha(data) != entry["sha256"]:
+                  fail(f"{what}: {entry['url']} is not sha256 {entry['sha256']}")
+              if "size" in entry and len(data) != entry["size"]:
+                  fail(f"{what}: {entry['url']} is not {entry['size']} bytes")
+              print(f"{what}: {entry['url']} checked ({len(data)} bytes)")
+
+          pinned = const("VERSION")
+          origin = const("ORIGIN")
+          cli_bytes = fetch(origin, 1 << 20)
+          cli = json.loads(cli_bytes)["cli"]
+          newest = cli["version"]
+          if plain(newest) is None or plain(pinned) is None:
+              fail(f"not plain versions: pinned {pinned}, Harness's {newest}")
+          if plain(newest) <= plain(pinned):
+              print(f"Harness {newest} is not newer than the pin {pinned}: nothing to do")
+              out(changed="false")
+              sys.exit(0)
+          print(f"Harness {newest} is newer than the pin {pinned}")
+          for name in ("cli", "notify"):
+              checked(f"cli.{name}", cli[name])
+
+          installer_origin = re.search(
+              r'pub const HARNESS_INSTALLER: &str = "([^"]+)";', INSTALL_RS.read_text()
+          ).group(1)
+          installer = fetch(installer_origin, 1 << 20)
+          if not installer.startswith(b"#!/bin/sh"):
+              fail("Harness's installer does not start #!/bin/sh")
+
+          # The four manifests, as product.rs names them: (env, old file, origin).
+          entries = re.findall(
+              r'env: "([A-Z_]+)",\s*path: "[^"]+",\s*bytes: include_bytes!\("'
+              + re.escape(INCLUDE)
+              + r'([^"]+)"\),\s*sha256: "[0-9a-f]{64}",\s*origin: "([^"]+)",',
+              src,
+          )
+          if len(entries) != 4:
+              fail(f"product.rs names {len(entries)} manifests, not 4")
+          # Each manifest's file name, from its own version: (prefix, its
+          # platforms' key, whether a linux-arm64 entry may be missing).
+          # Harness's managed tmux is for a Mac alone (its installer uses the
+          # system's tmux on Linux, `tmux_runs`, and the lamp's image has
+          # one), so its manifest names darwin builds only, as the 0.6.2 pin's
+          # copy already did: it is copied as it is, with no file to check.
+          names = {
+              "HARNESS_RUNTIME_METADATA_URL": ("runtime-node", "node", False),
+              "HARNESS_TMUX_METADATA_URL": ("runtime-tmux", "tmux", True),
+              "HARNESS_GRID_METADATA_URL": ("runtime-grid", "grid", False),
+              "HARNESS_TUI_MANIFEST_URL": ("tui", "builds", False),
+          }
+          new_files = {}
+          no_arch = []
+          for env, old, url in entries:
+              if env not in names:
+                  fail(f"an unknown manifest in product.rs: {env}")
+              prefix, key, may_lack = names[env]
+              data = fetch(url, 1 << 20)
+              manifest = json.loads(data)
+              builds = manifest.get(key)
+              if not isinstance(builds, dict) or not builds:
+                  fail(f"{env}: no '{key}' builds")
+              entry = builds.get(ARCH)
+              if entry is None and not may_lack:
+                  fail(f"{env}: no {ARCH} build")
+              if entry is None:
+                  # Its version from the builds it names, which must agree.
+                  versions = {b.get("version") for b in builds.values() if isinstance(b, dict)}
+                  version = versions.pop() if len(versions) == 1 else None
+              else:
+                  version = entry.get("version") or manifest.get("version")
+              if not version or not re.fullmatch(r"[0-9A-Za-z.\-]+", version):
+                  fail(f"{env}: no plain version")
+              if entry is None:
+                  no_arch.append(env)
+                  print(f"{env}: no {ARCH} build (the lamp uses its image's own); copied as it is")
+              else:
+                  checked(env, entry)
+              new_files[env] = (old, f"{prefix}-{version}.metadata.json", data)
+
+          cli_file = f"cli-{newest}.metadata.json"
+          installer_file = f"cli-install-{sha(installer)[:8]}.sh"
+          old_cli = re.search(r'deploy/harness/(cli-[^"]+\.metadata\.json)"', src).group(1)
+          old_installer = re.search(r'deploy/harness/(cli-install-[^"]+\.sh)"', src).group(1)
+
+          # The copies, byte for byte; the old ones go.
+          written = {cli_file: cli_bytes, installer_file: installer}
+          for _, new, data in new_files.values():
+              written[new] = data
+          for name, data in written.items():
+              (DEPLOY / name).write_bytes(data)
+          for old in [old_cli, old_installer] + [old for old, _, _ in new_files.values()]:
+              if old not in written:
+                  (DEPLOY / old).unlink()
+
+          # product.rs: each include path and its constant.
+          def swap(pattern, repl, text, what):
+              text, count = re.subn(pattern, repl, text, count=1)
+              if count != 1:
+                  fail(f"product.rs: {what} not found")
+              return text
+
+          src = swap(re.escape(INCLUDE + old_cli), INCLUDE + cli_file, src, "MANIFEST's path")
+          src = swap(r'(pub const MANIFEST_SHA256: &str =\s*")[0-9a-f]{64}"',
+                     rf'\g<1>{sha(cli_bytes)}"', src, "MANIFEST_SHA256")
+          src = swap(r'(pub const VERSION: &str = ")[^"]+"', rf'\g<1>{newest}"', src, "VERSION")
+          src = swap(re.escape(INCLUDE + old_installer), INCLUDE + installer_file, src,
+                     "INSTALLER's path")
+          src = swap(r'(pub const INSTALLER_SHA256: &str =\s*")[0-9a-f]{64}"',
+                     rf'\g<1>{sha(installer)}"', src, "INSTALLER_SHA256")
+          for env, (old, new, data) in new_files.items():
+              src = swap(
+                  r'(env: "' + env + r'",\s*path: "[^"]+",\s*bytes: include_bytes!\("'
+                  + re.escape(INCLUDE) + r')' + re.escape(old) + r'("\),\s*sha256: ")[0-9a-f]{64}"',
+                  rf'\g<1>{new}\g<2>{sha(data)}"', src, f"{env}'s entry")
+          PRODUCT.write_text(src)
+
+          # docs/install.md: the pinned version's own lines, and the copy's date.
+          doc = DOC.read_text()
+          today = datetime.date.today()
+          for pattern, repl in [
+              (re.escape(f"deploy/harness/{old_cli}"), f"deploy/harness/{cli_file}"),
+              (re.escape(f"when it named {pinned};"), f"when it named {newest};"),
+              (re.escape(f"`Harness {pinned} is the pinned version`"),
+               f"`Harness {newest} is the pinned version`"),
+              (r"copied on \d{1,2} [A-Z][a-z]{2} \d{4}",
+               f"copied on {today.day} {today.strftime('%b')} {today.year}"),
+          ]:
+              doc, count = re.subn(pattern, repl, doc)
+              if count < 1:
+                  fail(f"docs/install.md: no line matches {pattern}")
+          DOC.write_text(doc)
+
+          serve = {"HARNESS_METADATA_URL": cli_file}
+          for env, (_, new, _) in new_files.items():
+              serve[env] = new
+          out(changed="true", pinned=pinned, newest=newest, installer=installer_file,
+              serve=" ".join(f"{env}={name}" for env, name in serve.items()),
+              no_arch=" ".join(no_arch) or "none")
+          PY
+
+      # lamp-update's tests build alsa-sys, which needs ALSA's headers and
+      # pkg-config: the same packages the clippy job installs.
+      - name: Build packages for lamp-update's tests
+        if: steps.pin.outputs.changed == 'true'
+        run: |
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl git build-essential pkg-config clang libclang-dev libasound2-dev
+
+      - name: lamp-update's harness_install tests
+        if: steps.pin.outputs.changed == 'true'
+        working-directory: lampOS
+        run: cargo test --locked -p lamp-update --lib harness_install
+
+      - uses: docker/setup-qemu-action@v3
+        if: steps.pin.outputs.changed == 'true'
+        with:
+          platforms: arm64
+
+      - name: Install the pinned Harness on ARM64, from its copies on 127.0.0.1
+        if: steps.pin.outputs.changed == 'true'
+        env:
+          SERVE: ${{ steps.pin.outputs.serve }}
+          INSTALLER: ${{ steps.pin.outputs.installer }}
+          NEWEST: ${{ steps.pin.outputs.newest }}
+        run: |
+          set -eu
+          python3 -I -m http.server 8765 --bind 127.0.0.1 --directory lampOS/deploy/harness \
+            >/dev/null 2>&1 &
+          server=$!
+          trap 'kill "$server"' EXIT
+          envs=""
+          for pair in $SERVE; do
+            envs="$envs -e ${pair%%=*}=http://127.0.0.1:8765/${pair#*=}"
+          done
+          # As a lamp's one-shot runs it: `sh <file>`, unattended, no terminal.
+          # shellcheck disable=SC2086
+          docker run --rm --platform linux/arm64 --network host \
+            -v "$PWD/lampOS/deploy/harness:/kit:ro" $envs \
+            -e INSTALLER="$INSTALLER" -e NEWEST="$NEWEST" \
+            ubuntu:24.04 sh -euc '
+              apt-get update -qq
+              DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+                ca-certificates curl tar tmux procps >/dev/null
+              useradd -m harness-on
+              su harness-on -s /bin/sh -c "env -u HARNESS_INSTALL_ATTENDED \
+                HARNESS_METADATA_URL=$HARNESS_METADATA_URL \
+                HARNESS_RUNTIME_METADATA_URL=$HARNESS_RUNTIME_METADATA_URL \
+                HARNESS_TMUX_METADATA_URL=$HARNESS_TMUX_METADATA_URL \
+                HARNESS_GRID_METADATA_URL=$HARNESS_GRID_METADATA_URL \
+                HARNESS_TUI_MANIFEST_URL=$HARNESS_TUI_MANIFEST_URL \
+                sh /kit/$INSTALLER </dev/null"
+              said=$(su harness-on -s /bin/sh -c "~/.local/bin/harness version")
+              echo "harness version: $said"
+              case "$said" in *"$NEWEST"*) ;; *) echo "not $NEWEST" >&2; exit 1 ;; esac
+              su harness-on -s /bin/sh -c "~/.local/bin/harness --help" >/dev/null
+            '
+
+      # Minted here, not at the start: an App token lasts one hour, and the
+      # steps above can take longer.
+      - name: Mint the pin App's token
+        id: app
+        if: steps.pin.outputs.changed == 'true' || inputs.proof
+        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1.12.0
+        with:
+          app-id: ${{ secrets.LAMPOS_PIN_APP_ID }}
+          private-key: ${{ secrets.LAMPOS_PIN_APP_KEY }}
+
+      - name: Open the pin PR
+        if: steps.pin.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PINNED: ${{ steps.pin.outputs.pinned }}
+          NEWEST: ${{ steps.pin.outputs.newest }}
+          NO_ARCH: ${{ steps.pin.outputs.no_arch }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          branch="ci/harness-pin-$NEWEST"
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "a PR for $NEWEST is open already: nothing to do"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add -A lampOS/deploy/harness lampOS/crates/update/src/harness_install/product.rs \
+            lampOS/docs/install.md
+          git commit -q -m "lampOS: the Harness pin moves to $NEWEST, copied by CI (#5957)"
+          git push -q "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" "$branch"
+          body=$(cat <<EOF
+          The Harness pin moves from $PINNED to $NEWEST, copied by \`lampos-harness-pin.yml\` (#5957 part 1).
+
+          **Copied:** Harness's CLI manifest, its installer and the four manifests the installer reads, into \`lampOS/deploy/harness/\`, with \`harness_install/product.rs\`'s paths and SHA-256s and the pinned version's lines in \`docs/install.md\`.
+
+          **Checked in the workflow's run** ($RUN):
+          - every linux-arm64 file those manifests name, against its sha256 (and size);
+          - manifests with no linux-arm64 build, copied as they are (the lamp uses its image's own): $NO_ARCH;
+          - \`cargo test --locked -p lamp-update --lib harness_install\`;
+          - the pinned install on ARM64 from those copies on 127.0.0.1: \`harness version\` says $NEWEST, and \`harness --help\` runs.
+
+          **Before it merges:**
+          - its own CI (ARM64, clippy) passes: it starts by itself, as this PR was opened with the pin App's token;
+          - a reader's READ-OK;
+          - **its lamp row passes:** "Each Harness pin move" in \`docs/lamp-runs.md\` (#5957 (b)). The lamp moves from $PINNED to $NEWEST in one update round, its sign-in still holds, and one hand-over and one follow-up go through.
+
+          It reaches stable only on a promote after that.
+
+          Part of #5957
+          EOF
+          )
+          gh pr create --base lamp-voice --head "$branch" \
+            --title "lampOS: the Harness pin moves to $NEWEST, copied by CI (#5957)" --body "$body"
+          # An older pin PR from this workflow is superseded.
+          gh pr list --state open --search 'head:ci/harness-pin-' --json number,headRefName \
+            --jq ".[] | select(.headRefName != \"$branch\") | .number" |
+            while read -r older; do
+              gh pr close "$older" --comment "Superseded by the pin PR for Harness $NEWEST." \
+                --delete-branch
+            done
+
+      - name: Open a draft proof PR (dispatch with proof)
+        if: inputs.proof
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -eu
+          # Never a ci/harness-pin-* branch: a proof run can't touch a pin PR.
+          branch="ci/pin-proof-$GITHUB_RUN_ID"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          note=lampOS/docs/harness-pin-proof.md
+          printf '# Harness pin proof\n\nOpened by %s to show that a PR opened with the pin App token starts its own checks (#5957). Not for merging.\n' "$RUN" > "$note"
+          git add "$note"
+          git commit -q -m "lampOS CI: a proof that the pin App's PR starts its own checks (#5957)"
+          git push -q "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" "$branch"
+          gh pr create --draft --base lamp-voice --head "$branch" \
+            --title "[proof] lampOS: the Harness pin PR opens with the pin App's token (#5957)" \
+            --body "Opened by $RUN with the pin App's token. PASS: its checks (the doc links check) start with no push by a person. Close it, with its branch, once they have. Part of #5957"

@@ -521,6 +521,21 @@ light on); Expression's
 `the_nights_sleep_says_asleep_for_the_rings_face_until_it_wakes`
 (`alive_engine.rs`). Not shown on a lamp.
 
+### The reset's red (#5929)
+
+While the reset button is held, the ring worker reads its time from
+Controls' `controls/touch_state` (`held_us`, given only for an armed,
+enabled button, so a line resting pressed shows nothing) and shows, in place
+of the face, a computer's pixels and the shutdown's warning
+(`ring_worker::reset_warning`): nothing under 2 s; from 2 s the whole ring
+blinks red `(24, 0, 0)`, half a second lit and half dark by Controls' count;
+from 5 s (`RESET_HOLD_US`) steady red: let go now and the lamp resets. Red is
+no colour of the setup light, so it is not read as setup. Let go before 5 s,
+the red goes at the next frame (Controls' state lapses within 300 ms at
+worst). Not behind a switch: wherever the voice runs with a bus. With no voice
+there is no red, and the reset still runs (setup.md). Tests:
+`reset_warning_tests` (`ring_worker.rs`). Not shown on a lamp.
+
 ### The setup light (#806)
 
 While a lamp is not set up, no voice runs, so the ring belongs to
@@ -869,12 +884,12 @@ acoustic measurements. Stillness, silence and an unlit ring are valid behavior.
 
 ### A computer's mark: seeing or hearing through the lamp
 
-While a paired computer streams the lamp's camera (later its microphone), and for a moment at each snapshot, the ring shows **one small steady dot**: the top pixel (`ring_mark::MARK_PIXEL`), red like a camera's recording light. It's bright on a lit ring (`MARK_BRIGHT`, 120/0/0, under the ring's ceiling as everything is) and dim on a dark one (`MARK_DIM`, 24/0/0): on lamp-75c9 (30 Oct) a dim white dot was lost in the person's bright white light. One pixel and steady, so it never reads as the mute's dark-red breath around the whole ring. It's drawn over every frame the ring draws, a turn's face, a resting frame and a skill's light alike, so a person can always tell. It never breathes or moves, so it never reads as the lamp's own mood.
-- **Who asks for it:** `lamp-control` asks on `light/mark` (`lamp_msgs::RingMark`). A stream renews it every second, 2 s ahead (`camera::MARK_EVERY`, `MARK_HOLDS`), from before its first picture leaves. A snapshot asks for a blink, the dot for 600 ms (`ring_mark::BLINK_US`).
+While a paired computer streams the lamp's camera or its microphone, and for a moment at each snapshot, the ring shows **one small steady dot**: the top pixel (`ring_mark::MARK_PIXEL`), red like a camera's recording light. It's bright on a lit ring (`MARK_BRIGHT`, 120/0/0, under the ring's ceiling as everything is) and dim on a dark one (`MARK_DIM`, 24/0/0): on lamp-75c9 (30 Oct) a dim white dot was lost in the person's bright white light. One pixel and steady, so it never reads as the mute's dark-red breath around the whole ring. It's drawn over every frame the ring draws, a turn's face, a resting frame and a skill's light alike, so a person can always tell. It never breathes or moves, so it never reads as the lamp's own mood.
+- **Who asks for it:** `lamp-control` asks on `light/mark` (`lamp_msgs::RingMark`). A stream renews it every second, 2 s ahead (`camera::MARK_EVERY`, `MARK_HOLDS`), from before its first picture or block of sound leaves. A snapshot asks for a blink, the dot for 600 ms (`ring_mark::BLINK_US`).
 - **When it goes:** once every claim has lapsed, so an asker that stops can't leave it lit. A claim more than 3 s ahead, or on another boot's clock, is none.
-- **Always on:** the ring takes it whenever it has the bus, behind no switch. lamp-control gives no camera at all where it can't ask for the mark.
-- **It says it drew it:** after each frame shown with the mark, the ring tells `light/mark_drawn` (`lamp_msgs::RingMarkDrawn`) for each asker, at most every 250 ms each (`RingMarkDrawn::EVERY_US`). lamp-control sends a picture only within 1 s of that word, so a mark the ring doesn't draw stops the pictures.
-- **Where it isn't drawn:** never over the shutdown's warning, which the ring then shows alone, and not while the ring's own authority has lapsed, its ceiling is 0 or its marks never started. In each case the ring says nothing on `light/mark_drawn`, and the camera stops. On a dark ring it is drawn, dim. Privacy ends every stream at once anyway (control.md, "The camera").
+- **Always on:** the ring takes it whenever it has the bus, behind no switch. lamp-control gives no camera and no microphone at all where it can't ask for the mark.
+- **It says it drew it:** after each frame shown with the mark, the ring tells `light/mark_drawn` (`lamp_msgs::RingMarkDrawn`) for each asker, at most every 250 ms each (`RingMarkDrawn::EVERY_US`). The asker is the computer (`control:<client>`), not its stream: one word covers the camera and the microphone of that computer, as they share one dot. lamp-control sends a picture or a block of sound only within 1 s of that word, so a mark the ring doesn't draw stops the pictures and the sound.
+- **Where it isn't drawn:** never over the shutdown's warning, which the ring then shows alone, and not while the ring's own authority has lapsed, its ceiling is 0 or its marks never started. In each case the ring says nothing on `light/mark_drawn`, and the camera and the microphone stop. On a dark ring it is drawn, dim. Privacy ends every stream at once anyway (control.md, "The camera").
 
 ## Explicit qualification option
 

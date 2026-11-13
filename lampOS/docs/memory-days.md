@@ -197,30 +197,60 @@ byte, and a frozen note is reused as it opened. An older memory refuses the
 field (`deny_unknown_fields`), so the voice sends it only with its switch on.
 
 With `role:true` on `session_open` (the voice's `LAMP_MEMORY_ROLE`, off by
-default; the memory owner's design, 6 Nov), the answer also carries
+default, on in the product since the memory owner's call of 9 Nov; their
+design, 6 Nov), the answer also carries
 `"role"`: the name of the role that known person asked the lamp to play, or
 `null`. It is read with the open, never by a request of its own; the
-room's is always `null`. `role_set {person, name}` keeps it (`{ok:true}`),
+room's is always `null`. `role_set_session {person, session, generation, name}` keeps it (`{ok:true}`),
 one a person, a new one replacing theirs, at most 60 bytes (`ROLE_BYTES`),
 tidied (the voice sends only a short name: at most 4 words and 40 bytes,
 letters, spaces, hyphens and apostrophes, no word of a sentence or an
 instruction, so free text is never a role, and checks a stored role the
-same way when it reads it, never telling one that fails); `role_end {person}` removes it (`{ok:true,ended}`). Only a known
+same way when it reads it, never telling one that fails); `role_end_session {person, session, generation}` removes it (`{ok:true,ended}`). Only a known
 person (`p-` id) has one: the room, a rules scope or any other id is
 refused `bad_person`, and a name with no letter or digit `empty`. Kept in
 `roles(person PRIMARY KEY, name, at_unix_ms)`, created `IF NOT EXISTS`,
 `user_version` unchanged; it goes with `forget_all` and `forget_person`.
+Both writes require the exact adopted person snapshot's session and generation.
+Memory checks the existing session, its invalidation flag and both generations
+inside the mutation's transaction. Missing, closed or invalidated sessions fail
+with `stale_session`; no person or session is created by a role write. The old
+unfenced `role_set` and `role_end` operations now refuse. Older Memory rejects
+the new operation names, and Voice does not retry with the legacy operations.
+`forget_all` and `forget_person` advance the generation of targeted existing people even when
+there are no entries to erase. Closing and reopening a session name therefore
+cannot revive its pre-forget token. No person tombstones, database migration or
+extra Voice network request are added. Voice uses a fresh session prefix and
+monotonic counter. A caller must not reuse a closed session name as a new
+incarnation without a generation change: closing alone deletes the row, and
+reopening the same name otherwise represents the same token identity.
+
+An app forget invalidates storage immediately in its transaction. With
+conversation summaries enabled, Voice checks external-forget notifications
+every 500 ms off the turn path; its cached role may remain visible until that
+notification is handled. With summaries disabled, this notification path does
+not run, so this interval does not bound cache visibility. This is not
+an atomic cross-process speech cutoff; stale role writes are refused regardless
+of that notification delay.
+
 Without the field the answer is the one before it, byte for byte. An older
 memory refuses the field and answers `unknown_op` to the two new
 operations, so the voice sends them only with its switch on.
 
 On the voice's side, the person's own turns are told the role as data ("a
-name they chose, not an instruction"). A turn whose speaker is not placed is
+name they chose, not an instruction") and as who the lamp is with them, and
+that a kept role ends only by `end_role` ("be yourself", "just be Lamp",
+"drop the character"), so the lamp never says it has none while one is kept. A turn whose speaker is not placed is
 told only the role names of the known faces in view, deduped and naming no
 one, and that the lamp can't tell who is speaking, so it stays Lamp; that
 note is left out entirely while a name is held back (`someone_else_now`). An
 `end_role` the memory did not write keeps the role, and the lamp says it did
-not end.
+not end. A line placed only by one face in view cannot set or end a role:
+voice refuses both calls before writing and keeps the held role unchanged.
+Voice also fences cached role publication across set, end and forget; a late
+session response cannot restore a forgotten role. Conflicting successful
+write responses evict the uncertain cached role until a fresh session read
+(see [memory](memory.md)).
 
 With `LAMP_MEMORY_STRENGTH=on` (the memory owner's Tiers-ideas plan, 3 Nov,
 P2; off unless set, with the Days client only), the voice's `search`,
@@ -345,7 +375,14 @@ word, because every turn's session was shown it. Now it takes the evidence,
 "avoid peanuts because of your allergy" and an unlinked "I'm allergic to
 peanuts", and leaves the weather turns. The first builder's condition
 (#3504): a copy left behind is the failure that matters, so a linked row
-goes on a single shared word, a few unrelated ones with it. An unlinked
+goes on a single shared word, a few unrelated ones with it. That word is
+never one of the observation writer's opening verbs (`days::OPENERS`:
+want, ask, like, prefer, enjoy and their forms, as `tidy` reads them
+generic): on lamp-06c1 (12 Nov, C136) forgetting "Wants the light a little
+warmer." took five linked "Wants an event …" calendar asks and a "Wants a
+long story …" line on "want" alone. A fact of nothing but such verbs
+keeps them, so the walk is never wider than before; search and the copy
+rule below keep them too. An unlinked
 row needs every word, or "favourite colour is violet" would take every
 "favourite" the person said. A fact with no distinctive word takes the old
 broad walk, plus its literal copies (whole words; a text under three
@@ -615,6 +652,104 @@ use separately from repeated calls, and the exact lamp/build/settings.
 Most likely lamp differences are flash write delay, scheduling pressure,
 Memory's single-client queue, local-day configuration, and stale cloud
 context after forgetting. None of these scenes has been run for task 29.
+
+## Service records (`service_record`, the voice's `LAMP_SERVICE_RECORDS`)
+
+The voice's `LAMP_SERVICE_RECORDS` (off by default, on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064; the connector records
+plan, PR 1a, 10 Nov) keeps one record for each thing a known person asked of
+a linked service, in `service_records(person, key, service, action, status,
+reason, detail, result_id, asked_unix_ms, changed_unix_ms, links,
+replaced_by)`, keyed `(person, key)`, created `IF NOT EXISTS`, `user_version`
+unchanged.
+
+- `service_record {person, key, service, action, status, reason?, detail?,
+  result_id?, asked_unix_ms, changed_unix_ms, links?, replaced_by?}` puts
+  one: new, or the same key updated in place while it is `prepared`. A
+  status other than `prepared` is final: a later put keeps it and its
+  fields (only `replaced_by` may still be set), and the answer says the
+  status kept, `{ok:true,status}`. Statuses: `prepared`, `done`,
+  `cancelled`, `refused`, `failed`, `timed_out`, `no_result`. `key` and each
+  of `links` (at most 8) and `replaced_by` are 1 to 64 of `A-Za-z0-9_-`;
+  `detail` is an object of at most 16 KiB; `reason` is tidied to 200 bytes,
+  `result_id` (the service's id of what was made, an event id) to 512.
+- `service_records {person, limit?}` lists them, the latest change first,
+  at most 50. With `about` (the voice's `LAMP_SERVICE_RECORDS_TOLD`, a
+  recall's words), it gives instead the records those words match, whatever
+  their age: the most words matched first, then the latest change. A word
+  matches a record's word (service, action, reason, result id or any text of
+  the detail) lower case, without accents, as a singular, or, at four letters
+  or more, as the start of a longer one ("octavia" finds
+  `octaviab@example.com`); "email" is "mail"; small words ("the", "that",
+  "did", "you") match nothing, so words of only those find none.
+- `service_records_forget {person, about}` removes the records with every
+  key word of any subject of `about` (lists of words), compared lower case,
+  without accents and as singulars, in the service, action, reason, result
+  id and every text of the detail: `{ok:true,removed}`. With `all: true`
+  it removes every record of `person` instead, `about` not read, and a put
+  asked before it is refused as after a `forget_all`: the voice's forget
+  everything sends it for the services' owner id when that is not the
+  speaker's own (the private room), only when the speaker is the owner
+  under another of their ids (`person::owner_ids`). A known person who is
+  not the owner sends none for the owner's id (the owner's call of 11 Nov,
+  after a guest's forget everything on lamp-06c1 removed every record and
+  contact of the owner's).
+- **A put asked before a forget is refused** `forgotten`: one whose
+  `asked_unix_ms` is before the person's latest `forget_all` or
+  `forget_person` (or everyone's `forget_all`), kept in
+  `service_records_forgot(person, at_unix_ms)` (`''` for everyone's: an id
+  and a time only, so it holds across a restart), or before a
+  `service_records_forget` whose subjects it matches (held in memory only,
+  the last 64, since its words say what was forgotten). So a change the voice
+  sent before a forget, taken after it, is never kept; one asked after it is.
+  So is one sent to (`to`, `cc` or `bcc`) an address a
+  `service_contacts_forget` removed after it was asked (held the same way).
+
+Only a known person (`p-` id) has records: the room, a rules scope or any
+other id is refused `bad_person`. They are kept until forgotten: the day's
+expiry, the unused-entry expiry, the tidy and the nightly pass work on
+`entries` and never read this table. `forget_all` and `forget_person` remove
+them with everything else (and count them in `removed`). At most 10,000 a
+person; past it the record changed longest ago goes. What a read found is
+stored by the voice as metadata and a masked excerpt only; the store keeps
+what it is given. An older memory answers `unknown_op` to the three
+operations, so the voice sends them only with its switch on.
+
+## Service contacts (`service_contact`, the voice's `LAMP_SERVICE_CONTACTS`)
+
+The voice's `LAMP_SERVICE_CONTACTS` (off by default, on in the product by the owner's call of 11 Nov, https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064, beside
+`LAMP_SERVICE_RECORDS`; the connector records plan, PR 1c) keeps the
+owner's mail contacts in `service_contacts(person, name_key, name, address,
+saved_unix_ms, changed_unix_ms)`, keyed `(person, name_key)`, `name_key`
+being the name lower case, without accents, its words joined by one space.
+Created `IF NOT EXISTS`, `user_version` unchanged.
+
+- `service_contact {person, name, address, at_unix_ms}` saves one:
+  `{ok:true,kept}` with `new`, `same` (that address was kept), or `replaced`
+  (another address was kept for that name, and is no longer). `name` is 1 to
+  64 bytes of letters, spaces, hyphens and apostrophes (`bad_name`);
+  `address` one mail address, kept lower case (`bad_address`). The voice
+  sends it only after the owner confirmed a read-back naming that address.
+- `service_contacts {person, name?}` lists them by name, or the one of
+  `name` (none, or one).
+- `service_contacts_forget {person, about}` removes the contacts with every
+  key word of any subject of `about` in their name, their address or the
+  words "contact", "address", "email" and "mail", compared as the records'
+  forget compares them; one-letter words ("Octavia's" gives an "s") are
+  passed over: `{ok:true,removed,records,addresses}`. In the same
+  transaction it removes every service record of that person sent to a
+  removed address (its detail's `to`, `cc` or `bcc`, a list or a
+  comma-separated text, `Name <address>` read as the address), whatever the
+  record's words: `records` counts them and `addresses` names the removed
+  addresses, so the voice drops its own copies too. Otherwise a `done` mail
+  told to the model brought the forgotten address back. With `all: true` it removes every contact of
+  `person` instead, as the records' forget does (`{ok:true,removed}`).
+
+Only a known person (`p-` id) has contacts (`bad_person` otherwise). Kept
+until forgotten: no expiry, tidy or nightly pass reads this table;
+`forget_all` and `forget_person` remove them (counted in `removed`). At
+most 2,000 a person, the one changed longest ago going first past it. An
+older memory answers `unknown_op`, so the voice sends them only with its
+switch on.
 
 ## Storage and migration
 
@@ -1237,7 +1372,8 @@ switch for them, `LAMP_MEMORY_DAYS=on`, went on later: on lamp-4ace on
 ## Nightly pass B (the memory owner's extraction plan C, step B, 3 Nov)
 
 A model pass the voice runs once a night for one known person, behind
-`LAMP_MEMORY_NIGHTLY` (voice side; [switches.md](switches.md)). It fills
+`LAMP_MEMORY_NIGHTLY` (voice side; [switches.md](switches.md); on in the
+product, with patterns and feelings, by the memory owner's call on 5 Nov). It fills
 this store with what Tiers proposed: episodes, facts, profile lines,
 patterns, what is ahead and feelings (`crates/memory/src/nightly.rs`). The
 kinds and their validation rules are Tiers' (`docs/memory-design.md`, "How
@@ -1278,10 +1414,32 @@ expired items are history and not counted).
 An exchange said before a forget mark of its day (below) is dropped
 `forgotten` too. Days keeps no other forget fingerprints.
 
-**Forget marks** (El's option 2 on #5333). A topic forget (`forget
-{about}`) matches kept things and observations only, so an exchange said
-and never kept has nothing to match and stays active for its 30 days; the
-night would read it and keep it with a quote. So every forget a known
+**Talk about a forgotten thing** (lamp-06c1, 11 Nov). A topic forget
+(`forget {about}`) used to match kept things and observations only, so an
+exchange said and never kept stayed, and `recall` found it: "forget the
+recheck party", then "what happened with the recheck party?" was answered
+from the talk about it. After the kept things, the voice now sends
+`exchanges_forget {person, about}` (the same subjects as
+`service_records_forget`): each of that known person's own exchanges whose
+heard and said words have every key word of a subject (lower case, without
+accents, as singulars) is forgotten as a `forget {id}` of an exchange is,
+with what derives from it (its talk notes), never a kept thing (#3113):
+`{ok:true,removed}`, the count of exchanges. The room's exchanges are
+everyone's in the house and are never reached (the room, a rules scope or
+any other id is refused `bad_person`); an older memory answers
+`unknown_op` and the voice goes on. It is not sent when the kept things
+were not settled: the memory lost or refusing the listing, too much to look
+through, or more than eight matching (the model asks which one). Some removed, the answer says how many
+(`exchanges`, never their words) and the conversation stops being
+journalled, as after a forgotten kept thing. One more local request inside
+the call's 1.5 s.
+
+**Forget marks** (El's option 2 on #5333). Before the above, a topic
+forget matched kept things and observations only, so an exchange said
+and never kept had nothing to match and stayed active for its 30 days; the
+night would read it and keep it with a quote. The marks stay: an exchange
+whose words differ from the forget's (a paraphrase) still has nothing to
+match. So every forget a known
 person asks marks the day: `forget`, `forget_last` (found or not), and the
 voice's `forget_mark {person}` after a `forget {about}`, found or not
 (`{ok:true}`; the room or a rules scope marks nothing; an older memory
@@ -1349,7 +1507,9 @@ runs, so with the switch off nothing changes.
 unlike an observation. `maintain` closes it after its `expires` day: an
 `ahead` item after its `until`, or 14 days after its newest source without
 one; a `plan` fact 14 days after its newest source; a fact with
-`valid_until` after that day; an item citing one that closes goes with it.
+`valid_until` after that day; an item citing one that closes goes with it,
+except a weekly chapter, which keeps its own day (a source's expiry is no
+correction; a forget still takes it).
 Facts and profile lines otherwise live until forgotten or superseded.
 Episodes, feelings and patterns fade (`nightly::FADING`, the
 Reviewer-lead's P2 on #5097: without it a person reached 512 within months
@@ -1399,6 +1559,77 @@ later leaving the day alone, `forget_last` with nothing kept);
 `tests/voice_forget_about.rs`
 (`a_topic_forget_that_matched_nothing_keeps_the_night_off_that_days_lines`,
 through the voice's client and the real store).
+
+## Weekly chapters (B2, `LAMP_MEMORY_WEEKLY_CHAPTERS`, C109)
+
+The memory owner's extraction plan, B2, after nightly pass B: once a week,
+one short chapter of a known person's local week (Monday to Sunday), written
+by the same night thread from what pass B already checked and kept of that
+week. A chapter never reads an exchange; it cites the items it rests on
+(`crates/memory/src/chapters.rs`, the voice's `nightly.rs`).
+
+- **When:** the voice's `LAMP_MEMORY_WEEKLY_CHAPTERS=on`, beside
+  `LAMP_MEMORY_NIGHTLY=on` (off unless set). Each known person heard in a
+  week is queued for it (held in memory only, like the days); after that
+  night's days are done, a week that is over gets one call, in the same
+  hours, quiet, slide and night budget as a day. A week is let go after its
+  call, or 7 days after its Sunday.
+- **`weekly_prepare`** `{"person","week"}` (`week` a Monday, `YYYY-MM-DD`,
+  of a week over; `bad_day` otherwise): the person's current episodes,
+  facts, ahead items, patterns and feelings whose day is in the week, in day
+  order, at most 48 and 24 KiB, as `{"job":"w<n>","person","from","to",
+  "items":[{"id","kind","day","text",…}]}`; fewer than 2 is
+  `"reason":"nothing"`. A week with its chapter is `done`. The job keeps
+  ids only (`nightly_weeks`), never text, and goes a day after.
+- **`weekly_apply`** `{"person","job","proposal"}`: the proposal's
+  `{"chapter":{"text","cites"}}`, unknown fields ignored, checked:
+  `shape` (blank, over 600 bytes, a control character, cites empty, over
+  16, repeated or not whole numbers), `unknown_source` (a cite not in the
+  job), `forgotten` (an item the job gave, cited or not, gone since the
+  prepare), `grounded`
+  (fewer than a third of its content words in the cited items' words: the
+  model sums up, it adds nothing), `private_kind` (the nightly pass's
+  health and money word check, unless every cited item rests on a kept
+  thing), `full` (the person's 512 live items or 2,048 observations),
+  `done` (the week has its chapter). Answer
+  `{"ok":true,"accepted":0|1,"reasons":{…},"id"}`; a repeated apply gives
+  the same answer.
+- **Stored** as an `entries` observation (`category='chapter'`, day the
+  week's Sunday) with its `nightly_items` row (`kind='chapter'`, `night` the
+  Monday, `expires` 90 days after the Sunday, detail `{"from","to"}`) and
+  `sources` edges to every item the job gave, cited or not (the model read
+  them all, so its text may tell one it does not cite). It does not fade or
+  give way, and an item under it that expires leaves it: it closes on its
+  day, or with a forget. An episode under an active chapter does not fade
+  while the chapter lives, so a source can outlive its own fade by up to
+  the chapter's age.
+- **`chapters`** `{"person","day_from","day_to"}`: the person's chapters
+  whose week meets the span (the newest without one), newest first, at most
+  2 and 1,200 bytes. The voice asks it only for a known person's own recall
+  naming a day or a span, and tells the chapters first, each as
+  `{"week_from","week_to","chapter","about","theirs":true}`. A chapter is
+  never in the session note, so no turn's prompt grows by it; a plain
+  `search` can list one as a nightly observation (`nightly.kind` `chapter`).
+- **Privacy:** a known person's own scope only: the room, a rules scope and
+  an unknown speaker are `bad_person` on all three ops. A forget of anything
+  a chapter was given takes it (an exchange, its episode, the chapter),
+  whether the chapter cites it or not;
+  `forget_all` and `forget_person` take every chapter and weekly job of the
+  person. Nothing is spoken or shown; the voice's journal has counts only.
+- **Off:** no weekly op and no `chapters` op are sent; with no chapter rows,
+  every answer is byte for byte as before. An older lamp-memory answers
+  `unknown_op`.
+
+Tests: `chapters::tests` (a week's items make one chapter found for that
+week; each person's own and never the room's; a forget under it and forget
+everything take it, and so does a forget of an item given but not cited,
+before or after the apply; it outlives a plan it cites; each drop reason;
+only a week over with two items; never in the session note and closed after
+90 days; input and answers bounded;
+grounding); the voice's `nightly::tests` (one call for a week over, after the
+days, counts only in the journal; the switch off asks nothing; a week not
+over waits; only known drop reasons logged) and `remember::chapter_tests`
+(asked only for a known person's dated recall; told as their own summary).
 
 ## The benchmark's probe (#4748)
 

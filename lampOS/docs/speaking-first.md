@@ -463,13 +463,17 @@ the model's comes, about a second later. A say that is never begun has no
 such line. Then one line, once the outcome is known; the connection stays
 open until then:
 - `{"outcome":"spoken"}`: the turn completed with the model's audio played
-  whole, the proof a reminder's acknowledgement takes (complete, with
-  audio, no playback gaps, no owner left, the microphone allowed).
+  to its end (complete, with audio, no owner left, the microphone
+  allowed), with or without gaps in its playback (#6749 D: a skill task's
+  ask said whole was answered `dropped` for its gaps, so lamp-skills
+  counted it unsaid and asked again 10 minutes later). A reminder's say
+  with gaps keeps its own proof: its words at least 80% of what the
+  speaker wrote (#5258).
 - `{"outcome":"dropped","why":"…"}`: begun and not spoken: the reason the
   turn was cancelled (`user_interrupted`, …), or what became of it
-  (`no_audio_answer`, `provider_failed`,
-  `audio_written_with_playback_gaps_unscored`). Never tried again here: the
-  asker decides.
+  (`no_audio_answer`, `provider_failed`, a reminder's
+  `audio_written_with_playback_gaps_unscored`). Only a cut or a failed say
+  is dropped. Never tried again here: the asker decides.
 - `{"outcome":"expired"}`.
 
 **The asker's cancel**: while it waits for the outcome, the asker may
@@ -739,7 +743,7 @@ applied, and its speech-to-text language). A hit is played with no
 network. A miss is rendered once through the speech service the voice
 already speaks with (`Tts::speak`, ElevenLabs through the relay), within
 5 s, written whole (a temporary file, fsync, rename, the folder fsynced:
-the lamp is unplugged after a shutdown) and played; at most 48 lines and
+the lamp is unplugged after a shutdown) and played; at most 64 lines and
 20 s each are kept, a line past 20 s is played but not kept. A line written
 to a full cache first makes room (#4883): the oldest files go, never one of
 the owner's current fixed lines (those the voice warms at start, under this
@@ -753,7 +757,8 @@ rendered: …`), and the asker says the words another way. Its samples are
 played as a skill's sound is, with the same gates. At start the voice
 renders the cache's fixed lines (`tts_cache::WARM`), the shutdown's
 `lamp_msgs::GOING_TO_SLEEP` first, then a hand's hold's sleep line
-`lamp_msgs::SLEEP_LINE` (#3748, `LAMP_SLEEP_LINE`, controls.md), on a
+`lamp_msgs::SLEEP_LINE` (#3748, `LAMP_SLEEP_LINE`, controls.md), then the
+factory reset's `lamp_msgs::RESET_STARTING` (#5929, setup.md), on a
 thread of its own, tried again until kept (after a minute, then twice as
 long each time, at most hourly; a line that renders empty or past 20 s is
 never asked for again in that run), so the first
@@ -761,7 +766,7 @@ shutdown is said from the cache even with no network then. The cache is
 made once per process and shared: the coordinator reads the sleep line
 from it once per conversation (`TtsCache::kept`), a file read only, never
 a render. With an owner's language other than English (#4473 (c),
-second-voice.md, "The fixed lines"), its twenty-three fixed lines in that language
+second-voice.md, "The fixed lines"), its thirty-four fixed lines in that language
 are warmed first, then these two, and a cached `text` that is one of them
 is played in the owner's words when kept, its English otherwise; a plain
 `text` that is one of them (the first stand's) is told to the model in the

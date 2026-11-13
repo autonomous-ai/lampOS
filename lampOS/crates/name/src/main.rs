@@ -532,6 +532,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             .with_rescue(&given.path, &given.sha256)
             .map_err(io::Error::other)?;
     }
+    // The start's silence worked out once, copied back at each forget
+    // (#6462).
+    let models = models.with_lead(quiet::LEAD).map_err(io::Error::other)?;
     let mut hearer = Quiet::new(models, arguments.quiet_below);
     // `--wake`'s counts at the last minute line, to say the minute's.
     let mut woken_before = (0u64, 0u64, 0u64);
@@ -682,8 +685,12 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         // Whether a hearing said now, begun `ago_ms` before, goes out:
         // never one begun while the lamp spoke, and one begun while the body
         // moved only at `--moving-least`.
-        let mut lets_through = |name: &NameHeard| {
-            let ago = Duration::from_millis(u64::from(name.ago_ms));
+        // `call`: when the call began, if earlier than the hearing's own
+        // start ([`not_self::call_began`], #6114).
+        let mut lets_through = |name: &NameHeard, call: Option<Instant>| {
+            let ago = call.map_or(Duration::from_millis(u64::from(name.ago_ms)), |call| {
+                now.saturating_duration_since(call)
+            });
             if !(voice.is_none() || speaking.lets_through(ago, now)) {
                 return false;
             }
@@ -756,8 +763,14 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                             total_steps += scores.len() as u64;
                             // Each score is of a step counted back from the
                             // newest whole one, as in `check`.
-                            let first = hearer.steps() as u64 + 1 - scores.len() as u64;
+                            let newest = hearer.steps() as u64;
+                            let first = newest + 1 - scores.len() as u64;
                             for (step, score) in (first..).zip(scores) {
+                                // #6114: the sound this score is of, the
+                                // newest step having just come: a woken
+                                // grid's score given `late` steps on is of
+                                // sound that much older.
+                                let of = sound_at(now, newest - step + u64::from(score.late));
                                 // A stop is said at once, while it is heard.
                                 if let (Some(stop), Some(stops), Some(publisher)) =
                                     (score.stop, stops.as_mut(), stop_heard.as_mut())
@@ -768,9 +781,9 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                                     log(&format!("heard a stop word: score={:.3}", heard.score));
                                 }
                                 let judged = judged(&mut rescue, step, &score);
-                                name_said = name_said.or(hearings.score(judged, now));
+                                name_said = name_said.or(hearings.score_of(judged, of, now));
                                 if let Some(nears) = nears.as_mut() {
-                                    near_said = near_said.or(nears.score(judged, now));
+                                    near_said = near_said.or(nears.score_of(judged, of, now));
                                 }
                                 if let Some(line) = under_bars.score(judged, now) {
                                     log(&line);
@@ -785,7 +798,13 @@ fn run(arguments: &Arguments) -> io::Result<()> {
                                     rescued_in_hearing = true;
                                 }
                                 if let Some(first) = hearings.rising(now)
-                                    && lets_through(&first)
+                                    && lets_through(
+                                        &first,
+                                        Some(lamp_name::not_self::call_began(
+                                            began_of(&first, now),
+                                            nears.as_ref().and_then(Hearings::began),
+                                        )),
+                                    )
                                 {
                                     let _ = rising.publish_json(at_us(now), &first);
                                 }
@@ -819,10 +838,15 @@ fn run(arguments: &Arguments) -> io::Result<()> {
         }
         // A hearing that reached the lower bar, said as it is over: never
         // one begun while the lamp spoke, as for the name.
-        if let (Some(near), Some(publisher)) = (
-            near_said.or_else(|| nears.as_mut().and_then(|nears| nears.tick(now))),
-            near_heard.as_mut(),
-        ) && lets_through(&near)
+        let near_said = near_said.or_else(|| nears.as_mut().and_then(|nears| nears.tick(now)));
+        // When this pass's near hearing began, said now or still going on:
+        // the name's call is judged from it ([`not_self::call_began`]).
+        let near_began = near_said
+            .as_ref()
+            .map(|near| began_of(near, now))
+            .or_else(|| nears.as_ref().and_then(Hearings::began));
+        if let (Some(near), Some(publisher)) = (near_said, near_heard.as_mut())
+            && lets_through(&near, None)
         {
             let _ = publisher.publish_json(at_us(now), &near);
             log(&format!(
@@ -831,11 +855,15 @@ fn run(arguments: &Arguments) -> io::Result<()> {
             ));
         }
         if let Some(name) = name_said
-            && !lets_through(&name)
+            && !lets_through(
+                &name,
+                Some(lamp_name::not_self::call_began(
+                    began_of(&name, now),
+                    near_began,
+                )),
+            )
         {
-            let began = now
-                .checked_sub(Duration::from_millis(u64::from(name.ago_ms)))
-                .unwrap_or(now);
+            let began = lamp_name::not_self::call_began(began_of(&name, now), near_began);
             if voice.is_some() && speaking.covers(began, now) {
                 log(&format!(
                     "passed over a hearing that began while the lamp spoke: score={:.3} began_ms_ago={}{}",
@@ -937,6 +965,15 @@ fn run(arguments: &Arguments) -> io::Result<()> {
 
 /// The score the hearing rule judges: the name's, or with a rescue,
 /// what [`Rescue::score`] makes of it and the rescue model's.
+/// The sound of a step `back` steps before the one that came `now`: each
+/// step is 80 ms ([`lamp_name::hear::STEP`] at 16 kHz). `now` when the
+/// clock can't reach that far back.
+fn sound_at(now: Instant, back: u64) -> Instant {
+    let step_us = lamp_name::hear::STEP as u64 * 1_000_000 / 16_000;
+    now.checked_sub(Duration::from_micros(step_us.saturating_mul(back)))
+        .unwrap_or(now)
+}
+
 fn judged(rescue: &mut Option<Rescue>, step: u64, score: &lamp_name::hear::Score) -> f32 {
     match (rescue.as_mut(), score.rescue) {
         (Some(rescue), Some(trained)) => rescue.score(step, score.name, trained),
@@ -1073,6 +1110,7 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
             .with_rescue(&given.path, &given.sha256)
             .map_err(io::Error::other)?;
     }
+    let loaded = loaded.with_lead(quiet::LEAD).map_err(io::Error::other)?;
     let mut hearer = Quiet::new(loaded, *quiet_below);
     let (mut steps, mut worked, mut busy) = (0u64, 0u64, Duration::ZERO);
     for file in *files {
@@ -1082,8 +1120,9 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
         let mut hearings = Hearings::new(DEFAULT_LEAST);
         let mut stops = stop_least.map(Stops::new);
         let (mut highest, mut at_step) = (0f32, 0u64);
-        // The first score is of the first 2.03 s; each later one of 80 ms more.
-        let seconds = |step: u64| 2.03 + step.saturating_sub(1) as f64 * 0.08;
+        // Each score is of the file's sound to the end of its step, the
+        // first 80 ms after the start's silence (`quiet::LEAD`, #6114).
+        let seconds = |step: u64| step as f64 * 0.08;
         let clock = Instant::now();
         // The file's own time, not this machine's.
         let at = |step: u64| clock + Duration::from_millis(80 * step);
@@ -1107,11 +1146,12 @@ fn check(models: &str, options: &CheckOptions<'_>) -> io::Result<()> {
                 {
                     println!("{file}\tstop\t{:.2}\t{:.4}", seconds(step), heard.score);
                 }
+                let of = step.saturating_sub(u64::from(score.late));
                 let score = judged(&mut rescue, step, &score);
                 if score > highest {
-                    (highest, at_step) = (score, step);
+                    (highest, at_step) = (score, of);
                 }
-                said(hearings.score(score, at(step)), step);
+                said(hearings.score_of(score, at(of), at(step)), step);
             }
             if heard.rested {
                 said(hearings.cut(at(newest)), newest);
@@ -1244,6 +1284,12 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// When a hearing said at `now` began.
+fn began_of(heard: &NameHeard, now: Instant) -> Instant {
+    now.checked_sub(Duration::from_millis(u64::from(heard.ago_ms)))
+        .unwrap_or(now)
 }
 
 #[cfg(test)]
@@ -1677,6 +1723,7 @@ mod tests {
             name,
             stop: None,
             rescue: None,
+            late: 0,
         };
         let start = Instant::now();
         let at = |ms: u64| start + Duration::from_millis(ms);
@@ -1748,6 +1795,7 @@ mod tests {
                             name: 0.1,
                             stop: Some(0.99),
                             rescue: None,
+                            late: 0,
                         },
                     );
                 }
@@ -1756,6 +1804,7 @@ mod tests {
                     name,
                     stop: Some(0.1),
                     rescue: None,
+                    late: 0,
                 });
                 said += usize::from(
                     stops

@@ -32,6 +32,11 @@ serde_json.workspace = true
 ring = "0.17"
 base64 = "0.22"
 sha2.workspace = true
+# The owner's yes to a skill's task read and written never through a link
+# (`O_NOFOLLOW`, `task_yes`), as lamp-skills reads its own files.
+libc = "0.2"
+# A pushed package's `moves/` read as lamp-skills reads the package (`play`).
+tar = { version = "0.4", default-features = false }
 # A computer's clip checked at upload as the voice checks it (`sounds`).
 hound.workspace = true
 # The door on the network: WebSocket over TLS 1.3, the lamp's own
@@ -43,15 +48,21 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["ring"]
 rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
 futures-util = { version = "=0.3.34", default-features = false, features = ["std", "sink"] }
 rcgen = { version = "0.14", default-features = false, features = ["ring", "crypto"] }
+# A skill run's one-run token (#6304, `task_yes::KeptYes`): its folder hashed
+# and its grants read as lamp-skills and the voice do (`task::folder_sha256`,
+# `load_with`), one definition.
+lamp-skills = { path = "../skills" }
 
 [dev-dependencies]
 # The end-to-end test's client: TLS pinned to the lamp's certificate.
 tokio-tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
-# `express`'s table checked against the feelings skill's own `[[do]]` and
-# lamp-skills' light rule (`glow::relative`), so the two can't drift.
-lamp-skills = { path = "../skills" }
+# `express`'s table is checked against the feelings skill's own `[[do]]` and
+# lamp-skills' light rule (`glow::relative`, a dependency above).
 # `sounds`' checks held to the voice's own (`lamp_voice::say::decode_clip`).
 lamp-voice = { path = "../voice" }
+# The services' grants (`protocol::SERVICE_CODES`) held to lamp-services'
+# catalog, so a new service can't be missed (#6432).
+lamp-services = { path = "../services" }
 toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
 
 [lints]

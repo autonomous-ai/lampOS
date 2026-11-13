@@ -287,6 +287,10 @@ pub(super) enum SpeechOrigin {
     ExactLine,
     /// A person's bounded recording, after its spoken confirmation retired.
     RequestedAudio,
+    /// A paired computer's own sound (`speaker.stream`, [`crate::speaker_stream`]):
+    /// local PCM that comes as it is sent, no answer. Shown as an exact line
+    /// is: unshown to the head, the room and the voice's state, on the ring.
+    ComputerStream,
 }
 impl SpeechOrigin {
     /// Played from a recording held here, not from the provider.
@@ -304,12 +308,13 @@ impl SpeechOrigin {
                 | Self::WakeHum
                 | Self::SkillSound
                 | Self::ExactLine
+                | Self::ComputerStream
         )
     }
     /// A turn the ring asks no frame for: an unshown one, but a computer's
     /// exact line, which the ring shows speaking ([`Self::ExactLine`]).
     pub(super) fn ring_unshown(self) -> bool {
-        self.unshown() && self != Self::ExactLine
+        self.unshown() && !matches!(self, Self::ExactLine | Self::ComputerStream)
     }
     /// The trace's name for what plays.
     pub(super) fn trace_name(self) -> &'static str {
@@ -323,6 +328,7 @@ impl SpeechOrigin {
             Self::SkillSound => "skill_sound",
             Self::ExactLine => "exact_line",
             Self::RequestedAudio => "requested_audio",
+            Self::ComputerStream => "computer_stream",
         }
     }
 }
@@ -344,6 +350,10 @@ pub(super) enum NoticeDelivery {
         retired_at_us: Option<u64>,
         final_acceptance: Option<(u64, PlaybackCursor)>,
         gaps: u64,
+        /// A computer's stream: its sound comes through this feed as it is
+        /// sent, so the recording is empty and its end is known only when
+        /// the last chunk has gone ([`Self::stream`]).
+        feed: Option<Arc<crate::speaker_stream::Feed>>,
     },
 }
 impl NoticeDelivery {
@@ -367,6 +377,24 @@ impl NoticeDelivery {
             retired_at_us: None,
             final_acceptance: None,
             gaps: 0,
+            feed: None,
+        }
+    }
+    /// A computer's stream: played from `feed` in chunks as the sound comes,
+    /// the last one at its close.
+    pub(super) fn stream(feed: Arc<crate::speaker_stream::Feed>) -> Self {
+        Self::Selected {
+            origin: SpeechOrigin::ComputerStream,
+            recording: Arc::new(Recording {
+                info: None,
+                samples: Box::default(),
+            }),
+            cursor: 0,
+            attempted_at_us: None,
+            retired_at_us: None,
+            final_acceptance: None,
+            gaps: 0,
+            feed: Some(feed),
         }
     }
     /// Whether all of it was played: its final sample retired.
@@ -389,7 +417,20 @@ impl NoticeDelivery {
         )
     }
     pub(super) fn has_chunk(&self) -> bool {
-        matches!(self, Self::Selected { recording, cursor, retired_at_us:None, .. } if *cursor < recording.samples.len())
+        match self {
+            Self::Selected {
+                feed: Some(feed),
+                retired_at_us: None,
+                ..
+            } => feed.ready(),
+            Self::Selected {
+                recording,
+                cursor,
+                retired_at_us: None,
+                ..
+            } => *cursor < recording.samples.len(),
+            _ => false,
+        }
     }
     /// Called only after the current owner passes the speech-permit check.
     /// Mark before transport. The caller propagates send failure into ordinary
@@ -400,6 +441,7 @@ impl NoticeDelivery {
             cursor,
             attempted_at_us,
             retired_at_us: None,
+            feed,
             ..
         } = self
         else {
@@ -407,6 +449,21 @@ impl NoticeDelivery {
                 "notice dispatch without selected live recording",
             ));
         };
+        if let Some(feed) = feed {
+            // A stream's chunk is whole, its last known as it is taken.
+            if at_us == 0 {
+                return Err(io::Error::other("stream invalid dispatch time"));
+            }
+            let (samples, last) = feed
+                .take()
+                .ok_or_else(|| io::Error::other("stream exhausted"))?;
+            let first = attempted_at_us.is_none();
+            if first {
+                *attempted_at_us = Some(at_us);
+            }
+            *cursor += samples.len();
+            return Ok((samples, last, first));
+        }
         if at_us == 0 || *cursor >= recording.samples.len() {
             return Err(io::Error::other(
                 "notice exhausted or invalid dispatch time",
@@ -434,6 +491,7 @@ impl NoticeDelivery {
             attempted_at_us: Some(_),
             retired_at_us: None,
             final_acceptance,
+            feed,
             ..
         } = self
         else {
@@ -441,7 +499,7 @@ impl NoticeDelivery {
                 "notice final acceptance without attempted recording",
             ));
         };
-        if *reserved != recording.samples.len()
+        if !all_reserved(recording, *reserved, feed.as_deref())
             || sequence == 0
             || cursor.epoch == 0
             || cursor.frame == 0
@@ -473,6 +531,7 @@ impl NoticeDelivery {
             cursor,
             attempted_at_us: Some(start),
             retired_at_us,
+            feed,
             ..
         } = self
         else {
@@ -480,7 +539,10 @@ impl NoticeDelivery {
                 "notice retirement without an attempted recording",
             ));
         };
-        if *cursor != recording.samples.len() || retired_at_us.is_some() || at_us < *start {
+        if !all_reserved(recording, *cursor, feed.as_deref())
+            || retired_at_us.is_some()
+            || at_us < *start
+        {
             return Err(io::Error::other(
                 "notice retirement before exact final delivery",
             ));
@@ -489,9 +551,13 @@ impl NoticeDelivery {
         Ok(())
     }
     pub(super) fn gap(&mut self) -> io::Result<()> {
-        let Self::Selected { gaps, .. } = self else {
+        let Self::Selected { gaps, feed, .. } = self else {
             return Err(io::Error::other("notice gap without recording"));
         };
+        // The speaker's queue ran dry: for a stream, an underrun in its stats.
+        if let Some(feed) = feed {
+            feed.underrun();
+        }
         *gaps = gaps
             .checked_add(1)
             .ok_or_else(|| io::Error::other("notice gap counter exhausted"))?;
@@ -508,6 +574,7 @@ impl NoticeDelivery {
                 attempted_at_us,
                 retired_at_us,
                 gaps,
+                feed,
                 ..
             } => {
                 let state = if retired_at_us.is_some() {
@@ -527,7 +594,7 @@ impl NoticeDelivery {
                         "answer":false,"acoustic_delivery_verified":false}),
                     None => json!({
                         "state":state,"kind":origin.trace_name(),
-                        "frames":recording.samples.len(),
+                        "frames":if feed.is_some() { *cursor } else { recording.samples.len() },
                         "reserved_frames":cursor,"attempted_at_us":attempted_at_us,
                         "retired_at_us":retired_at_us,"playback_gaps":gaps,
                         "answer":false,"acoustic_delivery_verified":false}),
@@ -535,6 +602,16 @@ impl NoticeDelivery {
             }
         }
     }
+}
+
+/// Whether every sample of a notice has been reserved: a recording's, up to
+/// its length, or a stream's, once its last chunk has gone.
+fn all_reserved(
+    recording: &Recording,
+    reserved: usize,
+    feed: Option<&crate::speaker_stream::Feed>,
+) -> bool {
+    feed.map_or(reserved == recording.samples.len(), |feed| feed.finished())
 }
 
 /// No owner is minted here. A completed, cancelled or never-owned request
@@ -614,6 +691,7 @@ pub(super) fn select_failure_notice_in(
         retired_at_us: None,
         final_acceptance: None,
         gaps: 0,
+        feed: None,
     };
     // A line that can't be loaded, with a folder configured: the lamp's own
     // sigh in its place, and why, in the evidence (#2943 part 3).

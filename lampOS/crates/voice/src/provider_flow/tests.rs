@@ -121,6 +121,7 @@ impl Channels {
 
 fn audio(sequence: u64, samples: usize) -> ProviderOutput {
     ProviderOutput::Audio {
+        spoken: true,
         request: 7,
         sequence,
         provider_event_at_us: monotonic_us(),

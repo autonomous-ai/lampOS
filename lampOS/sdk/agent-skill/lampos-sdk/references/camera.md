@@ -23,10 +23,11 @@ without it, the calls are refused, or the `camera` grant can't be given.
     each frame as the camera made it, `size` `640x480` (the default when you
     give none) or `1280x720`, the JPEG as bytes in `data`.
   - **Otherwise:** the eyes' newest frame, about 1 to 2 a second, the JPEG
-    as base64 `jpeg`.
+    as base64 `jpeg`. This is the only path on customer lamps (stable 11450):
+    the fast frame path is merged but off by default, so `fast` is never true there.
 
   The answer and each frame carry `fps_now`, the rate the lamp is actually
-  sending. Measured on lamp-75c9: asked 24 fps at 640×480, the lamp said
+  sending. Measured on lamp-75c9 with the fast path: asked 24 fps at 640×480, the lamp said
   `fps_now` 24–25, and a laptop on Wi-Fi received 14.4 fps at about
   730 KB/s. Pick the size and rate for what your program does with the
   picture, not the largest.
@@ -43,5 +44,5 @@ without it, the calls are refused, or the `camera` grant can't be given.
   a stream ends with `camera.ended` ("the ring is not showing the camera's
   mark") and a snapshot is refused the same way. Handle it; don't retry in a
   loop.
-- **The microphone** has its grant in the same schema change; its calls come
-  with it.
+- **The microphone** comes the same way, with its own grant:
+  [api.md](api.md#the-microphone).

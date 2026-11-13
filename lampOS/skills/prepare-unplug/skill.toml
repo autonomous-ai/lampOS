@@ -13,13 +13,22 @@ topics = ["body/unplug_request", "body/unplug_state", "expression/unplug_state",
 
 # What it says at each outcome (#940): its own words, read only with its
 # core grant. The fold, its readiness check and the voice's guard stay core.
-# ready is said as written; the others are notes for the voice, as before.
+# Every line is said as written, the voice's exact words (#5777): no model
+# turn that could decline or reword it. ready keeps its guarded text.
 [unplug]
 ready = "My arm is folded. You can unplug me now."
-failed = "Say briefly: I could not confirm a safe folded position. Please do not unplug yet."
-stay = "Say exactly: Okay, I'll stay."
-timeout = "Say exactly: I'm still plugged in, so I'm getting back up."
-check = "Say exactly: I can't get up by myself; I need to be checked."
+failed = "I could not confirm a safe folded position. Please do not unplug yet."
+stay = "Okay, I'll stay."
+timeout = "I'm still plugged in, so I'm getting back up."
+check = "I can't get up by myself; I need to be checked."
+# With a turn-off socket (the product, #5763) ready is never said: a
+# confirmed fold asks ask_off, and only a spoken yes to it turns the lamp
+# off (#5774's P2), the shutdown then saying the last words; no yes, it says
+# stay and stands up. updating is said when an update holds the turn-off:
+# it stands up and asks to be told again; not_off is said when it could not.
+not_off = "I couldn't turn myself off just now, so please don't unplug me yet."
+ask_off = "My arm is folded. Shall I turn myself off now? Say yes, and I will."
+updating = "I'm in the middle of an update, so I can't turn myself off yet. I'll get back up; ask me again once it's done."
 
 [[do]]
 body = { prepare_unplug = true }

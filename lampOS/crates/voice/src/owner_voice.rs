@@ -6,6 +6,13 @@
 //! print averaged from a few of the owner's lines is steadier, and a send
 //! or a read in full is held to [`same_voice::SERVICES_SAME_FROM`], 0.55.
 //!
+//! Since the owner's call of 10 Nov (natural confirmations, no read-back
+//! or asker condition) a send is held to no voice, but one in a line begun
+//! in the echo tail of the lamp's words with any of them
+//! (`services::Turn::in_echo_tail`, #6009), and `services::run` no longer
+//! calls [`ask_after_send`]: a print already kept serves a read in full and
+//! such a send only.
+//!
 //! The first builder's terms, each held here and tested below:
 //!
 //! - **Only the setup owner, only after a spoken yes.** After an owner's

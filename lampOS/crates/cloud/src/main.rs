@@ -9,6 +9,9 @@
 //! `lamp-cloud exit-note UNIT`: run by systemd as `ExecStopPost=` of a
 //! lampOS unit (`deploy/product/exit-note.conf`), it keeps what systemd
 //! says of that stop for the reports (#1683), and nothing for a `success`.
+//!
+//! `lamp-cloud face-remove NAME`: the app's Remove of a person entirely,
+//! run by hand as root on the lamp (`lamp_cloud::face_remove`).
 use lamp_cloud::account::{self, Account};
 use lamp_cloud::lamp::{self, Places, Real, Ring, Texts, Wifi};
 use lamp_cloud::wire::Identity;
@@ -22,6 +25,7 @@ use tokio::sync::watch;
 const USAGE: &str = "usage: lamp-cloud [--bus-root ABSOLUTE_DIR] [--control-admin-socket ABSOLUTE_PATH]\n\
   | lamp-cloud exit-note UNIT\n\
   | lamp-cloud make-skill make WORDS REQUEST_ID | made REQUEST_ID (the played check, #2813)\n\
+  | lamp-cloud face-remove NAME (the app's Remove of a person entirely, by hand, as root)\n\
   With LAMP_CLOUD=on, and CREDENTIALS_DIRECTORY holding account, key and build\n\
   (the unit's LoadCredential=); a rotated login is kept in STATE_DIRECTORY.";
 
@@ -111,6 +115,15 @@ fn main() -> ExitCode {
         println!("{told}");
         return ExitCode::from(code);
     }
+    // The app's Remove of a person entirely (`face.remove`), run by hand on
+    // the lamp (A8, #2192): no switch, no broker, only the eyes' and
+    // memory's sockets, as root (or lampos with memory's narrow socket).
+    if std::env::args().nth(1).as_deref() == Some("face-remove") {
+        let rest: Vec<String> = std::env::args().skip(2).collect();
+        let (told, code) = lamp_cloud::face_remove::command(&rest);
+        println!("{told}");
+        return ExitCode::from(code);
+    }
     if std::env::args().nth(1).as_deref() == Some("exit-note") {
         return match std::env::args().nth(2) {
             Some(unit) => exit_note(&unit),
@@ -160,6 +173,13 @@ fn main() -> ExitCode {
     let key = std::fs::read_to_string(credentials.join("key"))
         .map(|key| key.trim().to_owned())
         .unwrap_or_default();
+    // Hermes or OpenClaw on the lamp (#5978, #6226): its DeepSeek through
+    // lamp-cloud's loopback forwarder, with this key; only with
+    // LAMP_HERMES_ON_LAMP=on or LAMP_OPENCLAW_ON_LAMP=on. The voice's
+    // second.json, when the unit hands it in as `second`, names the relay.
+    let hermes_key = key.clone();
+    let hermes_second = std::fs::read_to_string(credentials.join("second")).ok();
+    let hermes_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
     let build = std::fs::read_to_string(credentials.join("build"))
         .map(|state| lamp::build(&state))
         .unwrap_or_default();
@@ -189,6 +209,22 @@ fn main() -> ExitCode {
     // whatever LAMP_SIGNED_OUT says.
     let telling_on = signed_out::on_from_environment();
     signed_out::tell_the_app(telling_on);
+    // The app told once that setup is done (#5812): LAMP_APP_ONBOARDING_DONE=on
+    // with a state folder, where the acked date is kept.
+    lamp_cloud::onboarding_done::switch(
+        lamp_cloud::onboarding_done::on()
+            .then(|| std::env::var_os("STATE_DIRECTORY"))
+            .flatten()
+            .map(|dir| PathBuf::from(dir).join(lamp_cloud::onboarding_done::FILE)),
+    );
+    // The app told when an update starts and ends (#6284):
+    // LAMP_APP_UPDATE_EVENTS=on with a state folder, where what is owed is kept.
+    lamp_cloud::update_events::switch(
+        lamp_cloud::update_events::on()
+            .then(|| std::env::var_os("STATE_DIRECTORY"))
+            .flatten()
+            .map(|dir| PathBuf::from(dir).join(lamp_cloud::update_events::FILE)),
+    );
     let mut login = watches_login(
         telling_on,
         lamp_cloud::services::on_from_environment(),
@@ -261,7 +297,11 @@ fn main() -> ExitCode {
         schedule: lamp_cloud::schedule::from_environment(),
         // The lamp's software update for the app (#2194): only with LAMP_APP_UPDATE=on.
         update_page: lamp_cloud::update::from_environment(),
-        update_checks: Default::default(),
+        // The lamp's agents, a missing one installed from the app (#6240): only with
+        // LAMP_APP_ENGINES=on as well.
+        update_checks: lamp_cloud::update::Checks::with_engines(
+            lamp_cloud::update::engines_from_environment(),
+        ),
         // A restart from the app, asked of setup's change helper (#2193): only with LAMP_APP_RESTART=on.
         restart: (std::env::var(lamp_cloud::lamp::RESTART_ENVIRONMENT)
             .ok()
@@ -295,6 +335,9 @@ fn main() -> ExitCode {
         // The owner's face expressions and room sounds yeses (#5500): only
         // with LAMP_APP_CONSENT=on; room sounds only with LAMP_PRIVACY_CONTROLS=no-slide.
         consent: lamp_cloud::consent::Place::from_environment(),
+        // The owner's dev monitor (#5883): only with LAMP_APP_MONITOR=on and
+        // LAMP_SETTINGS_CHANGE=on, each link sealed to this lamp's device id.
+        monitor: lamp_cloud::monitor::Place::from_environment(&account.device_id),
     };
     // `can` names skills.make only while lamp-voice's maker has a computer (fourteen-P15).
     if let Some(socket) = &lamp.make_skill {
@@ -348,6 +391,7 @@ fn main() -> ExitCode {
         services: None,
         control: None,
         consent: None,
+        monitor: None,
         upload: None,
         shutdown: None,
     };
@@ -371,6 +415,29 @@ fn main() -> ExitCode {
                 say("the rotated login could not be kept: it lasts until a restart");
             }
         };
+        // Where the backend places the lamp (#6414), kept beside the rotated
+        // login for the voice to read; said once each time it changes.
+        let mut region_kept = std::env::var_os("STATE_DIRECTORY")
+            .map(|dir| ping::Region::at(PathBuf::from(dir).join("region")));
+        // The broker's WSS address (#6256 F9), for when its TCP port keeps
+        // failing; a new one alone never moves a working connection.
+        let (ws_url_tx, ws_url) = watch::channel(String::new());
+        let mut heard = |reply: &ping::Reply| {
+            ws_url_tx.send_if_modified(|kept| {
+                let changed = *kept != reply.mqtt_ws_url;
+                kept.clone_from(&reply.mqtt_ws_url);
+                changed
+            });
+            let region = reply.region.as_str();
+            if let Some(result) = region_kept.as_mut().and_then(|kept| kept.take(region)) {
+                match result {
+                    Ok(()) => say(&format!("the backend places the lamp in region {region:?}")),
+                    Err(_) => say(&format!(
+                        "the backend places the lamp in region {region:?}, which could not be kept"
+                    )),
+                }
+            }
+        };
         let mut said_too = |line: &str| say(line);
         let pinging = beat::pings(
             accounts_tx,
@@ -379,6 +446,7 @@ fn main() -> ExitCode {
             ping::EVERY,
             &mut said,
             &mut keep,
+            &mut heard,
             login.as_mut(),
         );
         let telling = async move {
@@ -387,7 +455,7 @@ fn main() -> ExitCode {
                 None => std::future::pending().await,
             }
         };
-        let staying = online::run(accounts, me, &mut lamp, &mut said_too, ping::FIRST);
+        let staying = online::run(accounts, me, ws_url, &mut lamp, &mut said_too, ping::FIRST);
         let reporting = async move {
             match reporting {
                 Some((shared, sources)) => reports::run(shared, sources, report_build).await,
@@ -413,7 +481,18 @@ fn main() -> ExitCode {
                 None => std::future::pending().await,
             }
         };
+        let mut said_hermes = |line: &str| say(line);
+        let forwarding = async move {
+            lamp_cloud::hermes_llm::run(
+                hermes_state.as_deref(),
+                hermes_second.as_deref(),
+                &hermes_key,
+                &mut said_hermes,
+            )
+            .await
+        };
         tokio::select! {
+            () = forwarding => {}
             () = alerting => {}
             () = wiping => {}
             () = pinging => {}

@@ -432,6 +432,24 @@ delivery token, clears pending, and adds a new elapsed deadline. The original
 recurrence anchor remains unchanged. Acknowledging the snoozed occurrence
 advances from that original anchor, to its next occurrence still ahead.
 
+**A one-time reminder just said may still be snoozed or cancelled** (C68:
+lamp-06c1 at 11450, 11 Nov 01:30, "Call the plumber." was said, "snooze it"
+came 9 s later, and with the reminder already gone from the set list only
+`list_reminders` ran; the lamp said "Snoozing it for five minutes. Nothing
+is due right now, so there's nothing to snooze.", and the cancel after it
+found it "already gone"). For `SAID_SNOOZABLE_MS` (2 min) after it was said,
+its said-record entry keeps the item as it was (`Said::again`, optional
+stored metadata, so no `schema` bump), and survives a restart. `Snooze` of
+that id and its said delivery sets it again, as it was, then snoozes it: the
+delivery goes up by one and it is due `seconds` from now. `Cancel` of that id
+ends it for good, `cancelled` with its said delivery. Either takes the kept
+item, so it is snoozed or cancelled once. Whose it is reads as for any item
+(`Said::visible`): another person's line, or the room's for a person's own,
+gets `not_found`. After the window, or for a repeat (never in the said
+record), nothing changes: `not_found`. A ListSet's `said` entry in its
+window has `can_snooze_or_cancel`, its `delivery` and `until_unix_ms`. Tests:
+`a_one_time_reminder_just_said_*` (`crates/schedule/tests/it/engine.rs`).
+
 **After time off, a repeat is said once** (#811, the first builder's decision
 of 2026-10-16 13:21: a person who was away does not hear "late" N times).
 A pending repeat whose later occurrences have also passed is shown as its
@@ -726,7 +744,7 @@ are in [`actions/src/schedule.rs`](../crates/actions/src/schedule.rs):
 | `repeat_reminder` | `text`, `time`, `every` | `weekday` (required for weekly), `zone` | `Set` with `Daily` or `Weekly` |
 | `list_reminders` | none (empty object allowed) | `pending_only` (default false), `after_id` (default 0) | `ListSet` with the line's `asker`, at most eight source items per page, only the line's own, and the room's (set by no one) |
 | `cancel_reminder` | `id`, or `text` | none | `Cancel` of the selected whole item/series, only the line's own or the room's; by `text`, the one item whose text holds the words (case and edge spaces aside), resolved from the line's own list, else the matches named and nothing cancelled |
-| `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, only the line's own or the room's |
+| `snooze_reminder` | `id`, `seconds` | none | `Get` then `Snooze` of the exact pending delivery, or of a one-time one said within two minutes (its said delivery, from `ListSet`'s `said`), only the line's own or the room's |
 
 Text is 1–300 UTF-8 bytes, nonblank and without controls. Seconds are whole
 integers from 1 through 31,536,000. `time` is exact `HH:MM`; `day` is `today`,
@@ -805,7 +823,21 @@ and `waiting_for_answer`; `said_complete` is false when some did not fit
 the 4,080-byte result. Its description adds `LIST_SAID`: asked what was set
 earlier, use both lists, "I reminded you at 10:49 about the report", never
 none set. Only Voice's `list_reminders` has it (`list_set`); the app's list
-has none.
+has none. One said within the last two minutes (C68, above) also has its
+`id`, and the result `said_note` (`JUST_SAID`): "snooze it" or "again in N minutes" is `snooze_reminder` with it,
+"cancel it" `cancel_reminder` (by id, or by its words, which also match it).
+`snooze_reminder` on a gone id reads the line's said record for its
+delivery; said longer ago, or already snoozed or cancelled, a snooze or a
+cancel answers `said_too_long_ago` with `SAID_TOO_LONG_AGO` (nothing changed,
+never say it is snoozed), not only "no longer active". Its description says
+"snooze it" with no length is 300 seconds (`SNOOZE_DEFAULT_SECONDS`), and
+never to say it is snoozed unless the call returns committed; a reply that
+says so with no snooze is held (`LAMP_ACTION_CLAIM_CHECKED`,
+`action_claim::SNOOZED`). Tests: `a_reminder_just_said_*`,
+`a_snooze_after_the_window_does_nothing_and_says_so`,
+`another_persons_line_never_snoozes_or_cancels_a_reminder_just_said` and
+`the_0130_plumber_sequence_snoozes_then_cancels`
+(`crates/actions/tests/it/schedule.rs`).
 
 **The same timer asked for twice in a moment is one (29e7, 2 Nov).** One
 "remind me in 5 minutes" left two water timers there, ids 8 and 9, set
@@ -1492,14 +1524,14 @@ The same occurrence is offered after the conversation when ordinary fresh
 capture, silence, readiness and the five-second attempt pace permit it. Words
 already heard may repeat; no time limit alone authorizes replay.
 
-**A reminder cut after most of it played counts as said; cut earlier, it is
+**A single reminder cut after most of it played counts as said; cut earlier, it is
 said once more as a repeat** (06c1, 5 Nov 17:04, build 10343). Two reminders
 were said on time as separate lines; "Time to drink some water." (request
 256) was cut by a wordless cut-in (request 257) after 4 of its 5 words,
 1950 ms of it, retired as a fenced cut-in (`not completed: this attempt can no
 longer speak, to be offered again`) and said again as if new (request 258).
 Now, as a line cuts in on a reminder's reply (`take_interrupted_reminder`),
-a reply whose provider answer was complete, with at least
+a reply for one item whose provider answer was complete, with at least
 `CUT_HEARD_MIN_SAMPLES` (8,000) samples handed to the speaker, and those at
 least `MOSTLY_PLAYED_PERCENT` (80%) of its whole answer plus the zeros of its
 gaps (`Reply::mostly_heard_at_cut`), completes its receipt on the cut's own
@@ -1507,7 +1539,18 @@ cursor (`Receipt::heard_before_the_cut`: its playback occurrence and the
 frames handed, the cut counting as the generation that ended it). The voice
 says `lamp-voice: the reminder was cut after H of its W samples had played:
 counted as said, not offered again`, and the consumer acknowledges it as for
-any completion. Cut earlier with a real share heard (`Reply::share_heard_at_cut`:
+any completion. A joined late-reminder line cannot use this partial-cut
+completion: the unplayed tail may contain an entire final reminder, and
+there are no per-item audio boundaries. Its receipt retains that the offer
+was joined and uses the existing bounded retry-or-held handling instead.
+With no prior eligible generation retirement, a successful owner fence
+produces qualified retirement. If a prior generation already retired, the
+receipt remains uncertain and its drop produces `Abandon`; that path also
+allows its existing bounded repeat before holding a further attempt.
+This can repeat earlier items that were heard; it never claims the whole
+batch was delivered from an aggregate percentage. A joined line played
+through completely still completes every item as before.
+Cut earlier, or cut a joined line, with a real share heard (`Reply::share_heard_at_cut`:
 a complete answer, at least `CUT_HEARD_MIN_SAMPLES` handed and at least
 `CUT_HEARD_SHARE_PERCENT` (50%) of the whole), the fenced `Retire` carries
 `heard_some`: the consumer offers it once more only (`not completed: this
@@ -1528,6 +1571,8 @@ before, not as a repeat. Tests:
 `a_reminder_cut_after_most_of_it_played_counts_as_said`,
 `a_reminder_cut_halfway_is_retired_as_heard_in_part` and
 `a_reminder_cut_early_is_a_light_cut` (`coordinator.rs`),
+`a_cut_joined_reminder_does_not_complete_its_unplayed_tail`
+(`coordinator/tests/reminders.rs`, real ledger plus single-item control),
 `a_cut_in_after_some_audio_offers_it_once_more_as_a_repeat_then_holds_it`,
 `light_cuts_never_count_toward_the_hold_and_are_capped` and `a_reminder_completed_at_its_cut_is_acknowledged_and_not_offered_again`
 (`reminders/consumer/tests.rs`), `one_said_again_after_a_cut_is_a_repeat`

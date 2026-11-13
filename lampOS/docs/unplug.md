@@ -1,9 +1,15 @@
 # Preparing to unplug (#1674)
 
-The core `prepare-unplug` skill runs when the person explicitly asks to unplug
-or turn off the lamp. It is installed with the product, but its tool is not
+The core `prepare-unplug` skill runs when the person tells the lamp they are
+unplugging it, will unplug it, or are turning it off. Its description names the
+present tense too ("I'm unplugging you now", "I'm going to unplug you") and asks
+for the call before any words: with "will unplug" alone, lamp-52e6 heard "Lamp,
+I'm unplugging you now." twice and answered in words with no call (#5747). A
+deterministic trigger on the heard words is a follow-up; Skills has no trigger
+on heard text today, so the call is still the model's. It is installed with the product, but its tool is not
 advertised unless Skills runs with `LAMP_UNPLUG=on`. Body, Expression and Voice
-need the same opt-in. All defaults stay off until a physical lamp trial passes.
+need the same opt-in. The code's default stays off; the product's four units
+set it on since #5747, after lamp-52e6's row 1 on #1699 (20 Oct).
 
 `body.prepare_unplug` is reserved to a `kind = "core"` skill declaring the
 core-only grant `core = ["prepare_unplug"]` in `[permissions]` (the shipped
@@ -46,9 +52,12 @@ Live route while its session has no `prepare_to_unplug` (on its own or
 through `use_skill`), and on the second route while the skills' catalogs
 offer none; with the tool there it is not told.
 
-This prepares the arm; it does not run an operating-system shutdown or cut
-power. Turning the lamp off safely, with the body let go and a light that says
-it may be unplugged, is shutdown.md. An ordinary bedtime request belongs to the bedtime skill.
+Unset `LAMP_UNPLUG_OFF_SOCKET`, this prepares the arm only; it does not run
+an operating-system shutdown or cut power. The product sets it (#5763's P1):
+a running lamp's storage is still written, and a plug pulled then can corrupt
+the SD card, so a product lamp never says it may be unplugged while it runs.
+Its confirmed fold turns it off instead, through shutdown.md's runner (step 7
+below). An ordinary bedtime request belongs to the bedtime skill.
 
 ## From the request to the answer
 
@@ -81,14 +90,94 @@ it may be unplugged, is shutdown.md. An ordinary bedtime request belongs to the 
 6. Skills requires all three fresh, matching receipts before asking Voice for
    the skill's `ready` line, “My arm is folded. You can unplug me now.”
    Every line it says is the skill's own, in `skills/prepare-unplug/skill.toml`'s
-   `[unplug]` (`ready`, `failed`, `stay`, `timeout`, `check`), read only
+   `[unplug]` (`ready`, `failed`, `stay`, `timeout`, `check`, `not_off`, `ask_off`, `updating`), read only
    with its core grant (#940, the first move of "Everything is a skill",
-   21 Oct). A file from before `[unplug]` says the words lamp-skills kept
+   21 Oct). Every line but `ready` goes to Voice as exact words (`text` with
+   `"exact": true`, say.rs): rendered as written, never a turn for the chat
+   model, and held while someone talks with the lamp rather than dropped
+   (#5777: on lamp-52e6, 10 Nov 12:43, the model refused the `ask_off` line,
+   "it isn't mine to say", and the `stay` note was dropped as
+   `user_interrupted`). An owner's language other than English hears them in
+   its own words: each is a fixed line (`language::FIXED_LINES`, second-voice.md,
+   "The fixed lines"; #5777's P3). Once one is played to `spoken`, Voice keeps
+   it in the thread as the lamp's own line, so the chat model's next turn has it
+   in its history (lamp-52e6, 10 Nov: with the ask and the stay left out, the
+   model's last word was its own "I'm preparing to fold", and it answered three
+   asks to unplug "I'm still folding" with no call); its `exact_line` event
+   carries the words. An exact line that is not a fixed line (a computer's, the
+   pairing pin, a service's read) is never kept nor journalled. A file from before `[unplug]` says the words lamp-skills kept
    before, for this release only, and the journal says so. The request carries
    `unplug_request`; Voice keeps that completion guard while the reply is
    queued or under way. An ordinary tool answer or an old asleep frame is
    never readiness. Privacy, playback ownership and the voice's own gates
    remain authoritative.
+7. **With `LAMP_UNPLUG_OFF_SOCKET` set** (the product's lamp-skills unit:
+   `/run/lampos-setup-change/change.sock`, root:lampos 0660), the `ready`
+   line is never asked. At the same three receipts Skills says the skill's
+   `ask_off` line ("My arm is folded. Shall I turn myself off now? Say yes,
+   and I will."), said before anything turns off, and waits 30 s
+   (`OFF_YES_WAIT`) for a spoken yes, the lamp's one spoken yes
+   (`first_stand::is_yes`, as the first stand's, body.md): a short line
+   opening with yes, heard 1.5 s or more after the ask's words ended (never
+   their echo), in a room that isn't busy (`room/state`). The first finished
+   line after the ask decides; any other words, a busy room, no line within
+   the wait, or an owner's language other than English (the yes is heard by
+   English words only) are no yes: Skills says `stay` and stands up, as a
+   "never mind" does (on a heard no, a line of five words or fewer opening
+   with "no", "nope", "nah", "not", "never" or a "-n't" word, the cancel
+   before `stay`, which may never begin; any other words keep the line
+   first; see "Never mind" below), and never powers off (#5774's P2: a TV's
+   "I'm unplugging you" or "I'm unplugging the kettle" folds the arm, then
+   stands up after its line). Only on the yes, Ready read once more,
+   Skills sends setup's change helper `{"shutdown":"lamp"}`, the app's Turn
+   off (shutdown.md, "The ways a person asks"), and waits 2 s for its answer.
+   The helper takes this one request from `lamp-skills.service`, by its
+   cgroup, and refuses it any other (setup.md, "Changed after setup"; #5747:
+   before, it took only `lamp-cloud`, and lamp-52e6 on build 11913 answered
+   the yes with "only the app's link may change the lamp's settings").
+   On `{"done":{"shutting_down":true}}` the runner says "Going to sleep now.
+   Unplug me when my light turns green.", stops every part read back
+   stopped, lets the arm go only while it is down, lights the ring green only
+   after that, syncs and powers off: no writer is left when the person
+   unplugs it. The runner's line stays as the app's Turn off has it: the
+   ring turns green once every part is stopped and the arm let go, which
+   is before the sync and the power-off (setup/shutdown.rs), as on the
+   app's path since #3697; "once my light is out" is not said, since no
+   lamp has shown the ring going dark (the first builder's call (a), left
+   for them to accept as it stands). Held by an update installing (the
+   helper's "an update is being installed"), Skills says the skill's
+   `updating` line ("I'm in the middle of an update, so I can't turn
+   myself off yet. I'll get back up; ask me again once it's done.") and
+   stands up at once, as a "never mind" does. Nothing waits for the update
+   in lamp-skills, which an install round restarts (#5777's P2: a wait
+   there was lost at the restart, the lamp left folded, never off and
+   never up). Refused otherwise, not reached or no answer:
+   Skills says the skill's `not_off` line ("I couldn't turn myself off just
+   now, so please don't unplug me yet.") and stands up, publishing the
+   cancel a "never mind" publishes, even when the line never began
+   (expired, the voice not reached): on lamp-52e6 (build 11913) a kept
+   request after `not turned off: expired` held it folded until a reboot.
+   A "never mind" before
+   the helper's yes cancels as below; after it, the lamp is turning off, as
+   after the app's Turn off, and comes back at its power-up. About 30 s from
+   the ask to the power-off: the fold (6.7 s on lamp-52e6, 20 Oct) and the
+   app's Turn off (20 to 26 s to the lamp gone silent on lamp-0c89, #3698).
+   Not yet: the runner waits only up to 10 s for a ringing alarm to be
+   heard, and nothing checks for a timer due soon before turning off
+   (a follow-up); and nothing tells who said the yes, so a TV's short
+   "Yes." right after a fold the TV itself caused would turn the lamp off
+   (two coincidences; it needs the voice to tell a person from a speaker).
+   lamp-skills reads the owner's language from `LAMP_LANGUAGE_FILE`, as
+   the voice does. Tests:
+   `a_lamp_with_a_turn_off_socket_turns_off_at_the_fold_only_after_a_spoken_yes`,
+   `a_fold_that_hears_no_yes_stands_up_and_never_turns_off`,
+   `a_turn_off_held_by_an_update_stands_up_at_once_and_asks_to_be_told_again`,
+   `a_yes_in_a_busy_room_stands_up_and_never_turns_off`,
+   `a_yes_in_the_echo_tail_is_not_taken_and_the_wait_ends_standing_up`,
+   `a_refused_turn_off_says_not_to_unplug_yet_and_never_says_unplug_me_now`,
+   `a_turn_off_not_taken_says_not_off_then_stands`,
+   `a_turn_off_not_taken_stands_even_when_its_note_expires`;
+   the install pin holds the product unit's socket to the helper's.
 
 The tool response target is under 150 ms on a warmed lamp. This target does
 not include speech recognition or the model deciding to call the tool. Body
@@ -163,7 +252,19 @@ clear the request merely to make a startup pass.
 A kept or malformed request with no matching cancel makes a restarted body
 refuse startup before actuator access, **even when `LAMP_UNPLUG` is now off**.
 A kept request with its matching Skills cancel starts normally, unless the
-body's last state for it was Failed. Removing the switch is
+body's last state for it was Failed. A refused body does not exit: it is held
+before any actuator access, its process up, telling systemd it is ready and
+alive with the reason as its status, and journals once `lamp-body: held,
+nothing moves: <why>`. It looks again every second (`unplug::HOLD`), so a
+refusal that clears (a read that failed once) starts it; a kept request
+holds it until a reboot clears the bus. The hold neither writes nor removes
+the request (`no_body_path_clears_the_kept_request`). Exiting instead made a
+restart-loop (#5777's P1: on lamp-52e6, 10 Nov 14:54, the fold rested 26
+counts off on arm joint 1, failed at 30 s, and the kit's restart left
+lamp-body refused three times, 15 s apart, then stopped by systemd's start limit
+until a reboot; any service restart or update round would have done the
+same). Tests: `a_failed_fold_kept_at_restart_holds_the_body_up_and_still`,
+`a_held_start_with_its_cancel_starts_at_once`. Removing the switch is
 not a way to clear accepted intent. Off with no kept request still creates no
 live adapter, publisher or polling worker; startup only checks the kept path.
 An unreadable bus/request fails closed rather than assuming no latch exists.
@@ -221,7 +322,25 @@ Skills checks first that the latch is in force and the body's own state is
 fresh (500 ms), names that request, and is Folding (spoken only) or Ready,
 never Failed. It then asks Voice for the line ("Okay, I'll stay." or the
 timeout's) at priority 8, and publishes the cancel only once Voice says the
-line has begun. A line that never begins cancels nothing.
+line has begun. For the timeout, and for silence, a yes not taken or other
+words at the turn-off ask (a TV, someone else talking), a line that never
+begins cancels nothing: someone may be unplugging it quietly, hands at the
+arm (the Reviewer-lead's P2 on #6519). A spoken "never mind" and a heard no
+at the turn-off ask publish the cancel
+first, then ask for the line, which plays when the voice is free or never
+(expired, the voice not reached): the person is there and said so, so the
+lamp stands at once. On lamp-52e6 (build 12130) a "No." whose `stay` line
+expired cancelled nothing, and a "never mind" 75 s later, past the ask, with
+the request still kept, did not stand it either. On build 12200 the voice
+model answered the "No." with its own turn, which held the exact line until
+it expired (30 s), and a cancel published after the line kept the arm down
+that long while the lamp said it was standing back up (#6515). A heard "no",
+a "never mind" and the timeout for the same request (the model may call
+`stay_plugged_in` on the same "No.") say the line once: one that finds the
+request cancelled, or another's line still being asked, says nothing (a
+"never mind" still publishes its cancel then). A cancel that failed before
+the line is tried again once the line begins. A "never mind" needs no run under
+way, only the kept request.
 
 The body checks again itself. It accepts a cancel only if its source label is
 `skills`, its identifier equals the request it accepted, and the preparation
@@ -230,7 +349,7 @@ latch stays. A cancel during Folding lets the fold finish to its rest pose; it
 never reverses mid-fold. The body clears its latch only when it is Ready on
 fresh, safe evidence (the same proof as above: no hold, contact, fault or
 stale read) and at least 3 s after it saw the cancel, so the line comes
-before motion. After the cancel, an unsafe sample (a hand on the arm to
+before motion when the line went first. After the cancel, an unsafe sample (a hand on the arm to
 help it up, a joint moved) withdraws Ready as a gap does and never fails the
 preparation: the latch holds while it lasts, and the stand waits for 500 ms
 of fresh, safe evidence again, so a hand only delays it. That delay is

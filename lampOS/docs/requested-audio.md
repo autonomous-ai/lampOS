@@ -9,9 +9,11 @@ A person speaking to the lamp can ask a skill to play one fixed local
 recording. Voice says a short confirmation, waits for its confirmed speaker
 retirement, then plays the recording under the same live spoken owner.
 `LAMP_REQUESTED_AUDIO=on` is required in **Voice, Skills and Actions**.
-Only the exact value `on` enables it; it is off by default and is not enabled
-in the repository's product or lamp units. Installing a skill does not
-enable playback.
+Only the exact value `on` enables it; it is off unless set. The product's
+`lamp-voice`, `lamp-skills` and `lamp-actions` units set it since #5749
+(11 Nov); the repository's per-lamp units do not. Installing a skill does not
+enable playback, and with the switch on nothing plays until a requested-audio
+skill such as relaxing-music is installed (from the Skills Store).
 
 Voice also requires an explicit absolute `LAMP_SKILLS_DIR` for the existing
 Skills socket. Missing or invalid optional playback configuration disables
@@ -134,6 +136,44 @@ the original request/call identity. Missing or invalid spoken context
 refuses media. Written requests, Messages requests and Messages
 `speak=true` never create this context or grant playback.
 
+On the second voice route, an offer plays only when the spoken line that led
+to the call asks to play something (#5764,
+`lamp_voice::requested_audio::asks_to_play`). Some sentence of the line must
+start, past greetings and one lead-in such as "can you", "could I", "I'd like
+to" or "let's", with an ask: play, put on, put some or put something, turn
+on, start, hear, listen to, or Vietnamese "mở/bật/phát nhạc", "mở/bật/phát
+bài" or "cho tôi/mình/em nghe". The immediate requested object must name
+music, a song, recording, sound, track, tune, playlist, melody, lullaby,
+"nhạc" or "bài". An optional recipient (me/us), determiner, one recording selector
+(first/second/next/previous/last/another/different), and up to three calm-mood
+adjectives may precede that noun. The noun must finish the requested object:
+English allows only up to three trailing please/now/on words. Vietnamese
+"nhạc"/"bài" allows optional "thư giãn", optional "cho tôi/mình/em", then
+up to three đi/nhé/nha words. Other continuations are conservatively refused;
+"play music trivia with me", "play a music quiz", and "play the next music
+game" do not authorize recordings. A recording mentioned later in
+an unrelated clause does not count: "turn on the light so I can read sheet
+music" and "play chess while I listen to music" are refused.
+"Something" instead accepts a calm-mood adjective, "to relax/unwind/sleep",
+or "to help me relax/unwind/sleep", with only please/now/on afterward.
+"Lamp, play me something to relax." and "Play something to help me sleep."
+ask; "Play something like chess to relax." and "Play something with me to
+relax." do not. A line with "don't", "not", "never", "no", "stop", "cancel",
+"actually", "wait", "maybe", "đừng", "thôi" or a whole-word phrase
+"forget it", "scratch that" or "changed my mind" anywhere, in any sentence,
+does not ask. These phrases override an earlier request; "scratch" or
+"changed" alone does not cancel a request. Otherwise Voice drops the offer and
+tells the model `{"error": NOT_ASKED_TO_PLAY}`: nothing plays, and it must
+not say it is playing. It is never told the skill's confirmation. This
+check is in code, so a skill's "only when explicitly asked" text is no longer
+the only check. On lamp-52e6 on 9 Nov, "Lamp, I listened to some relaxing music on
+the train this morning, it was really nice." got a `use_skill` call and the
+relaxing-music offer; it is refused now. It sits behind
+`LAMP_REQUESTED_AUDIO` with no switch of its own. The check is a word list:
+an ask in other words or another language is refused, and the person can say
+it plainly. The Live route has no line text when a call arrives and does not
+run this check yet.
+
 A typed direct skill call or translated `use_skill` call whose tool is named
 in catalog `body` metadata is refused before calling the Skills socket,
 whether requested audio is off or on. Ordinary typed non-body calls and
@@ -222,8 +262,41 @@ own checks: the service stopped, it wasn't ready, the speaker's state was
 being read past the clash spin, the speaker was muted, silent or its state
 unknown, its state changed, was stale, or was read after the check's own
 time, its Skills lease lapsed, it was past its time, Skills refused its start or a renewal, or its recording
-couldn't be read or wasn't the one offered. `request N: requested audio
-revoked: <why>` comes from the coordinator, when the turn is revoked.
+couldn't be read or wasn't the one offered. It also comes when the turn's
+output settles and its confirmation failed, contained no proven spoken PCM,
+or never retired. A wait cue or announcement is not confirmation, even if
+it retires or the model supplied transcript text without playable speech.
+The private Voice worker's audio packet carries a `spoken` flag; only
+validated, nonempty packets for the current request can establish that
+speech arrived. The second route sets it on real answer speech, never on
+its cue or announcement. Missing flags default to false. The parent and
+worker run the same versioned Voice executable; an old decoder does not
+accept a new packet with `spoken: true`, so this is not a cross-version
+public protocol. Live model audio remains answer output; it does not use the Second route's
+local cue or announcement path. This preserves Live recording playback.
+This adds one in-memory flag check, no polling, network call or delay.
+
+A
+playback gap in the confirmation does not end it: a gap is late words, not
+cut ones, and retirement means all of them played. On lamp-52e6 on 10 Nov
+(request 3) the wait sound played 1.5 s after the line and the two-piece
+confirmation 4.5 s after that, while the chat's second round ran; the zeros
+between them were counted as a gap and the recording was cancelled with
+"the confirmation had a gap". A gapped confirmation still leaves its news
+unacknowledged, as any gapped reply does. Before #5764 this end said nothing: on lamp-52e6 on 9 Nov (10883)
+three triggered requests played nothing and the journal said nothing. `request N: requested audio
+revoked: <why>` comes from the coordinator, when the turn is revoked. The
+speaker then drops the frames still queued for it, and that drop is the
+revocation's own: the recording stops and the voice goes on. On lamp-52e6
+on 10 Nov a mute 10 s into relaxing music ended the voice that way.
+
+The second route says the confirmation with the call and, with
+`LAMP_SECOND_SAID_ONCE`, nothing after its result, so a short confirmation
+can retire before the offer reaches the coordinator. That retirement still
+counts: accepting the offer keeps it. Any provider audio after it clears it,
+so newer words must retire before the recording starts. Before #5764 the
+offer cleared it, the confirmation never retired again, and the recording
+was dropped at settle.
 
 The same socket accepts two private operations:
 
@@ -423,8 +496,9 @@ Stop, interruption/new owner, microphone privacy closure, capture gap, speaker m
 invalid speaker state, definition revocation, daemon loss and deadline expiry
 are terminal for the item. Reopening microphone privacy, unmuting or restarting a daemon
 does not resume it. A completed model generation or accepted final chunk is
-not confirmation retirement: Voice requires the matching speaker completion,
-with no gap, before selecting media under the same spoken owner.
+not confirmation retirement: Voice requires the matching speaker completion
+before selecting media under the same spoken owner. A gap in the
+confirmation delays it and does not cancel the recording.
 
 ## Source example and validation boundary
 

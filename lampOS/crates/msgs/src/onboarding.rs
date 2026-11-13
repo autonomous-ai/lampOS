@@ -43,6 +43,34 @@ pub struct OnboardingPending {
     /// leads by talk. Absent from an older voice: false.
     #[serde(default)]
     pub walk: bool,
+    /// When the setup walk's done line finished playing, in Unix ms, as committed
+    /// in its progress file: kept through a redo, gone after a factory reset,
+    /// and absent for a walk set up before it was dated or not yet ended.
+    /// lamp-cloud tells the app once from it (`onboarding.done`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_at_unix_ms: Option<u64>,
+    /// This walk's id (#5979): when it began, in Unix ms, as committed in
+    /// its progress file. A redo of the whole walk makes a new one; a redo
+    /// of one step keeps it. Absent from an older voice, and for a walk
+    /// begun before it was dated.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub walk_id: Option<u64>,
+    /// The walk's steps that ended this walk, of `where_you_sit`,
+    /// `who_you_are`, `touch` and `how_you_sound` only, in the order they
+    /// ended. lamp-cloud tells the app each once (`onboarding.step`).
+    /// Empty from an older voice.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub steps_ended: Vec<OnboardingStepEnded>,
+}
+
+/// One walk step's end (#5979): its name, its outcome as the walk keeps it
+/// (`done`, `skipped`, `failed` or `not_available`) and when, in Unix ms.
+/// No names, no words.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OnboardingStepEnded {
+    pub step: String,
+    pub outcome: String,
+    pub at: u64,
 }
 
 impl OnboardingPending {
@@ -90,6 +118,87 @@ pub const ONBOARDING_STEPS: [&str; 9] = [
     "face_expressions",
     "preferences",
 ];
+
+/// The first update after a setup (#6284, `LAMP_FIRST_UPDATE`): setup writes
+/// this file with its marker, as `{"at_unix_ms": <ms>}`; lamp-update starts a
+/// round at once while it is there and removes it when that round ends; the
+/// voice holds the walk's beginning while it is there.
+pub const FIRST_UPDATE_FILE: &str = "/var/lib/lampos-setup/first-update";
+
+/// How long a first update may hold the walk, from the file's `at_unix_ms`
+/// (the product's call on #6284: 10 minutes, raised to 20 on 11 Nov after
+/// lamp-e82d fetched at 0.17 MB/s on the office's network). Past it the file
+/// counts as gone for every reader, whoever failed to remove it.
+pub const FIRST_UPDATE_WITHIN_MS: u64 = 1_200_000;
+
+/// The file's body.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FirstUpdate {
+    pub at_unix_ms: u64,
+    /// The boot's own clock when it was written. A new lamp joins Wi-Fi on
+    /// its last saved wall clock, often hours behind, and timesyncd sets it
+    /// a minute later; within the same boot the bound is measured on this
+    /// clock instead, so that jump neither ends the 20 minutes at once nor
+    /// stretches them. Absent from a file written without it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boot: Option<BootClock>,
+}
+
+/// One boot's id and its time since boot, suspend included, in ms
+/// (`/proc/sys/kernel/random/boot_id` and `/proc/uptime`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BootClock {
+    pub id: String,
+    pub ms: u64,
+}
+
+impl BootClock {
+    /// This boot's clock now; `None` off Linux or if either can't be read.
+    pub fn now() -> Option<Self> {
+        let id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id").ok()?;
+        let uptime = std::fs::read_to_string("/proc/uptime").ok()?;
+        let seconds: f64 = uptime.split_whitespace().next()?.parse().ok()?;
+        let id = id.trim();
+        (!id.is_empty() && seconds.is_finite() && seconds >= 0.0).then(|| Self {
+            id: id.to_owned(),
+            ms: (seconds * 1000.0) as u64,
+        })
+    }
+}
+
+impl FirstUpdate {
+    /// Whether a first update is still owed at `now_unix_ms` and this
+    /// boot's clock now: see [`FirstUpdate::owed_at`].
+    pub fn owed(&self, now_unix_ms: u64) -> bool {
+        self.owed_at(now_unix_ms, BootClock::now().as_ref())
+    }
+
+    /// Whether a first update is still owed. Within the boot that wrote it,
+    /// by the boot's clock: under the bound since it was written. Otherwise
+    /// by the wall clock: within the bound, and not from the future by more
+    /// than a minute (a clock set after setup counts it as owed only within
+    /// the bound from now).
+    pub fn owed_at(&self, now_unix_ms: u64, boot: Option<&BootClock>) -> bool {
+        if let (Some(then), Some(now)) = (&self.boot, boot)
+            && then.id == now.id
+        {
+            return now.ms >= then.ms && now.ms - then.ms < FIRST_UPDATE_WITHIN_MS;
+        }
+        now_unix_ms.saturating_add(60_000) >= self.at_unix_ms
+            && now_unix_ms.saturating_sub(self.at_unix_ms) < FIRST_UPDATE_WITHIN_MS
+    }
+
+    /// The file at `path`, if it is there and reads as one.
+    pub fn read(path: &std::path::Path) -> Option<Self> {
+        let bytes = std::fs::read(path).ok()?;
+        if bytes.len() > 256 {
+            return None;
+        }
+        serde_json::from_slice(&bytes).ok()
+    }
+}
 
 pub fn onboarding_topics() -> Vec<(&'static str, Declaration)> {
     vec![(OnboardingPending::TOPIC, OnboardingPending::declaration())]
@@ -143,5 +252,85 @@ mod tests {
         let giving: OnboardingPending =
             serde_json::from_str(&text.replace("privacy", "giving_way")).unwrap();
         assert_eq!(giving.invitations[0].step, OnboardingStep::GivingWay);
+    }
+
+    /// The walk's end date round-trips, is left out while unknown, and an
+    /// older voice's heartbeat without it reads as unknown.
+    #[test]
+    fn done_date_round_trips_and_is_absent_from_older_json() {
+        let pending = OnboardingPending {
+            done_at_unix_ms: Some(1_762_675_200_000),
+            ..OnboardingPending::default()
+        };
+        let text = serde_json::to_string(&pending).unwrap();
+        assert!(text.contains("\"done_at_unix_ms\":1762675200000"));
+        assert_eq!(
+            serde_json::from_str::<OnboardingPending>(&text).unwrap(),
+            pending
+        );
+        let unknown = serde_json::to_string(&OnboardingPending::default()).unwrap();
+        assert!(!unknown.contains("done_at_unix_ms"));
+        let old: OnboardingPending =
+            serde_json::from_str(r#"{"invitations":[],"walk":true}"#).unwrap();
+        assert_eq!(old.done_at_unix_ms, None);
+    }
+
+    /// A clock synced after the file was written, hours forward, does not
+    /// end the first update within the boot that wrote it; the boot's own
+    /// clock bounds it. Another boot, or no boot clock, falls back to the
+    /// wall clock.
+    #[test]
+    fn a_first_update_is_bounded_by_its_boots_clock_through_a_clock_sync() {
+        let stale = 1_794_000_000_000;
+        let synced = stale + 6 * 3_600_000;
+        let boot = |id: &str, ms: u64| BootClock { id: id.into(), ms };
+        let file = FirstUpdate {
+            at_unix_ms: stale,
+            boot: Some(boot("a", 40_000)),
+        };
+        let text = serde_json::to_string(&file).unwrap();
+        assert_eq!(serde_json::from_str::<FirstUpdate>(&text).unwrap(), file);
+        assert!(file.owed_at(synced, Some(&boot("a", 100_000))));
+        assert!(file.owed_at(synced, Some(&boot("a", 40_000 + 1_199_999))));
+        assert!(!file.owed_at(stale, Some(&boot("a", 40_000 + 1_200_000))));
+        assert!(!file.owed_at(synced, Some(&boot("a", 39_000))));
+        assert!(!file.owed_at(synced, Some(&boot("b", 100_000))));
+        assert!(!file.owed_at(synced, None));
+        assert!(file.owed_at(stale + 1_000, None));
+        let old: FirstUpdate = serde_json::from_str(r#"{"at_unix_ms":5}"#).unwrap();
+        assert_eq!(old.boot, None);
+        assert!(!serde_json::to_string(&old).unwrap().contains("boot"));
+    }
+
+    /// The walk's id and its ended steps round-trip, are left out while
+    /// there are none, and an older voice's heartbeat reads as neither.
+    #[test]
+    fn walk_id_and_ended_steps_round_trip_and_are_absent_from_older_json() {
+        let pending = OnboardingPending {
+            walk_id: Some(1_762_675_100_000),
+            steps_ended: vec![OnboardingStepEnded {
+                step: "where_you_sit".into(),
+                outcome: "done".into(),
+                at: 1_762_675_160_000,
+            }],
+            ..OnboardingPending::default()
+        };
+        let text = serde_json::to_string(&pending).unwrap();
+        assert!(text.contains(r#""walk_id":1762675100000"#), "{text}");
+        assert!(
+            text.contains(
+                r#""steps_ended":[{"step":"where_you_sit","outcome":"done","at":1762675160000}]"#
+            ),
+            "{text}"
+        );
+        assert_eq!(
+            serde_json::from_str::<OnboardingPending>(&text).unwrap(),
+            pending
+        );
+        let none = serde_json::to_string(&OnboardingPending::default()).unwrap();
+        assert!(!none.contains("walk_id") && !none.contains("steps_ended"));
+        let old: OnboardingPending =
+            serde_json::from_str(r#"{"invitations":[],"walk":true}"#).unwrap();
+        assert_eq!((old.walk_id, old.steps_ended.len()), (None, 0));
     }
 }

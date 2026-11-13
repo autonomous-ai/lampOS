@@ -86,6 +86,11 @@ pub struct Score {
     pub name: f32,
     pub stop: Option<f32>,
     pub rescue: Option<f32>,
+    /// How many steps before the one it is given in the name's score is
+    /// of (#6114): 0 for the first grid's own, and for a later grid's on
+    /// time; more for one a woken grid gave late ([`Grids::first`]). A
+    /// hearing is dated by the sound it is of, not by when its score came.
+    pub late: u32,
 }
 
 type Plan = Arc<TypedRunnableModel>;
@@ -176,6 +181,10 @@ pub struct Hearer {
     wait: bool,
     /// Samples the first grid was given since the last forget.
     fed: u64,
+    /// The silence [`Hearer::with_lead`] took as heard, in samples: each
+    /// stream keeps its state after it, restored by
+    /// [`Hearer::forget_to_lead`]. 0 for none.
+    led: usize,
 }
 
 /// The later grids woken by the first grid (`--wake`, #694), on a thread of
@@ -295,6 +304,9 @@ enum Work {
     /// from then on is of `epoch`; anything of an earlier one, still being
     /// worked on as this was sent, is let go when it comes.
     Restart { from: u64, skip: usize, epoch: u64 },
+    /// Start again from each grid's state after the lead's silence
+    /// ([`Hearer::forget_to_lead`]): scores count from 0, of `epoch`.
+    Lead { epoch: u64 },
 }
 
 impl Woken {
@@ -318,6 +330,13 @@ impl Woken {
                             for stream in &mut streams {
                                 stream.forget();
                                 stream.skip += skip;
+                            }
+                        }
+                        Work::Lead { epoch: now } => {
+                            from = 0;
+                            epoch = now;
+                            for stream in &mut streams {
+                                stream.lead();
                             }
                         }
                         Work::Hear(samples, awake) => {
@@ -371,6 +390,7 @@ struct Models {
 
 /// One grid of steps: the sound it has not yet made into frames, and the
 /// frames and embeddings it may still need.
+#[derive(Clone)]
 struct Stream {
     /// Samples to pass over after a start, so this grid's steps fall
     /// later than the first grid's; 0 for the first.
@@ -390,6 +410,9 @@ struct Stream {
     /// The score of the newest embedding made, if it was scored: one woken
     /// scores the [`BACK`] positions before as well, once.
     scored: usize,
+    /// This grid after [`Hearer::with_lead`]'s silence, worked out once
+    /// at load: a forget to the lead is a copy of it, no model run (#6462).
+    led: Option<Box<Stream>>,
 }
 
 /// Embeddings kept for a score: [`CONTEXT`], and [`BACK`] - 1 more so a
@@ -519,7 +542,8 @@ impl Grids {
                 } else {
                     self.late(at + 1, later)
                 };
-                if let Some(taken) = taken {
+                if let Some(mut taken) = taken {
+                    taken.late = u32::try_from(step - (at + 1)).unwrap_or(u32::MAX);
                     best = higher(best, taken);
                 }
                 self.later[grid].pop_front();
@@ -545,6 +569,12 @@ fn higher(one: Score, other: Score) -> Score {
         name: one.name.max(other.name),
         stop: max(one.stop, other.stop),
         rescue: max(one.rescue, other.rescue),
+        // The name's score is dated by the step it is of: the higher one's.
+        late: if other.name > one.name {
+            other.late
+        } else {
+            one.late
+        },
     }
 }
 
@@ -559,11 +589,26 @@ impl Stream {
             made: 0,
             embeddings: VecDeque::with_capacity(KEPT),
             scored: 0,
+            led: None,
         }
     }
 
     fn forget(&mut self) {
+        let led = self.led.take();
         *self = Self::new(self.offset);
+        self.led = led;
+    }
+
+    /// As just after the lead's silence: its state, copied; from nothing
+    /// without one.
+    fn lead(&mut self) {
+        match self.led.take() {
+            Some(led) => {
+                *self = (*led).clone();
+                self.led = Some(led);
+            }
+            None => self.forget(),
+        }
     }
 
     /// Scores for the steps that became whole, each with its number (the
@@ -693,6 +738,7 @@ impl Stream {
                     name: *score.first().ok_or("name.onnx: no score")?,
                     stop,
                     rescue,
+                    late: 0,
                 },
             ));
         }
@@ -724,6 +770,7 @@ impl Hearer {
             woken: None,
             wait: false,
             fed: 0,
+            led: 0,
         };
         // Enough silence for one score: 2.9 s.
         let scores = hearer.hear(&vec![0i16; STEP * 36])?;
@@ -794,6 +841,58 @@ impl Hearer {
         self.wake = Some(bar);
         self.grids.hearing_at(least);
         Ok(self)
+    }
+
+    /// `samples` of silence (under a window: never a score) taken as heard
+    /// at each [`Hearer::forget_to_lead`], worked out here once: each
+    /// grid's state after it is kept, and a forget to the lead copies it
+    /// back, with no model run on the program's loop (#6462: run each time,
+    /// 1.95 s of zeros cost 0.3 to 0.7 s of lamp-4ace at every lost
+    /// block). Given last, after the grids and heads, before any sound;
+    /// the hearer is left just after the silence.
+    pub fn with_lead(mut self, samples: usize) -> Result<Self, String> {
+        if self.woken.is_some() || self.fed > 0 {
+            return Err("a lead is worked out before any sound".to_owned());
+        }
+        let silence = vec![0i16; samples];
+        let awake = self.wake.is_none();
+        for (grid, stream) in self.streams.iter_mut().enumerate() {
+            let mut led = Stream::new(stream.offset);
+            if !led
+                .hear(&self.models, &silence, awake || grid == 0)?
+                .is_empty()
+            {
+                return Err(format!(
+                    "a lead of {samples} samples gave a score: a lead is under a window"
+                ));
+            }
+            stream.led = Some(Box::new(led));
+        }
+        self.led = samples;
+        self.forget_to_lead();
+        Ok(self)
+    }
+
+    /// The silence [`Hearer::with_lead`] took as heard, in samples.
+    pub fn led(&self) -> usize {
+        self.led
+    }
+
+    /// Start again, as if nothing had been heard but
+    /// [`Hearer::with_lead`]'s silence: what the models held is of before.
+    /// The same as [`Hearer::forget`] and hearing that silence, at the cost
+    /// of a copy (without a lead, the same as a forget).
+    pub fn forget_to_lead(&mut self) {
+        for stream in &mut self.streams {
+            stream.lead();
+        }
+        self.grids.forget();
+        self.awake_steps = 0;
+        self.fed = self.led as u64;
+        if let Some(woken) = self.woken.as_mut() {
+            woken.epoch += 1;
+            woken.pending -= woken.queue.restart(Work::Lead { epoch: woken.epoch });
+        }
     }
 
     /// Start again, as if nothing had been heard: after sound was lost,
@@ -871,7 +970,9 @@ impl Hearer {
 
     /// More of what the microphone hears, 16 kHz, one channel. A score
     /// for every step that became whole with it, oldest first: none for
-    /// about the first two seconds after a start, then one every 80 ms.
+    /// about the first two seconds after a start, then one every 80 ms
+    /// (lamp-name gives it 1.95 s of silence first, `quiet::LEAD`, #6114,
+    /// worked out once by [`Hearer::with_lead`]).
     pub fn hear(&mut self, samples: &[i16]) -> Result<Vec<Score>, String> {
         let awake = self.wake.is_none() || self.awake_steps > 0;
         if self.wake.is_some() && self.streams.len() > 1 && self.woken.is_none() {
@@ -943,6 +1044,7 @@ mod tests {
             name,
             stop: None,
             rescue: None,
+            late: 0,
         }
     }
 
@@ -1006,6 +1108,7 @@ mod tests {
             name,
             stop: Some(stop),
             rescue: None,
+            late: 0,
         };
         let mut both = Grids::new(2);
         both.hearing_at(0.9);
@@ -1030,8 +1133,11 @@ mod tests {
         stopped.later(1, 0, stop(0.97, 0.99));
         assert_eq!(
             stopped.first(stop(0.0, 0.0)),
-            stop(0.97, 0.0),
-            "the stop let go, the name kept"
+            Score {
+                late: 9,
+                ..stop(0.97, 0.0)
+            },
+            "the stop let go, the name kept, of step 1 given at step 10"
         );
         // A forget keeps the bars.
         woken.forget();
@@ -1043,6 +1149,61 @@ mod tests {
         // One grid: every score as it came.
         let mut one = Grids::new(1);
         assert_eq!(one.first(score(0.3)).name, 0.3);
+    }
+
+    /// #6114: a step's score says how many steps back the sound its name's
+    /// score is of: 0 for the first grid's own and a later grid's on time,
+    /// and for one a woken grid gave late, the steps between. lamp-name
+    /// dates a hearing by it, so a name the fine grids caught a second late
+    /// is still placed where it was said.
+    #[test]
+    fn a_late_score_says_how_many_steps_back_its_sound_is() {
+        let mut grids = Grids::new(2);
+        assert_eq!(grids.first(score(0.2)).late, 0, "the first grid's own");
+        grids.later(1, 0, score(0.96));
+        assert_eq!(
+            grids.first(score(0.1)),
+            Score {
+                late: 0,
+                ..score(0.96)
+            }
+        );
+        // The fine grids woke on "Lamp" at step 1 and caught up 14 steps
+        // (1.1 s) later: their best is of step 2, given at step 16.
+        for _ in 2..16 {
+            grids.first(score(0.3));
+        }
+        grids.later(1, 1, score(0.94));
+        assert_eq!(
+            grids.first(score(0.3)),
+            Score {
+                late: 14,
+                ..score(0.94)
+            }
+        );
+        // When the first grid's own is higher, the step is its own.
+        grids.later(1, 5, score(0.5));
+        assert_eq!(
+            grids.first(score(0.8)),
+            Score {
+                late: 0,
+                ..score(0.8)
+            }
+        );
+        // And it is the name's step that counts, not the stop's.
+        let mut both = Grids::new(2);
+        for _ in 0..5 {
+            both.first(score(0.0));
+        }
+        both.later(
+            1,
+            0,
+            Score {
+                stop: Some(0.99),
+                ..score(0.0)
+            },
+        );
+        assert_eq!(both.first(score(0.1)).late, 0);
     }
 
     /// Reviewer-two on #2759: the woken grids' queue holds at most
@@ -1131,11 +1292,13 @@ mod tests {
             name: 0.2,
             stop: Some(0.7),
             rescue: None,
+            late: 0,
         };
         let other = Score {
             name: 0.9,
             stop: Some(0.1),
             rescue: Some(0.4),
+            late: 0,
         };
         assert_eq!(
             higher(one, other),
@@ -1143,6 +1306,7 @@ mod tests {
                 name: 0.9,
                 stop: Some(0.7),
                 rescue: Some(0.4),
+                late: 0,
             }
         );
     }

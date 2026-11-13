@@ -13,20 +13,31 @@
 //! ([`rate`]). Nothing listens yet: the server, pairing and the routing to
 //! the parts come in the pieces after it, off unless `LAMP_CONTROL=on`.
 
+pub mod agent;
 pub mod body_info;
 pub mod body_lease;
 pub mod body_state;
 pub mod camera;
 pub mod cert;
 pub mod feelings;
+pub mod hands;
 pub mod journal;
+pub mod language;
 pub mod lease;
+pub mod microphone;
+pub mod motion_done;
+pub mod notes;
 pub mod pairing;
 pub mod parts;
 pub mod protocol;
 pub mod push;
+pub mod pushed_moves;
 pub mod rate;
+pub mod runs;
 pub mod server;
+pub mod services;
 pub mod session;
 pub mod sounds;
+pub mod speaker;
+pub mod task_yes;
 pub mod watch;

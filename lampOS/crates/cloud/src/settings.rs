@@ -37,7 +37,11 @@ pub const ENVIRONMENT: &str = "LAMP_SETTINGS_CHANGE";
 /// The kinds, each answered `starting` and then its result. `control.set`
 /// (`{"on": bool}`) is the owner's developer setting: root's helper writes
 /// or removes lamp-control's drop-in and restarts it (`docs/control.md`).
-pub const KINDS: [&str; 5] = [
+/// `control.set_agent` (`{"on": bool}`) is the owner's local agent switch:
+/// the same helper writes or removes lamp-control's second drop-in, fixed
+/// text, and only while developer access is on (`docs/control.md`, "The
+/// local agent").
+pub const KINDS: [&str; 6] = [
     "timezone.set",
     "person.name.set",
     "device.rename",
@@ -45,10 +49,15 @@ pub const KINDS: [&str; 5] = [
     // checked by the helper, which restarts the voice once it rests.
     "language.set",
     CONTROL_KIND,
+    AGENT_KIND,
 ];
 
 /// The owner's developer setting: lamp-control on or off (`{"on": bool}`).
 pub const CONTROL_KIND: &str = "control.set";
+
+/// The owner's local agent switch: lamp-control's socket for the one fixed
+/// user, on or off (`{"on": bool}`); no user is ever named in the request.
+pub const AGENT_KIND: &str = "control.set_agent";
 
 /// `on`, beside [`ENVIRONMENT`] and `LAMP_CLOUD`, takes [`WIFI_KIND`].
 pub const WIFI_ENVIRONMENT: &str = "LAMP_SETTINGS_WIFI";
@@ -373,6 +382,9 @@ pub fn line(kind: &str, data: &Value) -> Result<String, String> {
     if kind == CONTROL_KIND {
         return control_line(data);
     }
+    if kind == AGENT_KIND {
+        return agent_line(data);
+    }
     let (field, key, why) = match kind {
         "timezone.set" => ("timezone", "timezone", "timezone must be text"),
         "person.name.set" => ("name", "person_name", "name must be text"),
@@ -397,6 +409,18 @@ fn control_line(data: &Value) -> Result<String, String> {
         .ok_or_else(why)?;
     let on = object.get("on").and_then(Value::as_bool).ok_or_else(why)?;
     Ok(json!({ "control": on }).to_string())
+}
+
+/// `control.set_agent`'s line: exactly one field, `on`, true or false. The
+/// helper's line is `{"local_agent": on}`: the user is the helper's constant.
+fn agent_line(data: &Value) -> Result<String, String> {
+    let why = || "on must be true or false, and the only field".to_owned();
+    let object = data
+        .as_object()
+        .filter(|object| object.len() == 1)
+        .ok_or_else(why)?;
+    let on = object.get("on").and_then(Value::as_bool).ok_or_else(why)?;
+    Ok(json!({ "local_agent": on }).to_string())
 }
 
 /// What the helper's reply line says: its `data`, or why not.
@@ -1518,6 +1542,32 @@ mod tests {
     /// The owner's developer setting: exactly one boolean `on`, else
     /// refused at once, before the helper is asked.
     #[test]
+    fn control_set_agent_takes_exactly_one_boolean_on_and_names_no_user() {
+        assert_eq!(
+            line("control.set_agent", &json!({"on": true})),
+            Ok(r#"{"local_agent":true}"#.to_owned())
+        );
+        assert_eq!(
+            line("control.set_agent", &json!({"on": false})),
+            Ok(r#"{"local_agent":false}"#.to_owned())
+        );
+        for data in [
+            json!({}),
+            json!({"on": "yes"}),
+            json!({"on": 1}),
+            json!({"on": true, "user": "root"}),
+            json!({"user": "root"}),
+            json!(true),
+        ] {
+            assert_eq!(
+                line("control.set_agent", &data),
+                Err("on must be true or false, and the only field".to_owned()),
+                "{data}"
+            );
+        }
+    }
+
+    #[test]
     fn control_set_takes_exactly_one_boolean_on() {
         assert_eq!(
             line("control.set", &json!({"on": true})),
@@ -1576,6 +1626,59 @@ mod tests {
             (&said["status"], &said["data"]["on"]),
             (&json!("success"), &json!(true))
         );
+        let _ = std::fs::remove_file(&path);
+    }
+
+    /// `control.set_agent` goes the same way: acked at once, its line is the
+    /// helper's `{"local_agent": bool}` (never a user), and the helper's own
+    /// refusal (developer access is off) comes back in its words.
+    #[test]
+    fn control_set_agent_is_acked_at_once_and_the_helpers_refusal_comes_back_in_words() {
+        let path = socket("agent");
+        let serving = helper(&path, Duration::ZERO, "{\"done\":{\"on\":true}}\n");
+        let changes = Changes::new(&path, Duration::from_secs(5));
+        let mut lamp = Fake {
+            changes: Some(changes.clone()),
+            ..Fake::default()
+        };
+        assert_eq!(
+            answer(
+                &mut lamp,
+                "control.set_agent",
+                &json!({"on": true, "user": "root"})
+            ),
+            Err("on must be true or false, and the only field".to_owned())
+        );
+        let sent = br#"{"cmd":"data","kind":"control.set_agent","data":{"on":true}}"#;
+        let acked: Value =
+            serde_json::from_str(&reply(&identity(), &mut lamp, sent, "t").unwrap()).unwrap();
+        assert_eq!(
+            (&acked["kind"], &acked["status"]),
+            (&json!("control.set_agent"), &json!("starting"))
+        );
+        let (kind, result) = first(&changes);
+        assert_eq!(kind, "control.set_agent");
+        assert_eq!(result, Ok(Some(json!({"on": true}))));
+        assert_eq!(serving.join().unwrap(), "{\"local_agent\":true}\n");
+        let _ = std::fs::remove_file(&path);
+        // The helper refuses while developer access is off: the app reads why.
+        let why =
+            "turn developer access on first: the local agent's socket is the developer door's";
+        let path = socket("agent-off");
+        let serving = helper(
+            &path,
+            Duration::ZERO,
+            "{\"refused\":\"turn developer access on first: the local agent's socket is the developer door's\"}\n",
+        );
+        let changes = Changes::new(&path, Duration::from_secs(5));
+        let mut lamp = Fake {
+            changes: Some(changes.clone()),
+            ..Fake::default()
+        };
+        reply(&identity(), &mut lamp, sent, "t").unwrap();
+        let (_, result) = first(&changes);
+        assert_eq!(result, Err(why.to_owned()));
+        serving.join().unwrap();
         let _ = std::fs::remove_file(&path);
     }
 

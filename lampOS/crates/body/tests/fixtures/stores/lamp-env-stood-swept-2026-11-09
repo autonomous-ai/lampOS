@@ -1,0 +1,6 @@
+# lamp-06c1, read at rest with torque off by lamp-body-measure, 2026-11-09T02:00Z.
+# At rest: yaw 2034, shoulder 2050, elbow 2059, roll 2057, pitch 1772; the pitch servo's limits 1451-3067.
+# The servos' own limits: yaw 0-4095, shoulder 0-4095, elbow 0-4095, roll 0-4095, pitch 1451-3067.
+# home, folded-arm: found at rest. stand: this arm's, stood at 100% at the lamp's first stand, confirmed by a touch, with this lamp's roll and yaw. pitch-window: the default, checked. gaze: NOT measured (body.md, with a face and the camera).
+BODY_POSES="--home 1772,2057,2034 --folded-arm 2050,2059 --stand 1772,2057,2034,2633,2603 --pitch-window 1740,2030 --torque on"
+# Swept by hand: yaw 855-3283, shoulder 2056-3989, elbow 3900-300 (across the seam), roll 1223-3237, pitch 1470-3103.

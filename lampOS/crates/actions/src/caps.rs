@@ -2,8 +2,10 @@
 //!
 //! Success means the restriction was committed, never that a mixer or ring
 //! applied it. The caller applies the effective minimum and reports hardware
-//! confirmation separately. Releasing a restriction supplies no saved volume
-//! or light setting to restore.
+//! confirmation separately. Releasing a restriction supplies no saved light
+//! setting to restore. The one volume level a cap lowered, to be given back
+//! on its release, is kept here too ([`Controller::keep_given_back`]), so a
+//! restart under the cap still gives it back (#6479).
 
 use lamp_schedule::store::Store;
 use serde::{Deserialize, Serialize};
@@ -233,6 +235,11 @@ struct State {
     schema: u32,
     revision: u64,
     sources: Vec<Entry>,
+    /// The mixer's (from, to) a volume cap lowered, until it is given back
+    /// or a person's change forgets it. Additive: a store without it, or a
+    /// build that ignores it, gives back nothing after a restart, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    given_back: Option<(u8, u8)>,
 }
 
 impl State {
@@ -241,6 +248,7 @@ impl State {
             schema: SCHEMA,
             revision: 0,
             sources: Vec::new(),
+            given_back: None,
         }
     }
 
@@ -257,7 +265,12 @@ impl State {
             return Err(Error::Schema(version.schema));
         }
         let state: Self = serde_json::from_slice(bytes).map_err(|_| Error::Corrupt)?;
-        if state.sources.len() > MAX_SOURCES || (state.revision == 0 && !state.sources.is_empty()) {
+        if state.sources.len() > MAX_SOURCES
+            || (state.revision == 0 && !state.sources.is_empty())
+            || state
+                .given_back
+                .is_some_and(|(from, to)| from > 100 || to > 100)
+        {
             return Err(Error::Corrupt);
         }
         let mut names = BTreeSet::new();
@@ -354,6 +367,31 @@ impl Controller {
             .revision
             .checked_add(1)
             .ok_or(Error::Invalid("cap revision is exhausted"))?;
+        let bytes = serde_json::to_vec(&next).map_err(|_| Error::Corrupt)?;
+        if bytes.len() > MAX_STATE_BYTES {
+            return Err(Error::Invalid("cap state exceeds its byte bound"));
+        }
+        self.store.commit(&bytes).map_err(Error::Storage)?;
+        self.state = next;
+        Ok(())
+    }
+
+    /// The volume level to give back on release, as last kept.
+    pub fn given_back(&self) -> Option<(u8, u8)> {
+        self.state.given_back
+    }
+
+    /// Keep the (from, to) a volume cap lowered, or forget it with `None`.
+    /// It is not a restriction, so the revision stays as it is.
+    pub fn keep_given_back(&mut self, given_back: Option<(u8, u8)>) -> Result<(), Error> {
+        self.healthy()?;
+        if self.state.given_back == given_back {
+            return Ok(());
+        }
+        let next = State {
+            given_back,
+            ..self.state.clone()
+        };
         let bytes = serde_json::to_vec(&next).map_err(|_| Error::Corrupt)?;
         if bytes.len() > MAX_STATE_BYTES {
             return Err(Error::Invalid("cap state exceeds its byte bound"));

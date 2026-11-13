@@ -22,6 +22,13 @@
         "type": "string"
       }
     },
+    "grants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "What a do.task's script may reach through lamp-control: names of its grants, each once, never skills. Only beside a do.task; the lamp checks the names (docs/skills.md, 'A skill's task')."
+    },
     "kind": {
       "enum": [
         "core",
@@ -72,6 +79,11 @@
     "tool": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,47}$"
+    },
+    "knowledge": {
+      "description": "A file of the skill's folder told to the tool's call after its note, the section its choice names (#5790).",
+      "type": "string",
+      "pattern": "^[a-z0-9-]+\\.md$"
     },
     "choice": {
       "type": "object",
@@ -330,6 +342,12 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 512
+        },
+        "when": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "When to call the stop function and when not, in short (#6218): the tools file's when with LAMP_USE_SKILL_SUMMARY on."
         }
       }
     },
@@ -658,6 +676,20 @@
         }
       }
     },
+    "day_name": {
+      "type": "string",
+      "enum": [
+        "mon",
+        "tue",
+        "wed",
+        "thu",
+        "fri",
+        "sat",
+        "sun",
+        "weekdays",
+        "weekend"
+      ]
+    },
     "core_table": {
       "type": "object",
       "description": "A table of the lamp's own skills, checked by the part that reads it; not part of the public format, and the schema doesn't look inside it."
@@ -843,6 +875,21 @@
         "during": {
           "$ref": "#/$defs/window"
         },
+        "days": {
+          "description": "The local days of the week its `during` opens on (#6066): one name or a nonempty list of `mon` to `sun`, `weekdays`, `weekend`. Only with `during`; an overnight window's hours after midnight are the day it opened's.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/day_name"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/day_name"
+              }
+            }
+          ]
+        },
         "once_per_day": {
           "type": "boolean"
         },
@@ -1008,7 +1055,10 @@
           "$ref": "#/$defs/duration"
         },
         "unknown": {
-          "const": "holds"
+          "enum": [
+            "holds",
+            "holds_stale"
+          ]
         },
         "through": {
           "type": "array"
@@ -1510,6 +1560,25 @@
               }
             }
           ]
+        },
+        "task": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "task",
+            "run"
+          ],
+          "properties": {
+            "task": {
+              "type": "string",
+              "description": "The task's words, 1 to 500 bytes, no control characters."
+            },
+            "run": {
+              "type": "string",
+              "description": "The script, a plain file inside the skill's own scripts/ (at most four parts, none hidden)."
+            }
+          },
+          "description": "A task handed to the lamp's agent, alone in its [[do]] table, one a skill, in an installable skill (do.task, docs/skills.md)."
         }
       }
     },

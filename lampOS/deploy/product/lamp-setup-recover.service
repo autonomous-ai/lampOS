@@ -1,7 +1,7 @@
 # Recovery (#3020, lampOS/docs/setup.md, "When the saved network is gone"): on a set-up lamp whose saved
 # network is gone, 90 s off every known network, and not joining one, opens setup's own hotspot and page
-# so the app can set a new network, its marker and the person's data kept. Off: without
-# LAMP_WIFI_RECOVERY=on (a drop-in, lamp-setup-recover.service.d/on.conf) it says so and exits at once.
+# so the app can set a new network, its marker and the person's data kept. On in the product (#5758,
+# below); with LAMP_WIFI_RECOVERY set to anything else (a drop-in) it says so and exits at once.
 [Unit]
 Description=lampOS: setup's hotspot again when the saved network is gone
 After=network-pre.target
@@ -13,6 +13,9 @@ ConditionPathExists=/etc/lampOS/setup/serve.json
 Type=simple
 # Root: it moves the radio between station and hotspot, as setup does.
 User=root
+# On in the product (#5758, the first builder's yes 11 Nov): a lamp whose network is gone opens setup's
+# hotspot instead of needing a reset.
+Environment=LAMP_WIFI_RECOVERY=on
 # /run/lampos-setup-recover/on while it runs with its switch on: lamp-cloud reads it for system.info's recovery.
 RuntimeDirectory=lampos-setup-recover
 RuntimeDirectoryMode=0755

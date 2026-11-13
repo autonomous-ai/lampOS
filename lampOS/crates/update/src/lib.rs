@@ -12,25 +12,33 @@
 //! written by `lamp-update-apply`; [`switches`] the product's switches,
 //! and a kept file that turns one off.
 pub mod added;
+pub mod agent_ns;
 pub mod app_check;
 pub mod apply;
 pub mod check_units;
 pub mod companion;
+pub mod engines;
 pub mod fetch;
+pub mod first_update;
 pub mod fixed_copy;
 pub mod harness_install;
 mod head_touch;
+pub mod hermes_install;
+pub mod hermes_schedule;
 pub mod image;
 pub mod install;
 pub mod judge;
 pub mod manifest;
 pub mod models;
+pub mod openclaw_install;
 pub mod own;
 pub mod product_skills;
 pub mod publish;
 pub mod quiet;
 pub mod records;
+pub mod reset_hold;
 pub mod round;
+pub mod sdk_tree;
 mod setup_lifecycle;
 pub mod status;
 pub mod switches;

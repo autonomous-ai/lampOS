@@ -5,7 +5,12 @@
 //!                    [--mood-socket PATH] [--say-socket PATH] [--actions-socket PATH]
 //!                    [--bus-root DIR] [--boot-id ID]
 //!                    [--sight-file PATH|off] [--frames-socket PATH|off] [--remote on|off]
+//!                    [--camera-opens-on-demand]
+//!                    [--microphone on|off] [--speaker on|off]
+//!                    [--run-socket PATH] [--run-socket-user USER]
+//!                    [--services-socket PATH]
 //! lamp-control code --grants body,light,speak [--admin-socket PATH]
+//! lamp-control grants CLIENT --grants body,light [--admin-socket PATH]
 //! lamp-control revoke CLIENT [--admin-socket PATH]
 //! lamp-control clients [--admin-socket PATH]
 //! ```
@@ -22,7 +27,11 @@
 //! is refused with a why. The `camera` grant's pictures are the eyes' newest
 //! frame in `--sight-file` (`/run/lampos-eyes/sight.jpg`, the eyes' own; `off`
 //! for none), read only with `--bus-root`, which says when the lamp is
-//! private (docs/control.md, "The camera"). Connections come only from the
+//! private (docs/control.md, "The camera"). The `microphone` grant's sound is
+//! the ears' `mic1/audio` on that bus, which they publish only with
+//! `LAMP_BUS_AUDIO=on`, and only with `--microphone on` (or
+//! `LAMP_CONTROL_MICROPHONE=on`; off unless given) (docs/control.md, "The
+//! microphone"). Connections come only from the
 //! lamp's own network unless `--remote on` (or `LAMP_CONTROL_REMOTE=on`)
 //! lets any address in, a VPN's 100.64/10 included; never to the camera or
 //! the microphone, which stay on the lamp's own network (docs/control.md,
@@ -45,6 +54,10 @@ const SIGHT: &str = "/run/lampos-eyes/sight.jpg";
 const FRAMES: &str = "/run/lampos-eyes/frames.sock";
 /// `--remote on` from the environment, when the flag isn't given.
 const REMOTE_ENVIRONMENT: &str = "LAMP_CONTROL_REMOTE";
+/// The owner's switch for `microphone.stream`, off unless `on`.
+const MICROPHONE_ENVIRONMENT: &str = "LAMP_CONTROL_MICROPHONE";
+/// The owner's switch for `speaker.stream`, off unless `on`.
+const SPEAKER_ENVIRONMENT: &str = "LAMP_CONTROL_SPEAKER";
 
 fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).collect();
@@ -80,12 +93,28 @@ fn run(arguments: &[String]) -> Result<(), String> {
                 .collect();
             ask(&admin, &serde_json::json!({"code": {"grants": grants}}))
         }
+        Some("grants") => {
+            // A keeper's way to change a paired computer's grants at the lamp,
+            // as the app's `control.set_grants` does: the whole list, no new code.
+            let client = arguments.get(1).ok_or("grants CLIENT --grants a,b")?;
+            // The whole list, so it must be given: `--grants ""` is none; a missing flag is a slip.
+            let grants: Vec<String> = option(arguments, "--grants")
+                .ok_or("grants CLIENT --grants a,b (the whole list; --grants \"\" for none)")?
+                .split(',')
+                .filter(|grant| !grant.is_empty())
+                .map(str::to_owned)
+                .collect();
+            ask(
+                &admin,
+                &serde_json::json!({"set_grants": {"client": client, "grants": grants}}),
+            )
+        }
         Some("revoke") => {
             let client = arguments.get(1).ok_or("revoke CLIENT")?;
             ask(&admin, &serde_json::json!({"revoke": client}))
         }
         Some("clients") => ask(&admin, &serde_json::json!({"clients": true})),
-        _ => Err("serve, code, revoke or clients (see docs/control.md)".to_owned()),
+        _ => Err("serve, code, grants, revoke or clients (see docs/control.md)".to_owned()),
     }
 }
 
@@ -103,9 +132,20 @@ fn ask(admin: &PathBuf, asked: &serde_json::Value) -> Result<(), String> {
 }
 
 fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
-    if std::env::var(ENVIRONMENT).ok().as_deref() != Some("on") {
+    // The door (paired computers over TLS on `--listen`) only with
+    // LAMP_CONTROL=on, the owner's developer setting. Without it, a lamp
+    // with a skill's tasks on (`LAMP_SKILL_TASKS=on`) still serves the
+    // owner's side (`--admin-socket`: the voice's yes records, lamp-tasks'
+    // mints) and the run socket, and nothing listens on the network.
+    let door_on = std::env::var(ENVIRONMENT).ok().as_deref() == Some("on");
+    if !door_on && !lamp_control::task_yes::on() {
         eprintln!("lamp-control: off ({ENVIRONMENT} is not on): nothing listens");
         return Ok(());
+    }
+    if !door_on {
+        eprintln!(
+            "lamp-control: the door is off ({ENVIRONMENT} is not on): only the owner's side and skill runs, nothing on the network"
+        );
     }
     let state =
         PathBuf::from(option(arguments, "--state-dir").unwrap_or_else(|| STATE_DIR.to_owned()));
@@ -124,7 +164,8 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let clients =
         Clients::load(&clients_path).map_err(|e| format!("{}: {e}", clients_path.display()))?;
     eprintln!(
-        "lamp-control: on, {listen}, {} paired, certificate pin {}",
+        "lamp-control: on, {}, {} paired, certificate pin {}",
+        if door_on { listen.as_str() } else { "no door" },
         clients.clients.len(),
         identity.pin
     );
@@ -175,7 +216,11 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         clients,
         Some(clients_path),
     )
-    .with_quiet_hours(session::Quiet::new(local_time).with_window(window));
+    .with_quiet_hours(session::Quiet::new(local_time).with_window(window))
+    .with_language_file(std::env::var_os("LAMP_LANGUAGE_FILE").map_or_else(
+        || PathBuf::from(lamp_control::language::PATH),
+        PathBuf::from,
+    ));
     if rates_off {
         door = door.with_rates_off();
     }
@@ -192,6 +237,20 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let clips = state.join(lamp_control::sounds::SOUNDS_FOLDER);
     if say.is_some() {
         door = door.with_sound_folder(clips.clone());
+    }
+    // A computer's own notes: always kept, in the state folder's `notes`.
+    door = door.with_notes_folder(state.join(lamp_control::notes::NOTES_FOLDER));
+    // A skill run's linked services (#6432): only with LAMP_SKILL_TASKS=on,
+    // sent on to lamp-services' tools socket (`--services-socket`).
+    if lamp_control::services::on(
+        std::env::var(lamp_control::services::ENVIRONMENT)
+            .ok()
+            .as_deref(),
+    ) {
+        let socket = option(arguments, "--services-socket")
+            .unwrap_or_else(|| lamp_control::services::SOCKET.to_owned());
+        eprintln!("lamp-control: a skill run's linked services go to {socket}");
+        door = door.with_skill_services(PathBuf::from(socket));
     }
     let actions = option(arguments, "--actions-socket").map(PathBuf::from);
     let bus = match option(arguments, "--bus-root") {
@@ -223,50 +282,57 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         None => Some(PathBuf::from(SIGHT)),
     }
     .filter(|_| bus.is_some());
-    // The camera is never seen without the ring's mark (`light/mark`): no
-    // mark on the bus, no camera.
-    let mark = match (&sight, &bus) {
-        (Some(_), Some(bus)) => match bus.publisher_declared(
+    // The camera and the microphone are never seen or heard without the
+    // ring's mark (`light/mark`): no mark on the bus, neither.
+    let ring_mark = match &bus {
+        Some(bus) => match bus.publisher_declared(
             lamp_msgs::RingMark::TOPIC,
             &lamp_msgs::RingMark::declaration(),
             "control",
         ) {
-            Ok(publisher) => {
-                let publisher = Mutex::new(publisher);
-                Some(lamp_control::camera::mark_on(
-                    clock_id.clone(),
-                    move |mark| {
-                        if let Ok(mut publisher) = publisher.lock()
-                            && let Err(error) =
-                                publisher.publish_json(lamp_ipc::monotonic_us(), mark)
-                        {
-                            eprintln!("lamp-control: the ring's mark was not asked: {error}");
-                        }
-                    },
-                ))
-            }
+            Ok(publisher) => Some(Arc::new(Mutex::new(publisher))),
             Err(error) => {
-                eprintln!("lamp-control: no camera, since the ring's mark can't be asked: {error}");
+                eprintln!(
+                    "lamp-control: no camera or microphone, since the ring's mark can't be asked: {error}"
+                );
                 None
             }
         },
-        _ => None,
+        None => None,
+    };
+    let marked = |kind: lamp_msgs::MarkKind| {
+        ring_mark.clone().map(|publisher| {
+            lamp_control::camera::mark_on(clock_id.clone(), kind, move |mark| {
+                if let Ok(mut publisher) = publisher.lock()
+                    && let Err(error) = publisher.publish_json(lamp_ipc::monotonic_us(), mark)
+                {
+                    eprintln!("lamp-control: the ring's mark was not asked: {error}");
+                }
+            })
+        })
     };
     // The ring's word that it drew each computer's mark
-    // (`light/mark_drawn`): no word, no picture (Thirteen's P2 on #4521).
-    let mark = match (mark, &bus) {
-        (Some(mark), Some(bus)) => match drawn_on(bus, clock_id.clone()) {
-            Ok(drawn) => Some((mark, drawn)),
+    // (`light/mark_drawn`): no word, no picture and no sound (Thirteen's P2
+    // on #4521).
+    let drawn = match &bus {
+        Some(bus) if ring_mark.is_some() => match drawn_on(bus, clock_id.clone()) {
+            Ok(drawn) => Some(drawn),
             Err(error) => {
                 eprintln!(
-                    "lamp-control: no camera, since the ring's word on its mark can't be read: {error}"
+                    "lamp-control: no camera or microphone, since the ring's word on its mark can't be read: {error}"
                 );
                 None
             }
         },
         _ => None,
     };
-    let sight = sight.zip(mark);
+    let sight = sight.zip(marked(lamp_msgs::MarkKind::Camera).zip(drawn.clone()));
+    // The microphone: the ears' `mic1/audio`, subscribed only while a
+    // stream is on; shared only where they publish it (`LAMP_BUS_AUDIO=on`).
+    let hearing = bus
+        .clone()
+        .zip(marked(lamp_msgs::MarkKind::Microphone).zip(drawn.clone()))
+        .map(|(bus, marking)| (lamp_control::microphone::on_bus(bus), marking));
     // The fast stream from the eyes' frames socket, when they serve one; its
     // frames go out once the server below has a way to send them.
     let frames = match option(arguments, "--frames-socket").as_deref() {
@@ -283,17 +349,150 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     let (looks, looked) = tokio::sync::mpsc::unbounded_channel();
     let follow = lamp_control::body_lease::Follower::default();
     let on_lease = lease_socket.is_some().then(|| (looks, follow.clone()));
+    // Whether a hand is wanted (`humans/hands/wanted`): true while a
+    // computer's `look` at `hand` stands, for the eyes to look for one only
+    // then (hands.rs).
+    if let (Some(bus), true) = (&bus, lease_socket.is_some()) {
+        match bus.publisher_declared(
+            lamp_msgs::HandsWanted::TOPIC,
+            &lamp_msgs::HandsWanted::declaration(),
+            "control",
+        ) {
+            Ok(mut publisher) => {
+                let held = follow.clone();
+                let spawned = std::thread::Builder::new()
+                    .name("hands-wanted".into())
+                    .spawn(move || {
+                        lamp_control::hands::run(
+                            held,
+                            move |wanted| {
+                                let word = lamp_msgs::HandsWanted { wanted };
+                                if let Err(error) =
+                                    publisher.publish_json(lamp_ipc::monotonic_us(), &word)
+                                {
+                                    eprintln!("lamp-control: whether a hand is wanted was not told: {error}");
+                                }
+                            },
+                            Arc::new(std::sync::atomic::AtomicBool::new(false)),
+                            lamp_control::hands::LOOK_EVERY,
+                        );
+                    });
+                if let Err(error) = spawned {
+                    eprintln!("lamp-control: no hand is asked of the eyes: {error}");
+                }
+            }
+            Err(error) => eprintln!("lamp-control: no hand is asked of the eyes: {error}"),
+        }
+    }
+    let sink_for_ears = sink.clone();
+    // The microphone stream is off unless the owner switches it on: no unit
+    // sets it (docs/control.md, "The microphone").
+    let microphone = match option(arguments, "--microphone")
+        .or_else(|| std::env::var(MICROPHONE_ENVIRONMENT).ok())
+        .as_deref()
+    {
+        None | Some("off") => false,
+        Some("on") => true,
+        Some(_) => return Err("--microphone is on or off".to_owned()),
+    };
+    eprintln!(
+        "lamp-control: {}",
+        if microphone {
+            "the microphone stream is on (--microphone on), where the ears share their sound"
+        } else {
+            "the microphone stream is off (--microphone)"
+        }
+    );
+    // The speaker stream is off unless the owner switches it on, and needs the
+    // voice's say socket, the bus (`speaker/audio`) and the ring's mark: no
+    // unit sets it (docs/control.md, "The speaker").
+    let speaker_switch = match option(arguments, "--speaker")
+        .or_else(|| std::env::var(SPEAKER_ENVIRONMENT).ok())
+        .as_deref()
+    {
+        None | Some("off") => false,
+        Some("on") => true,
+        Some(_) => return Err("--speaker is on or off".to_owned()),
+    };
+    eprintln!(
+        "lamp-control: {}",
+        if speaker_switch {
+            "the speaker stream is on (--speaker on), played through the voice"
+        } else {
+            "the speaker stream is off (--speaker)"
+        }
+    );
+    let speaker = match (&bus, &say, marked(lamp_msgs::MarkKind::Speaker).zip(drawn)) {
+        (Some(bus), Some(say), Some(marking)) => match lamp_control::speaker::on_bus(bus) {
+            Ok(publish) => {
+                let (private, muted) = lamp_control::speaker::gates(Some(watching.clone()));
+                Some(Arc::new(
+                    lamp_control::speaker::Speaker::new(private, muted)
+                        .playing(
+                            Arc::new(lamp_control::speaker::SayVoice { path: say.clone() }),
+                            publish,
+                        )
+                        .marking(marking.0, marking.1)
+                        .switched(speaker_switch),
+                ))
+            }
+            Err(error) => {
+                eprintln!(
+                    "lamp-control: no speaker stream, since speaker/audio can't be published: {error}"
+                );
+                None
+            }
+        },
+        _ => None,
+    };
+    let speaker_for_door = speaker.clone();
+    // The body's word on each motion (`body/gesture`), for a gesture's,
+    // move's and feeling's move's `done` (#4209); without it they end at
+    // their answer, as hello's limits then say.
+    let gestures = match (&bus, &body) {
+        (Some(bus), Some(_)) => match bus.subscribe(lamp_msgs::BodyGesture::TOPIC, "control") {
+            Ok(subscriber) => Some(subscriber),
+            Err(error) => {
+                eprintln!(
+                    "lamp-control: no motion done, since body/gesture can't be read: {error}"
+                );
+                None
+            }
+        },
+        _ => None,
+    };
+    // What the app's grants screen may offer: wired streams (and the microphone's
+    // and the speaker's switches).
+    let features = server::Features {
+        camera: sight.is_some(),
+        microphone: hearing.is_some() && microphone,
+        speaker: speaker_for_door.is_some() && speaker_switch,
+    };
     let shared = server::Shared::new_with(door, identity.pin.clone(), move |events| {
-        let mut lamp = parts::Lamp::new(body, light, say, clock_id, events)
+        let lamp = parts::Lamp::new(body, light, say, clock_id, events)
             .watching(watching)
             .with_clips(clips);
+        let mut lamp = match hearing {
+            Some((listen, marking)) => lamp.hearing(listen, marking, sink_for_ears, microphone),
+            None => lamp,
+        };
+        if let Some(speaker) = speaker {
+            lamp = lamp.speaking(speaker);
+        }
+        if let Some(gestures) = gestures {
+            lamp = lamp.telling_motions(gestures);
+        }
         if let Some(actions) = actions {
             lamp = lamp.volume_through(actions);
         }
+        let on_demand = arguments.iter().any(|a| a == "--camera-opens-on-demand");
         let lamp = match sight {
             Some((sight, mark)) => match frames {
-                Some(frames) => lamp.seeing(sight, mark).fast_frames(frames, sink_for_lamp),
-                None => lamp.seeing(sight, mark),
+                Some(frames) => lamp
+                    .seeing(sight, mark)
+                    .camera_on_demand(on_demand)
+                    .fast_frames(frames, sink_for_lamp),
+                None => lamp.seeing(sight, mark).camera_on_demand(on_demand),
             },
             None => lamp,
         };
@@ -305,7 +504,13 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
     if let Some(manage) = manage {
         shared.set_manage_socket(manage);
     }
+    // The owner's yeses to skills' tasks (#6305), in its own state folder,
+    // which lamp-skills can't write (`lamp_control::task_yes`).
+    shared.set_task_yes_folder(state.clone());
     let _ = sink.set(shared.binary());
+    if let Some(speaker) = speaker_for_door {
+        shared.set_speaker(speaker);
+    }
     let remote = match option(arguments, "--remote")
         .or_else(|| std::env::var(REMOTE_ENVIRONMENT).ok())
         .as_deref()
@@ -315,6 +520,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         Some(_) => return Err("--remote is on or off".to_owned()),
     };
     shared.set_remote(remote);
+    shared.set_features(features);
     eprintln!(
         "lamp-control: {}",
         if remote {
@@ -324,14 +530,41 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         }
     );
     let tls = server::acceptor(&identity).map_err(|e| format!("tls: {e}"))?;
+    // The local agent's socket: only when the owner turned a user on (the
+    // flag, or LAMP_CONTROL_LOCAL_AGENT; the flag wins; `off` is off).
+    let local_agent = option(arguments, "--local-agent")
+        .or_else(|| std::env::var("LAMP_CONTROL_LOCAL_AGENT").ok())
+        .filter(|user| !user.is_empty() && user != "off");
+    let agent_socket = PathBuf::from(
+        option(arguments, "--agent-socket")
+            .unwrap_or_else(|| lamp_control::agent::SOCKET.to_owned()),
+    );
+    let agent_group =
+        option(arguments, "--agent-group").unwrap_or_else(|| lamp_control::agent::GROUP.to_owned());
+    // The run socket (one-run tokens for a skill's run): only when a user is
+    // named (the flag, or LAMP_CONTROL_RUN_SOCKET_USER; the flag wins; `off`
+    // is off). A token is minted only from the owner's yes kept here
+    // (`task_yes::KeptYes`, #6304), with LAMP_SKILL_TASKS on.
+    let run_user = option(arguments, "--run-socket-user")
+        .or_else(|| std::env::var("LAMP_CONTROL_RUN_SOCKET_USER").ok())
+        .filter(|user| !user.is_empty() && user != "off");
+    let run_socket = PathBuf::from(
+        option(arguments, "--run-socket").unwrap_or_else(|| lamp_control::runs::SOCKET.to_owned()),
+    );
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
         .map_err(|e| e.to_string())?;
     runtime.block_on(async move {
-        let listener = tokio::net::TcpListener::bind(&listen)
-            .await
-            .map_err(|e| format!("{listen}: {e}"))?;
+        let listener = if door_on {
+            Some(
+                tokio::net::TcpListener::bind(&listen)
+                    .await
+                    .map_err(|e| format!("{listen}: {e}"))?,
+            )
+        } else {
+            None
+        };
         let _ = std::fs::remove_file(&admin);
         // The owner's side: its folder 0700 before the socket is bound, so
         // nobody else can reach it even before its own 0600 (the
@@ -353,6 +586,38 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
         std::fs::set_permissions(&admin, std::fs::Permissions::from_mode(0o600))
             .map_err(|e| e.to_string())?;
         tokio::spawn(server::admin(owner, shared.clone()));
+        if let Some(user) = local_agent {
+            match start_agent(&user, &agent_socket, &agent_group, &shared) {
+                Ok((listener, uid, client)) => {
+                    eprintln!(
+                        "lamp-control: the local agent {user} (uid {uid}) may use {}: no pairing, the grants the owner left it",
+                        agent_socket.display()
+                    );
+                    tokio::spawn(server::serve_agent(listener, uid, user, client, shared.clone()));
+                }
+                // Off, and said why: never a socket for a user that could not be named.
+                Err(why) => eprintln!("lamp-control: the local agent {user}: off: {why}"),
+            }
+        }
+        if let Some(user) = run_user {
+            match start_run_socket(&user, &run_socket) {
+                Ok((listener, uid)) => {
+                    eprintln!(
+                        "lamp-control: skill runs (uid {uid}, {user}) may use {} with a one-run token",
+                        run_socket.display()
+                    );
+                    // The owner's yes, kept in the state folder, for the
+                    // skill's folder as lamp-control hashes it at each mint.
+                    shared.set_skill_yes(Arc::new(lamp_control::task_yes::KeptYes {
+                        state: state.clone(),
+                        skills: PathBuf::from(lamp_control::task_yes::SKILLS),
+                        on: lamp_control::task_yes::on(),
+                    }));
+                    tokio::spawn(server::serve_run(listener, uid, user, shared.clone()));
+                }
+                Err(why) => eprintln!("lamp-control: the run socket for {user}: off: {why}"),
+            }
+        }
         if let Some(bus) = &bus {
             server::watch_bus(bus, watch, shared.clone())
                 .map_err(|e| format!("bus topics: {e}"))?;
@@ -368,12 +633,62 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                 looked,
             ));
         }
-        tokio::select! {
-            () = server::serve(listener, tls, shared) => {}
-            _ = tokio::signal::ctrl_c() => {}
+        match listener {
+            Some(listener) => tokio::select! {
+                () = server::serve(listener, tls, shared) => {}
+                _ = tokio::signal::ctrl_c() => {}
+            },
+            None => {
+                server::keep_ticking(shared);
+                let _ = tokio::signal::ctrl_c().await;
+            }
         }
         Ok::<(), String>(())
     })
+}
+
+/// The run socket's user's uid, and the socket. Any failure is the whole
+/// answer: no socket.
+fn start_run_socket(
+    user: &str,
+    path: &std::path::Path,
+) -> Result<(tokio::net::UnixListener, u32), String> {
+    use lamp_control::agent;
+    if !agent::user_name_ok(user) {
+        return Err("not a user name".to_owned());
+    }
+    let passwd = std::fs::read_to_string("/etc/passwd").map_err(|e| format!("/etc/passwd: {e}"))?;
+    let uid = agent::uid_of(user, &passwd).ok_or_else(|| "no such user".to_owned())?;
+    let listener =
+        lamp_control::runs::bind(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok((listener, uid))
+}
+
+/// The local agent `user`'s socket: its uid and its record, made if the lamp
+/// had none. Any failure is the whole answer: no socket.
+fn start_agent(
+    user: &str,
+    path: &std::path::Path,
+    group: &str,
+    shared: &std::sync::Arc<server::Shared>,
+) -> Result<(tokio::net::UnixListener, u32, String), String> {
+    use lamp_control::agent;
+    if !agent::user_name_ok(user) {
+        return Err("not a user name".to_owned());
+    }
+    let passwd = std::fs::read_to_string("/etc/passwd").map_err(|e| format!("/etc/passwd: {e}"))?;
+    let uid = agent::uid_of(user, &passwd).ok_or_else(|| "no such user".to_owned())?;
+    let groups = std::fs::read_to_string("/etc/group").map_err(|e| format!("/etc/group: {e}"))?;
+    let gid = agent::gid_of(group, &groups).ok_or_else(|| format!("no group {group}"))?;
+    let wall = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs())
+        .unwrap_or_default();
+    let client = shared
+        .ensure_local(user, wall)
+        .map_err(|e| format!("its record could not be kept: {e}"))?;
+    let listener = agent::bind(path, gid).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok((listener, uid, client))
 }
 
 /// When the ring last drew each computer's mark, as it says on

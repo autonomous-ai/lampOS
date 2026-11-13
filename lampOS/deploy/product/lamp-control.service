@@ -4,7 +4,10 @@
 #   [Service]
 #   Environment=LAMP_CONTROL=on
 # as a drop-in and restarts it. Off, `serve` says so and exits 0 with nothing listening.
-# No --manage-socket: skill push comes on in its own pull request, after this one. The body's
+# Skill push on (--manage-socket, docs/control.md "Skills pushed from a computer"): a paired computer
+# with the `skills` grant pushes, lists and removes its own skills through root's manage helper
+# (lamp-skills-manage.socket), which reads the push from --state-dir's push/ and installs it into
+# /var/lib/lampOS/skills-dev for lamp-skills. The body's
 # lease socket is opened by the product lamp-body unit (#4568); until it is there, lamp-control
 # retries it and `look` is refused as the body not reachable.
 [Unit]
@@ -12,7 +15,7 @@ Description=lampOS control (lamp-control)
 PartOf=lampos.target
 # Not before setup has finished (#806). The target's own condition holds back none of its parts.
 ConditionPathExists=/var/lib/lampos-setup/done
-After=local-fs.target network-online.target lamp-voice.service lamp-body.service lamp-actions.service
+After=local-fs.target network-online.target lamp-voice.service lamp-body.service lamp-actions.service lamp-skills-manage.socket
 StartLimitIntervalSec=600
 StartLimitBurst=5
 
@@ -22,12 +25,29 @@ User=lampos
 Group=lampos
 Slice=lampos-parts.slice
 Nice=10
+# A skill's task (#6305, #6432, docs/control.md): the owner's yes kept in --state-dir's task-yes.json, and a
+# run's service.read and service.write sent to lamp-services; only on the run socket, with the door on or off ((b)).
+Environment=LAMP_SKILL_TASKS=on
+# The lamp's agent's connectors (#6648, #6664): a skill's linked-service grants kept in the owner's yes and carried
+# by the run's token, so service.read and service.write reach only what the yes named. The same line in
+# lamp-tasks, lamp-skills, lamp-skills-manage@ and lamp-voice. On in the product (owner, 13 Nov).
+Environment=LAMP_AGENT_SERVICES=on
+# The run socket (/run/lampos-control/control.sock) for lamp-tasks' skill runs as `lampos` (#6071 PR 1,
+# docs/control.md "The control socket, lamp-control's side"). With LAMP_CONTROL off, lamp-control serves only it and
+# admin.sock (no TLS door), once the first builder's (b) of 12 Nov 08:15 lands.
+Environment=LAMP_CONTROL_RUN_SOCKET_USER=lampos
 # Its certificate and paired computers in --state-dir, the owner's side on --admin-socket (0600),
-# the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`)
-# and the ring's light requests on the bus.
-ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --lease-socket /run/lampos-body/lease.sock --say-socket /run/lampos-say/say.sock --actions-socket /run/lampos-actions/call.sock --bus-root /run/lampos-bus
+# the body's mood and lease sockets, the voice's say socket, lamp-actions' call socket (`volume`),
+# root's skills manage helper (skill push) and the ring's light requests on the bus.
+ExecStart=/opt/lampOS/control/current/lamp-control serve --state-dir /var/lib/lampos-control --admin-socket /run/lampos-control/admin.sock --mood-socket /run/lampos-body/mood.sock --lease-socket /run/lampos-body/lease.sock --say-socket /run/lampos-say/say.sock --actions-socket /run/lampos-actions/call.sock --manage-socket /run/lampos-skills-manage/manage.sock --bus-root /run/lampos-bus
 Restart=on-failure
 RestartSec=5s
+# The local agent's socket file (docs/control.md, "The local agent") is made by lamp-control while the owner's switch is on,
+# in /run/lampos-agent, which is writable here only through the switch's own drop-in (agent.conf). Turning the switch off
+# removes that drop-in, so the next lamp-control cannot remove the old file: it would stay, owned by lampos and listening
+# nowhere. A stop removes it, by root (the `+`: outside this unit's sandbox), and a missing file is no error. A start with
+# the switch on makes it again.
+ExecStopPost=-+/usr/bin/rm -f /run/lampos-agent/agent.sock
 StandardInput=null
 StandardOutput=journal
 StandardError=journal

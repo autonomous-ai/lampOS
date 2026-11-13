@@ -26,6 +26,9 @@ pub struct UnitState {
     /// `ConditionResult`: whether its `Condition…=` held at its last start
     /// (`yes`, `no`), empty when not said.
     pub condition: String,
+    /// `StatusText`: what the unit last told systemd of itself, empty when
+    /// nothing (an old build's body says nothing).
+    pub status: String,
 }
 
 impl UnitState {
@@ -43,7 +46,16 @@ impl UnitState {
     pub fn skipped_by_condition(&self) -> bool {
         self.ended_cleanly() && self.condition == "no"
     }
+
+    /// Why it is up and held still, as lamp-body says after a failed unplug
+    /// fold (#5777, unplug.md): its `STATUS=` begins [`HELD`].
+    pub fn held(&self) -> Option<&str> {
+        self.status.strip_prefix(HELD)
+    }
 }
+
+/// How a held lamp-body's `STATUS=` begins (#5777).
+pub const HELD: &str = "held, nothing moves: ";
 
 /// Units made to end by themselves once their job is done. The waking face
 /// (`lamp-waking.service`, `Type=simple`, no `RemainAfterExit`) ends as soon
@@ -64,7 +76,17 @@ pub const ENDS_BY_DESIGN: &[&str] = &["lamp-waking.service"];
 // Not setup's own unit: a completed setup the round restarted anyway, then
 // skipped by its marker, is a phone grace period cut short, which
 // `setup_lifecycle` exists to prevent; its watch rules stand as they are.
-const CONDITION_OWN_RULES: &[&str] = &["lamp-setup.service"];
+const CONDITION_OWN_RULES: &[&str] = &[SETUP];
+
+/// Setup's own unit. It ends by itself once setup is done (its marker
+/// written, exit 0, `Restart=on-failure`). A first update switches while
+/// setup still runs (#6284), so setup can finish inside the watch: a
+/// customer lamp on 12 Nov had build 12587 put back and refused for good
+/// as "lamp-setup.service stopped" for it (#6820). Ended cleanly after it
+/// ran, with setup's marker there ([`Watch::setup_done`]), is setup
+/// finished, not a part stopped. Failed, crashed, started again, ended
+/// without the marker, or skipped by its condition is still not well.
+const SETUP: &str = "lamp-setup.service";
 
 /// A part's name in the lamp's health: its binary's without `lamp-`.
 pub fn part_of(binary: &str) -> &str {
@@ -78,6 +100,8 @@ pub fn part_of(binary: &str) -> &str {
 pub struct Before {
     pub fresh: bool,
     pub level: Option<Level>,
+    /// Its unit was held ([`UnitState::held`]) before the switch.
+    pub held: bool,
 }
 
 impl Before {
@@ -85,6 +109,7 @@ impl Before {
         Self {
             fresh: health.is_some(),
             level: health.and_then(|health| item(health, part)),
+            held: false,
         }
     }
 }
@@ -111,6 +136,10 @@ pub struct Watch {
     /// when the build being judged left the unit's `Condition…=` lines as
     /// the build before had them ([`Watch::conditions_unchanged`]).
     skip_is_well: bool,
+    /// Setup's marker is there at this look ([`SETUP`]).
+    setup_done: bool,
+    /// Held at the end as it was before the switch (#6113): kept, and why.
+    pub held: Option<String>,
 }
 
 impl Watch {
@@ -122,7 +151,16 @@ impl Watch {
             first: None,
             ended: false,
             skip_is_well: false,
+            setup_done: false,
+            held: None,
         }
+    }
+
+    /// Whether setup's marker is there now: told before each look, so
+    /// setup's own unit ending once setup is done is setup finished
+    /// ([`SETUP`]). Any other unit ignores it.
+    pub fn setup_done(&mut self, done: bool) {
+        self.setup_done = done;
     }
 
     /// A restart skipped by its own condition is well (not this lamp's now,
@@ -146,7 +184,9 @@ impl Watch {
             self.first = None;
             return Ok(());
         }
-        if ENDS_BY_DESIGN.contains(&self.unit.as_str()) && state.ended_cleanly() {
+        let setup_finished = self.unit == SETUP && self.setup_done && state.condition != "no";
+        if (ENDS_BY_DESIGN.contains(&self.unit.as_str()) || setup_finished) && state.ended_cleanly()
+        {
             // Its job done: a later start of it is seen afresh.
             self.ended = true;
             self.first = None;
@@ -196,6 +236,17 @@ impl Watch {
                 self.unit, state.active, state.sub
             ));
         }
+        // Held by a kept unplug request (#5777): up, still, and saying no
+        // health. Held before the switch too, this build did not do it and a
+        // put-back fixes nothing (#6113); held only now, it is not well.
+        if let Some(why) = state.held() {
+            let why = format!("{} {}{why}", self.unit, HELD);
+            if !self.before.held {
+                return Err(format!("{why}, and was not before the switch"));
+            }
+            self.held = Some(why);
+            return Ok(());
+        }
         if self.part == "health" && self.before.fresh && health.is_none() {
             return Err("the lamp's health is not published since lamp-health was switched".into());
         }
@@ -231,6 +282,7 @@ mod tests {
             restarts,
             result: "success".into(),
             condition: "yes".into(),
+            status: String::new(),
         }
     }
 
@@ -349,6 +401,7 @@ mod tests {
             restarts: 0,
             result: result.into(),
             condition: "yes".into(),
+            status: String::new(),
         }
     }
 
@@ -428,6 +481,7 @@ mod tests {
             restarts: 0,
             result: "success".into(),
             condition: "no".into(),
+            status: String::new(),
         };
         let mut watch =
             Watch::new("lamp-tasks.service", "tasks", Before::default()).conditions_unchanged(true);
@@ -473,5 +527,42 @@ mod tests {
         let mut watch =
             Watch::new("lamp-setup.service", "setup", Before::default()).conditions_unchanged(true);
         assert!(watch.finish(&setup, None).is_err());
+        // Its marker there does not make a skip well either (#6820).
+        let mut watch =
+            Watch::new("lamp-setup.service", "setup", Before::default()).conditions_unchanged(true);
+        watch.setup_done(true);
+        assert!(watch.finish(&setup, None).is_err());
+    }
+
+    /// #6820: setup's own unit ending once setup is done, inside the watch,
+    /// is setup finished; failed, or ended without the marker, is not; and
+    /// the marker means nothing for any other unit.
+    #[test]
+    fn setup_ending_with_its_marker_is_setup_finished() {
+        let ended = |result: &str| UnitState {
+            unit: SETUP.into(),
+            active: "inactive".into(),
+            sub: "dead".into(),
+            result: result.into(),
+            condition: "yes".into(),
+            ..UnitState::default()
+        };
+        let mut watch = Watch::new(SETUP, "setup", Before::default());
+        watch.look(&running(41, 0)).unwrap();
+        watch.setup_done(true);
+        assert_eq!(watch.look(&ended("success")), Ok(()));
+        assert_eq!(watch.finish(&ended("success"), None), Ok(()));
+        for (result, done) in [("exit-code", true), ("success", false)] {
+            let mut watch = Watch::new(SETUP, "setup", Before::default());
+            watch.setup_done(done);
+            assert!(watch.finish(&ended(result), None).is_err(), "{result}");
+        }
+        let mut watch = Watch::new("lamp-voice.service", "voice", Before::default());
+        watch.setup_done(true);
+        let voice = UnitState {
+            unit: "lamp-voice.service".into(),
+            ..ended("success")
+        };
+        assert!(watch.finish(&voice, None).is_err());
     }
 }

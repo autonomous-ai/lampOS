@@ -36,13 +36,22 @@ pub(crate) const FACE_EXPRESSIONS_NO: &str =
 /// "Preferences"' done line, the walk's own once the step is done: the
 /// walk's last words, so they also say where the app's buttons and gestures
 /// guide is (#1711 item 1).
-pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures.\")";
+pub(crate) const PREFERENCES_DONE: &str = "(Say only this, nothing before or after it: \"All done! You can add more skills in the Autonomous app. Now, ask me anything.\")";
 
 /// "Who you are" ended with the name only on a lamp that keeps faces
 /// (#5139): what is remembered waits for a face, so the person is told, and
 /// the face is asked for once more later ([`FACE_AGAIN`]). In code, not the
-/// file: an older build refuses a new key.
-pub(crate) const NAME_ONLY: &str = "(Say only this, nothing before or after it: \"Got your name. I'll remember things for you once I've seen your face.\")";
+/// file: an older build refuses a new key. It claims nothing kept: with no
+/// face saved no owner is set and the record says `"name_kept": false`, so
+/// "Got your name" was a claim not done (#5669, the PM's 11:28 ruling).
+pub(crate) const NAME_ONLY: &str = "(Say only this, nothing before or after it: \"Thanks. I'll remember your name, and things for you, once I've seen your face.\")";
+
+/// The face question, said by the walk when the model has not asked it
+/// once the name's yes is in (#5931: on lamp-52e6 on 10 Nov two walks
+/// ended with the name only and the question never asked). A fixed note
+/// the model says, never an own line, so it is in the chat history and the
+/// worker's yes to it runs the save with no call (`yes_save`, #5684).
+pub(crate) const FACE_ASK: &str = "(Say only this, nothing before or after it: \"May I remember your face, so I know you next time?\")";
 
 /// The face asked for once more, after the walk, when "who you are" ended
 /// with the name only (#5139). The name is known by then; a yes and the
@@ -53,18 +62,18 @@ pub(crate) const FACE_AGAIN: &str = "(Nobody has spoken. Ask exactly this: \"One
 /// once per setup with `LAMP_ONBOARDING_FIRST_TRIES` on (#5316, the first
 /// customers' stage 2 on #5296): the introduction ends on what to do next,
 /// a few everyday things, never a list of features.
-pub(crate) const PREFERENCES_DONE_TRIES: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.\")";
+pub(crate) const PREFERENCES_DONE_TRIES: &str = "(Say only this, nothing before or after it: \"All done! You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one.\")";
 
 /// [`PREFERENCES_DONE`] ending with the one sentence about Harness
 /// (`harness_line::SENTENCE`), inside the same quoted line: one closing
 /// turn (#5488, with `LAMP_ONBOARDING_HARNESS_LINE` on and Harness not
 /// signed in).
-pub(crate) const PREFERENCES_DONE_HARNESS: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
+pub(crate) const PREFERENCES_DONE_HARNESS: &str = "(Say only this, nothing before or after it: \"All done! You can add more skills in the Autonomous app. Now, ask me anything. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
 
 /// [`PREFERENCES_DONE_TRIES`] ending with the same sentence, with
 /// `LAMP_ONBOARDING_FIRST_TRIES` on too: still one closing turn, so a new
 /// owner never hears two speeches at the end (the PM on #5488).
-pub(crate) const PREFERENCES_DONE_TRIES_HARNESS: &str = "(Say only this, nothing before or after it: \"Got it, that's everything. You can ask me to redo the setup any time. For my buttons and touch gestures, open the Autonomous app, select me, then General, About, Buttons and gestures. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
+pub(crate) const PREFERENCES_DONE_TRIES_HARNESS: &str = "(Say only this, nothing before or after it: \"All done! You can add more skills in the Autonomous app. Now, ask me anything. If you'd like somewhere to start, ask me for a timer, the weather, or anything you're curious about. You can also add a skill from the Skill Store in the app, or just ask me to make one. If you work on a computer, I can take on tasks for you: open Harness in the app to connect.\")";
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(deny_unknown_fields)]

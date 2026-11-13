@@ -566,6 +566,10 @@ impl Test {
     }
 
     fn generation(&mut self) -> SpeakerChunk {
+        self.generation_with_spoken(true)
+    }
+
+    fn generation_with_spoken(&mut self, spoken: bool) -> SpeakerChunk {
         let request = self.reply.as_ref().unwrap().owner.turn();
         let at = monotonic_us();
         let samples = vec![200; 240];
@@ -574,6 +578,7 @@ impl Test {
             &mut self.reply,
             &ProviderOutput::Audio {
                 request,
+                spoken,
                 sequence: self.sequence + 1,
                 provider_event_at_us: at,
                 source_frames: samples.len(),
@@ -583,7 +588,7 @@ impl Test {
         )
         .unwrap();
         let current = self.reply.as_mut().unwrap();
-        current.append_provider_audio(samples, at);
+        current.append_provider_packet(samples, at, spoken);
         current.had_audio = true;
         observe_provider_output(
             &mut self.cloud,
@@ -868,6 +873,40 @@ fn prepared_recordings_wait_for_retirement_keep_the_spoken_owner_and_finish_afte
         "requested audio prepared host handoff: first={}us repeated={}us; target<=250000us; authored speaker IPC acceptance, acoustic onset unmeasured",
         host_handoffs[0], host_handoffs[1]
     );
+}
+
+/// The second route says a request's confirmation with its call ("Sure,
+/// playing something calm now." and `use_skill`), and with
+/// `LAMP_SECOND_SAID_ONCE` says nothing after the call's result. A short
+/// confirmation can retire before the offer reaches the coordinator: on
+/// lamp-52e6 (10883, #5764) the skill was triggered and nothing played, and
+/// nothing said why. A retirement before the offer is still the turn's
+/// confirmation, so the recording follows it.
+#[test]
+fn a_confirmation_retired_before_its_offer_still_starts_the_recording() {
+    let _clock = fixture_clock();
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let original_owner = test.reply.as_ref().unwrap().owner;
+    let confirmation = test.generation();
+    test.accept(&confirmation, 240);
+    let retired = test.retire(&confirmation);
+    let offer = test.load(1);
+    test.provider_complete();
+    assert!(
+        test.prepare(),
+        "the retired confirmation before the offer starts the recording"
+    );
+    let first = test.dispatch().unwrap();
+    assert_eq!(first.permit.owner(), original_owner);
+    assert_eq!(first.samples, [100; 240]);
+    assert!(test.accept(&first, 240) >= retired);
+    let final_chunk = test.dispatch().unwrap();
+    test.accept(&final_chunk, 240);
+    test.retire(&final_chunk);
+    test.complete_media();
+    assert!(test.reply.as_ref().unwrap().settled(&test.pending));
+    test.skills
+        .finished(&offer, RequestedAudioOutcome::Completed);
 }
 
 #[test]
@@ -1513,45 +1552,107 @@ fn written_reminder_say_and_offline_turns_never_authorize_requested_recordings()
 }
 
 #[test]
-fn an_empty_or_gapped_confirmation_cancels_instead_of_starting_the_recording() {
+fn an_empty_confirmation_cancels_instead_of_starting_the_recording() {
     let _clock = fixture_clock();
-    for gapped in [false, true] {
-        let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
-        let offer = test.load(1);
-        test.answer_news();
-        if gapped {
-            let chunk = test.generation();
-            test.accept(&chunk, 240);
-            let at = monotonic_us();
-            test.event(WorkerEvent::PlaybackGap {
-                phase: PlaybackGapPhase::Started,
-                gap: PlaybackGap {
-                    owner: chunk.permit.owner(),
-                    first_sample: PlaybackCursor {
-                        epoch: 1,
-                        frame: test.cursor,
-                    },
-                    end_sample: PlaybackCursor {
-                        epoch: 1,
-                        frame: test.cursor + 240,
-                    },
-                    started_at_us: at,
-                    last_zero_accepted_at_us: at,
-                    zero_frames: 240,
-                },
-                observed_at_us: at,
-            });
-            test.retire(&chunk);
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let offer = test.load(1);
+    test.answer_news();
+    test.provider_complete();
+    assert!(!test.prepare());
+    assert!(!test.reply.as_ref().unwrap().requested_audio_waiting());
+    assert!(test.dispatch().is_none());
+    assert!(test.finish_if_settled());
+    assert!(test.heard_news.is_empty());
+    test.skills
+        .finished(&offer, RequestedAudioOutcome::Cancelled);
+}
+
+/// Request 3 on lamp-52e6 on 10 Nov (#5802): "Lamp, can you play some
+/// relaxing music?" had its wait sound 1.5 s after the line, `use_skill`
+/// and its offer, then a two-piece confirmation 4.5 s later. The speaker
+/// wrote zeros in between, a delivery gap, and the recording was cancelled
+/// for it. Late words are not cut words: the confirmation retired whole, so
+/// the recording plays. Its news stays unacknowledged, as for any gapped
+/// reply.
+#[test]
+fn a_confirmation_after_a_wait_sound_and_a_gap_still_starts_the_recording() {
+    let _clock = fixture_clock();
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let original_owner = test.reply.as_ref().unwrap().owner;
+    let request = original_owner.turn();
+    // A piece's audio; one block is held back until more comes or the
+    // generation ends, as on the speaker path.
+    let piece = |test: &mut Test, last: bool, spoken: bool| {
+        let at = monotonic_us();
+        let current = test.reply.as_mut().unwrap();
+        current.append_provider_packet(vec![200; 480], at, spoken);
+        current.had_audio = true;
+        if last {
+            observe_provider_output(
+                &mut test.cloud,
+                &mut test.reply,
+                &ProviderOutput::GenerationComplete { request },
+            )
+            .unwrap();
         }
-        test.provider_complete();
-        assert!(!test.prepare());
-        assert!(!test.reply.as_ref().unwrap().requested_audio_waiting());
-        assert!(test.dispatch().is_none());
-        assert!(test.finish_if_settled());
-        assert!(test.heard_news.is_empty());
-        test.skills
-            .finished(&offer, RequestedAudioOutcome::Cancelled);
-    }
+        loop {
+            let chunk = test.dispatch().unwrap();
+            test.accept(&chunk, 240);
+            if !last || chunk.end_of_speech {
+                return chunk;
+            }
+        }
+    };
+    let gap = |test: &mut Test, phase: PlaybackGapPhase| {
+        let at = monotonic_us();
+        test.event(WorkerEvent::PlaybackGap {
+            phase,
+            gap: PlaybackGap {
+                owner: original_owner,
+                first_sample: PlaybackCursor {
+                    epoch: 1,
+                    frame: test.cursor,
+                },
+                end_sample: PlaybackCursor {
+                    epoch: 1,
+                    frame: test.cursor + 240,
+                },
+                started_at_us: at,
+                last_zero_accepted_at_us: at,
+                zero_frames: 240,
+            },
+            observed_at_us: at,
+        });
+    };
+    test.answer_news();
+    // The wait sound, then zeros while the chat's second round runs.
+    piece(&mut test, false, false);
+    gap(&mut test, PlaybackGapPhase::Started);
+    gap(&mut test, PlaybackGapPhase::Resumed);
+    test.cursor += 240;
+    let offer = test.load(1);
+    // ElevenLabs piece 1, a gap before piece 2 on a new connection, piece 2.
+    piece(&mut test, false, true);
+    gap(&mut test, PlaybackGapPhase::Started);
+    gap(&mut test, PlaybackGapPhase::Resumed);
+    test.cursor += 240;
+    let last = piece(&mut test, true, true);
+    test.provider_complete();
+    assert_eq!(test.reply.as_ref().unwrap().playback_gaps, 2);
+    assert!(!test.prepare(), "accepted final PCM has not retired");
+    test.retire(&last);
+    assert!(test.prepare(), "a gapped confirmation retired whole");
+    let first = test.dispatch().unwrap();
+    assert_eq!(first.permit.owner(), original_owner);
+    assert_eq!(first.samples, [100; 240]);
+    test.accept(&first, 240);
+    let final_chunk = test.dispatch().unwrap();
+    test.accept(&final_chunk, 240);
+    test.retire(&final_chunk);
+    assert!(test.finish_if_settled());
+    assert!(test.heard_news.is_empty());
+    test.skills
+        .finished(&offer, RequestedAudioOutcome::Completed);
 }
 
 #[test]
@@ -1855,4 +1956,141 @@ fn an_accepted_offer_stays_bound_to_its_original_worker_session_and_privacy() {
     .unwrap();
     test.skills
         .finished(&offer, RequestedAudioOutcome::Cancelled);
+}
+
+#[test]
+fn a_wait_sound_and_gap_without_confirmation_words_must_not_start_recording() {
+    let _clock = fixture_clock();
+    let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+    let original_owner = test.reply.as_ref().unwrap().owner;
+    let request = original_owner.turn();
+    // A piece's audio; one block is held back until more comes or the
+    // generation ends, as on the speaker path.
+    let piece = |test: &mut Test, last: bool| {
+        let at = monotonic_us();
+        let current = test.reply.as_mut().unwrap();
+        current.append_provider_packet(vec![200; 480], at, false);
+        current.had_audio = true;
+        if last {
+            observe_provider_output(
+                &mut test.cloud,
+                &mut test.reply,
+                &ProviderOutput::GenerationComplete { request },
+            )
+            .unwrap();
+        }
+        loop {
+            let chunk = test.dispatch().unwrap();
+            test.accept(&chunk, 240);
+            if !last || chunk.end_of_speech {
+                return chunk;
+            }
+        }
+    };
+    let gap = |test: &mut Test, phase: PlaybackGapPhase| {
+        let at = monotonic_us();
+        test.event(WorkerEvent::PlaybackGap {
+            phase,
+            gap: PlaybackGap {
+                owner: original_owner,
+                first_sample: PlaybackCursor {
+                    epoch: 1,
+                    frame: test.cursor,
+                },
+                end_sample: PlaybackCursor {
+                    epoch: 1,
+                    frame: test.cursor + 240,
+                },
+                started_at_us: at,
+                last_zero_accepted_at_us: at,
+                zero_frames: 240,
+            },
+            observed_at_us: at,
+        });
+    };
+    test.answer_news();
+    // The wait sound, then zeros while the chat's second round runs.
+    piece(&mut test, false);
+    gap(&mut test, PlaybackGapPhase::Started);
+    gap(&mut test, PlaybackGapPhase::Resumed);
+    test.cursor += 240;
+    let offer = test.load(1);
+    // No confirmation audio arrives after the offer: only the earlier cue.
+    observe_provider_output(
+        &mut test.cloud,
+        &mut test.reply,
+        &ProviderOutput::GenerationComplete { request },
+    )
+    .unwrap();
+    let last = loop {
+        let chunk = test.dispatch().unwrap();
+        test.accept(&chunk, 240);
+        if chunk.end_of_speech {
+            break chunk;
+        }
+    };
+    test.provider_complete();
+    assert_eq!(test.reply.as_ref().unwrap().playback_gaps, 1);
+    assert!(!test.prepare(), "accepted final PCM has not retired");
+    test.retire(&last);
+    assert!(!test.prepare(), "a wait cue is not spoken confirmation");
+    assert!(test.dispatch().is_none());
+    test.skills
+        .finished(&offer, RequestedAudioOutcome::Cancelled);
+}
+
+#[test]
+fn transcript_without_spoken_pcm_cannot_turn_a_cue_into_confirmation() {
+    let _clock = fixture_clock();
+    for words_first in [false, true] {
+        let mut test = Test::new(Route::Spoken, REQUESTED_AUDIO_LEASE_US, false);
+        let offer = test.load(1);
+        let request = test.reply.as_ref().unwrap().owner.turn();
+        let words = ProviderOutput::Transcript {
+            request: Some(request),
+            text: "Sure, I will play music.".into(),
+            finished: true,
+        };
+        if words_first {
+            observe_provider_output(&mut test.cloud, &mut test.reply, &words).unwrap();
+        }
+        let cue = test.generation_with_spoken(false);
+        if !words_first {
+            observe_provider_output(&mut test.cloud, &mut test.reply, &words).unwrap();
+        }
+        test.provider_complete();
+        test.accept(&cue, 240);
+        test.retire(&cue);
+        assert!(
+            !test.prepare(),
+            "text and a cue are not spoken confirmation"
+        );
+        assert!(test.dispatch().is_none());
+        test.skills
+            .finished(&offer, RequestedAudioOutcome::Cancelled);
+    }
+}
+
+#[test]
+#[ignore = "manual host packet-acceptance timing; not acoustic latency"]
+fn requested_audio_provenance_packet_latency() {
+    let _clock = fixture_clock();
+    for spoken in [false, true] {
+        let mut elapsed = Vec::new();
+        for _ in 0..256 {
+            let (_, mut reply, _) = active_reply();
+            let samples = vec![200; 240];
+            let at = monotonic_us();
+            let began = std::time::Instant::now();
+            reply.append_provider_packet(samples, at, spoken);
+            elapsed.push(began.elapsed().as_nanos());
+            assert_eq!(reply.media.spoken_audio, spoken);
+        }
+        let first = elapsed[0];
+        elapsed.sort_unstable();
+        eprintln!(
+            "requested audio packet append spoken={spoken}: first={first} ns, p95={} ns, max={} ns; 256 fresh replies; excludes input-sample allocation, IPC and playback",
+            elapsed[243], elapsed[255]
+        );
+    }
 }

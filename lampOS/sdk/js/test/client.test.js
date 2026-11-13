@@ -2,7 +2,7 @@
 // refusals, as docs/control.md says them. No lamp needed.
 import assert from 'node:assert/strict';
 import { execFile, execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -32,6 +32,19 @@ test('the packaged schema is the repository\'s', (t) => {
   const repoSchema = new URL('../../../docs/control.schema.json', import.meta.url);
   if (!existsSync(repoSchema)) return t.skip('docs/control.schema.json is not beside this copy');
   assert.deepEqual(JSON.parse(readFileSync(repoSchema, 'utf8')), schema.schema);
+});
+
+test('light_off is a black ring for a while', async () => {
+  await withLamp({ grants: ['light'] }, async (lamp, fake) => {
+    const count = lamp.ringPixels;
+    assert.ok(count);
+    await lamp.lightOff({ forMs: 5000 });
+    const asked = fake.received.filter((f) => f.op === 'light').at(-1);
+    assert.deepEqual(asked.pixels, Array(count).fill('#000000'));
+    assert.equal(asked.for_ms, 5000);
+    await lamp.lightOff();
+    assert.equal(fake.received.filter((f) => f.op === 'light').at(-1).for_ms, 30000);
+  });
 });
 
 test('proofs name what they are for', async () => {
@@ -77,6 +90,15 @@ test('pairing keeps the key private and the lamp pinned', async (t) => {
   assert.ok(!readFileSync(join(keyring.folder, 'lamps.json'), 'utf8').includes(fake.code));
 });
 
+test('the lamp\'s language comes from hello and is English when it says none', async () => {
+  for (const [said, shown] of [['en', 'en'], ['vi', 'vi'], ['ko', 'ko'], [null, 'en'], ['klingon', 'en']]) {
+    await withLamp({ language: said }, async (lamp) => {
+      assert.equal(lamp.language, shown, String(said));
+      assert.equal(lamp.info.language, said ?? undefined, String(said));
+    });
+  }
+});
+
 test('a wrong code is refused and nothing is kept', async (t) => {
   const fake = await started(t);
   const keyring = new Keyring(folder());
@@ -114,8 +136,9 @@ test('the debug log redacts what would pair or hello as this computer', async ()
   assert.deepEqual(shown.lamp, { id: 'lamp-1', fp: '<redacted>' });
   assert.deepEqual(shown.skills, [{ sig: '<redacted>' }, { pin: '<redacted>' }]);
   // Fails closed: a field nobody decided (a newer lamp's) is hidden, at any depth.
-  assert.deepEqual(debug.redact({ ev: 'lamp.changed', token: 't0ps3cret', lamp: { id: 'lamp-1', badge: 'b4dge' } }),
-    { ev: 'lamp.changed', token: '<not shown>', lamp: { id: 'lamp-1', badge: '<not shown>' } });
+  assert.deepEqual(debug.redact({ ev: 'lamp.changed', ticket: 't0ps3cret', lamp: { id: 'lamp-1', badge: 'b4dge' } }),
+    { ev: 'lamp.changed', ticket: '<not shown>', lamp: { id: 'lamp-1', badge: '<not shown>' } });
+  assert.equal(debug.redact({ op: 'hello', token: 'T'.repeat(43) }).token, '<redacted>');
   // What a lamp sends beyond the schema's own fields is decided too.
   for (const frame of [
     { re: 3, ok: true, to: 'body', move: 'glad-lift', light: true },
@@ -198,7 +221,7 @@ test('LAMPOS_LOG=debug logs each frame with its secrets redacted', async () => {
 // the Python SDK's test has the same list).
 const UNPLAYABLE = [
   [[[0, 0, 0, 0, 0], [20, 0, 0, 0, 0], [20, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 200, 'frames: a move this body cannot play: it lasts 600 ms, not 1500 to 10000'],
-  [[[0, 0, 0, 0, 0], [0, 0, 151, 0, 0], [0, 0, 0, 0, 0]], 1000, 'frames: a move this body cannot play: frame 1 takes joint 2 151 counts, farther than 150'],
+  [[[0, 0, 0, 0, 0], [0, 0, 1301, 0, 0], [0, 0, 0, 0, 0]], 1000, "frames: a move this body cannot play: frame 1 takes joint 2 1301 counts, farther than 1300, this lamp's yaw reach (--reach)"],
   [[[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 1000, null], // 2 s: one the body plays
   [[...Array(7).fill([0, 0, 0, 0, 0]), ...Array(8).fill([0, 0, 0, 0, 300]), [0, 0, 0, 0, 0]], 100, 'frames: a move this body cannot play: frame 7 asks joint 4 for 3000 counts a second, faster than 800'],
   [[[1, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]], 500, 'frames: start and end at home, all five 0'],
@@ -213,7 +236,7 @@ test('the move rules are the body\'s and lamp-control\'s own', async (t) => {
   if (!existsSync(body) || !existsSync(door)) return t.skip('the Rust crates are not beside this copy');
   const [bodyText, doorText] = [readFileSync(body, 'utf8'), readFileSync(door, 'utf8')];
   const numbers = (text) => [...text.matchAll(/[0-9][0-9_]*(?:\.[0-9]+)?/g)].map((m) => Number(m[0].replaceAll('_', '')));
-  assert.deepEqual(numbers(bodyText.match(/pub const FARTHEST: \[i16; 5\] = \[([^\]]*)\]/)[1]), MOVE_FARTHEST);
+  assert.deepEqual(numbers(bodyText.match(/pub const CEILING: \[u16; 5\] = \[([^\]]*)\]/)[1]), MOVE_FARTHEST);
   assert.deepEqual(numbers(bodyText.match(/pub const FASTEST: \[f32; 5\] = \[([^\]]*)\]/)[1]), MOVE_FASTEST);
   const shortest = numbers(bodyText.match(/const SHORTEST_US: u64 = ([0-9_]+);/)[1])[0];
   const longest = numbers(bodyText.match(/const LONGEST_US: u64 = ([0-9_]+);/)[1])[0];
@@ -229,7 +252,8 @@ test('the fake refuses a move the body would drop, with its words, before the le
   for (const [frames, stepMs, refusal] of UNPLAYABLE) assert.equal(moveRefusal(stepMs, frames), refusal, JSON.stringify(frames));
   assert.equal(moveRefusal(20, PLAYABLE), 'step_ms: from 40 to 1000');
   assert.equal(moveRefusal(500, [[0, 0, 0, 0, 0]]), 'frames: at least 2');
-  await withLamp({}, async (lamp, fake) => {
+  // An app-reach lamp takes a move up to the ceiling (the 1301 above is past it).
+  await withLamp({ appReach: true }, async (lamp, fake) => {
     // Refused before the lease is asked for, as lamp-control's protocol.rs checks it.
     await assert.rejects(lamp.move(UNPLAYABLE[0][0], 200), (error) => error instanceof byCode.bad_request && error.message.includes('a move this body cannot play: it lasts 600 ms'));
     await lamp.withLease(['body'], async () => {
@@ -240,6 +264,46 @@ test('the fake refuses a move the body would drop, with its words, before the le
       await lamp.move(PLAYABLE, 500);
     }, { forMs: 5000 });
     assert.equal(fake.asked('move').length, 2);
+  });
+});
+
+const LIGHT_REFUSALS = [
+  [{ rgb: '#ff8000', for_ms: 1000, fade_ms: 500 }, 'fade_ms: from 1000 to 60000'],
+  [{ rgb: '#ff8000', for_ms: 1000, fade_ms: 60001 }, 'fade_ms: from 1000 to 60000'],
+  [{ rgb: '#ff8000', for_ms: 30001 }, 'for_ms: from 1 to 30000'],
+  [{ rgb: '#ff8000', for_ms: 0 }, 'for_ms: from 1 to 30000'],
+  [{ rgb: '#ff8000', for_ms: 1000, brightness: 101 }, 'brightness: from 0 to 100'],
+  [{ rgb: 'ff8000', for_ms: 1000 }, 'rgb: #rrggbb'],
+  [{ pixels: Array(33).fill('#000000'), for_ms: 1000 }, 'pixels: 32 of them, one per pixel of the ring'],
+  [{ pixels: [...Array(31).fill('#000000'), 'red'], for_ms: 1000 }, 'pixels: each #rrggbb'],
+  [{ rgb: '#ff8000', colour: 'red', level: 3, for_ms: 1000 }, 'one of colour, rgb or pixels'],
+  [{ for_ms: 1000 }, 'one of colour, rgb or pixels'],
+  [{ colour: 'mauve', level: 3, for_ms: 1000 }, 'colour: one of yellow, red, green, blue, cyan, purple, orange, pink, white, warm'],
+  [{ colour: 'red', level: 6, for_ms: 1000 }, 'level: from 1 to 5, with colour'],
+  [{ colour: 'red', for_ms: 1000 }, 'level: from 1 to 5, with colour'],
+  [{ colour: 'red', level: 3, brightness: 50, for_ms: 1000 }, 'brightness goes with rgb or pixels; colour has level'],
+  [{ rgb: '#ff8000', level: 3, for_ms: 1000 }, 'level and pattern go with colour'],
+];
+const LIGHT_TAKEN = [
+  { rgb: '#FF8000', for_ms: 1, fade_ms: 1000 },
+  { rgb: '#ff8000', for_ms: 30000, fade_ms: 60000, brightness: 0 },
+  { pixels: Array(32).fill('#000000'), for_ms: 1000, brightness: 100 },
+  { colour: 'warm', level: 3, for_ms: 1000 },
+];
+
+test('the fake refuses a light the lamp would refuse, with lamp-control\'s words, and keeps the connection', async () => {
+  const { lightRefusal } = await import('../src/testing.js');
+  for (const [fields, refusal] of LIGHT_REFUSALS) assert.equal(lightRefusal({ op: 'light', ...fields }), refusal, JSON.stringify(fields).slice(0, 80));
+  for (const fields of LIGHT_TAKEN) assert.equal(lightRefusal({ op: 'light', ...fields }), null, JSON.stringify(fields).slice(0, 80));
+  await withLamp({}, async (lamp, fake) => {
+    // Sent past the client's own check, as another computer's code might.
+    for (const [fields, refusal] of LIGHT_REFUSALS) {
+      // A colour the client itself knows is wrong is refused by its own check, in its words.
+      const own = fields.colour === 'mauve';
+      await assert.rejects(lamp.request('light', fields), (error) => (own ? error.code === 'bad_request' : error instanceof byCode.bad_request && error.why === refusal), JSON.stringify(fields).slice(0, 80));
+    }
+    for (const fields of LIGHT_TAKEN) await lamp.request('light', fields);
+    assert.equal(fake.asked('light').length, LIGHT_TAKEN.length);
   });
 });
 
@@ -309,6 +373,38 @@ test('phrases go with their subscription, and events carry only the phrase', asy
   });
 });
 
+test('a phrase handler hears only its own phrases, and one with none hears all', async () => {
+  await withLamp({ grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
+    const [started, finished, all] = [[], [], []];
+    const start = (event) => started.push(event.phrase);
+    await lamp.on('phrase.heard', start, { phrases: ['start studying'] });
+    await lamp.on('phrase.heard', async (event) => { finished.push(event.phrase); }, { phrases: ['all done here'] });
+    await lamp.on('phrase.heard', (event) => all.push(event.phrase));
+    fake.emit('phrase.heard', { phrase: 'start studying' });
+    fake.emit('phrase.heard', { phrase: 'All Done Here' });
+    await until(() => all.length === 2);
+    assert.deepEqual(started, ['start studying']);
+    assert.deepEqual(finished, ['All Done Here']);
+    // off() takes a filtered handler off by the handler itself.
+    await lamp.off('phrase.heard', start);
+    fake.emit('phrase.heard', { phrase: 'start studying' });
+    await until(() => all.length === 3);
+    assert.deepEqual(started, ['start studying']);
+  });
+});
+
+test('phrases compare lowercased as the lamp and the Python SDK do, not case-folded', async () => {
+  await withLamp({ grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
+    const heard = [];
+    await lamp.on('phrase.heard', (event) => heard.push(event.phrase), { phrases: ['Große Straße'] });
+    fake.emit('phrase.heard', { phrase: 'große straße' });
+    fake.emit('phrase.heard', { phrase: 'GROSSE STRASSE' });
+    await until(() => heard.length);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(heard, ['große straße']);
+  });
+});
+
 // The lamp's floor and its words (lamp-control's PHRASE_MIN_LETTERS, #3901),
 // with the phrases Fourteen tried there: a short one never leaves the computer.
 test('a phrase under the lamp\'s floor is refused before sending', async () => {
@@ -351,8 +447,12 @@ test('the fake answers look as lamp-control does', async () => {
     const dones = [];
     lamp.on('done', (done) => dones.push(done));
     await lamp.withLease(['body'], async () => {
-      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
-      await assert.rejects(lamp.look('name'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
+      await assert.rejects(lamp.look('name'), (error) => error.code === 'refused' && error.why === "not in this release: look at who said the lamp's name (the lamp has no sound direction)");
+      // A face: taken, then dropped "no face in view" while the fake sees none.
+      assert.equal((await lamp.look('face')).to, 'body');
+      for (let i = 0; i < 50 && !dones.length; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+      assert.deepEqual([dones[0].how, dones[0].why], ['dropped', 'no face in view']);
+      dones.length = 0;
       assert.equal((await lamp.look({ yaw: -10, pitch: 5 })).to, 'body');
       for (let i = 0; i < 50 && !dones.length; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
     });
@@ -367,12 +467,29 @@ test('actions send the schema\'s fields and wait for done', async () => {
     await lamp.light('warm', 3, 10_000, 'breathe');
     await lamp.say('Build passed.');
     await lamp.express('glad');
-    assert.equal((await lamp.gesture('nod', { wait: true })).to, 'body');
+    // The lamp says `motion_done`: the wait resolves to the gesture's `done`.
+    const ended = await lamp.gesture('nod', { wait: true });
+    assert.deepEqual([ended.ev, ended.how], ['done', 'finished']);
     await lamp.stop();
     assert.deepEqual(fake.asked('light'), [{ colour: 'warm', level: 3, pattern: 'breathe', for_ms: 10000 }]);
     assert.deepEqual(fake.asked('say'), [{ text: 'Build passed.' }]);
     assert.deepEqual(fake.asked('express'), [{ feeling: 'glad' }]);
     assert.deepEqual(fake.asked('stop'), [{}]);
+  });
+});
+
+test('a name that is no event says which event it meant', async () => {
+  await withLamp({}, async (lamp, fake) => {
+    // `lease.ended` is the event `lease` (state `lost`); `lease` and `done` come with no subscription.
+    assert.throws(() => lamp.on('lease.ended', () => {}), (error) => error.code === 'bad_request'
+      && error.message.includes("no event 'lease.ended'") && error.message.includes("lamp.on('lease', handler)")
+      && error.message.includes('lost'));
+    assert.throws(() => lamp.on('done.finished', () => {}), (error) => error.message.includes("lamp.on('done', handler)"));
+    assert.throws(() => lamp.on('camera.zoomed', () => {}), (error) => error.message.includes('person.arrived')
+      && error.message.includes("'lease' or 'done'") && error.message.includes('camera.frame')
+      && error.message.includes('microphone.audio'));
+    await assert.rejects(lamp.subscribe(['lease']), (error) => error.message.includes('without subscribing'));
+    assert.deepEqual(fake.received.filter((f) => f.op === 'subscribe'), []);
   });
 });
 
@@ -460,6 +577,20 @@ test('get answers the states asked', async () => {
   });
 });
 
+test('lamp.said needs the speech grant and comes with who had it said', async () => {
+  await withLamp({ grants: ['speech'] }, async (lamp, fake) => {
+    let told;
+    const said = new Promise((resolve) => { told = resolve; });
+    await lamp.on('lamp.said', (event) => told(event));
+    fake.emit('lamp.said', { text: 'It is a long', by: 'lamp', source: 'reply', cut: true });
+    const event = await said;
+    assert.deepEqual([event.text, event.by, event.source, event.cut], ['It is a long', 'lamp', 'reply', true]);
+  });
+  await withLamp({ grants: ['speak'] }, async (lamp) => {
+    await assert.rejects(lamp.on('lamp.said', () => {}), (error) => error.code === 'no_grant');
+  });
+});
+
 test('air and device need their grants, and air.changed comes on a new reading', async () => {
   await withLamp({ grants: ['air', 'device'] }, async (lamp, fake) => {
     assert.deepEqual(await lamp.air(), AIR);
@@ -500,6 +631,46 @@ test('the fake light state shows what the ring draws', async () => {
   });
 });
 
+test('the fake light state shows pixels while a computer holds its own', async () => {
+  // `shows.pixels` (docs/control.md): the pixels as asked of the ring (each at the brightness), while that light
+  // lasts; the nearest named light beside them as lamp-control names it (parts.rs nearest_light: the real lamp's
+  // own answer for these is purple, level 4); none for a named light, once it lapses, or on a lamp that draws none.
+  await withLamp({ grants: ['light'] }, async (lamp, fake) => {
+    let now = 100_000;
+    fake.clock = () => now;
+    const pixels = Array(32).fill('#000000');
+    pixels[0] = '#ff0000';
+    pixels[31] = '#0010ff';
+    await lamp.ring(pixels, { forMs: 4000, brightness: 80 });
+    const shows = (await lamp.get('light')).light.shows;
+    assert.equal(shows.pixels.length, 32);
+    assert.deepEqual([shows.pixels[0], shows.pixels[31]], ['#cc0000', '#000dcc']);
+    assert.deepEqual({ on: shows.on, colour: shows.colour, level: shows.level }, { on: true, colour: 'purple', level: 4 });
+    // A named light replaces it: no pixels.
+    await lamp.light('green', 3, 2000);
+    assert.deepEqual((await lamp.get('light')).light.shows, { on: true, colour: 'green', level: 3 });
+    // Pixels again, then they lapse: the person's own, no pixels.
+    fake.state.light = { on: true, colour: 'warm', level: 1 };
+    await lamp.ring(pixels, { forMs: 1500 });
+    assert.ok(Array.isArray((await lamp.get('light')).light.shows.pixels));
+    now += 1600;
+    assert.deepEqual((await lamp.get('light')).light.shows, { on: true, colour: 'warm', level: 1 });
+    // All dark: off, warm, level 1, and the pixels asked.
+    await lamp.ring(Array(32).fill('#000000'), { forMs: 1000 });
+    const dark = (await lamp.get('light')).light.shows;
+    assert.deepEqual({ on: dark.on, colour: dark.colour, level: dark.level }, { on: false, colour: 'warm', level: 1 });
+    assert.deepEqual(dark.pixels, Array(32).fill('#000000'));
+  });
+});
+
+test('the debug log shows a light\'s pixels as they are', async () => {
+  const debug = await import('../src/debug.js');
+  const shows = { on: true, colour: 'purple', level: 4, pixels: ['#cc0000', ...Array(30).fill('#000000'), '#000dcc'] };
+  const shown = debug.redact({ re: 2, ok: true, state: { light: { on: true, colour: 'purple', level: 4, shows } } });
+  assert.deepEqual(shown.state.light.shows, shows);
+  assert.doesNotMatch(JSON.stringify(shown), /not shown/);
+});
+
 test('the tour runs every step against a fake lamp', async () => {
   const { spawn } = await import('node:child_process');
   const fake = await FakeLamp.start({ grants: [...schema.grants] });
@@ -524,6 +695,143 @@ test('the tour runs every step against a fake lamp', async () => {
   } finally {
     await fake.stop();
   }
+});
+
+test('the camera example saves a picture and a frame, and says a refusal', async () => {
+  const { spawn } = await import('node:child_process');
+  const { FAKE_JPEG } = await import('../src/testing.js');
+  const example = new URL('../examples/camera.js', import.meta.url).pathname;
+  const run = async (grants) => {
+    const fake = await FakeLamp.start({ grants });
+    const home = folder();
+    const cwd = folder();
+    try {
+      await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, keyring: new Keyring(home) });
+      // Not execFileSync: the fake answers on this process's event loop.
+      const [code, said] = await new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, [example, '0.5'], { cwd, env: { ...process.env, LAMPOS_HOME: home } });
+        let out = '';
+        child.stdout.on('data', (chunk) => { out += chunk; });
+        child.stderr.on('data', (chunk) => { out += chunk; });
+        child.on('error', reject);
+        child.on('close', (exit) => resolve([exit, out]));
+      });
+      return { code, said, cwd, streams: fake.asked('camera.stream').map((r) => r.on) };
+    } finally {
+      await fake.stop();
+    }
+  };
+  const granted = await run(['camera']);
+  assert.equal(granted.code, 0, granted.said);
+  assert.deepEqual(readFileSync(`${granted.cwd}/snapshot.jpg`), FAKE_JPEG);
+  assert.deepEqual(readFileSync(`${granted.cwd}/last-frame.jpg`), FAKE_JPEG);
+  assert.deepEqual(granted.streams, [true, false], granted.said);
+  const refused = await run(['light']);
+  assert.equal(refused.code, 1, refused.said);
+  assert.ok(refused.said.includes('snapshot: refused,') && !refused.said.includes('    at '), refused.said);
+  assert.ok(!existsSync(`${refused.cwd}/snapshot.jpg`));
+});
+
+// A fake lamp with this computer paired and no connection open yet.
+async function withPaired(options, body) {
+  const fake = await FakeLamp.start(options);
+  const keyring = new Keyring(folder());
+  try {
+    await Lamp.pair(fake.code, fake.host, { pin: fake.pin, port: fake.port, name: 'test laptop', keyring });
+    await body(fake, keyring);
+  } finally { await fake.stop(); }
+}
+
+test('a lease whose connection closed is lost, not held', async () => {
+  // The lamp ends a computer's leases when its last connection closes and
+  // tells nobody: `state` must not go on saying `held` (the lead's 4-lamp
+  // show, 10 Nov: held, then no_lease on the next look).
+  await withPaired({ grants: ['body'] }, async (fake, keyring) => {
+    const lamp = await Lamp.connect(undefined, { keyring });
+    const lease = await lamp.lease('body').take();
+    assert.equal(lease.held, true);
+    fake.restart();
+    await until(() => lease.state !== 'held');
+    assert.equal(lease.state, 'lost');
+    assert.equal(lease.lostWhy, 'the connection closed');
+    assert.equal(lease.held, false);
+    await lamp.close();
+  });
+});
+
+test('keepConnected carries a program across the lamp\'s restart', async () => {
+  await withPaired({ grants: ['body', 'look'] }, async (fake, keyring) => {
+    const arrivals = [];
+    const setups = [];
+    const stop = new AbortController();
+    const kept = Lamp.keepConnected(async (lamp) => {
+      setups.push(lamp);
+      // A lease held when the lamp goes: closing after it is quiet.
+      await lamp.lease('body').take();
+      await lamp.on('person.arrived', (event) => arrivals.push(event.count));
+    }, { keyring, pauses: [0.05, 0.1], signal: stop.signal });
+    for (const round of [1, 2, 3]) {
+      await until(() => fake.asked('subscribe').length >= round);
+      fake.emit('person.arrived', { count: round, near: 0.3 });
+      await until(() => arrivals.length >= round);
+      if (round < 3) fake.restart();
+    }
+    assert.deepEqual(arrivals, [1, 2, 3]);
+    assert.equal(new Set(setups).size, 3);
+    stop.abort();
+    await kept;
+  });
+});
+
+test('keepConnected stops at an abort that comes while it connects or pauses', async () => {
+  // Second's P2 on #5833: an abort while connect is on its way, or before a
+  // pause, is not missed: setup never runs and nothing stays open.
+  await withPaired({ grants: ['light'] }, async (fake, keyring) => {
+    const stop = new AbortController();
+    const connect = Lamp.connect;
+    let setups = 0;
+    Lamp.connect = async (...args) => {
+      const connection = await connect.call(Lamp, ...args);
+      stop.abort(); // aborted while the connection was being made
+      return connection;
+    };
+    try {
+      await Lamp.keepConnected(async (lamp) => { setups += 1; await lamp.light('green', 2, 1000); }, { keyring, signal: stop.signal });
+    } finally {
+      Lamp.connect = connect;
+    }
+    assert.equal(setups, 0);
+    assert.equal(fake.asked('light').length, 0);
+    await until(() => fake.wss.clients.size === 0);
+  });
+  // An abort during a failed connect: the pause after it doesn't wait out its 10 s.
+  const stop = new AbortController();
+  const connect = Lamp.connect;
+  Lamp.connect = async () => { stop.abort(); throw Object.assign(new Error('refused'), { code: 'ECONNREFUSED' }); };
+  const started = Date.now();
+  try {
+    await Lamp.keepConnected(() => {}, { keyring: new Keyring(folder()), pauses: [10], signal: stop.signal });
+  } finally {
+    Lamp.connect = connect;
+  }
+  assert.ok(Date.now() - started < 2000, `${Date.now() - started} ms`);
+});
+
+test('keepConnected stops on what connecting again can\'t mend', async () => {
+  await assert.rejects(Lamp.keepConnected(() => {}, { keyring: new Keyring(folder()) }), NotPaired);
+  await withPaired({ grants: ['light'] }, async (fake, keyring) => {
+    await assert.rejects(
+      Lamp.keepConnected(() => { throw new TypeError("the program's own mistake"); }, { keyring, pauses: [0.05] }),
+      TypeError,
+    );
+    // A subscription the lamp refuses (no `look` grant) comes out of it too,
+    // instead of connecting again and again.
+    await assert.rejects(
+      Lamp.keepConnected((lamp) => lamp.on('person.arrived', () => {}), { keyring, pauses: [0.05] }),
+      (error) => error instanceof LampError && error.code === 'no_grant',
+    );
+    assert.equal(fake.received.filter((r) => r.op === 'hello').length, 2);
+  });
 });
 
 test('the examples call only what the client has', async () => {
@@ -595,10 +903,11 @@ test('off takes a handler off and unsubscribes the last', async () => {
 });
 
 test('the fake says done and lease changes to whoever they are for', async () => {
-  await withLamp({ autoDone: false }, async (lamp, fake) => {
+  await withLamp({ autoDone: false, grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
     await lamp.withLease(['body'], async (lease) => {
-      const waiting = lamp.play('wave', { wait: true });
-      await until(() => fake.asked('play').length);
+      // A turn, whose `done` the test says.
+      const waiting = lamp.startTurn(undefined, { wait: true });
+      await until(() => fake.asked('turn.start').length);
       fake.leaseEvent(lease.id, 'suspended', 'conversation');
       await until(() => lease.state === 'suspended');
       fake.done(fake.requests.at(-1).id, 'cut_short', 'conversation');
@@ -696,9 +1005,10 @@ test('a refused waiting action leaves nothing behind to reject on close', async 
 });
 
 test('a waiting gesture or move returns at the body\'s answer', async () => {
-  // lamp-control's reply shape: `{"re":N,"ok":true,"to":"body"}` and no
-  // `done` after it; autoDone off, so nothing else ever comes.
-  await withLamp({ autoDone: false }, async (lamp) => {
+  // A lamp-control from before #4209 (no `motion_done` in hello's limits):
+  // `{"re":N,"ok":true,"to":"body"}` and no `done` after it; autoDone off,
+  // so nothing else ever comes.
+  await withLamp({ autoDone: false, motionDone: false }, async (lamp) => {
     await lamp.withLease(['body'], async () => {
       const nod = await lamp.gesture('nod', { wait: true });
       const move = await lamp.move(PLAYABLE, 500, { wait: true });
@@ -709,12 +1019,12 @@ test('a waiting gesture or move returns at the body\'s answer', async () => {
 });
 
 test('an action refused here takes no id, so the next waiting one keeps its own', async () => {
-  await withLamp({ autoDone: false, grants: ['body', 'light', 'speak'] }, async (lamp, fake) => {
+  await withLamp({ autoDone: false, grants: ['body', 'light', 'speak', 'hear'] }, async (lamp, fake) => {
     await lamp.withLease(['body'], async () => {
       const bogus = lamp.gesture('Bogus', { wait: true });
-      const wave = lamp.play('wave', { wait: true });
+      const wave = lamp.startTurn(undefined, { wait: true });
       await assert.rejects(bogus, (error) => error.code === 'bad_request');
-      await until(() => fake.asked('play').length);
+      await until(() => fake.asked('turn.start').length);
       fake.done(fake.requests.at(-1).id);
       assert.equal((await wave).how, 'finished');
     }, { forMs: 5000 });
@@ -735,9 +1045,52 @@ test('a refused on() takes off only its own copy of the handler', async () => {
   });
 });
 
-test('only gesture and move end a wait at their reply, as control.md says', async () => {
+test('a waiting motion ends at its done where the lamp says motion_done', async () => {
+  // #4209: hello's limits say `motion_done`, so `{ wait: true }` resolves to
+  // the `done` the lamp sends once the body says what became of the motion.
+  await withLamp({ autoDone: false }, async (lamp, fake) => {
+    assert.equal(lamp.limits.motion_done, true);
+    await lamp.withLease(['body'], async () => {
+      let ended = false;
+      const nod = lamp.gesture('nod', { wait: true }).then((done) => { ended = true; return done; });
+      await until(() => fake.asked('gesture').length);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.equal(ended, false, 'a wait that ended before the motion\'s done');
+      fake.done(fake.requests.at(-1).id);
+      assert.equal((await nod).how, 'finished');
+      const move = lamp.move(PLAYABLE, 500, { wait: true });
+      await until(() => fake.asked('move').length);
+      fake.done(fake.requests.at(-1).id, 'dropped', 'dropped: the person is using the lamp');
+      const dropped = await move;
+      assert.deepEqual([dropped.how, dropped.why], ['dropped', 'dropped: the person is using the lamp']);
+    }, { forMs: 5000 });
+    const glad = lamp.express('glad', undefined, { wait: true });
+    await until(() => fake.asked('express').length);
+    fake.done(fake.requests.at(-1).id);
+    assert.equal((await glad).how, 'finished');
+    // Too slight to move: no move, no `done`, the answer at once.
+    const still = await lamp.express('glad', 0.01, { wait: true });
+    assert.deepEqual([still.to, still.move], ['body', null]);
+    assert.equal(lamp.done.size, 0);
+  });
+});
+
+test('a waiting say resolves to its done', async () => {
+  await withLamp({ autoDone: false }, async (lamp, fake) => {
+    let ended = false;
+    const said = lamp.say('Word for word.', { wait: true }).then((done) => { ended = true; return done; });
+    await until(() => fake.asked('say').length);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(ended, false, 'a say\'s wait that ended before its done');
+    fake.done(fake.requests.at(-1).id);
+    assert.equal((await said).how, 'finished');
+    assert.equal(lamp.done.size, 0);
+  });
+});
+
+test('only gesture, move and express end a wait at their reply on a lamp without motion_done', async () => {
   const { ENDS_AT_REPLY } = await import('../src/client.js');
-  assert.deepEqual([...ENDS_AT_REPLY].sort(), ['gesture', 'move']);
+  assert.deepEqual([...ENDS_AT_REPLY].sort(), ['express', 'gesture', 'move', 'play']);
 });
 
 test('a request after the lamp has gone is refused at once, never left waiting', async () => {
@@ -750,7 +1103,7 @@ test('a request after the lamp has gone is refused at once, never left waiting',
 });
 
 test('a waiting gesture keeps no done', async () => {
-  await withLamp({ autoDone: false }, async (lamp) => {
+  await withLamp({ autoDone: false, motionDone: false }, async (lamp) => {
     const pending = lamp.gesture('nod', { wait: true });
     assert.equal(lamp.done.size, 0, 'a done kept for an action that gets none');
     await pending;
@@ -792,9 +1145,42 @@ test('a fake like lamp-control refuses what it does not route yet', async () => 
 test('the fake checks the lease before the routing refusal', async () => {
   const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
   await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES }, async (lamp) => {
-    await assert.rejects(lamp.look('face'), (error) => error.code === 'no_lease');
+    await assert.rejects(lamp.play('wave'), (error) => error.code === 'no_lease');
     await lamp.withLease(['body'], async () => {
-      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === "the body's lease socket is not on here");
+      await assert.rejects(lamp.play('wave'), (error) => error.code === 'refused' && error.why === 'not routed yet: waits for client packages');
+    });
+  });
+});
+
+// As lamp-control on stable 10824 (parts.rs `joints`, the product lamp-body's
+// lease socket): a look ahead or at an angle is taken, joints naming only yaw
+// and pitch go, and one naming roll, shoulder or elbow is refused whole in its
+// words; face and name stay "not in this release".
+test('the fake takes look and yaw and pitch as a stable lamp does', async () => {
+  const { JOINTS_WAIT, LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
+  await withLamp({ grants: schema.grants, refuses: LAMP_CONTROL_REFUSES, faceLook: false }, async (lamp) => {
+    await lamp.withLease(['body'], async (lease) => {
+      assert.equal((await lamp.look({ yaw: 5, pitch: 2 })).to, 'body');
+      assert.equal((await lamp.joints(lease, 300, { yaw: -3, pitch: 1 })).to, 'body');
+      for (const joint of ['roll', 'shoulder', 'elbow']) {
+        await assert.rejects(lamp.joints(lease, 300, { yaw: 0, [joint]: 1 }), (error) => error.code === 'refused' && error.why === JOINTS_WAIT);
+      }
+      await assert.rejects(lamp.look('face'), (error) => error.code === 'refused' && error.why === 'not in this release: look at a face or a name');
+    });
+  });
+});
+
+// The next build (row 34): a look at a face is one turn toward the face the
+// body sees, its `done` saying where the head got to; none seen, dropped.
+test('the fake turns once toward a face in view and drops a look with none', async () => {
+  const fake = { face: { yaw: 12, pitch: -4 } };
+  await withLamp({ grants: ['body', 'look'], ...fake }, async (lamp) => {
+    const dones = [];
+    lamp.on('done', (done) => dones.push(done));
+    await lamp.withLease(['body'], async () => {
+      assert.equal((await lamp.look('face')).to, 'body');
+      for (let i = 0; i < 50 && !dones.length; i += 1) await new Promise((resolve) => setTimeout(resolve, 10));
+      assert.deepEqual([dones[0].how, dones[0].yaw, dones[0].pitch], ['finished', 12, -4]);
     });
   });
 });
@@ -990,8 +1376,10 @@ test('followHand lets go on a lamp that takes the look without following', async
 test('a look at the hand needs the body\'s lease socket, as other looks do', async () => {
   // lamp-control without --lease-socket refuses every look, `hand` too
   // (parts.rs: "the body's lease socket"), and followHand lets go of its lease.
-  const { LAMP_CONTROL_REFUSES } = await import('../src/testing.js');
-  await withLamp({ grants: ['body', 'look'], refuses: LAMP_CONTROL_REFUSES }, async (lamp, fake) => {
+  // No product unit runs without it since stable 10824; LAMP_CONTROL_REFUSES
+  // takes look, so this lamp is named here.
+  const noLeaseSocket = { look: "the body's lease socket is not on here" };
+  await withLamp({ grants: ['body', 'look'], refuses: noLeaseSocket }, async (lamp, fake) => {
     await lamp.withLease(['body'], async () => {
       for (const at of ['ahead', 'hand']) {
         await assert.rejects(lamp.look(at), (error) => error instanceof byCode.refused && /lease socket/.test(error.message));
@@ -1012,6 +1400,13 @@ test('a say is exact unless rephrase is asked', async () => {
     ]);
   });
 });
+
+test('the fake camera gives the picture a test sets', () => withLamp({ grants: ['camera'] }, async (lamp, fake) => {
+  // An app that reads its picture (a brightness meter) needs a real image: `fake.picture` is what a snapshot
+  // and a stream's frames carry; the default is the smallest whole JPEG.
+  fake.picture = Buffer.from([0xff, 0xd8, 0x6d, 0x69, 0x6e, 0x65, 0xff, 0xd9]);
+  assert.deepEqual(await lamp.cameraSnapshot(), fake.picture);
+}));
 
 test('the camera stream asks up to 30 a second, and 31 is refused before sending', () => withLamp({ grants: ['light', 'camera'] }, async (lamp) => {
   const started = await lamp.cameraStream(true, 30);
@@ -1052,6 +1447,59 @@ function wav(seconds, level = 1_000) {
   return data;
 }
 
+test('notes are set, read, listed and deleted as this computer\'s own', async () => {
+  await withLamp({ grants: ['notes'] }, async (lamp, fake) => {
+    assert.equal(lamp.limits.notes.keys_max, 256);
+    assert.equal(await lamp.notes.get('mood'), undefined);
+    assert.equal(await lamp.notes.get('mood', 'calm'), 'calm');
+    assert.deepEqual(await lamp.notes.set('mood', { calm: [1, 2, 3] }), { key: 'mood', bytes: 16 });
+    assert.deepEqual(await lamp.notes.get('mood'), { calm: [1, 2, 3] });
+    // A stored null is found, not a missing key.
+    await lamp.notes.set('nothing', null);
+    assert.equal(await lamp.notes.get('nothing', 'missing'), null);
+    await lamp.notes.set('mode', 7);
+    const listed = await lamp.notes.list('mo');
+    assert.deepEqual(listed.keys, [{ key: 'mode', bytes: 1 }, { key: 'mood', bytes: 16 }]);
+    assert.deepEqual([listed.count, listed.total, listed.keys_max, listed.bytes_max], [2, 3, 256, 262_144]);
+    assert.equal((await lamp.notes.list()).count, 3);
+    assert.equal(await lamp.notes.delete('mood'), true);
+    assert.equal(await lamp.notes.delete('mood'), false);
+    assert.deepEqual(fake.asked('notes.delete'), [{ key: 'mood' }, { key: 'mood' }]);
+    // The same calls by their op names, as every op has one.
+    assert.equal(await lamp.notesGet('mode'), 7);
+    assert.equal((await lamp.notesList('m')).count, 1);
+  });
+});
+
+test('notes are held to the lamp\'s bounds and belong to one computer', async () => {
+  await withLamp({ grants: ['notes'] }, async (lamp, fake, keyring) => {
+    for (const bad of ['a b', '', 'k'.repeat(65)]) {
+      await assert.rejects(lamp.notes.set(bad, 1), (error) => error.code === 'bad_request', bad);
+    }
+    await assert.rejects(lamp.notes.list('a/b'), (error) => error.code === 'bad_request');
+    const big = 'x'.repeat(16_384 - 2);
+    assert.equal((await lamp.notes.set('big', big)).bytes, 16_384);
+    await assert.rejects(lamp.notes.set('big', `${big}x`), /16384/);
+    assert.equal(await lamp.notes.get('big'), big);
+    await lamp.notes.delete('big');
+    for (let at = 0; at < 256; at++) await lamp.notes.set(`k${String(at).padStart(4, '0')}`, at);
+    await assert.rejects(lamp.notes.set('one-more', 1), /full/);
+    await lamp.notes.set('k0000', 'replaced');
+    const client = keyring.pairing().client;
+    assert.deepEqual([...fake.notes.keys()], [client]);
+    fake.revoke(client);
+    assert.equal(fake.notes.get(client)?.size ?? 0, 0);
+  });
+});
+
+test('notes need their grant', async () => {
+  await withLamp({ grants: ['speak'] }, async (lamp) => {
+    for (const call of [() => lamp.notes.get('k'), () => lamp.notes.set('k', 1), () => lamp.notes.delete('k'), () => lamp.notes.list()]) {
+      await assert.rejects(call(), (error) => error.code === 'no_grant');
+    }
+  });
+});
+
 test('a clip is uploaded in parts, played, listed and removed', async () => {
   await withLamp({ grants: ['speak'] }, async (lamp, fake) => {
     // 2 s, about 96 KB: three parts of 36 KiB.
@@ -1069,6 +1517,20 @@ test('a clip is uploaded in parts, played, listed and removed', async () => {
     assert.deepEqual(await lamp.sounds(), []);
     await assert.rejects(lamp.sound('chime'), /no clip named chime/);
     await assert.rejects(lamp.uploadSound('bad', Buffer.from('not a wav')), /not a WAV/);
+    // The lamp's loudness cap, in its words (sounds.rs `check_clip`; lamp-75c9
+    // refused a louder clip so, 9 Nov).
+    await assert.rejects(lamp.uploadSound('loud', wav(0.5, 1_100)), (error) => error.why === 'clip: louder than -30 dBFS RMS over 10 ms');
+    const click = wav(0.5, 0);
+    click.writeInt16LE(9_000, 44);
+    await assert.rejects(lamp.uploadSound('click', click), (error) => error.why === 'clip: a peak past -12 dBFS');
+    assert.deepEqual(await lamp.sounds(), []);
+    // A file shorter than its header says, by an odd or an even count of bytes: refused as sounds.rs's hound says,
+    // and the connection goes on (Reviewer-two's P2 on #5800).
+    for (const short of [1, 2]) {
+      const clip = wav(0.01, 0);
+      await assert.rejects(lamp.uploadSound('short', clip.subarray(0, clip.length - short)), (error) => error.why === 'clip: a WAV file cut short');
+      assert.deepEqual(await lamp.sounds(), []);
+    }
   });
 });
 
@@ -1103,6 +1565,102 @@ test('a version in a literal string packs as in a basic one', async () => {
   const { pack } = await import('../src/push.js');
   const pkg = pack(skillFolder('desk-lit', "version = '0.2.0'\n[permissions]\nlight = true\n"));
   assert.equal(pkg.version, '0.2.0');
+});
+
+// A recorded move: an 8 s lean of `yaw` counts and back, no step over half of it.
+function moveFile(dir, name, yaw = 100) {
+  const frames = [0, yaw / 2, yaw, yaw / 2, 0, yaw / 2, yaw, yaw / 2, 0].map((count) => [0, 0, count, 0, 0]);
+  writeFileSync(join(dir, 'moves', `${name}.json`), JSON.stringify({ name, step_ms: 1000, frames }));
+}
+
+test('a package whose moves fail the check still installs and the answer names them', async () => {
+  const { pack } = await import('../src/push.js');
+  await withLamp({ grants: ['light', 'skills'] }, async (lamp) => {
+    const dir = skillFolder('desk-bad');
+    moveFile(dir, 'ok');
+    moveFile(dir, 'far', 1400);
+    writeFileSync(join(dir, 'moves', 'other.json'), JSON.stringify({ name: 'not-other', step_ms: 1000, frames: [] }));
+    rmSync(join(dir, 'moves', 'wave.json'));
+    const skill = await lamp.pushSkill(dir);
+    assert.equal(skill.name, 'desk-bad');
+    assert.deepEqual(skill.moves.kept, ['ok']);
+    assert.deepEqual(skill.moves.left_out.map((left) => [left.name, left.why.includes('farther than'), left.why.includes('not-other')]), [['far', true, false], ['other', false, true]]);
+    assert.deepEqual((await lamp.skills()).map((listed) => listed.name), ['desk-bad']);
+    assert.ok(pack(dir).parts.length >= 1);
+  });
+});
+
+test('a skill whose task hands a script to the lamp packs with its scripts/ folder and is pushed', async () => {
+  // lamp-75c9, 13 Nov (stable 12587): the lamp took this shape from a raw skill.push; the JS push never checked a folder, so it goes.
+  const { pack } = await import('../src/push.js');
+  await withLamp({ grants: ['light', 'skills'] }, async (lamp) => {
+    const rules = 'format = 2\nversion = "1.0.0"\ngrants = ["light"]\ntool = "blue_task"\n\n[permissions]\nlight = true\n\n'
+      + '[[do]]\ntask = { task = "Breathe the light blue for a few seconds", run = "scripts/main.py" }\n';
+    const dir = skillFolder('blue-task', rules);
+    mkdirSync(join(dir, 'scripts'), { recursive: true });
+    writeFileSync(join(dir, 'scripts', 'main.py'), "print('x')\n");
+    const pkg = pack(dir);
+    assert.equal(pkg.name, 'blue-task');
+    const skill = await lamp.pushSkill(dir);
+    assert.equal(skill.name, 'blue-task');
+    assert.deepEqual((await lamp.skills()).map((listed) => listed.name), ['blue-task']);
+  });
+});
+
+test('a waiting play ends at the answer or the done as a move does', async () => {
+  // `play` is sent as a `move`: the answer on a lamp that does not say
+  // `motionDone`, the body's `done` (told by the test) on one that does.
+  for (const motionDone of [false, true]) {
+    await withLamp({ grants: ['body', 'skills'], motionDone, autoDone: false }, async (lamp, fake) => {
+      const one = skillFolder(`desk-wave-${motionDone}`);
+      moveFile(one, 'wave');
+      await lamp.pushSkill(one);
+      await lamp.withLease(['body'], async () => {
+        const waiting = lamp.play('wave', { wait: true });
+        let ended = false;
+        waiting.then(() => { ended = true; }, () => { ended = true; });
+        if (!motionDone) {
+          assert.equal((await waiting).to, 'body');
+        } else {
+          await until(() => fake.asked('play').length === 1);
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          assert.equal(ended, false);
+          fake.done(fake.requests.at(-1).id);
+          assert.equal((await waiting).how, 'finished');
+        }
+      });
+    });
+  }
+});
+
+test('a recorded move of a pushed skill is played by name', async () => {
+  await withLamp({ grants: ['body', 'light', 'skills'] }, async (lamp, fake) => {
+    const one = skillFolder('desk-wave');
+    moveFile(one, 'wave');
+    moveFile(one, 'wiggle', 120);
+    const skill = await lamp.pushSkill(one);
+    assert.deepEqual(skill.moves, { kept: ['wave', 'wiggle'], left_out: [] });
+    assert.equal('moves' in (await lamp.skills())[0], false);
+    await assert.rejects(lamp.play('wave'), byCode.no_lease);
+    await lamp.withLease(['body'], async () => {
+      assert.equal((await lamp.play('wave')).to, 'body');
+      // A wait ends at the body's `done`, as `move`'s does where the lamp says `motionDone`.
+      assert.equal((await Promise.race([lamp.play('wave', { wait: true }), new Promise((_, no) => setTimeout(() => no(new Error('play wait never returned')), 2000))])).how, 'finished');
+      await assert.rejects(lamp.play('constructor'), (error) => error.why.startsWith('no move constructor'));
+      assert.deepEqual(fake.asked('play').at(0), { name: 'wave' });
+      await assert.rejects(lamp.play('nothing'), (error) => error.why === 'no move nothing in your pushed skills: skill.push one with moves/nothing.json');
+      const two = skillFolder('desk-greet');
+      moveFile(two, 'wave', 90);
+      await lamp.pushSkill(two);
+      await assert.rejects(lamp.play('wave'), (error) => error.why === 'the move wave is in more than one of your skills (desk-greet, desk-wave): say which with skill');
+      assert.equal((await lamp.play('wave', { skill: 'desk-greet' })).to, 'body');
+      assert.deepEqual(fake.asked('play').at(-1), { name: 'wave', skill: 'desk-greet' });
+      await assert.rejects(lamp.play('wave', { skill: 'gamma' }), (error) => error.why === 'no skill gamma of yours has recorded moves');
+      await assert.rejects(lamp.play('wiggle', { skill: 'desk-greet' }), (error) => error.why === 'no move wiggle in your skill desk-greet');
+      await lamp.removeSkill('desk-wave');
+      await assert.rejects(lamp.play('wiggle'), (error) => /no move wiggle in your pushed skills/.test(error.why));
+    }, { forMs: 5000 });
+  });
 });
 
 test('a skill is pushed in parts, listed and removed', async () => {
@@ -1307,5 +1865,268 @@ test('the volume needs the speak grant', async () => {
   await withLamp({ grants: ['body'] }, async (lamp) => {
     await assert.rejects(lamp.volume({ to: 10 }), (error) => error.code === 'no_grant');
     await assert.rejects(lamp.get('volume'), (error) => error.code === 'no_grant');
+  });
+});
+
+// lamp-75c9, 9 Nov 14:33: a joints asked while a conversation had the lease
+// suspended was answered { to: 'body' } by the door and refused by the body
+// ('the body is not held'); without a wait, nothing told the program. With
+// `wait`, the body's `done` comes back. test_client.py has the same.
+test('a look or joints waits for the body\'s done and says when a conversation drops it', async () => {
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    const until = async (ready) => { while (!ready()) await new Promise((r) => setTimeout(r, 10)); };
+    await lamp.withLease(['body'], async (lease) => {
+      const there = await lamp.look({ yaw: -10, pitch: 5 }, { wait: true });
+      assert.deepEqual([there.ev, there.how, there.yaw, there.pitch], ['done', 'finished', -10, 5]);
+      const aimed = await lamp.joints(lease, 300, { pitch: 2, yaw: -4 }, { wait: true });
+      assert.deepEqual([aimed.how, aimed.yaw, aimed.pitch], ['finished', -4, 2]);
+      // Without `wait`, only the door's answer, as before.
+      assert.equal((await lamp.joints(lease, 300, { yaw: 1 })).to, 'body');
+      // A conversation suspends the lease: the door refuses a body op as the
+      // suspension it is (session.rs), not as "take a lease first" nor
+      // "another computer".
+      fake.leaseEvent(lease.id, 'suspended', 'conversation');
+      await until(() => lease.state === 'suspended');
+      await assert.rejects(lamp.joints(lease, 300, { yaw: -13 }, { wait: true }), (error) => error.code === 'busy' && /suspended while someone talks/.test(error.why));
+      await assert.rejects(lamp.look({ yaw: 3, pitch: 1 }, { wait: true }), (error) => error.code === 'busy' && /your lease on the body is suspended/.test(error.why));
+      fake.leaseEvent(lease.id, 'held');
+      await until(() => lease.state === 'held');
+      assert.equal((await lamp.look('ahead', { wait: true })).how, 'finished');
+      // A look at the hand has no `done` to wait for.
+      await assert.rejects(lamp.look('hand', { wait: true }), /followHand/);
+    }, { forMs: 5000 });
+    assert.deepEqual(fake.asked('joints')[0], { lease: 'l_1', targets: { pitch: 2, yaw: -4 }, within_ms: 300 });
+  });
+});
+
+// The race the door cannot see: a look taken, then the conversation suspends
+// the lease before the body answers: the body's `done` says it was dropped.
+test('a look taken just before a conversation is dropped by the body in its done', async () => {
+  await withLamp({ grants: ['body', 'look'], autoDone: false }, async (lamp, fake) => {
+    const until = async (ready) => { while (!ready()) await new Promise((r) => setTimeout(r, 10)); };
+    await lamp.withLease(['body'], async (lease) => {
+      const waiting = lamp.look({ yaw: 3, pitch: 1 }, { wait: true });
+      await until(() => fake.asked('look').length > 0);
+      fake.leaseEvent(lease.id, 'suspended', 'conversation');
+      fake.done(fake.requests.at(-1).id, 'dropped', 'the body is not held');
+      const dropped = await waiting;
+      assert.deepEqual([dropped.how, dropped.why], ['dropped', 'the body is not held']);
+    }, { forMs: 5000 });
+  });
+});
+
+// Reviewer-two's P2 on #5837: lamp-control ends a hand-follow as soon as
+// another look is taken, so the SDK does too, before the wait for the body's
+// `done`. A refused look leaves it be, and the fake's `joints` is held to the
+// door's rules. test_client.py has the same.
+test('a waiting look ends a hand-follow when taken, not at its done', async () => {
+  const { JOINTS_UNKNOWN, JOINTS_WAIT } = await import('../src/testing.js');
+  await withLamp({ grants: ['body', 'look'] }, async (lamp, fake) => {
+    const following = await lamp.followHand().start();
+    assert.ok(following.following);
+    fake.autoDone = false;
+    // Taken, with its `done` held back: the follow ends at once.
+    const look = lamp.look({ yaw: 2, pitch: 1 }, { wait: true });
+    look.catch(() => {});
+    while (fake.asked('look').length < 2) await new Promise((r) => setTimeout(r, 10));
+    while (following.following) await new Promise((r) => setTimeout(r, 10));
+    fake.done(fake.requests.at(-1).id);
+    assert.equal((await look).how, 'finished');
+    assert.ok(!following.following);
+    fake.autoDone = true;
+    // A refused look leaves a following alone.
+    const again = await lamp.followHand().start();
+    await assert.rejects(lamp.look('name', { wait: true }), byCode.refused);
+    assert.ok(again.following);
+    await again.stop();
+    await lamp.withLease(['body'], async (lease) => {
+      // Roll, shoulder and elbow wait for the body's goal stream.
+      await assert.rejects(lamp.joints(lease, 300, { elbow: 4 }, { wait: true }), (error) => error.why === JOINTS_WAIT);
+      // A joint not named stays where `get` `body` says it is.
+      const body = (await lamp.get('body')).body.joints;
+      const done = await lamp.joints(lease, 300, { yaw: -3 }, { wait: true });
+      assert.deepEqual([done.yaw, done.pitch], [-3, body.pitch.deg]);
+      // Unknown where the head is: name both, as the door says.
+      fake.state.body.joints.pitch.deg = null;
+      await assert.rejects(lamp.joints(lease, 300, { yaw: -3 }, { wait: true }), (error) => error.why === JOINTS_UNKNOWN);
+      assert.equal((await lamp.joints(lease, 300, { yaw: -3, pitch: 1 }, { wait: true })).how, 'finished');
+    }, { forMs: 5000 });
+  });
+});
+
+// The same poses give the same frames in both SDKs: this digest is
+// test_client.py's too.
+const POSES_CASES = [[[{"pitch":10},{"pitch":-5,"yaw":8}],400],[[{"yaw":1}],0],[[{"shoulder":20,"elbow":-12.5},{"roll":-2.25,"pitch":3}],250],[[{"roll":0.5},{"roll":0.5},{"roll":0.5}],0]];
+const POSES_DIGEST = 'e35bf686207b90cb4ba49373a765e63f0beeaade9e4b63165e8c09e0ae5ae765';
+
+test('poses become a move the body plays, eased there and back, as Python makes it', async () => {
+  const { createHash } = await import('node:crypto');
+  const { posesToFrames } = await import('../src/index.js');
+  const { COUNTS_PER_DEGREE, moveWhy } = await import('../src/moves.js');
+  const made = POSES_CASES.map(([poses, holdMs]) => posesToFrames(poses, { holdMs }));
+  assert.equal(createHash('sha256').update(JSON.stringify(made)).digest('hex'), POSES_DIGEST);
+  const frames = made[0];
+  assert.equal(moveWhy(50, frames), null);
+  // Up is positive for pitch, as get('body') and joints count it: fewer counts.
+  const up = [-Math.round(10 * COUNTS_PER_DEGREE), 0, 0, 0, 0];
+  const at = frames.findIndex((frame) => JSON.stringify(frame) === JSON.stringify(up));
+  assert.deepEqual(frames.slice(at, at + 9), Array(9).fill(up));
+  assert.ok((made[1].length - 1) * 50 >= 1500);
+  assert.equal(made[3].length - 1, 4 * 8);
+});
+
+test('poses a move cannot make are refused with the joint, before sending', async () => {
+  const { posesToFrames } = await import('../src/index.js');
+  for (const [poses, words] of [
+    [[], 'at least one pose'],
+    [[{}], 'name at least one of pitch, roll, yaw, shoulder, elbow'],
+    [[{ nose: 3 }], "'nose' is not a joint"],
+    [[{ pitch: true }], 'pitch must be a number of degrees'],
+    [[{ pitch: NaN }], 'pitch must be a number of degrees'],
+    [[{ pitch: 130 }], 'pitch 130° is farther than a move may take it, 114.3° either way'],
+    [[{ yaw: -130 }], 'yaw -130° is farther than a move may take it, 114.3° either way'],
+    [Array(12).fill({ shoulder: 30, elbow: -30 }), "longer than a move's 10000"],
+  ]) {
+    assert.throws(() => posesToFrames(poses), (error) => error instanceof LampError && error.code === 'bad_request' && error.message.includes(words), words);
+  }
+  assert.throws(() => posesToFrames([{ yaw: 2 }], { holdMs: -1 }), /holdMs/);
+  await withLamp({}, async (lamp, fake) => {
+    await lamp.withLease(['body'], async () => {
+      await assert.rejects(lamp.movePoses([{ pitch: 130 }]), /farther than a move may take it/);
+      assert.deepEqual(fake.asked('move'), []);
+      await lamp.movePoses([{ pitch: 10 }, { yaw: -8 }], { holdMs: 200 });
+    }, { forMs: 5000 });
+    const sent = fake.asked('move');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].step_ms, 50);
+    assert.deepEqual(sent[0].frames, posesToFrames([{ pitch: 10 }, { yaw: -8 }], { holdMs: 200 }));
+  });
+});
+
+test('the microphone streams 20 ms blocks with the microphone grant only, says lost blocks, and ends when private', async () => {
+  await withLamp({ grants: ['light', 'microphone'] }, async (lamp, fake) => {
+    const blocks = [];
+    const ended = [];
+    lamp.on('microphone.audio', (block) => blocks.push(block));
+    lamp.on('microphone.ended', (event) => ended.push(event));
+    const reply = await lamp.microphoneStream();
+    assert.deepEqual(
+      [reply.stream, reply.sample_rate, reply.channels, reply.format, reply.block_ms, reply.source],
+      ['on', 16000, 1, 's16le', 20, 'mic1'],
+    );
+    await until(() => blocks.length >= 3);
+    const [first] = blocks;
+    assert.equal(first.ev, 'microphone.audio');
+    assert.equal(first.lost, 0);
+    assert.equal(first.format, 's16le');
+    assert.equal(first.bytes, 640);
+    assert.equal(first.data.length, 640);
+    // Blocks lost on the way are said in the next one.
+    fake.loseAudio(4);
+    await until(() => blocks.some((block) => block.lost === 4));
+    // Off: no more blocks and no event.
+    assert.equal((await lamp.microphoneStream(false)).stream, 'off');
+    const after = blocks.length;
+    await new Promise((r) => setTimeout(r, 80));
+    assert.equal(blocks.length, after);
+    assert.equal(ended.length, 0);
+    // Private: a stream ends at once, and a new one is refused.
+    await lamp.microphoneStream(true);
+    fake.setPrivate();
+    await until(() => ended.length === 1);
+    assert.deepEqual(ended[0], { ev: 'microphone.ended', why: 'the lamp is private' });
+    await assert.rejects(lamp.microphoneStream(true), byCode.private);
+    // Someone else in view: the same, with its own why.
+    fake.setPrivate(false);
+    await lamp.microphoneStream(true);
+    fake.setInView(2);
+    await until(() => ended.length === 2);
+    assert.deepEqual(ended[1], { ev: 'microphone.ended', why: 'someone else is here' });
+    await assert.rejects(lamp.microphoneStream(true), (error) => error instanceof byCode.refused && /someone else/.test(error.message));
+  });
+  await withLamp({}, async (lamp) => {
+    await assert.rejects(lamp.microphoneStream(true), byCode.no_grant);
+  });
+});
+
+test('fake.connect() gives a connected lamp with its own keyring and stop() cleans up', async () => {
+  const home = folder();
+  const before = process.env.LAMPOS_HOME;
+  process.env.LAMPOS_HOME = join(home, 'own'); // a test must not touch the developer's own
+  const fake = await FakeLamp.start();
+  try {
+    const lamp = await fake.connect();
+    const third = await fake.connect();
+    const other = await fake.connect({ name: 'second computer' });
+    assert.deepEqual([...fake.clients.values()].map((c) => c.name), ['test app 1', 'test app 2', 'second computer']);
+    await third.close();
+    const reply = await lamp.say('hello');
+    assert.deepEqual(fake.asked('say'), [{ text: 'hello' }]);
+    assert.ok(reply.ok !== false && other !== lamp);
+    assert.equal(fake.folders.length, 3);
+    assert.ok(fake.folders.every((f) => existsSync(f)));
+    await other.close(); // the test closed one itself: stop() must not trip on it
+    const folders = [...fake.folders];
+    await fake.stop();
+    assert.ok(folders.every((f) => !existsSync(f)));
+    assert.equal(existsSync(join(home, 'own')), false);
+    await assert.rejects(lamp.say('after the fake is gone'));
+  } finally {
+    if (before === undefined) delete process.env.LAMPOS_HOME; else process.env.LAMPOS_HOME = before;
+  }
+});
+
+test("FakeLamp({ grants: 'all' }) takes every grant the protocol names; the default stays narrow", async () => {
+  const narrow = await FakeLamp.start();
+  try {
+    const lamp = await narrow.connect();
+    await assert.rejects(lamp.on('phrase.heard', () => {}, { phrases: ['good night lamp'] }), { code: 'no_grant' });
+  } finally { await narrow.stop(); }
+  const wide = await FakeLamp.start({ grants: 'all' });
+  try {
+    const lamp = await wide.connect();
+    await lamp.on('phrase.heard', () => {}, { phrases: ['good night lamp'] });
+    assert.deepEqual(wide.grants, [...schema.grants]);
+  } finally { await wide.stop(); }
+  for (const slip of ['hear', 'All', '']) assert.throws(() => new FakeLamp({ grants: slip }), TypeError);
+});
+
+test('a missing camera or microphone grant says only the owner can add it; another grant keeps its short words', async () => {
+  await withLamp({ grants: ['light'] }, async (lamp) => {
+    await assert.rejects(lamp.cameraSnapshot(), (error) => error instanceof byCode.no_grant
+      && error.why === 'not granted: camera (only the owner can add it: with a new pairing code that names it, or by changing the grants of this computer)');
+    await assert.rejects(lamp.say('x'), (error) => error instanceof byCode.no_grant && error.why === 'not granted: speak');
+  });
+});
+
+test('the fake holds a move to the caps every shipped lamp has unless told it has app reach', async () => {
+  const ramp = [0, 150, 300, 450, 600, 681];
+  const sway = [...ramp, ...ramp.toReversed()].map((n) => [0, 0, n, 0, 0]);
+  await withLamp({}, async (lamp) => {
+    await lamp.withLease(['body'], async () => {
+      await assert.rejects(lamp.move(sway, 200), (error) => error instanceof byCode.bad_request && error.why.includes("joint 2 300 counts, farther than 250, this lamp's yaw reach (--reach)"));
+    }, { forMs: 5000 });
+  });
+  await withLamp({ appReach: true }, async (lamp) => {
+    await lamp.withLease(['body'], async () => { await lamp.move(sway, 200); }, { forMs: 5000 });
+  });
+});
+
+
+test('a close the lamp explains is logged once, with its reason', async () => {
+  await withPaired({ grants: ['body'] }, async (fake, keyring) => {
+    const lamp = await Lamp.connect(undefined, { keyring });
+    const lines = [];
+    const logged = console.error;
+    console.error = (line) => lines.push(String(line));
+    try {
+      fake.restart();
+      await lamp.closed();
+    } finally {
+      console.error = logged;
+    }
+    assert.deepEqual(lines, ['lampos: the lamp closed the connection: the lamp restarts']);
+    assert.equal(lamp.closeReason, 'the lamp restarts');
+    await lamp.close();
   });
 });

@@ -1,12 +1,13 @@
 # Music sway (#1669, the owner, 19 Oct 07:2x: "a small sway while music
 # plays ... rare and small, and never while the lamp is speaking or someone
 # is talking to it"; docs/creature.md, Joys). It reads ears/classes
-# (LAMP_EARS_CLASSES=on in lamp-ears) and sways its head a little, once,
+# (only with LAMP_EARS_CLASSES=on in lamp-ears, set in the product unit
+# since #5748) and sways its head a little, once,
 # when music has played in the room for a while. Written to lamp-skills'
 # schema (docs/skills.md).
 needs = ["ears", "body"]
-# A core skill (docs/skills.md, "Core and installable skills"), installed
-# disabled until its lamp check (install::PRODUCT_SKILLS_OFF).
+# A core skill (docs/skills.md, "Core and installable skills"), on in the
+# product since #5770.
 # Without the ears' classes it does nothing.
 kind = "core"
 version = "1.0.0"

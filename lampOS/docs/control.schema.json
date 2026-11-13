@@ -22,12 +22,12 @@
       "maximum": 9007199254740991
     },
     "time": {
-      "description": "The lamp's local time with its offset (RFC 3339).",
+      "description": "A time in UTC, RFC 3339 with `Z` (`2026-10-27T08:40:01Z`), as lamp-control writes it; a client turns it into local time itself.",
       "type": "string",
       "format": "date-time"
     },
     "grant": {
-      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound, never while the lamp is private (not routed yet).",
+      "description": "What a paired client may do. body: gestures, moves, look, joints; light; speak: say and sound; look: presence events; hear: registered phrases; sound: sound classes; skills: its own skills put on the lamp, which run on their own after it goes; air: the air sensor's readings (get air, air.changed); device: the lamp's own processor, memory, disk and temperatures (get device); camera: the camera's pictures (camera.snapshot, camera.stream), never while the lamp is private; microphone: the microphone's sound (microphone.stream), never while the lamp is private; speaker: sound played through the lamp's speaker, any sound and not only the lamp's own voice (speaker.stream), never while the lamp is private; notes: its own small key/value notes kept on the lamp (notes.set, notes.get, notes.delete, notes.list), gone with its revoke; speech: every line the lamp says out loud (lamp.said), which can be personal, never what a person says to it.",
       "enum": [
         "body",
         "light",
@@ -39,7 +39,10 @@
         "air",
         "device",
         "camera",
-        "microphone"
+        "microphone",
+        "speaker",
+        "notes",
+        "speech"
       ]
     },
     "part": {
@@ -66,7 +69,8 @@
         "lamp.changed",
         "body.state",
         "air.changed",
-        "volume.changed"
+        "volume.changed",
+        "lamp.said"
       ]
     },
     "state_name": {
@@ -137,12 +141,12 @@
       "maximum": 180
     },
     "frame": {
-      "description": "One step of a move: head pitch, head roll, base yaw, shoulder, elbow, in counts from the pose (4,096 a turn), as moves/*.json.",
+      "description": "One step of a move: head pitch, head roll, base yaw, shoulder, elbow, in counts from the pose (4,096 a turn), as moves/*.json. At most 1,300 either way here (the ceiling any lamp could take); the body holds each joint to its own reach.",
       "type": "array",
       "items": {
         "type": "integer",
-        "minimum": -350,
-        "maximum": 350
+        "minimum": -1300,
+        "maximum": 1300
       },
       "minItems": 5,
       "maxItems": 5
@@ -210,6 +214,18 @@
           "$ref": "#/$defs/sound.remove"
         },
         {
+          "$ref": "#/$defs/notes.set"
+        },
+        {
+          "$ref": "#/$defs/notes.get"
+        },
+        {
+          "$ref": "#/$defs/notes.delete"
+        },
+        {
+          "$ref": "#/$defs/notes.list"
+        },
+        {
           "$ref": "#/$defs/volume"
         },
         {
@@ -238,6 +254,18 @@
         },
         {
           "$ref": "#/$defs/listen.set"
+        },
+        {
+          "$ref": "#/$defs/microphone.stream"
+        },
+        {
+          "$ref": "#/$defs/service.read"
+        },
+        {
+          "$ref": "#/$defs/service.write"
+        },
+        {
+          "$ref": "#/$defs/speaker.stream"
         }
       ]
     },
@@ -296,6 +324,11 @@
           "description": "The client key's Ed25519 signature over \"lampos/v1/hello\" and a zero byte, then the welcome's 32 nonce bytes; base64 (64 bytes).",
           "type": "string",
           "pattern": "^[A-Za-z0-9+/]{86}==$"
+        },
+        "token": {
+          "description": "On the control socket only (/run/lampos-control/control.sock): the one-run token a skill's run holds, 43 characters of base64url; the client is then c_0 and the sig 64 zero bytes. A secret: never logged.",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{43}$"
         }
       },
       "required": [
@@ -665,7 +698,7 @@
       "additionalProperties": false
     },
     "play": {
-      "description": "A recorded move from the client's installed package; needs a body lease held by this client.",
+      "description": "A recorded move of one of this computer's pushed skills (its moves/NAME.json, kept when skill.push installed the skill), sent as a move of the same frames is; needs a body lease held by this client. skill says which when two of its skills have the name; the lamp refuses an ambiguous name, naming them.",
       "type": "object",
       "properties": {
         "id": {
@@ -677,6 +710,11 @@
         "name": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_-]{0,63}$"
+        },
+        "skill": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]{1,64}$",
+          "description": "The pushed skill whose moves/ has the move, when two have the name."
         }
       },
       "required": [
@@ -974,6 +1012,97 @@
       ],
       "additionalProperties": false
     },
+    "notes_key": {
+      "description": "A note's key: 1 to 64 bytes of letters, digits and . _ : -.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,64}$"
+    },
+    "notes.set": {
+      "description": "Keeps a note of this computer's own under a key, over one of the same key: the reply's key and bytes (the value serialized). The value is any JSON, at most 16384 bytes serialized; a computer keeps at most 256 keys and 262144 bytes of keys and values in all (hello's limits.notes). Needs the notes grant.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.set"
+        },
+        "key": {
+          "$ref": "#/$defs/notes_key"
+        },
+        "value": {}
+      },
+      "required": [
+        "id",
+        "op",
+        "key",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "notes.get": {
+      "description": "One of this computer's own notes: the reply's key, found and, when found, value. A key not kept is found false, not an error.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.get"
+        },
+        "key": {
+          "$ref": "#/$defs/notes_key"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "notes.delete": {
+      "description": "One of this computer's own notes dropped: the reply's key and deleted (false when it was not kept).",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.delete"
+        },
+        "key": {
+          "$ref": "#/$defs/notes_key"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "key"
+      ],
+      "additionalProperties": false
+    },
+    "notes.list": {
+      "description": "This computer's own keys that start with prefix (all when it is left out), sorted: the reply's keys (each key and the bytes of its value), count (those listed), total (all it keeps), bytes (all its keys and values take), keys_max and bytes_max.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "notes.list"
+        },
+        "prefix": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{0,64}$"
+        }
+      },
+      "required": [
+        "id",
+        "op"
+      ],
+      "additionalProperties": false
+    },
     "clip": {
       "description": "A clip of this computer's own, as sound.upload and sound.list say it.",
       "type": "object",
@@ -1172,7 +1301,7 @@
     "reply": {
       "oneOf": [
         {
-          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; turn.end carries turn and started; listen.set carries mute.",
+          "description": "Taken. A pair reply carries client and grants; hello carries lamp, grants and limits; lease.take and lease.renew carry lease and until; get carries state, the states asked for by name; skill.push carries got for each part but the last, and skill (and moves) for the last; skill.list carries skills; camera.snapshot carries jpeg, bytes and age_ms; camera.stream carries stream and, on, fps and fps_now; sound.upload carries got for each part but the last, and sound for the last; sound.list carries sounds; sound.remove carries removed; notes.set carries key and bytes; notes.get carries key, found and, when found, value; notes.delete carries key and deleted; notes.list carries keys, count, total, bytes, keys_max and bytes_max; turn.end carries turn and started; listen.set carries mute; microphone.stream carries stream and, on, sample_rate, channels, format, block_ms and source.",
           "type": "object",
           "properties": {
             "re": {
@@ -1195,7 +1324,14 @@
             "grants": {
               "type": "array",
               "items": {
-                "$ref": "#/$defs/grant"
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/grant"
+                  },
+                  {
+                    "$ref": "#/$defs/service_grant"
+                  }
+                ]
               },
               "uniqueItems": true
             },
@@ -1210,6 +1346,10 @@
                 },
                 "v": {
                   "const": 1
+                },
+                "language": {
+                  "description": "The owner's language (en, vi, ja, zh or ko), from the lamp's setup, so a program's own lines can follow it; en when the owner has not chosen one. Lamps from before this say none: read it as en.",
+                  "enum": ["en", "vi", "ja", "zh", "ko"]
                 }
               },
               "required": [
@@ -1239,7 +1379,7 @@
                     "object",
                     "null"
                   ],
-                  "description": "The person's own light (`on`, `colour`, `level`, from light/state), and `shows`: what the ring draws now (light/drawn), the person's light or one asked for over it. Each is left out until the lamp has said it; null until either is known.",
+                  "description": "The person's own light (`on`, `colour`, `level`, from light/state), and `shows`: what the ring draws now (light/drawn), the person's light or one asked for over it. Each is left out until the lamp has said it; null until either is known. `shows.pixels` is optional (see its description).",
                   "properties": {
                     "on": {
                       "type": "boolean"
@@ -1261,6 +1401,16 @@
                         },
                         "level": {
                           "type": "integer"
+                        },
+                        "pixels": {
+                          "description": "Optional. The ring's own pixels, as a paired computer asked for them (`light` with `rgb` or `pixels`): present only while that computer holds them and the ring draws that light; left out otherwise, and on a lamp that does not say it. Each is `#rrggbb`, the colour asked of the ring (the ring's own channel ceiling may draw it dimmer).",
+                          "type": "array",
+                          "minItems": 32,
+                          "maxItems": 32,
+                          "items": {
+                            "type": "string",
+                            "pattern": "^#[0-9a-f]{6}$"
+                          }
                         }
                       },
                       "required": [
@@ -1288,25 +1438,25 @@
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 1 µm, µg/m³, to a tenth."
+                      "description": "Particles under 1 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "pm2_5": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+                      "description": "Particles under 2.5 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "pm4_0": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 4 µm, µg/m³, to a tenth."
+                      "description": "Particles under 4 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "pm10": {
                       "type": "number",
                       "minimum": 0,
                       "maximum": 1000,
-                      "description": "Particles under 10 µm, µg/m³, to a tenth."
+                      "description": "Particles under 10 \u00b5m, \u00b5g/m\u00b3, to a tenth."
                     },
                     "co2_ppm": {
                       "type": "integer",
@@ -1420,6 +1570,40 @@
             "skill": {
               "type": "object"
             },
+            "moves": {
+              "description": "With the last skill.push part's skill, on a lamp that has play: the moves of the package's moves/ that were kept for play, and the ones left out with why (the skill is installed either way).",
+              "type": "object",
+              "properties": {
+                "kept": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "left_out": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "why": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "why"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "kept",
+                "left_out"
+              ]
+            },
             "skills": {
               "type": "array",
               "items": {
@@ -1475,8 +1659,60 @@
             "removed": {
               "type": "string"
             },
+            "key": {
+              "type": "string"
+            },
+            "found": {
+              "type": "boolean"
+            },
+            "value": {},
+            "result": {
+              "description": "service.read and service.write (a skill's run only): lamp-services' answer as it gave it, quoted data from the person's service or a write's read_back, held: true and next (never a send_id). Personal: never logged."
+            },
+            "deleted": {
+              "type": "boolean"
+            },
+            "keys": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "key": {
+                    "type": "string"
+                  },
+                  "bytes": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "key",
+                  "bytes"
+                ]
+              }
+            },
+            "count": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "keys_max": {
+              "type": "integer"
+            },
+            "bytes_max": {
+              "type": "integer"
+            },
             "turn": {
-              "const": "ended"
+              "description": "turn.end's: \"ended\"; speaker.stream's: this stream's number (a speaker.ended with another turn is not this stream's end).",
+              "oneOf": [
+                {
+                  "const": "ended"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              ]
             },
             "started": {
               "description": "turn.end's: the id of the turn.start it ended.",
@@ -1488,6 +1724,47 @@
                 "lifted",
                 "nothing_held"
               ]
+            },
+            "sample_rate": {
+              "description": "microphone.stream: samples a second, 16000.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "channels": {
+              "description": "microphone.stream: channels interleaved in a block, 1.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "format": {
+              "description": "microphone.stream: how a sample is written: s16le, signed 16 bits, low byte first.",
+              "const": "s16le"
+            },
+            "block_ms": {
+              "description": "microphone.stream: how long one block is, 20 ms.",
+              "type": "integer",
+              "minimum": 1
+            },
+            "source": {
+              "description": "microphone.stream: which of the lamp's microphones: mic1, the room microphone the ears read. speaker.stream: speaker.",
+              "enum": [
+                "mic1",
+                "speaker"
+              ]
+            },
+            "frame_ms": {
+              "description": "speaker.stream: how long one frame it takes may be, from 10 to 100 ms.",
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "integer",
+                "minimum": 1
+              }
+            },
+            "buffer_ms": {
+              "description": "speaker.stream: how much sound the voice buffers, in ms.",
+              "type": "integer",
+              "minimum": 0
             }
           },
           "required": [
@@ -1780,6 +2057,72 @@
             "store_max_bytes"
           ]
         },
+        "notes": {
+          "description": "A computer's own notes (notes.set): a key's and a value's largest, how many keys and bytes each computer keeps, and the rates of writes (set, delete) and reads (get, list).",
+          "type": "object",
+          "properties": {
+            "key_max_bytes": {
+              "type": "integer"
+            },
+            "value_max_bytes": {
+              "type": "integer"
+            },
+            "keys_max": {
+              "type": "integer"
+            },
+            "bytes_max": {
+              "type": "integer"
+            },
+            "writes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "most": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "within_ms": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "most",
+                  "within_ms"
+                ]
+              }
+            },
+            "reads": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "most": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "within_ms": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                },
+                "required": [
+                  "most",
+                  "within_ms"
+                ]
+              }
+            }
+          },
+          "required": [
+            "key_max_bytes",
+            "value_max_bytes",
+            "keys_max",
+            "bytes_max",
+            "writes",
+            "reads"
+          ]
+        },
         "push": {
           "type": "array",
           "items": {
@@ -1819,6 +2162,10 @@
               "within_ms"
             ]
           }
+        },
+        "motion_done": {
+          "const": true,
+          "description": "Present when a `gesture`, `move` or feeling's move ends with a `done` once the body says what became of it (#4209): `finished` at its end, `dropped` (never began: the person using the lamp, a move it can't play, nothing begun within 10 s) or `cut_short` (ended as it played: replaced by a newer motion, or for the person), each with the body's `why`. Without it, a lamp-control from before reads no word from the body, and an SDK's wait for them ends at the answer."
         },
         "ring": {
           "type": "object",
@@ -1899,14 +2246,18 @@
                 "lease",
                 "done",
                 "camera.frame",
-                "camera.ended"
+                "camera.ended",
+                "microphone.audio",
+                "microphone.ended",
+                "speaker.stats",
+                "speaker.ended"
               ]
             }
           ]
         },
         "at": {
           "$ref": "#/$defs/time",
-          "description": "The lamp's local time, on the events about the room. welcome, lease and done may not carry it."
+          "description": "When it happened, in UTC (`…Z`), on the events about the room. welcome, lease and done may not carry it."
         }
       },
       "required": [
@@ -1940,6 +2291,10 @@
                   },
                   "v": {
                     "const": 1
+                  },
+                  "language": {
+                    "description": "The owner's language (en, vi, ja, zh or ko), from the lamp's setup, so a program's own lines can follow it; en when the owner has not chosen one. Lamps from before this say none: read it as en.",
+                    "enum": ["en", "vi", "ja", "zh", "ko"]
                   }
                 },
                 "required": [
@@ -2063,6 +2418,25 @@
             "required": [
               "class"
             ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "name.heard"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "score": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "How sure the lamp's listener was that it heard its name, to a hundredth. A sound like the name can reach the lamp's own bar, so a program that acts on its own may want a higher one."
+              }
+            }
           }
         },
         {
@@ -2351,31 +2725,31 @@
             }
           },
           "then": {
-            "description": "The air sensor's reading (air/state, the air grant): the first one, then one where a value moved by its step (particles 5 µg/m³, carbon dioxide 50 ppm, humidity 3, temperature 0.5 °C), came or went, or feel changed; at most once every 5 s, the newest held back until then.",
+            "description": "The air sensor's reading (air/state, the air grant): the first one, then one where a value moved by its step (particles 5 \u00b5g/m\u00b3, carbon dioxide 50 ppm, humidity 3, temperature 0.5 \u00b0C), came or went, or feel changed; at most once every 5 s, the newest held back until then.",
             "properties": {
               "pm1_0": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 1 µm, µg/m³, to a tenth."
+                "description": "Particles under 1 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "pm2_5": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+                "description": "Particles under 2.5 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "pm4_0": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 4 µm, µg/m³, to a tenth."
+                "description": "Particles under 4 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "pm10": {
                 "type": "number",
                 "minimum": 0,
                 "maximum": 1000,
-                "description": "Particles under 10 µm, µg/m³, to a tenth."
+                "description": "Particles under 10 \u00b5m, \u00b5g/m\u00b3, to a tenth."
               },
               "co2_ppm": {
                 "type": "integer",
@@ -2437,6 +2811,47 @@
           "if": {
             "properties": {
               "ev": {
+                "const": "lamp.said"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "text": {
+                "type": "string",
+                "description": "What the lamp said out loud, as written (for a reply, what the model wrote; see cut)."
+              },
+              "by": {
+                "enum": [
+                  "lamp",
+                  "computer"
+                ],
+                "description": "Who had it said: the lamp itself, or a computer's own say (back to that computer alone)."
+              },
+              "source": {
+                "enum": [
+                  "reply",
+                  "exact",
+                  "cached"
+                ],
+                "description": "A reply of the lamp's model, a computer's word-for-word say, or one of the lamp's fixed phrases."
+              },
+              "cut": {
+                "const": true,
+                "description": "Present only when the line was cut short (talked over, stopped): text may not have been said in full."
+              }
+            },
+            "required": [
+              "text",
+              "by",
+              "source"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
                 "const": "camera.frame"
               }
             }
@@ -2491,6 +2906,145 @@
               "why"
             ]
           }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "microphone.audio"
+              }
+            }
+          },
+          "then": {
+            "description": "One block of a microphone.stream, the header of its binary WebSocket message (the sound itself follows the header, never in JSON).",
+            "properties": {
+              "sequence": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The block's count since the ears started; a step of more than one is sound that was lost."
+              },
+              "lost": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Blocks lost since the last one this stream sent: gaps in sequence, and blocks the connection had no room for."
+              },
+              "sample_rate": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "channels": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "format": {
+                "const": "s16le"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "The sound's size in bytes: 640 for a 20 ms block."
+              }
+            },
+            "required": [
+              "sequence",
+              "lost",
+              "sample_rate",
+              "channels",
+              "format",
+              "bytes"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "microphone.ended"
+              }
+            }
+          },
+          "then": {
+            "description": "The microphone.stream ended by itself: the lamp turned private, someone else came into view (more than one person), or no sound came for 2 s (the lamp's microphone isn't shared here).",
+            "properties": {
+              "why": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "why"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "speaker.stats"
+              }
+            }
+          },
+          "then": {
+            "description": "Every 2 s while a speaker.stream runs: how much sound the voice held when it wrote the line (`buffered_ms`, in ms at the speaker's 24 kHz; the line reaches the computer about a second old, and no line carries the stream's final totals), and what was lost: blocks the lamp had no room for or held back for the ring's mark, underruns (gaps the speaker itself reported in the stream's sound, its own queue ran dry; the stream running dry because the computer stopped sending counts as one when the speaker reports it), the 10 ms windows of sound the voice lowered or clipped to the clips' loudness cap (`limited`), and binary messages dropped because they were another connection's, too big or not whole samples.",
+            "properties": {
+              "turn": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "buffered_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "lost": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "underruns": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "limited": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "stray": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "turn",
+              "buffered_ms",
+              "lost",
+              "underruns",
+              "limited",
+              "stray"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "ev": {
+                "const": "speaker.ended"
+              }
+            }
+          },
+          "then": {
+            "description": "The speaker.stream ended by itself, with why: the lamp turned private or muted, the ring's mark is not shown, the voice ended it (the lamp or the person speaks, a hand on the head, stop), no frame came for 2 s (idle), 10 minutes (limit), or another connection replaced it (replaced).",
+            "properties": {
+              "turn": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "why": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "turn",
+              "why"
+            ]
+          }
         }
       ]
     },
@@ -2502,25 +3056,25 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 1 µm, µg/m³, to a tenth."
+          "description": "Particles under 1 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "pm2_5": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 2.5 µm, µg/m³, to a tenth."
+          "description": "Particles under 2.5 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "pm4_0": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 4 µm, µg/m³, to a tenth."
+          "description": "Particles under 4 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "pm10": {
           "type": "number",
           "minimum": 0,
           "maximum": 1000,
-          "description": "Particles under 10 µm, µg/m³, to a tenth."
+          "description": "Particles under 10 \u00b5m, \u00b5g/m\u00b3, to a tenth."
         },
         "co2_ppm": {
           "type": "integer",
@@ -2888,6 +3442,131 @@
         "counts",
         "moving"
       ]
+    },
+    "microphone.stream": {
+      "description": "The microphone's sound, each 20 ms block the ears share on mic1/audio (mono, 16 kHz, S16LE), as a binary WebSocket message: the header's length (4 bytes, big-endian), the header (JSON: ev microphone.audio, sequence, lost, sample_rate, channels, format, bytes), then the samples, 640 bytes. Until on is false, stop, the connection closes, or a microphone.ended event (the lamp turned private, someone else came into view, or no block came for 2 s: the ears share their sound only with LAMP_BUS_AUDIO=on). On again while one runs replaces it. Needs the microphone grant, the lamp's own network and the owner's switch (lamp-control --microphone on, LAMP_CONTROL_MICROPHONE=on; off unless given: refused, the microphone stream is off on this lamp). Refused while the lamp is private, while more than one person is in view (refused: someone else is here; the door can't tell the owner from anyone else), and where the ring can't show its mark; either of the first two also ends a running stream with microphone.ended.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "microphone.stream"
+        },
+        "on": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "on"
+      ],
+      "additionalProperties": false
+    },
+    "service_grant": {
+      "description": "A linked service's grant, a skill run's alone (on the control socket, from the owner's yes; never a paired computer's): <code>-read reads it, <code>-write prepares a write the person's spoken yes sends. The codes are lamp-services' (gmail covers gmail-app, figma covers figma-api).",
+      "type": "string",
+      "pattern": "^(gmail|google_calendar|google_drive|figma|github|linear|asana|ahrefs|facebook|slack|mondaydotcom|hubspot|amplitude|notion)-(read|write)$"
+    },
+    "service_code": {
+      "description": "A linked service's code, as lamp-services' catalog has it.",
+      "enum": [
+        "gmail",
+        "gmail-app",
+        "google_calendar",
+        "google_drive",
+        "figma",
+        "figma-api",
+        "github",
+        "linear",
+        "asana",
+        "ahrefs",
+        "facebook",
+        "slack",
+        "mondaydotcom",
+        "hubspot",
+        "amplitude",
+        "notion"
+      ]
+    },
+    "service.read": {
+      "description": "A skill's run only (the control socket, LAMP_SKILL_TASKS=on): one read of a linked service through lamp-services' service_read, args as that function takes them, without service. Needs the <service>-read grant. The reply's result is lamp-services' answer; its refusal comes as refused, with off while the switch is off.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "service.read"
+        },
+        "service": {
+          "$ref": "#/$defs/service_code"
+        },
+        "args": {
+          "description": "service_read's own arguments (what, query, id, count, ...), never service. Personal: never logged.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "service"
+      ],
+      "additionalProperties": false
+    },
+    "service.write": {
+      "description": "A skill's run only (the control socket, LAMP_SKILL_TASKS=on): one write to a linked service, only prepared by lamp-services' service_write, read back and held for the person's spoken yes, which sends it; never sent by the run. Needs the <service>-write grant. The reply's result is the read_back, sent false and held true, with no send_id.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "service.write"
+        },
+        "service": {
+          "$ref": "#/$defs/service_code"
+        },
+        "args": {
+          "description": "service_write's own arguments (action, to, subject, text, ...), never service, send_id or said. Personal: never logged.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "service"
+      ],
+      "additionalProperties": false
+    },
+    "speaker.stream": {
+      "description": "Sound for the lamp's speaker: after on: true the connection sends binary WebSocket messages, the header's length (4 bytes, big-endian), the header (JSON: ev speaker.audio, sequence), then 10 to 100 ms of mono S16LE samples at sample_rate (16000, the default, or 24000), at most 9600 bytes of samples. The lamp plays them through the voice's own speaker path, so the person's volume, privacy and the speaking order hold: it starts only when the lamp is not speaking, and ends at once (speaker.ended, with why) when the lamp or the person speaks, the lamp turns private or muted, the ring's mark is not shown, no frame comes for 2 s, 10 minutes pass, or a second connection opens one. One stream on the lamp, bound to the connection that opened it. Needs the speaker grant; local network only.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "op": {
+          "const": "speaker.stream"
+        },
+        "on": {
+          "type": "boolean"
+        },
+        "sample_rate": {
+          "description": "The sample rate of the frames this stream sends: 16000 (the default) or 24000.",
+          "enum": [
+            16000,
+            24000
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "op",
+        "on"
+      ],
+      "additionalProperties": false
     }
   }
 }

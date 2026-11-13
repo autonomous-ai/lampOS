@@ -402,6 +402,12 @@ impl<S: Save> Save for ReleasingSave<'_, S> {
     fn first_volume(&mut self) {
         self.save.first_volume()
     }
+    fn first_update(&mut self) {
+        self.save.first_update()
+    }
+    fn start_parts(&mut self) {
+        self.save.start_parts()
+    }
     fn marker(&mut self) -> io::Result<()> {
         if let Some(light) = self.light {
             light.release();

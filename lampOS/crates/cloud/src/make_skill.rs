@@ -1,15 +1,15 @@
 //! A skill typed in the owner's app (#2813; the first builder on #2602,
 //! 22 Oct 10:3x): `skills.make` hands the words to lamp-voice's app-make
-//! socket (`lamp_voice::app_make`), which hands them over to the computer's
-//! agent as the voice's own brief; `skills.made` reads what became of the
+//! socket (`lamp_voice::app_make`), where the lamp's own model makes the
+//! skill from them as the voice's own brief; `skills.made` reads what became of the
 //! app's ask. Off unless `LAMP_APP_MAKE_SKILL=on` here and on the skills
 //! page (`LAMP_SKILLS_PAGE=on`); lamp-voice checks the same switch in its
 //! own unit, so this is not the only gate.
 //!
-//! **Nothing from the app puts a skill on.** The lamp asks about the kept
-//! skill out loud, and only a spoken yes at the lamp puts it on (the lead's
-//! ruling on #1711, 20 Oct 08:37). The app shows what it will ask about:
-//! the name, what it does, what it may use and the SHA-256.
+//! **The app's MAKE IT is the ask** (#5977; the owner, 10 Nov): a kept skill
+//! goes on at once with no spoken yes, held to the cap and the check, and
+//! the lamp says what it made, what it does and what it uses. The app
+//! shows the same: the name, what it does, what it may use and the SHA-256.
 //!
 //! The owner's alone, as every kind here is: only the lamp's own account
 //! channel commands it (`online::commanded`).
@@ -54,12 +54,35 @@ pub const READY_EVERY: Duration = Duration::from_secs(60);
 /// The newest [`ready`] answer, read by `system.info`'s `can` with no wait.
 static READY: AtomicBool = AtomicBool::new(false);
 
-/// `{"ready": {}}` (fourteen-P15): whether lamp-voice's maker has a computer
-/// to hand the work to, so the app's "Make a skill" can work on this lamp.
-/// No answer is no.
+/// Why making a skill isn't ready when lamp-voice's app-make socket
+/// doesn't answer: lamp-voice isn't up yet, or the switch is off in its
+/// unit.
+pub const NOT_ANSWERING: &str = "lamp-voice's maker isn't answering yet";
+
+/// Why, when lamp-voice answers `ready` with neither yes nor a reason.
+pub const NOT_SAID: &str = "lamp-voice's maker didn't say it's ready";
+
+/// `{"ready": {}}` (fourteen-P15): whether lamp-voice's maker answers
+/// ready, so the app's "Make a skill" can work on this lamp. The lamp makes
+/// the skill with its own model (`lamp_voice::make_skill_local`; no
+/// computer and no Harness since 3 Nov), so a maker that answers is ready.
+/// Or why not: the voice's own `why`, [`NOT_SAID`] or [`NOT_ANSWERING`].
+pub fn readiness(socket: &Path) -> Result<(), String> {
+    match exchange(socket, &json!({"ready": {}})) {
+        Ok(answer) if answer.get("ready") == Some(&json!(true)) => Ok(()),
+        Ok(answer) => Err(answer
+            .get("why")
+            .and_then(Value::as_str)
+            .filter(|why| !why.is_empty())
+            .unwrap_or(NOT_SAID)
+            .to_owned()),
+        Err(_) => Err(NOT_ANSWERING.to_owned()),
+    }
+}
+
+/// [`readiness`] as yes or no. No answer is no.
 pub fn ready(socket: &Path) -> bool {
-    exchange(socket, &json!({"ready": {}}))
-        .is_ok_and(|answer| answer.get("ready") == Some(&json!(true)))
+    readiness(socket).is_ok()
 }
 
 /// [`ready`]'s newest answer.
@@ -67,27 +90,28 @@ pub fn is_ready() -> bool {
     READY.load(Ordering::Relaxed)
 }
 
-/// Asks [`ready`] at once and every [`READY_EVERY`] on a thread of its own,
-/// so `can` names `skills.make` only while it is (the first builder's yes on
-/// fourteen-P15: the button shows only on a lamp whose Harness has a
-/// computer). The journal says each change, never more.
+/// The journal's line for a [`readiness`].
+pub fn ready_line(readiness: &Result<(), String>) -> String {
+    match readiness {
+        Ok(()) => "lamp-cloud: making a skill is ready: the lamp's maker answers".to_owned(),
+        Err(why) => format!("lamp-cloud: making a skill is not ready: {why}"),
+    }
+}
+
+/// Asks [`readiness`] at once and every [`READY_EVERY`] on a thread of its
+/// own, so `can` names `skills.make` only while lamp-voice's maker answers
+/// ready (fourteen-P15). The journal says each change ([`ready_line`]),
+/// never more.
 pub fn watch(socket: PathBuf) {
     let spawned = std::thread::Builder::new()
         .name("lamp-cloud-make-ready".into())
         .spawn(move || {
             let mut was = None;
             loop {
-                let now = ready(&socket);
-                READY.store(now, Ordering::Relaxed);
-                if was != Some(now) {
-                    eprintln!(
-                        "lamp-cloud: making a skill is {}",
-                        if now {
-                            "ready: the computer's agent is set up"
-                        } else {
-                            "not ready: the computer's agent isn't set up for the lamp yet"
-                        }
-                    );
+                let now = readiness(&socket);
+                READY.store(now.is_ok(), Ordering::Relaxed);
+                if was.as_ref() != Some(&now) {
+                    eprintln!("{}", ready_line(&now));
                     was = Some(now);
                 }
                 std::thread::sleep(READY_EVERY);
@@ -386,16 +410,47 @@ mod tests {
             "ready",
             vec![
                 json!({"ready": true}),
-                json!({"ready": false, "why": "the computer's agent isn't set up for the lamp yet"}),
+                json!({"ready": false, "why": "making a skill isn't on for this lamp"}),
                 json!({"making": true}),
+                json!({"ready": true}),
             ],
         );
         assert!(ready(&socket));
         assert_eq!(lines.recv().unwrap(), json!({"ready": {}}));
-        assert!(!ready(&socket));
-        assert!(!ready(&socket));
+        assert_eq!(
+            readiness(&socket),
+            Err("making a skill isn't on for this lamp".to_owned())
+        );
+        assert_eq!(readiness(&socket), Err(NOT_SAID.to_owned()));
+        assert_eq!(readiness(&socket), Ok(()));
         assert!(!ready(Path::new("/nowhere/make.sock")));
+        assert_eq!(
+            readiness(Path::new("/nowhere/make.sock")),
+            Err(NOT_ANSWERING.to_owned())
+        );
         let _ = std::fs::remove_dir_all(socket.parent().unwrap());
+    }
+
+    /// A tester's lamp, 11 Nov: the journal said "the computer's agent
+    /// isn't set up for the lamp yet" while lamp-voice wasn't answering,
+    /// and a person took it that Make a Skill needs a paired computer. The
+    /// lamp's own model makes it (since 3 Nov): the lines say what is so.
+    #[test]
+    fn the_journal_says_whether_the_lamps_maker_answers_never_a_computer() {
+        assert_eq!(
+            ready_line(&Ok(())),
+            "lamp-cloud: making a skill is ready: the lamp's maker answers"
+        );
+        assert_eq!(
+            ready_line(&Err(NOT_ANSWERING.to_owned())),
+            "lamp-cloud: making a skill is not ready: lamp-voice's maker isn't answering yet"
+        );
+        for line in [ready_line(&Ok(())), ready_line(&Err(NOT_ANSWERING.into()))] {
+            assert!(
+                !line.contains("computer") && !line.contains("Harness"),
+                "{line}"
+            );
+        }
     }
 
     /// lamp-voice's own names, so the two never part.

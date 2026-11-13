@@ -216,7 +216,7 @@ On the Live route it follows the session's functions, on the second route
 the flag; with `go_to_sleep` declared it is not told.
 
 **The hold says the line (#3748 part 1, `LAMP_SLEEP_LINE=on`, off unless
-on).** At the hold's 2 s mark the voice plays the line "Going to sleep. Tap
+on; on in the product unit since #6028).** At the hold's 2 s mark the voice plays the line "Going to sleep. Tap
 my head to wake me." (`lamp_msgs::SLEEP_LINE`, the same words as the
 `go_to_sleep` function's) in place of the falling breath, as the same sound
 turn of its own. The line comes from the voice's speech cache
@@ -226,7 +226,13 @@ lamp, so it plays offline. The coordinator reads it at each hold, from the
 file only, never waiting on a render, so a line rendered after the
 conversation started plays at the next hold; with an owner's language
 other than English, the line in that language when kept, the English
-otherwise (#4473 (c), second-voice.md, "The fixed lines"). If it isn't kept yet (no
+otherwise (#4473 (c), second-voice.md, "The fixed lines"). In the quiet
+hours (22:00 to 07:00 local, `lamp_local_time::quiet_hours`, the one
+definition skills keep too) the breath plays in its place, and the asleep
+face alone shows the sleep (#6028); a local time it cannot read is not quiet.
+The journal says "a hand's hold in the quiet hours: the breath plays, not the
+sleep line". The line is a sound turn of its own, not a line in the chat's
+history: a later turn is not told it was said. If it isn't kept yet (no
 speech cache, not rendered yet, or its render failed), the breath plays as
 without the switch, and the journal says so. Either way the sleep now waits for that cue: the 3 s Hold no longer
 mutes at once, it makes the sleep owed (`HandControls::land_owed_sleep`),

@@ -222,6 +222,10 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::SoundUpload { .. } => "sound.upload",
         Op::SoundList {} => "sound.list",
         Op::SoundRemove { .. } => "sound.remove",
+        Op::NotesSet { .. } => "notes.set",
+        Op::NotesGet { .. } => "notes.get",
+        Op::NotesDelete { .. } => "notes.delete",
+        Op::NotesList { .. } => "notes.list",
         Op::TurnStart { .. } => "turn.start",
         Op::TurnEnd {} => "turn.end",
         Op::ListenSet { .. } => "listen.set",
@@ -232,6 +236,10 @@ pub fn op_name(op: &Op) -> &'static str {
         Op::CameraSnapshot {} => "camera.snapshot",
         Op::CameraStream { .. } => "camera.stream",
         Op::Volume { .. } => "volume",
+        Op::MicrophoneStream { .. } => "microphone.stream",
+        Op::ServiceRead { .. } => "service.read",
+        Op::ServiceWrite { .. } => "service.write",
+        Op::SpeakerStream { .. } => "speaker.stream",
     }
 }
 
@@ -257,6 +265,11 @@ pub fn went(op: &Op) -> &'static str {
         Op::SkillPush { .. } | Op::SkillList {} | Op::SkillRemove { .. } => "the skill helper",
         Op::CameraSnapshot {} => "the eyes' newest frame, by sight.jpg",
         Op::CameraStream { .. } => "the eyes, by sight.jpg or their frames socket",
+        Op::MicrophoneStream { .. } => "the ears, by mic1/audio",
+        Op::ServiceRead { .. } | Op::ServiceWrite { .. } => {
+            "lamp-services, by its tools' call.sock"
+        }
+        Op::SpeakerStream { .. } => "the voice, by speaker/audio",
         _ => "the door",
     }
 }
@@ -303,7 +316,7 @@ fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
         Op::TurnStart { prompt: None } => "no prompt".to_owned(),
         Op::ListenSet { on } => format!("on {on}"),
         Op::Gesture { name }
-        | Op::Play { name }
+        | Op::Play { name, .. }
         | Op::Sound { name }
         | Op::SoundRemove { name } => word(name),
         Op::SoundUpload {
@@ -349,6 +362,17 @@ fn fields(op: &Op, said: impl Fn(&str) -> String) -> String {
             format!("{}, for_ms {for_ms}", list(parts.iter().map(named)))
         }
         Op::LeaseRenew { for_ms, .. } => format!("for_ms {for_ms}"),
+        // Its start and its stop told apart; never the sound.
+        Op::MicrophoneStream { on } => (if *on { "on" } else { "off" }).to_owned(),
+        // The service and what is asked of it, as plain words: never a
+        // search, an address or a text.
+        Op::ServiceRead { service, args } => {
+            format!("{}, {}", word(service), word(text_of(args, "what")))
+        }
+        Op::ServiceWrite { service, args } => {
+            format!("{}, {}", word(service), word(text_of(args, "action")))
+        }
+        Op::SpeakerStream { on, .. } => (if *on { "on" } else { "off" }).to_owned(),
         _ => return String::new(),
     };
     format!(" ({inside})")
@@ -366,6 +390,13 @@ pub fn word(name: &str) -> String {
     } else {
         "a name the door doesn't write".to_owned()
     }
+}
+
+/// A text field of `args`, or nothing.
+fn text_of<'a>(args: &'a serde_json::Map<String, serde_json::Value>, key: &str) -> &'a str {
+    args.get(key)
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default()
 }
 
 fn list(names: impl Iterator<Item = String>) -> String {

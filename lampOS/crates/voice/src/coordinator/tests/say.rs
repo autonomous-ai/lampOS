@@ -157,6 +157,7 @@ impl Test {
             &mut self.cloud,
             &mut self.reply,
             &ProviderOutput::Audio {
+                spoken: true,
                 request,
                 sequence: self.sequence + 1,
                 provider_event_at_us: received_at,
@@ -279,6 +280,47 @@ fn a_say_whose_turn_completes_with_its_audio_played_is_spoken() {
     assert_eq!(test.answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
 }
 
+/// #6749 D (lamp-52e6, 13 Nov): a skill task's ask said whole, with gaps in
+/// its playback, was answered `dropped`
+/// (`audio_written_with_playback_gaps_unscored`), so lamp-skills counted it
+/// unsaid and asked again 10 min later. A say that played to its end
+/// through gaps, nobody's turn taken over it, is `spoken`, however much of
+/// it the gaps' zeros were; one cut over its gaps is still dropped.
+#[test]
+fn a_say_played_to_its_end_through_gaps_is_spoken() {
+    for zeros in [0, 64, 2_400] {
+        let mut test = Test::new();
+        let first = test.generation(17);
+        test.accept(&first, 240);
+        test.retire(&first);
+        let current = test.reply.as_mut().unwrap();
+        current.playback_gaps = 2;
+        current.gap_zeros.total = zeros;
+        test.provider_complete();
+        assert!(test.finish_if_settled());
+        assert_eq!(
+            test.answered.try_recv(),
+            Ok(Answer::Done(Outcome::Spoken)),
+            "{zeros} zero frames"
+        );
+    }
+    let mut cut = Test::new();
+    let first = cut.generation(17);
+    cut.accept(&first, 120);
+    cut.reply.as_mut().unwrap().playback_gaps = 1;
+    cancel_reply(
+        &mut cut.owner,
+        &mut cut.reply,
+        &mut cut.trace,
+        "user_interrupted",
+    )
+    .unwrap();
+    assert_eq!(
+        cut.answered.try_recv(),
+        Ok(Answer::Done(Outcome::Dropped("user_interrupted".into())))
+    );
+}
+
 /// A person speaks over it: the voice cancels the turn, and the asker is
 /// told it was dropped, and why.
 #[test]
@@ -325,7 +367,11 @@ fn the_setup_intro_is_kept_as_said_only_when_its_committed_turn_was_heard_whole(
                 walk.tick(at, at, true, false, Some(face), true)
             })
             .expect("the intro");
-        assert_eq!(note, crate::onboarding::SIT_NOTE);
+        // The opener: the intro, then step one's ask.
+        assert!(
+            note.contains("Step one: sit where you usually sit, and look at me."),
+            "{note}"
+        );
         let mut test = Test::writing(&note);
         let bound = {
             let owner = test.reply.as_ref().unwrap().owner;
@@ -390,6 +436,13 @@ fn a_say_the_model_left_silent_is_dropped() {
 /// them, put on the turn by the news branch's own `news_on` (the reviewer
 /// on #1425: with that a no-op, no harness would ever close).
 const NEWS: [&str; 2] = ["s1:147:67", "s1:148:70"];
+/// The keys of the news begun since the last call ([`crate::task_news::begun`]).
+fn begun_keys() -> Vec<String> {
+    crate::task_news::take_begun()
+        .into_iter()
+        .map(|(_, key)| key)
+        .collect()
+}
 fn telling_news(test: &mut Test) {
     let told = crate::task_news::News {
         key: NEWS[0].into(),
@@ -399,7 +452,11 @@ fn telling_news(test: &mut Test) {
         finished: None,
         also: vec![NEWS[1].into()],
     };
-    news_on(told, &mut test.reply);
+    news_on(
+        told,
+        crate::task_news::NotHeard(std::sync::mpsc::channel().0),
+        &mut test.reply,
+    );
     assert_eq!(test.reply.as_ref().unwrap().news, NEWS);
 }
 
@@ -407,17 +464,26 @@ fn telling_news(test: &mut Test) {
 /// part (so that its harness may be closed) only as the turn ends heard
 /// whole, on the proof a say's `spoken` takes; every key told together
 /// with it too, and not a moment before.
+/// #6530: the tasks part is told the news began as its first words reach
+/// the speaker, so the harness closes then, not once the turn ends.
 #[test]
 fn news_heard_whole_is_handed_on_as_the_turn_ends() {
+    let _ = crate::task_news::take_begun();
     let mut test = Test::new();
     telling_news(&mut test);
     let chunk = test.generation(17);
     test.provider_complete();
+    assert!(
+        crate::task_news::take_begun().is_empty(),
+        "nothing played yet"
+    );
     test.accept(&chunk, 240);
+    assert_eq!(begun_keys(), NEWS, "begun as it plays");
     assert!(!test.finish_if_settled(), "accepted is not retired");
     test.retire(&chunk);
     assert!(test.finish_if_settled());
     assert_eq!(test.heard, NEWS);
+    assert!(crate::task_news::take_begun().is_empty());
 }
 
 /// #1390, the follow-up to #1425: news the person asked about
@@ -449,9 +515,12 @@ fn news_answered_to_a_question_rides_on_its_own_turn() {
 }
 
 /// A Stop or the person speaking over it cancels the turn: the news goes
-/// with it, never handed on, and its harness stays open.
+/// with it, never handed on as heard. Its telling began, so its harness
+/// is closed all the same (#6530); cut before any word played, it stays
+/// open.
 #[test]
 fn news_cut_short_is_never_handed_on() {
+    let _ = crate::task_news::take_begun();
     let mut test = Test::new();
     telling_news(&mut test);
     let chunk = test.generation(17);
@@ -465,27 +534,57 @@ fn news_cut_short_is_never_handed_on() {
     .unwrap();
     assert!(test.reply.is_none());
     assert!(test.heard.is_empty());
+    assert!(
+        crate::task_news::take_begun()
+            .iter()
+            .map(|(_, key)| key.as_str())
+            .take(2)
+            .eq(NEWS)
+    );
+
+    let mut before = Test::new();
+    telling_news(&mut before);
+    let _ = before.generation(17);
+    cancel_reply(
+        &mut before.owner,
+        &mut before.reply,
+        &mut before.trace,
+        "user_interrupted",
+    )
+    .unwrap();
+    assert!(before.heard.is_empty());
+    assert!(crate::task_news::take_begun().is_empty());
 }
 
 /// A turn that ends with no audio, or with a gap in its playback, is no news
 /// heard. (Muting the mic takes the turn from its owner: it is cut short.)
+/// #6530, on a lamp on 12 Nov: a news played with gaps
+/// (`audio_written_with_playback_gaps_unscored`) kept its harness open 71 s
+/// after the task went idle. Its telling began, so the tasks part is told
+/// at once, whatever the score; a turn that played nothing tells nothing.
 #[test]
 fn news_not_heard_whole_is_never_handed_on() {
+    let _ = crate::task_news::take_begun();
     let mut silent = Test::new();
     telling_news(&mut silent);
     silent.provider_complete();
     assert!(silent.finish_if_settled());
     assert!(silent.heard.is_empty());
+    assert!(crate::task_news::take_begun().is_empty());
 
     let mut gap = Test::new();
     telling_news(&mut gap);
     let chunk = gap.generation(17);
     gap.accept(&chunk, 240);
+    assert_eq!(begun_keys(), NEWS, "begun as it plays");
     gap.retire(&chunk);
     gap.reply.as_mut().unwrap().playback_gaps = 1;
     gap.provider_complete();
     assert!(gap.finish_if_settled());
     assert!(gap.heard.is_empty());
+    // Begun again as the turn ends: the tasks part takes each key once
+    // ([`crate::task_news::TaskNews::begun`]).
+    assert_eq!(begun_keys(), NEWS);
 }
 
 /// #939, (c): with the switch, a due reminder or news waits for a skill's
@@ -790,6 +889,7 @@ fn take_sound(
         &mut false,
         PlayoutStart::default(),
         trace,
+        None,
         |_| Ok(()),
     )
     .unwrap()
@@ -1030,6 +1130,104 @@ fn an_exact_line_waits_for_the_person_then_is_played_to_spoken() {
     assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
 }
 
+/// lamp-52e6, 10 Nov: a skill's exact ask played to `spoken` never reached
+/// the chat's history, so the next ask to unplug was answered from the
+/// model's own last words ("I'm preparing to fold") with no call. Once
+/// spoken, the line is the lamp's own in the next chat request's history.
+#[test]
+fn an_exact_skill_line_said_is_in_the_next_chat_requests_history() {
+    let line = "My arm is folded. Shall I turn myself off now? Say yes, and I will.";
+    let (mut says, answered) = crate::say::Says::words_for_test(
+        "unplug",
+        crate::say::Words::ExactSound {
+            samples: vec![400; 480],
+            text: Some(line.to_owned()),
+        },
+        crate::say::NORMAL_PRIORITY,
+    );
+    let mut owner = resting_owner();
+    let (mut reply, mut pending, mut trace) = (None, None, SessionState::default());
+    let admission = InputAdmission::default();
+    let now_is = crate::say::SoundNow {
+        conversing: false,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(take_exact(
+        &mut says, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+    let mut played = play_sound(&mut owner, &mut reply, &mut pending, &mut trace, 2);
+    played
+        .peer
+        .control
+        .send(WorkerEvent::SpeechRetired {
+            owner: played.last.permit.owner(),
+            sequence: played.last.chunk_sequence,
+            final_sample: PlaybackCursor {
+                epoch: 1,
+                frame: played.cursor,
+            },
+            observed_at_us: monotonic_us(),
+        })
+        .unwrap();
+    service_speaker_control(
+        &mut played.speaker,
+        &mut owner,
+        &mut reply,
+        &mut pending,
+        &mut played.mask,
+        &mut played.snapshot,
+        &mut 0,
+        &mut 16,
+        &mut trace,
+        &mut None,
+    )
+    .unwrap();
+    let current = reply.as_mut().unwrap();
+    owner.complete_turn(now(), current.owner).unwrap();
+    let snapshot = owner.snapshot(now()).unwrap();
+    // The voice's thread is a global other tests write to, and their turns
+    // are numbered as this one is: a fresh thread just before, and the line
+    // looked for among the room's history, not as the whole of it.
+    *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    current.answer_say(&pending, snapshot);
+    let (_, history) = crate::second_provider::worker::thread_and_history(0, None, None, None);
+    assert_eq!(answered.try_recv(), Ok(Answer::Done(Outcome::Spoken)));
+    assert!(
+        history.contains(&crate::second_provider::net::Message::assistant(line)),
+        "{history:?}"
+    );
+}
+
+/// An exact line's event says the words it plays.
+#[test]
+fn an_exact_lines_event_carries_its_text() {
+    let line = "Okay, I'll stay.";
+    let (mut says, _answered) = crate::say::Says::words_for_test(
+        "unplug",
+        crate::say::Words::ExactSound {
+            samples: vec![400; 480],
+            text: Some(line.to_owned()),
+        },
+        crate::say::NORMAL_PRIORITY,
+    );
+    let mut owner = resting_owner();
+    let (mut reply, mut trace) = (None, SessionState::default());
+    let admission = InputAdmission::default();
+    let now_is = crate::say::SoundNow {
+        conversing: false,
+        ..sound_now(&mut owner, &reply, &admission, &says)
+    };
+    assert!(take_exact(
+        &mut says, &now_is, &mut owner, &mut reply, &mut trace
+    ));
+    let row = trace
+        .iter()
+        .find(|row| row["kind"] == "exact_line")
+        .expect("an exact_line event");
+    assert_eq!(row["text"], line, "{row}");
+}
+
 /// lamp-75c9, 2 Nov, 19:15: in a busy office the voice hears speech most of
 /// the time, none of it to the lamp. An exact line plays through it: the
 /// room's speech and a candidate line being heard, with no turn and no
@@ -1048,6 +1246,61 @@ fn an_exact_line_plays_through_the_rooms_speech() {
     };
     assert!(take_exact(
         &mut says, &office, &mut owner, &mut reply, &mut trace
+    ));
+    assert_eq!(
+        reply.as_ref().unwrap().notice.origin(),
+        SpeechOrigin::ExactLine
+    );
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+}
+
+/// #5999 (the Reviewer-lead's HOLD on #6111): a skill's step's exact line,
+/// asked `quiet`, keeps the quiet its priority bought it as a say: Dusty
+/// air's nudge (priority 5) waits while two people talk in the room and
+/// for [`crate::say::QUIET_US`] since the last turn, unanswered, and is
+/// said once the room is quiet.
+#[test]
+fn a_skills_exact_line_waits_for_the_rooms_quiet_then_is_said() {
+    let (mut says, answered) = crate::say::Says::quiet_exact_for_test(
+        "dusty-air",
+        vec![400; 480],
+        crate::say::NORMAL_PRIORITY,
+    );
+    let mut owner = resting_owner();
+    let (mut reply, mut trace) = (None, SessionState::default());
+    let admission = InputAdmission::default();
+    let rest = sound_now(&mut owner, &reply, &admission, &says);
+    for (held, why) in [
+        (
+            crate::say::SoundNow {
+                listening: true,
+                conversing: false,
+                ..rest
+            },
+            "someone in the room is speaking",
+        ),
+        (
+            crate::say::SoundNow {
+                since_turn_us: crate::say::QUIET_US - 1,
+                conversing: false,
+                ..rest
+            },
+            "the last turn is nearer than its quiet",
+        ),
+    ] {
+        assert!(
+            !take_exact(&mut says, &held, &mut owner, &mut reply, &mut trace),
+            "{why}"
+        );
+        assert!(reply.is_none(), "{why}");
+        assert!(answered.try_recv().is_err(), "{why}: still waiting");
+    }
+    let quiet = crate::say::SoundNow {
+        conversing: false,
+        ..rest
+    };
+    assert!(take_exact(
+        &mut says, &quiet, &mut owner, &mut reply, &mut trace
     ));
     assert_eq!(
         reply.as_ref().unwrap().notice.origin(),
@@ -1093,6 +1346,7 @@ fn take_exact(
         reply,
         PlayoutStart::default(),
         trace,
+        None,
         |_| Ok(()),
     )
     .unwrap()
@@ -1448,6 +1702,22 @@ fn a_request_begun_in_the_walk_is_marked_before_any_of_its_sound() {
     // Off without the switch, and with no walk known.
     assert!(!sleep_not_now(false, None, None));
     assert!(!sleep_not_now(true, None, None));
+}
+
+/// #5931: the second route's worker, another process, is told the walk's
+/// state with each turn while it is under way (a worker started since
+/// learns it), once as it ends or a conversation begins, and never more
+/// outside it.
+#[test]
+fn the_worker_is_told_the_walk_with_each_turn_while_it_is_under_way() {
+    assert!(walk_to_tell(None, (1, false)));
+    assert!(!walk_to_tell(Some((1, false)), (2, false)));
+    assert!(walk_to_tell(None, (1, true)));
+    assert!(!walk_to_tell(Some((1, true)), (1, true)));
+    assert!(walk_to_tell(Some((1, true)), (2, true)));
+    assert!(walk_to_tell(Some((2, true)), (2, false)));
+    assert!(walk_to_tell(Some((2, true)), (3, false)));
+    assert!(!walk_to_tell(Some((3, false)), (4, false)));
 }
 
 /// "Lamp, go to sleep" (#3748, the reviewer-lead's P2 on #3835): its sleep

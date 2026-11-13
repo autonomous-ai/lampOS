@@ -73,6 +73,12 @@ Environment=LAMP_ONBOARDING_FILE=/var/lib/lampOS/voice/onboarding/progress.json
 # setup. Row 10 passed whole on lamp-52e6 on 22 Oct (#2843). Its functions reach every chat request on the
 # second route since #3430.
 Environment=LAMP_ONBOARDING=on
+# The walk's done line also names a few things to try first, once per setup (#5316, docs/onboarding.md "The walk's
+# last words name a few things to try"). Played on lamp-52e6, build 12587: the closing quoted, tries_said true.
+Environment=LAMP_ONBOARDING_FIRST_TRIES=on
+# The walk waits for the first update after setup (#6284, docs/onboarding.md "Held for the first update"): one line
+# when a newer build is read, one when it has switched. With setup's and lamp-update's.
+Environment=LAMP_FIRST_UPDATE=on
 Environment=LAMP_BUS=on
 # The privacy route (docs/privacy-switch.md): Controls reads the lamp's privacy switch (chip 1 line 9, the pins file's
 # privacy section), Voice leases the microphones from it and Ears captures only under that lease. Set in Controls,
@@ -155,6 +161,11 @@ Environment=LAMP_FIRST_SECONDS_QUIET=on
 Environment=LAMP_SECOND_OPEN_NAME=on
 Environment=LAMP_NAME_NEAR=on
 Environment=LAMP_NAME_SECOND_SIGN=on
+# A first word said as a sentence of its own, written as another word ("Link. What reminders do I have?"), is the
+# name when lamp-name heard it near by the line's start (#5277, #6078): on lamp-52e6 on 10 Nov (11450), the first
+# "Lamp, ..." line after a restart was taken 0/5 off and 3/5 on; of 10 lines without the name, 2/10 woke it off and
+# 1/10 on, each one lamp-name's own hearing at 0.9 or more, none the switch's.
+Environment=LAMP_NAME_AS_A_SENTENCE=on
 # A line opened by "Ma'am," or "Sir," said to a person is no call of the lamp's on a start hearing alone (#3945,
 # #5233): on lamp-c0a4 on 6 Nov (10441), a person's own "Ma'am, could you pass me the salt, please?", turned away,
 # was heard as the name at the line's start and held; every "Ma'am/Sir" line held, every "Lamp, …" answered.
@@ -176,6 +187,8 @@ Environment=LAMP_ENDPOINT_UNFINISHED_BELOW=0.5
 Environment=LAMP_ENDPOINT_UNSURE_MS=1200
 Environment=LAMP_SECOND_UNFINISHED_WAIT=on
 Environment=LAMP_JOIN_CUT_WORDS=on
+# An ask cut short by a line let out that the model only declines is answered in its place (#5961).
+Environment=LAMP_CUT_ASK_ANSWERED=on
 Environment=LAMP_REPLY_END_REACH=on
 # Its own voice heard back, a cut-in told as one, words said once, and a reply that is not for it.
 Environment=LAMP_SECOND_OWN_ECHO=on
@@ -212,6 +225,9 @@ Environment=LAMP_LIGHT_TOLD=on
 # A reply claiming a light, volume or timer action no call made is asked again once, then said not done: on lamp-52e6
 # "Timer set. It rings at 9:39 am." (9928) and "Louder."/"Brighter."/"Cooler." came with no call (#5215).
 Environment=LAMP_ACTION_CLAIM_CHECKED=on
+# The owner's line is told which services are linked in the app, so "what can you do with my calendar?"
+# is answered from it, not as the app's job (#5523).
+Environment=LAMP_SERVICES_TOLD=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
 # Talk over the lamp's own line (a say, a reminder, news) in a busy room is let go and the line goes on; its name,
@@ -234,6 +250,9 @@ Environment=LAMP_SECOND_MEMORY_HITS=on
 # The owner's approximate place from the app, city level (#4333): told only beside a line that needs a place
 # ("near me", the weather). The lead's yes on 3 Nov; shown on lamp-0c89 on 30 Oct (asked nothing back, and asked after a clear).
 Environment=LAMP_OWNER_PLACE=on
+# The owner's chosen voice and character words (#5394): spoken in the chosen voice, the words told after its
+# character; the same line in lamp-cloud.service. On in the product on 12 Nov for the lead (#6590).
+Environment=LAMP_CHOSEN_VOICE=on
 # Speed: the relay's near routes, the chat's connection kept, the link said for lamp/online.
 Environment=LAMP_RELAY_ROUTES=on
 Environment=LAMP_SECOND_CHAT_KEPT=on
@@ -277,6 +296,9 @@ Environment=LAMP_STAFF_NOTE=on
 Environment=LAMP_TASK_NEWS_AT_PAUSE=on
 Environment=LAMP_MEMORY_RULES=on
 Environment=LAMP_LIGHT_REQUESTS=on
+# Bedtime and Morning's night caps (#5753, #1732): the ring keeps under Actions' output caps, light 24 from 21:00
+# to 06:00; all night under the caps on lamp-06c1 through restarts and silence (#2804, 22-23 Oct).
+Environment=LAMP_OUTPUT_CAPS=on
 Environment=LAMP_QUIET_PACE=on
 # A silent service costs no connection and no line waiting on it: the provider file's unset
 # waits become assume_over, 8 s with no output = unanswered, 12 s for a first output (#705).
@@ -293,12 +315,19 @@ Environment=LAMP_RING_ASLEEP=on
 # legacy_head, as install's head_touch_comes_whole_and_never_beside_the_old_engines_head holds. Merged only after
 # a person's try on lamp-52e6: a tap, a hold, and sleep and wake (#1798).
 Environment=LAMP_HEAD_TOUCH=on
+# A hand's 3 s hold says "Going to sleep. Tap my head to wake me." in the owner's language before the mute (#3748,
+# #6028): the speech cache's kept line at the hold's 2 s mark, the breath in the quiet hours (22:00 to 07:00) or
+# while the line is not kept yet. The mute comes once the cue has played, at most 6 s after the hold.
+Environment=LAMP_SLEEP_LINE=on
 Environment=LAMP_RESTORED_MUTE=on
 # The privacy slide is the lamp's sleep and wake (migrate-P4, #5182): closing it lays the lamp down, and open for 1 s
 # it wakes as at a tap, with no touch; a POWER mute stays. The lead's yes on 6 Nov, after lamp-e82d's row at 10441.
 Environment=LAMP_SLIDE_WAKES=on
 # On after the checks: the button and the app on lamp-52e6 (#3697, 2 Nov), the app's power-off on lamp-0c89 (#3698, 30 Oct).
 Environment=LAMP_SHUTDOWN=on
+# "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
+# (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
+Environment=LAMP_UNPLUG=on
 # A run that fails before its capture gave any audio, with no control input in flight, leaves the lamp as its person
 # left it, and a fault after the stop's signal is the stop's (#1567). On for #4332: a busy first boot (a privacy
 # connection refused, a capture message late) ended the voice before it heard anything, and the guard then muted a
@@ -335,6 +364,14 @@ Environment=LAMP_TASKS_NAMED_ONLY=on
 # call on 5 Nov: on once the app's sign-in screen is in a TestFlight build.
 Environment=LAMP_TASKS_SIGN_IN=on
 Environment=LAMP_TASKS_SIGN_IN_APP=on
+# A session the person names for the work (#5535; "the book program one"): start_agent_task takes it, and
+# lamp-tasks.service's --reply-named types the work into that session, never a new one. With the lamp's own Hermes
+# (#5978, LAMP_HERMES_ON_LAMP there), a named session is looked for on the lamp first, then the computers.
+Environment=LAMP_TASKS_REPLY_NAMED=on
+# "Is Harness signed in?", "which computers do you have?", "what can you hand work to?" answered from lamp-tasks'
+# own status, targets and work under way, with no Harness call; each computer said by its alias only (#6061, #6222).
+# The owner's ask, 11 Nov: on in the product.
+Environment=LAMP_TASKS_HARNESS_STATUS=on
 Environment=LAMP_CUT_KEEPS_NAME=on
 Environment=LAMP_SELFTEST_SPEAKER=on
 # Each stall of 50 ms or more in the voice's loops, with what held it, in /run/lampos-voice (#1179): cheap, and
@@ -356,6 +393,11 @@ Environment=LAMP_SKILLS_DIR=/run/lampos-skills
 # installed skills no longer push the lamp's own past the chat route's 48 (lamp-9adf, 6 Nov, on 10441: the_time,
 # reports_state and fetch_page left out). Who was here and Guard mode answered through it there by drop-in (#1685).
 Environment=LAMP_USE_SKILL=on
+# Music to relax (#1685, #5749): a spoken request for a skill's checked local recording plays it after the
+# confirmation; Stop, an interruption, the privacy slide or mute ends it, and nothing resumes (requested-audio.md).
+# The same line in lamp-voice, lamp-skills and lamp-actions; played on lamp-4ace on 6963 (#2793). Installing
+# the skill (relaxing-music, a Store skill) is separate: with none installed nothing plays.
+Environment=LAMP_REQUESTED_AUDIO=on
 # "Stop sending reports" and asking whether they're sent (#2862, reports_stop.rs): the voice can only
 # turn them off, never on.
 Environment=LAMP_REPORTS=on
@@ -393,6 +435,22 @@ Environment=LAMP_SAME_VOICE_FOR=services
 # A made skill reads a linked service to its owner alone (#5288, #5303): the made-skill brief lets one read
 # through, passed to the provider and second routes. Played on lamp-9adf 5 Nov.
 Environment=LAMP_SKILL_READS=on
+# A made skill's write (#6066, #6142): the made-skill brief carries one fixed write, said back whole, and the
+# owner's later yes approves its content (the say-back's own echo held), passed to both routes; a send needs that
+# yes, at most three a day, never a public post, and is told at the next heard line. On in the product (owner, 11 Nov).
+Environment=LAMP_SKILL_WRITES=on
+# A Store or pushed skill's `do.task` (#6305, docs/skills.md "A skill's task"): its task and each grant said back,
+# and the person's yes recorded by lamp-control (task_yes_record); passed to the provider and second routes.
+Environment=LAMP_SKILL_TASKS=on
+# A made skill's code of its own (#6307, docs/skills.md "Made by voice"): the making model may write up to 4
+# scripts/ files run by one task step, said back with its grants; on only at the person's later yes to that package's
+# SHA-256, never at once; passed to both routes. The same line in lamp-skills and lamp-skills-manage@.
+Environment=LAMP_MADE_SCRIPTS=on
+# The lamp's agent's connectors (#6648, #6664, docs/skills.md): a voice make of a skill that reads or writes a linked
+# service is one `do.task` for the lamp's agent, its grants said back; a send comes back here for the owner's
+# spoken yes; passed to both routes. The same line in lamp-tasks, lamp-skills, lamp-skills-manage@ and
+# lamp-control. On in the product (owner, 13 Nov).
+Environment=LAMP_AGENT_SERVICES=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill
@@ -414,6 +472,12 @@ Environment=LAMP_MEMORY_KEEP_ASKED=on
 # And a line that plainly asks for a timer or a reminder calls the function that sets it (lamp-4ace, 25 Oct:
 # "remind me in three minutes to call my sister" got "Three minutes, call your sister." and no call).
 Environment=LAMP_SCHEDULE_ASKED=on
+# And a line that is only a plain question about the person's reminders calls list_reminders (lamp-52e6, 9 Nov:
+# "what reminders do I have?" was answered in words with no call in 2 of 8 asks).
+Environment=LAMP_REMINDERS_ASKED=on
+# And a line that is only a plain ask for a light scene or a light show calls its skill (lamp-52e6, 9 Nov: "movie
+# light" and "show me a light show" were answered in words and no call, and the light never changed).
+Environment=LAMP_SKILL_ASKED=on
 # A line is a known person's only when their own face was seen speaking it, else the room's (#3437, reviewer-three's
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.
@@ -431,6 +495,13 @@ Environment=LAMP_PERSON_SCOPE_ONE_FACE=on
 # 0, and their own reminder left out of the list). Memory's reads stay the room's. Known risk, accepted by the
 # memory owner on 4 Nov: a voice not seen saying it, with the person's face alone in view, hears their reminders.
 Environment=LAMP_ONE_FACE_REMINDERS=on
+# And such a line is told and read as theirs, not only kept (the memory owner's call, 6 Nov on #5385; switched on by
+# their call on 10 Nov, after lamp-3e83 answered a lone known face at the desk from the room's memory, "nothing from
+# before is kept", while their own held the answer): recall, hits, their note and thread, and its exchange journalled
+# in their record. Forgets, rule and correction calls still need their face seen speaking. Known risk, accepted by the
+# memory owner: a guest off camera, the person's face silent and alone in view and no other voice heard, is told the
+# person's recall, and the guest's words are filed as theirs.
+Environment=LAMP_PERSON_SCOPE_ONE_FACE_READS=on
 # And such a line's reply is told the person's name, only their name, when no face was seen speaking it, their own
 # known face was the one face in view through it (the mouth not read), it was not carried and no other voice was heard
 # (lamp-06c1 on 5 Nov, request 6: the test face alone in 11 of 11 looks, read still in 6, and "what's my name?" got
@@ -453,6 +524,10 @@ Environment=LAMP_CONVERSATION_CARRIES=on
 # it. Still no recall, note or hits on it, no forget and no yes, never another person's scope, and a line held only by
 # a face's gap holds nothing.
 Environment=LAMP_CONVERSATION_CARRIED_SAVES=on
+# And a carried line recalls and keeps as its person's, never forgets (#5842; the memory owner's call, switched on 10 Nov,
+# when lamp-3e83's carried "It's correct." was refused as unseen). Needs lamp-same-voice where the voice expects it;
+# without it the switch is said at start and does nothing.
+Environment=LAMP_CONVERSATION_CARRIED_MEMORY=on
 # And a silent face doesn't count (#4339, lamp-3e83 on 30 Oct: the known face in all 30 looks of a line, none with it
 # alone, so 4 lines carried while one conversation split in two): with no other face seen speaking a line and no other
 # voice in the conversation (the rule's sign of another person, kept for the cut words' join), other faces in view
@@ -551,9 +626,18 @@ Environment=LAMP_MEMORY_REPLACES=on
 # "Forget what I said about my bicycle" forgets just those things (#2176): on lamp-06c1 on 4 Nov (build 10012) both
 # bicycle things were forgotten by forget's about, and the coffee one was still found.
 Environment=LAMP_MEMORY_FORGET_ABOUT=on
+# A bare "forget that" right after the same person's keep forgets that keep, by its id in their scope, and past a
+# minute asks which (C88, #5022). The memory owner's call on 5 Nov, after lamp-06c1 answered "Lamp, forget that." 56 s
+# after Olivia's umbrella was kept in words, nothing forgotten, on two days running. Needs LAMP_MEMORY_DAYS above.
+Environment=LAMP_MEMORY_FORGET_JUST_KEPT=on
 # Recall's second version (#2176), with lamp-memory from the same build: on lamp-06c1 on 4 Nov (build 10012) "my"
 # alone found nothing (5 before), the drink order was found, and "last week" got a span answer (span=true).
 Environment=LAMP_MEMORY_RECALL_V2=on
+# A keep the round right after it doubts is taken back and held for the person's yes (C37, docs/memory.md): the
+# memory owner's call A on 11 Nov, after lamp-06c1 kept "renunctinus" twice on 10 Nov and then asked "is that
+# ranunculus?". A round asking whether a kept word was another keeps the asked word on their yes. Needs
+# LAMP_MEMORY_FORGET_ALL and LAMP_EYES_SPEAKING, both on here.
+Environment=LAMP_MEMORY_DOUBT_UNDOES=on
 # Tiers' ideas in Days (the memory owner's 3 Nov plan, P1 to P4; docs/memory-days.md). The session note keeps the
 # person's tastes and kept facts first (PROFILE): the memory owner's call on 5 Nov, off for the candidate on 6 Nov
 # (#5464), back on after its played check passed on lamp-06c1 with ElevenLabs voices on 6 Nov (PASS bd98421414,
@@ -564,10 +648,39 @@ Environment=LAMP_MEMORY_RECALL_V2=on
 # a played correction is either replaced or kept alone, so its earlier:true is not reachable as played.
 Environment=LAMP_MEMORY_STRENGTH=on
 Environment=LAMP_MEMORY_PROFILE=on
+# The nightly pass (extraction plan C, step B; docs/memory.md, "The nightly pass"): 03:00 to 06:00 local, after
+# 20 min quiet with the privacy slide open, each known person's day before is sent through the relay's model once
+# more and Days keeps the episodes, facts, profile lines, ahead items, patterns and feelings that pass its checks, one
+# by one. Nothing is said or shown; the journal has counts only. The memory owner's call on 5 Nov, with patterns and
+# feelings; its quotes are kept, by the owner's decision on 4 Nov. Needs lamp-memory's nightly ops (--memory-days).
+Environment=LAMP_MEMORY_NIGHTLY=on
+Environment=LAMP_MEMORY_NIGHTLY_PATTERNS=on
+Environment=LAMP_MEMORY_NIGHTLY_FEELINGS=on
+# A role a seen person gives the lamp ("you are Harry Potter") lasts with them until they end it (the memory owner's
+# design of 6 Nov, #5545; switched on by their call on 9 Nov). Only a short name is kept, per known face, read once with
+# their session's open; a turn not placed as theirs is told only the role names of the known faces in view, never
+# whose. Private-room mode above does not hold names back; outside that mode a held-back name suppresses this note.
+# Second route and Days only; needs same-build lamp-memory (role_set_session, role_end_session), which a product install ships.
+Environment=LAMP_MEMORY_ROLE=on
+# Connector records (PRs 1a to 1d, docs/services.md): each linked-service ask kept in memory with its status, told
+# to the owner's turns, redone from its record, and confirmed mail addresses kept as contacts. On: the owner's call
+# of 11 Nov, on the lamp-06c1 row https://github.com/autonomous-ai/lampOS/pull/6312#issuecomment-6789879064 (its two forget gaps follow later). Needs same-build lamp-memory.
+Environment=LAMP_SERVICE_RECORDS=on
+# LAMP_SERVICE_RECORDS_TOLD on again (12 Nov): its 11 Nov P1 (a read-back and "done" with no service_write, on
+# lamp-9adf) came from the history dropping service_write calls, fixed by #6453; with it and #6404 on lamp-06c1,
+# 9 of 9 second writes made a real call and every test event was moved or cancelled. Off, the model never sees an
+# event's id, so a move or cancel reads first and the read-then-write rule refuses it (06c1 on 825's code, 12 Nov).
+Environment=LAMP_SERVICE_RECORDS_TOLD=on
+Environment=LAMP_SERVICE_CONTACTS=on
+Environment=LAMP_SERVICE_REDO=on
 Environment=LAMP_BODY_MOOD_SOCKET=/run/lampos-body/mood.sock
 Environment=LAMP_EYES_PERMIT_SOCKET=/run/lampos-eyes/permit.sock
 Environment=LAMP_EYES_PRESENCE_FILE=/run/lampos-eyes/present
 Environment=LAMP_EYES_WHO_SOCKET=/run/lampos-eyes/who.sock
+# A face added from the app's photo is asked about once at the lamp, as its own turn while quiet, and the person's
+# spoken yes or no is told to the eyes (photo_face_yes, photo_face_no; never a written request); never named
+# before they agree (#1968's consent; on with the eyes' --photo-dir and lamp-cloud's, #5750).
+Environment=LAMP_PHOTO_FACES=on
 # The name typed at setup (lamp-setup writes it; a reset and the owner's own "forget everything" wipe it,
 # #4461), told to the model (docs/setup.md, #806). No file, no name.
 Environment=LAMP_PERSON_NAME=/etc/lampOS/person/name

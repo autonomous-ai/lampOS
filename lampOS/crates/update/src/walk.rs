@@ -39,10 +39,7 @@ pub fn under_way(config: &Config) -> bool {
     if !setup_lifecycle::done(&config.root) {
         return false;
     }
-    let voice = fs::read_to_string(config.on(&config.units).join(VOICE_UNIT)).unwrap_or_default();
-    let walks = unit::environment(&voice, "LAMP_ONBOARDING").as_deref() == Some("on");
-    let progress =
-        unit::environment(&voice, "LAMP_ONBOARDING_FILE").unwrap_or_else(|| PROGRESS.to_owned());
+    let (walks, progress) = file(config);
     let bytes = match fs::read(config.on(&progress)) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return walks,
@@ -57,6 +54,56 @@ pub fn under_way(config: &Config) -> bool {
     lamp_msgs::ONBOARDING_STEPS
         .iter()
         .any(|step| !steps.contains_key(*step))
+}
+
+/// Whether the walk holds a round: under way, and no first update after
+/// setup owed before the walk began (#6284, crate::first_update), whose
+/// round the walk has not begun for. With `LAMP_FIRST_UPDATE` off,
+/// [`under_way`] alone.
+pub fn holds(config: &Config) -> bool {
+    under_way(config) && !crate::first_update::before_walk(config, records::unix_ms())
+}
+
+/// Whether the walk has begun: its progress file keeps at least one step's
+/// outcome. A walk not yet begun has none, or no file.
+pub fn begun(config: &Config) -> bool {
+    let (_, progress) = file(config);
+    fs::read(config.on(&progress))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok())
+        .and_then(|file| {
+            file.get("steps")
+                .and_then(serde_json::Value::as_object)
+                .map(|steps| !steps.is_empty())
+        })
+        .unwrap_or(false)
+}
+
+/// Whether the installed voice unit walks (`LAMP_ONBOARDING=on`), and
+/// the onboarding file it names.
+fn file(config: &Config) -> (bool, String) {
+    let voice = fs::read_to_string(config.on(&config.units).join(VOICE_UNIT)).unwrap_or_default();
+    let walks = unit::environment(&voice, "LAMP_ONBOARDING").as_deref() == Some("on");
+    let progress =
+        unit::environment(&voice, "LAMP_ONBOARDING_FILE").unwrap_or_else(|| PROGRESS.to_owned());
+    (walks, progress)
+}
+
+/// When the setup walk ended (#5978, the Hermes install's window): the
+/// voice's onboarding file's `done_at_unix_ms`, which the walk sets once,
+/// once its first done line has played, and keeps through a redo. None
+/// while a walk is under way, before it ended, for a walk ended before it
+/// was dated, or a file that can't be read.
+pub fn ended_at_unix_ms(config: &Config) -> Option<u64> {
+    if under_way(config) {
+        return None;
+    }
+    let (_, progress) = file(config);
+    let bytes = fs::read(config.on(&progress)).ok()?;
+    serde_json::from_slice::<serde_json::Value>(&bytes)
+        .ok()?
+        .get("done_at_unix_ms")?
+        .as_u64()
 }
 
 /// What the switch's quiet wait gives up with when a walk begins while it

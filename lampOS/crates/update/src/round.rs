@@ -39,8 +39,8 @@ use crate::{
     quiet::{BETWEEN_TURNS, QUIET, Quiet},
     records,
     records::{
-        Added, Build, Journal, LinkBack, Records, SkillBack, State, Switching, replace_link,
-        sync_folder, sync_parent, write_whole,
+        Added, Build, CUT_SHORTS_REFUSE, Journal, LinkBack, Records, SkillBack, State, Switching,
+        replace_link, sync_folder, sync_parent, write_whole,
     },
     unit::{self, Program},
     world::{Clock, Disk, Ears, Systemd},
@@ -63,6 +63,11 @@ pub const VOICE_UNIT: &str = "lamp-voice.service";
 /// after a round's watch passed when [`RECOVER_SWITCH`] is on.
 pub const RECOVER_UNIT: &str = "lamp-setup-recover.service";
 pub const RECOVER_SWITCH: &str = "LAMP_WIFI_RECOVERY";
+/// lamp-control (#6699): started by a kept or up-to-date round whenever it
+/// ended cleanly with a switch on that keeps it up, changed or not.
+pub const CONTROL_UNIT: &str = "lamp-control.service";
+/// Either keeps lamp-control up: the developers' door, or a skill's tasks.
+pub const CONTROL_SWITCHES: [&str; 2] = ["LAMP_CONTROL", "LAMP_SKILL_TASKS"];
 /// The body; its unit declarations determine its restart order.
 pub const BODY_UNIT: &str = "lamp-body.service";
 /// How often the world is looked at while waiting and watching.
@@ -120,6 +125,9 @@ pub struct Config {
     /// `LAMP_UPDATE_IMAGE=on`: the image's own files a build carries are
     /// written the same way (crate::image, #1369).
     pub image: bool,
+    /// `LAMP_FIRST_UPDATE=on` (#6284, crate::first_update): while the first
+    /// update after a setup is owed, the setup walk does not hold a round.
+    pub first_update: bool,
     /// This program's own bytes, from which a round refreshes the settings
     /// writer before it looks at a build (crate::writer_swap). None: the
     /// writer is never refreshed.
@@ -176,6 +184,9 @@ pub enum Outcome {
     NotQuiet(String),
     /// Switched, and every part well.
     Switched(u64),
+    /// Switched and kept, every part well but one held still as it was
+    /// before the switch (#6113): not this build's doing, so not put back.
+    Held { sequence: u64, why: String },
     /// The parts run build `sequence`, and `update/current` now names its
     /// lamp-update (`to`) instead of `from`: started in this program's
     /// place, it must confirm itself (crate::own).
@@ -244,7 +255,9 @@ impl Outcome {
     /// The build this outcome is about, where it names one.
     pub fn sequence(&self) -> Option<u64> {
         match self {
-            Self::UpToDate(sequence) | Self::Switched(sequence) => Some(*sequence),
+            Self::UpToDate(sequence) | Self::Switched(sequence) | Self::Held { sequence, .. } => {
+                Some(*sequence)
+            }
             Self::SelfSwitched { sequence, .. }
             | Self::Climbs { sequence, .. }
             | Self::RolledBack { sequence, .. } => Some(*sequence),
@@ -262,6 +275,7 @@ impl Outcome {
             Self::Would(_) => "would",
             Self::NotQuiet(_) => "not-quiet",
             Self::Switched(_) => "switched",
+            Self::Held { .. } => "held",
             Self::SelfSwitched { .. } | Self::Climbs { .. } => "self-switched",
             Self::RolledBack { .. } => "rolled-back",
             Self::Failed(_) => "failed",
@@ -287,6 +301,9 @@ impl std::fmt::Display for Outcome {
             Self::NotQuiet(why) => write!(f, "not switched: {why}"),
             Self::Switched(sequence) => {
                 write!(f, "switched to build {sequence}; every part is well")
+            }
+            Self::Held { sequence, why } => {
+                write!(f, "switched to build {sequence} and kept; held: {why}")
             }
             Self::SelfSwitched { sequence, from, to } => write!(
                 f,
@@ -366,6 +383,8 @@ struct Change {
     /// The new folder is to be made, with these files.
     make: Option<Vec<Want>>,
     was_active: bool,
+    /// Held still before the switch (judge::UnitState::held, #6113).
+    was_held: bool,
     /// A part started through its `current` link: the link, and the build
     /// it names before and after. Its unit is written only if it changes.
     link: Option<Link>,
@@ -440,10 +459,12 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
         rollback_order: None,
         held: None,
         apply_failed: false,
+        lines: Vec::new(),
     };
     if !config.apply {
-        let state = run.records.peek_state();
-        return match run.look(&state) {
+        // A dry round: the state is only looked at, never kept.
+        let mut state = run.records.peek_state();
+        return match run.look(&mut state) {
             Ok((manifest, changes, placing))
                 if changes.is_empty()
                     && run.placings.is_empty()
@@ -521,14 +542,32 @@ pub fn round(config: &Config, world: &mut World) -> Outcome {
     {
         outcome = climbed;
     }
+    // A lamp-control left dead under an older build (#6699) is started on
+    // an up-to-date round too: the round that switches a lamp to a build is
+    // run by the updater it had, so the first one of the new updater, after
+    // its own switch, finds the lamp up to date. A switching round starts
+    // it with the parts it added (`start_added`).
+    if let Outcome::UpToDate(sequence) = outcome {
+        run.start_added(&[], sequence);
+    }
     if config.self_switch
-        && let Outcome::Switched(sequence) | Outcome::UpToDate(sequence) = outcome
+        && let Outcome::Switched(sequence)
+        | Outcome::Held { sequence, .. }
+        | Outcome::UpToDate(sequence) = outcome
         && let Some(switched) = run.own(sequence)
     {
         outcome = switched;
     }
-    run.records
-        .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
+    // Before setup, a channel out of reach is a plain line, not a round's
+    // end that `update/status` reads back at a restart (#6284).
+    // What the round said, before its end (which `update/status` reads back).
+    run.keep_lines(&outcome);
+    if crate::first_update::kept(crate::first_update::before_setup(config), &outcome) {
+        run.records
+            .log_round(outcome.kind(), &outcome.kept(), outcome.sequence());
+    } else {
+        run.records.log(outcome.kind(), &outcome.kept());
+    }
     outcome
 }
 
@@ -566,7 +605,14 @@ struct Run<'r, 'w> {
     /// This round's `apply` of the build's settings failed: a writer not yet
     /// proved is put back after the apply's own undo (crate::writer_swap).
     apply_failed: bool,
+    /// What this round said, kept for [`Self::keep_lines`] (#6266 5b): at most
+    /// [`MOST_LINES`] lines of [`MOST_LINE`] characters.
+    lines: Vec<String>,
 }
+
+/// The most lines of a round kept in the log, and the most characters of each.
+const MOST_LINES: usize = 200;
+const MOST_LINE: usize = 400;
 
 /// A unit as it is to be put back.
 struct Back {
@@ -723,8 +769,60 @@ impl Run<'_, '_> {
             && crate::setup_lifecycle::done(&self.config.root)
     }
 
+    /// Setup left unrestarted by the first update after it
+    /// ([`crate::setup_lifecycle::first_update_leaves`]).
+    fn leave_setup_for_first_update(&self, back: &Back, unit: &str) -> bool {
+        self.forced()
+            && crate::setup_lifecycle::first_update_leaves(&self.config.root, &back.unit, unit)
+    }
+
     fn say(&mut self, line: &str) {
+        if self.lines.len() < MOST_LINES {
+            self.lines.push(line.chars().take(MOST_LINE).collect());
+        }
         (self.world.say)(line);
+    }
+
+    /// Says `line`, and keeps `kept` in its place for [`Self::keep_lines`]:
+    /// for a line that holds text the log must not (a unit's own words).
+    fn say_apart(&mut self, line: &str, kept: &str) {
+        if self.lines.len() < MOST_LINES {
+            self.lines.push(kept.chars().take(MOST_LINE).collect());
+        }
+        (self.world.say)(line);
+    }
+
+    /// What this round said, kept in `log.jsonl` (#6266 5b) for a round that
+    /// changed something or failed, so what lamp-update decided and did is
+    /// there after the journal is gone: the journal is RAM on the product
+    /// lamp and holds about the last 40 minutes, and is empty after a reboot.
+    /// A round that did nothing (up to date, unreachable, nothing published,
+    /// not quiet, a refusal said again) keeps only its end, as before: they
+    /// come every round and say the same.
+    fn keep_lines(&self, outcome: &Outcome) {
+        if matches!(
+            outcome,
+            Outcome::Switched(_)
+                | Outcome::Held { .. }
+                | Outcome::SelfSwitched { .. }
+                | Outcome::Climbs { .. }
+                | Outcome::RolledBack { .. }
+                | Outcome::Failed(_)
+        ) && !self.lines.is_empty()
+        {
+            // A failure that comes every round the same way (15 minutes
+            // apart) is kept once: the lines only when they differ from the
+            // last kept ones. Its end is still written each round.
+            if matches!(outcome, Outcome::Failed(_))
+                && self
+                    .records
+                    .last_lines()
+                    .is_some_and(|(event, lines)| event == outcome.kind() && lines == self.lines)
+            {
+                return;
+            }
+            self.records.log_lines(outcome.kind(), &self.lines);
+        }
     }
 
     fn acting(&mut self) -> Outcome {
@@ -757,7 +855,7 @@ impl Run<'_, '_> {
             Ok(state) => state,
             Err(error) => return Outcome::Failed(format!("the state cannot be read: {error}")),
         };
-        let (manifest, mut changes, placing) = match self.look(&state) {
+        let (manifest, mut changes, placing) = match self.look(&mut state) {
             Ok(found) => found,
             Err(outcome) => return outcome,
         };
@@ -786,6 +884,7 @@ impl Run<'_, '_> {
                 record_skills(&mut state, &placing.steps);
             }
             state.installed = Some(build);
+            state.cut_short = None;
             return match self.records.save_state(&state) {
                 Ok(()) => Outcome::UpToDate(manifest.sequence),
                 Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
@@ -793,10 +892,26 @@ impl Run<'_, '_> {
         }
         // The setup walk under way: nothing fetched or switched this round,
         // at most `walk::MOST_HELD` rounds on a lamp (#3689, crate::walk).
-        if crate::walk::under_way(self.config)
-            && let Some(held) = crate::walk::hold(self.records.folder())
-        {
-            return Outcome::NotQuiet(crate::walk::held(held));
+        // Not while the first update after setup is owed (#6284): the walk
+        // has not begun, the voice holding it until that round ends.
+        if crate::walk::under_way(self.config) {
+            if crate::first_update::before_walk(self.config, crate::records::unix_ms()) {
+                self.say(crate::first_update::NOT_HELD);
+            } else if let Some(held) = crate::walk::hold(self.records.folder()) {
+                return Outcome::NotQuiet(crate::walk::held(held));
+            }
+        }
+        // A reset of the lamp may be under way, or the lamp has only just
+        // booted: no switch yet, and not refused either (crate::reset_hold,
+        // #6266).
+        if crate::reset_hold::stale_beside_marker(self.config) {
+            self.say(&format!(
+                "{} is beside the setup marker and is not new: a failed unlink or a restore left it, not a reset, so it holds nothing",
+                crate::reset_hold::JOURNAL
+            ));
+        }
+        if let Some(why) = crate::reset_hold::hold(self.config, self.forced()) {
+            return Outcome::NotQuiet(why);
         }
         // A template is never active itself, and never restarted: only its
         // instances run.
@@ -808,9 +923,9 @@ impl Run<'_, '_> {
         match self.world.systemd.states(&units) {
             Ok(states) => {
                 for change in &mut changes {
-                    change.was_active = states
-                        .iter()
-                        .any(|state| state.unit == change.unit && state.running());
+                    let state = states.iter().find(|state| state.unit == change.unit);
+                    change.was_active = state.is_some_and(UnitState::running);
+                    change.was_held = state.is_some_and(|state| state.held().is_some());
                 }
             }
             Err(why) => return Outcome::Failed(format!("systemd cannot be asked: {why}")),
@@ -879,6 +994,7 @@ impl Run<'_, '_> {
         ));
         record_skills(state, &steps);
         state.installed = Some(build.clone());
+        state.cut_short = None;
         match self.records.save_state(state) {
             Ok(()) => Outcome::UpToDate(build.sequence),
             Err(error) => Outcome::Failed(format!("the state cannot be written: {error}")),
@@ -904,7 +1020,10 @@ impl Run<'_, '_> {
 
     /// Steps 2 to 5: what the newest build would change here, or why
     /// nothing will.
-    fn look(&mut self, state: &State) -> Result<(Manifest, Vec<Change>, Option<Placing>), Outcome> {
+    fn look(
+        &mut self,
+        state: &mut State,
+    ) -> Result<(Manifest, Vec<Change>, Option<Placing>), Outcome> {
         let url = format!("{}{}", self.config.channel_url, manifest::ENVELOPE);
         let mut envelope = Vec::new();
         match self
@@ -940,6 +1059,17 @@ impl Run<'_, '_> {
                     manifest.sequence, installed.sequence
                 )));
             }
+        }
+        // A build put back while a part was held by a passing local state is no
+        // fault of its own: one more try after 24 hours or a reboot (#6266).
+        let boot = crate::own::boot_id(&self.config.root);
+        if let Some(after) =
+            state.lapse_held(manifest.sequence, records::unix_ms(), boot.as_deref())
+        {
+            self.say(&format!(
+                "build {} was put back while a part was held by a passing local state; after {after} it is tried once more",
+                manifest.sequence
+            ));
         }
         if let Some(refusal) = state.refusal(manifest.sequence) {
             return Err(Outcome::Refused(format!(
@@ -1435,11 +1565,14 @@ impl Run<'_, '_> {
                 // the writer this lamp-update. Only in a round that applies: a
                 // dry one (a climbed updater's confirm) writes nothing.
                 // So is the models switch file, from updater 11
-                // (`manifest::MODELS_ENV_UPDATER`).
+                // (`manifest::MODELS_ENV_UPDATER`), and lamp-update's own
+                // switch file, from updater 12 (`manifest::UPDATE_ENV_UPDATER`).
                 if self.config.apply
                     && !these.is_empty()
                     && let Some(newer) = manifest.settings.iter().find(|setting| {
-                        setting.path == manifest::STORE_ENV || setting.path == manifest::MODELS_ENV
+                        setting.path == manifest::STORE_ENV
+                            || setting.path == manifest::MODELS_ENV
+                            || setting.path == manifest::UPDATE_ENV
                     })
                     && let Some(running) = &self.config.writer_from
                     && fs::read(self.config.on(crate::own::BACK))
@@ -2121,10 +2254,10 @@ impl Run<'_, '_> {
         // "says nothing" for 22 minutes of someone talking to the lamp).
         let mut looked = false;
         loop {
-            if !self.voice_running() {
+            if !self.voice_running() || self.forced() {
                 return Ok(());
             }
-            if walk && crate::walk::under_way(self.config) {
+            if walk && crate::walk::holds(self.config) {
                 return Err(crate::walk::UNDER_WAY.to_owned());
             }
             let now = self.world.clock.now_ms();
@@ -2378,6 +2511,22 @@ impl Run<'_, '_> {
         }
     }
 
+    /// How long the voice must have been quiet before it is switched: 45 s.
+    /// The first update after setup waits for none ([`Run::forced`]).
+    fn quiet_needed(&self) -> Duration {
+        QUIET
+    }
+
+    /// The first update after setup is forced (#6284, the product's call on
+    /// 12 Nov): it switches as soon as it is fetched, with no quiet moment
+    /// and whoever is heard, since the walk has not begun and the lamp has
+    /// said only its update line. On lamp-e82d on 12 Nov, office noise
+    /// ("heard 0 words") ended the 5 s wait `not-quiet` and the walk ran
+    /// on the old build.
+    fn forced(&self) -> bool {
+        crate::first_update::before_walk(self.config, crate::records::unix_ms())
+    }
+
     /// Steps 7 and 8.
     fn switch(
         &mut self,
@@ -2391,16 +2540,22 @@ impl Run<'_, '_> {
         // A count that can't be kept holds nothing: the wait goes on as
         // before, with the walk no longer looked at.
         let walk = !crate::walk::spent(self.records.folder());
-        let waited = match self.wait_quiet(QUIET, self.config.quiet_wait, false, walk) {
+        let waited = match self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, walk)
+        {
             Err(why) if walk && why == crate::walk::UNDER_WAY => {
                 if let Some(held) = crate::walk::hold(self.records.folder()) {
                     return Outcome::NotQuiet(crate::walk::held(held));
                 }
-                self.wait_quiet(QUIET, self.config.quiet_wait, false, false)
+                self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, false)
             }
             waited => waited,
         };
         if let Err(why) = waited {
+            return Outcome::NotQuiet(why);
+        }
+        // A reset that began while the round fetched or waited holds it too,
+        // before anything is written (crate::reset_hold, #6266).
+        if let Some(why) = crate::reset_hold::hold(self.config, self.forced()) {
             return Outcome::NotQuiet(why);
         }
         // The product skills' files as they are now, and as they were: kept
@@ -2427,7 +2582,10 @@ impl Run<'_, '_> {
                 text: change.before.clone(),
                 was_active: change.was_active,
                 restarted: false,
-                before: Before::of(&change.part, health.as_ref()),
+                before: Before {
+                    held: change.was_held,
+                    ..Before::of(&change.part, health.as_ref())
+                },
                 link: change.link.as_ref().map(|link| LinkBack {
                     path: link.path.clone(),
                     build: link.old.clone(),
@@ -2479,6 +2637,7 @@ impl Run<'_, '_> {
             models: self.model_backs.clone(),
             settings: !self.setting_writes.is_empty(),
             skills: skills.clone(),
+            refusing: None,
         };
         if let Err(error) = self
             .records
@@ -2537,7 +2696,8 @@ impl Run<'_, '_> {
         self.listen(Duration::ZERO);
         let now = self.world.clock.now_ms();
         if self.voice_running()
-            && let Err(why) = self.quiet.for_at_least(QUIET, now)
+            && !self.forced()
+            && let Err(why) = self.quiet.for_at_least(self.quiet_needed(), now)
         {
             let restored = self.put_units_and_links_back(&backs);
             self.settings_now(state);
@@ -2580,7 +2740,9 @@ impl Run<'_, '_> {
                     .any(|back| back.was_active && !unrestarted.contains(&back.unit)) =>
             {
                 self.listen(Duration::ZERO);
-                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false, false) {
+                if let Err(why) =
+                    self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, false)
+                {
                     return self.put_back(state, &build, &backs, None, why, String::new());
                 }
                 backs[voice_at].restarted = true;
@@ -2599,12 +2761,24 @@ impl Run<'_, '_> {
                 continue;
             }
             let back = &backs[at];
-            if changes
+            let after = changes
                 .iter()
                 .find(|change| change.unit == back.unit)
-                .is_some_and(|change| self.leave_completed_setup(back, &change.after))
+                .map(|change| change.after.clone());
+            if after
+                .as_deref()
+                .is_some_and(|after| self.leave_completed_setup(back, after))
             {
                 self.say("setup is complete; its phone grace period is not restarted");
+                continue;
+            }
+            if after
+                .as_deref()
+                .is_some_and(|after| self.leave_setup_for_first_update(back, after))
+            {
+                self.say(
+                    "the first update after setup: setup is done; its phone grace period is not restarted",
+                );
                 continue;
             }
             if backs[at].unit == VOICE_UNIT && !voice_stopped {
@@ -2613,7 +2787,9 @@ impl Run<'_, '_> {
                 // before marking it restarted or stopping its old process.
                 // A voice stopped first was judged before its stop.
                 self.listen(Duration::ZERO);
-                if let Err(why) = self.wait_quiet(QUIET, self.config.quiet_wait, false, false) {
+                if let Err(why) =
+                    self.wait_quiet(self.quiet_needed(), self.config.quiet_wait, false, false)
+                {
                     return self.put_back(state, &build, &backs, None, why, String::new());
                 }
             }
@@ -2637,7 +2813,9 @@ impl Run<'_, '_> {
             );
         }
         (self.world.phase)("watching");
-        if let Err((unit, why, judged)) = self.watch(&mut watches) {
+        let watched = self.watch(&mut watches);
+        let held = watches.iter().find_map(|watch| watch.held.clone());
+        if let Err((unit, why, judged)) = watched {
             let told = if judged {
                 self.told(&unit)
             } else {
@@ -2647,6 +2825,8 @@ impl Run<'_, '_> {
         }
         record_skills(state, &steps);
         state.previous = state.installed.replace(build.clone());
+        // A finished switch ends any count of cut-shorts (#6266).
+        state.cut_short = None;
         if !self.placings.is_empty() {
             let mut before = state.models.clone();
             for placing in &self.placings {
@@ -2670,8 +2850,18 @@ impl Run<'_, '_> {
             ));
         }
         self.start_recover_if_on();
+        self.start_added(&backs, build.sequence);
         self.prune(state);
-        Outcome::Switched(build.sequence)
+        match held {
+            Some(why) => {
+                self.say(&format!("build {} kept; held: {why}", build.sequence));
+                Outcome::Held {
+                    sequence: build.sequence,
+                    why,
+                }
+            }
+            None => Outcome::Switched(build.sequence),
+        }
     }
 
     /// Recovery, enabled and with its switch on through its drop-ins, is
@@ -2706,6 +2896,137 @@ impl Run<'_, '_> {
         }
     }
 
+    /// lamp-control's switch that keeps it up (#6699), when its unit is
+    /// here, enabled into `lampos.target`, and one of [`CONTROL_SWITCHES`]
+    /// reads `on` through its drop-ins, as install reads a switch. None
+    /// otherwise: a lamp-control off by both exits 0 by design.
+    fn control_kept_up(&self) -> Option<&'static str> {
+        let path = format!("{}{CONTROL_UNIT}", crate::install::UNITS);
+        let text = fs::read_to_string(self.config.on(&path)).ok()?;
+        let link = format!("{}/{}.wants/{CONTROL_UNIT}", added::UNITS, added::LAMP);
+        fs::symlink_metadata(self.config.on(&link)).ok()?;
+        let on = |lamp: &str| self.config.on(lamp);
+        let mut sources = vec![(path.clone(), crate::switches::environment(&text))];
+        sources.extend(crate::install::kept_sources(&on, CONTROL_UNIT, &text, &[]));
+        CONTROL_SWITCHES
+            .into_iter()
+            .find(|switch| crate::switches::effective(switch, &sources) == Some("on"))
+    }
+
+    /// The long-running parts of `lampos.target` this switch added and
+    /// enabled (crate::added::to_start), each started once here with
+    /// `--no-block`: after the watch passed and the build is kept, so a part
+    /// that ends at once can never put a build back. Without this a part a
+    /// round adds, lamp-services among them, stays dead until the lamp's
+    /// next start, and an account the app shows linked goes nowhere. Only
+    /// while `lampos.target` runs (the lamp is set up), and only a part
+    /// that is inactive: a running one is never restarted, a failed one is
+    /// left. A start that fails is said and the round stays switched.
+    ///
+    /// The same for a part the lamp had that this switch changed and that
+    /// had ended cleanly (#6699): inactive with its last run a success, as
+    /// lamp-control was after it exited 0 under a build where its switch
+    /// was off. A round restarts only what runs, so such a part stayed dead
+    /// until the lamp's next start, through any number of updates. Started
+    /// once, on the same terms; one still off by its own switch exits again.
+    fn start_added(&mut self, backs: &[Back], sequence: u64) {
+        let read = |back: &Back| {
+            let path = format!("{}/{}", added::UNITS, back.unit);
+            let text = fs::read_to_string(self.config.on(&path)).ok()?;
+            Some((back.unit.clone(), text))
+        };
+        let added: Vec<(String, String)> = backs
+            .iter()
+            .filter(|back| back.added.is_some())
+            .filter_map(read)
+            .collect();
+        let ended: Vec<(String, String)> = backs
+            .iter()
+            .filter(|back| back.added.is_none() && !back.was_active)
+            .filter_map(read)
+            .collect();
+        let enabled = |unit: &str| {
+            let link = format!("{}/{}.wants/{unit}", added::UNITS, added::LAMP);
+            fs::symlink_metadata(self.config.on(&link)).is_ok()
+        };
+        let picked = added::to_start(&added, enabled);
+        let ended: Vec<String> = added::to_start(&ended, enabled)
+            .into_iter()
+            .filter(|unit| !picked.contains(unit))
+            .collect();
+        let control = (!picked.iter().chain(&ended).any(|unit| unit == CONTROL_UNIT))
+            .then(|| self.control_kept_up())
+            .flatten();
+        if picked.is_empty() && ended.is_empty() && control.is_none() {
+            return;
+        }
+        let mut asked = picked.clone();
+        asked.extend(ended.iter().cloned());
+        if control.is_some() {
+            asked.push(CONTROL_UNIT.to_owned());
+        }
+        asked.push(added::LAMP.to_owned());
+        let states = match self.world.systemd.states(&asked) {
+            Ok(states) => states,
+            Err(why) => {
+                self.say(&format!(
+                    "the parts build {sequence} added or changed are not started: systemd cannot say how they are ({why}); they start at the next boot"
+                ));
+                return;
+            }
+        };
+        let state = |unit: &str| states.iter().find(|state| state.unit == unit).cloned();
+        if state(added::LAMP).is_none_or(|state| state.active != "active") {
+            self.say(&format!(
+                "the parts build {sequence} added or changed start with {}, which is not running",
+                added::LAMP
+            ));
+            return;
+        }
+        let starts = picked
+            .into_iter()
+            .filter(|unit| state(unit).is_some_and(|state| state.active == "inactive"))
+            .map(|unit| (unit, format!("added by build {sequence}")))
+            .chain(
+                ended
+                    .into_iter()
+                    .filter(|unit| {
+                        state(unit).is_some_and(|state| {
+                            state.ended_cleanly() && !state.skipped_by_condition()
+                        })
+                    })
+                    .map(|unit| {
+                        (
+                            unit,
+                            format!("ended before build {sequence}, which changed it"),
+                        )
+                    }),
+            )
+            .chain(
+                control
+                    .filter(|_| {
+                        state(CONTROL_UNIT).is_some_and(|state| {
+                            state.ended_cleanly() && !state.skipped_by_condition()
+                        })
+                    })
+                    .map(|switch| {
+                        (
+                            CONTROL_UNIT.to_owned(),
+                            format!("ended cleanly with {switch} on"),
+                        )
+                    }),
+            )
+            .collect::<Vec<_>>();
+        for (unit, why_started) in starts {
+            match self.world.systemd.start_added(&unit) {
+                Ok(()) => self.say(&format!("started {unit}, {why_started}")),
+                Err(why) => self.say(&format!(
+                    "{unit} could not be started ({why}); it starts at the next boot"
+                )),
+            }
+        }
+    }
+
     /// Watches the restarted parts for the configured time. The unit and
     /// why, for the first that is not well.
     /// The third is whether the part was found not well: false when systemd
@@ -2737,7 +3058,10 @@ impl Run<'_, '_> {
                 }
             };
             let health = if done { self.world.ears.health() } else { None };
+            // Read after the states: setup writes its marker, then ends.
+            let setup_done = crate::setup_lifecycle::done(&self.config.root);
             for watch in watches.iter_mut() {
+                watch.setup_done(setup_done);
                 let state = states
                     .iter()
                     .find(|state| state.unit == watch.unit)
@@ -2773,15 +3097,46 @@ impl Run<'_, '_> {
         // by the caller before anything is put back.
         told: String,
     ) -> Outcome {
-        self.say(&format!(
-            "putting build {} back: {why}{told}",
-            build.sequence
-        ));
+        self.put_back_as(state, build, backs, failed, why, told, false)
+    }
+
+    /// As [`Self::put_back`]; a switch `cut_short` (step 1) says nothing of
+    /// its build, so it is only counted, and refused at its
+    /// `CUT_SHORTS_REFUSE`th in a row (#6266).
+    #[allow(clippy::too_many_arguments)]
+    fn put_back_as(
+        &mut self,
+        state: &mut State,
+        build: &Build,
+        backs: &[Back],
+        failed: Option<&str>,
+        why: String,
+        told: String,
+        cut_short: bool,
+    ) -> Outcome {
+        // `told` carries a unit's own last journal line: it is said, never
+        // kept in the log (the log keeps `why` alone, as the refusal does).
+        self.say_apart(
+            &format!("putting build {} back: {why}{told}", build.sequence),
+            &format!("putting build {} back: {why}", build.sequence),
+        );
+        // A fault of the build is written into the journal before anything
+        // is put back, so a start after a cut in the put-back, or before the
+        // state below is written, refuses the build as this one would have,
+        // and does not take it for a cut-short (#6266; Thirteen's P3 on
+        // #6416). A cut-short leaves the journal unmarked: tried again.
+        if !cut_short && let Err(error) = self.records.mark_journal_refusing(&why) {
+            self.say(&format!(
+                "the journal cannot be marked with why build {} is put back: {error}",
+                build.sequence
+            ));
+        }
         let (after, old, files_back) = self.restore(backs, failed);
         self.settings_now(state);
         if !files_back {
-            // Not all is as it was: the journal stays, for the next start
-            // to try again, and nothing is pruned that a path still names.
+            // Not all is as it was: the journal stays, marked as above, for
+            // the next start to try again, and nothing is pruned that a path
+            // still names.
             return Outcome::RolledBack {
                 sequence: build.sequence,
                 why,
@@ -2789,7 +3144,31 @@ impl Run<'_, '_> {
                 told: Told { new: told, old },
             };
         }
-        state.refuse(build, &why);
+        if !cut_short {
+            let kind = refusal_kind(&why, failed);
+            state.refuse_as(
+                build,
+                &why,
+                Some(kind),
+                crate::own::boot_id(&self.config.root).as_deref(),
+            );
+        } else {
+            let times = state.count_cut_short(build);
+            if times >= CUT_SHORTS_REFUSE {
+                state.cut_short = None;
+                state.refuse_as(
+                    build,
+                    &format!("{why}, {times} times in a row"),
+                    Some("cut_short"),
+                    crate::own::boot_id(&self.config.root).as_deref(),
+                );
+            } else {
+                self.say(&format!(
+                    "build {} is not refused: cut short {times} of {CUT_SHORTS_REFUSE} times in a row; the next round tries it again",
+                    build.sequence
+                ));
+            }
+        }
         if let Err(error) = self
             .records
             .save_state(state)
@@ -2884,7 +3263,10 @@ impl Run<'_, '_> {
             // Recovery's journal truthfully retains was_active, even when
             // Setup completed while fetching. Recheck its restored product
             // lifecycle here as well as at the forward restart boundary.
-            if files_back && self.leave_completed_setup(back, &back.text) {
+            if files_back
+                && (self.leave_completed_setup(back, &back.text)
+                    || self.leave_setup_for_first_update(back, &back.text))
+            {
                 self.say("setup is complete; restoring its files needs no restart");
                 continue;
             }
@@ -2969,8 +3351,13 @@ impl Run<'_, '_> {
         // already-restored prefix is excluded below. Legacy journals stay
         // byte-for-byte intact while their graph is reconstructed.
         self.rollback_order = journal.rollback_order.clone();
-        let why =
-            "the switch was cut short (lamp-update stopped, or the lamp lost power)".to_owned();
+        // A put-back for a fault of the build that could not finish says
+        // why in the journal: refused for it. Otherwise the switch was cut
+        // short, which says nothing of the build (#6266).
+        let cut_short = journal.refusing.is_none();
+        let why = journal.refusing.clone().unwrap_or_else(|| {
+            "the switch was cut short (lamp-update stopped, or the lamp lost power)".to_owned()
+        });
         self.say(&format!(
             "putting build {} back: {why}",
             journal.build.sequence
@@ -3053,7 +3440,15 @@ impl Run<'_, '_> {
             Ok(state) => state,
             Err(error) => return Outcome::Failed(format!("the state cannot be read: {error}")),
         };
-        self.put_back(&mut state, &journal.build, &backs, None, why, String::new())
+        self.put_back_as(
+            &mut state,
+            &journal.build,
+            &backs,
+            None,
+            why,
+            String::new(),
+            cut_short,
+        )
     }
 
     /// A signed build for a newer updater than this one: refused, with
@@ -3467,12 +3862,14 @@ fn installed_units(config: &Config) -> io::Result<Vec<Installed>> {
         // A linked unit lives somewhere else, which is not this program's
         // to change. Neither is a unit of lamp-update's own: its service, and
         // the writer's one-shot (crate::writer_unit) and Harness's
-        // (crate::harness_install), which start `update/current` too and
-        // must never move that link as a part's.
+        // (crate::harness_install), and the region's (crate::install::REGION_UNIT),
+        // which start `update/current` too and must never move that link as a
+        // part's.
         if !manifest::is_unit_name(&name)
             || name == OWN_UNIT
             || name == crate::writer_unit::UNIT
             || name == crate::harness_install::UNIT
+            || name == crate::install::REGION_UNIT
             || !entry.file_type()?.is_file()
         {
             continue;
@@ -3575,7 +3972,8 @@ fn list_sha256(wants: &[Want]) -> String {
 
 /// What goes into a part's new folder: what is beside its binary now,
 /// each from the build if the build carries it, else from the old folder;
-/// and the binary. A folder that is not there is installed afresh (V1's
+/// the tools install puts beside it that the build carries; and the
+/// binary. A folder that is not there is installed afresh (V1's
 /// lesson: a missing installation is a reinstall, not an error).
 fn wants_of(
     config: &Config,
@@ -3586,6 +3984,18 @@ fn wants_of(
     let old_folder = program.folder();
     let mut names = BTreeSet::from([program.binary.clone()]);
     names.extend(models.keys().map(|name| (*name).to_owned()));
+    // The tools install puts beside this binary, when the build carries
+    // them: a folder made before one shipped gets it at the next round, not
+    // only at an install (lamp-same-voice on lamp-06c1, 10 Nov).
+    names.extend(
+        crate::install::BESIDE
+            .iter()
+            .chain(crate::install::BESIDE_IF_CARRIED)
+            .filter(|(owner, _)| *owner == program.binary)
+            .flat_map(|(_, tools)| tools.iter())
+            .filter(|tool| files.contains_key(**tool))
+            .map(|tool| (*tool).to_owned()),
+    );
     if let Ok(entries) = fs::read_dir(config.on(&old_folder)) {
         for entry in entries {
             let entry = entry.map_err(|error| format!("{old_folder}: {error}"))?;
@@ -3749,6 +4159,7 @@ fn plan(
             new_folder,
             make,
             was_active: false,
+            was_held: false,
             link,
             kind: None,
             added: None,
@@ -3774,6 +4185,7 @@ fn plan(
             new_folder: folder,
             make: None,
             was_active: false,
+            was_held: false,
             link: None,
             kind: companion::kind(name),
             added: None,
@@ -3885,6 +4297,24 @@ fn add_units(
         let (folder, make, link) = match (installed_part, added_part) {
             (Some(part), _) => (part.program.folder(), None, None),
             (None, Some(other)) => (other.new_folder.clone(), None, None),
+            // A unit of lamp-update's own (the region's, #6386) starts
+            // through `update/current`, which no part owns: lamp-update's own
+            // unit does, and no round moves that link. It is added beside
+            // the folder that unit starts from, the link left as it is.
+            (None, None) if builds == own::FOLDER => {
+                let own = fs::read_to_string(config.on(&config.units).join(OWN_UNIT))
+                    .ok()
+                    .and_then(|text| {
+                        unit::program(&text).or_else(|| unit::linked_program(&text, &config.root))
+                    })
+                    .filter(|program| program.builds == own::FOLDER);
+                let Some(own) = own else {
+                    return Err(format!(
+                        "{name} starts through {link_path}, and {OWN_UNIT} does not"
+                    ));
+                };
+                (own.folder(), None, None)
+            }
             (None, None) => {
                 if fs::symlink_metadata(config.on(&link_path)).is_ok() {
                     return Err(format!(
@@ -3923,6 +4353,7 @@ fn add_units(
             new_folder: folder,
             make,
             was_active: false,
+            was_held: false,
             link: None,
             kind: None,
             added: Some(Adding { wants, link }),
@@ -3979,6 +4410,7 @@ fn add_units(
             new_folder: folder,
             make: None,
             was_active: false,
+            was_held: false,
             link: None,
             kind: companion::kind(name),
             added: Some(Adding {
@@ -4138,4 +4570,107 @@ fn conditions(text: &str) -> Vec<&str> {
         .map(str::trim)
         .filter(|line| line.starts_with("Condition"))
         .collect()
+}
+
+/// A refusal's fixed name for the app (#6266, `lamp_msgs::UpdateRefused`): a
+/// part held still by a passing local state right after the switch
+/// (`judge::HELD`, a kept unplug request) is `held`; any other part not well
+/// (`failed` names its unit) is `part_unwell`; the rest (the switch's own
+/// steps, the quiet moment) is `other`. Never the text.
+pub(crate) fn refusal_kind(why: &str, failed: Option<&str>) -> &'static str {
+    if why.contains(crate::judge::HELD) {
+        "held"
+    } else if failed.is_some() {
+        "part_unwell"
+    } else {
+        "other"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(root: &Path) -> Config {
+        Config {
+            root: root.to_owned(),
+            units: "/etc/systemd/system/".into(),
+            records: "/var/lib/lampos-update/".into(),
+            channel: "lamp-voice".into(),
+            channel_url: "https://channel.test/".into(),
+            key: [0; 32],
+            lamp: "lamp-06c1".into(),
+            apply: false,
+            quiet_wait: Duration::ZERO,
+            watch: Duration::ZERO,
+            keep_free: 0,
+            self_switch: false,
+            running: None,
+            updater: manifest::UPDATER,
+            models: false,
+            models_file: false,
+            settings: false,
+            product_settings: false,
+            image: false,
+            first_update: false,
+            writer_from: None,
+        }
+    }
+
+    fn file(name: &str) -> manifest::File {
+        manifest::File {
+            name: name.into(),
+            sha256: manifest::sha256_hex(name.as_bytes()),
+            size: 1,
+        }
+    }
+
+    /// A lamp whose voice folder was made before the voice's same-voice
+    /// check shipped took every round after it with only what was already
+    /// beside the voice, so the check never arrived (lamp-06c1 on build
+    /// 11091, 10 Nov): a round puts a tool the build carries beside its part,
+    /// as install does.
+    #[test]
+    fn a_round_puts_a_carried_tool_beside_its_part() {
+        let folder = tempfile::tempdir().unwrap();
+        let build = "a".repeat(64);
+        let old = folder.path().join(format!("opt/lampOS/voice/{build}"));
+        fs::create_dir_all(&old).unwrap();
+        fs::write(old.join("lamp-voice"), "voice 1").unwrap();
+        fs::write(old.join("lamp-turn-end"), "turn-end 1").unwrap();
+        let carried = [
+            file("lamp-voice"),
+            file("lamp-turn-end"),
+            file("lamp-same-voice"),
+            file("lamp-body-measure"),
+        ];
+        let files: BTreeMap<&str, &manifest::File> = carried
+            .iter()
+            .map(|file| (file.name.as_str(), file))
+            .collect();
+        let program = Program {
+            builds: "/opt/lampOS/voice/".into(),
+            build,
+            binary: "lamp-voice".into(),
+            linked: true,
+        };
+        let wants = wants_of(&config(folder.path()), &files, &BTreeMap::new(), &program).unwrap();
+        let names: Vec<&str> = wants.iter().map(|want| want.name.as_str()).collect();
+        assert_eq!(names, ["lamp-same-voice", "lamp-turn-end", "lamp-voice"]);
+        assert!(
+            wants
+                .iter()
+                .all(|want| matches!(&want.source, Source::Build(_)))
+        );
+
+        // A build without it still makes the folder, without it.
+        let older: BTreeMap<&str, &manifest::File> = files
+            .iter()
+            .filter(|(name, _)| **name != "lamp-same-voice")
+            .map(|(name, file)| (*name, *file))
+            .collect();
+        let wants = wants_of(&config(folder.path()), &older, &BTreeMap::new(), &program).unwrap();
+        let names: Vec<&str> = wants.iter().map(|want| want.name.as_str()).collect();
+        assert_eq!(names, ["lamp-turn-end", "lamp-voice"]);
+    }
 }

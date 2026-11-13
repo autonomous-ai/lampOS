@@ -49,6 +49,9 @@ pub struct Volume<M> {
     limit: Option<u8>,
     /// Where it stood when it was muted.
     before_mute: Option<u8>,
+    /// What a limit lowered (from, to), given back on release if the mixer
+    /// is still where the limit left it. Any later write forgets it.
+    lowered: Option<(u8, u8)>,
     observed: Option<u8>,
     last_observed: Option<u8>,
     observation_revocation: Option<u64>,
@@ -68,6 +71,7 @@ impl<M: Mixer> Volume<M> {
             product_ceiling: ceiling.clamp(1, 100),
             limit: None,
             before_mute: None,
+            lowered: None,
             observed: None,
             last_observed: None,
             observation_revocation: Some(0),
@@ -144,14 +148,30 @@ impl<M: Mixer> Volume<M> {
         })
     }
 
+    /// What a limit lowered (from, to), while it is still to be given back.
+    pub fn lowered(&self) -> Option<(u8, u8)> {
+        self.lowered
+    }
+
+    /// The (from, to) a limit lowered before a restart, as [`Volume::lowered`]
+    /// said it then. The release gives `from` back only while the mixer still
+    /// reads `to`, so a change made meanwhile still stands.
+    pub fn restore_lowered(&mut self, lowered: (u8, u8)) {
+        self.lowered = Some(lowered);
+    }
+
     /// Apply a raw ceiling of 1..=100, bounded by the product's ceiling.
     /// A louder mixer is lowered now; a quieter or muted one is left alone.
     /// The restriction stays active even if its hardware change fails:
     /// a later call or another `set_limit` can try the bounded write again.
     ///
-    /// `None` releases the restriction without writing or restoring a level.
-    /// A remembered pre-mute level is lowered with the limit too, never
-    /// restored on release, so a later unmute cannot revive that old level.
+    /// `None` releases the restriction. It writes back only the level a limit
+    /// lowered, and only while the mixer still reads what that limit wrote:
+    /// any person's change in between stands (#5753). A remembered pre-mute
+    /// level is lowered with the limit too, never restored on release, so a
+    /// later unmute cannot revive that old level. The level to give back is
+    /// read with [`Volume::lowered`] and put back after a restart with
+    /// [`Volume::restore_lowered`]; the caller keeps it durable (#6479).
     /// The result reports the actual level, not proof of durable storage;
     /// the caller owns the limit's lifetime and restart recovery.
     pub fn set_limit(&mut self, limit: Option<u8>) -> Result<Level, String> {
@@ -165,7 +185,15 @@ impl<M: Mixer> Volume<M> {
         }
         let current = self.read().map_err(|_| UNREAD.to_owned())?;
         let now = if limit.is_some() && current > ceiling {
-            self.write(ceiling)?
+            let from = self.lowered.map_or(current, |(from, _)| from);
+            let now = self.write(ceiling)?;
+            self.lowered = Some((from, now));
+            now
+        } else if limit.is_none()
+            && let Some((from, to)) = self.lowered.take()
+            && current == to
+        {
+            self.write(from.min(ceiling))?
         } else {
             current
         };
@@ -176,6 +204,7 @@ impl<M: Mixer> Volume<M> {
     /// a point, but an active limit never confirms a level above its ceiling,
     /// nor a request for silence that still reads above zero.
     fn write(&mut self, to: u8) -> Result<u8, String> {
+        self.lowered = None;
         let ceiling = self.ceiling();
         let to = if self.limit.is_some() {
             to.min(ceiling)
@@ -519,11 +548,20 @@ pub(crate) mod tests {
                 max_volume: 80,
             })
         );
-        assert_eq!(volume.set_limit(None).unwrap().max_volume, 80);
         assert_eq!(volume.mixer.writes, [40]);
+        // Only the release gives back what the limit lowered (#5753).
+        assert_eq!(
+            volume.set_limit(None),
+            Ok(Level {
+                volume: 88,
+                raw: 70,
+                max_volume: 80,
+            })
+        );
+        assert_eq!(volume.mixer.writes, [40, 70]);
         assert_eq!(
             said(volume.up()),
-            "My volume is now 60 out of 80; it was 40."
+            "My volume is now 80 out of 80; it was 70."
         );
     }
 
@@ -535,6 +573,33 @@ pub(crate) mod tests {
             assert_eq!(volume.set_limit(None).unwrap().raw, current);
             assert!(volume.mixer.writes.is_empty(), "was at {current}");
         }
+    }
+
+    /// The night cap's lift at 06:00 (#5753): the level the cap lowered at
+    /// 21:00 comes back, unless the person changed the volume in the night.
+    #[test]
+    fn the_lift_gives_back_the_level_the_cap_lowered_unless_the_person_changed_it() {
+        let mut volume = at(50, 100);
+        assert_eq!(volume.set_limit(Some(35)).unwrap().raw, 35);
+        assert_eq!(volume.set_limit(None).unwrap().raw, 50);
+        assert_eq!(volume.mixer.writes, [35, 50]);
+
+        let mut volume = at(50, 100);
+        volume.set_limit(Some(35)).unwrap();
+        assert_eq!(volume.to_share(57).unwrap().raw, 20);
+        assert_eq!(volume.set_limit(None).unwrap().raw, 20);
+        assert_eq!(volume.mixer.writes, [35, 20]);
+
+        let mut volume = at(30, 100);
+        volume.set_limit(Some(35)).unwrap();
+        assert_eq!(volume.set_limit(None).unwrap().raw, 30);
+        assert!(volume.mixer.writes.is_empty());
+
+        let mut volume = at(50, 100);
+        volume.set_limit(Some(35)).unwrap();
+        said(volume.mute());
+        assert_eq!(volume.set_limit(None).unwrap().raw, 0);
+        assert_eq!(volume.mixer.writes, [35, 0]);
     }
 
     #[test]

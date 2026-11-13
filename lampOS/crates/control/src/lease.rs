@@ -194,6 +194,17 @@ impl Leases {
             .map(|lease| lease.client.as_str())
     }
 
+    /// Whether `client` holds `part` by a lease that is suspended now (a
+    /// conversation took it for a while).
+    pub fn has_suspended(&self, client: &str, part: Part, now_us: u64) -> bool {
+        self.held.iter().any(|lease| {
+            lease.client == client
+                && lease.suspended
+                && lease.parts.contains(&part)
+                && lease.until_us > now_us
+        })
+    }
+
     /// The leases that lapsed by `now_us`, ended, with any an earlier call
     /// found: one change each, each told once.
     pub fn lapse(&mut self, now_us: u64) -> Vec<Change> {
@@ -462,6 +473,10 @@ mod tests {
             leases.take("c_3", &[Part::Body], 1_000, S),
             Err(Refusal::Busy { .. })
         ));
+        // The holder's own take is told apart from another computer's.
+        assert!(leases.has_suspended("c_1", Part::Body, S));
+        assert!(!leases.has_suspended("c_3", Part::Body, S));
+        assert!(!leases.has_suspended("c_1", Part::Light, S));
         // Suspending again tells nothing new.
         assert!(
             leases

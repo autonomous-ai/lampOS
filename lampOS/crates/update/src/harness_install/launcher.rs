@@ -13,7 +13,14 @@
 //! Harness command run by hand then holds its updates too. lamp-tasks writes
 //! the same at its start, for lamps installed before this
 //! (crates/tasks/src/hold.rs, `pin_at_start`).
+//!
+//! On a lamp whose updater follows the lamp-voice feed (a dev or beta lamp,
+//! the canary for Harness's releases, #6300) the hold is lifted: the
+//! launcher's preamble is taken out instead, as lamp-tasks does at its
+//! start. Which lamp that is, is decided in `lamp_msgs::harness_hold`, for
+//! both.
 use crate::install::{HARNESS_HOME, Runner};
+use lamp_msgs::harness_hold::{HarnessHold, REFUSE_UPDATE, harness_hold};
 use rustix::{
     fs::{self as rfs, AtFlags, Mode, OFlags},
     io::Errno,
@@ -59,14 +66,42 @@ pub fn switch_on(run: &mut Runner) -> Result<bool, String> {
         .any(|assignment| assignment == format!("{SWITCH}=on")))
 }
 
+/// lamp-update's own `ExecStart`, as systemd has it loaded, which names
+/// the feed this lamp follows (`lamp_msgs::harness_hold::feed`): one
+/// `systemctl show` through `run`. `None` (the hold kept) when it fails.
+pub fn own_exec_start(run: &mut Runner) -> Option<String> {
+    let argv = [
+        "systemctl",
+        "show",
+        "lamp-update.service",
+        "--property=ExecStart",
+        "--value",
+    ]
+    .map(str::to_owned);
+    run(&argv).ok().filter(|text| !text.trim().is_empty())
+}
+
 /// `text`, a Harness launcher, in Harness's pinned shape: every
 /// `export ADAPTER_UPDATE_DISABLE=` and `export HARNESS_ENV_FILE=` line
 /// before its first `exec` line taken out, then `export
-/// ADAPTER_UPDATE_DISABLE=true` and `export HARNESS_ENV_FILE=<env_file>`
-/// put just before it. The `exec` line and every other line are kept as
-/// they are, so a launcher already pinned comes back byte for byte. `None`
-/// when there is no `exec` line. The same text as lamp-tasks' own.
+/// ADAPTER_UPDATE_DISABLE=true`, `export HARNESS_ENV_FILE=<env_file>` and
+/// the line refusing `harness update` (`REFUSE_UPDATE`, #5957) put just
+/// before it, that line taken out first too. The `exec` line and every
+/// other line are kept as they are, so a launcher already pinned comes back
+/// byte for byte. `None` when there is no `exec` line. The same text as
+/// lamp-tasks' own.
 pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
+    shaped(text, Some(env_file))
+}
+
+/// `text`, a Harness launcher, with the hold taken out (#6300): the same
+/// lines as [`pinned_launcher`] takes out, none put back. `None` when there
+/// is no `exec` line. The same text as lamp-tasks' own.
+pub fn unpinned_launcher(text: &str) -> Option<String> {
+    shaped(text, None)
+}
+
+fn shaped(text: &str, env_file: Option<&str>) -> Option<String> {
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let exec = lines
         .iter()
@@ -76,13 +111,18 @@ pub fn pinned_launcher(text: &str, env_file: &str) -> Option<String> {
         let line_text = line.trim();
         if line_text.starts_with(&format!("export {DISABLE}="))
             || line_text.starts_with(&format!("export {ENV_FILE}="))
+            || line_text == REFUSE_UPDATE
         {
             continue;
         }
         pinned.push_str(line);
     }
-    pinned.push_str(&format!("export {DISABLE}=true\n"));
-    pinned.push_str(&format!("export {ENV_FILE}={env_file}\n"));
+    if let Some(env_file) = env_file {
+        pinned.push_str(&format!("export {DISABLE}=true\n"));
+        pinned.push_str(&format!("export {ENV_FILE}={env_file}\n"));
+        pinned.push_str(REFUSE_UPDATE);
+        pinned.push('\n');
+    }
     for line in &lines[exec..] {
         pinned.push_str(line);
     }
@@ -127,6 +167,17 @@ pub(crate) const MAX_LAUNCHER: u64 = 64 * 1024;
 /// folder after any name left there is unlinked, written and given its mode
 /// and owner through its own open file, and renamed in the same folder.
 pub fn pin(launcher: &Path, env_file: &str) -> Result<Pinned, String> {
+    write_shaped(launcher, Some(env_file))
+}
+
+/// The launcher at `launcher` with the hold taken out
+/// ([`unpinned_launcher`], #6300), written as [`pin`] writes it, with the
+/// same checks: one with no hold is not written, a missing one not made.
+pub fn unpin(launcher: &Path) -> Result<Pinned, String> {
+    write_shaped(launcher, None)
+}
+
+fn write_shaped(launcher: &Path, env_file: Option<&str>) -> Result<Pinned, String> {
     let said = |error: &dyn std::fmt::Display| format!("{}: {error}", launcher.display());
     let home = launcher
         .ancestors()
@@ -176,7 +227,7 @@ pub fn pin(launcher: &Path, env_file: &str) -> Result<Pinned, String> {
         return Err(said(&why));
     }
     drop(file);
-    let pinned = pinned_launcher(&text, env_file).ok_or_else(|| said(&"no exec line"))?;
+    let pinned = shaped(&text, env_file).ok_or_else(|| said(&"no exec line"))?;
     if pinned == text {
         return Ok(Pinned::Kept);
     }
@@ -260,8 +311,10 @@ fn write_next(dir: &OwnedFd, bytes: &[u8], was: &fs::Metadata) -> io::Result<()>
 
 /// After an install: with the switch on in lamp-tasks' unit, Harness's
 /// launcher under `root` pinned to `<HARNESS_HOME>/harness-hold.env`, and
-/// one line said; with it off, or lamp-tasks' unit unreadable (taken as
-/// off), the launcher not looked at or written, and one line said.
+/// one line said; on the canary (lamp-update follows the lamp-voice feed,
+/// #6300), the hold taken out of it instead; with the switch off, or
+/// lamp-tasks' unit unreadable (taken as off), the launcher not looked at
+/// or written, and one line said.
 pub fn after_install(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
     match switch_on(run) {
         Ok(true) => {}
@@ -280,6 +333,22 @@ pub fn after_install(root: &Path, run: &mut Runner, say: &mut dyn FnMut(&str)) {
     }
     let home = root.join(HARNESS_HOME.trim_start_matches('/'));
     let launcher = home.join(LAUNCHER);
+    let hold = harness_hold(Some("on"), own_exec_start(run).as_deref());
+    if hold == HarnessHold::Lifted {
+        match unpin(&launcher) {
+            Ok(Pinned::Written) => say(
+                "Harness's launcher unpinned: this lamp follows the lamp-voice feed, the canary for Harness's releases (#6300)",
+            ),
+            Ok(Pinned::Kept) => say(
+                "Harness's launcher not pinned: this lamp follows the lamp-voice feed, the canary for Harness's releases (#6300)",
+            ),
+            Ok(Pinned::Missing) => say(&format!(
+                "no Harness launcher at {HARNESS_HOME}/{LAUNCHER}: left alone"
+            )),
+            Err(why) => say(&format!("Harness's launcher not unpinned: {why}")),
+        }
+        return;
+    }
     let env_file = format!("{HARNESS_HOME}/{HOLD_FILE}");
     match pin(&launcher, &env_file) {
         Ok(Pinned::Written) => say(&format!(

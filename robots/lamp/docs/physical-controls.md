@@ -150,7 +150,7 @@ Deploy the updated HAL before uploading JSON with these new fields.
 | **Hold 5–10 s, then release** | Shutdown OS (TTS announce → release servos → `sudo shutdown -h now`). LED blinks red while armed. | n/a — TTP223 hardware cannot reliably hold (see "FastMode" below) |
 | **Hold 10 s+, then release** | Factory-reset: wipe device state + reboot into AP setup (TTS announce → release servos → POST `/api/system/factory-reset` on the OS server). LED goes solid red while armed. **Off on Lamp** (`"factory_reset": false` on the primary button): a 10 s+ hold stays at shutdown because the dedicated reset button owns factory-reset. | n/a |
 
-The table above covers the primary GPIO button and TTP223. The dedicated reset button on pin 37 only factory-resets when released after a hold of at least 5 s. Shorter holds and single/triple taps do nothing; it never invokes sleep or shutdown. LED stays unchanged below 5 s and uses the shared solid-red factory-reset preset from 5 s onward.
+The table above covers the primary GPIO button and TTP223. The dedicated reset button on pin 37 only factory-resets when released after a hold of at least 5 s. Shorter holds and single/triple taps do nothing; it never invokes sleep or shutdown. LED stays unchanged below 5 s and uses the shared solid-red factory-reset preset from 5 s onward. On lampOS (V2) the ring blinks red from 2 s and stays red from 5 s, and the lamp says "Factory reset starting." before the reset stops the voice (`lampOS/docs/setup.md`, #5929).
 
 With Harness OFF, Lamp maps an MPR121 hold of at least 2 seconds followed by release to switching voice input mode. This binding is configurable; sleep/shutdown holds remain disabled. GPIO destructive holds retain their separate behavior.
 

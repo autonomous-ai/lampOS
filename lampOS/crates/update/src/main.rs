@@ -50,6 +50,8 @@ install lampOS on a blank lamp (docs/install.md): the newest build's binary of e
         product part, in its folder with its current link; the product units, tmpfiles,
         users and zone; enables the lamp and starts nothing. Run again, it changes
         nothing. As root, on the lamp itself.
+region  the name and time servers for the region lamp-cloud keeps (docs/install.md, #6256):
+        China's only on a lamp placed in China. As root; lamp-region.service runs it.
 harness-off undoes install's Harness at boot, and only that: as lampos, the Harness CLI's
         `harness service uninstall` and `harness stop`, then `loginctl disable-linger
         lampos`, then install's record of it. Harness itself, its sign-in and the
@@ -63,7 +65,19 @@ harness-on puts Harness on a lamp lampOS is installed on: without Harness at
 harness-install run by lamp-update-harness.service, which a `serve` round starts with
         LAMP_HARNESS_AT_ONBOARDING=on while Harness is missing (#5197): harness-on's
         install alone, through the manifest the round pinned if it named one (its sha256
-        checked first), recorded for update/status; no Harness at boot, no daemon.
+        checked first), recorded for update/status; no Harness at boot, no daemon. Then
+        Hermes after it (on by default on a product lamp, LAMP_HERMES_ON_LAMP=off
+        turns it off), pinned, as lampos, only in its quiet window and watched by
+        serve while it runs (#5978); with LAMP_HERMES_SKILLS (on by default on a
+        product lamp), its namespace shows lamp-skills' socket (#6128); with
+        LAMP_SKILL_TASKS=on, lamp-control's control socket alone (#6306). Then OpenClaw
+        after Hermes (on by default on a product lamp, LAMP_OPENCLAW_ON_LAMP=off turns
+        it off; off with Harness off): a pinned Node 24 and the pinned openclaw package,
+        as lampos, in the same namespace and the same window, taking turns with Hermes,
+        with its gateway lamp-openclaw-gateway.service on loopback, enabled and always
+        on while the switch is (disabled and stopped with it off); with
+        LAMP_OPENCLAW_SKILLS (on by default on a product lamp) its namespace shows
+        lamp-skills' socket (#6226).
 back    lamp-update-back (installed as /usr/local/lib/lampos/lamp-update-back, started by
         lamp-update.service's failure and its timer): when lamp-update switched to its own
         new build (LAMP_UPDATE_SELF=on) and that build has not confirmed itself, and
@@ -151,6 +165,7 @@ fn main() -> ExitCode {
         }
         "check" | "once" | "serve" => return on_the_lamp(command, &options),
         "install" => install(&options),
+        "region" => region(&options),
         "harness-off" => harness_off(&options),
         "harness-on" => harness_on(&options),
         "harness-install" => harness_install(&options),
@@ -406,6 +421,17 @@ fn install(options: &BTreeMap<String, String>) -> Result<(), String> {
     Ok(())
 }
 
+fn region(options: &BTreeMap<String, String>) -> Result<(), String> {
+    known(options, &[])?;
+    let mut say = |line: &str| eprintln!("lamp-update: {line}");
+    let mut changed = Vec::new();
+    install::region_servers(Path::new("/"), &mut System, &mut changed, &mut say)?;
+    for line in &changed {
+        println!("{line}");
+    }
+    Ok(())
+}
+
 fn harness_off(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
     let mut say = |line: &str| eprintln!("lamp-update: {line}");
@@ -445,22 +471,19 @@ fn harness_on(options: &BTreeMap<String, String>) -> Result<(), String> {
     Ok(())
 }
 
-/// `lamp-update harness-install`: Harness's one-shot (#5197). Ends with 1
-/// when the install failed or another held its lock; the record says why.
+/// `lamp-update harness-install`: Harness's one-shot (#5197), Hermes
+/// after it (#5978), and OpenClaw after Hermes (#6226). Ends with 1 when Harness's install failed or another
+/// held its lock; the records say why. Hermes's failure is its own record's.
 fn harness_install(options: &BTreeMap<String, String>) -> Result<(), String> {
     known(options, &[])?;
     let mut say = |line: &str| eprintln!("lamp-update: {line}");
-    let said = lamp_update::harness_install::install_now(
+    lamp_update::hermes_install::one_shot(
         Path::new("/"),
         Path::new(lamp_update::install::RECORDS),
         &mut install::output_of,
         &mut lamp_update::records::unix_ms,
         &mut say,
-    )?;
-    match said.error {
-        None => Ok(()),
-        Some(error) => Err(format!("Harness is not installed: {error}")),
-    }
+    )
 }
 
 /// `lamp-update back`: lamp-update-back, at its fixed path (#1680).
@@ -708,7 +731,7 @@ fn config(
     let self_switch = own::on(std::env::var(own::SWITCH).ok().as_deref());
     let settings_env = std::env::var_os(lamp_update::apply::SWITCH);
     let (settings, product_settings) = settings_switches(settings_env.as_deref(), self_switch);
-    let config = Config {
+    let mut config = Config {
         root,
         units: "/etc/systemd/system/".into(),
         records: lamp_update::install::RECORDS.into(),
@@ -729,10 +752,27 @@ fn config(
         settings,
         product_settings,
         image: lamp_update::image::on(std::env::var(lamp_update::image::SWITCH).ok().as_deref()),
+        // Set below: the product default needs the config's root and units.
+        first_update: false,
         writer_from: lamp_update::fixed_copy::own_bytes()
             .ok()
             .map(lamp_update::writer_swap::Running::new),
     };
+    // The first update after setup (#6284): on by this build's default on a
+    // product lamp, since lamp-update's own unit is never carried by a round
+    // (own_unit_line_tests) and so can't be given the switch on a lamp in a
+    // home; LAMP_FIRST_UPDATE=off turns it off, and another lamp needs `on`.
+    config.first_update = lamp_update::hermes_install::wanted(
+        std::env::var(lamp_update::first_update::SWITCH)
+            .ok()
+            .as_deref(),
+        config.apply
+            && lamp_update::harness_install::product::product_lamp(
+                &config.root,
+                &config.on(&config.units),
+            ),
+        lamp_update::first_update::PRODUCT_DEFAULT,
+    );
     Ok((
         config,
         seconds(options, "every-s", 900)?,
@@ -753,6 +793,7 @@ fn status(outcome: &Outcome) -> u8 {
     match outcome {
         Outcome::UpToDate(_)
         | Outcome::Switched(_)
+        | Outcome::Held { .. }
         | Outcome::SelfSwitched { .. }
         | Outcome::Climbs { .. }
         | Outcome::Would(_)
@@ -860,6 +901,12 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
     // `serve` that acts, the one that says `update/status`.
     let mut app_check = (config.apply && command == "serve")
         .then(|| lamp_update::app_check::AppCheck::new(&bus_root, &mut say));
+    // The first update after setup (#6284, LAMP_FIRST_UPDATE=on): only
+    // the `serve` that acts, the one the app's check is read by.
+    let mut first = app_check
+        .is_some()
+        .then(|| lamp_update::first_update::First::new(&config))
+        .flatten();
     // Harness before the sign-in (#5197): only a `serve` that acts, with
     // its switch on.
     let harness = {
@@ -886,14 +933,205 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         }
         on.then_some(wanted.pin)
     };
+    // lamp-update's own switches (#6607): set in its environment, or not set
+    // there, from the carried /etc/lampOS/update.env (no round rewrites this
+    // unit); skill tasks from the file only on a product lamp. Read here once,
+    // and again after each round: a round that writes or changes the file
+    // starts lamp-update again (below), so they take effect with no reboot.
+    let switches_product = lamp_update::harness_install::product::product_lamp(
+        &config.root,
+        &config.on(&config.units),
+    );
+    let read_switches = || {
+        lamp_update::switches::update_switches(&config.root, switches_product, |name| {
+            std::env::var_os(name)
+        })
+    };
+    let switches = read_switches();
+    // Hermes on the lamp (#5978): only with Harness's install on too, as it
+    // rides on Harness's one-shot.
+    let hermes = {
+        use lamp_update::{harness_install::product, hermes_install as hermes};
+        let acts = config.apply && command == "serve";
+        // On by this build's default on a product lamp (PRODUCT_DEFAULT true, the product owner's
+        // decision, 10 Nov, with the first builder's schedule: crate::hermes_schedule);
+        // LAMP_HERMES_ON_LAMP=off turns it off, and another lamp needs `on`.
+        let product = acts && product::product_lamp(&config.root, &config.on(&config.units));
+        let wanted = hermes::wanted(
+            std::env::var(hermes::SWITCH).ok().as_deref(),
+            product,
+            hermes::PRODUCT_DEFAULT,
+        );
+        // Its own switch (#6128), on by this build's default on a product lamp
+        // (SKILLS_PRODUCT_DEFAULT true): Hermes is shown lamp-skills' socket folder,
+        // read-only; LAMP_HERMES_SKILLS=off turns it off, and another lamp needs `on`.
+        let skills = hermes::wanted(
+            std::env::var(hermes::SKILLS_SWITCH).ok().as_deref(),
+            product,
+            hermes::SKILLS_PRODUCT_DEFAULT,
+        );
+        // A skill's tasks (#6306): LAMP_SKILL_TASKS, the switch lamp-tasks reads,
+        // as read above (#6607). On, Hermes is shown lamp-control's control socket
+        // alone, read-only.
+        let tasks = switches.tasks;
+        // The one run path (#6685): LAMP_SKILL_DEFAULT_AGENT=on, read only with
+        // LAMP_SKILL_TASKS on. On, Hermes's wrapper is the one every agent has,
+        // with Hermes's data, and runs the one agent namespace.
+        let one_path = tasks
+            && lamp_update::agent_ns::default_agent(
+                std::env::var(lamp_update::agent_ns::DEFAULT_AGENT_SWITCH)
+                    .ok()
+                    .as_deref(),
+            );
+        let shown = hermes::Shown {
+            skills,
+            tasks,
+            one_path,
+        };
+        if acts && wanted && harness.is_none() {
+            say("Hermes on the lamp: off, as Harness before the sign-in is off");
+        }
+        let on = acts && wanted && harness.is_some();
+        if acts {
+            hermes::at_start(
+                &config.root,
+                &records,
+                on,
+                shown,
+                lamp_update::records::unix_ms(),
+            );
+        }
+        // Off, a `serve` that acts still takes out what an earlier install
+        // left for lampos to run (its wrapper and namespace script).
+        acts.then_some((on, shown))
+    };
+    // OpenClaw on the lamp (#6226): as Hermes, beside it, on Harness's one-shot.
+    let openclaw = {
+        use lamp_update::{harness_install::product, openclaw_install as openclaw};
+        let acts = config.apply && command == "serve";
+        // On by this build's default on a product lamp (PRODUCT_DEFAULT true: beside Hermes,
+        // the default engine, under Harness, #6498); LAMP_OPENCLAW_ON_LAMP=off turns it off, and
+        // another lamp needs `on`. Its skills switch is read the same way.
+        let product = acts && product::product_lamp(&config.root, &config.on(&config.units));
+        let wanted = openclaw::wanted(
+            std::env::var(openclaw::SWITCH).ok().as_deref(),
+            product,
+            openclaw::PRODUCT_DEFAULT,
+        );
+        let skills = openclaw::wanted(
+            std::env::var(openclaw::SKILLS_SWITCH).ok().as_deref(),
+            product,
+            openclaw::SKILLS_PRODUCT_DEFAULT,
+        );
+        // OpenClaw takes no skill's run yet (#6685: its own fenced path per run
+        // is a later step), so its namespace shows lamp-control's socket to none.
+        let shown = lamp_update::hermes_install::Shown {
+            skills,
+            ..Default::default()
+        };
+        if acts && wanted && harness.is_none() {
+            say("OpenClaw on the lamp: off, as Harness before the sign-in is off");
+        }
+        let on = acts && wanted && harness.is_some();
+        if acts {
+            openclaw::at_start(
+                &config.root,
+                &records,
+                on,
+                shown,
+                lamp_update::records::unix_ms(),
+            );
+        }
+        acts.then_some((on, shown))
+    };
+    // Hermes's schedule (#5978): each install watched while it runs, the
+    // voice heard from the start, so speech freezes it and a lost privacy
+    // reading stops it; one watch for Hermes's and OpenClaw's both (#6226).
+    let hermes_watch = (matches!(hermes, Some((true, _))) || matches!(openclaw, Some((true, _))))
+        .then(|| lamp_update::hermes_schedule::Watcher::start(&bus_root, &records));
+    // The lamp's agents for the app (#6240): LAMP_APP_ENGINES, as read above
+    // (#6607). Hermes's state on update/status, and the app's tap heard beside
+    // the app's checks.
+    let engines = switches.engines.then(|| lamp_update::engines::Engines {
+        hermes_on: matches!(hermes, Some((true, _))),
+        frozen: hermes_watch
+            .as_ref()
+            .map(lamp_update::hermes_schedule::Watcher::frozen)
+            .unwrap_or_default(),
+        pending: Default::default(),
+        // OpenClaw beside Hermes, said and installed as Hermes is (#6240,
+        // V2's ask of 12 Nov): on as its install is (its switch, Harness's).
+        openclaw_on: matches!(openclaw, Some((true, _))),
+        openclaw_pending: Default::default(),
+        harness: Default::default(),
+    });
+    if let Some(engines) = &engines {
+        // Every other engine the lamp's Harness has (the lead's rule of 12
+        // Nov: the list is Harness's, never a fixed two), looked at on a
+        // thread of its own every five minutes (`HARNESS_LOOK_EVERY`), only by a `serve` that acts.
+        if config.apply && command == "serve" {
+            engines.look_at_harness_every(
+                lamp_update::engines::HARNESS_LOOK_EVERY,
+                lamp_update::engines::harness_run(),
+                |line: &str| eprintln!("lamp-update: {line}"),
+            );
+        }
+        app_check = app_check.map(|check| {
+            check.with_engines(lamp_update::engines::Asks::new(
+                &bus_root,
+                &records,
+                engines.clone(),
+                &mut say,
+            ))
+        });
+    }
+    // One agent namespace for every engine Harness reports (#6510 Part 1,
+    // step 1): only with lamp-update's own LAMP_AGENT_NS=on (no product unit
+    // sets it), by a `serve` that acts, beside the look at Harness's engines
+    // (LAMP_APP_ENGINES=on) that says which; the namespace shows what
+    // Hermes's does (its skills and tasks switches).
+    let agent_ns = {
+        use lamp_update::agent_ns::rounds;
+        let wanted = config.apply
+            && command == "serve"
+            && rounds::on(std::env::var(rounds::SWITCH).ok().as_deref());
+        if wanted && engines.is_none() {
+            say(&format!(
+                "the agent namespace for every engine: off, as {} (the look at Harness's engines) is off",
+                lamp_update::engines::SWITCH
+            ));
+        }
+        if wanted && harness.is_none() {
+            say("the agent namespace for every engine: off, as Harness before the sign-in is off");
+        }
+        match (wanted, &engines, hermes) {
+            (true, Some(engines), Some((_, shown))) if harness.is_some() => {
+                Some((engines.harness.clone(), shown))
+            }
+            _ => None,
+        }
+    };
     // `update/status` (#2194): where each round is, and how the last ended,
     // only for a round that acts; Harness's record looked at often only
     // with its switch on.
     // Held in a cell: the round's phase and target both tell it (#5473).
+    // What the agent namespace's rounds last said, so a line that stays
+    // true is said once (#6510).
+    let mut agent_ns_said = lamp_update::agent_ns::rounds::Said::default();
     let telling = std::cell::RefCell::new(config.apply.then(|| {
-        lamp_update::status::Telling::start(&bus_root, &records, harness.is_some(), &mut say)
+        lamp_update::status::Telling::start(
+            &bus_root,
+            &records,
+            harness.is_some(),
+            engines.clone(),
+            &mut say,
+        )
     }));
     loop {
+        let before_setup = lamp_update::first_update::before_setup(&config);
+        if let Some(first) = &mut first {
+            first.begin(lamp_update::records::unix_ms(), &mut say);
+        }
         let outcome = {
             let mut phase = |now: &'static str| {
                 if let Some(telling) = telling.borrow_mut().as_mut() {
@@ -925,20 +1163,151 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }
             )
         {
-            lamp_update::harness_install::after_round(
+            // A move to a newer pin waits while Harness is in use (#5957):
+            // tasks/status on the bus, and Harness's own processes.
+            lamp_update::harness_install::after_round_when(
                 &config.root,
                 &records,
                 pin,
                 &mut systemd,
                 lamp_update::records::unix_ms(),
+                &mut || {
+                    lamp_update::harness_install::busy::in_use(
+                        &config.root,
+                        Some(bus_root.as_path()),
+                    )
+                },
+                &mut say,
+            );
+            if let (Some(_), Some((true, shown))) = (&hermes_watch, hermes) {
+                use lamp_update::{hermes_install, hermes_schedule};
+                let now_unix_ms = lamp_update::records::unix_ms();
+                let window = hermes_schedule::window(&hermes_schedule::Moment {
+                    walk_under_way: lamp_update::walk::under_way(&config),
+                })
+                // The app's tap (#6240): a recent failure does not hold it.
+                .map(|window| {
+                    if engines
+                        .as_ref()
+                        .is_some_and(lamp_update::engines::Engines::pending)
+                    {
+                        hermes_schedule::Window::Asked
+                    } else {
+                        window
+                    }
+                });
+                hermes_install::after_round(
+                    &config.root,
+                    &records,
+                    shown,
+                    &mut systemd,
+                    now_unix_ms,
+                    window,
+                    &mut say,
+                );
+                if let Some(engines) = &engines {
+                    engines.settle(&records);
+                }
+            }
+            // OpenClaw after Hermes, in its own window by its own record's
+            // last try; Hermes's install under way holds it to a later round.
+            if let (Some(_), Some((true, shown))) = (&hermes_watch, openclaw) {
+                use lamp_update::{hermes_schedule, openclaw_install};
+                let now_unix_ms = lamp_update::records::unix_ms();
+                let window = hermes_schedule::window(&hermes_schedule::Moment {
+                    walk_under_way: lamp_update::walk::under_way(&config),
+                })
+                // The app's tap (#6240): a recent failure does not hold it.
+                .map(|window| {
+                    if engines
+                        .as_ref()
+                        .is_some_and(lamp_update::engines::Engines::openclaw_pending)
+                    {
+                        hermes_schedule::Window::Asked
+                    } else {
+                        window
+                    }
+                });
+                openclaw_install::after_round(
+                    &config.root,
+                    &records,
+                    shown,
+                    &mut systemd,
+                    now_unix_ms,
+                    window,
+                    &mut say,
+                );
+                if let Some(engines) = &engines {
+                    engines.settle_openclaw(&records);
+                }
+            }
+            // Every other engine Harness says is installed, after Hermes's
+            // and OpenClaw's own installers (#6510): its wrapper, the
+            // namespace script and its home, written again when not there.
+            if let Some((look, shown)) = &agent_ns {
+                let look = look.lock().unwrap_or_else(|e| e.into_inner()).clone();
+                lamp_update::agent_ns::rounds::after_round(
+                    &config.root,
+                    &look,
+                    *shown,
+                    &mut agent_ns_said,
+                    &mut lamp_update::agent_ns::rounds::lampos_ids,
+                    &mut lamp_update::agent_ns::wrapper::login_finds,
+                    &mut lamp_update::agent_ns::wrapper::login_programs,
+                    &mut say,
+                );
+            }
+        }
+        if matches!(hermes, Some((false, _)))
+            && !matches!(
+                outcome,
+                Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }
+            )
+        {
+            lamp_update::hermes_install::after_round_off(
+                &config.root,
+                &records,
+                &mut systemd,
                 &mut say,
             );
         }
+        if matches!(openclaw, Some((false, _)))
+            && !matches!(
+                outcome,
+                Outcome::Unreachable(_) | Outcome::SelfSwitched { .. } | Outcome::Climbs { .. }
+            )
+        {
+            lamp_update::openclaw_install::after_round_off(
+                &config.root,
+                &records,
+                &mut systemd,
+                &mut say,
+            );
+        }
+        let kept = lamp_update::first_update::kept(before_setup, &outcome);
         if let Some(telling) = telling.borrow_mut().as_mut() {
-            let at_unix_ms = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |since| since.as_millis() as u64);
-            telling.ended(&outcome, at_unix_ms);
+            if kept {
+                let at_unix_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_or(0, |since| since.as_millis() as u64);
+                telling.ended(&outcome, at_unix_ms);
+            } else {
+                telling.let_go();
+            }
+        }
+        // Before setup, a channel out of reach is asked again soon, not
+        // after the whole interval: the lamp has no internet yet.
+        let every = if kept {
+            every
+        } else {
+            say(&format!(
+                "setup is not done: the channel is out of reach, not told, asked again in {} s",
+                lamp_update::first_update::BEFORE_SETUP_AGAIN.as_secs()
+            ));
+            every.min(lamp_update::first_update::BEFORE_SETUP_AGAIN)
+        };
+        if let Some(first) = &mut first {
+            first.ended(&outcome, &mut say);
         }
         let text = outcome.to_string();
         if let Outcome::SelfSwitched { .. } | Outcome::Climbs { .. } = outcome {
@@ -964,6 +1333,29 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
             println!("{text}");
             return ExitCode::from(status(&outcome));
         }
+        // A round that wrote or changed /etc/lampOS/update.env (#6607): this
+        // program starts again in its own place, with the same options, so
+        // its switches take effect with no reboot. An exec that fails returns
+        // here, and the switches wait for the next start.
+        if lamp_update::switches::restart_for(switches, read_switches()) {
+            eprintln!("lamp-update: {text}");
+            eprintln!(
+                "lamp-update: {} changed: lamp-update starts again",
+                lamp_update::manifest::UPDATE_ENV
+            );
+            match std::env::current_exe() {
+                Ok(program) => {
+                    let error = Command::new(&program)
+                        .args(std::env::args_os().skip(1))
+                        .exec();
+                    eprintln!(
+                        "lamp-update: {} cannot be started: {error}",
+                        program.display()
+                    );
+                }
+                Err(error) => eprintln!("lamp-update: its own program is not known: {error}"),
+            }
+        }
         // A round that says what the one before said is not said again.
         if text != last {
             eprintln!("lamp-update: {text}");
@@ -972,14 +1364,39 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
         // Between rounds the bus is still read, so that what the voice said
         // meanwhile does not wait in the sockets. A check from the app ends
         // the wait (#4153); one that came during the round is dropped.
-        match &mut app_check {
-            Some(app_check) => {
-                app_check.forget();
-                if app_check.wait(ears.as_mut(), every) {
-                    eprintln!("lamp-update: the app asked for a check: a round now");
+        match (&mut app_check, &mut first) {
+            (Some(app_check), Some(first)) => {
+                use lamp_update::app_check::Woken;
+                app_check.forget(&mut say);
+                let mut due =
+                    |say: &mut dyn FnMut(&str)| first.due(lamp_update::records::unix_ms(), say);
+                match app_check.wait_or(ears.as_mut(), every, &mut say, &mut due) {
+                    Woken::Asked => {
+                        eprintln!("lamp-update: the app asked for a check: a round now");
+                        // The owner's retry of a refused build (#6266) drops
+                        // its refusal before the round, as without the first
+                        // update (#6800).
+                        app_check.retry_asked(
+                            &lamp_update::records::Records::new(records.clone()),
+                            &mut say,
+                        );
+                    }
+                    Woken::Due | Woken::Waited => {}
                 }
             }
-            None => {
+            (Some(app_check), None) => {
+                app_check.forget(&mut say);
+                if app_check.wait(ears.as_mut(), every, &mut say) {
+                    eprintln!("lamp-update: the app asked for a check: a round now");
+                    // The owner's retry of a refused build (#6266) drops its
+                    // refusal before the round.
+                    app_check.retry_asked(
+                        &lamp_update::records::Records::new(records.clone()),
+                        &mut say,
+                    );
+                }
+            }
+            (None, _) => {
                 let _ = ears.listen(every);
             }
         }

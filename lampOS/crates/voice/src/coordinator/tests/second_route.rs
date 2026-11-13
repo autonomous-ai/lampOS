@@ -246,8 +246,8 @@ struct Script {
     voiced: bool,
     /// One parsed Say request, read at this capture frame's scenario time.
     say_at_frame: Option<(u64, crate::say::LineForTest)>,
-    /// A second Say request, made as it is read at this capture frame (it
-    /// may name what the first one began).
+    /// A second Say request, made as it is read at this capture frame once
+    /// a turn has been opened (it may name what the first one began).
     say_later: Option<(u64, std::rc::Rc<dyn Fn() -> crate::say::LineForTest>)>,
     /// Onboarding's near-call try window opens this many milliseconds from
     /// the scenario's start, for its 7 s (#1803).
@@ -491,6 +491,7 @@ fn request_of(input: &ProviderInput) -> u64 {
         | ProviderInput::StepCall { request, .. }
         | ProviderInput::Onboarding { request, .. }
         | ProviderInput::TurnOpened { request, .. }
+        | ProviderInput::WalkUnderWay { request, .. }
         | ProviderInput::WokenByName { request, .. }
         | ProviderInput::Written { request, .. }
         | ProviderInput::Reminder { request, .. } => *request,
@@ -658,6 +659,11 @@ impl Peers {
             .say_later
             .as_ref()
             .is_some_and(|(frame, _)| self.frames >= *frame)
+            // Its line names the id of the turn the first Say opened. Under
+            // load the voice's pass has not opened it by the frame, and the
+            // id would read 0: wait for the open (the run's limit still ends
+            // a turn that never opens).
+            && crate::control_turn::last_opened_for_test() > 0
         {
             let (_, line) = self.script.say_later.take().unwrap();
             line().read_at(monotonic_us());
@@ -999,6 +1005,7 @@ impl Peers {
         for _ in 0..packets {
             self.audio_sequence += 1;
             self.peers[index].queued.push_back(ProviderOutput::Audio {
+                spoken: true,
                 request,
                 sequence: self.audio_sequence,
                 provider_event_at_us: monotonic_us(),

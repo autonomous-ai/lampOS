@@ -271,7 +271,7 @@ impl change::Systemd for Units<'_> {
     fn systemctl(&mut self, args: &[&str]) -> Result<(), String> {
         let held = self.records.lock().is_err();
         self.calls.push((args.join(" "), held));
-        if self.stop_fails && args[0] == "stop" {
+        if self.stop_fails && (args[0] == "stop" || args[0] == "restart") {
             return Err("exit status: 1".into());
         }
         Ok(())
@@ -429,6 +429,341 @@ fn off_while_an_update_holds_the_lock_refuses_and_keeps_the_drop_in() {
     let _ = fs::remove_dir_all(folder);
 }
 
+/// The local agent off: closed before the answer too, as developer access
+/// is. The lock first, then the agent's drop-in removed, reload and a
+/// restart (the developer door stays, so the unit runs on) under it, and
+/// only then the reply; a restart that fails is said, never claimed closed;
+/// an update holding the lock refuses it and keeps the drop-in; with
+/// developer access off as well the unit is stopped. Developer access off
+/// takes the agent's drop-in with it.
+#[test]
+fn the_agent_off_is_closed_before_the_reply_and_developer_off_takes_it_too() {
+    let root = Root::new();
+    root.agent_ready();
+    let config = root.config();
+    let (folder, records) = records_folder("agent-off");
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    };
+    let off = r#"{"local_agent": false}"#;
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    // None there: not this path. On is not this path.
+    assert!(
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).is_none()
+    );
+    answer(r#"{"control": true}"#, &config, true);
+    answer(r#"{"local_agent": true}"#, &config, true);
+    assert!(config.agent_dropin.exists());
+    assert!(
+        change::close_before_answer(
+            r#"{"local_agent": true}"#,
+            &config,
+            true,
+            &records,
+            &mut ears,
+            &mut units
+        )
+        .is_none()
+    );
+    // Held by an update: refused, kept, systemd not asked.
+    let update = records.lock().unwrap();
+    let (reply, done) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
+    assert_eq!(reply, json!({"refused": change::CLOSE_INSTALLING}));
+    assert!(done.is_none() && units.calls.is_empty());
+    assert!(config.agent_dropin.exists());
+    drop(update);
+    // Taken: the file gone, reload and restart under the lock, then the reply.
+    let (reply, done) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
+    assert_eq!(
+        units.calls,
+        vec![
+            ("daemon-reload".to_owned(), true),
+            ("restart lamp-control.service".to_owned(), true)
+        ]
+    );
+    assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
+    let done = done.unwrap();
+    assert!(!done.restart_control && !done.restart_schedule);
+    assert!(!config.agent_dropin.exists());
+    assert!(config.control_dropin.exists(), "the developer door stays");
+    drop(records.lock().unwrap());
+    // A restart that fails is not claimed closed.
+    answer(r#"{"local_agent": true}"#, &config, true);
+    let mut failing = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: true,
+    };
+    let (reply, _) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut failing).unwrap();
+    assert_eq!(
+        reply["done"]["closed"],
+        json!(false),
+        "a failed restart is said"
+    );
+    assert!(!config.agent_dropin.exists());
+    // Developer access off takes the agent's drop-in with it, and stops.
+    answer(r#"{"local_agent": true}"#, &config, true);
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    let (reply, _) = change::close_before_answer(
+        r#"{"control": false}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+        &mut units,
+    )
+    .unwrap();
+    assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
+    assert!(!config.control_dropin.exists() && !config.agent_dropin.exists());
+    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    // A leftover agent drop-in with developer access off: off stops, never restarts.
+    fs::write(&config.agent_dropin, "x").unwrap();
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    drop(records.lock().ok());
+    change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
+    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    assert!(!config.agent_dropin.exists());
+    // Developer off with only the agent's drop-in left (no developer one):
+    // cleared, and the unit stopped.
+    fs::write(&config.agent_dropin, "x").unwrap();
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    drop(records.lock().ok());
+    let (reply, _) = change::close_before_answer(
+        r#"{"control": false}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+        &mut units,
+    )
+    .unwrap();
+    assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
+    assert!(!config.agent_dropin.exists());
+    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    // A removal that fails (the agent's drop-in is a folder here) does not
+    // leave the door open: the developer drop-in is still removed, the unit
+    // stopped, and the failure answered in words; the retry is on this path.
+    answer(r#"{"control": true}"#, &config, true);
+    fs::create_dir_all(config.agent_dropin.join("inside")).unwrap();
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    drop(records.lock().ok());
+    let (reply, done) = change::close_before_answer(
+        r#"{"control": false}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+        &mut units,
+    )
+    .unwrap();
+    assert!(
+        reply["refused"]
+            .as_str()
+            .is_some_and(|why| why.starts_with("the change could not be saved")),
+        "{reply}"
+    );
+    assert!(done.is_none());
+    assert!(
+        !config.control_dropin.exists(),
+        "the developer drop-in went"
+    );
+    assert_eq!(units.calls[1].0, "stop lamp-control.service");
+    // The words say the unit was stopped but comes back while a drop-in is there.
+    assert!(
+        reply["refused"]
+            .as_str()
+            .unwrap()
+            .contains("lamp-control was stopped for now"),
+        "{reply}"
+    );
+    // The same removal failing and the stop failing too: both are said, the
+    // stop failure is not swallowed.
+    answer(r#"{"control": true}"#, &config, true);
+    drop(records.lock().ok());
+    let mut failing = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: true,
+    };
+    let (reply, _) = change::close_before_answer(
+        r#"{"control": false}"#,
+        &config,
+        true,
+        &records,
+        &mut ears,
+        &mut failing,
+    )
+    .unwrap();
+    let why = reply["refused"].as_str().unwrap();
+    assert!(
+        why.starts_with("the change could not be saved") && why.contains("did not stop either"),
+        "{reply}"
+    );
+    let _ = fs::remove_dir_all(&config.agent_dropin);
+    let _ = fs::remove_dir_all(folder);
+}
+
+/// The accounts of a lamp, as a test has them: the group file is the rig's and
+/// the user is a flag; every make is recorded and a
+/// chosen one fails.
+struct Accts {
+    group_file: std::path::PathBuf,
+    user: bool,
+    calls: Vec<String>,
+    fail: Option<&'static str>,
+}
+
+impl change::Accounts for Accts {
+    fn has_group(&self, group: &str) -> bool {
+        fs::read_to_string(&self.group_file).is_ok_and(|text| {
+            text.lines()
+                .any(|line| line.split(':').next() == Some(group))
+        })
+    }
+    fn has_user(&self, _: &str) -> bool {
+        self.user
+    }
+    fn make_group(&mut self, group: &str) -> Result<(), String> {
+        self.calls.push(format!("group {group}"));
+        if self.fail == Some("group") {
+            return Err("groupadd: exit status: 9".into());
+        }
+        let mut text = fs::read_to_string(&self.group_file).unwrap_or_default();
+        text.push_str(&format!("{group}:x:995:\n"));
+        fs::write(&self.group_file, text).unwrap();
+        Ok(())
+    }
+    fn make_user(&mut self, user: &str, group: &str) -> Result<(), String> {
+        self.calls.push(format!("user {user} {group}"));
+        if self.fail == Some("user") {
+            return Err("useradd: exit status: 1".into());
+        }
+        self.user = true;
+        Ok(())
+    }
+    fn make_folder(&mut self, path: &std::path::Path) -> Result<(), String> {
+        self.calls.push(format!("folder {}", path.display()));
+        fs::create_dir_all(path).unwrap();
+        Ok(())
+    }
+}
+
+/// The owner's tap on a lamp the installer never reached (a channel update):
+/// the root helper makes the agent's group, user and folder from the fixed
+/// names, under lamp-update's lock, and the drop-in is then written as on any
+/// lamp. Nothing is made for another request, with developer access off, or
+/// where it is all there; a failure is said and no drop-in is written.
+#[test]
+fn the_agents_tap_makes_its_group_user_and_folder_from_the_fixed_names() {
+    let root = Root::new();
+    let config = root.config();
+    let (folder, records) = records_folder("make-agent");
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    };
+    let mut accts = Accts {
+        group_file: config.agent_group_file.clone(),
+        user: false,
+        calls: Vec::new(),
+        fail: None,
+    };
+    let on = r#"{"local_agent": true}"#;
+    let make = |accts: &mut Accts, ears: &mut Script, line: &str| {
+        change::make_agent_account(line, &config, true, &records, ears, accts)
+    };
+    // Developer access off: nothing made (the refusal in words is parse's).
+    assert!(make(&mut accts, &mut ears, on).is_none() && accts.calls.is_empty());
+    answer(r#"{"control": true}"#, &config, true);
+    // Another request, or an extra key, or off: nothing made.
+    for line in [
+        r#"{"local_agent": false}"#,
+        r#"{"local_agent": true, "user": "root"}"#,
+        r#"{"control": true}"#,
+        r#"{"local_agent": "yes"}"#,
+    ] {
+        assert!(make(&mut accts, &mut ears, line).is_none(), "{line}");
+    }
+    assert!(accts.calls.is_empty());
+    // Held by an update: refused, nothing made.
+    let update = records.lock().unwrap();
+    let refused = make(&mut accts, &mut ears, on).unwrap();
+    assert_eq!(refused, json!({"refused": change::CLOSE_INSTALLING}));
+    assert!(accts.calls.is_empty());
+    drop(update);
+    // A user that cannot be made: said, and the drop-in is not written.
+    accts.fail = Some("user");
+    let refused = make(&mut accts, &mut ears, on).unwrap();
+    assert!(
+        refused["refused"]
+            .as_str()
+            .unwrap()
+            .contains("the agent's user could not be set up: useradd"),
+        "{refused}"
+    );
+    assert!(!config.agent_dropin.exists());
+    // Made: the group, the user (in that group) and the folder, from the
+    // constants alone, in that order; then the helper's answer writes the drop-in.
+    accts.fail = None;
+    accts.calls.clear();
+    assert!(make(&mut accts, &mut ears, on).is_none());
+    assert_eq!(
+        accts.calls,
+        vec![
+            "user lampagent lamp-agents".to_owned(),
+            format!("folder {}", config.agent_folder.display()),
+        ],
+        "the group the failed try made is there already"
+    );
+    let (reply, done) = answer(on, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    assert!(done.unwrap().restart_control);
+    assert!(config.agent_dropin.exists());
+    // All there: nothing more is made.
+    accts.calls.clear();
+    assert!(make(&mut accts, &mut ears, on).is_none() && accts.calls.is_empty());
+    // A lamp with nothing: the group too.
+    let (second, _) = (Root::new(), ());
+    let config2 = second.config();
+    let mut none = Accts {
+        group_file: config2.agent_group_file.clone(),
+        user: false,
+        calls: Vec::new(),
+        fail: None,
+    };
+    answer(r#"{"control": true}"#, &config2, true);
+    assert!(
+        change::make_agent_account(on, &config2, true, &records, &mut ears, &mut none).is_none()
+    );
+    assert_eq!(none.calls[0], "group lamp-agents");
+    assert_eq!(none.calls.len(), 3);
+    let _ = fs::remove_dir_all(folder);
+}
+
 /// On: answered first (the drop-in written), then lamp-update's lock, with
 /// no quiet, and reload and restart under it once an update lets it go.
 #[test]
@@ -502,5 +837,81 @@ fn a_room_sounds_yes_restarts_ears_once_unlocked() {
         units.calls,
         vec![("try-restart lamp-ears.service".to_owned(), true)]
     );
+    let _ = fs::remove_dir_all(folder);
+}
+
+/// #5883: the dev monitor goes the way developer access does, for
+/// lamp-peek. On is answered with the drop-in written, then lamp-peek is
+/// restarted under lamp-update's lock; off with the drop-in there stops
+/// lamp-peek under the lock before the reply exists.
+#[test]
+fn the_dev_monitor_starts_once_unlocked_and_stops_before_the_reply() {
+    let root = Root::new();
+    let config = root.config();
+    let (folder, records) = records_folder("peek");
+    let (reply, done) = answer(r#"{"monitor": true}"#, &config, true);
+    assert_eq!(reply, json!({"done": {"on": true}}));
+    let done = done.unwrap();
+    assert!(done.restart_peek && !done.restart_control);
+    assert_eq!(
+        fs::read_to_string(&config.monitor_dropin).unwrap(),
+        "[Service]\nEnvironment=LAMP_PEEK=monitor\n"
+    );
+    let mut ears = Script {
+        now: 0,
+        at: Box::new(|_| Vec::new()),
+    };
+    let mut units = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: false,
+    };
+    let said = change::restart_peek_when_unlocked(&mut ears, &records, &mut units);
+    assert_eq!(said, "lamp-peek restarted on the dev monitor");
+    assert_eq!(
+        units.calls,
+        vec![
+            ("daemon-reload".to_owned(), true),
+            ("restart lamp-peek.service".to_owned(), true)
+        ]
+    );
+    // Off: stopped under the lock, and only then the reply.
+    units.calls.clear();
+    let off = r#"{"monitor": false}"#;
+    let (reply, done) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).unwrap();
+    assert_eq!(
+        units.calls,
+        vec![
+            ("daemon-reload".to_owned(), true),
+            ("stop lamp-peek.service".to_owned(), true)
+        ]
+    );
+    assert_eq!(reply, json!({"done": {"on": false, "closed": true}}));
+    assert_eq!(
+        done.unwrap().said,
+        "the dev monitor is off; lamp-peek stopped"
+    );
+    assert!(!config.monitor_dropin.exists());
+    // Off again with nothing there: answered as any change, systemd not asked.
+    units.calls.clear();
+    assert!(
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut units).is_none()
+    );
+    assert!(units.calls.is_empty());
+    // A stop that fails is said, never claimed closed.
+    answer(r#"{"monitor": true}"#, &config, true);
+    let mut failing = Units {
+        records: &records,
+        calls: Vec::new(),
+        stop_fails: true,
+    };
+    let (reply, _) =
+        change::close_before_answer(off, &config, true, &records, &mut ears, &mut failing).unwrap();
+    assert_eq!(
+        reply,
+        json!({"done": {"on": false, "closed": false, "note": change::MONITOR_MAY_STAY_OPEN}})
+    );
+    assert!(!config.monitor_dropin.exists());
     let _ = fs::remove_dir_all(folder);
 }

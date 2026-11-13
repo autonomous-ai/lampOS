@@ -134,6 +134,14 @@ const CONTACT_STEPS: u8 = 3;
 const HAND_STEPS: u16 = 50;
 use crate::HAND_MOVED;
 const LIMP_LAG: u16 = 11;
+/// A joint held where it gave way that has not moved more than `HAND_MOVED`
+/// for this many steps (twenty seconds) is no longer renewed as in a hand:
+/// its hold runs out and it is let go, and a hand truly still on it gives
+/// way again. Its readings alone never end such a hold: lamp-06c1's head,
+/// moved 40 counts and left there, read its own weight of 130 over
+/// `STALL_LOAD`, the same as a hand holding it still, and was said a hand
+/// on `body/hand` until lamp-body was restarted (#5196).
+const HAND_STILL_STEPS: u16 = 1_000;
 /// With `--give-way`, a joint whose goal is more than `STALL_SLACK` counts
 /// from where it is, whose load is over `STALL_LOAD` and which moves no
 /// more than `STALL_SLACK` counts for `STALL_STEPS` steps is told to stop
@@ -341,7 +349,14 @@ const GESTURE_WAIT: Duration = Duration::from_secs(3);
 /// a clip is followed exactly and one that is dropped goes back no faster.
 const GESTURE_STEP: [f32; 5] = [24.0, 34.0, 26.0, 21.0, 21.0];
 /// The farthest a gesture takes each of those from where the lamp has it.
-const GESTURE_REACH: [f32; 5] = [220.0, 220.0, 170.0, 360.0, 360.0];
+/// At least what a move may ask (`moves::FARTHEST`: 200, 200, the lamp's own
+/// yaw reach up to 250, 350, 350), so that a move the check takes is played
+/// whole, never cut here (banana's P2 on ten/move-reach). The base's yaw is
+/// laid over the pose, and the sum is held to home plus `Limits::yaw` (or to
+/// where the look alone already has the base, if farther): a sway alone goes
+/// 250 either way of home, and over a turned look it stops at the reach and
+/// says so in the journal, never past it.
+const GESTURE_REACH: [f32; 5] = [220.0, 220.0, 250.0, 360.0, 360.0];
 /// The farthest a holder's pose (`Asked::pose`) takes the head's roll from
 /// the pose; the arm goes anywhere inside its window instead (the pose's
 /// own clamp), and pitch and yaw stay with the holder's look.
@@ -392,6 +407,8 @@ pub const OWN_RANGES: &str = "LAMP_BODY_OWN_RANGES";
 pub fn own_ranges_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
+
+pub use crate::moves::{APP_REACH, app_reach_from};
 
 /// `LAMP_BODY_STRAIN_GUARD=on` (#4390, #4501): a long strain sits the arm
 /// down, a fast warming is said, and a second hot or strained sit-down
@@ -1124,6 +1141,14 @@ pub struct Limits {
     /// limits are not read, as before.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub own_ranges: bool,
+    /// The lamp was started without `--reach`: its `yaw` is `Limits::FOLDED`'s, not a choice, and
+    /// a move on it is admitted to `moves::YAW_REACH_DEFAULT` (`gesture_yaw_reach`).
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub yaw_unset: bool,
+    /// `LAMP_BODY_APP_REACH=on`: a move's reach of each joint is 90% of the
+    /// hardware's ([`APP_REACH`]); needs `own_ranges`. Off: as before.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub app_reach: bool,
     /// `LAMP_BODY_STRAIN_GUARD=on` (#4390, #4501), with its bounds; `None`
     /// is the body as before.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1273,6 +1298,8 @@ impl Limits {
         arbitration: false,
         gesture_pause: false,
         own_ranges: false,
+        yaw_unset: false,
+        app_reach: false,
         strain_guard: None,
     };
 }
@@ -1647,6 +1674,10 @@ pub struct BodyReport {
     /// start, by `Joint::index` (#3558).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub own_ranges: Option<[(u16, u16); 5]>,
+    /// With `Limits::app_reach`, what a move may take each joint (`moves::Reach`): 90% of
+    /// the hardware's range from the pose, as read at start.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub app_reach: Option<crate::moves::Reach>,
     /// Writes of torque enable: to clear a latched overload on the shoulder
     /// or the elbow before standing, and, told to take hold, to each joint
     /// found without torque.
@@ -2015,6 +2046,76 @@ const SETTLES_KEPT: usize = 16;
 /// Reads of a first read that found a joint hot, before it is acted on.
 const FIRST_HEAT_REREADS: usize = 3;
 
+/// The base's reach a gesture laid over the pose is held to, either side of
+/// home: the lamp's own (`--reach`'s yaw), as configured, even a small one;
+/// only a lamp started without `--reach` (`Limits::yaw_unset`), whose yaw is
+/// `Limits::FOLDED`'s 40, keeps the 150 counts a move is admitted to there
+/// (Third's P2 on #6002: an accepted move of 150 was played cut to 40; Second's:
+/// a configured yaw of 100 must not be raised to 150).
+fn gesture_yaw_reach(limits: &Limits) -> f32 {
+    if limits.yaw_unset {
+        limits.yaw.max(f32::from(crate::moves::YAW_REACH_DEFAULT))
+    } else {
+        limits.yaw
+    }
+}
+
+/// What a move may take each joint on a lamp on `LAMP_BODY_APP_REACH` (the
+/// person, 14:04 on 10 Nov): 90% of the hardware's range from the pose each
+/// side, pitch, roll, yaw, shoulder, elbow. The head and the base from the
+/// servos' own stored ranges (`ranges`, by `Joint::index`: yaw, shoulder,
+/// elbow, roll, pitch) and the pose a standing lamp is in (a folded one's home);
+/// the arm, which V1 never calibrated, from its window (`arm_windows`: the way
+/// between folded and stood up, and `ARM_WINDOW_MARGIN` either side), the
+/// bounds the body already reports.
+///
+/// A head or base joint whose servo stores the whole turn (`0..=ENCODER_MAX`,
+/// as [`own_window`] reads it: never calibrated, no stop of its own) has no
+/// hardware range to take 90% of, so it keeps today's reach (`yaw_reach` for
+/// the base); the pitch floor is left alone for it too.
+pub fn app_reach_of(
+    ranges: &[(u16, u16); 5],
+    home: Option<[u16; 3]>,
+    standing: Option<Standing>,
+    yaw_reach: u16,
+) -> crate::moves::Reach {
+    // Pitch, roll and yaw of the pose: stood up when it stands, else home.
+    let pose: [u16; 3] = standing
+        .map(|up| [up.pose[0], up.pose[1], up.pose[2]])
+        .or(home)
+        .unwrap_or([2_048; 3]);
+    let own = |joint: Joint, at: u16| {
+        let (min, max) = ranges[joint.index()];
+        (at.saturating_sub(min), max.saturating_sub(at))
+    };
+    let head = [
+        own(Joint::WristPitch, pose[0]),
+        own(Joint::WristRoll, pose[1]),
+        own(Joint::BaseYaw, pose[2]),
+    ];
+    let windows = arm_windows(standing);
+    let arm: [(u16, u16); 2] = std::array::from_fn(|index| {
+        let at = standing.map_or(0, |up| up.pose[3 + index]);
+        let (low, high) = windows[index];
+        (at.saturating_sub(low), high.saturating_sub(at))
+    });
+    let mut reach = crate::moves::Reach::of_hardware(
+        [head[0].0, head[1].0, head[2].0, arm[0].0, arm[1].0],
+        [head[0].1, head[1].1, head[2].1, arm[0].1, arm[1].1],
+    );
+    let today = crate::moves::Reach::today(yaw_reach);
+    for (index, joint) in [Joint::WristPitch, Joint::WristRoll, Joint::BaseYaw]
+        .into_iter()
+        .enumerate()
+    {
+        if ranges[joint.index()] == (0, ENCODER_MAX) {
+            reach.low[index] = today.low[index];
+            reach.high[index] = today.high[index];
+        }
+    }
+    reach
+}
+
 /// The window each arm goal must be inside, shoulder then elbow, for a body
 /// given a pose to stand in: its way between folded and stood up, and
 /// `ARM_WINDOW_MARGIN` either side.
@@ -2045,6 +2146,9 @@ struct Bus<'a, P, R> {
     /// start is the same recovery, and brings the head and the base home
     /// from anywhere (`RECOVER_REACH`) as a start that folded the arm does.
     after_arm_wait: bool,
+    /// The farthest from the last written goal an arm goal is eased toward
+    /// (`ARM_EASE_REACH`, more with a move's app reach).
+    ease_reach: u16,
     /// Each head and base joint's window, by `Joint::index`: 0..=4095, or
     /// with `Limits::own_ranges` its own (`own_window`).
     windows: [(u16, u16); 5],
@@ -2111,6 +2215,7 @@ impl<'a, P: PortIo, R: Runtime> Bus<'a, P, R> {
             runtime,
             arm_windows: arm_windows(standing),
             after_arm_wait: false,
+            ease_reach: ARM_EASE_REACH,
             windows: [(0, 4_095); 5],
             ranges: [(0, 4_095); 5],
             refused: None,
@@ -2661,7 +2766,7 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         let (low, high) = self.window(joint);
         if self.goal_refused(joint, goal).is_none()
             || !(low..=high).contains(&goal)
-            || goal.abs_diff(from) > ARM_EASE_REACH
+            || goal.abs_diff(from) > self.ease_reach
             || resting
         {
             goal
@@ -4984,6 +5089,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         standing: None,
         standing_refused: None,
         own_ranges: None,
+        app_reach: None,
         torque_writes: 0,
         torque_given: Vec::new(),
         arm_releases: 0,
@@ -5230,7 +5336,60 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         bus.windows = ranges.map(own_window);
         bus.ranges = ranges;
+        if limits.app_reach {
+            report.app_reach = Some(app_reach_of(
+                &ranges,
+                home,
+                standing,
+                gesture_yaw_reach(&limits) as u16,
+            ));
+        }
     }
+    // The app's reach (`LAMP_BODY_APP_REACH`): the head's pitch is held no
+    // nearer its up stop than the servo's own stored limit less the margin,
+    // not the floor tuned for lamp-4ace's head; a gesture is played to each
+    // side's reach (never less than `GESTURE_REACH`), and the arm's ease
+    // reach grows with the arm's, so that a move the check took is played
+    // whole, never cut here.
+    let app = report.app_reach;
+    let limits = match (app, report.own_ranges) {
+        (Some(_), Some(ranges)) if ranges[Joint::WristPitch.index()] != (0, ENCODER_MAX) => {
+            Limits {
+                pitch_floor: limits.pitch_floor.min(
+                    ranges[Joint::WristPitch.index()]
+                        .0
+                        .saturating_add(OWN_RANGE_MARGIN),
+                ),
+                ..limits
+            }
+        }
+        _ => limits,
+    };
+    let (gesture_low, gesture_high): ([f32; 5], [f32; 5]) = match app {
+        Some(app) => (
+            std::array::from_fn(|index| GESTURE_REACH[index].max(f32::from(app.low[index]))),
+            std::array::from_fn(|index| GESTURE_REACH[index].max(f32::from(app.high[index]))),
+        ),
+        None => (GESTURE_REACH, GESTURE_REACH),
+    };
+    // The base's reach either side that the look and a gesture laid over it
+    // are held to (the Reviewer-lead's P2 on ten/move-reach): the unit's, or
+    // an app's if wider.
+    let (yaw_reach_low, yaw_reach_high) = match app {
+        Some(app) => (
+            gesture_yaw_reach(&limits).max(f32::from(app.low[2])),
+            gesture_yaw_reach(&limits).max(f32::from(app.high[2])),
+        ),
+        None => (gesture_yaw_reach(&limits), gesture_yaw_reach(&limits)),
+    };
+    bus.ease_reach = ARM_EASE_REACH
+        + app.map_or(0, |app| {
+            app.low[3]
+                .max(app.low[4])
+                .max(app.high[3])
+                .max(app.high[4])
+                .saturating_sub(360)
+        });
     if standing.is_some() && home.is_none() {
         standing = None;
         will_not_stand(&mut report, "a lamp that stands needs a home".into());
@@ -6143,6 +6302,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut gesture_fates = Fates::default();
     let mut handed_over = None;
     let mut gesture_now = [0.0f32; 5];
+    // Steps a played outside clip has wanted yaw of the base while none was commanded (said once).
+    // The base's yaw was cut to its reach under a gesture, said once a gesture.
+    let mut yaw_cut_said = false;
     let mut gesture_cooling = 0u16;
     // Steps are being cut short by the anti-tip rule.
     let mut tipping = false;
@@ -6235,6 +6397,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     // Steps left that a head or base joint the stall rule just gave way
     // under is said as a hand ([`STALL_HAND_STEPS`]).
     let mut stalled_hand = [0u16; 3];
+    // Where each held joint last moved more than `HAND_MOVED`, and steps
+    // held since ([`HAND_STILL_STEPS`]).
+    let mut held_still = [(0u16, 0u16); 3];
     // What each joint read on its last step neither held, a hand nor over
     // its bound: its own weight.
     let mut rest_load = [0u16; 3];
@@ -7114,6 +7279,45 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 }
             }
         }
+        // With the app's reach, a gesture asked past what the lamp's hardware
+        // gives each side is dropped whole, said, never played cut short
+        // (banana's P2 on ten/move-reach). With the switch on but the servos'
+        // ranges unread (`app` is None), nothing past `GESTURE_REACH` is
+        // known to be safe, so a gesture past it is dropped and said too,
+        // never cut short.
+        if limits.app_reach
+            && let Some((clip, since)) = playing
+            && since == now
+            && clip.frames.iter().any(|frame| {
+                frame.iter().enumerate().any(|(joint, offset)| {
+                    let reach = if *offset < 0 {
+                        gesture_low
+                    } else {
+                        gesture_high
+                    };
+                    f32::from(offset.unsigned_abs()) > reach[joint]
+                })
+            })
+        {
+            playing = None;
+            report.gestures_dropped += 1;
+            if from_outside(clip) {
+                gesture_fates.push_told(
+                    (
+                        clip.name,
+                        if app.is_some() {
+                            "dropped: past this lamp's reach"
+                        } else {
+                            "dropped: this lamp's reach is not known (its servos' ranges were not read)"
+                        },
+                    ),
+                    Told {
+                        source: playing_by.1,
+                        by: None,
+                    },
+                );
+            }
+        }
         // V1's anti-tip rule (src/cog.rs, V1 `check_stable`): a gesture any
         // frame of which, laid over the pose the lamp is in, takes its
         // centre of gravity farther than 22 mm off the base's axis is
@@ -7249,15 +7453,20 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
             None => {
                 easing_out = None;
-                let reach = if posing { POSE_REACH } else { GESTURE_REACH };
+                let (reach_low, reach_high) = if posing {
+                    (POSE_REACH, POSE_REACH)
+                } else {
+                    (gesture_low, gesture_high)
+                };
                 for (index, now_at) in gesture_now.iter_mut().enumerate() {
-                    let wanted = gesture_wanted[index].clamp(-reach[index], reach[index]);
+                    let wanted = gesture_wanted[index].clamp(-reach_low[index], reach_high[index]);
                     *now_at += (wanted - *now_at).clamp(-GESTURE_STEP[index], GESTURE_STEP[index]);
                 }
             }
         }
         gesture_moved = std::array::from_fn(|index| gesture_now[index] - before[index]);
         let gesturing = playing.is_some() || gesture_now != [0.0; 5];
+        yaw_cut_said &= gesturing;
         yielding &= gesturing;
         // A glance is a quick move of the head, and is judged as a gesture
         // is: a head that lags or strains lets the move go, not the run.
@@ -7509,7 +7718,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // gesture either: on lamp-4ace that joint turns a round head about
         // its own axis, which nobody sees.
         let over_of: [f32; 3] = std::array::from_fn(|index| {
-            if index == 1 && limits.stand_roll <= limits.roll {
+            if index == 1 && limits.stand_roll <= limits.roll && app.is_none() {
                 0.0
             } else {
                 gesture_now[index]
@@ -7517,11 +7726,19 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         });
         // What is wanted of each joint with the move laid over, while one
         // plays: a stall in a move is held against this (`Stall::with_move`).
+        let yaw_home = home_now[2];
         let moving_of = |wanted_of: &[f32; 3], index: usize| {
             gesturing.then(|| {
-                (wanted_of[index] + over_of[index])
-                    .round()
-                    .clamp(0.0, 4_095.0) as u16
+                let mut sum = wanted_of[index] + over_of[index];
+                // The base is asked no farther than its reach (below), so a
+                // stall is judged against that, not the move's whole offset.
+                if index == 2 {
+                    sum = sum.clamp(
+                        (yaw_home - yaw_reach_low).min(wanted_of[2]),
+                        (yaw_home + yaw_reach_high).max(wanted_of[2]),
+                    );
+                }
+                sum.round().clamp(0.0, 4_095.0) as u16
             })
         };
         for (index, offset) in offsets.into_iter().enumerate() {
@@ -7545,7 +7762,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             if relaxed {
                 continue;
             }
-            let wanted = match glance_from {
+            // A glance does not turn the base, but a move from a computer does: while one plays the
+            // base is asked as if no glance were under way. Run 5 on lamp-75c9 (10 Nov): every move
+            // after the first was taken, the gesture layer wanted 683 counts of yaw, and the base's
+            // goal stayed where the look had it; with this, run 6 played them (to 88.9 degrees).
+            let glancing = glance_from.filter(|_| !(index == 2 && gesturing));
+            let wanted = match glancing {
                 // The base is not turned for a glance.
                 Some(_) if index == 2 => continue,
                 // From where it rested, by no more than the joint's own reach
@@ -7623,7 +7845,37 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             } else {
                 commanded[index]
             };
-            goals[index] = (led + over).round().clamp(least, 4_095.0) as u16;
+            let mut sum = led + over;
+            if index == 2 && over != 0.0 {
+                // Whatever is laid over the look, the base is asked no
+                // farther from home than its reach, or than the look alone
+                // already has it (the Reviewer-lead's P2 on ten/move-reach:
+                // a look at 22 degrees and a sway of 22 more would go to 44,
+                // past the reach and toward the cables). The way back
+                // toward home is never cut.
+                let (low_goal, high_goal) = (
+                    (home_now[2] - yaw_reach_low).min(led),
+                    (home_now[2] + yaw_reach_high).max(led),
+                );
+                let cut = sum.clamp(low_goal, high_goal);
+                if (cut - sum).abs() >= 1.0 && !yaw_cut_said {
+                    yaw_cut_said = true;
+                    eprintln!(
+                        "lamp-body: step {} gesture's yaw cut to the reach: a look at {:.0} and the move's {:.0} would go {:.0} from home, the reach is {:.0}",
+                        report.steps,
+                        led - home_now[2],
+                        over,
+                        sum - home_now[2],
+                        if sum > led {
+                            yaw_reach_high
+                        } else {
+                            yaw_reach_low
+                        }
+                    );
+                }
+                sum = cut;
+            }
+            goals[index] = sum.round().clamp(least, 4_095.0) as u16;
             if index == 0 && leads != leading {
                 leading = leads;
                 let why = match (leads, below, lead) {
@@ -8367,6 +8619,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         for (index, joint) in COMMANDED.iter().enumerate() {
             let is = samples[joint.index()];
             report.peak_load[index] = report.peak_load[index].max(is.load);
+            if !held[index] {
+                held_still[index] = (is.position, 0);
+            }
             let (strained, astray) = if gesture_cooling > 0 {
                 (
                     limits.load[index].max(GESTURE_LOAD),
@@ -8507,6 +8762,14 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // renews; 06c1's head pushed at 300 from its rest of 130
                 // reads its weight again.
                 let still = is.position.abs_diff(held_from[index]) <= HAND_MOVED;
+                held_still[index] = match held_still[index] {
+                    (at, steps) if at.abs_diff(is.position) <= HAND_MOVED => {
+                        (at, steps.saturating_add(1))
+                    }
+                    _ => (is.position, 0),
+                };
+                // Held still this long: not renewed, so it is let go.
+                let worn = held_still[index].1 >= HAND_STILL_STEPS;
                 let bound = if still && !(over_full[index] && pressing) {
                     strained
                 } else {
@@ -8516,10 +8779,12 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 // quiet read among them (a servo whose goal is where it is
                 // reads little) is not the hand gone, and a joint sent home
                 // with the hand still on it pushes into it and jerks.
-                if is.load > bound || is.position.abs_diff(written[index]) > HAND_MOVED {
+                if !worn && (is.load > bound || is.position.abs_diff(written[index]) > HAND_MOVED) {
                     easing[index] = easing[index].max(HAND_STEPS);
                 }
-                if let Some(moved) = in_hand_after(
+                if worn {
+                    in_hand[index] = 0;
+                } else if let Some(moved) = in_hand_after(
                     &mut in_hand[index],
                     is,
                     bound,

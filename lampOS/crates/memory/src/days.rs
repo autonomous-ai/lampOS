@@ -62,7 +62,7 @@ pub const TALK_NOTES_MOST: usize = 4;
 pub const TALK_NOTES_BYTES: usize = 12_800;
 /// A talk note as `talk_notes` gives it: its id, its day and its text.
 pub type TalkNote = (u64, String, String);
-const DAY_MS: u64 = 86_400_000;
+pub(crate) const DAY_MS: u64 = 86_400_000;
 /// Times a kept thing was said again (#4753) waiting for the line that said
 /// them, at most this many ([`Days::said_pending`]).
 const SAID_PENDING: usize = 64;
@@ -204,6 +204,19 @@ pub struct Days {
     /// are kept as observations inside each exchange's write
     /// ([`crate::taste_rules`]). Off unless [`Self::enable_taste_rules`].
     taste_rules: bool,
+    /// Each forget about a thing of a person's service records
+    /// ([`crate::service_records`]): whose, its subjects and when, so a
+    /// record asked before it that matches it is refused. Never on disk,
+    /// since it names what was forgotten; the voice drops its waiting
+    /// changes before it sends the forget, so only one already in flight
+    /// can come after it. The oldest goes past
+    /// [`crate::service_records::FORGOT_ABOUT_HELD`].
+    pub(crate) records_forgot_about: std::collections::VecDeque<(String, Vec<Vec<String>>, u64)>,
+    /// Each forget about a mail contact
+    /// ([`crate::service_contacts`]): whose, the addresses it removed and
+    /// when, so a record asked before it that was sent to one of them is
+    /// refused. Never on disk, held as [`Self::records_forgot_about`] is.
+    pub(crate) records_forgot_addresses: std::collections::VecDeque<(String, Vec<String>, u64)>,
     _held: File,
 }
 
@@ -273,6 +286,8 @@ impl Days {
             now,
             set_aside,
             said_pending: std::collections::VecDeque::new(),
+            records_forgot_about: std::collections::VecDeque::new(),
+            records_forgot_addresses: std::collections::VecDeque::new(),
             taste_rules: false,
             _held: held,
         };
@@ -448,11 +463,12 @@ impl Days {
         let tx = self.db.transaction()?;
         keep_origins(&tx)?;
         tx.execute("DELETE FROM doomed", [])?;
-        tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling') AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
+        tx.execute("INSERT INTO doomed SELECT rid FROM entries WHERE (kind='exchange' AND day<?1) OR (kind='observation' AND coalesce(category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling','chapter') AND used_unix_ms<?2 AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=entries.rid AND d.day>=?3))",params![day,unused,event])?;
         // Nightly pass B's items close on their own end days, and an
         // episode, feeling or pattern after 90 unused days, never with
         // their source exchanges (`nightly::expire`).
         crate::nightly::expire(&tx, &today, &day, self.now)?;
+        crate::chapters::expire(&tx, self.now)?;
         descendants(&tx, Some(&event))?;
         let count = erase(&tx)?;
         tx.execute(
@@ -790,9 +806,12 @@ impl Days {
     /// Whether a correction of `old` in `text` would only say it again: `old`
     /// is a kept thing of this person's, active, not newer than `at`, that
     /// `shown` holds (each as [`Self::remember_replacing_on_by`] checks), and
-    /// its words are `text`'s (the same as `once` compares them,
-    /// [`same_text`]). Anything else is `false`, and the correction goes on
-    /// to be checked, and refused or kept, as before.
+    /// its words are `text`'s, the same as `once` compares them
+    /// ([`once_text`]: C81 on lamp-06c1, stock 11091, 10 Nov, "They said: my
+    /// gym locker code is 441." kept as heard, then "Gym locker code is 441."
+    /// replaced it as a new id and no time it was said again was kept).
+    /// Anything else is `false`, and the correction goes on to be checked,
+    /// and refused or kept, as before.
     pub fn restates(
         &self,
         person: &Person,
@@ -812,7 +831,7 @@ impl Days {
             && record.active
             && record.at_unix_ms <= at
             && !text.is_empty()
-            && same_text(&record.text) == same_text(&text))
+            && once_text(person, &record.text) == once_text(person, &text))
     }
 
     /// A remember's `from`, the person's own exchanges, and its text tidied.
@@ -854,25 +873,16 @@ impl Days {
     }
 
     /// The id of this person's active kept thing with `text`, the same by
-    /// [`same_text`], and in a person's own scope by [`own_text`] too.
+    /// [`once_text`].
     fn kept_already(&self, person: &Person, text: &str) -> Result<Option<u64>> {
-        let own = person.as_str() != Person::EVERYONE;
-        let fold = |text: &str| {
-            let same = same_text(text);
-            if own {
-                own_text(&same).to_owned()
-            } else {
-                same
-            }
-        };
-        let wanted = fold(text);
+        let wanted = once_text(person, text);
         let mut statement = self.db.prepare(
             "SELECT id,text FROM entries WHERE person=? AND kind='kept' AND active=1 ORDER BY id",
         )?;
         let mut rows = statement.query([person.as_str()])?;
         while let Some(row) = rows.next()? {
             let kept: String = row.get(1)?;
-            if fold(&kept) == wanted {
+            if once_text(person, &kept) == wanted {
                 return Ok(Some(row.get(0)?));
             }
         }
@@ -1324,6 +1334,57 @@ impl Days {
         Ok(count)
     }
 
+    /// A known person's own exchanges (what they said and the lamp said,
+    /// never kept) with every key word of any of `about` (a forget about a
+    /// thing's subjects, as `service_records_forget` matches them: lower
+    /// case, without accents, a plural its singular), each forgotten as
+    /// `forget {id}` of an exchange forgets it: what derives from it goes
+    /// too (its talk notes), never a kept thing (#3113). A forget about a
+    /// thing matched kept things and observations only, so recall still
+    /// found the talk about it (lamp-06c1, 11 Nov: "forget the recheck
+    /// party", then "what happened with the recheck party?"). The room's
+    /// exchanges are everyone's in the house: never reached here. Marked
+    /// for the night first, found or not ([`Self::forget_mark`]). How many
+    /// exchanges went.
+    pub fn exchanges_forget(&mut self, person: &Person, about: &[Vec<String>]) -> Result<u64> {
+        crate::service_records::owner_only(person)?;
+        let subjects = crate::service_records::subjects_of(about);
+        if subjects.is_empty() {
+            return Ok(0);
+        }
+        self.forget_mark(person)?;
+        let matching: Vec<u64> = {
+            let mut statement = self.db.prepare(
+                "SELECT id,heard,said FROM entries WHERE person=?1 AND kind='exchange' ORDER BY id",
+            )?;
+            statement
+                .query_map([person.as_str()], |r| {
+                    Ok((
+                        r.get::<_, u64>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, String>(2)?,
+                    ))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+                .into_iter()
+                .filter(|(_, heard, said)| {
+                    crate::service_records::about_any(&subjects, &format!("{heard} {said}"))
+                })
+                .map(|(id, _, _)| id)
+                .collect()
+        };
+        let mut removed = 0;
+        for id in matching {
+            if self.forget_here(person, id, false)? > 0 {
+                removed += 1;
+            }
+        }
+        if removed > 0 {
+            self.forget_set_aside()?;
+        }
+        Ok(removed)
+    }
+
     fn forget_here(&mut self, person: &Person, id: u64, selective: bool) -> Result<u64> {
         let Some(record) = self.record(person, id)? else {
             return Ok(0);
@@ -1456,6 +1517,7 @@ impl Days {
     pub fn forget_all(&mut self, person: Option<&Person>) -> Result<u64> {
         let tx = self.db.transaction()?;
         let count = empty(&tx, person)?;
+        crate::service_records::mark_forgot(&tx, person, self.now)?;
         tx.commit()?;
         self.forget_set_aside()?;
         Ok(count)
@@ -1478,6 +1540,7 @@ impl Days {
         let removed = empty(&tx, Some(person))?;
         let ruled = empty(&tx, Some(&rules))?;
         tx.execute("DELETE FROM speakers WHERE speaker=?1", [person.as_str()])?;
+        crate::service_records::mark_forgot(&tx, Some(person), self.now)?;
         tx.commit()?;
         self.forget_set_aside()?;
         Ok((removed, ruled))
@@ -1529,34 +1592,42 @@ impl Days {
             .collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
-    /// The role `person` asked the lamp to play (the voice's
-    /// `LAMP_MEMORY_ROLE`): the name it answers to with them, kept until they
-    /// end it ([`Self::role_end`]) or forget everything. A known person's
-    /// alone (`p-` ids): the room, a rules scope or a guest has none. One a
-    /// person: a new one replaces theirs. At most [`ROLE_BYTES`], tidied.
-    pub fn role_set(&mut self, person: &Person, name: &str) -> Result<()> {
+    /// A role write belongs to the exact session that admitted it. Check
+    /// under the write transaction, so a forget cannot slip between the
+    /// check and the mutation. Missing and invalidated sessions fail closed.
+    pub fn role_set_session(
+        &mut self,
+        person: &Person,
+        session: &str,
+        generation: u64,
+        name: &str,
+    ) -> Result<()> {
         known_only(person)?;
+        identifier(session)?;
         let name = store::tidy(name, ROLE_BYTES);
         if !name.chars().any(char::is_alphanumeric) {
             return Err(Error::new("empty", "there is no name for the role"));
         }
         let tx = self.db.transaction()?;
-        ensure_person(&tx, person)?;
-        tx.execute(
-            "INSERT INTO roles(person,name,at_unix_ms) VALUES(?1,?2,?3) ON CONFLICT(person) DO UPDATE SET name=excluded.name,at_unix_ms=excluded.at_unix_ms",
-            params![person.as_str(), name, self.now],
-        )?;
+        role_session(&tx, person, session, generation)?;
+        tx.execute("INSERT INTO roles(person,name,at_unix_ms) VALUES(?1,?2,?3) ON CONFLICT(person) DO UPDATE SET name=excluded.name,at_unix_ms=excluded.at_unix_ms", params![person.as_str(), name, self.now])?;
         tx.commit()?;
         Ok(())
     }
 
-    /// `person`'s role ended: whether they had one.
-    pub fn role_end(&mut self, person: &Person) -> Result<bool> {
+    pub fn role_end_session(
+        &mut self,
+        person: &Person,
+        session: &str,
+        generation: u64,
+    ) -> Result<bool> {
         known_only(person)?;
-        Ok(self
-            .db
-            .execute("DELETE FROM roles WHERE person=?1", [person.as_str()])?
-            > 0)
+        identifier(session)?;
+        let tx = self.db.transaction()?;
+        role_session(&tx, person, session, generation)?;
+        let ended = tx.execute("DELETE FROM roles WHERE person=?1", [person.as_str()])? > 0;
+        tx.commit()?;
+        Ok(ended)
     }
 
     /// `person`'s role, if they set one and have not ended it.
@@ -1637,7 +1708,7 @@ impl Days {
         if text.len() > cap {
             text.clear();
         }
-        let candidates:Vec<u64>=self.db.prepare("SELECT id FROM entries WHERE person=? AND active=1 AND kind IN ('kept','observation') AND coalesce(category,'') NOT IN ('episode','fact','pattern','ahead','feeling') ORDER BY CASE category WHEN 'promise' THEN 0 WHEN 'thread' THEN 1 ELSE 2 END,at_unix_ms DESC,id DESC LIMIT 256")?.query_map([person.as_str()],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?;
+        let candidates:Vec<u64>=self.db.prepare("SELECT id FROM entries WHERE person=? AND active=1 AND kind IN ('kept','observation') AND coalesce(category,'') NOT IN ('episode','fact','pattern','ahead','feeling','chapter') ORDER BY CASE category WHEN 'promise' THEN 0 WHEN 'thread' THEN 1 ELSE 2 END,at_unix_ms DESC,id DESC LIMIT 256")?.query_map([person.as_str()],|r|r.get(0))?.collect::<rusqlite::Result<_>>()?;
         // The day a fact is about, apart from when it was said (#3987): a
         // session opened after a restart told only "dentist on Friday" took
         // it against the new day. Older voices ignore the field.
@@ -2805,11 +2876,76 @@ pub(crate) fn same_text(text: &str) -> String {
 /// there (C81, stock 10538 on lamp-06c1, 6 Nov: "The gym locker code is
 /// 441." kept, "My gym locker code is 441." said again and kept twice). In
 /// the room's, "my" is whoever said it, so it is never folded.
+/// A line the voice kept as heard leads with "They said: " (its
+/// `remember::heard::SAID`), which is folded first: "They said: my gym
+/// locker code is 441." is "Gym locker code is 441." (C81, stock 11091 on
+/// lamp-06c1, 10 Nov).
 fn own_text(same: &str) -> &str {
+    let same = same.strip_prefix("they said: ").unwrap_or(same);
     ["my ", "the "]
         .iter()
         .find_map(|lead| same.strip_prefix(lead))
         .unwrap_or(same)
+}
+
+/// The words `once` compares in `person`'s scope: [`same_text`], in a
+/// person's own scope [`own_text`] too, and in either [`digit_text`].
+fn once_text(person: &Person, text: &str) -> String {
+    let same = same_text(text);
+    if person.as_str() != Person::EVERYONE {
+        digit_text(own_text(&same))
+    } else {
+        digit_text(&same)
+    }
+}
+
+/// The digit a whole word names, "zero" to "nine" or the digit itself, and
+/// with a comma after it ("four, four, one").
+fn single_digit(word: &str) -> Option<char> {
+    let word = word.strip_suffix(',').unwrap_or(word);
+    const WORDS: [&str; 10] = [
+        "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+    ];
+    if let Some(n) = WORDS.iter().position(|w| *w == word) {
+        return char::from_digit(n as u32, 10);
+    }
+    let mut chars = word.chars();
+    match (chars.next(), chars.next()) {
+        (Some(c), None) if c.is_ascii_digit() => Some(c),
+        _ => None,
+    }
+}
+
+/// [`same_text`]'s words with each whole number word from "zero" to "nine"
+/// a digit, and each run of single digits one number: "four four one" and
+/// "4 4 1" are "441" (C81 on lamp-06c1, stock 12226, 12 Nov: "They said:
+/// my gym locker code is four four one." kept as heard and "My gym locker
+/// code is 441." kept again as a new id, never marked said again). Only
+/// whole words are read, so "someone", "often" or "tone" stay as they are,
+/// and "oh" is never a zero. For comparing alone: the kept text is never
+/// changed.
+fn digit_text(same: &str) -> String {
+    let mut out = String::with_capacity(same.len());
+    let mut in_digits = false;
+    for word in same.split(' ') {
+        match single_digit(word) {
+            Some(digit) => {
+                if !in_digits && !out.is_empty() {
+                    out.push(' ');
+                }
+                out.push(digit);
+                in_digits = true;
+            }
+            None => {
+                if !out.is_empty() {
+                    out.push(' ');
+                }
+                out.push_str(word);
+                in_digits = false;
+            }
+        }
+    }
+    out
 }
 
 fn is_punctuation(c: char) -> bool {
@@ -3185,7 +3321,8 @@ fn versions(db: &Connection) -> Result<()> {
 
 /// What goes with a targeted `selective` forget of a kept thing or an
 /// observation (the doomed rows: it and its versions), by each version's
-/// distinctive words ([`search::content_words`]):
+/// distinctive words ([`search::content_words`]), without the
+/// observation writer's opening verbs for the linked walk ([`OPENERS`]):
 /// - reached from them through old source links, through rows that stay as
 ///   well as rows that go, every exchange or observation, of any scope,
 ///   that carries one word of any version;
@@ -3240,6 +3377,29 @@ enum Read {
 /// only ones [`search::splits_unlike_index`] can be true of.
 const NOT_ASCII: &str = "*[^\u{1}-\u{7f}]*";
 
+/// The verbs the observation writer opens an observation with, which say
+/// nothing of what it is about: the generic verbs of [`tidy::about_words`]
+/// ("Likes …", "Prefers …", "Wants …", "Enjoys …") and the "Asked …" of
+/// [`tidy::only_asked`] ("Asked the lamp to remind them …"), with "ask",
+/// "asks" and "wanted". In [`search::content_words`]' form when used. Only
+/// [`selective_rows`]' linked walk leaves them out; search keeps them.
+const OPENERS: &[&str] = &[
+    "want",
+    "wants",
+    "wanted",
+    "ask",
+    "asks",
+    "asked",
+    "like",
+    "likes",
+    "liked",
+    "prefer",
+    "prefers",
+    "preferred",
+    "enjoy",
+    "enjoys",
+];
+
 /// [`selective_descendants`] for the doomed rows' `texts`, reading what
 /// `read` says: how many rows it checked word by word.
 fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read) -> Result<u64> {
@@ -3259,7 +3419,18 @@ fn selective_rows(db: &Connection, person: &Person, texts: &[String], read: Read
         .map(|text| literal(text))
         .filter(|text| !text.is_empty())
         .collect();
-    let any: BTreeSet<String> = own.iter().flatten().cloned().collect();
+    // The linked walk's words leave out the observation writer's opening
+    // verbs ([`OPENERS`]): "Wants the light a little warmer." took every
+    // linked "Wants …" observation (C136). A fact of nothing but them keeps
+    // them, so the walk is never wider than before. Copies still need every
+    // word of a version, openers included.
+    let all: BTreeSet<String> = own.iter().flatten().cloned().collect();
+    let openers: BTreeSet<String> = OPENERS
+        .iter()
+        .flat_map(|word| search::content_words(word))
+        .collect();
+    let distinct: BTreeSet<String> = all.difference(&openers).cloned().collect();
+    let any = if distinct.is_empty() { all } else { distinct };
     let doom = |rid: i64| db.execute("INSERT OR IGNORE INTO doomed VALUES (?1)", [rid]);
     // Read when the index found it (`hit`), or its words may be held
     // otherwise; every row read, with `Read::Every`.
@@ -3391,7 +3562,7 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
         // expired exchange goes by the foreign key (#2176). So does an
         // observation whose event day is on or after `event`: it is kept to
         // its follow-up window. A forget, below, still follows those links.
-        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' AND coalesce(e.category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling') AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=s.child AND d.day>=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[event])?;
+        db.execute("WITH RECURSIVE chain(rid) AS (SELECT rid FROM doomed UNION SELECT s.child FROM sources s JOIN chain c ON s.parent=c.rid JOIN entries e ON e.rid=s.child WHERE e.kind!='kept' AND coalesce(e.category,'') NOT IN ('talk','episode','fact','profile','pattern','ahead','feeling','chapter') AND NOT EXISTS (SELECT 1 FROM event_days d WHERE d.rid=s.child AND d.day>=?1)) INSERT OR IGNORE INTO doomed SELECT rid FROM chain",[event])?;
     } else {
         // A forget: a kept thing goes only when it is named (the doomed rows
         // this walk starts from, with their versions), never because it
@@ -3403,6 +3574,22 @@ fn descendants(db: &Connection, expiry: Option<&str>) -> Result<()> {
     }
     Ok(())
 }
+/// Indexed session/person lookup; it never creates a person or a session.
+fn role_session(tx: &Transaction<'_>, person: &Person, session: &str, expected: u64) -> Result<()> {
+    let valid: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sessions s JOIN people p ON p.person=s.person WHERE s.person=?1 AND s.session=?2 AND s.invalidated=0 AND s.generation=?3 AND p.generation=?3)",
+        params![person.as_str(), session, expected], |row| row.get(0),
+    )?;
+    if valid {
+        Ok(())
+    } else {
+        Err(Error::new(
+            "stale_session",
+            "the role's session is no longer current",
+        ))
+    }
+}
+
 /// Every entry of `person`, or of every person for `None`, erased in the
 /// caller's transaction, with their session notes, jobs and skipped count.
 fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
@@ -3424,6 +3611,12 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         room_from_citing(tx, person)?;
         talk_with_doomed(tx)?;
     }
+    // erase advances people with doomed entries. Advance empty people too:
+    // closing/reopening the same session name cannot revive a pre-forget token.
+    tx.execute(
+        "UPDATE people SET generation=generation+1 WHERE (?1 IS NULL OR person=?1) AND NOT EXISTS(SELECT 1 FROM entries e JOIN doomed d ON d.rid=e.rid WHERE e.person=people.person)",
+        [person.map(Person::as_str)],
+    )?;
     let count = erase(tx)?;
     // Empty people also have job and snapshot metadata, but keep the high
     // water mark so a stale external reference can never name a new entry.
@@ -3436,11 +3629,18 @@ fn empty(tx: &Transaction<'_>, person: Option<&Person>) -> Result<u64> {
         [person.map(Person::as_str)],
     )?;
     crate::nightly::empty(tx, person)?;
+    crate::chapters::empty(tx, person)?;
     // A role they asked the lamp to play goes with everything else of theirs.
     tx.execute(
         "DELETE FROM roles WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],
     )?;
+    // Their service records too (the voice's `LAMP_SERVICE_RECORDS`),
+    // counted, so a forget of someone who kept only records still says it
+    // removed something.
+    let count = count + crate::service_records::empty(tx, person)?;
+    // And their mail contacts (the voice's `LAMP_SERVICE_CONTACTS`).
+    let count = count + crate::service_contacts::empty(tx, person)?;
     tx.execute(
         "UPDATE people SET skipped=0 WHERE ?1 IS NULL OR person=?1",
         [person.map(Person::as_str)],
@@ -3741,6 +3941,74 @@ mod tests {
         fs::remove_dir_all(dir).unwrap();
     }
 
+    /// C81: number words and digits are the same words to `once`, word by
+    /// word: a run of single digits is one number, other words keep theirs.
+    #[test]
+    fn once_text_reads_number_words_as_digits() {
+        let olivia = Person::new("p-b2471d941bf88836").unwrap();
+        let everyone = Person::everyone();
+        for person in [&olivia, &everyone] {
+            let same = |a: &str, b: &str| once_text(person, a) == once_text(person, b);
+            assert!(same(
+                "gym locker code is four four one",
+                "gym locker code is 441"
+            ));
+            assert!(same("gym locker code is 4 4 1.", "Gym locker code is 441"));
+            assert!(same("code is four, four, one", "code is 441"));
+            assert!(!same(
+                "gym locker code is four four one",
+                "gym locker code is 442"
+            ));
+            assert!(!same("code is four forty one", "code is 441"));
+            assert!(same("One more thing", "1 more thing"));
+            assert!(!same("one more thing", "more thing"));
+            assert!(!same("one more thing", "two more things"));
+        }
+        assert_eq!(
+            once_text(&olivia, "Someone often hums a tone, oh well"),
+            "someone often hums a tone, oh well"
+        );
+        assert_eq!(once_text(&olivia, "one more thing"), "1 more thing");
+        assert_eq!(
+            once_text(&olivia, "Room 12 is on floor 3 4"),
+            "room 12 is on floor 34"
+        );
+    }
+
+    /// C81 on stock 12226 (lamp-06c1, 12 Nov, run-1447 req 34/37): "They
+    /// said: my gym locker code is four four one." kept as heard, then "My
+    /// gym locker code is 441." kept again as a second id. `once` finds it
+    /// now, and a correction in those words restates it; 442 is another.
+    #[test]
+    fn a_remember_once_finds_number_words_said_as_digits() {
+        let dir = std::env::temp_dir().join(format!("lamp-days-once-num-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let now = 1_791_892_800_000;
+        let options = Options {
+            dir: dir.clone(),
+            keep_days: 30,
+            local: LocalTime::Offset(0),
+        };
+        let mut store = Days::open(options, now).unwrap();
+        let olivia = Person::new("p-b2471d941bf88836").unwrap();
+        let heard = "They said: my gym locker code is four four one.";
+        let (gym, existing) = store
+            .remember_once_from(&olivia, now, heard, &[], true)
+            .unwrap();
+        assert!(!existing);
+        let again = store.remember_once_from(&olivia, now, "My gym locker code is 441.", &[], true);
+        assert_eq!(again.unwrap(), (gym, true), "the same kept thing");
+        let restated = store.restates(&olivia, now, "Gym locker code is 441.", gym, &[gym]);
+        assert!(restated.unwrap(), "a correction in its words says it again");
+        let other = store
+            .remember_once_from(&olivia, now, "My gym locker code is 442.", &[], true)
+            .unwrap();
+        assert!(!other.1, "another number is another thing");
+        assert_eq!(store.record(&olivia, gym).unwrap().unwrap().text, heard);
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     /// #2176: a remember `once` that finds the kept thing links the new
     /// conversation's exchanges to it, so forgetting it removes both.
     #[test]
@@ -4025,6 +4293,111 @@ mod tests {
         for id in [longer, among, unrelated] {
             assert!(store.record(&person, id).unwrap().is_some(), "{id}");
         }
+        drop(store);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// C136 (lamp-06c1, 12 Nov): forgetting "Wants the light a little
+    /// warmer." took five calendar asks and a story line linked to it,
+    /// each only sharing the observation writer's opening "Wants". An
+    /// opening verb is no word of the fact: the linked rows with the fact's
+    /// own words, and its copies, still go.
+    #[test]
+    fn a_forget_takes_no_linked_observation_on_an_opening_verb_alone() {
+        let (dir, mut store, person, now) = scratch("selective-openers");
+        fn observe(store: &Days, person: &Person, at: u64, text: &str, sources: &[u64]) -> u64 {
+            ensure_person(&store.db, person).unwrap();
+            let id = next_id(&store.db, person).unwrap();
+            insert_record(
+                &store.db,
+                &Record {
+                    id,
+                    person: person.as_str().into(),
+                    kind: "observation".into(),
+                    at_unix_ms: at,
+                    heard: String::new(),
+                    said: String::new(),
+                    text: text.into(),
+                    category: Some(tidy::Category::Thread),
+                    source_ids: sources.to_vec(),
+                    supersedes: None,
+                    active: true,
+                },
+                &store.local,
+                store.now,
+            )
+            .unwrap();
+            id
+        }
+        let light = observe(
+            &store,
+            &person,
+            now,
+            "Wants the light a little warmer.",
+            &[],
+        );
+        let shown = store
+            .append(&person, now + 1, "Add an event at 10PM", "Done", &[light])
+            .unwrap();
+        let event = observe(
+            &store,
+            &person,
+            now + 2,
+            "Wants an event 'x' at 10PM.",
+            &[shown],
+        );
+        let story = observe(
+            &store,
+            &person,
+            now + 3,
+            "Wants a long story at bedtime.",
+            &[shown],
+        );
+        let asked = observe(
+            &store,
+            &person,
+            now + 4,
+            "Asked the lamp to remind them at 9PM.",
+            &[shown],
+        );
+        let linked = observe(
+            &store,
+            &person,
+            now + 5,
+            "Likes the light dim at night.",
+            &[shown],
+        );
+        let copy = observe(
+            &store,
+            &person,
+            now + 6,
+            "Wants the light a little warmer.",
+            &[],
+        );
+        store.forget(&person, light).unwrap();
+        for id in [light, linked, copy] {
+            assert!(store.record(&person, id).unwrap().is_none(), "{id}");
+        }
+        for id in [shown, event, story, asked] {
+            assert!(store.record(&person, id).unwrap().is_some(), "{id}");
+        }
+
+        // A fact of nothing but an opening verb keeps the walk on it, as
+        // before: no wider.
+        let bare = store
+            .append(&person, now + 7, "I want it", "Sure", &[])
+            .unwrap();
+        let wants = store.remember(&person, now + 8, "Wants it").unwrap();
+        let after = store
+            .append(&person, now + 9, "Do you still want it?", "Yes", &[wants])
+            .unwrap();
+        let other = store
+            .append(&person, now + 10, "Is it late?", "A little", &[wants])
+            .unwrap();
+        store.forget(&person, wants).unwrap();
+        assert!(store.record(&person, after).unwrap().is_none());
+        assert!(store.record(&person, other).unwrap().is_some());
+        assert!(store.record(&person, bare).unwrap().is_none());
         drop(store);
         fs::remove_dir_all(dir).unwrap();
     }

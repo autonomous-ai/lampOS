@@ -14,12 +14,28 @@ protocol underneath:
 | you write | use | install |
 |---|---|---|
 | Python | `lampos` | `pip install "git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/python"` |
-| JavaScript (Node 20.11+) | `lampos` | clone the repo, then `npm install ./lampOS/sdk/js` |
+| JavaScript (Node 20.11+) | `lampos` | `git clone --branch lamp-voice https://github.com/autonomous-ai/lampOS.git`, then in your project `npm install --install-links <the clone>/lampOS/sdk/js` (a copy, so Node finds its `ws`) |
 | an AI agent's tools | `lamp-mcp` | both in one command: `pip install "lampos @ git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/python" "lamp-mcp @ git+https://github.com/autonomous-ai/lampOS@lamp-voice#subdirectory=lampOS/sdk/mcp"`, then `claude mcp add lamp -- lamp-mcp` (or any MCP client) |
 
-The packages aren't on PyPI or npm yet; install from the repository as above.
+The packages aren't on PyPI or npm yet (`pip install lampos` and
+`npm install lampos` fail); install from the repository as above.
 `lamp-mcp` needs `lampos` in the same `pip` command, or pip looks for it on
 PyPI and fails.
+
+**An MCP client usually starts `lamp-mcp` without your shell's environment**, so
+`LAMPOS_HOME` is lost, the pairing isn't found, and the client shows only
+"Connection closed". Give the folder `lamp pair` used: `--home PATH` in the
+client's config (`claude mcp add lamp -- lamp-mcp --home ~/.config/lampos`), or
+`python -m lamp_mcp` from the venv's python when the client can't find `lamp-mcp`
+on its PATH. An unpaired start says in one stderr line which folder it looked in.
+
+**On a customer lamp (stable 11450)** five things are missing: `play` and a
+look at a face or name, a motion's end (`wait=True` returns when the lamp takes
+it), limp and pose, mDNS (pair with `--host`), and local event times (`at` is
+UTC). Skill push, `joints` for `roll`, `shoulder` and `elbow` (while the lamp
+stands) and a head tap as a `touch` event are in 11450. Read
+[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-stable-11450)
+before promising any of them.
 
 ## Start without a lamp
 
@@ -31,8 +47,10 @@ lamp fake --everything     # a fake lamp, paired with this computer; leave it ru
 python my_program.py       # in another terminal, same LAMPOS_HOME
 ```
 
-`--everything` answers every op; without it the fake refuses what real lamps
-don't route yet, as they do. In tests, use `lampos.testing.FakeLamp` (JS:
+`--everything` answers every op; without it the fake answers as a customer
+lamp does: `look` and `joints` at yaw and pitch taken, `play` and `joints`
+at roll, shoulder or elbow refused in lamp-control's words. It takes a skill
+push, which a customer lamp refuses. In tests, use `lampos.testing.FakeLamp` (JS:
 `FakeLamp` from `lampos/testing`): see [references/testing.md](references/testing.md).
 
 ## Pair with a real lamp
@@ -51,7 +69,9 @@ owner for the grants your program needs, by what it does:
 | hears music, laughter, the door, footsteps | `sound` |
 | puts skills of its own on the lamp | `skills` |
 | reads the room's air, the lamp's own computer | `air`, `device` |
-| sees pictures, hears audio (arriving) | `camera`, `microphone` |
+| sees pictures | `camera` |
+| hears the room's sound (20 ms blocks of samples) | `microphone` |
+| plays sound of its own through the speaker | `speaker` |
 
 **A grant added later needs a new pairing code:** the owner can't widen a pairing. Then, on the computer:
 
@@ -94,7 +114,9 @@ elsewhere:
 - **Grants:** the owner ticks what this computer may do: `body` (move),
   `light`, `speak`, `look` (presence, hands, face/hand targets), `hear`
   (phrases, the name), `sound` (sound classes), `skills` (push skills),
-  `air` (the air sensor), `device` (the lamp's own computer).
+  `air` (the air sensor), `device` (the lamp's own computer), `camera`
+  (pictures), `microphone` (the room's sound), `speaker` (sound of
+  its own, through the lamp's speaker).
   A call without its grant is refused `no_grant`. Grants are read at hello.
 - **Leases:** moving the body (`look`, `move`, `play`, `joints`) needs a
   `body` lease. Hold one with `async with lamp.lease("body"):` (JS
@@ -117,9 +139,10 @@ elsewhere:
 - **A new motion cuts the one playing short:** a gesture, move or
   feeling's move asked while another plays replaces it, eased out from where
   the body is. While the person is using the lamp, the body drops the new
-  one ("the person is using the lamp").
-- **Quiet hours:** a lamp setting (`limits.quiet_hours`, by default 22:00 to
-  07:00, or `off`). `say` and `sound` are refused `quiet_hours` then; the
+  one ("the person is using the lamp"). Stable 10824 and older refused it
+  `busy` with `retry_ms` instead: wait and ask again.
+- **Quiet hours:** a lamp setting (`limits.quiet_hours`, `off` by default,
+  or a `{from, to}` window the lamp sets). `say` and `sound` are refused `quiet_hours` then; the
   light still works.
 - **Be a living thing, not a machine:** react to something that happened, let
   a move finish, don't loop gestures. A lamp switching feelings every 3 s
@@ -161,12 +184,29 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
   body's joints, bounds and caps with `lamp.body_info()` (JS
   `lamp.bodyInfo()`, the `body` grant).
 - What each carries, and its grant: [references/api.md](references/api.md#events-and-state).
-- Never readable, by any grant: pictures, audio, transcripts, face prints,
-  names. A hand's or face's place is a share of the picture.
+- Never readable, by any grant but `camera` and `microphone`: pictures,
+  audio. By any grant: transcripts, face prints, names. A hand's or face's
+  place is a share of the picture.
 - **The camera** (the `camera` grant): a snapshot, or a stream of
   frames; never while private, never off the lamp's own network:
-  [references/camera.md](references/camera.md). The microphone and `body.state`
-  come next; this skill gains them as they land.
+  [references/camera.md](references/camera.md).
+- **The microphone** (the `microphone` grant): Python
+  `await lamp.microphone_stream(True)`, JS `lamp.microphoneStream(true)`,
+  sends `microphone.audio` events, each a 20 ms block (16 kHz mono S16LE,
+  640 bytes in `data`), until `microphone_stream(False)` /
+  `microphoneStream(false)`, `stop`, or `microphone.ended`; off unless the
+  owner switched it on, never while private or with someone else in view,
+  never off the lamp's own network:
+  [references/api.md](references/api.md#the-microphone).
+- **The speaker** (the `speaker` grant, never ticked for you): Python
+  `async with lamp.speaker_stream() as out: await out.speaker_write(pcm)`
+  (plain call `speaker_stream_request`), JS `lamp.speakerStream()` with
+  `speakerWrite`, the command `lamp speaker FILE.wav` and the MCP tool
+  `lamp_play_audio` play sound of your own through the lamp's speaker
+  (mono S16LE, 16000 or 24000 Hz); off unless the owner switched it on,
+  never while private or muted, never off the lamp's own network:
+  [references/api.md](references/api.md#the-speaker). `body.state` and
+  routed `joints` come next; this skill gains them as they land.
 
 ## Patterns
 
@@ -178,8 +218,8 @@ that runs for days, and a web app on the SDK:
 ## Gotchas we hit
 
 Read [references/gotchas.md](references/gotchas.md) before your first real
-run: breathe and pulse levels, one pulse a minute, `busy` while a motion
-plays, the light's `shows`, the restart mute.
+run: what a customer lamp lacks today, breathe and pulse levels, one pulse a
+minute, `busy` while a motion plays, the light's `shows`, the restart mute.
 
 ## Debugging
 

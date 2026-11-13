@@ -5,8 +5,9 @@
 //!
 //! When the eyes say an unconfirmed face is at the lamp
 //! (`{"photo_here":true}`), the voice tells them it is asking
-//! (`{"photo_asked":NAME}`) and asks once, as a written turn ([`note`]):
-//! "Someone added your face from a photo, as NAME. Shall I remember you?"
+//! (`{"photo_asked":NAME}`) and asks once, as a written turn ([`turn`]):
+//! "Someone added your face from a photo, as NAME. Shall I remember you?",
+//! the lamp's own words, never the model's.
 //! Their spoken answer calls [`YES`] or [`NO`], which tell the eyes
 //! (`photo_yes`, `photo_no`). No answer in that meeting is the eyes' to let
 //! go. Off unless set, and only with the eyes' request socket.
@@ -62,15 +63,41 @@ pub fn tools() -> Vec<Tool> {
     ]
 }
 
-/// What the model is told to say, once: the question in its own words,
-/// never the name used as theirs until they agree.
+/// The question, the same words for every photo added: never the name used
+/// as theirs until they agree.
+pub fn ask_line(name: &str) -> String {
+    format!("Someone added your face from a photo, as {name}. Shall I remember you?")
+}
+
+/// What the model is told to say, once: the question in its own words.
+/// Only for a lamp in another language, or a name a fixed line can't hold
+/// ([`turn`]).
 pub fn note(name: &str) -> String {
     format!(
         "Someone added the face of the person at the lamp from a photo, under the name {name}. \
-         Ask them once, gently, in your own words: \"Someone added your face from a photo, as {name}. \
-         Shall I remember you?\" If they say yes, call {YES}. If they say no, call {NO}. \
-         Don't call them {name} unless they say yes, and don't ask again."
+         Ask them once, gently, in your own words: \"{}\" \
+         If they say yes, call {YES}. If they say no, call {NO}. \
+         Don't call them {name} unless they say yes, and don't ask again.",
+        ask_line(name)
     )
+}
+
+/// The ask's written turn. In English it is the lamp's own line, said as it
+/// is and no chat asked (`onboarding::said_as_is`): a new photo is a new
+/// ask, whatever the thread holds. On lamp-52e6 (10 Nov, #5907) the model,
+/// given the thread, said "I didn't catch that. Try once more when I stop
+/// talking." in its place, and after an earlier no for the same name "I
+/// already asked, and you said no", so the yes that followed was read
+/// against that no and never called [`YES`]. In another language, or for a
+/// name with a `"`, the model says [`note`] in its words.
+// ponytail: another language is still the model's wording; a fixed line
+// per language with the name in it if that run fails the same way.
+pub fn turn(name: &str, language: Option<crate::language::Language>) -> String {
+    language
+        .is_none()
+        .then(|| crate::onboarding::said_as_is(&ask_line(name)))
+        .flatten()
+        .unwrap_or_else(|| note(name))
 }
 
 /// The unconfirmed face at the lamp now, if the eyes say one is.
@@ -244,7 +271,9 @@ pub fn run(socket: &Path, call: &ToolCall) -> (Value, bool) {
         (YES, None) => {
             json!({"ok": true, "result": "Remembered: you'll know them now. Tell them so in a few words."})
         }
-        (NO, None) => {
+        // Only the eyes' `{"let_go":true}` is a deletion: `false` or any
+        // other answer deleted nothing, and is never said as let go.
+        (NO, None) if answer["let_go"] == true => {
             json!({"ok": true, "result": "Let go. Tell them in a few words: okay, you've let it go."})
         }
         (_, Some("not_here")) => {
@@ -321,6 +350,20 @@ mod tests {
         let names: Vec<String> = tools().into_iter().map(|tool| tool.name).collect();
         assert_eq!(names, [YES, NO]);
         assert!(is_tool(YES) && is_tool(NO) && !is_tool("remember_my_face"));
+    }
+
+    /// In English the ask is the lamp's own fixed line, never the model's;
+    /// in another language, or for a name a fixed line can't hold, the note.
+    #[test]
+    fn the_ask_turn_is_the_lamps_own_line_in_english() {
+        let english = turn("Walter", None);
+        assert_eq!(
+            crate::onboarding::own_words(&english),
+            Some("Someone added your face from a photo, as Walter. Shall I remember you?")
+        );
+        let vietnamese = turn("Walter", Some(crate::language::Language::Vietnamese));
+        assert_eq!(vietnamese, note("Walter"));
+        assert_eq!(turn("Wal\"ter", None), note("Wal\"ter"));
     }
 
     /// The face here is asked about, and the person's yes or no goes to the
@@ -587,6 +630,36 @@ mod tests {
                 .iter()
                 .all(|tool| !is_tool(&tool.name))
         );
+    }
+
+    /// A no the eyes deleted nothing for, `{"let_go":false}` or a save
+    /// that failed, is never told to the model as let go.
+    #[test]
+    fn a_no_the_eyes_did_not_delete_is_not_said_as_let_go() {
+        let _one = ONE_AT_A_TIME.lock().unwrap_or_else(|e| e.into_inner());
+        let not_deleted: fn(&Value) -> Value = |line| {
+            if line.get("photo_here").is_some() {
+                json!({"photo_here": "Kim"})
+            } else {
+                json!({"let_go": false})
+            }
+        };
+        let not_saved: fn(&Value) -> Value = |line| {
+            if line.get("photo_here").is_some() {
+                json!({"photo_here": "Kim"})
+            } else {
+                json!({"error": "storage"})
+            }
+        };
+        for (name, answer) in [("no-false", not_deleted), ("no-storage", not_saved)] {
+            let (socket, _) = eyes(name, answer);
+            let (said, answered) = run(&socket, &call(NO));
+            assert!(answered, "{name}: {said}");
+            assert!(said.get("ok").is_none(), "{name}: {said}");
+            assert!(said["error"].as_str().is_some(), "{name}: {said}");
+            assert!(!said.to_string().contains("let it go"), "{name}: {said}");
+            let _ = std::fs::remove_file(socket);
+        }
     }
 
     /// The eyes refuse a face that has gone: the model is told nothing

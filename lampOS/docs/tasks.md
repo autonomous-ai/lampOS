@@ -125,30 +125,133 @@ when it is idle as `harness reply` does (openharness#2157, the person's
 `--reply-named` (off unless set; #5535, the owner, 9 Nov) hands the work
 to a session the person names ("go into the docs session and also do
 this"), never a new one. The tasks request `prepare` takes an optional
-`session`, the session's name as the person said it, and it goes into the launch, so the
+`session`, the session as the person said it (its name, or what it worked on), and it goes into the launch, so the
 yes is to that session (`Launch::session`, absent when none was named;
 a store holding such a task is schema 5). After the yes and the machines
 preflight, `Cli::reply_named` lists that computer's sessions with `harness
 ps --machine <id> --all --json`, the ones stopped this week too, within
-the read bound. A row fits when its name or its folder's last part is
+the launch's bound (60 s), not the 10 s read bound: on lamp-c0a4 on 9 Nov
+that list of the person's Mac took 4.5 to 10 s, and two hand-overs said
+yes to twice ended `sessions_timeout` at 10 s. A row fits when its name or its folder's last part is
 the words said, compared on letters and digits only ("Docs-Update",
 "docs update"); when no row is that, a row where each word said begins
 one of the name's or folder's words, in order (three letters or more in
 all: "docs" fits "Docs-Update", "api" never fits "rapid-prototype", the
-Reviewer-lead's P2 on #5779). Words around the name ("the docs one") are
-not stripped, so the voice sends the name alone. The words are typed in with `harness reply
+Reviewer-lead's P2 on #5779). When neither fits, the session is found by
+what it worked on (the owner, 9 Nov: a person remembers the work, never a
+session's name, which for one the lamp started is `lamp-<hex>`, or its
+id): the words said, less the ones that only say which one ("the", "one",
+"session", "earlier", "that", … `NOT_THE_WORK`), against each row's
+`asks` and `about` (never its name or folder, which only the rule above
+reads, so "client api" never finds "Fix the API client"). A word said is
+held when a row's word is the same, or the same with one of the endings
+s, es, ed, ing, er or ers (`ENDINGS`: "book" for "books.py", "test" for
+"tests", never "testament" or "notebook", the Reviewer-lead's P2 on #5784
+at de9bebdb41). A word of one or two letters takes no ending, so "the US
+tax session" never finds "Update user tax settings" (`SHORTEST_STEM`,
+Reviewer-three's P2 on #5784 at 71bf964baa). A row fits only when it holds every one of those words,
+so "the payroll dashboard one" never finds a weather dashboard on
+"dashboard" alone (Reviewer-three's P2 on #5784 at 3d90e56736). So "the
+book program one" finds the session whose `about` is "I wrote books.py, a
+short command-line program for keeping a reading list". Two that fit are
+`session_ambiguous`, a live one beside a stopped one too, since the one
+meant may be the stopped one (the Reviewer-lead's P2 on #5784 at
+71bf964baa). Harness fills `asks` (the last two
+prompts) and `about` (the last recaps) only for a live session with a
+finished turn, within 3 s, for the first 40 rows, and never for a stopped
+one (openharness cli `commands.ts` 602-605, as the Harness team means
+it). So with `--close-told`, which closes a session once its done line
+is told, a follow-up by its work ("in the moon poem, add a line about
+the stars") would never find it (lamp-c0a4, 10 Nov). When no row fits by
+name, folder or work and the words name some work, the newest stopped
+rows of that machine (at most 4, `MOST_STOPPED_READ`, by `lastActive`;
+failed or offline ones are not read) are read together, one thread
+each, with `harness show --machine <id> <agent> --json` (its last turn
+only: `ask`, `answer`, `tools`, commands.ts 746-790), each within what
+was left of the launch bound less 1 s when they began (none with under
+2 s left), and their last `ask` is matched by work the same way, newest
+first. On lamp-c0a4 on 10 Nov each show took about 2.3 s, so four read
+one after another cost about 9.2 s of a 22.8 s follow-up; together they
+cost about one show.
+One that fits is that stopped session; two are `session_ambiguous`; a
+show that fails or can't be read is passed over. A live row that fits by
+its work is taken without reading the stopped ones, so a stopped one
+that also holds the words is not weighed against it. A row with no turn
+ended yet is found by its name or folder alone. A session
+the lamp started keeps the `lamp-<hex>` it was given with `--name`, which
+Harness never replaces with the agent's title. `harness route` was tried for this
+and not used: on lamp-c0a4 on 9 Nov it took 6.6–18.6 s a call and called
+"add a search feature to the reading list book program" new work. The words are typed in with `harness reply
 --machine <id> <agent> --json -- <task>`, which Harness takes for a live,
 idle session behind the person's `programs-reply` switch. Nothing is
 routed, the engine is not asked about (`--engines-ready`, a known
 refusal), and nothing is started new in any case:
 - **One live session fits and takes it:** the task's agent, `joined`, as a
-  routed one: watched, told, and never closed by the lamp.
+  routed one: watched, told, and never closed by the lamp. How the person
+  knows that session is kept on the task (`dispatch.joined`, listed): its
+  `name`, or its folder's last part when it has none, never a lamp-made
+  `lamp-<hex>` one, and its first `ask`, on one line, cut at a word to 80
+  characters. Task news says it at once, so a wrong join is heard (the
+  Reviewer-lead's P2 on #5784 at 71bf964baa). A routed join keeps none.
 - **Not sent, with why:** `session_not_found`; `session_ambiguous` (two or
-  more live ones fit; never guessed); `session_stopped` (only a stopped
-  one fits); `session_busy` (working, asking the person something, or
-  still starting); the reply's refusal (`reply_off`, `reply_not_idle`,
-  `reply_not_running`, `reply_failed`); `sessions_failed` or
-  `sessions_<code>` when the list can't be read.
+  more live ones fit, or, found by its work, a live one and a stopped one,
+  or two stopped ones by their last asks; never guessed);
+  `session_stopped` (only a stopped one fits, `LAMP_TASKS_RESUME_CLOSED`
+  off; two stopped ones by their name too); `session_busy` (working, asking the person something, or
+  still starting); `session_closed` (the reply's `NOT_RUNNING`: Harness
+  says it was closed or stopped; nothing is started on its own, the first
+  builder's ruling on #5784's follow-up; with `LAMP_TASKS_RESUME_CLOSED`
+  it is reopened first, below); the reply's other refusals
+  (`reply_off`, `reply_not_idle`, `reply_failed`); `sessions_failed` or
+  `sessions_<code>` when the list can't be read, `sessions_timeout` too
+  when it leaves the reply under 1 s of the launch bound (`REPLY_FLOOR`),
+  and `sessions_offline` when nothing fits while a computer was left out
+  as offline (below).
+- **Closed, reopened** (`LAMP_TASKS_RESUME_CLOSED=on` in lamp-tasks' own
+  unit, off unless set). It needs Harness CLI 0.5.98 or newer, the first
+  released CLI that lists `resume` in `harness --help` (openharness#3606,
+  PR #3808); the switch can be on once the lamp's pin reaches it (#5957).
+  One stopped session that fits, by its name or folder or by its last
+  ask (above), is reopened with `harness resume --machine <id> <agent>
+  --json` before any reply (Harness CLI 0.6.2 `commands.ts` 983: the same
+  id, name and folder, `hermes --resume <sessionId>` for Hermes), and a
+  reply that says `NOT_RUNNING` is followed by it once, both inside the
+  same launch bound. Then `harness reply` types the words as into an idle
+  one, which needs the person's `programs-reply` switch (else
+  `REPLY_OFF`, exit 5, `reply_off`). Before the first
+  resume of a start, lamp-tasks asks whether the installed CLI has it
+  (`harness --help` lists `resume`, or else `harness resume --help` exits
+  0) and keeps the answer for the rest of the run (a look that can't
+  finish is not kept, and says no that time); a CLI without it is one
+  journal line, `Harness <version> has no resume` (from `harness
+  --version`), and `session_closed`. Only `ok`,
+  `id`, `resumed` and `state` are read, never `effect` (its words may
+  change); an answer for another session, or with no `resumed`, is a
+  failure. `idle` is typed into with `harness reply` again; `working` is
+  waited for first (`harness wait --machine <id> <agent> --timeout <s>s
+  --json`, leaving `REPLY_FLOOR`); anything else, or still working at the
+  bound, is `session_busy`. Typed into, it is `joined`, with
+  `dispatch.joined.resumed` (`true` with its earlier conversation, `false`
+  open again in a new one), and Task news adds `joined_reopened` ("I
+  reopened that session") or `joined_fresh` (it starts fresh, without the
+  earlier conversation). `RESUME_UNCONFIRMED` (Harness could not confirm
+  it yet; a second run joins the first) is `session_resume_unconfirmed`,
+  told with `failed_closed_soon`, the closed-session line and "try again
+  in a moment"; any other end (`NOT_YOURS`, `REPLY_OFF`, `UNKNOWN_HARNESS`,
+  `AGENT_BUSY`, a timeout, an unknown code or an answer it can't read) is
+  `session_closed`. Never resumed twice in one hand-over (a second
+  `NOT_RUNNING` is `session_closed`), never started new; under 1 s left
+  before the resume or the reply is `sessions_timeout`, nothing typed.
+  Off, a closed session is `session_closed` as above, and a stopped one
+  that fits `session_stopped`, nothing typed. Tests:
+  `tests/harness.rs`
+  `with_resume_closed_a_closed_named_session_is_reopened_once_and_typed_into`,
+  `a_stopped_session_is_found_by_its_last_ask_and_reopened_with_the_switch`,
+  `words_that_name_no_work_read_no_stopped_session`,
+  `with_resume_closed_a_stopped_session_found_by_name_is_reopened`,
+  `with_resume_closed_a_resume_that_leaves_no_time_types_nothing`,
+  `with_resume_closed_an_older_harness_without_resume_is_told_closed`;
+  `task_news::tests::a_reopened_named_session_is_said_reopened_and_an_unconfirmed_one_closed`.
 - **Uncertain:** a reply that started and gave no answer, or one Harness
   took (exit 0) whose answer can't be read or names another session
   (`reply_uncertain`): the words may be there, so never sent again.
@@ -158,11 +261,230 @@ refusal), and nothing is started new in any case:
   128 bytes or hold a control character are refused (`bad_session` at
   `prepare`, `invalid_session` at launch).
 - **Tests:** `tests/harness.rs`
-  `with_reply_named_a_named_session_is_typed_into_and_never_started_new`;
-  `engine::tests::a_store_with_a_named_session_is_written_as_schema_five`.
-- **Not yet:** the voice's side (`start_agent_task`'s `session`, the
-  read-back naming the session, Task news' words for the codes above)
-  comes in a later PR; until then nothing sends `session`.
+  `with_reply_named_a_named_session_is_typed_into_and_never_started_new`,
+  `with_reply_named_a_session_is_found_by_what_it_worked_on`,
+  `with_reply_named_the_joined_session_is_kept_by_its_name_and_first_ask`,
+  `with_reply_named_a_closed_session_is_told_closed_and_nothing_new_starts`;
+  `engine::tests::a_store_with_a_named_session_is_written_as_schema_five`,
+  `engine::tests::a_joined_sessions_name_and_first_ask_are_kept_and_listed`.
+- **The voice's side** (off unless `LAMP_TASKS_REPLY_NAMED=on`, the
+  provider worker's `--tasks-reply-named`, last of the tasks flags; it
+  needs only the tasks part): `start_agent_task` takes an optional
+  `session`, described as "Only for earlier work, not new: as said, its
+  name or what it worked on ("the book program one"). A change to work
+  handed over in this talk is that work. Sent with no task, it opens it.
+  Never guessed." (the last sentence since #6274, below). It is trimmed and sent as `prepare`'s
+  `session`; blank is none, and words over 128 bytes or with a control
+  character prepare nothing and the model is told to ask which session.
+  The answer's `where`, which the read-back says, is "<who>, in the
+  session "…" on <computer>, not a new one", and its `next` is
+  `session_next`, never only "Shall I start it?": say who will do it and
+  where, as `where` says it, and ask whether to start it there, so the
+  person hears the session before their yes (the Reviewer-lead's P2 on
+  #5784 at de9bebdb41). The session is kept with the
+  task waiting for its yes. A yes in the turn that prepared it (#5169,
+  #6547 A) never starts a task for a named session, whatever the
+  read-back said: which session a line said can't be told from its words
+  ("docs" inside "the docs archive session" is not the "docs" session,
+  and Harness may hold both), so it always waits for a second yes, to the
+  read-back of `start_agent_task`'s answer, whose `where` says the session
+  as prepared (the Reviewer-lead's P2 on #5784, Reviewer-three's P2); a session of only filler words ("the
+  that") prepares nothing and the model is told to ask; with `LAMP_TASKS_CORRECT`, an ask that
+  changes only the session is a correction and replaces the one waiting. A
+  session named for Devin's cloud is refused before anything is asked of
+  the tasks part. Without the switch the parameter isn't offered, and one
+  the model sends anyway is dropped. Task news tells
+  `session_busy` (and `reply_not_idle`) with the `failed_busy` words, as a
+  busy routed pick; `session_closed` and `session_stopped` with the
+  `failed_closed` words, which have the lamp say "That session is closed.
+  Open it in the Harness app and ask me again, or I can start a new one in
+  the same project." (the first builder's ruling on #5784's follow-up);
+  the other codes above are told as a plain failure.
+  Work said yes to that joined a session is told once, at once, within
+  10 minutes of the hand-over on this boot (`<store>:<task>:joined`, beside
+  its later finish): with the `joined` words, naming the session by its
+  name, or with `joined_asked`, by what it was first asked, and that the
+  person can say if it's the wrong one. A new session, or the router's
+  pick, is not told so.
+  Tests: `agent_tasks::tests::a_named_session_is_sent_with_the_task_only_with_the_switch`,
+  `agent_tasks::tests::the_reply_named_switch_is_on_only_with_the_tasks_part_and_adds_session`,
+  `agent_tasks::tests::a_task_for_a_named_session_never_starts_on_one_yes`,
+  `agent_tasks::tests::another_session_is_a_correction_and_devins_cloud_takes_none`,
+  `task_news::tests::a_busy_named_session_is_told_as_busy_and_its_other_ends_as_a_failure`,
+  `task_news::tests::a_closed_named_session_is_told_how_to_open_it_again`,
+  `task_news::tests::work_that_joined_an_earlier_session_names_that_session_once`.
+- **A name said nearly right** (#6274): for a look only (below), never
+  the hand-over that types into a session, and only when no machine has a
+  session that fits by name, folder or work, a speech-to-text slip or a
+  misspelt word still finds the session (`near_session`, `near_name`). Each word said must still match a word of the name or
+  folder, in order, either as the start of that word (as above) or as the
+  whole word with a slip or two: a letter left out, added or changed, or
+  two side by side swapped (optimal string alignment distance). At most 1
+  slip for a word of 4–7 letters and 2 for one of 8 or more; a word under 4
+  letters, said or in the name, takes none (`SHORTEST_NEAR`). At least one
+  slip must be there, since with none the begins step would have found it.
+  So "costumer survey", "survay" and "Customer Srvey" find "Customer
+  Survey", while "svrvay" (two slips in six letters), "dox" for "docs" and
+  "api" for "rapid-prototype" find nothing. The session with the fewest
+  slips in all is the one. Two as close, on one machine or two, are
+  `session_ambiguous`, live or stopped, never a guess. It is tried only
+  after every machine's list was read and the stopped rows' last asks too
+  (`find_named`), so a session named as it is on a computer always beats
+  a near one on the lamp ("test": the Mac's "Test runner", not the lamp's
+  "Text formatter"). The answer says `"near":true`, and the voice names
+  the session it found so the person hears which one. The hand-over that
+  types takes a name as it is only: its read-back says the person's own
+  words, so their yes could not catch a near pick (the Reviewer-lead's P2
+  on #6422). Tests: `tests/harness.rs`
+  `a_name_said_nearly_right_finds_the_one_closest_session`,
+  `a_name_as_it_is_on_a_computer_beats_a_near_one_on_the_lamp`.
+- **Opened or asked about by name, with no work** (#6274): the person says
+  "open the customer survey one" or "how far has the customer survey one
+  got", and nothing is to be typed. On lamp-c0a4 the model called nothing
+  (`calls=none`): `start_agent_task` needed a `task`, and
+  `check_agent_task` knew only work the lamp had handed over. With both
+  switches on, the voice now asks lamp-tasks to look on the voice's own
+  socket: `{"op":"session","look":"voice-<request>-look-<n>","target":"<alias>","session":"<words>","join":true|false}`.
+  Only for the lamp's owner, heard, as the services hold a read
+  (`services::owner_of`, `agent_tasks::Asker`; in the private room,
+  whoever speaks): anyone else in the room is told "only the lamp's owner
+  can open or ask about their sessions", and a line nobody said (the model
+  alone) is refused too, with nothing asked of lamp-tasks, so no name,
+  state or work of any session is heard (the Reviewer-lead's P1 on #6422).
+  The `target` is chosen as for a hand-over: the lamp's own target when the
+  work would be done there, else the agent named, else the default. The
+  request answers at once, `{"ok":true,"look":…,"done":false}`, because
+  every request must answer within 1.1 s and listing the person's
+  sessions takes seconds. The look runs on a lane of its own
+  (`SessionLane`, `Cli::session_lane`, beside the hand-over lane), at most
+  4 at a time, each answer kept 60 s. The voice asks again with the same
+  `look` every 250 ms, for up to 16 s (`LOOK_WAIT`; lamp-tasks' own bound is
+  `LOOK_BOUND`, 15 s), and stops (`cancelled`) once the request's turn is
+  over: its memory scope revoked at its end or by a cut-in. A route with
+  no scope has nothing to stop it but those bounds. Done, the answer is `"found"` (`state`, `name`,
+  `ask`, `about` cut at a word to 160 characters and marked untrusted for
+  the model, `last_active_unix_ms`, `resumed`, `on`) or `"code"`.
+  `Cli::look_session` finds the session as a named hand-over does
+  (`find_named`: the lamp's own target looks among the computers too, and
+  offline ones are left out), types nothing and routes nothing. The one
+  thing it can start is below: a closed session named as it is, reopened.
+  - `join` (`start_agent_task` with `session` and no `task`, only from
+    words the person said): one idle live session is open as it is; one
+    busy is said busy; one stopped and named as it is is reopened with
+    `harness resume` under `LAMP_TASKS_RESUME_CLOSED`, which starts its
+    agent again on that computer (else `session_stopped`). One stopped and
+    found only by a name said nearly right is never reopened: it is told as
+    the closest, closed, and the person is asked whether they mean it, to
+    say its name as it is. The model is told
+    `{"open":true,"session":…,"where":…,"next":…}`. Its `next` says the
+    session is open (or reopened), to ask what it should do, and that what
+    they ask of it next goes in with `start_agent_task` and that session.
+    That task is then said back and waits for a yes, as any named
+    hand-over does. Nothing is prepared or typed by the open itself.
+  - Not `join` (`check_agent_task` with `session`): whatever fits is said
+    as it stands, stopped too, nothing reopened. This includes a session
+    the lamp never handed anything, or one handed over in an earlier talk.
+    The model is told `session`, `where`, `state` in plain words, `doing`
+    (`{"untrusted": …}`, paths put as "a file") and `last_active`.
+  - None fitting is said plainly ("No session of theirs fits …"), more
+    than one is asked about, never a guess. Closed, busy, an offline
+    computer and a list that can't be read each have their own few words.
+  - In the schemas, with the switch, `start_agent_task` has no `required`
+    (a session alone is enough; with neither, "Say what the work is."), and
+    `session`'s description says "Sent with no task, it opens it." `check_agent_task` gains `session` ("Only when they ask how
+    an earlier session of theirs is going: … even one you never handed
+    over.") and one sentence. Without the switch, both are word for word
+    as before, `required: ["task"]` too.
+  - Tests: `tests/harness.rs`
+    `a_named_session_is_looked_at_to_open_or_say_how_it_is_with_nothing_typed`,
+    `a_near_name_never_reopens_a_closed_session`;
+    `tests/runtime.rs`
+    `a_look_at_a_named_session_answers_at_once_and_is_asked_again_for_what_it_found`;
+    `agent_tasks::tests::with_reply_named_a_session_alone_opens_it_and_needs_no_task`,
+    `agent_tasks::tests::with_reply_named_a_check_names_a_session_and_is_told_its_own_state`,
+    `agent_tasks::tests::a_named_session_is_opened_or_told_only_to_the_lamps_owner`,
+    `agent_tasks::tests::a_look_stops_asking_again_once_its_turn_is_over`.
+  - Not yet shown on a lamp: the whole path with a voice played from the
+    Mac, and how long the person waits while the sessions are listed. A
+    hand-over's lookup took 15.2 s on lamp-c0a4 on 10 Nov with two
+    computers offline; a look is the same lists.
+- **The sessions the lamp started, kept by name** (#6274, the first
+  builder's ruling of 11 Nov; with `serve --reply-named`, no switch of its
+  own): `harness ps --all` lists only sessions open or stopped in the last
+  7 days, so "open the Christmas dates one" for an older session the lamp
+  started found nothing (`session_not_found`). lamp-tasks keeps an index of
+  the sessions it started (`new`, the id under `agent.id`), typed into (a
+  named hand-over, the router's pick) or opened (a look with `join`), in
+  `sessions-started.json` of the tasks folder (`--dir`,
+  `SESSION_INDEX_FILE`, `crate::session_index`): by machine, each one's
+  `id`, `name` and `last_used` (unix ms), nothing else, never its asks,
+  answers, `about` or folder. A started session's name is the lamp's own,
+  so none is kept until a list shows its title: each `harness ps` lamp-tasks
+  reads (the named lookup's lists, the progress read) and each `show` below
+  keeps the name it shows for a session the index has. At most 200
+  (`MOST_INDEXED`) on every machine together; one more lets the least
+  lately used go. Written whole beside the file and renamed over it, mode
+  0600, never through a link; one that can't be read is none.
+  - Used in the named lookup (`find_named`) only when no listed row fits by
+    name, folder or work on any machine read: the index's sessions on those
+    machines that their lists do not show are matched by the same name
+    rules (`by_name`: the name as said, then each word said beginning one of
+    its words, in order), the lamp's own first. Each that fits is read by
+    its id, `harness show --machine <m> <id> --json` (at most 4, together,
+    within what is left of the bound less the reply's floor), for its state
+    and name. One Harness says is no longer there (`UNKNOWN_HARNESS`,
+    `GONE`) is let go from the index and the lookup goes on; one that can't
+    be read is passed over (`sessions_failed` if nothing else fits). One
+    still there follows a listed session's rules: idle is joined, busy is
+    `session_busy`, stopped is reopened by its id with `harness resume`
+    only under `LAMP_TASKS_RESUME_CLOSED` and only named as it is (else
+    `session_stopped`), and the hand-over types into it after; two that fit
+    are `session_ambiguous`, never a guess. A look (not the hand-over that
+    types) then tries a name said nearly right among the index's names as
+    among the lists' (`nearest_rows`): the index's is taken only when it is
+    nearer than any listed, two as near are `session_ambiguous`, and one
+    found so is never reopened. A lookup that finds nothing in the lists
+    costs one more `show` (about 2.3 s on lamp-c0a4, 10 Nov) per index
+    session that fits, read together; when none fits, nothing more.
+  - Cleared: the lamp's reset wipes `/var/lib/lampos-tasks/store` (the
+    product's reset plan, `crates/setup/fixtures/reset-plan-product.json`),
+    the folder the file is in. The owner's "forget everything" (marked by
+    the second route's guard, their memory emptied, as the kept journal
+    goes) asks lamp-tasks on the voice's socket `{"op":"forget_sessions"}`
+    (`agent_tasks::forget_sessions_with_everything`), which removes the
+    file and answers `{"forgotten":true|false}`; the voice's answer to the
+    person is as it was. A hand-over or look still running when the forget
+    comes may keep its one session again after it: that is a use after
+    the forget, as any later one is.
+  - Signed out: when `harness auth status` reads signed out
+    (`Cli::signed_in_here`), the index lets the account machines' sessions
+    go, since the next sign-in may be another account's. It keeps those on
+    this computer's own id, which Harness starts work under while signed
+    out (`session_index::forget_machines`). Signed in or offline, it keeps
+    every one.
+  - Unpaired: each read of the account's machines (`Cli::machines`) lets
+    the sessions of a machine no longer listed go, since it was unpaired
+    in the app. The listed machines and this computer's own id stay.
+  - Tests: `tests/harness.rs`
+    `signed_out_the_account_machines_sessions_are_let_go`,
+    `an_unpaired_machines_sessions_are_let_go`;
+    `tests/session_index.rs` `forgetting_machines_keeps_only_those_kept`;
+    `tests/harness.rs`
+    `an_older_session_not_listed_is_found_by_its_name_through_the_index`,
+    `a_listed_session_is_found_as_before_and_the_index_only_adds`,
+    `an_indexed_session_that_is_gone_is_dropped`,
+    `an_ambiguous_index_match_is_asked_about`,
+    `the_index_never_makes_a_near_name_reopen_a_closed_session`,
+    `the_lamp_keeps_the_sessions_it_starts_and_their_names_as_listed`,
+    `the_index_lives_in_the_tasks_folder_the_reset_wipes`;
+    `tests/session_index.rs` `the_index_holds_only_id_name_and_last_use`,
+    `the_index_keeps_the_most_lately_used`, `forgetting_removes_the_index`;
+    `tests/runtime.rs`
+    `forget_sessions_removes_the_index_of_the_sessions_the_lamp_started`;
+    `agent_tasks::tests::the_owners_forget_everything_forgets_the_sessions_the_lamp_started`.
+  - Not yet shown on a lamp: a session older than 7 days reopened by its
+    id (Harness 0.6.12 says `resume <id>` and `show <id>` reach one), and
+    the time one more `show` adds.
 
 `--progress` (off unless set; #732, the second builder, 2026-10-15) reads
 how each task handed over is going with one `harness ps` a machine and puts
@@ -282,6 +604,8 @@ inspection evidence, not a playback grant.
 | `get_progress` | `id` | With `serve --progress` only: the agent's progress line as last read, and what was read with it (["Progress on the bus"](#progress-on-the-bus-serve---progress-732)) |
 | `tasks_now` | none | With `serve --progress` only: every task being worked on or lately settled, newest first, with its last step in the agent's words marked untrusted, in under 2 KiB (["Tasks now"](#tasks-now-4342-serve---progress)) |
 | `prepare` | `guard`, `text`, `target` alias | Immutable proposal; no CLI call |
+| `session` | `look` (the voice's id for it), `target` alias, `session` (the person's words), optional `join` | Trusted, with `serve --reply-named` only (else `reply_named_off`, #6274): a look at a named session, to open it (`join`) or to say how it is. Answers at once, `done:false`, while the look runs on its own lane; asked again with the same `look`, `done:true` with `found` (`near` when found only by a name said nearly right) or `code`. Never types or routes; with `join` it may reopen a closed session named as it is (`LAMP_TASKS_RESUME_CLOSED`), never one found near. The voice asks only for the lamp's owner, heard |
+| `forget_sessions` | none | Trusted (#6274): the index of the sessions the lamp started (`sessions-started.json`) removed, for the owner's "forget everything"; answers `forgotten` |
 | `confirm` | `guard`, `id`, `prepared_digest`, `session_id` | Trusted person's spoken confirmation |
 | `cancel` | `guard`, `id` | Only before dispatch attempt |
 | `observe` | `guard`, `id` | Explicit `show` of the bound accepted agent |
@@ -291,7 +615,7 @@ inspection evidence, not a playback grant.
 | `sign_in_state` | none | With `serve --sign-in-by-code` only, trusted: the sign-in's code, the email it asks about, or how it ended; `none` before any |
 | `sign_in_asked` | `id`, `request` | With `serve --sign-in-by-code` only, trusted: the voice heard the question "Sign in as …?" said whole for sign-in `id`, in its request `request` (`not_asking`, `not_this_sign_in` otherwise) |
 | `sign_in_answer` | `answer`: `yes` or `no`; `request` | With `serve --sign-in-by-code` only, trusted: the person's spoken answer, in the voice's request `request`, passed on only while Harness asks (`not_asking`), once the question was told in an earlier request (`not_told`) and within two minutes of it (`too_late`) |
-| `told` | `guard`, `id`, `observation_id`, `session_id` | Trusted: the voice's news of this observation was heard whole, in its model's own words ([#1390](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit)); once only, `already_told` after. Without `--close-told`, `told:false` and nothing written |
+| `told` | `guard`, `id`, `observation_id`, `session_id` | Trusted: the voice's news of this observation began to be told, in its model's own words (#6530; heard whole or not) ([#1390](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit)); once only, `already_told` after. Without `--close-told`, `told:false` and nothing written |
 
 The [protocol](../crates/tasks/src/protocol.rs) and
 [engine](../crates/tasks/src/engine.rs) define the serialized fields and error
@@ -673,12 +997,34 @@ started once its answer is told:
   - **Heard from the voice's news** (`told`): the voice's task news tells it
     as a turn its model says in its own words, so it claims no exact text.
     The turn carries its news keys (the task's, and those told with it).
-    As it ends heard whole, on the proof a skill's say takes for `spoken`
-    (settled and complete, its audio played with no gap, the mic allowed),
-    the voice sends `told` for each on the trusted socket. A turn cut short
-    (a Stop, the person speaking over it, muting) or ended with no audio or
-    a gap sends nothing, and the harness stays open. The news is still kept
-    as told when its turn begins, so it is never told twice.
+    Once its telling begins (#6530), the voice sends `told` for each on the
+    trusted socket: as the model's first words reach the speaker
+    (`TaskNews::begun`), and again as the turn ends heard whole, on the
+    proof a skill's say takes for `spoken` (settled and complete, its audio
+    played with no gap, the mic allowed), for keys added during the turn.
+    Each key is sent once. A turn cut short (a Stop, the person speaking
+    over it, muting) or ended with gaps still sends it once its words began
+    to play; one that played none of its words (no audio, or only a failure
+    notice) sends nothing, and the harness stays open. The news is still
+    kept as told when its turn begins, so it is never told twice.
+    - **Heard whole doesn't decide the close (#6530):** on a lamp on 12 Nov
+      task 18 went idle at 21:21:26 and its news played 21:21:32 to 35 with
+      gaps (`audio_written_with_playback_gaps_unscored`, "was not heard
+      whole: its harness stays open" at 21:21:53). Its harness was closed
+      only at 21:22:37, 71 s after idle. Now `told` is sent as its news
+      begins, and the close (a read, then `harness close`) follows it. Heard whole still decides alone whether the news is
+      told once more (`LAMP_TASK_NEWS_RETELL`, #4342), which reads the answer
+      kept in the store, so needs no open session. The journal says "was
+      not heard whole (…): begun, so its harness closes" or "was cut short
+      (…): begun, so its harness closes".
+    - **Only a finished task closes:** `close_due` closes only an agent
+      `idle` with an answer. One waiting for the person, stopped or failed
+      stays open as before, whatever was told.
+    - **Test:** `news_not_heard_whole_is_never_handed_on`,
+      `news_cut_short_is_never_handed_on`,
+      `news_heard_whole_is_handed_on_as_the_turn_ends` (coordinator) and
+      `news_begun_closes_its_harness_at_once_and_is_still_told_once_more`
+      (`task_news`).
     - **Sent off the coordinator's loop,** on a thread of the news's own.
       If the tasks part can't be reached (restarting, say), it's sent again
       every 10 s, for an hour.
@@ -708,6 +1054,29 @@ started once its answer is told:
       closed: the news path never said so.
   - **Or by a speech claim:** its telling played, or isn't known to have
     (`spoken` or `uncertain`). One still `claimed` is being played: not yet.
+  - **Or on the lamp's own agent, a minute untold (#6530):** a task handed
+    to the target `lamp` (Hermes or OpenClaw on the lamp itself, not a
+    session joined on a computer) is closed when its news is told, as any
+    other. If it isn't told, it's closed `UNTOLD_CLOSE_MS` (60 s) after its
+    newest answer was kept from an agent `idle` with an answer, on the
+    lamp's own ask (`closes_untold`). On 52e6 (12226) a Hermes turn done in
+    10 s had its news cut short (`user_interrupted`), so it was never told,
+    and its chat stayed open 7+ min in `epoll_wait`.
+    - **The minute keeps follow-ups:** the person's follow-up ("now add
+      apples to that") still joins the same session meanwhile (Twelve's read
+      on #6536). A follow-up asked after the close starts a fresh session.
+    - **The news doesn't need the session:** the voice tells the answer kept
+      in the store, so the close can't cut it. A close of this kind isn't
+      counted as told in the record (`Engine::recent`).
+    - **Timing:** with the watch's 30 s looks and its 10 s confirming look,
+      an untold one is closed about 70 to 100 s after its last turn, and a
+      told one soon after its telling.
+    - **A computer's harness** still waits for its telling, since the person
+      may be at that screen.
+    - **Test:** `the_lamps_own_agent_is_closed_once_done_its_news_untold`.
+      One still working, or idle with no answer yet, is left open. One done
+      stays open under a minute untold, then is closed. A computer's waits
+      for its telling.
   - **`ask` doesn't count:** Harness's `ask` is what the agent was last
     asked, the lamp's own task text, so it plays no part here.
   - **Left to the person:** an agent that waits for them (`needs-input`).
@@ -746,6 +1115,9 @@ started once its answer is told:
     text): closed with `harness close --machine <id> <agent-id> --json`, by
     the agent's own id, never `--now`. Harness saves its screen and stops it,
     and keeps its conversation, so the person can still open and resume it.
+    `Cli::close_now` (`harness close ... --now`, stopping it even while it
+    works) is only for a skill's run lamp-tasks started itself
+    (`HarnessRunner`, #6510 Part 1 step 2), at its deadline or end.
   - **Any other turn or state:** the person went on with it at the computer,
     so it's theirs. It's left for good (`left`), never asked again.
   - **Stopped or failed already:** nothing to close (`closed`, code `gone`).
@@ -1040,8 +1412,10 @@ again and again, saying nothing useful. `lamp-tasks serve --set-up-later`
 with `--targets-from-machines claude`, since 3 Nov) lets it run, and says why
 hand-overs are off. On lamp-c0a4 on 3 Nov, without it, `lamp-update
 harness-on` left the part failing at every start (`tasks: No such file or
-directory (os error 2)`) until systemd stopped restarting it. The product
-unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
+directory (os error 2)`) until systemd stopped restarting it. Every file
+error at start names its path, e.g. `tasks:
+/var/lib/lampos-tasks/targets.json: No such file or directory (os error 2)`.
+The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
 (`crates/update/tests/install.rs`):
 
 - **No targets file:** the part starts with no target. Every `prepare` is
@@ -1080,10 +1454,15 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
   |---|---|
   | `no_harness` | Harness is not installed on this lamp; hand-overs are off until it is |
   | `no_computer` | No computer to hand tasks to yet: the task targets are missing or empty |
+  | `computers_need_sign_in` | Harness is not signed in: tasks go to the lamp's own agent; sign in to hand tasks to your computers |
   | `not_signed_in` | Harness is not signed in to the person's account; hand-overs fail until it is |
 
   Their level is ok: a lamp not yet set up isn't unwell. With the sign-in
-  read, `signed_in` is `yes`, `offline` or `no`. Targets for a newer build
+  read, `signed_in` is `yes`, `offline` or `no`. `computers_need_sign_in`
+  is said in place of `not_signed_in` while the lamp's own target names
+  this computer's own id (signed out, #6407, "The lamp itself, signed
+  out" below): work goes to the lamp, and only the computers need the
+  sign-in. Targets for a newer build
   keep their own warning. Being signed out doesn't refuse a `prepare`: the
   sign-in read is up to a minute old, and the hand-over then fails as
   before ("could not hand the last task over").
@@ -1211,9 +1590,17 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
     one shell that timed out doesn't move a target to another engine. A
     reading more than 15 minutes old is unknown.
   - **Targets from what is there:** a target written from the machines
-    gets `ENGINE` where it is known installed on that computer, else the
-    first known installed of claude, codex and opencode, else `ENGINE` as
-    before. A file someone else wrote is still never written over.
+    gets, of the engines known installed on that computer, one that can
+    run (#6657, the first builder's (b), no switch): known signed in
+    first, then sign-in unknown, then known signed out, and within each
+    `ENGINE` first, then claude, codex and opencode
+    (`readiness::Known::chosen`). So a known signed-out engine, which the
+    hand-over would then refuse (`engine_not_signed_in`), never wins over
+    one that can run: on a laptop with claude installed and signed out and
+    codex signed in, the target is codex, and moves back at the first look
+    after claude signs in. None known installed: `ENGINE` as before. A
+    file someone else wrote is still never written over. Test:
+    `the_engine_chosen_is_one_that_can_run`.
   - **Its own file,** `targets.engines.json` beside the targets:
     `{"version":1,"computers":{ALIAS:{"status":{"value":WORD,"read_ms":MS},
     "engines":{ENGINE:{"installed":{"value":BOOL,"read_ms":MS},
@@ -1263,6 +1650,575 @@ unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_m
   - **Not yet shown on a lamp:** a played before/after count on lamp-c0a4,
     hand-overs to a missing, a signed-out and an offline agent each refused
     at once with a plain line, and a good one unchanged.
+- **The lamp itself, with Hermes** (`LAMP_HERMES_ON_LAMP=on`, only with
+  `--engines-from-machines`; off unless set, #5978 part 3; the product's
+  `lamp-tasks.service` sets both). Off, the
+  machine Harness marks `current` (the lamp) is left out, as above.
+  - **Kept as a target** only while its own engines look says `hermes` is
+    `installed: true` (fresh, as above): with the switch the lamp's machine
+    is looked at too. The target is `lamp`, engine Hermes only, folder
+    `~/harnesses/lamp-tasks/lamp` under `lampos`'s home (the part makes it,
+    0700, since Harness makes only a `~/harnesses/<name>` folder), with no
+    name. With it, at most 7
+    computers are kept, so the file keeps its 8; a computer whose name
+    makes `lamp` is `lamp-2`. With no computer, the file holds the lamp
+    alone instead of being removed. Hermes missing, not looked at, or the
+    switch off: left out, as before. Without `--engines-from-machines` the
+    part says once that the lamp is no target while signed in.
+  - **The lamp itself, signed out** (#6407). A product lamp never signed
+    in, Hermes 0.22.2 installed, answered "I can't reach Hermes": the
+    target above came only from `harness machines`, which works only signed
+    in, and the part said `Harness signed in: no` and `no engines file`.
+    Harness 0.6 signed out refuses `machines` and every `--machine`, while
+    `start` and `new` with none work on this computer, under its own id
+    (`computerId`, a UUID, which `auth status --json` names signed out too;
+    an account machine's id is 32 hex digits). So, with a lamp engine's
+    switch on (`LAMP_OPENCLAW_ON_LAMP` or `LAMP_HERMES_ON_LAMP`) and
+    `--targets-from-machines`:
+    - **The target from the lamp itself.** At each sign-in read that says
+      signed out and names this computer's id, the lamp's engine is
+      installed here when its program is where Harness finds it,
+      `/usr/local/bin/<engine>` (`LAMP_ENGINES_BIN`; `hermes` and
+      `openclaw` are lamp-update's wrappers), executable, and a wrapper
+      lamp-update wrote: its first 512 bytes carry `Written by
+      lamp-update.` (`LAMP_WRAPPER_MARK`, #6506). Then the file is written, as
+      from the machines and never over a file the part didn't write, with
+      the lamp alone: `lamp`, that engine, `~/harnesses/lamp-tasks/lamp`
+      (made, with its guidance), under this computer's id. A computer's
+      targets written before go: none can be reached signed out. Not
+      installed here, a target written so before is removed; any other
+      file is left as it is. The engine is the first in `lamp_order` (the
+      lamp's engines switched on, in `LAMP_LAMP_ENGINE`'s order, Hermes
+      first unless set (#6498), OpenClaw left out while the Harness here is too old
+      for it) that is installed here; neither engine is named anywhere else.
+      One journal line a change.
+    - **No machines look and no `--machine`.** A target naming this
+      computer's id is started with no `machines --json` preflight (and no
+      `machines engines` with `--engines-ready`), and every call for its
+      work (`new`, `show`, `ps`, `wait`, `watch`, `reply`, `resume`,
+      `close`, `route`) leaves `--machine` out; the journal's call line
+      still names the machine. `new`'s `machineId` must still be that id.
+    - **The daemon at boot.** A part whose first sign-in read says signed
+      out starts Harness's daemon too, while a lamp engine's switch is on
+      (below).
+    - **Signed in again**, the machines write the targets, as above, and the
+      lamp's target names the account's machine. Work started under the
+      account's machine id stays readable only signed in (its calls name
+      it with `--machine`); the computers keep needing the sign-in.
+    - **What is said.** The health line says `computers_need_sign_in`
+      (above), and the voice's `harness_status` says only the computers
+      need the sign-in (below).
+    - **Tests:** `a_lamp_never_signed_in_hands_work_to_its_own_engine`
+      (`tests/runtime.rs`),
+      `the_lamps_own_target_signed_out_is_asked_with_no_machines_look_and_no_machine`
+      and `signed_out_the_computers_own_id_is_read_with_the_sign_in`
+      (`tests/harness.rs`).
+    - **Not yet shown on a lamp:** signed out, "ask Hermes …" answered and
+      a follow-up reaching the same session.
+  - **While Hermes is still installing.** With the switch on and no lamp
+    target yet (Hermes not installed; lamp-update installs it later in a
+    quiet window), the `targets` answer adds `"lamp":"installing"`;
+    otherwise it is as before. A hand-over the voice asks for then finds no
+    target of its engine and the model is told the lamp's own helper is
+    still being installed (`LAMP_INSTALLING`), never that it needs setting
+    up on a computer; nothing is prepared or kept waiting. A computer target
+    of that engine still takes the work, as before. Tests:
+    `engine::tests::the_targets_say_the_lamp_is_installing_only_with_the_switch_on_and_no_lamp_hermes`
+    and
+    `agent_tasks::tests::a_lamp_whose_hermes_is_installing_says_so_instead_of_asking_for_a_computer`.
+  - **Hermes' home.** Hermes keeps its settings in
+    `HERMES_HOME=/var/lib/lampos-hermes/.hermes`, outside `lampos`'s home,
+    apart from Harness' sign-in and lamp-cloud's credentials. Hermes saves
+    its shell environment there (`cache/scratch`), so nothing lamp-tasks
+    gives it carries a key: only the forwarder's local token. Which user
+    Hermes runs as is part 1's (install) and still being settled. At
+    start, with the switch on, the part (as `lampos`) writes Hermes'
+    settings there for the lamp's DeepSeek forwarder (port 7741) with the
+    token from `/var/lib/lampos-cloud/hermes-token`, and says one journal
+    line: written, unchanged, or "not written: no forwarder token yet",
+    when the token is missing (then nothing is written).
+  - **The lamp's skills for Hermes.** With the switch on, Hermes acts for
+    the lamp's voice, so it sees the lamp's own skills and can run them:
+    - **Read in place.** The same settings merge adds
+      `/var/lib/lampOS/skills` (the folder lamp-skills reads) to Hermes'
+      `skills.external_dirs`, so Hermes lists the lamp's skills as
+      external, read-only skills. They are never copied into
+      `HERMES_HOME`. The merge keeps every other key under `skills:` and
+      every dir a person added there, adds the lamp's only when it is not
+      there already (a trailing `/` or quotes count as there), and leaves
+      Harness's `hooks:` block as it is. A flow list (`[a, b]`) or a single
+      path becomes a block list of the same items and the lamp's; a value a
+      reset left (`{}`, `[]`, `null`) takes the block. Anything else there
+      (a nested item, an anchor, a block scalar) refuses the whole merge,
+      as above, and the file is left as it is.
+    - **The guidance.** Each time the part keeps the lamp as a target, it
+      writes `AGENTS.md` in the lamp's work folder
+      (`~/harnesses/lamp-tasks/lamp`), which Hermes reads from its working
+      folder as the project's context; never a file under `HERMES_HOME`.
+      It says where the skills are and how to run one, and the owner's
+      rules: run a skill only when the person's task asks for it, never
+      move, light up or play sounds unprompted; if the lamp's skills
+      refuse, say why and don't retry around it; never edit or copy the
+      skills folder; a new skill goes in the work folder, and installing
+      it is the person's step. The file is lampOS's: it is written, 0600,
+      only when what is there differs (a hand edit is written over at the
+      next look), never through a link, and a work folder that is a link
+      is refused. One journal line when it is written or not written.
+    - **Calling a skill's tool.** `lamp-tasks skill list` prints the tools
+      in `/run/lampos-skills/tools.json` as one JSON line
+      (`{"ok":true,"tools":[...]}`). `lamp-tasks skill call NAME
+      ['{"key":"value"}']` sends the voice's own line,
+      `{"op":"call","name":NAME,"args":{...}}`, on
+      `/run/lampos-skills/call.sock` and prints the one line back as it
+      came (`{"ok":true,"result":{...}}` or `{"ok":false,"error":"..."}`).
+      The guidance names it by its path on the lamp,
+      `/opt/lampOS/tasks/current/lamp-tasks`. It waits at most 3 s,
+      connecting included. It refuses, without connecting, a name the
+      tools file doesn't list, arguments that are not a JSON object, and a
+      line over 8192 bytes; the folder is fixed (no option or variable
+      names another), and a socket that is a link is never followed.
+      Exit status: 0 for `ok:true`, 1 for the skills' `ok:false`, 2 for its
+      own refusal or no answer (also printed as `{"ok":false,"error":...}`).
+      The lamp's skills service applies its own checks to the call, as to
+      the voice's (cooldowns, the lamp's pause, its policy).
+    - **Without the switch** nothing of this is written: no
+      `external_dirs` line, no `AGENTS.md`. `lamp-tasks skill` is there
+      either way, and does only what is asked of it by hand.
+  - **`HERMES_HOME` for Harness.** With the switch on, the env file the
+    part writes for Harness (`HARNESS_ENV_FILE`, as for the hold above)
+    names `HERMES_HOME` and `SHELL=/bin/sh`, and every Harness command the
+    part runs has both. `lampos`'s own shell is `/usr/sbin/nologin`, and
+    Harness reads an engine's launch environment through `SHELL` first:
+    without it `harness new` times out "Waiting to read the engine's
+    launch environment" (seen on a lamp).
+    Harness's daemon reads the file only when it starts: on lamp-c0a4 on
+    10 Nov it was written with `SHELL` and `HERMES_HOME` while harnessd
+    ran, and `harness new hermes` waited on "Waiting to read the engine's
+    launch environment" until harnessd was restarted by hand. So when
+    lamp-tasks' write gives the file other words (or it was not there)
+    and a daemon answers on Harness's port (`/api/health`), lamp-tasks
+    starts it again once with `harness start --restart` (Harness CLI
+    0.6.2: stops the daemon running for this data folder and starts it
+    over), on its job lane as the daemon start after a sign-in is
+    (openharness#1463), before the next hand-over; never while a task is
+    busy (watched), then it waits until none is. One journal line says it
+    (`Harness's daemon started again: its env file changed while it ran`,
+    or `not started again: <code>`). Tests:
+    `hold::tests::the_env_file_is_said_changed_only_when_its_words_change`,
+    `tests/runtime.rs`
+    `a_changed_env_file_restarts_harnesss_daemon_once_and_never_while_a_task_is_busy`,
+    `tests/harness.rs` `the_daemon_is_started_again_with_harness_start_restart`.
+    The file is written with the hold off too, then without the hold's
+    lines: the launcher isn't pinned then, so only the Harness commands the
+    part runs, and the daemon they start, have `HERMES_HOME`. The hooks
+    block is kept as it is: Harness writes its hooks into Hermes'
+    `config.yaml` only while that file is owned by Harness's user
+    (`lampos`).
+  - **Which session, which machine.** A hand-over naming a session looks
+    for it as #5784 does (exact name, then a word-start prefix, then by its
+    work, then by a stopped session's last ask), on the lamp first, then
+    on each computer target's machine. A fit on the lamp is the answer,
+    and the computers' lists are then not read at all; one fit on a
+    computer alone is replied into
+    there (`harness reply --machine <its id>`), the task's dispatch says
+    `joined_on` (alias, machine, engine; schema 6), and it is shown,
+    watched, closed and told as that machine's, like any computer task.
+    Two computers fitting and none on the lamp is `session_ambiguous`; a
+    computer that can't be read is left out rather than said not found.
+    A computer the last `harness machines` look said is `offline` is not
+    listed at all (kept by lamp-tasks from that look, no call of its own):
+    nothing could be typed there, and its list only answers DISCONNECTED.
+    A hand-over naming a machine looks there only. Latency: on lamp-c0a4
+    on 10 Nov the lookup took 15.2 s, reading every machine in turn,
+    including two offline computers that each answered DISCONNECTED after
+    about 2.2 s and the person's Mac, whose list takes about 4 s. Now a
+    session on the lamp costs the lamp's own list (and, found by its last
+    ask, up to 4 `harness show` reads and a `harness resume`); the
+    computers' 8.4 s or so are gone. A session only on the Mac costs the
+    lamp's list plus the Mac's (about 4 s), the offline ones' 4.4 s gone.
+  - **New work goes to the lamp.** A new task naming nothing goes to the
+    lamp's Hermes, and so does one naming Hermes or the lamp as `who`;
+    one naming their computer (`where` `"computer"`) or an agent there
+    goes to the computer, and a computer known `offline` is
+    refused `computer_offline`, never moved to the lamp quietly. The task
+    is followed on the lamp's machine id exactly like a computer task:
+    show, wait, watch, task news and the status and progress tool. Its
+    session shows in Harness Desktop like any other.
+  - **The voice:** the `lamp` target is never one of the staff.
+    `start_agent_task` gets `where` (`"lamp"`, and `"computer"` only with a
+    computer paired, #6547) while the tasks part has it; the description says long work is handed over, an
+    earlier session of theirs first (the lamp's first), else a new one on
+    the lamp unless they name their computer. The read-back and the yes
+    are as before (one yes for a named session too): "Hermes on the lamp".
+    Asked for with no `lamp` target, it says that isn't set up and nothing
+    goes to a computer instead. A call naming no machine from a tool
+    declared with the lamp's words goes to the lamp even when the `lamp`
+    target went away since (the lamp's reading went stale): it is said not
+    set up, never sent to a computer. A finished task's news adds that it was
+    done here on the lamp ("I did it here on the lamp"); a session joined
+    on a computer is told as that computer's.
+  - **A named engine (#6492).** The voice keeps the lamp's engines from
+    the `targets` answer: the `lamp` target's `engine` (its default) first,
+    then its `engines`, each once (`[engine]` alone from an older tasks
+    part). They are whatever Harness reports on the lamp; the voice keeps no
+    list of engines. While the tasks part has the `lamp` target,
+    `start_agent_task` also takes `engine`, its `enum` the lamp's engines as
+    last read (none before they are read), filled only when the person
+    names one of them for work on the lamp. A hand-over to the lamp naming
+    one, by `engine` or by `who` (its id or the name it is called, any case,
+    spaces and "the " left off), sends `"engine"` with the `prepare` and
+    says that engine as who does it ("Pi on the lamp"); naming none, or a
+    name not among the lamp's engines, sends no `engine` and says the
+    lamp's default. A `who` naming one of the lamp's engines goes to the
+    lamp with that engine even when a computer has an agent of that name
+    ("Claude Code"); only `where` `"computer"` sends it to the computer. An
+    `engine` for a computer is ignored. Names are said from a small table
+    (Hermes, OpenClaw, Claude Code, Codex, OpenCode, Devin), else the id
+    with a capital ("Pi"); the table only names, it gates nothing. A
+    refusal `engine_not_here` is said "<Name> isn't set up on me, so I
+    didn't start that." (`engine_unknown`: "I don't know <Name> here, so I
+    didn't start that."), and is never retried on another engine. Tests:
+    `agent_tasks::tests::a_named_lamp_engine_goes_with_the_prepare_and_is_said`,
+    `agent_tasks::tests::the_lamp_engine_is_declared_only_with_the_lamp`,
+    `agent_tasks::tests::the_lamp_engines_are_read_from_the_targets_answer`,
+    `agent_tasks::tests::an_engine_is_said_by_its_name_or_its_id_with_a_capital`,
+    `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
+  - **Named in the heard words, by code (#6492, the lead's V2).** While
+    the lamp has its own target, the voice reads the person's own heard
+    line for the request (a line the lamp wrote is not read) and sets
+    `where`/`engine`/`who` itself, so a model that leaves them out can't
+    send the task elsewhere. The names come only from what this lamp has:
+    the lamp's engines as last read (by id or the name it is called) and
+    the computer staff (Claude Code when none is read); never a fixed list
+    of agents. A name counts only as the doer: after "ask", "have", "tell",
+    "get" or "let", or "with", "using", "via" or "use" (not "don't ask …",
+    "did you ask …"), or first in the line before a comma ("Hey Lamp,
+    Hermes, …"); any case, its words together or apart ("Open Claw"). One
+    of the lamp's engines named: `where` `lamp` and that `engine`, whatever
+    the model sent. One of the staff named: `where` `computer`, `who` them,
+    no `engine`. A name on both the lamp and a computer is the lamp's,
+    unless the computer is named as the place or the words need the
+    computer's things: "my" + repo, repository, codebase, code, project,
+    folder, files or branch, or "the repo/repository/codebase" (general
+    words only; such a cue alone sets nothing). "On/use my/the computer",
+    "Mac", "MacBook", "laptop" or "PC" (a word may come between: "my office
+    computer") sets `where` `computer` and drops `engine` (and a `who`
+    naming only the lamp's engine); negated ("don't use my computer") or
+    "on the lamp", "yourself", "right here" sets `where` `lamp`, the model's
+    `engine` kept. A mention names nothing ("what is Hermes?", "OpenClaw's
+    update"), nor a name in no list; words that disagree (two agents, the
+    lamp and the computer, an agent only on the lamp with "on my computer",
+    one only on a computer with "on the lamp") set nothing, leaving the
+    model's args. Each override logs one line with what was set and what
+    the model sent, never the words. The read-back says where it runs, as
+    before ("OpenClaw on the lamp", "Claude Code on the office computer").
+    A turn where the model calls no `start_agent_task` is caught on the
+    second route (next point).
+    Tests: `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
+    `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
+    `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
+    `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
+  - **Named, nothing handed over: asked again once (#6547 (1b)).** On the
+    second route, with the tasks part, a spoken line whose own words name
+    an agent for the work, read exactly as above (the doer only, from the
+    lamp's engines while the lamp has its target and the staff, Claude Code
+    when none is read; a mention such as "What is Hermes?" names nothing;
+    an agent only called by name first in the line, "Hermes, …", counts
+    only when the rest of the line asks for work: a work verb such as
+    write, make, fix, list or look (`WORK_VERBS`), or at least
+    `WHOLE_ASK_FEWEST` (4) ask words beside the words of consent, as
+    `new_ask` counts them, `agent_tasks::asks_for_work`; so "Hermes, what
+    time is it?", "Hermes, how are you?", "Hey Hermes, tell me a joke." and
+    "Codex, what can you do?" name nothing and are answered as normal, while
+    "Hermes, write a poem about rain into rain.md" names Hermes; "ask/have/
+    tell Hermes to …" count as before; Thirteen's P2 on #6572),
+    has its round 1 words held to the round's end
+    (`agent_tasks::named_for_work`, `Engine::catching_named_agents`). If
+    round 1 answers in words alone, with no call, those words are not said:
+    the turn is asked once more with a system note naming the agent ("the
+    person asked Hermes to do this … Call start_agent_task now to hand the
+    work to Hermes; never do it yourself"), and the journal says
+    `request N: named agent, no start_agent_task: asked again`, then what
+    came of it (`…: asked again: start_agent_task called`, `…: still no
+    call, said it wasn't done`, or `…: called <names>, not start_agent_task`).
+    If round 1 calls only the lamp's own tools instead ("Hermes, look up the
+    weather" answered with `weather`: V2's P1 on 12587), none of them runs:
+    each is answered as not run, its words are not said, the turn is asked
+    again once with the same note, and the journal says `request N: named
+    agent, called <names> not start_agent_task: none run, asked again`
+    (`agent_tasks_named::named_answered_by_an_own_tool_runs_none_and_is_asked_again_once`;
+    with no agent named, an own tool runs as before). The agent-task tools
+    (`confirm_agent_task`, `check_agent_task`, `tasks_now`, the status read)
+    are not own tools: "Hermes, go ahead and run it" answered with
+    `confirm_agent_task` runs as called, nothing asked again (the
+    Reviewer-lead's P1 on #6786,
+    `agent_tasks_named::an_agent_task_tool_with_the_agent_named_runs_as_called`).
+    This catch waits out the join window below too; a newer line begun in it
+    is journalled `…: a newer line began within the join window: none run,
+    not asked again`. It is asked again only once the join window (`JOIN_WITHIN`, 3 s from
+    the answer's start, about the line's end) has passed with no newer line
+    begun: a paused ask's second half begun within it joins the first
+    (`LAMP_JOIN_CUT_WORDS`), and the first half is never asked again nor
+    handed over alone (W3's P1 on #6572: "Make a file called beach.md." was
+    handed over and the rest, 3392 ms later, was not joined). A newer line
+    begun in the window ends the turn, journalled `…: a newer line began
+    within the join window: not asked again`. Once a request
+    (`agent_tasks::AskedAgain`, the last 8 requests kept): round 2's words
+    are held too, said beside a call; answered in words alone again, they
+    are not said and the plain line "Sorry, I didn't do that. Could you ask
+    me again?" (`action_claim::NOT_DONE_LINE`, in the owner's language) is
+    said instead. A request asked again before is said with `…: asked
+    again before, said as it came`; it never loops.
+    A round 1 that calls anything (`start_agent_task`, `not_for_me`, a
+    skill) goes on as before, its words said at the round's end; a line
+    naming no agent is untouched and streams as before. The Live route is
+    not caught. Tests: `second_provider::tests::agent_tasks_named`
+    (`named_with_no_start_is_asked_again_once`,
+    `named_with_no_start_twice_says_it_was_not_done`,
+    `named_with_start_is_untouched`,
+    `not_named_and_a_question_about_an_agent_are_untouched`,
+    `a_request_asked_again_before_is_not_asked_again`,
+    `a_paused_ask_is_joined_and_never_asked_again_half_said`),
+    `agent_tasks::tests::a_named_agent_is_the_doer_and_asked_again_once_a_request`.
+  - **A read-back with no call: asked again once (#6547 C).** On 52e6 on
+    12 Nov the lamp often said "I'll have Hermes on the lamp … Shall I start
+    it?" with no call, so nothing was prepared. On the second route, with
+    the tasks part, a spoken round 1 that calls nothing and whose answer
+    reads a task back (`agent_tasks::speaks_a_read_back`: it ends with a
+    question holding "start", "begin", "hand", "send", "go" or "kick", and
+    names an agent the voice knows, "agent", or the computer; "Shall I
+    start a timer?" is none) is asked again the same way, named agent or
+    not, after the same join window, once a request
+    (`agent_tasks::AskedAgain`). Its words were said as they streamed (the
+    person heard the read-back and may say yes to it in the window; that
+    yes is a newer line and ends this turn), so the note
+    (`agent_tasks::read_back_no_start_note`) says to call
+    `start_agent_task` with the task as said back and to say nothing more
+    unless it could not be prepared; held words (a round held for another
+    reason) are not said. The journal says `request N: read back, no
+    start_agent_task: asked again` and what came of it, as above; a second
+    words-only answer is not said and `NOT_DONE_LINE` is. Tests:
+    `second_provider::tests::agent_tasks_named`
+    (`a_words_only_read_back_is_asked_again_for_the_call`,
+    `a_read_back_twice_says_it_was_not_done_and_never_loops`,
+    `an_answer_that_is_no_read_back_is_untouched`),
+    `agent_tasks::tests::a_read_back_is_told_from_other_answers`.
+  - **A new ask while a task waits replaces it (#6547 B).** Before,
+    `pending_note` told the model not to call `start_agent_task` again
+    while a task waited (`CONFIRM_WITHIN`, 120 s), so a new ask was only
+    read back and the yes started the old task. Now the note reads the
+    line's own words: a line that is no plain yes (`plain_yes`), no plain no
+    (`services::plain_no`) and holds at least `WHOLE_ASK_FEWEST` (4) ask
+    words (`ask_words`, as #6527's) beside the words of consent
+    (`CONSENT_WORDS`: yes, yeah, yep, yup, sure, ok, okay, go, ahead, do,
+    it, start, begin, send, hand, over, sounds, good, great, fine, please,
+    now, right, away) is a new ask. "Yes, go ahead and start it now.",
+    "Yeah sure, go ahead and do it.", "Yes, sounds good, start it.",
+    "Okay, yes, please start that." and "Yes please, hand it over." are
+    none: each starts the task waiting, with `LAMP_TASKS_ONE_YES` on or off
+    (Heron's P2 on #6572). A new ask's note says a `start_agent_task` with
+    it replaces the task waiting, which will not start. Nothing is marked
+    while the note is built, before the model reads the line: only a
+    `start_agent_task` in the new ask's own request replaces the task
+    waiting, with or without `LAMP_TASKS_CORRECT`, and cancels it then
+    with the tasks part's `cancel` op, as the correction does (journal
+    `lamp-voice: tasks: request N: a corrected or new ask replaces task
+    <id>, which this voice no longer confirms`); a yes after it starts only
+    the new one. Until one does, the task waiting keeps its yes: a question
+    that is no work ("What's the weather going to be like in Hanoi
+    today?"), answered with no call, and then "yes" start it (Heron's P3 on
+    #6572). A yes, a no or a short line ("What was that?") keeps the note
+    as before. Tests:
+    `agent_tasks::tests::a_new_ask_while_a_task_waits_replaces_it_and_the_yes_starts_the_new_one`,
+    `agent_tasks::tests::a_question_while_a_task_waits_leaves_its_yes`,
+    `agent_tasks::tests::a_yes_said_at_length_starts_the_waiting_task`.
+  - **No computer in `where` without a pairing (#6547 (1c)).** With no
+    computer paired (no staff: the test the description already uses),
+    `where`'s `enum` is `["lamp"]` alone and its description never names
+    the computer; with one paired, `["lamp", "computer"]` as before. A
+    hand-over that still asks for a computer in that state (`where`
+    `"computer"`, one the heard words set from "on my computer", "on my
+    Mac" or an agent of the computer's named, or a `who` that is neither
+    the lamp nor one of its engines) is refused, nothing prepared, and the
+    model is told no computer is paired and to ask whether the lamp's own
+    agent should do it: never quietly the lamp's task (V2's P1 on 12587,
+    Fifth's row-6547: claude, garbled, doc, mac); with the switch
+    `LAMP_TASKS_WHO` off, where the staff are never read, it goes to the
+    configured target as before. Until a staff read has come back (none
+    made yet, or every one so far failed), the staff are empty, which
+    counts as none paired: `computer` leaves `where`. A later read that
+    fails keeps the staff last read. Tests:
+    `agent_tasks::tests::where_offers_no_computer_without_a_pairing`,
+    `agent_tasks::tests::no_computer_paired_a_computer_asked_for_is_refused_never_the_lamps`,
+    `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`.
+  - **Tests:** `readiness::tests::the_lamp_is_kept_only_where_hermes_is_known_installed`,
+    `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
+    `runtime::tests::hermes_settings_are_written_at_start_only_with_a_token`,
+    `runtime::tests::the_lamp_folder_gets_the_guidance_once_and_again_when_changed`,
+    `hermes_config::tests`: `the_lamps_skills_dir_is_added_once_and_hooks_are_kept`,
+    `a_persons_own_skills_dirs_and_keys_are_kept`,
+    `the_dir_already_there_in_any_spelling_is_left_as_it_is`,
+    `a_flow_list_a_single_path_or_a_reset_becomes_a_block_list`,
+    `skills_that_cannot_be_merged_safely_are_refused`,
+    `the_guidance_is_written_once_never_through_a_link`,
+    `the_guidance_says_where_the_skills_are_how_to_run_one_and_the_rules`,
+    `skill_call::tests` (the list, the voice's line and its answer, the
+    skills' refusal, a name not listed or bad arguments never reaching the
+    socket, a linked socket never followed, the deadline),
+    `hold::tests::the_env_file_names_hermes_home_and_a_shell_with_or_without_the_hold`,
+    `engine::tests::a_session_joined_on_another_machine_is_followed_there`,
+    `tests/harness.rs`: `a_named_session_is_looked_for_on_the_lamp_first_then_the_computers`,
+    `a_computer_said_offline_is_not_listed_for_a_named_session`,
+    `a_lamp_with_no_computer_finds_and_reopens_its_closed_session`,
+    `the_session_machines_come_from_the_targets`,
+    `tests/runtime.rs`: `a_lamp_with_no_computer_hands_work_to_its_own_hermes`
+    (the owner's rule: a fresh lamp with no computer paired is one device,
+    and its targets are only `lamp` with Hermes, a hand-over to it started
+    on the lamp's machine; the lamp's work folder is made whichever look,
+    the machines' or an engines look coming back, finds Hermes there first),
+    the voice's `agent_tasks::tests::a_lamp_with_no_computer_still_hands_work_to_its_own_hermes`,
+    `the_lamp_is_a_target_with_hermes_only_when_on_and_installed_there`
+    (off, Hermes missing, installed; a computer offline refused; the answer
+    shown on the lamp's machine),
+    `with_hermes_on_lamp_off_work_naming_no_machine_goes_to_the_computer`
+    (the PM's: the switch unset, `off`, empty or `ON`, the lamp listed as a
+    machine with Hermes installed, yet the targets are the office computer
+    alone, `lamp` is refused as no target, and work naming no machine is
+    started on the computer with Claude Code, as on stable), the voice's
+    `agent_tasks::tests::new_work_goes_to_the_lamp_unless_a_computer_is_named`
+    and `task_news::tests::work_done_on_the_lamp_is_told_as_done_here`.
+  - **Not yet shown on a lamp:** Hermes found by the lamp's Harness, a task
+    run there with DeepSeek, its done line, the hooks block after a
+    restart, the session in Harness Desktop, and the
+    voice staying responsive while it runs (#5978 part 4); the lamp's
+    skills in Hermes' list through `external_dirs` with the hooks block
+    kept, `AGENTS.md` written in the work folder, and a skill's tool
+    (such as `dance`) called by `lamp-tasks skill call` from Hermes'
+    own namespace.
+- **The lamp itself, with OpenClaw** (`LAMP_OPENCLAW_ON_LAMP=on`, only
+  with `--engines-from-machines`; off unless set, #6226). OpenClaw is the
+  lamp's other engine (no memory floor: the owner, #6226, every lamp has 6 GB): it is the lamp's own target
+  in exactly Hermes's role (above) when chosen or when Hermes is not
+  installed; Hermes is the default again (#6498, the lead's decision,
+  back from #6226's OpenClaw).
+  `lamp_order` (`crates/tasks/src/runtime.rs`) leaves OpenClaw out only
+  while the Harness on the lamp is older than 0.6.11.
+  - **Which engine:** `LAMP_LAMP_ENGINE` is `openclaw` or `hermes`, unset
+    `hermes`, the default (#6498; #6226 had `openclaw`). The lamp's target is still `lamp`, with that engine; when
+    the one chosen is not installed but the other is, the other.
+  - **The lamp's engines, named or not, and the app's choice (#6492).**
+    Nothing on the lamp is built per engine: Harness has many, and Hermes
+    and OpenClaw are two of them. The lamp's engines are the engines
+    Harness's engines look (`harness machines engines <id> --json`, read
+    with the computers' looks, bounded and refreshed as they are) reports
+    installed on the lamp's own machine (the one `harness machines` marks
+    `current`), in Harness's order, of those Harness starts with a task:
+    an engine lamp-tasks has no name for is one Harness launches with no
+    first prompt (`PROMPT_UNSUPPORTED`), so it is never offered, and Devin
+    Cloud works in Devin's cloud, never on the lamp. `LAMP_HERMES_ON_LAMP`
+    and `LAMP_OPENCLAW_ON_LAMP` are off-switches only: an engine whose
+    switch is off is not offered (OpenClaw also not under a Harness older
+    than 0.6.11); every other engine has no switch. On a lamp an engine is
+    offered only while its `/usr/local/bin/<engine>` is a wrapper
+    lamp-update wrote, carrying `Written by lamp-update.` in its first 512
+    bytes (`LAMP_WRAPPER_MARK`, #6506): the wrapper runs it in its own
+    namespace, away from the lamp's services and the person's things. A
+    program put there any other way (a `claude` installed by hand) is not
+    offered and the app can't make it the default (`engine_not_installed`),
+    whatever Harness reports. Before a look has
+    reported (or signed out, #6407), the lamp's engines are the ones
+    switched on, as before. The default comes first, then every other in
+    Harness's order (`lamp_order`): the owner's choice in the app when it is
+    among them, else `LAMP_LAMP_ENGINE`'s (any engine's name), else the
+    build's (`lamp_engines`' first switched on), else the first of them.
+    The `targets` answer's `lamp` entry says the default as its `engine`
+    and lists them all, default first:
+    `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
+    (no `engines` when there are none). A `prepare` for the `lamp` target
+    may carry `"engine"` with any engine's name (absent: not written;
+    another target ignores it). Named, the work runs on exactly that engine
+    while it is among the lamp's engines and not known missing there, passed
+    to Harness by its name (`harness new <engine>` in the lamp's folder, as
+    Harness starts that engine: no per-engine runner here; OpenClaw's
+    Gateway wait and lost-first-prompt check, #6226, stay keyed by its
+    name as Harness's documented behaviour); otherwise the prepare is
+    refused with `engine_not_here` and nothing is launched: never moved to
+    another engine. An empty or blank name is refused with
+    `engine_unknown`. Named none, the work runs on the default. The lamp's
+    folder gets Hermes's or OpenClaw's guidance only for those two; any
+    other engine reads its own settings, as Harness starts it. The app
+    sets the default on the app's route (`--app-socket`) with
+    `{"op":"app_engine_default","engine":"claude"}`: among the lamp's
+    engines, kept and used at once; blank, `engine_unknown`; not among
+    them, `engine_not_installed`; `engine_default_unsaved` when the file
+    can't be written. It is kept in `engine-default.json` in the tasks
+    folder (`--dir`) as `{"version":1,"engine":"claude"}`, written beside
+    and renamed over, and used at once, without a restart: the lamp's
+    order puts it first, the `targets` answer says it as the `lamp`
+    target's engine (so the voice names it), and the lamp's target is
+    written again at the next look. `{"op":"app_engine_default_state"}`
+    reads it. Both answer `{"ok":true,"default":"claude","chosen_in_app":true}`
+    (`default` null when the lamp has no engine; `chosen_in_app` true only
+    while the app's choice is the default). The file is read at start;
+    missing, not valid, or naming an engine Harness starts with no task is
+    no choice. A choice no longer among the lamp's engines (Harness no
+    longer reports it, or its switch is off) is passed over, not wiped.
+    The lamp's reset wipes it with the tasks folder. Shown in tests:
+    `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
+    `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
+    `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
+    `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default`,
+    `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
+    `runtime::tests::the_lamps_engines_are_harness_s_the_default_first_then_harness_s_order`,
+    `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
+    `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
+    `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
+  - **Started** as Harness starts OpenClaw:
+    `openclaw tui --session harness-<agentId> --message "<prompt>"`, with
+    no permission modes and no model routing (OpenClaw picks its own
+    model, from its settings below).
+  - **Idle with no ask counts as handed over** (#6499): after a `new`
+    that answered, lamp-tasks reads `show` until the harness is asked or
+    idle, within the same `launch_timeout`. Either way the task is
+    `Created`, as Harness answered it: on the lamp OpenClaw's `show` can
+    read idle with no `ask` seconds after a `new` whose `--message` it did
+    take. Idle with no ask writes one journal line and nothing else:
+    nothing is closed, `new` is not asked again, and nothing is typed in
+    with `harness reply`. A `show` that fails is uncertain, with its code.
+    The real loss, OpenClaw dropping `--message` while the TUI pairs with
+    a cold Gateway, is fixed in Harness 0.6.23
+    (autonomous-ai/openharness#4172: it starts OpenClaw without
+    `--message` and types the task once the pane is ready); a lamp gets it
+    with the Harness pin move (#5957). (#6504's close-and-start-again
+    stopgap is gone.)
+  - **Never begun, told and closed** (#6577): the lamp's own OpenClaw
+    task, handed over in this boot, still read idle with nothing asked,
+    no answer and no tool used `OPENCLAW_BEGIN_WITHIN_MS` (130 s: the
+    slowest real first prompt seen, 65.1 s on lamp-fc4b with Harness
+    0.6.16 on 12 Nov, times two; 0.6.41's reading is still to come) after
+    it was accepted, and so at every
+    read since, is kept as `failed` (`engine::never_began`, one journal
+    line). The voice then tells it as any failed task, in one plain
+    sentence that it stopped without finishing, and its empty harness is
+    closed as a told lamp task's is (`close_due`). It is not tried again
+    and not moved to Hermes (the lead's rule). Anything asked, answered or
+    used before the bound, a task from an earlier boot, the person's own
+    session, Hermes and the computer's agents are as before.
+  - **The voice** (`agent_tasks`, `task_news`): reads the lamp's target's
+    engine from `{"op":"targets"}` and names it, so a hand-over naming no
+    machine is said as "OpenClaw on the lamp" and the tool descriptions
+    say "OpenClaw here on the lamp"; with `hermes` there, "Hermes" as
+    before. Until the targets are read it says Hermes, the default (#6498).
+    `who` "OpenClaw" or "Hermes", while the lamp has its target, is the
+    lamp's own, never a computer's. OpenClaw is also one of the agents the
+    voice can name on a computer, heard as "OpenClaw", "open claw", "open
+    clause", "open close", "open clow" or "open klaw". News of work done by
+    either engine on the lamp is told as done here on the lamp.
+  - **Shown only in tests:** `agent_tasks::tests::new_work_goes_to_openclaw_on_the_lamp`,
+    `agent_tasks::tests::with_the_lamps_target_the_hand_over_says_what_goes_where`,
+    `agent_tasks::tests::with_named_only_the_words_name_an_agent_not_set_up`,
+    `task_news::tests::work_done_by_openclaw_on_the_lamp_is_told_as_done_here`.
+    Not shown on a lamp.
 
 Signing in a lamp with no screen is by a spoken code since Harness 0.4.23
 (openharness#1410; ["Signing in by a spoken code"](#signing-in-by-a-spoken-code---sign-in-by-code-1676)).
@@ -1328,6 +2284,38 @@ environment list), `harness start` among them. Its journal says `tasks:
 Harness's own updates held (ADAPTER_UPDATE_DISABLE=true,
 HARNESS_ENV_FILE=…)`, or `not held: <why>` when the file can't be written.
 
+**The managed grid held too (#6283).** `ADAPTER_UPDATE_DISABLE` doesn't
+reach Harness's managed grid runtime: the daemon's `ensureManagedGrid`
+(openharness `lib/runtimeInstall.ts`, v0.6.13_cli) follows the grid pin at
+`ADAPTER_GRID_RUNTIME_METADATA_URL` (Harness's CDN) on each start and every
+10 minutes, held or not. So a held lamp's `harness-hold.env` also says
+`HARNESS_GRID_BIN=<the grid binary>`, the path Harness's installer recorded
+in `/var/lib/lampos-tasks/.harness/runtime/current-grid` when it laid down
+the pin's grid. With it set the daemon uses that binary and never fetches
+another, so a newer grid comes only with a pin move, whose install lays
+down the pinned grid and records it again (lamp-tasks is started again
+after the move, and the file's new words restart the daemon). The line is
+written only when that record is a plain absolute path to a `bin/grid` file
+inside `.harness/runtime`. With no grid installed, or on a dev or beta lamp
+where the hold is lifted, there is no line, and the variable isn't given.
+
+**Dev and beta lamps: the hold lifted (#6300, (B)).** With the switch on,
+a lamp whose updater follows the lamp-voice feed is the canary for Harness's
+releases, and every writer of the hold lifts it there instead:
+`harness-hold.env` is written without `ADAPTER_UPDATE_DISABLE=true` (said
+changed on a lamp that held before, so a running daemon is started again once
+no task is busy, and `harness start` rewrites its unit without the hold), no
+Harness command is given `ADAPTER_UPDATE_DISABLE`, and the launcher's three
+lines below are taken out, at lamp-tasks' start and after `lamp-update
+harness-install`. The journal says `tasks: Harness's own updates not held:
+this lamp follows the lamp-voice feed, …`, and the health line after each
+start is kept. The feed is the `--channel-url` of `systemctl show
+lamp-update.service --property=ExecStart --value`, exactly
+`https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/`.
+The stable feed, any other, and a line not read (systemctl failed) keep the
+hold exactly as below. One predicate decides it for both lamp-tasks and
+lamp-update (`lamp_msgs::harness_hold`, `crates/msgs/src/harness_hold.rs`).
+
 **The pinned launcher (#5493).** The environment above reaches only the
 Harness commands lamp-tasks runs. A `harness logout` run by hand over ssh,
 without them, restarted the held daemon from its own environment, and the
@@ -1341,12 +2329,26 @@ installer writes with `--no-updates`:
 #!/bin/sh
 export ADAPTER_UPDATE_DISABLE=true
 export HARNESS_ENV_FILE=/var/lib/lampos-tasks/harness-hold.env
+case "${1-}" in update) echo "harness: this lamp keeps Harness at its pinned version and updates it itself; nothing was changed" >&2; exit 1 ;; esac
 exec … cli.js "$@"
 ```
 
 Every `harness …` run through the launcher (or through `/usr/local/bin/harness`,
 its link) then holds the updates, whoever runs it. Harness's own updates
 rewrite only the `exec` line, so the preamble stays.
+
+**`harness update` refused (#5957).** The daemon's hold stops only its own
+self-update. `harness update`, run from a shell as the tasks user (by hand,
+or by an agent's terminal tool), installs the newest Harness whatever the
+hold says. It put lamp-c0a4 above its build's pin on 11 Nov, where
+lamp-update never moves it back down. So the launcher's third line refuses
+that one command before Harness runs: one line on stderr, exit 1, nothing
+changed. Harness takes its command from its first argument (openharness
+`cli/src/cli.ts`), so only that is read: `harness update --force` is
+refused, `harness reply <id> update` and every other command run as before.
+lamp-update moves Harness to its pin itself (`harness-install`) and never
+calls `harness update`. The line is written and taken out with the hold by
+both writers, from one text (`lamp_msgs::harness_hold::REFUSE_UPDATE`).
 
 - **Where:** lamp-tasks at its start (`hold::pin_at_start`), for lamps
   installed before this; and `lamp-update harness-install` right after it
@@ -1358,8 +2360,8 @@ rewrite only the `exec` line, so the preamble stays.
   line (`LAMP_HARNESS_HOLD_UPDATES is not on in lamp-tasks.service: …` or
   `lamp-tasks.service's environment not read (<why>): … taken as off, …`).
 - **What is written:** any `export ADAPTER_UPDATE_DISABLE=…` or `export
-  HARNESS_ENV_FILE=…` line before the first `exec` line is taken out, and
-  the two lines above are put just before it. The `exec` line and every other
+  HARNESS_ENV_FILE=…` line, and the refusing line, before the first `exec`
+  line is taken out, and the three lines above are put just before it. The `exec` line and every other
   line are kept as they are. A launcher already in that shape is not written
   (byte for byte the same, no second preamble). Otherwise it is written whole,
   through `.harness.lampos-pin` beside it, with its own mode (executable) and
@@ -1485,8 +2487,11 @@ credential of its own.
   `machines_failed`). With `--sign-in-by-code` and `--set-up-later`, when
   the part's first sign-in read says signed in (or offline), it runs the
   same `harness start`, with the same tries below, and journals
-  `Harness signed in at this start: its daemon is started (#5379)`. A part
-  that starts signed out starts nothing until a sign-in.
+  `Harness read yes at this start: its daemon is started (#5379, #6407)`
+  (`offline`, or `no` below). A part that starts signed out starts nothing
+  until a sign-in, unless the lamp's own engine may be its target
+  (`LAMP_OPENCLAW_ON_LAMP` or `LAMP_HERMES_ON_LAMP` on, #6407): then it starts the daemon signed out
+  too, since the lamp's own work runs on it.
 - **A failed start is tried again.** On lamp-75c9 (21 October) the start
   right after a spoken sign-in said `start_failed`, and one by hand about a
   minute later worked. So a failed start is tried again 10 s later, then
@@ -1520,6 +2525,511 @@ of a hand-over waiting, and never after a sign-in that failed),
 waiting hand-over goes after the try that works, or after the last) and
 `the_daemon_is_started_with_harness_start`. The
 voice's side (`sign_in_computer`, `sign_in_answer`) is its own PR.
+
+## Hermes' settings on the lamp (#5978, `hermes_config`)
+
+`lamp_tasks::hermes_config::write(HERMES_HOME, port, token)` merges what
+Hermes on the lamp needs into its own two files, and nothing else. Nothing
+calls it yet: the lamp as a target (#5978, part 3) runs it before a Hermes
+task, with lamp-cloud's forwarder port (7741) and its local token
+(`/var/lib/lampos-cloud/hermes-token`, docs/cloud.md, "Hermes' DeepSeek,
+forwarded on the lamp").
+
+- `config.yaml`: `model.provider: "custom:lamp"` and
+  `model.default: "deepseek-flash"` (the voice's DeepSeek model), with any
+  `model.base_url`, `model.api_key` or `model.api_mode` from another provider
+  removed; `providers.lamp` with `base_url:
+  "http://127.0.0.1:7741/v1/deepseek"`, `api_mode: "chat_completions"`
+  (DeepSeek's OpenAI-compatible chat), `key_env: "LAMP_HERMES_TOKEN"` and
+  `default_model: "deepseek-flash"`; and `approvals.mode: "manual"`, so
+  Hermes asks before a dangerous command (lamp-tasks never says yes to it
+  by itself). The values are quoted: PyYAML would read a bare `off` or `on`
+  as a boolean.
+- `.env`: one `LAMP_HERMES_TOKEN=<token>` line, the forwarder's local
+  token, never the relay's key. Provider keys are taken out
+  (`DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`,
+  `AUTONOMOUS_API_KEY`, `OPENROUTER_API_KEY`); every other line kept.
+- **Who:** it must run as Hermes' own user (`lampos`), so both files stay
+  Hermes'. lamp-tasks (also `lampos`) reads the token from
+  `/var/lib/lampos-cloud/hermes-token`. Neither file is read through a link
+  (`O_NOFOLLOW`), and one that isn't a regular file is refused.
+- **Kept:** every other key and line, Harness's `hooks:` block above all
+  (openharness `engines/hermes/contract.ts`), comments, and other providers.
+  Running it again changes nothing, and a file already right is not
+  written. A written file is 0600, written beside the old one and renamed
+  over it.
+- **Refused:** the workspace has no YAML crate, so the merge is line-based
+  over block-style YAML, as Hermes and Harness write it. A file it can't
+  merge safely (a tab, a document marker, a key twice, a list or anchor
+  where a mapping is set, a top level that isn't a mapping) is left as it
+  is, and nothing is written, `.env` included.
+
+## OpenClaw's settings on the lamp (#6226)
+
+With `LAMP_OPENCLAW_ON_LAMP` on, lamp-tasks at its start merges what
+OpenClaw on the lamp needs into `<state>/openclaw.json`
+(`/var/lib/lampos-openclaw/state`, JSON5), exactly as `hermes_config` does
+for Hermes, and keeps every other key (lamp-update's `gateway` block among
+them) (`crates/tasks/src/openclaw_config.rs`):
+
+- `models`: `mode: "merge"`, with the provider `lampos`: `baseUrl`
+  `http://127.0.0.1:7741/v1/deepseek` (lamp-cloud's forwarder, docs/cloud.md),
+  `apiKey` `"${LAMP_HERMES_TOKEN}"` (the wrapper exports it from the
+  forwarder's token file), `api` `"openai-completions"`, and one model,
+  `deepseek-flash` (the forwarder's only model). A loopback target may
+  need `request.allowPrivateNetwork: true` on the provider.
+- `agents.defaults.model.primary`: `"lampos/deepseek-flash"`.
+- `agents.defaults.workspace`: the lamp's own work folder
+  (`/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`, `LAMP_PROJECT` under
+  `lampos`'s home), where the lamp's skills keys point and the guidance
+  (`AGENTS.md`) is written, as for Hermes.
+
+## Harness's hooks inside the lamp's agent namespace (#6530)
+
+Harness's hooks for an engine (`harness hook hermes session-start`,
+`harness hook hermes tool`) run inside the lamp's agent namespace, where
+Harness's CLI and state are hidden. The shared agent namespace piece
+(`crates/update/src/agent_ns.rs`, #6510's "one namespace for every engine",
+used today by Hermes's and OpenClaw's namespaces) puts a stand-in `harness`
+first on the namespace's `PATH`: `/usr/local/lib/lampos/ns-bin/harness`,
+root's, 0755, written by lamp-update. It answers `harness hook …` with
+nothing and exit 0, refuses anything else, and shows no Harness state. Each
+engine start writes one journal line: "Harness hooks aren't available inside
+the lamp's agent namespace yet (openharness#4194)". So Harness's hook-driven
+session tracking does not see a namespaced engine's sessions for now. The
+stand-in is removed once a sandbox hook mode (openharness#4194) ships in the
+pinned Harness (docs/install.md, "Hermes on the lamp").
+
+## A skill's task on the lamp's Hermes (#6306, #6071's PR 3, off unless `LAMP_SKILL_TASKS=on`, on in the product)
+
+A made skill's `do.task` step (#6305, docs/skills.md, "A skill's task")
+hands its slower part to the lamp's own Hermes. lamp-skills sends one line
+for each run, and is answered once the run ends
+(`lamp_tasks::skill_task::answer`):
+
+- **The line:** `{"op":"skill_task","skill","task","run","folder","sha256","grants"}`.
+  Every field is needed and no other is taken. `skill` is a skill's name
+  (`a-z`, `0-9`, `-`, `_`, at most 64), `folder` is exactly
+  `/var/lib/lampOS/skills/<skill>` (the skills Hermes sees read-only) or,
+  for a skill the owner's computer pushed, `/var/lib/lampOS/skills-dev/<skill>`
+  (`skill_task::PUSHED`, shown read-only to a skill's run alone), compared
+  as written (a `..` or any other folder is refused "the skill's folder is
+  not its own among the lamp's skills"); the pushed folder only while nothing
+  of that name (a folder, a file or a link) is under `skills/`
+  (`skill_task::lamp_has_skill_named`, lamp-control's and lamp-skills' rule),
+  else "a skill of that name is on the lamp: a pushed one never runs in its
+  place",
+  `run` is a file under the skill's `scripts/` (each part only `A-Z a-z 0-9
+  . _ -`, never starting with `.`, so no `..`, no hidden part, no newline,
+  backtick or space; not absolute), `task` is 1 to 500 bytes with no
+  control character, `sha256` is 64 lowercase hex digits,
+  and `grants` are each once and each known (`grant_known`): one of
+  lamp-control's own (`CONTROL_GRANTS`: `body`, `light`, `speak`, `look`,
+  `hear`, `sound`, `air`, `device`, `camera`, `microphone`, `notes`,
+  `speech`; never `skills`), or a linked service's `<code>-read` or
+  `<code>-write` (#6432, `SERVICE_GRANTS`: lamp-services' catalog codes,
+  `gmail-app` told as `gmail` and `figma-api` as `figma`, so `gmail-read`,
+  `google_calendar-write`). A test holds `SERVICE_GRANTS` to the catalog.
+  Anything else is `bad_request`, and no token is asked for.
+- **The answer:** `{"ok":true,"id":N}` once the run ended, or
+  `{"ok":false,"error","message"}`: `off` (the switch is not `on`),
+  `bad_request`, `too_long` (over 8192 bytes), `no_token` (lamp-control gave
+  no one-run token), `run_failed`, or `busy` (another skill's task is
+  running: one runs at a time).
+- **A one-run token** (the first builder's 12:45 conditions on #6071): for
+  each run lamp-tasks asks lamp-control (#6304, PR #6408) for a token on
+  its admin socket, `/run/lampos-control/admin.sock` (`ControlTokens`, the
+  `Tokens` trait): `{"mint":{"skill","run","expires_in_ms"}}`, the run id
+  lamp-tasks' own and new for each hand-over (`run_id`), the life 14
+  minutes (`RUN_LIFETIME`, under lamp-control's most of 30, a minute under lamp-skills' 15-minute wait), and `{"end":{"run"}}` when
+  it ends. A mint whose answer is lost (no answer in 5 s, or not JSON) is
+  ended at once too, since its token may be live. lamp-control reads the owner's yes itself and names its grants; a
+  run whose minted grants are not exactly the ones its line asks is refused
+  `no_token` and its token ended, so a run never gets grants its skill did
+  not ask. A line that asks no grant and a yes kept with none match: its
+  token names none, and the run goes with nothing of the lamp's. lamp-control's own refusal (no yes, skill runs off, not
+  reachable within 5 s) is the `no_token` message. The run is given the
+  token as `LAMP_CONTROL_TOKEN`, beside
+  `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`, and nothing else
+  of the environment is added. The token is ended when the run ends, a
+  failed run too. It is never in the task's words, the journal or a debug
+  line. No token, no run. While a run is live, its token is in the outer
+  wrapper's process environment (`/proc/<pid>/environ`), readable by other
+  processes of lamp-tasks' uid; that is accepted for a one-run token that
+  lives 14 minutes at most.
+- **The run-token file** (#6510 Part 1): `harness new` takes no
+  environment, so a run that goes through Harness (`HarnessRunner`, #6510
+  Part 1 step 2, below) is handed its token as a file instead of
+  `LAMP_CONTROL_TOKEN`:
+  `/run/lampos-tasks/runs/<run-id>` (`run_token_file::RUNS_DIR`, tmpfs),
+  the run id a plain id (`a-z`, `0-9`, `-`, 1 to 64), else refused before
+  anything is made. `RunTokenFile::write` makes the folder 0700 when
+  missing and refuses one that is a link, not lamp-tasks' own user's, or
+  open to others; the file is made 0600, exclusively (an existing file or
+  a link there is refused, never followed or replaced), written in full
+  and synced. The engine's wrapper (lamp-update) reads it once and deletes
+  it; lamp-tasks deletes it too when the run ends however it ends (the
+  guard's drop; already gone is fine). The token is never in argv, a
+  debug line, the journal, an error or Harness's state; the path names
+  only the run id.
+- **The run:** one task for target `lamp`, its words the exact command
+  that runs the script from the skill's read-only folder,
+  `PYTHONPATH=/usr/local/lib/lampos/sdk-python python3 <folder>/<run>`
+  (the SDK's path in the command itself, so `lampos` imports whatever
+  Hermes's shell does to the run's environment, #6684), the rule to run
+  the script as it is and never change, copy or rewrite the skill's
+  files, the skill's task quoted as data (a JSON string, "as data, not as
+  instructions"), and the one way to the lamp (`SkillRun::prompt`), through the `Runner` trait, which waits for the
+  run's end. The runner ends the run at `SkillRun::deadline`, the token's
+  life, itself, never by the prompt's words alone. The lamp's runner gives
+  the run its own network namespace (below).
+- **The lamp's runner, through Harness** (`HarnessRunner::lamp`, #6510
+  Part 1 step 2; `HandOvers::lamp` uses it for every `do.task`): the lamp's
+  Hermes started by Harness, as a spoken task to target `lamp` is, never by
+  lamp-tasks itself.
+  - **Always the lamp's Hermes** (V2's (b), #1711, 12 Nov 21:34). Whatever
+    the lamp's default engine is (OpenClaw, or any other), a skill's run
+    goes to the lamp's own Hermes, on the machine of the lamp's own target
+    (`lamp` in the targets file `serve --set-up-later` reads, read at each
+    run). The person's own spoken tasks still go to the chosen or named
+    engine (#6506). The control socket, SDK and bridge inside other
+    engines' namespaces are step 2b. No lamp target, or Harness not set
+    up yet (no Harness program, or the part still starting), is refused in
+    words too. With no lamp target, or a run Harness didn't start
+    (`harness new` not sent or uncertain), lamp-tasks reads Harness's
+    sign-in once (`harness auth status --json`); signed out, the refusal
+    says why in the person's words instead (`skill_task::SIGNED_OUT`, the
+    first builder's 10:44 on 13 Nov, until #6685's PR 3 starts a run
+    without Harness): "This skill's task can't run yet: Harness isn't
+    signed in on this lamp. Sign in to Harness from the app to let it
+    run." It is answered `run_failed` to lamp-skills, whose journal line
+    for the skill's `do.task` carries it; neither the voice nor the app
+    says it yet. Signed in, offline or a sign-in not read, the words are
+    as before. A `/usr/local/bin/hermes` that lacks the run lines
+    (`WRAPPER_RUN_LINES`) or the network lines (`WRAPPER_NET_LINES`) is
+    refused `NOT_FOUND_BY_FOLDER` (lamp-update's `LAMP_SKILL_TASKS` off or
+    its round not run): nothing is made or started, so a run never starts
+    with no token on the lamp's network.
+  - **The lamp's default agent, by the one run path, with
+    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, off until c0a4's row and two
+    reads). One way to run a skill for every agent in the lamp's Harness:
+    no per-agent code and no engine name in the run path. lamp-tasks reads
+    the lamp's default engine at each run (`runtime::lamp_default`, the
+    app's choice first; before Harness has said, the lamp target's engine)
+    and makes one check for whichever it is
+    (`skill_task::default_agent_takes_runs`):
+    - an agent in its maker's cloud (`EngineKind::cloud`, Devin Cloud) never
+      runs on the lamp;
+    - its wrapper `/usr/local/bin/<engine>` is lamp-update's one run path
+      wrapper for it: `ONE_PATH_MARK` as its second line, its data naming
+      it (`E=<engine>`), the run lines (`WRAPPER_RUN_LINES`) and the one
+      path's network lines (`AGENT_NS_NET_LINES`: the caller's
+      `LAMP_CONTROL_TOKEN` and `LAMP_NS_NET` unset, `--net` only in a run,
+      the one `unshare` into `/usr/local/lib/lampos/agent-ns`);
+    - the agent namespace `/usr/local/lib/lampos/agent-ns` takes the home
+      from the wrapper (`AGENT_NS_HOME_LINE`) and shows lamp-control's
+      socket (`AGENT_NS_TASKS_LINE`, lamp-update's `LAMP_SKILL_TASKS` on);
+    - **what Harness would start is that wrapper**, asked live at the run's
+      start, never on the voice's turn and never from a round's snapshot
+      (`skill_task::login_finds_wrapper`): Harness starts whatever
+      `lampos`'s login shell finds as `command -v <engine>`, and an
+      engine's own program earlier on that `PATH` (`~/.local/bin/<engine>`)
+      would run with no namespace and the lamp's network. lamp-tasks is
+      `lampos` (with `NoNewPrivileges`), so it cannot run lamp-update's
+      `runuser -l lampos`; it runs lamp-update's own command
+      (`skill_task::login_command`, `command -v <engine>`, held to
+      lamp-update's source by a test) in a login shell it starts itself
+      (`LoginLookup`): `/bin/sh -l -c`, the shell Harness reads an engine's
+      launch environment through (`hold::LAUNCH_SHELL`; `lampos`'s own is
+      `/usr/sbin/nologin`), its environment cleared to `HOME` (Harness's
+      home, lamp-tasks' own `/var/lib/lampos-tasks`, where Harness's
+      installer's `~/.local/bin` is), `SHELL`, `USER`/`LOGNAME` `lampos`
+      and `PATH=/usr/local/bin:/usr/bin:/bin`, in its own process group,
+      bounded to 2 s (`LOGIN_LOOKUP_WITHIN`; past it the group is killed).
+      The one line it prints and `/usr/local/bin/<engine>` must be the same
+      file once both are resolved as `readlink -f` resolves them
+      (`found_is_wrapper`): a link to the wrapper counts, any other file
+      does not. Another program found first, none found, a shell that
+      fails, prints more than one line, cannot be started or runs past
+      2 s is refused in words, with no token file written and nothing
+      asked of Harness.
+
+    The same lines for Hermes, Claude Code or any other agent: a test pins
+    them to the wrappers lamp-update writes for Hermes and Claude Code
+    (`crates/update/src/agent_ns/wrapper/one-path-*.sh`). A default that
+    fails the check is refused in words, journaled: "the lamp's default
+    agent (<engine>) isn't set up for a skill's run yet (<why>), so nothing
+    was started", with nothing made or asked, and no other agent runs it
+    instead. A wrapper lamp-update wrote (its mark, `WRAPPER_MARK`, in the
+    first 512 bytes) without the run lines is said as an agent with no
+    fenced run path for a skill's run yet, whatever lamp-update's switch,
+    with no engine named in the check: OpenClaw's one gateway has no
+    wrapper started per run, so as the default it is refused this way until
+    it has a fenced path of its own (a later step). The token file is written before the launch, as for
+    Hermes, and the run is `harness new <engine>` in its own folder (below).
+    Messages after the launch say "the lamp's default agent". Off, every
+    run is the lamp's Hermes through its own wrapper, as above (the
+    interim).
+  - **Its own folder.** lamp-tasks makes `skill-<run-id>` (0700,
+    `RUN_FOLDER_PREFIX`) in its Harness project
+    `/var/lib/lampos-tasks/harnesses/lamp-tasks` (made 0700 when missing),
+    never one already there, and writes the run's token file (above). It
+    then hands the run over with the Cli spoken tasks use
+    (`Cli::launch`), with routing, named sessions, resumes, `--new`
+    folders, the sessions index and the daemon's restart off
+    (`SkillHarness::new`): `harness new hermes --machine <lamp> <folder>
+    --name skill-<run-id> --json --task <words>`, the folder `new`'s
+    positional argument (Harness only checks that it is a folder; Hermes
+    has no folder trust to register). The run id comes from that folder:
+    Hermes's wrapper takes it from `pwd -P` (docs/install.md, "Hermes on
+    the lamp"), reads the token file once, deletes it, and gives the run
+    `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH` and
+    `LAMP_NS_NET=run`, before its namespace starts. By the one run path
+    (above) the run is `harness new <engine>` and the agent's one run path
+    wrapper does the same, with the same lines. The token is never in
+    Harness's arguments, environment or state.
+  - **Its end.** `harness wait --machine <lamp> <agent> --any --timeout
+    600s --json` on the one agent, asked again (a failed `wait` after 1 s,
+    `WAIT_RETRY`) until it ends or the deadline (14 minutes, the token's
+    life) cancels it. Ended `idle`, `stopped`, `closed` or `gone` is
+    `{"ok":true,"id":0}`; `failed`, or `needs-input` (no one answers a
+    skill's run), is `run_failed`. At the deadline the run is closed with
+    `harness close --machine <lamp> <agent> --now --json`
+    (`Cli::close_now`) and is `run_failed` "the run was ended at its
+    deadline, 840 s". `new` not started (`not_sent`, `uncertain`, or a
+    `pending` creation) is `run_failed` too.
+  - **However it ends**, its guard first has lamp-control end the run's
+    token (`{"end":{"run"}}`, once), then closes the session (`close
+    --now`, once; not for one Harness says is `closed` or `gone`), removes
+    the run's folder, and deletes the token file if the wrapper hasn't
+    (V2's order on #6510: revoke, then `close --now`, then the SIGKILL
+    below, so a run being stopped can do nothing on the lamp). A creation Harness
+    finishes later finds no folder or no token, and its wrapper ends it
+    ("no token for run <run-id>"). Nothing the run printed is kept by
+    lamp-tasks; Harness's own record of the session and Hermes's session
+    under its `HERMES_HOME` are as for any Harness session.
+  - **When lamp-tasks stops** (SIGTERM: a restart, an update), a run
+    still waited on is ended the same way, since Harness's daemon, not
+    lamp-tasks, holds its Hermes and would keep it going past lamp-tasks:
+    the stop cancels the wait, the token is ended, then `close --now`,
+    then the folder and token file are removed ("the run was ended as
+    lamp-tasks stops"). lamp-tasks waits for this, at most 20 s
+    (`skill_task::STOP_WAIT`), before it exits. `lamp-tasks.service` sets
+    no `TimeoutStopSec`, so systemd's default 90 s covers those 20 s; a
+    unit that shortens it below that cuts the stop short. A SIGKILL skips
+    it; the next start sweeps what it left (below). Test:
+    `a_skill_run_is_ended_when_lamp_tasks_stops`.
+  - **The workers' own stop** (#6717). After the stop, lamp-tasks waits
+    up to 5 s (`runtime::SHUTDOWN_WAIT`) for the store's owner and the
+    Harness worker to finish the step each is in. The owner's step can
+    hold a durable store write, which takes well over 300 ms on an SD card
+    or a loaded disk. Only a worker still busy after that is "Tasks worker
+    did not stop; exit this process before restarting".
+  - **The start's sweep** (#6691). A run a SIGKILL cut, or a `close --now`
+    that ran past `STOP_WAIT` or failed, leaves its session, folder or
+    token file behind. At its next start, once Harness is set up,
+    lamp-tasks finds each such run by any one trace: a `skill-<run-id>`
+    folder in its Harness project (never a link), a token file in
+    `/run/lampos-tasks/runs/`, or a session on the lamp's machine named
+    `skill-<run-id>` that works in that run's own folder,
+    `<project>/skill-<run-id>` (`harness ps --json`, its `folder`). Only
+    the run id shape lamp-tasks makes counts, `task-<millis>-<pid>-<n>`
+    (`made_run_id`), so a pane, folder or file a person named `skill-…`
+    (say `skill-writer`) is never closed or removed, and a session with no
+    folder or another one is left alone (#6713 review). Each session is closed
+    `--now` (within `CLOSE_BUDGET`), after its token is ended with
+    lamp-control (the run holds the token in memory, so removing its file
+    revokes nothing), then the folder and the token file are removed, even
+    when a close failed. One journal line per run says what was asked to end,
+    closed and removed ("a run an earlier start left, skill-<id>: token
+    end asked, closed …, folder removed, token file removed"). The sweep
+    runs on a thread of its own before the skill runs' Harness is set, so
+    a skill's run is refused ("Harness isn't set up on this lamp yet")
+    until it is done, no run of this start is ever swept, and spoken tasks
+    don't wait for it. With no lamp target yet, sessions aren't looked
+    for (said); folders and token files still go
+    (`skill_task::sweep_at_start`). Tests: `issue_6691_*`.
+  - **No SIGKILL backstop yet.** The design's backstop, SIGKILL to the
+    namespace's `unshare` pid when `close --now` fails, is not built:
+    Harness's daemon starts Hermes in its own pane, and neither `new` nor
+    `show` gives lamp-tasks that pid (a `TODO(#6510)` in `skill_task.rs`).
+    A failed `close --now` is said in the journal; the run's token is
+    refused by lamp-control from its end (or its 14-minute life), and the
+    token file is gone, so a run left going holds no way to the lamp.
+  - **Known limits.** Each run shares Hermes's one `HOME`
+    (`/var/lib/lampos-hermes`); a fresh home for each run is still open
+    (Heron's and the Reviewer-lead's P3 on #6652). `/run/lampos-tasks/runs`
+    is out of reach of every namespaced session: the namespace lays a fresh
+    empty tmpfs over `/run`, so no engine Harness starts on the lamp, and
+    no other skill run, can read another run's token file. A process
+    outside a namespace running as `lampos` (lamp-tasks' and Harness's own
+    user) still can, between the file's write and the wrapper's read.
+- **The lamp's runner without Harness** (`HermesRunner::lamp`, kept for
+  #6643's skill make until it moves onto `HarnessRunner`; no `do.task`
+  uses it): the lamp's Hermes started
+  as Harness starts it for target `lamp`: `/usr/local/bin/hermes chat -q`
+  and the run's words as the last argument (the wrapper runs Hermes only in
+  its namespace, `hermes-ns`: no lamp service's folder or socket, the
+  skills read-only; with `LAMP_SKILL_TASKS=on` in lamp-update's own unit,
+  lamp-control's `/run/lampos-control/control.sock` alone, read-only, never
+  `admin.sock` (docs/install.md, "Hermes on the lamp")), in the lamp's work folder
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`; that folder not there
+  is `run_failed` with nothing started. Its environment is only `PATH`,
+  `HOME`, `HERMES_HOME` and `SHELL` (as lamp-tasks.service gives them),
+  `LAMP_NS_NET=run` (below), and the run's `LAMP_CONTROL_SOCKET`, `LAMP_CONTROL_TOKEN` and `PYTHONPATH`
+  (`/usr/local/lib/lampos/sdk-python`, the build's own lampos SDK with the `websockets` it needs, one read-only copy for
+  every agent, written by lamp-update: `from lampos import Lamp` works in whichever Python runs the script, #6507); nothing else of
+  lamp-tasks' own. The token is never an argument, and the run's output
+  goes nowhere, not into the journal. The run is its own process group,
+  killed whole at its deadline (14 minutes); exit status 0 is
+  `{"ok":true,"id":0}` (the status: there is no Harness task number), any
+  other `run_failed` naming the status.
+- **The socket** (`HandOvers`): with `LAMP_SKILL_TASKS=on` in
+  lamp-tasks' environment, `serve` binds
+  `/run/lampos-tasks/skill-task.sock` (`HAND_OVER_SOCKET`), made as its
+  other sockets are (0600 in its 0700 runtime folder); off, nothing is
+  bound. A socket that can't be bound leaves skill tasks off and the rest
+  of the part running, said in the journal. Only `lamp-skills.service` run
+  as lamp-tasks' own user is answered (read from the kernel, as the app's
+  route reads lamp-cloud); any other caller is closed with no answer. Each
+  connection is one line (its newline taken off, read within 5 s), answered
+  on a thread of its own, so the accept loop never waits on a run. One run
+  at a time: a second line while one runs is answered `busy` at once, and
+  at most 4 connections are read or answered at once, a fifth `busy` too.
+  The journal keeps each outcome's code only, never the line, the task's
+  words or the token. lamp-skills names the socket with `--tasks-socket` or
+  `LAMP_SKILLS_TASKS_SOCKET` (#6346); the product's lamp-skills unit passes
+  `/run/lampos-tasks/skill-task.sock`.
+- **No other network: two ways out** (the first builder's design on
+  #6443). The run is started with `LAMP_NS_NET=run` (`NET_ENV`), the only
+  opt-in, which only takes access away: with `LAMP_SKILL_TASKS=on` in
+  lamp-update's own unit, Hermes's wrapper then gives it a network
+  namespace of its own with only `lo` (docs/install.md, "Hermes on the
+  lamp"), so no other address resolves or connects. Harness's own panes
+  never set it, and keep their network. It fails closed both ways: the
+  script ends the run when the namespace has any link besides `lo` (the kernel's fallback
+  tunnels, `@NONE`, have no device under them and are let be), and
+  `HermesRunner` starts nothing while the installed wrapper lacks the
+  network lines (`WRAPPER_NET_LINES`, `NOT_HELD_OFF`: lamp-update's
+  `LAMP_SKILL_TASKS` off or its round not run yet), so a run is never
+  started with the lamp's own network (Heron's and Fourteen's P2 on
+  #6443); `HarnessRunner` likewise, and also without the run lines
+  (`NOT_FOUND_BY_FOLDER`). A run through Harness has `LAMP_NS_NET=run` set
+  by the wrapper itself, from its folder. Its two ways out are files shown
+  read-only in it: lamp-control's `control.sock` (above), and lamp-tasks'
+  bridge to lamp-cloud's model forwarder (`net_bridge`):
+  - **The bridge** (`Bridge`): with `LAMP_SKILL_TASKS=on`, `serve` binds
+    `/run/lampos-tasks/model.sock` (`MODEL_SOCKET`), made as its other
+    sockets are (0600 in its 0700 runtime folder), and pipes each
+    connection to lamp-cloud's forwarder on TCP `127.0.0.1:7741`
+    (`FORWARDER`). Off, nothing is bound; one not bound is said in the
+    journal, and a run's namespace script then fails closed.
+  - **The relay** (`lamp-tasks net-relay --listen 127.0.0.1:7741 --to
+    /run/lampos-tasks/model.sock`, `relay_main`): started by the run's
+    namespace script before Hermes, inside the namespace; it listens on a
+    loopback address only, prints `ready`, closes its output, and pipes
+    each connection to the bridge until the run's PID namespace ends it.
+    Hermes's model calls go to `http://127.0.0.1:7741/v1/deepseek` as
+    before.
+  - **Bounded, and blind to what it pipes:** each side at most 4
+    connections at once (lamp-cloud's forwarder runs 4; one more is closed
+    at once), 5 s to reach the other side, each direction ended after
+    130 s with no byte and each connection after 700 s (past the
+    forwarder's own 120 s read and 600 s answer bounds). Bytes are piped,
+    never read as HTTP, and nothing of a body or a header (the forwarder's
+    token travels in one) is logged: the few lines said are fixed text.
+    Neither gives the run more than its uid already had: the forwarder
+    answers any local caller, only with its token.
+
+**Not yet (said so the code is not read as more):** `ControlTokens` speaks
+lamp-control's admin socket (#6408, merged), but lamp-control keeps no skill
+yes yet (#6509 adds it), so every mint is refused there today, and with
+`LAMP_CONTROL` off lamp-control serves no run socket until (b) (#6304). The
+product units set `LAMP_SKILL_TASKS=on` and pass lamp-skills the socket
+(`LAMP_SKILLS_TASKS_SOCKET=/run/lampos-tasks/skill-task.sock`, 12 Nov), so a
+skill's task is handed over, and is refused at its mint until those two land. hermes-ns shows the run lamp-control's `control.sock` only with
+`LAMP_SKILL_TASKS=on` in lamp-update's own unit too; its own network
+namespace is the same. The run's result is not yet Task news, and the
+skill's folder is named in the run's words, not in the work folder's
+`AGENTS.md`.
+
+**The caps on lamp-tasks.service** (#6306; the first builder's 09:32 on
+#6306, 12 Nov). A skill's run is started by lamp-tasks itself, and
+Hermes's wrapper only unshares namespaces, so the run stays in
+lamp-tasks.service's cgroup, beside the part's Harness children (one
+`harness wait` and up to four `harness watch`es, Node, about 130 MB each on
+lamp-75c9). Harness's own panes run under harnessd's user unit, not here.
+A skill task may run beside a spoken one, so the cgroup is sized for two
+task deltas at once (`skill_task::TASKS_AT_ONCE`): the memory and tasks
+caps are **rest + 2 × delta × 1.5**, rounded up
+(`skill_task::two_tasks_cap`), and the CPU cap is two tasks' CPU and half
+again. The measures are Fourteen's of a real Hermes
+voice task (a packing list, 80 s) on lamp-9adf, a 6 GB lamp on build 12255,
+read from lamp-tasks.service's cgroup with `systemctl show`; the CPU came
+through the first builder (13:14 on #6059). The peaks were sampled every
+2 s, so they are a floor; the half again covers what fell between samples.
+After the task closed, the cgroup held 727 MiB and 89 tasks.
+
+| Measure (`skill_task::`) | Measured | Source | Cap in the product unit |
+|---|---|---|---|
+| Cgroup memory, `MemoryCurrent` (`MEASURED_REST_MEMORY_MB`, `MEASURED_PEAK_MEMORY_MB`) | 632 MiB at rest, 1120 MiB peak (+488; a floor: 2 s samples) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | `MemoryHigh=2100M` (`MEMORY_HIGH`): 632 + 2 × 488 × 1.5 = 2096, rounded up to 100 MB. Past it the kernel throttles and reclaims the part's own memory, never kills it: no `MemoryMax`. The lamp has no swap, so past it every process in lamp-tasks.service, serve included, stalls in reclaim until the cgroup is back under it (inferred, not measured) |
+| Cgroup tasks, `TasksCurrent`, processes with threads (`MEASURED_REST_TASKS`, `MEASURED_TASKS`) | 91 at rest, 126 peak (+35; a floor: 2 s samples) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | `TasksMax=512` (`TASKS_MAX`): 91 + 2 × 53 = 197, rounded up to 10 gives 200, raised to the least of 512 (`TASKS_MAX_LEAST`): a tool-heavy run (Python, Node, a browser's threads) can pass 100 at once. Past it a fork fails, lamp-tasks' own included; nothing is killed |
+| CPU (`MEASURED_CPU_PERCENT`) | about 1.2 cores (120%): an average over the 80 s run from the cgroup's `CPUUsageNSec`, an upper bound, not a peak | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059); the first builder, 13:14 | `CPUQuota=360%` (`CPU_QUOTA`): 2 × 120 × 1.5 = 360%, which leaves over 4 of the lamp's 8 cores (`LAMP_CORES`, the A733) to the voice; a test holds it under 7 cores |
+| Least MemAvailable (`MEASURED_MIN_AVAILABLE_MB`) | 3208 MB (3,285,476 kB) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | none; a test holds it, less a second task's 488 MB (2720 MB), at or over Hermes's install floor (`HERMES_FLOOR_MB`, ≥1,350 MB) |
+| Run time, `new` to close (`MEASURED_RUN_SECS`) | 75 s | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | none; a test holds it, and half again, within a run's life (`RUN_LIFETIME`, 14 minutes) |
+| Work folder's size (`MEASURED_WORK_FOLDER_MB`) | 1 MB, rounded up (36K before, 40K after) | lamp-9adf, 12 Nov, lamp-tasks.service cgroup (#6059) | none; recorded only |
+
+Each `MEASURED_*` and its cap must agree, in the unit too: the tests fail
+when a measure changes without its cap.
+Tests: `skill_task::tests` (the switch, the token's life, a failed
+run, no token, every refused line; the socket answering a line, a second
+run refused `busy`, the switch off binding nothing, a caller not
+lamp-skills given no answer; a run killed at its deadline, its exit status,
+and the token in its environment, never its arguments; the lamp's runner
+setting `LAMP_NS_NET=run`) and `net_bridge::tests` (a call piped TCP to
+unix to TCP and its answer back, byte for byte, through a stand-in
+forwarder on an ephemeral port; a connection past the most closed at once
+and the bound let go; an idle pipe ended; nothing piped ever said; the
+relay's arguments; the switch off binding nothing), and the caps
+(`skill_task::tests`: each in the product unit's `[Service]` once, no hard
+memory line, each cap holding two tasks with half again, the least
+MemAvailable less a second task's delta at or over Hermes's floor, the run time and half again within a run's
+life), on any computer, with no Hermes. `HarnessRunner` (#6510 Part 1
+step 2): `skill_task::tests::the_wrapper_run_lines_are_lamp_updates_own`
+(the lines it looks for held to lamp-update's source, and the folder they
+match the one it makes), and, in `tests/harness.rs` with the fixture as
+Harness, `a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothing`
+(the `new`, `wait` and `close --now` arguments, the folder the positional
+argument, no token in any argument or environment, the folder and token
+file gone), `a_skill_run_past_its_deadline_is_closed_now`,
+`a_skill_run_that_fails_leaves_nothing` and
+`a_skill_run_is_refused_with_no_harness_or_an_old_wrapper` (no target, no
+Harness, an old wrapper: refused, nothing asked or made).
+
+**The lamp row (not yet run):** on a lamp with Hermes installed,
+lamp-control serving and `LAMP_SKILL_TASKS=on` in both units, a skill's run
+whose script runs `curl https://example.com` gets a failure (no name
+resolves, no route), while the same run's model call is answered and its
+`control.sock` call works with its token.
+
+**Every engine's wrapper (#6510 Part 1, step 1, off unless
+`LAMP_AGENT_NS=on`):** lamp-update's one wrapper for every engine
+(docs/install.md, "One agent namespace for every engine") carries the same
+run lines as Hermes's (step 2): started in
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-<run-id>`, it reads
+`/run/lampos-tasks/runs/<run-id>` once, deletes it, and gives the engine
+`LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET` and `PYTHONPATH` in its
+environment only, with `LAMP_NS_NET=run`; the provisional `LAMP_RUN_ID` is
+gone. The engine's `HOME` is its own `/var/lib/lampos-agents/<engine>`.
+An engine counts as present only when `lampos`'s login shell finds the
+wrapper first (not its own program in `~/.local/bin`). With lamp-update's
+own `LAMP_AGENT_NS=on` (and `LAMP_APP_ENGINES=on`), each round writes it
+for every engine Harness says is installed except Hermes and OpenClaw, and
+takes out a wrapper it wrote (exactly its own text, nothing else) once
+Harness no longer says that engine is installed or no program of the
+engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
+line that stays true round after round is logged once. Skill runs still go
+to Hermes alone (`HarnessRunner`, above).
 
 ## Devin (#1854)
 
@@ -2169,8 +3679,8 @@ used only to say it.
   (`task_news::waiting`) answer `check_agent_task`. A stop is said plainly. Each piece is told once: its key
   (store, task, observation) goes into `/var/lib/lampOS/voice/tasks-told`
   (`LAMP_TASKS_TOLD`), read again on each pass. With `--close-told`,
-  once its turn is heard whole, a task's observation is also marked `told`
-  in the tasks part, so that its harness can be [closed](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit).
+  once its telling begins (#6530), a task's observation is also marked
+  `told` in the tasks part, so that its harness can be [closed](#closing-a-finished-harness-1390-serve---close-told-on-in-the-product-unit).
 - **Told once more when not heard** (#4342, off unless
   `LAMP_TASK_NEWS_RETELL=on`). News is kept as told the moment it is taken
   to tell (`TaskNews::tell`) or answered (`check_agent_task`), before
@@ -2182,7 +3692,7 @@ used only to say it.
   again. With the switch, settled news (done, failed, stopped, or an agent
   waiting for the person, and a hand-over that failed) whose turn was cut
   short or ended not heard whole is told once more. That includes news
-  played through with gaps, whose harness stays open (#4035): on lamp-c0a4
+  played through with gaps (#4035): on lamp-c0a4
   on 3 November such a news, played under someone's words that made no
   request (`audio_written_with_playback_gaps_unscored`), was otherwise
   neither told again nor closed. It is told once more
@@ -2196,8 +3706,9 @@ used only to say it.
   (`task_news` record `retold: true`), it is never told again unasked: not
   heard whole again, it is let go, two tries in all, the first one
   included. Heard whole in the meantime (asked and answered), it is not
-  told again. Heard whole, the tasks part is told as for any news, so its
-  `told` is set. Progress and a sign-in's question are never told again
+  told again. Its harness doesn't wait for it: the tasks part was told when
+  its first telling began, heard whole or not, so its `told` is set and the
+  harness closed (#6530); the retelling reads the answer kept in the store. Progress and a sign-in's question are never told again
   this way (progress is the Policy's to time; a sign-in asks again its own
   way). Off, news not heard whole stays as before: kept as told, said only
   when asked.
@@ -2386,6 +3897,31 @@ corrected ask, read back again, and started only on a yes:
   plain no, call nothing; "Only their yes starts it": the same work asked
   again, in the same words or others, is not a yes, so `start_agent_task`
   again and read it back, never `confirm_agent_task`.
+- **A plain no drops the task in code (#6582, with or without the switch).**
+  Before, a plain no called nothing and the task stayed waiting, here and
+  in the tasks part, for the whole `CONFIRM_WITHIN` (120 s), so a later yes
+  could still start it. Now, on the second route, a heard line that is a
+  plain no (`services::plain_no`, the list the voice already reads a no to a
+  skill's write with: "No.", "No thanks.", "Never mind.", "Don't.", "Cancel
+  that.", "Không, thôi.", and "No, don't start it.": "start", "begin", "do"
+  and "run" count, as "send" does, only after "don't", found on lamp-c0a4
+  at 12431 where "No, don't start it." was not a no) while a task waits, from a request that could have
+  said yes to it (`may_confirm`), drops it (`agent_tasks::declined`, hooked
+  as the engine's `declining_a_task_waiting`): `PENDING` is cleared, so no
+  later yes in the window starts it; the tasks part is sent its `cancel`,
+  the same op a corrected ask sends, after a `status` for its guard, on a
+  thread of its own bounded by `DEADLINE` (3.5 s), so a cancel refused or
+  never answered never holds the voice (journalled `could not be
+  cancelled; this voice no longer confirms it, and it lapses in the tasks
+  part`); the journal says `lamp-voice: tasks: request N: task <id>
+  dropped: the person said no to its read-back`; and the line is told, in
+  place of the note above, "they said no to the task you read back. It is
+  dropped and nothing was started. Say only … that you won't start it. Call
+  nothing." A no with more in it ("no, write a poem about tea instead",
+  "no, I said tea", "no, ask Codex") is not plain and stays a correction,
+  as above. A no with nothing waiting, in the request that prepared the
+  task, or past the 120 s, does nothing. The Live route has no such hook
+  yet: there a plain no still calls nothing.
 - a `start_agent_task` that prepares while another task still waits for its
   yes replaces it, but only from a request that could say yes to it
   (`may_confirm`): a later request than the one that prepared it, heard (or
@@ -2410,7 +3946,10 @@ corrected ask, read back again, and started only on a yes:
 Without the switch the note, `next` and the lines sent are byte-for-byte
 as before (a second prepare already replaced the one waiting, unsaid).
 Tests: `a_corrected_ask_replaces_the_one_waiting_and_only_it_starts`,
-`a_plain_no_starts_nothing_and_a_failed_cancel_keeps_the_correction`,
+`a_plain_no_drops_the_task_and_a_failed_cancel_keeps_the_correction`,
+`a_plain_no_then_a_yes_within_the_window_starts_nothing`,
+`a_correction_after_the_read_back_is_not_a_plain_no`,
+`a_plain_no_with_nothing_pending_does_nothing`,
 `two_starts_in_one_request_or_a_written_one_replace_nothing`,
 `without_the_correct_switch_the_note_and_next_are_as_before`,
 `with_the_correct_switch_a_repeat_of_the_waiting_ask_is_not_a_yes`,
@@ -2425,15 +3964,31 @@ in Piper's voice, `LAMP_SPOKEN_TO=off` as lamp-name didn't take Piper's
 "Lamp"; #2838):
 - **Passed:**
   - a correction then yes (task 24 replaced, only 25 reached the computer);
-  - a plain no (nothing called);
+  - a plain no (nothing called; since #6582 the voice drops the task
+    itself);
   - two corrections in a row then yes (31 and 32 replaced, only 33 sent).
 - **Found:**
   - a reworded repeat was taken as the yes (before the words above);
   - within the 120 s after a plain no, new asks were answered in words, as
-    the declined task's note still stood beside them;
+    the declined task's note still stood beside them (since #6582 the no
+    clears it, so the note goes with it);
   - "yes, and also …" isn't shown cleanly yet.
 
-### One yes for a read-back said in words (#5169, off unless `LAMP_TASKS_ONE_YES=on`)
+### One yes for a read-back said in words (#5169; on in the product for a yes to a words-only read-back, #6547 A)
+
+Since #6547 A, with no switch and no off switch, a yes to the lamp's
+words-only read-back in the same exchange, within `CONFIRM_WITHIN`,
+prepares and starts the task: `confirm_agent_task` with nothing prepared
+answers the "Nothing is prepared yet …" line below when the yes is a plain
+yes heard right after a question the lamp asked within 120 s, not cut
+(`agent_tasks::yes_to_a_question`), and the same-turn rule below
+(`yes_in_the_same_turn`) applies with the switch or without it. It holds
+every bound below: only a yes to the lamp's line just before it, which
+reads this task back whole. A yes to an older line, past 120 s, or after
+a cut starts nothing new. `LAMP_TASKS_ONE_YES` itself now changes only
+`start_agent_task`'s description (the call first) and its `task` words.
+Tests: `one_yes_to_a_words_only_read_back_prepares_and_starts_it`,
+`one_yes_counts_only_inside_the_exchange_and_the_window`.
 
 On lamp-c0a4 on 4 November the product voice often said the task back in
 words ("Claude Code will write … Shall I start it?") without calling
@@ -2449,9 +4004,12 @@ tasks flags; it needs only the tasks part):
   one short sentence, and ask whether to start it." With the staff, it says
   ", with who will do it," as before. Every description still fits in 1,024
   bytes, with the switch on too (`every_description_fits_the_service_whatever_the_switches`).
-- `start_agent_task`'s `task` parameter reads "The work, in the person's
-  own words. A short ask is enough: the agent works out the details." in
-  place of "… complete enough to do without asking." (folded in from #5119).
+- `start_agent_task`'s `task` parameter reads "Every part of what the
+  person asked, in their own words: what to do, and any count, list, topic,
+  file name or place they said. Never shorten it; the agent works out the
+  rest." in place of "… complete enough to do without asking." (folded in
+  from #5119; reworded by #6527, below: "A short ask is enough: the agent
+  works out the details" was read as leave to shorten the ask).
   With the old words the model asked what a short ask should have instead
   of calling: on lamp-c0a4 on 3 November, "ask Claude Code to build a
   website that promotes tourism in Vietnam" called it 1 time in 3, and the
@@ -2463,7 +4021,8 @@ tasks flags; it needs only the tasks part):
   (`a_short_ask_is_enough_only_with_the_one_yes_switch`).
 - `confirm_agent_task` with nothing prepared answers "Nothing is prepared
   yet: call start_agent_task now with the task you said back, then call
-  confirm_agent_task again." Without the switch it answers "There is no task
+  confirm_agent_task again." Without the switch it answers so after a
+  plain yes to a question just asked (#6547 A), else "There is no task
   waiting to be started." as before.
 - A yes in the request that prepared the task may start it
   (`agent_tasks::yes_in_the_same_turn`) only when all of these hold. If any
@@ -2539,7 +4098,7 @@ tasks flags; it needs only the tasks part):
 
 The guard that a yes must come after a read-back stays. This rule only
 recognizes a read-back said in words, before the call. Without the switch
-every description, answer and line is byte-for-byte as before
+every description is byte-for-byte as before
 (`the_one_yes_switch_changes_only_the_read_back_and_task_words`). Tests:
 `a_yes_in_the_turn_that_prepared_counts_only_after_its_read_back_in_words`,
 `one_yes_starts_only_a_task_read_back_whole`,
@@ -2554,6 +4113,54 @@ every description, answer and line is byte-for-byte as before
 `the_one_yes_switch_is_on_only_with_the_tasks_part`. Not yet played: a
 count of 10 spoken hand-overs with a real yes on each side of the switch,
 counting those that needed only one yes (#5169).
+
+### The task is the whole ask (#6527)
+
+On 52e6 on 12 November (row-6361c) "have your agent list five fruits that
+are good when you're sick and write them to fruits dot md" reached Hermes as
+"Create a file called fruits.md": the list and the count were lost, and the
+file held no fruit. The `task` words above now ask for every part of the
+ask, and `start_agent_task` checks it in code (`agent_tasks::whole_ask`),
+with or without any switch, before the tasks part is asked anything:
+
+- **The heard words.** The request's own line only
+  (`thread::heard_in_own_line`: the line held for it, or its exchange's),
+  never the newest words heard since the last answer, which may be another
+  utterance's (#6537). A typed text (`messages::is_text`), a line the lamp
+  wrote itself, or a request with nothing heard is not checked. Neither is a
+  plain yes (the task then comes from the read-back), nor a line where more
+  than a quarter of the content words are not plain ASCII (a Vietnamese ask
+  handed over in English can't be compared word for word).
+- **Content words** (`ask_words`): lower-case runs of letters and digits,
+  without a small set of asking and joining words (`NOT_ASK`: "the", "to",
+  "your", "agent", "have", "please", …, and the spoken separators "dot",
+  "slash", "underscore", "dash"), the place words "lamp", "computer",
+  "mac", "macbook", "laptop", and every form of an agent's name the voice
+  knows (`KINDS`), matched as a whole run so "open" in "open the file"
+  stays. A number word is its digits ("five" is "5", `NUMBER_WORDS`), so
+  "fruits dot md" and "fruits.md" are the same words; others compare by
+  stem. Only the words after the last agent's name (or "agent") count:
+  what comes before it is often an aside ("ugh, work was rough today,
+  anyway have Claude fix the login bug"), and an aside must never be pushed
+  into a task that leaves the lamp (#6537, the privacy read).
+- **The rule.** With at least `WHOLE_ASK_FEWEST` (4) content words heard, a
+  task that keeps under `WHOLE_ASK_SHARE` (half) of them is refused:
+  "Nothing was prepared: the task looks shorter than what the person asked
+  of the agent. If part of the task was left out (a count, a list or a file
+  name), call start_agent_task again now with the whole task; leave out
+  anything said that is not part of it." The dropped words are never named
+  back. Once per request: a second call in the
+  same request goes through whatever it keeps, so a person is never stuck.
+
+Tests: `a_task_that_drops_most_of_the_ask_is_refused_then_the_whole_ask_goes`,
+`start_refuses_a_cut_task_before_preparing_it`,
+`a_paraphrase_that_keeps_the_ask_passes`,
+`a_short_heard_ask_is_never_refused`, `no_heard_text_is_never_checked`,
+`number_words_and_spoken_file_names_match`,
+`an_aside_before_the_agent_is_not_part_of_the_ask`,
+`heard_in_own_line_never_takes_another_utterance`. Not yet played: row-6361c's ask
+on 52e6 reaching Hermes whole, and a voice-eval of 10 spoken asks with a
+list, a count or a file name.
 
 ### A lead-in before a call (#799, `LAMP_TOOL_LEAD_IN=on`, on in the product)
 
@@ -2660,8 +4267,9 @@ product-installed lamp (updates.md), so lamps already in homes get it too.
 `lamp-tasks serve --sign-in-by-code --app-socket PATH` binds a third socket,
 the owner's app's route (`/run/lampos-tasks/app.sock`, reached by
 `lamp-cloud` for the app's `harness.sign_in.*`, `docs/cloud.md`, which keeps the code and the email off the broker and hands them to the backend over HTTPS). It takes
-only `app_sign_in_start` (`{"method":"code"}`, the default and, for now, the
-only method), `app_sign_in_state` and `app_sign_in_answer` (`{"id","answer"}`);
+only `app_sign_in_start` (`{"method":"code"}`, the default, or
+`{"method":"qr"}`; another method is `bad_request`), `app_sign_in_state` and
+`app_sign_in_answer` (`{"id","answer"}`);
 any other op there is `not_on_this_route`, and those three on the public or
 voice socket are `untrusted`. Without `--sign-in-by-code` the socket isn't
 bound. The contract the app builds on is in #5198.
@@ -2677,8 +4285,38 @@ bound. The contract the app builds on is in #5198.
   (`unit none` when it can't be read), never anything the caller sent.
 
 - **Who started it.** Each sign-in records `by` (`voice` or `app`) and
-  `method` (`code`). A start from the app while the app's own is open gives
-  it back; while a voice-started one is open it is `voice_sign_in_open`.
+  `method` (`code` or `qr`). A start from the app while the app's own is
+  open gives it back, whatever its method; while a voice-started one is open
+  it is `voice_sign_in_open`.
+- **The QR (#5198, `"method":"qr"`, only from the app; the voice's
+  `sign_in_start` is always by code).** lamp-tasks runs
+  `harness login --qr --json` (Harness 0.6.16, the pinned version) in place
+  of `--code`, on the same lane, with the same environment, `HOME`, life and
+  one-open-sign-in rule (`Cli::sign_in`). Harness prints
+  `{"type":"qr","url":"https://harness.autonomous.ai/signin#k=…","expiresIn":N}`,
+  again when it is kept alive, then the same `confirm` and `result` as the
+  code. The link is read only when it begins with Harness's sign-in page and
+  `#k=` (`sign_in::QR_PREFIX`), is at most 512 plain bytes, and is good for
+  1 to 600 s; anything else ends the sign-in `unreadable`. The app's view is
+  `sign_in:"qr"` with `expires_in` and `expires_at` (moved on each keepalive
+  as the code's); the app shows the link as a QR, which the Harness phone
+  app scans (Settings ▸ Sign in a computer). Then the question "Sign in as
+  …?" is the app's to answer, as for the code. The voice reads it as the
+  app's (`in_app`) and never sees the link. A code line in a QR sign-in, or
+  a link in a code one, is passed over.
+- **The QR link is as secret as the code.** It is held only in the session
+  and given as `qr_url` in one view per telling
+  (`Session::app_view_claiming`: a new link or the same kept alive is given
+  once more), only in the replies to `app_sign_in_start`,
+  `app_sign_in_state` and `app_sign_in_answer` (which lamp-cloud hands to
+  the backend, only if it is the Harness sign-in page, `docs/cloud.md`;
+  another is told back as `relay_failed`), never in the
+  `app_sign_in_relay` reply, a plain view, the voice's view, a `Debug`, a
+  journal line ("QR given (good for N s)", never the link itself) or
+  Harness's `message` (one holding `://`, `#k=` or `hnq_` is dropped), and
+  forgotten when the sign-in ends or the link's time is up. One that ran out
+  says "The QR code ran out of time. Start again for a new one." It rides
+  `LAMP_TASKS_SIGN_IN_APP`, with no switch of its own.
 - **The voice never says an app-started one.** On the voice route it is only
   `{"sign_in":"in_app","id":N}`: `sign_in_start` is `started_in_app`, its code
   claim `not_available`, `sign_in_asked` and `sign_in_answer` `started_in_app`.
@@ -2690,7 +4328,14 @@ bound. The contract the app builds on is in #5198.
   shows its code and never its email. `revision` is the sign-in's id times
   1000 plus its changes: every change moves it, a read never does. A done
   sign-in has `message`: Harness's own result `message` (bounded, never one
-  holding an `@`) or the lamp's words for its code; Harness's
+  holding an `@`, eight digits, or the sign-in's code, matched on the
+  message's digits alone whatever the spacing or separators ("1234 5678",
+  "1234-5678"), and still after the question was asked; spelled-out digits
+  are not matched: the privacy reader's P3 on #5236 and the reviewer-lead's
+  P2 on #5579; tests
+  `a_result_keeps_harness_message_and_already_signed_in_for_the_app` and
+  `a_sign_in_message_quoting_the_code_with_separators_is_dropped`) or the lamp's
+  words for its code; Harness's
   `alreadySignedIn:true` is `done` success with `already_signed_in:true`.
 - **The app's answer** (`Session::answer_from_app`): only for an app-started
   sign-in (`started_by_voice`), for its `id` (`not_this_sign_in`), once the
@@ -2721,8 +4366,9 @@ bound. The contract the app builds on is in #5198.
   sign-in code couldn't reach the app. Try again." with a new revision;
   the sign-in goes on. `delivered:true` (a later put that worked) clears it,
   with a new revision again. The same word twice is no change.
-- The journal says `sign-in N: started from the app (code)`, `answered yes in
-  the app`, `yes from the app not taken: CODE`: never the digits or the email.
+- The journal says `sign-in N: started from the app (code)` (or `(qr)`),
+  `answered yes in the app`, `yes from the app not taken: CODE`: never the
+  digits, the QR link or the email.
 
 Tests: `sign_in::tests::a_result_keeps_harness_message_and_already_signed_in_for_the_app`,
 `protocol::tests::app_sign_in_operations_are_their_own_and_take_only_a_method_or_an_answer`,
@@ -2730,7 +4376,12 @@ and the service's `the_apps_sign_in_is_its_own_routes_and_never_the_voices`
 (each route's refusals, the app's start, state and answer, the voice's
 `in_app`, a voice-started one shown without its email and not answerable
 from the app, `revision` moved by changes and not reads, Harness's message
-passed on).
+passed on). By QR: `sign_in::tests::harness_qr_lines_are_read_strictly`,
+`a_qr_sign_in_goes_from_its_link_to_the_question_to_the_answer`,
+`the_qr_link_is_claimed_once_and_never_printed_or_kept`,
+`each_method_takes_only_its_own_form`, the CLI's
+`the_qr_sign_in_runs_login_qr_and_reads_its_link` and the service's
+`the_apps_qr_sign_in_gives_its_link_once_and_the_voice_keeps_the_code`.
 
 With the same switch in the voice, `sign_in_computer` and the news say the
 code more slowly, one digit at a time with a comma after each and a full stop
@@ -2763,7 +4414,9 @@ finish?" for any recent piece of work.
   over, not looked at yet", …), `since` ("7 minutes ago"), `quiet_for` when
   a working agent was last active 3 or more minutes ago, `last_step` as
   `{"untrusted": "…"}` (at most 160 characters, quoted), and, for settled
-  work, `told`. `not_listed` counts what the record left out. No task
+  work, `told`: its news **began** to be told, heard whole or not (#6530,
+  the first builder's 23:14 on #6059); whether it was heard whole decides
+  only a retell (`LAMP_TASK_NEWS_RETELL`). `not_listed` counts what the record left out. No task
   number, store or machine id. Every word of `asked` and `last_step` that
   looks like a path (it holds `/` or `\`, or starts with `~`) is given as
   "a file", so a folder or a username never reaches the model
@@ -2811,6 +4464,62 @@ Tests: `agent_tasks::tests::tasks_now_is_declared_and_run_only_with_its_switch`,
 `agent_tasks::tests::tasks_now_with_no_task_or_no_record_says_so_lightly`,
 `agent_tasks::tests::every_description_fits_the_service_whatever_the_switches`.
 
+### How the lamp's Harness is (#6061 part B, off unless `LAMP_TASKS_HARNESS_STATUS=on`)
+
+The voice could not say whether the lamp's Harness is signed in, or which
+computers and agents it can hand work to, though lamp-tasks knows both. With
+`LAMP_TASKS_HARNESS_STATUS=on` and the tasks part (`LAMP_TASKS_DIR`), the
+voice's `--tasks-harness-status`, taken last, after `--tasks-reply-named`,
+the model also has `harness_status`. It answers "is Harness signed in?",
+"which computers do you have?" and "what can you hand work to?".
+
+- **Where it reads.** Three requests on the tasks part's request socket,
+  each under the call's own deadline: `{"op":"status"}` for `signed_in`
+  (#5488), `{"op":"targets"}` for each computer's alias, `name` (#1676) and
+  engine, and `{"op":"tasks_now"}` for how many pieces of work are under
+  way. All three are the tasks part's own memory, so there is no Harness call
+  and the answer comes at once. lamp-tasks does not change.
+- **What the model gets.**
+  - `signed_in`: `yes`, `offline` (signed in, but Harness can't reach its
+    service just now), `no`, or `unknown` (not read yet since lamp-tasks
+    started, or any other value).
+  - `computers`: each computer once, in the targets' order (targets with
+    the same own name are one computer), with the agents it has by name.
+    It is always called by its first alias (`office`), never by its own
+    name, `LAMP_TASKS_MACHINE_NAMES` or not, since a device name often holds
+    a person's name (Thirteen's P2 on #6222; the first builder, 11 Nov). A target
+    whose engine wasn't found there (`installed: false`, #5199), one whose
+    alias isn't an alias's shape, and an engine the voice doesn't know are
+    left out. At most three are listed, and `more_computers` counts the rest.
+  - `working`: how many pieces of work are `working`. It is left out when
+    `tasks_now` is refused (no `serve --progress`), never a guess. No task's
+    words and no last step are given.
+  - `next`: answer only what was asked, in one or two sentences, never a
+    list, and name only what the answer has. With `signed_in: no`, it offers
+    to sign in by voice only with `LAMP_TASKS_SIGN_IN` (`--tasks-sign-in`);
+    otherwise it says to sign in from the app. Signed out with the lamp's
+    own target among the targets (#6407), it first says work goes to the
+    lamp's own agent, and to "sign in to hand tasks to your computers",
+    never that nothing works until then.
+- **When it fails.** No tasks part, or none set up, gets the same words as
+  every task call (`unreached`). A `status` that is refused gets the light
+  "can't do that" words, and the journal has only its code
+  (`lamp-voice: tasks: harness_status was refused: <code>`). A `targets` or
+  `tasks_now` that doesn't answer only leaves its part out.
+- **Off**, the function is not declared, and every other tool's description
+  is word for word as before (a test holds it).
+- **Who hears it.** Whoever asks the lamp hears the person's computers by
+  alias (`office`) and their agents, never a computer's own name. The switch
+  stays off in the product until its played check (TWO READS).
+- **Tests** (`agent_tasks`):
+  - `harness_status_is_declared_and_run_only_with_its_switch`;
+  - `harness_status_says_the_sign_in_the_computers_and_the_work_as_counts`
+    (each `signed_in`, grouping, aliases only, names on or off, the cap, no task words, within
+    500 ms of a local tasks part);
+  - `harness_status_refused_says_it_lightly`;
+  - `harness_status_signed_out_with_the_lamps_own_target_says_computers_need_the_sign_in`
+    (#6407).
+
 ### Signing the lamp in by voice (#1676, off unless `LAMP_TASKS_SIGN_IN=on`)
 
 On in the product's voice since 5 Nov (#5198), which the app's sign-in needs
@@ -2832,7 +4541,9 @@ be taken are kept in the tasks part alone, each sign-in by its `id`
 (#2137's redesign, after its first version kept them per process and could
 never have asked or taken an answer on a lamp).
 
-- **`sign_in_computer`**, when the person asks to sign the lamp in: the code
+- **`sign_in_computer`**, when the person asks to sign the lamp in, to
+  connect the lamp to their computer or to Harness, or to set up hand-overs
+  to their computer (the first two since #5198's follow-up): the code
   is said digit by digit in two groups ("1 2 3 4, 5 6 7 8"), with where to
   type it (the Harness app under Machines ▸ Approve a device, or
   harness.autonomous.ai). A start refused says why: only the switch being
@@ -2909,6 +4620,20 @@ never have asked or taken an answer on a lamp).
   again`. Tests: `a_sign_ins_question_cut_short_is_offered_again_until_heard_whole`
   (the news thread against a stand-in tasks part) and
   `a_question_not_heard_whole_is_due_again_a_few_times_at_most`.
+- **A question talked over is asked at the next pause** (#5198): when the
+  question's turn ends not heard whole, cancelled (the person talks over
+  it: `cancel_reply`) or finished with its audio cut or unheard
+  (`heard_news`), the coordinator hands its news to `TaskNews::not_heard`.
+  A sign-in's question among it is offered again at once
+  (`AskAgain::cut`), not 30 s later, so it is told at the next pause. It
+  still counts toward `ASKED_MOST`: one talked over on its last telling is
+  let go. Other news is left as it was. A turn cancelled by
+  `privacy_muted`, `privacy_gap` or `service_stopped` was not talked over:
+  its question is not offered again at once. Tests:
+  `a_sign_ins_question_talked_over_is_offered_again_at_once`,
+  `a_question_talked_over_is_due_at_once`,
+  `news_a_turn_did_not_get_heard_is_told_not_heard` and
+  `a_sign_in_question_cut_by_privacy_or_a_stop_is_not_talked_over`.
 - **The question heard:** once the question's turn was heard whole
   (`TaskNews::heard`), the coordinator sends `sign_in_asked` with the
   sign-in's id and that turn's number, the same number the worker's tools
@@ -3028,7 +4753,8 @@ A skill is made by the lamp's own model, never handed to a computer's agent
 [skills.md](skills.md#made-by-voice-1685-lamp_make_skillon-on-in-the-product)).
 The tasks part declares no `make_skill` or `put_on_made_skill`, and the
 worker's `--tasks-make-skill` flag is gone: `LAMP_MAKE_SKILL=on` alone gives
-the voice its own two functions, with a tasks part or without one, and an
+the voice its own function, `make_skill` (`put_on_made_skill` is gone since
+#5977: a made skill goes on as soon as it is kept), with a tasks part or without one, and an
 app's typed skill (`LAMP_APP_MAKE_SKILL`) is made the same way, never handed
 over. The made skills' news words (`made`, `not_kept`) and their repair through
 a task are gone with it. A task whose words are a skill's brief, handed over
@@ -3588,7 +5314,10 @@ Codex.
 
 **Not shown.** No task was started anywhere for this; no Harness session,
 receipt or answer from Codex or OpenCode was seen. Nothing was run on a lamp.
-How often the model names the right one from speech is not measured.
+How often the model names the right one from speech is not measured on a
+lamp; from written requests, `provider-check --hand-overs` scores each
+hand-over's place and engine, not only that it started (#6547,
+`docs/tools.md`).
 
 ### A named ask is a hand-over (off unless `LAMP_TASKS_NAMED_ASK=on`, #1722)
 

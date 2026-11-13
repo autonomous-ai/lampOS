@@ -1,0 +1,769 @@
+
+running 21 tests
+lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 1 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 0 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 2 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write, service_write, service_write, service_write, service_write, service_write, service_write, service_write, service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 9 send tries began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 10 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 2 chat round 2 first event in 1 ms
+lamp-voice second: request 2 first piece to the voice 1 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 3 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 2 first event in 301 ms
+lamp-voice second: request 2 first piece to the voice 301 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 303 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write, service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 2 send tries began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 3 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 2 chat round 2 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 1 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 2 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 2 chat round 2 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 1 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 2 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 3 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 3 first answer audio 2 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 2 chat round 2 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 1 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 2 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called the_time
+lamp-voice second: request 1 chat round 2 first event in 0 ms
+lamp-voice second: request 1 chat round 2 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 4 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 2 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 0 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 2 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 9 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 0 ms
+lamp-voice second: request 3 first piece to the voice 1 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 2 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 0 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 7 words, the last 0 ms after the line ended
+lamp-voice second: request 2: of its 7 words, 0 in request 1's words it cut short
+lamp-voice second: request 1's words, cut short, are let go: request 2 is answered
+lamp-voice second: request 2 chat round 1 first event in 0 ms
+lamp-voice second: request 2 chat round 1 called service_write
+lamp-voice second: request 2 chat round 2 first event in 0 ms
+lamp-voice second: request 2 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 2 first answer audio 2 ms after the words were heard
+lamp-voice second: request 3: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 3 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 3: of its 5 words, 5 in the lamp's answer to request 2 so far
+lamp-voice second: request 3 chat round 1 first event in 0 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 4: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 4 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 4 is held, so request 3's words, cut short by it, are answered in its place
+lamp-voice second: request 4: request 3's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 4 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 4 chat round 1 first event in 0 ms
+lamp-voice second: request 4 chat round 1 called service_write
+lamp-voice second: request 4 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 4 chat round 2 first event in 0 ms
+lamp-voice second: request 4 first piece to the voice 0 ms after the words were heard, 5 words
+lamp-voice second: request 4 first answer audio 2 ms after the words were heard
+.lamp-voice second: request 1: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 1 heard 5 words, the last 0 ms after the line ended
+lamp-voice second: request 1 chat round 1 first event in 1 ms
+lamp-voice second: request 1 chat round 1 called service_write
+lamp-voice second: request 1: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 2: speech to text opened in 0 ms, 10 ms of the line's sound waiting
+lamp-voice second: request 2 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 2 is held, so request 1's words, cut short by it, are answered in its place
+lamp-voice second: request 2: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 2 goes on from 2 messages of the cut answer's finished rounds
+lamp-voice second: request 2 chat round 1 first event in 1 ms
+lamp-voice second: request 2 chat round 1 called forget_my_face
+lamp-voice second: request 2 chat round 1: forget_my_face not run: nothing they said asks to forget (LAMP_FORGET_ASKED)
+lamp-voice second: request 2: ended before its answer: a newer line began; its words wait for that line's verdict
+lamp-voice second: request 3 goes on from request 2: its 10 ms of sound go first
+lamp-voice second: request 3: speech to text opened in 0 ms, 20 ms of the line's sound waiting
+lamp-voice second: request 3 heard 0 words, the last 0 ms after the line ended
+lamp-voice second: request 3 is held, so request 2's words, cut short by it, are answered in its place
+lamp-voice second: request 3: request 1's 1 send try began before a newer line cut its answer; the sent one and each try's own result go with its words
+lamp-voice second: request 3 goes on from 4 messages of the cut answer's finished rounds
+lamp-voice second: request 3 chat round 1 first event in 1 ms
+lamp-voice second: request 3 chat round 1 called service_write
+lamp-voice second: request 3 chat round 1: service_write not run: the write their go-ahead asked for was already sent
+lamp-voice second: request 3 chat round 2 first event in 3 ms
+lamp-voice second: request 3 first piece to the voice 3 ms after the words were heard, 7 words
+lamp-voice second: request 3 first answer audio 4 ms after the words were heard
+.lamp-voice second: request 151: request 150's 1 send try began before a newer line cut its answer; only confirmation of the earlier send go with its words
+..lamp-voice second: request 161: request 160's 2 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+..forget admission host first call after engine setup, empty: n=1 median=0.412 us p95=0.412 us max=0.412 us; target <1000 us (diagnostic only)
+forget admission host repeated empty: n=256 median=0.096 us p95=0.109 us max=0.425 us; target <1000 us (diagnostic only)
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1001: request 1's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1002: request 2's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1003: request 3's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1004: request 4's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1005: request 5's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1006: request 6's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1007: request 7's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 1008: request 8's 64 send tries began before a newer line cut its answer; only confirmation of the earlier send go with its words
+forget admission host inputs: 8 requests x 64 calls = 512 receipt entries; each has 1024 ASCII argument bytes and 4096 ASCII result bytes plus JSON/IDs; 2621440 variable-content bytes total; no carried rounds, no lock contention; representative bounded payload, not maximum wire-response size
+forget admission host saturated ledger: n=64 median=0.716 us p95=1.336 us max=2.200 us; target <1000 us (diagnostic only)
+....lamp-voice second: request 111: request 110's 1 send try began before a newer line cut its answer; only confirmation of the earlier send go with its words
+lamp-voice second: request 113: request 112's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 115: request 114's 1 send try began before a newer line cut its answer; a send not known to have gone go with its words
+lamp-voice second: request 117: request 116's 1 send try began before a newer line cut its answer; only the earlier refusal go with its words
+.
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 5488 filtered out; finished in 3.34s
+

@@ -105,17 +105,17 @@ pub fn room_sounds_yes(path: &Path) -> bool {
         .is_ok_and(|value| value.get("room_sounds").and_then(|v| v.as_str()) == Some("yes"))
 }
 
-/// Qualcomm AI Hub's YAMNet ONNX float export, release v0.59.0
-/// (`yamnet-onnx-float.zip`): the graph and its external weights beside it.
-pub const MODEL_ID: &str = "yamnet-qai-v0.59.0";
-const GRAPH_BYTES: u64 = 25_789;
-const GRAPH_SHA256: &str = "970ea63f4dc1aa33c86ef7d61d854319fdfe6bdd078f5b3d674ee1db5dd96471";
+/// Our own conversion of Google's `yamnet.h5` (#6232,
+/// `tools/yamnet-convert.sh`): the graph and its external weights beside it,
+/// released in `models-2026-11-11` and placed by `models.json`.
+pub const MODEL_ID: &str = "yamnet-h5-lampos-2026-11-11";
+const GRAPH_BYTES: u64 = 29_489;
+const GRAPH_SHA256: &str = "c7e501792262e7335b309e67ed68f8e99773a869719397b479593a82fa69657d";
 /// The graph names its weights by this file name, beside it.
 pub const DATA_NAME: &str = "yamnet.data";
-const DATA_BYTES: u64 = 14_915_108;
-const DATA_SHA256: &str = "1d6dff488da4712190e10f1c841252aa58011381132d0126dcd5ee56a4e7ed31";
-/// AudioSet indices in the bundled label map (`yamnet_class_map.csv`, as
-/// qai-hub-models v0.59.0's `labels/yamnet_labels.txt`): Speech, Music,
+const DATA_BYTES: u64 = 14_917_924;
+const DATA_SHA256: &str = "26771b4915f21765ec6605f89cfb6da9121631c2e1c6a1e767d9ef95248cc6bd";
+/// AudioSet indices in Google's label map (`yamnet_class_map.csv`): Speech, Music,
 /// Laughter, and "Walk, footsteps" (#2562).
 const SPEECH: usize = 0;
 const MUSIC: usize = 132;
@@ -142,6 +142,21 @@ const BLOCK_US: u64 = 20_000;
 const SILENT_US: u64 = 100_000;
 /// The contract's retention bound, in samples: two seconds.
 const RETAIN: usize = 2 * RATE as usize;
+/// A patch none of whose 20 ms blocks rose this far over the room's quiet is
+/// not run through the model: silence costs the classifier nothing (#5770,
+/// lamp-52e6 at rest: 14.8 % of a core with classes on, 6.5 % off).
+// ponytail: a fixed margin over the 30 s floor; a steady, heavily compressed
+// track can pull that floor to within it after 30 s. Tune from a lamp run.
+const NEAR_FLOOR_DB: f32 = 6.0;
+/// What a patch near the quiet says: nothing heard, as YAMNet scores silence
+/// (speech 8.63e-8, music 7.07e-15, docs/sound-events.md).
+const QUIET: SoundScores = SoundScores {
+    speech: 0.0,
+    music: 0.0,
+    laughter: 0.0,
+    door: 0.0,
+    footsteps: 0.0,
+};
 
 /// One admitted block, owned. Neither Clone nor Debug; zeroed on drop with the
 /// same best-effort limits as [`crate::pcm::Pcm`].
@@ -151,6 +166,8 @@ pub struct Block {
     /// The voice said, freshly, that the lamp was speaking as this block
     /// was captured: its own sound may be in it.
     own: bool,
+    /// The room's quiet as capture knew it then ([`crate::Listener::floor_db`]).
+    floor_db: Option<f32>,
 }
 
 impl Drop for Block {
@@ -191,12 +208,14 @@ impl Handoff {
     /// Only a block whose own permit and fence still hold is copied. A full
     /// queue drops it and marks the worker's window overloaded. `own`: the
     /// voice said, freshly, that the lamp was speaking as it was captured.
+    /// `floor_db`: the room's quiet then, if known.
     pub fn offer(
         &self,
         samples: &[i16; BLOCK],
         gate: &PublicationGate,
         stamp: CaptureStamp,
         own: bool,
+        floor_db: Option<f32>,
         now_us: u64,
     ) -> bool {
         if stamp.captured_at_us > now_us || !gate.allows(stamp.permit, stamp.fence, now_us) {
@@ -206,6 +225,7 @@ impl Handoff {
             samples: *samples,
             stamp,
             own,
+            floor_db,
         }) {
             Ok(()) => true,
             Err(TrySendError::Full(_)) => {
@@ -475,6 +495,8 @@ pub struct Patch {
     pub fence: u64,
     /// A block of it was captured while the lamp was speaking (#1757's read).
     pub own: bool,
+    /// No block of it rose [`NEAR_FLOOR_DB`] over the room's quiet.
+    pub quiet: bool,
 }
 
 /// The samples of one uninterrupted capture era, from the next patch's start.
@@ -485,6 +507,10 @@ pub struct Window {
     times: VecDeque<u64>,
     /// Beside each block's time, whether the lamp was speaking as it came.
     own: VecDeque<bool>,
+    /// And its level, dBFS.
+    levels: VecDeque<f32>,
+    /// The room's quiet as of the newest block.
+    floor_db: Option<f32>,
     base: usize,
     first_frame: usize,
     era: Option<Era>,
@@ -515,6 +541,7 @@ impl Window {
         self.samples.clear();
         self.times.clear();
         self.own.clear();
+        self.levels.clear();
         self.base = 0;
         self.first_frame = 0;
         self.era.take().is_some()
@@ -570,6 +597,9 @@ impl Window {
             .extend(block.samples.iter().map(|&x| f32::from(x) / 32768.0));
         self.times.push_back(stamp.captured_at_us);
         self.own.push_back(block.own);
+        self.levels
+            .push_back(crate::decibels(crate::energy(&block.samples)));
+        self.floor_db = block.floor_db;
         if self.samples.len() > RETAIN {
             self.purge();
             return purged.or(Some(SoundUnavailable::Overloaded));
@@ -609,6 +639,11 @@ impl Window {
             capture_epoch: era.epoch,
             fence: era.fence,
             own: self.own.range(first..=last).any(|&own| own),
+            quiet: self.floor_db.is_some_and(|floor| {
+                self.levels
+                    .range(first..=last)
+                    .all(|&db| db < floor + NEAR_FLOOR_DB)
+            }),
         })
     }
 
@@ -625,6 +660,7 @@ impl Window {
         self.samples.drain(..blocks * BLOCK);
         self.times.drain(..blocks);
         self.own.drain(..blocks);
+        self.levels.drain(..blocks);
         self.base += blocks * BLOCK;
     }
 }
@@ -766,13 +802,17 @@ pub fn serve(
             status.purged(reason, at, &mut send);
         }
         if let (Some(score), Some(patch)) = (score.as_mut(), window.ready()) {
-            let scores = window.features(&frontend, &patch).and_then(|mut features| {
-                // A log-mel patch is about a second of the room, roughly
-                // invertible: zeroed once scored (the reviewer on #1923).
-                let scored = score(&features);
-                features.fill(0.0);
-                scored
-            });
+            let scores = if patch.quiet {
+                Ok(QUIET)
+            } else {
+                window.features(&frontend, &patch).and_then(|mut features| {
+                    // A log-mel patch is about a second of the room, roughly
+                    // invertible: zeroed once scored (the reviewer on #1923).
+                    let scored = score(&features);
+                    features.fill(0.0);
+                    scored
+                })
+            };
             window.advance();
             let completed_us = now();
             match scores {

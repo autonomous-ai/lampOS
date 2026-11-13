@@ -1,0 +1,45 @@
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::motor_crash_preserves_actual_voice_owner_and_next_audio_dispatch ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5497 filtered out; finished in 2.03s
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::crash_and_stalled_control_never_allow_replacement_or_false_cleanup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5497 filtered out; finished in 4.86s
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::privacy_does_not_hide_actual_discard_or_close_failure ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5497 filtered out; finished in 5.61s
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token --test-threads=1 --nocapture
+
+running 1 test
+test coordinator::motor::tests::unresolved_cleanup_removes_the_service_mute_restart_token ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5497 filtered out; finished in 1.86s
+
+EXIT: 0
+
+COMMAND: /Users/d/code/autonomous-os/lampOS/target/debug/deps/lamp_voice-0e0f35ef66c6fc0e --exact reminders::transport::tests::lost_wait_ownership_drop_retains_claim_until_fixture_exit --test-threads=1 --nocapture
+
+running 1 test
+test reminders::transport::tests::lost_wait_ownership_drop_retains_claim_until_fixture_exit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5497 filtered out; finished in 2.84s
+
+EXIT: 0

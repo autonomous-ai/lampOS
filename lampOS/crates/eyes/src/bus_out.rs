@@ -18,7 +18,9 @@
 use crate::{
     activity::{Judge, Look},
     away::{Away, Seen},
-    faces, facing, speaking,
+    faces, facing,
+    sitting::{self, Keeper, Sitting},
+    speaking,
 };
 use lamp_bus::{Bus, Publisher, Subscriber};
 use lamp_msgs::{
@@ -416,6 +418,10 @@ struct ActivityOut {
     stood: Publisher,
     judge: Judge,
     by: ActivityBy,
+    /// Where the sitting is kept across a short restart (`sitting`), and
+    /// the one the run before kept, until this run's first look tries it.
+    keeper: Option<Keeper>,
+    kept: Option<Sitting>,
 }
 
 /// `room/presence`, what it is judged from, and the voice's lines.
@@ -534,11 +540,14 @@ impl BusOut {
             bus.publisher_declared(RoomActivity::TOPIC, &RoomActivity::declaration(), SOURCE)?;
         out.expires_after(Some(RoomActivity::LASTS));
         let stood = bus.publisher_declared(StoodUp::TOPIC, &StoodUp::declaration(), SOURCE)?;
+        let (keeper, kept) = sitting::at_start(lamp_ipc::monotonic_us());
         self.activity = Some(ActivityOut {
             out,
             stood,
             judge: Judge::default(),
             by,
+            keeper,
+            kept,
         });
         Ok(())
     }
@@ -733,7 +742,21 @@ impl BusOut {
             presence.away.looked_at(now_us, &faces);
         }
         if let Some(activity) = self.activity.as_mut() {
-            activity.judge.looked(now_us, &Look::all(found, filled));
+            let looks = Look::all(found, filled);
+            // This run's first look: the sitting kept from before the
+            // restart, taken back only if it finds the sitter (`sitting`).
+            if let Some(kept) = activity.kept.take() {
+                let taken = activity.judge.take_back(now_us, kept, &looks);
+                eprintln!(
+                    "lamp-eyes: the sitting kept from before the restart {}",
+                    if taken {
+                        "taken back: the sitter is at their place"
+                    } else {
+                        "let go: no sitter at their place within its gap"
+                    }
+                );
+            }
+            activity.judge.looked(now_us, &looks);
         }
         if let Some(diagnostic) = diagnostic
             && let Ok(line) = serde_json::to_string(&diagnostic)
@@ -823,6 +846,24 @@ impl BusOut {
         if let Some(activity) = self.activity.as_mut() {
             if let Some(now) = activity.judge.say(now_us) {
                 let _ = activity.out.publish_json(now_us, &now);
+            }
+            // A kept sitting the camera stayed closed past: let go, and its
+            // file removed below.
+            if activity
+                .kept
+                .is_some_and(|kept| now_us.saturating_sub(kept.last_face_us) > sitting::GAP_US)
+            {
+                activity.kept = None;
+                eprintln!(
+                    "lamp-eyes: the sitting kept from before the restart let go: no look within its gap"
+                );
+            }
+            // Not before the first look has tried the kept sitting, so a
+            // restart before it does not lose the file.
+            if activity.kept.is_none()
+                && let Some(keeper) = activity.keeper.as_mut()
+            {
+                keeper.keep(activity.judge.sitting(now_us), now_us);
             }
             if let Some(up) = activity.judge.stood_up(now_us) {
                 let _ = activity.stood.publish_json(now_us, &up);

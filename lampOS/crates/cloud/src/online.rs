@@ -61,7 +61,10 @@ const _: () = assert!(SESSION_EXPIRY_S > WILL_DELAY_S);
 /// event loop keeps them. The backend reads only `type`, `id` and `device` of
 /// an `offline`, and takes messages on a channel in the order they come.
 pub fn options_with_will(account: &Account, identity: &Identity) -> Option<MqttOptions> {
-    let mut options = options(account)?;
+    Some(with_will(options(account)?, account, identity))
+}
+
+fn with_will(mut options: MqttOptions, account: &Account, identity: &Identity) -> MqttOptions {
     let properties = LastWillProperties {
         delay_interval: Some(WILL_DELAY_S),
         payload_format_indicator: None,
@@ -78,7 +81,7 @@ pub fn options_with_will(account: &Account, identity: &Identity) -> Option<MqttO
         false,
         Some(properties),
     ));
-    Some(options)
+    options
 }
 
 /// Where lamp-cloud reads whether the broker is reached over TLS: `on`, and
@@ -90,22 +93,38 @@ pub const TLS_ENVIRONMENT: &str = "LAMP_CLOUD_TLS";
 /// when TLS is asked and cannot be set up, so it never connects in the
 /// clear in its place.
 pub fn options(account: &Account) -> Option<MqttOptions> {
-    options_with(
-        account,
-        std::env::var(TLS_ENVIRONMENT).is_ok_and(|value| value == "on"),
-    )
+    options_with(account, tls_on())
+}
+
+/// Whether this lamp-cloud runs with `LAMP_CLOUD_TLS=on`: the broker over
+/// TLS, and the ping saying so (`mqtt_tls`, #6031).
+pub fn tls_on() -> bool {
+    tls_from(std::env::var(TLS_ENVIRONMENT).ok().as_deref())
+}
+
+/// [`tls_on`] for a given value: `on` exactly.
+pub fn tls_from(value: Option<&str>) -> bool {
+    value == Some("on")
 }
 
 /// The client's options for `account`: V1's, with this lamp's keepalive,
 /// over TLS (1.2 and 1.3, the webpki roots, as the ping has it) when `tls`.
 pub fn options_with(account: &Account, tls: bool) -> Option<MqttOptions> {
-    let mut options = MqttOptions::new(
-        account.client_id(),
+    options_at(
+        account,
         account.mqtt_endpoint.trim(),
         account.mqtt_port,
-    );
+        tls,
+    )
+}
+
+/// [`options_with`] to `host` and `port` in place of the account's broker:
+/// the WSS bridge's (`crate::wss`), with the same login and client id.
+fn options_at(account: &Account, host: &str, port: u16, tls: bool) -> Option<MqttOptions> {
+    let mut options = MqttOptions::new(account.client_id(), host, port);
     options
         .set_keep_alive(KEEP_ALIVE)
+        .set_connection_timeout(crate::wss::CONNECT.as_secs())
         .set_clean_start(true)
         .set_credentials(account.mqtt_username.trim(), account.mqtt_password.as_str())
         .set_connect_properties(ConnectProperties {
@@ -187,6 +206,13 @@ pub fn reply(
             {
                 data["message"] = crate::harness_sign_in::message_for(why).into();
             }
+            // The default agent from the app (#6492): plain words beside
+            // lamp-tasks' code.
+            if let Err(why) = &answered
+                && kind == crate::engine_default::KIND
+            {
+                data["message"] = crate::engine_default::message_for(why).into();
+            }
             data
         }
         Command::Other(cmd) => identity.refused(now, &cmd),
@@ -248,6 +274,10 @@ struct Handed {
     uploads_lost: Vec<crate::settings::Outcome>,
     /// Those the broker acknowledged, for `Uploads::acked`.
     uploads_acked: Vec<crate::settings::Outcome>,
+    /// The `onboarding.done` date the broker acknowledged (#5812).
+    onboarding_done_acked: Option<u64>,
+    /// The update's events the broker acknowledged, by round (#6284).
+    update_events_acked: Vec<(u64, crate::update_events::Which)>,
     /// Journal lines, one per step of a change's result (Mobile on #1959,
     /// 21:0x): handed, sent as a packet, acked or lost. Never its data.
     journal: Vec<String>,
@@ -269,6 +299,12 @@ enum Tagged {
     /// A skill added from a file's result (`crate::upload`), said again if
     /// it is lost before its ack: the backend deletes the file on it.
     Upload(crate::settings::Outcome),
+    /// The app told the walk's end, at this date (`crate::onboarding_done`),
+    /// sent again if it is lost before its ack.
+    OnboardingDone(u64),
+    /// The app told an update's start or end, of this round
+    /// (`crate::update_events`), sent again if it is lost before its ack.
+    UpdateEvent(u64, crate::update_events::Which),
 }
 
 impl Handed {
@@ -355,6 +391,14 @@ impl Handed {
                 self.uploads_acked.push(outcome);
                 None
             }
+            Some(Tagged::OnboardingDone(at)) => {
+                self.onboarding_done_acked = Some(at);
+                None
+            }
+            Some(Tagged::UpdateEvent(round, which)) => {
+                self.update_events_acked.push((round, which));
+                None
+            }
             _ => None,
         }
     }
@@ -434,8 +478,23 @@ fn dropped(
     lamp: &mut impl Lamp,
     changes: &Option<Arc<crate::settings::Changes>>,
     reports: &Option<Arc<crate::reports::Shared>>,
+    onboarding_done: &mut Option<crate::onboarding_done::Done>,
+    onboarding_step: &mut Option<crate::onboarding_step::Steps>,
+    update_events: &mut Option<crate::update_events::Events>,
 ) {
     let again = handed.lost();
+    // The update's events not acked went too: sent again on the next one.
+    if let Some(events) = update_events {
+        events.lost();
+    }
+    // Whatever was not acked went with the connection: the walk's end too.
+    if let Some(done) = onboarding_done {
+        done.lost();
+    }
+    // Looked at again with the walk's end on the next connection (#5979).
+    if let Some(steps) = onboarding_step {
+        steps.lost();
+    }
     let services = std::mem::take(&mut handed.services_lost);
     if let Some(shared) = lamp.services() {
         shared.owe(services);
@@ -478,6 +537,15 @@ async fn relink_wanted(changes: &Option<Arc<crate::settings::Changes>>) {
     }
 }
 
+/// Ends when, on WSS, the broker's TCP port took a connection again; never
+/// on TCP. Cancel-safe: a notice not waited for is kept.
+async fn tcp_again(bridge: &Option<crate::wss::Bridge>) {
+    match bridge {
+        Some(bridge) => bridge.tcp_back.notified().await,
+        None => std::future::pending().await,
+    }
+}
+
 /// Where `run` says what happens: one line for each change of state.
 pub trait Say {
     fn line(&mut self, line: &str);
@@ -495,6 +563,7 @@ impl<F: FnMut(&str)> Say for F {
 pub async fn run(
     mut accounts: watch::Receiver<Option<Account>>,
     identity: watch::Receiver<Identity>,
+    ws_url: watch::Receiver<String>,
     lamp: &mut impl Lamp,
     say: &mut impl Say,
     first: Duration,
@@ -508,7 +577,7 @@ pub async fn run(
             continue;
         };
         tokio::select! {
-            () = session(&account, &identity, lamp, say, first) => return,
+            () = session(&account, &identity, &ws_url, lamp, say, first) => return,
             changed = accounts.changed() => {
                 if changed.is_err() {
                     return;
@@ -524,6 +593,7 @@ pub async fn run(
 async fn session(
     account: &Account,
     identity: &watch::Receiver<Identity>,
+    ws_url: &watch::Receiver<String>,
     lamp: &mut impl Lamp,
     say: &mut impl Say,
     first: Duration,
@@ -531,19 +601,29 @@ async fn session(
     // With the switch, the broker is left a will (`options_with_will`), on
     // the first connection and on every one made again after a Wi-Fi change.
     let will = lamp.offline_will();
-    let made = || {
-        if will {
-            options_with_will(account, &identity.borrow())
+    // `bridged`: the WSS bridge's port while on WSS (#6256 F9).
+    let made = |bridged: Option<u16>| {
+        let options = match bridged {
+            Some(port) => options_at(account, "127.0.0.1", port, false),
+            None => options(account),
+        }?;
+        Some(if will {
+            with_will(options, account, &identity.borrow())
         } else {
-            options(account)
-        }
+            options
+        })
     };
-    let Some(options) = made() else {
+    let Some(options) = made(None) else {
         say.line("the broker's TLS cannot be set up (LAMP_CLOUD_TLS): not connecting in the clear in its place");
         return std::future::pending().await;
     };
     let (mut client, mut events) = AsyncClient::new(options, 64);
     let mut wait = first;
+    // Over WSS after `wss::FAILURES` failed TCP connections in a row, with
+    // the ping's address; the bridge lives only while on WSS.
+    let mut tcp_failures = 0u32;
+    let mut bridge: Option<crate::wss::Bridge> = None;
+    let mut back_to_tcp = false;
     // Health and crash reports, with their switch (#1683): handed over only
     // while connected, and kept until the broker acknowledges them.
     let reports = lamp.reports();
@@ -557,6 +637,20 @@ async fn session(
     let mut harness_sign_in = lamp
         .harness_sign_in()
         .map(crate::harness_sign_in::Follow::new);
+    // The walk's end told to the app once (#5812), with its switch.
+    let mut onboarding_done = lamp
+        .onboarding_done()
+        .map(crate::onboarding_done::Done::new);
+    // Each walk step's end told to the app once (#5979), with the same
+    // switch, its file beside the done one.
+    let mut onboarding_step = lamp
+        .onboarding_done()
+        .map(crate::onboarding_step::Steps::new);
+    // An update's start and end told to the app (#6284), with their switch.
+    let mut update_events = lamp.update_events().map(crate::update_events::Events::new);
+    // A skill that needs a connector not linked, told to the app
+    // (`crate::skills::NEEDS_LINK_KIND`), with its switch.
+    let skill_link = lamp.skills().is_some_and(|places| places.link.is_some());
     tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     // What was last said, so a state is said once.
     let mut said = String::new();
@@ -597,8 +691,25 @@ async fn session(
                             break None;
                         }
                     }
-                    _ = tick.tick(), if skill_lines || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() => {
+                    // On WSS, the broker's TCP port took a connection again.
+                    () = tcp_again(&bridge) => {
+                        back_to_tcp = true;
+                        break None;
+                    }
+                    _ = tick.tick(), if skill_lines || skill_link || changes.is_some() || services.is_some() || uploads.is_some() || harness_sign_in.is_some() || onboarding_done.is_some() || update_events.is_some() => {
                         let me = identity.borrow().clone();
+                        // A skill installed or made that needs a connector
+                        // not linked (#6059): only while connected, best
+                        // effort, codes and names only.
+                        if connected && skill_link {
+                            for data in crate::skills::take_told() {
+                                let event = me
+                                    .data(&now(), crate::skills::NEEDS_LINK_KIND, &Ok(Some(data)))
+                                    .to_string();
+                                let took = handed.publish(&client, account.fd_channel.as_str(), event, None);
+                                say.line(&format!("{}: {}", crate::skills::NEEDS_LINK_KIND, if took { "handed to the client" } else { "not handed to the client, not tried again" }));
+                            }
+                        }
                         // Only while connected: the app asks `state` on its
                         // screen's open for what it missed.
                         if connected
@@ -609,6 +720,71 @@ async fn session(
                                 .data(&now(), crate::harness_sign_in::PUSHED, &Ok(Some(view)))
                                 .to_string();
                             handed.publish(&client, account.fd_channel.as_str(), pushed, None);
+                        }
+                        // Each walk step's end (#5979): only while connected,
+                        // best effort, tried once and never waiting on an
+                        // ack. Before the walk's end, on the same look (one
+                        // `looked`, both lost with the connection), so the
+                        // last step's event goes ahead of `onboarding.done`;
+                        // neither waits on the other.
+                        let looked = std::time::Instant::now();
+                        if connected
+                            && let Some(steps) = onboarding_step.as_mut()
+                            && let Some((walk_id, ended)) = steps.due(looked, crate::chat::now_ms(), || lamp.onboarding_steps())
+                        {
+                            for ended in ended {
+                                let event = me
+                                    .data(&now(), crate::onboarding_step::KIND, &Ok(Some(crate::onboarding_step::data(walk_id, &ended))))
+                                    .to_string();
+                                let took = handed.publish(&client, account.fd_channel.as_str(), event, None);
+                                say.line(&steps.tried(&ended, took));
+                            }
+                        }
+                        // The app's onboarding page done (#6076): only while
+                        // connected, with the same switch, once a page.
+                        if connected
+                            && onboarding_done.is_some()
+                            && let Some(done) = lamp.onboarding_page_done()
+                        {
+                            let event = me
+                                .data(&now(), crate::onboarding_page::DONE_KIND, &Ok(Some(done)))
+                                .to_string();
+                            let took = handed.publish(&client, account.fd_channel.as_str(), event, None);
+                            say.line(&format!("{}: {}", crate::onboarding_page::DONE_KIND, if took { "handed to the client" } else { "not handed to the client, not tried again" }));
+                        }
+                        // The walk's end (#5812): only while connected, and
+                        // kept until the broker's ack.
+                        if connected
+                            && let Some(done) = onboarding_done.as_mut()
+                            && let Some(at) = done.due(looked, || lamp.onboarding())
+                        {
+                            let event = me
+                                .data(&now(), crate::onboarding_done::KIND, &Ok(Some(crate::onboarding_done::data(at))))
+                                .to_string();
+                            let tag = Tagged::OnboardingDone(at);
+                            if handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {
+                                done.handed(at);
+                                say.line(&format!("{}: handed to the client, at {at}", crate::onboarding_done::KIND));
+                            }
+                        }
+                        // An update's start and end (#6284): looked at
+                        // connected or not, so a round that ends offline is
+                        // still told; sent only while connected, in order,
+                        // and kept until the broker's ack.
+                        if let Some(events) = update_events.as_mut() {
+                            if let Some(line) = events.look(looked, crate::chat::now_ms(), || lamp.update_now()) {
+                                say.line(&line);
+                            }
+                            if connected {
+                                for (round, which, data) in events.due() {
+                                    let event = me.data(&now(), which.kind(), &Ok(Some(data))).to_string();
+                                    let tag = Tagged::UpdateEvent(round, which);
+                                    if !handed.publish_tagged(&client, account.fd_channel.as_str(), event, tag) {
+                                        break;
+                                    }
+                                    say.line(&events.handed(round, which));
+                                }
+                            }
                         }
                         if texting {
                             for data in lamp.chat_events(crate::chat::now_ms()) {
@@ -697,17 +873,36 @@ async fn session(
             say.line(&line);
         }
         let Some(polled) = polled else {
-            dropped(&mut handed, lamp, &changes, &reports);
+            dropped(
+                &mut handed,
+                lamp,
+                &changes,
+                &reports,
+                &mut onboarding_done,
+                &mut onboarding_step,
+                &mut update_events,
+            );
             connected = false;
             for line in std::mem::take(&mut handed.journal) {
                 say.line(&line);
             }
-            tell(
-                say,
-                "a Wi-Fi change moved the lamp: the link is dropped and made again at once"
-                    .to_owned(),
-            );
-            let Some(options) = made() else {
+            // Either way the next connection is over TCP again: a new
+            // network may not drop the broker's port.
+            let was_wss = bridge.take().is_some();
+            tcp_failures = 0;
+            if std::mem::take(&mut back_to_tcp) {
+                say.line("the broker's TCP port takes a connection again: back from WSS to TCP");
+            } else {
+                tell(
+                    say,
+                    "a Wi-Fi change moved the lamp: the link is dropped and made again at once"
+                        .to_owned(),
+                );
+                if was_wss {
+                    say.line("trying TCP again on the new network: off WSS");
+                }
+            }
+            let Some(options) = made(None) else {
                 drop(client);
                 drop(events);
                 say.line("the broker's TLS cannot be set up (LAMP_CLOUD_TLS): not connecting in the clear in its place");
@@ -720,6 +915,9 @@ async fn session(
         match polled {
             Ok(Event::Incoming(Packet::ConnAck(_))) => {
                 wait = first;
+                if bridge.is_none() {
+                    tcp_failures = 0;
+                }
                 if let Some(changes) = &changes {
                     changes.set_broker(account.mqtt_endpoint.trim(), account.mqtt_port);
                     changes.online();
@@ -768,6 +966,16 @@ async fn session(
                         changes.acked(&outcome);
                     }
                 }
+                if let Some(at) = handed.onboarding_done_acked.take()
+                    && let Some(done) = onboarding_done.as_mut()
+                {
+                    say.line(&done.acked(at));
+                }
+                for (round, which) in std::mem::take(&mut handed.update_events_acked) {
+                    if let Some(events) = update_events.as_mut() {
+                        say.line(&events.acked(round, which));
+                    }
+                }
                 // A skill from a file's result acked: no longer in flight.
                 for outcome in std::mem::take(&mut handed.uploads_acked) {
                     if let Some(uploads) = lamp.upload() {
@@ -785,13 +993,46 @@ async fn session(
             }
             Ok(_) => {}
             Err(error) => {
-                connected = false;
-                dropped(&mut handed, lamp, &changes, &reports);
+                // A failed connection, or a working one that dropped.
+                let failed = !std::mem::replace(&mut connected, false);
+                dropped(
+                    &mut handed,
+                    lamp,
+                    &changes,
+                    &reports,
+                    &mut onboarding_done,
+                    &mut onboarding_step,
+                    &mut update_events,
+                );
                 for line in std::mem::take(&mut handed.journal) {
                     say.line(&line);
                 }
                 // The error names a code or an I/O kind, never the login.
                 tell(say, format!("offline, trying again: {error}"));
+                if bridge.is_none() {
+                    tcp_failures = if failed { tcp_failures + 1 } else { 0 };
+                    let url = ws_url.borrow().clone();
+                    if crate::wss::over(tcp_failures, &url) == crate::wss::Over::Wss {
+                        let tcp = (account.mqtt_endpoint.trim().to_owned(), account.mqtt_port);
+                        match crate::wss::Bridge::open(url, tcp, crate::wss::TCP_AGAIN).await {
+                            Ok(opened) => {
+                                say.line(&format!(
+                                    "the broker's TCP port failed {tcp_failures} times in a row: on to MQTT over WSS, TCP tried again every {} min",
+                                    crate::wss::TCP_AGAIN.as_secs() / 60
+                                ));
+                                if let Some(options) = made(Some(opened.port)) {
+                                    drop(client);
+                                    drop(events);
+                                    (client, events) = AsyncClient::new(options, 64);
+                                    bridge = Some(opened);
+                                    wait = first;
+                                    continue;
+                                }
+                            }
+                            Err(why) => say.line(&format!("no WSS bridge: {why}")),
+                        }
+                    }
+                }
                 // A Wi-Fi change that moves the lamp meanwhile cuts the wait
                 // short: one try at once, then the waits from the first.
                 let relinked = tokio::select! {
@@ -811,6 +1052,11 @@ async fn session(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// No WSS address from a ping: TCP only, as before #6256 F9.
+    fn no_wss() -> watch::Receiver<String> {
+        watch::channel(String::new()).1
+    }
 
     /// Only the lamp's own account channel commands it: not its reply
     /// channel, another lamp's, a longer or shorter topic, or an empty one.
@@ -909,6 +1155,12 @@ mod tests {
         /// publish after it in its queue meanwhile (#2562, the reviewer's
         /// correction read on #2769).
         HoldsFirstAck,
+        /// Takes every connection, but closes the first on its first
+        /// `onboarding.done`, unacknowledged (#5812).
+        DropsDoneUnacked,
+        /// Takes every connection, but closes the first on its first
+        /// `update.ended`, unacknowledged (#6284).
+        DropsEndUnacked,
     }
 
     /// How long [`Broker::HoldsFirstAck`] holds the first PUBACK back.
@@ -1079,6 +1331,11 @@ mod tests {
                         }
                         Packet::Publish(publish) => {
                             let payload = String::from_utf8_lossy(&publish.payload).into_owned();
+                            let unacked = connections == 1
+                                && ((behaves == Broker::DropsDoneUnacked
+                                    && payload.contains("\"kind\":\"onboarding.done\""))
+                                    || (behaves == Broker::DropsEndUnacked
+                                        && payload.contains("\"kind\":\"update.ended\"")));
                             if behaves == Broker::StaleFirstLateAck
                                 && payload.contains("\"kind\":\"wifi.joined\"")
                             {
@@ -1088,6 +1345,9 @@ mod tests {
                                 String::from_utf8_lossy(&publish.topic).into_owned(),
                                 payload,
                             ));
+                            if unacked {
+                                break 'connection;
+                            }
                             if behaves == Broker::HoldsFirstAck && replies == 0 {
                                 tokio::time::sleep(HELD_ACK).await;
                             }
@@ -1293,7 +1553,7 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
-            run(accounts, me, &mut lamp, &mut say, first).await;
+            run(accounts, me, no_wss(), &mut lamp, &mut say, first).await;
         });
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         while !until(&seen.lock().unwrap()) && tokio::time::Instant::now() < deadline {
@@ -1351,7 +1611,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let renames = |seen: &[Seen]| {
             publishes(seen)
@@ -1410,7 +1678,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let added = |seen: &[Seen]| {
             publishes(seen)
@@ -1450,7 +1726,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
             lamp
         });
         let sets = |seen: &[Seen]| {
@@ -1576,7 +1860,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let sets = |seen: &[Seen]| {
             publishes(seen)
@@ -1657,6 +1949,7 @@ mod tests {
             run(
                 accounts,
                 me,
+                no_wss(),
                 &mut lamp,
                 &mut say,
                 Duration::from_millis(600),
@@ -1795,7 +2088,7 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
-            run(accounts, me, &mut lamp, &mut say, first).await;
+            run(accounts, me, no_wss(), &mut lamp, &mut say, first).await;
         });
         let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
         while !until(&seen.lock().unwrap(), &lines.lock().unwrap())
@@ -2070,7 +2363,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
             lamp.texts
         });
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
@@ -2167,7 +2468,15 @@ mod tests {
         let task = tokio::spawn(async move {
             let mut lamp = lamp;
             let mut say = |line: &str| said.lock().unwrap().push(line.to_owned());
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
         while !enough(&lines.lock().unwrap()) && tokio::time::Instant::now() < deadline {
@@ -2383,7 +2692,15 @@ mod tests {
                     ..Fake::default()
                 };
                 let mut say = |_: &str| {};
-                run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+                run(
+                    accounts,
+                    me,
+                    no_wss(),
+                    &mut lamp,
+                    &mut say,
+                    Duration::from_millis(50),
+                )
+                .await;
             });
             let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
             while shared.with(|reports| reports.queued()) > 0
@@ -2426,7 +2743,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let subscribed = Seen::Subscribe("fa/d-42".into());
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
@@ -2460,7 +2785,15 @@ mod tests {
                 ..Fake::default()
             };
             let mut say = |_: &str| {};
-            run(accounts, me, &mut lamp, &mut say, Duration::from_millis(50)).await;
+            run(
+                accounts,
+                me,
+                no_wss(),
+                &mut lamp,
+                &mut say,
+                Duration::from_millis(50),
+            )
+            .await;
         });
         let connected = |seen: &[Seen]| seen.iter().any(|s| matches!(s, Seen::Connect { .. }));
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
@@ -2611,5 +2944,451 @@ mod tests {
             .filter(|s| matches!(s, Seen::Subscribe(_)))
             .count();
         assert!(connects >= 2 && subscribes >= 2, "{seen:?}");
+    }
+
+    /// The walk's end the tests' lamp knows (#5812).
+    const DONE_AT: u64 = 1_762_675_200_000;
+
+    /// A lamp that knows the walk's end `at`, with the switch on (its file
+    /// in `dir`) or off.
+    fn lamp_done(at: Option<u64>, dir: Option<&std::path::Path>) -> Fake {
+        Fake {
+            onboarding: at,
+            onboarding_done: dir.map(|dir| dir.join(crate::onboarding_done::FILE)),
+            ..Fake::default()
+        }
+    }
+
+    /// The `onboarding.done` replies the broker saw, on `fd_channel`.
+    fn dones(seen: &[Seen]) -> Vec<serde_json::Value> {
+        publishes(seen)
+            .into_iter()
+            .filter(|(topic, reply)| topic == "fd/d-42" && reply["kind"] == "onboarding.done")
+            .map(|(_, reply)| reply)
+            .collect()
+    }
+
+    fn acked(lines: &[String]) -> bool {
+        lines
+            .iter()
+            .any(|line| line.starts_with("onboarding.done: acked by the broker"))
+    }
+
+    /// #5812: the walk's end goes to the app exactly once, as an unasked
+    /// `data` reply with `at` only; once acked it is kept in the state
+    /// file, and a restart sends nothing more.
+    #[tokio::test]
+    async fn the_walks_end_is_told_once_and_kept_after_the_ack() {
+        let dir = tempfile::tempdir().unwrap();
+        let start = std::time::Instant::now();
+        let (seen, lines) = lines_against(
+            Broker::Takes,
+            lamp_done(Some(DONE_AT), Some(dir.path())),
+            |lines| acked(lines) && start.elapsed() >= Duration::from_millis(2500),
+        )
+        .await;
+        let told = dones(&seen);
+        assert_eq!(told.len(), 1, "{told:?} {lines:?}");
+        assert_eq!(
+            (&told[0]["type"], &told[0]["status"], &told[0]["data"]),
+            (
+                &serde_json::json!("data"),
+                &serde_json::json!("success"),
+                &serde_json::json!({"at": DONE_AT})
+            )
+        );
+        let file = dir.path().join(crate::onboarding_done::FILE);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), DONE_AT.to_string());
+        // lamp-cloud restarts: acked already, so nothing more is sent.
+        let start = std::time::Instant::now();
+        let (seen, _) = lines_against(
+            Broker::Takes,
+            lamp_done(Some(DONE_AT), Some(dir.path())),
+            |_| start.elapsed() >= Duration::from_millis(1500),
+        )
+        .await;
+        assert!(dones(&seen).is_empty(), "{seen:?}");
+    }
+
+    /// #5812: one the connection took before its ack is sent again on the
+    /// next connection, the same `at`, and kept once that one is acked.
+    #[tokio::test]
+    async fn the_walks_end_lost_before_its_ack_is_told_again_on_the_next_connection() {
+        let dir = tempfile::tempdir().unwrap();
+        let (seen, lines) = lines_against(
+            Broker::DropsDoneUnacked,
+            lamp_done(Some(DONE_AT), Some(dir.path())),
+            acked,
+        )
+        .await;
+        let told = dones(&seen);
+        // The client may also send its own copy again: two at least.
+        assert!(told.len() >= 2, "{told:?} {lines:?}");
+        assert!(
+            told.iter()
+                .all(|reply| reply["data"] == serde_json::json!({"at": DONE_AT}))
+        );
+        let connects = seen
+            .iter()
+            .filter(|seen| matches!(seen, Seen::Connect { .. }))
+            .count();
+        assert_eq!(connects, 2, "{seen:?}");
+        let file = dir.path().join(crate::onboarding_done::FILE);
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), DONE_AT.to_string());
+    }
+
+    /// #5812: no date (a walk not ended, or set up before it was dated)
+    /// sends nothing, nor does a date with the switch off.
+    #[tokio::test]
+    async fn without_a_date_or_the_switch_the_walks_end_is_not_told() {
+        let dir = tempfile::tempdir().unwrap();
+        for lamp in [
+            lamp_done(None, Some(dir.path())),
+            lamp_done(Some(DONE_AT), None),
+        ] {
+            let start = std::time::Instant::now();
+            let (seen, lines) = lines_against(Broker::Takes, lamp, |_| {
+                start.elapsed() >= Duration::from_millis(1500)
+            })
+            .await;
+            assert!(
+                seen.iter().any(|seen| matches!(seen, Seen::Publish(..))),
+                "{seen:?}"
+            );
+            assert!(dones(&seen).is_empty(), "{seen:?}");
+            assert!(
+                !lines.iter().any(|line| line.starts_with("onboarding.done")),
+                "{lines:?}"
+            );
+        }
+        assert!(!dir.path().join(crate::onboarding_done::FILE).exists());
+    }
+
+    /// A lamp whose walk `WALK` ended two steps just before `now` (Unix
+    /// ms), its end known, with the switch on (its files in `dir`) or off
+    /// (#5979).
+    fn lamp_steps(now: u64, dir: Option<&std::path::Path>) -> Fake {
+        let ended = |step: &str, outcome: &str, at| lamp_msgs::OnboardingStepEnded {
+            step: step.into(),
+            outcome: outcome.into(),
+            at,
+        };
+        Fake {
+            onboarding_steps: Some((
+                WALK,
+                vec![
+                    ended("where_you_sit", "done", now - 2_000),
+                    ended("touch", "not_available", now - 1_000),
+                ],
+            )),
+            ..lamp_done(Some(DONE_AT), dir)
+        }
+    }
+
+    /// The walk's id the tests' lamp knows (#5979).
+    const WALK: u64 = 1_762_675_100_000;
+
+    /// The `onboarding.step` replies the broker saw, on `fd_channel`.
+    fn steps_told(seen: &[Seen]) -> Vec<serde_json::Value> {
+        publishes(seen)
+            .into_iter()
+            .filter(|(topic, reply)| topic == "fd/d-42" && reply["kind"] == "onboarding.step")
+            .map(|(_, reply)| reply)
+            .collect()
+    }
+
+    /// #5979: each ended step goes to the app once, in the order it ended,
+    /// as an unasked `data` reply holding its step, outcome, end and walk
+    /// only; `onboarding.done` goes as before and is acked; a restart sends
+    /// no step again.
+    #[tokio::test]
+    async fn each_walk_step_is_told_once_beside_the_walks_end() {
+        let dir = tempfile::tempdir().unwrap();
+        let now = crate::chat::now_ms();
+        let start = std::time::Instant::now();
+        let (seen, lines) =
+            lines_against(Broker::Takes, lamp_steps(now, Some(dir.path())), |lines| {
+                acked(lines) && start.elapsed() >= Duration::from_millis(2500)
+            })
+            .await;
+        let told = steps_told(&seen);
+        let named: Vec<_> = told.iter().map(|reply| &reply["data"]["step"]).collect();
+        assert_eq!(named, ["where_you_sit", "touch"], "{told:?} {lines:?}");
+        for reply in &told {
+            assert_eq!(
+                (&reply["type"], &reply["status"], &reply["data"]["walk_id"]),
+                (
+                    &serde_json::json!("data"),
+                    &serde_json::json!("success"),
+                    &serde_json::json!(WALK)
+                )
+            );
+            let mut keys: Vec<_> = reply["data"].as_object().unwrap().keys().collect();
+            keys.sort();
+            assert_eq!(keys, ["at", "outcome", "step", "walk_id"]);
+        }
+        assert_eq!(told[1]["data"]["outcome"], "not_available");
+        assert_eq!(dones(&seen).len(), 1, "{seen:?}");
+        // The heartbeat has the last step ended and the walk's end dated:
+        // the steps go first, then `onboarding.done` (#5979's done-when).
+        let kinds: Vec<_> = publishes(&seen)
+            .into_iter()
+            .filter(|(_, reply)| {
+                reply["kind"] == "onboarding.step" || reply["kind"] == "onboarding.done"
+            })
+            .map(|(_, reply)| reply["kind"].as_str().unwrap_or_default().to_owned())
+            .collect();
+        assert_eq!(
+            kinds,
+            ["onboarding.step", "onboarding.step", "onboarding.done"],
+            "{seen:?}"
+        );
+        // lamp-cloud restarts: its steps sent already, nothing more.
+        let start = std::time::Instant::now();
+        let (seen, _) = lines_against(Broker::Takes, lamp_steps(now, Some(dir.path())), |_| {
+            start.elapsed() >= Duration::from_millis(1500)
+        })
+        .await;
+        assert!(steps_told(&seen).is_empty(), "{seen:?}");
+    }
+
+    /// #5979: with the switch off, no step is told, nor is any file kept.
+    #[tokio::test]
+    async fn without_the_switch_no_walk_step_is_told() {
+        let start = std::time::Instant::now();
+        let (seen, lines) = lines_against(
+            Broker::Takes,
+            lamp_steps(crate::chat::now_ms(), None),
+            |_| start.elapsed() >= Duration::from_millis(1500),
+        )
+        .await;
+        assert!(
+            seen.iter().any(|seen| matches!(seen, Seen::Publish(..))),
+            "{seen:?}"
+        );
+        assert!(steps_told(&seen).is_empty(), "{seen:?}");
+        assert!(
+            !lines.iter().any(|line| line.starts_with("onboarding.step")),
+            "{lines:?}"
+        );
+    }
+
+    /// The round the tests' lamp updates in (#6284).
+    const ROUND: u64 = 1_792_296_000_000;
+
+    /// `update/status`: `now`, the round under way from [`ROUND`] to 813
+    /// unless idle, and the last end `(outcome, its round)`.
+    fn update_said(now: &str, running: u64, last: Option<(&str, u64)>) -> lamp_msgs::UpdateStatus {
+        let build = |sequence| lamp_msgs::UpdateBuild {
+            sequence,
+            commit: "4a39f04".into(),
+        };
+        lamp_msgs::UpdateStatus {
+            running: Some(build(running)),
+            now: now.into(),
+            last: last.map(|(outcome, round)| lamp_msgs::UpdateResult {
+                outcome: outcome.into(),
+                sequence: Some(813),
+                at_unix_ms: round + 60_000,
+                reason: None,
+                started_at_unix_ms: Some(round),
+            }),
+            harness: None,
+            engines: None,
+            refused: None,
+            round: (now != "idle").then(|| lamp_msgs::UpdateRound {
+                started_at_unix_ms: ROUND,
+                step_started_at_unix_ms: ROUND + 1_000,
+                // A round names a newer target only once it has read one: a
+                // `checking` that finds the lamp current never does.
+                target: (now != "checking").then(|| build(813)),
+            }),
+        }
+    }
+
+    /// The earlier round, which found the lamp current.
+    const EARLIER: Option<(&str, u64)> = Some(("up-to-date", ROUND - 900_000));
+
+    /// A lamp saying `status`, with the switch on (its file in `dir`) or off.
+    fn lamp_updating(status: lamp_msgs::UpdateStatus, dir: Option<&std::path::Path>) -> Fake {
+        Fake {
+            update_events: dir.map(|dir| dir.join(crate::update_events::FILE)),
+            update_now: Some(status),
+            ..Fake::default()
+        }
+    }
+
+    /// The `kind` replies the broker saw, on `fd_channel`.
+    fn told_kind(seen: &[Seen], kind: &str) -> Vec<serde_json::Value> {
+        publishes(seen)
+            .into_iter()
+            .filter(|(topic, reply)| topic == "fd/d-42" && reply["kind"] == kind)
+            .map(|(_, reply)| reply)
+            .collect()
+    }
+
+    fn update_acked(kind: &'static str) -> impl Fn(&[String]) -> bool {
+        move |lines| {
+            lines
+                .iter()
+                .any(|line| line.starts_with(&format!("{kind}: acked by the broker")))
+        }
+    }
+
+    /// Runs a lamp saying `status` for `ms` at least, and until `enough`.
+    async fn updating_for(
+        behaves: Broker,
+        status: lamp_msgs::UpdateStatus,
+        dir: Option<&std::path::Path>,
+        ms: u64,
+        enough: impl Fn(&[String]) -> bool,
+    ) -> (Vec<Seen>, Vec<String>) {
+        let start = std::time::Instant::now();
+        lines_against(behaves, lamp_updating(status, dir), |lines| {
+            enough(lines) && start.elapsed() >= Duration::from_millis(ms)
+        })
+        .await
+    }
+
+    /// #6284: with the switch off, a round with changes tells nothing, nor
+    /// is any file kept.
+    #[tokio::test]
+    async fn without_the_switch_no_update_event_is_told() {
+        let (seen, lines) = updating_for(
+            Broker::Takes,
+            update_said("fetching", 812, EARLIER),
+            None,
+            1500,
+            |_| true,
+        )
+        .await;
+        assert!(
+            seen.iter().any(|seen| matches!(seen, Seen::Publish(..))),
+            "{seen:?}"
+        );
+        assert!(told_kind(&seen, "update.started").is_empty(), "{seen:?}");
+        assert!(
+            !lines.iter().any(|line| line.starts_with("update.")),
+            "{lines:?}"
+        );
+    }
+
+    /// #6284: a round that only checks and finds the lamp current tells
+    /// the app nothing.
+    #[tokio::test]
+    async fn an_up_to_date_round_tells_the_app_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        for status in [
+            update_said("checking", 812, EARLIER),
+            update_said("idle", 812, Some(("up-to-date", ROUND))),
+        ] {
+            let (seen, lines) =
+                updating_for(Broker::Takes, status, Some(dir.path()), 1500, |_| true).await;
+            assert!(told_kind(&seen, "update.started").is_empty(), "{seen:?}");
+            assert!(told_kind(&seen, "update.ended").is_empty(), "{seen:?}");
+            assert!(
+                !lines.iter().any(|line| line.starts_with("update.")),
+                "{lines:?}"
+            );
+        }
+    }
+
+    /// #6284: a round that fetches is told once, as an unasked `data` reply
+    /// with its round and builds; acked, a restart mid-round tells it no
+    /// more; its end, seen after that restart (the switch restarts
+    /// lamp-cloud), is told once, and a further restart tells nothing.
+    #[tokio::test]
+    async fn an_updates_start_is_told_once_and_its_end_after_a_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let (seen, lines) = updating_for(
+            Broker::Takes,
+            update_said("fetching", 812, EARLIER),
+            Some(dir.path()),
+            2500,
+            update_acked("update.started"),
+        )
+        .await;
+        let started = told_kind(&seen, "update.started");
+        assert_eq!(started.len(), 1, "{started:?} {lines:?}");
+        assert_eq!(
+            (&started[0]["type"], &started[0]["status"]),
+            (&serde_json::json!("data"), &serde_json::json!("success"))
+        );
+        let data = &started[0]["data"];
+        assert_eq!(
+            (&data["round"], &data["from"], &data["to"]),
+            (
+                &serde_json::json!(ROUND),
+                &serde_json::json!("812+4a39f04"),
+                &serde_json::json!("813+4a39f04")
+            )
+        );
+        // Restarted mid-round: nothing again.
+        let (seen, _) = updating_for(
+            Broker::Takes,
+            update_said("watching", 813, EARLIER),
+            Some(dir.path()),
+            1500,
+            |_| true,
+        )
+        .await;
+        assert!(told_kind(&seen, "update.started").is_empty(), "{seen:?}");
+        assert!(told_kind(&seen, "update.ended").is_empty(), "{seen:?}");
+        // The round ended: its end, once.
+        let end = update_said("idle", 813, Some(("switched", ROUND)));
+        let (seen, lines) = updating_for(
+            Broker::Takes,
+            end.clone(),
+            Some(dir.path()),
+            2500,
+            update_acked("update.ended"),
+        )
+        .await;
+        let ended = told_kind(&seen, "update.ended");
+        assert_eq!(ended.len(), 1, "{ended:?} {lines:?}");
+        assert_eq!(
+            ended[0]["data"],
+            serde_json::json!({"round": ROUND, "outcome": "switched", "build": "813+4a39f04", "at": ROUND + 60_000})
+        );
+        assert!(told_kind(&seen, "update.started").is_empty(), "{seen:?}");
+        let (seen, _) = updating_for(Broker::Takes, end, Some(dir.path()), 1500, |_| true).await;
+        assert!(told_kind(&seen, "update.ended").is_empty(), "{seen:?}");
+    }
+
+    /// #6284: an end the connection took before its ack is told again on
+    /// the next connection, the same round, and kept once that one is
+    /// acked.
+    #[tokio::test]
+    async fn an_updates_end_lost_before_its_ack_is_told_again() {
+        let dir = tempfile::tempdir().unwrap();
+        updating_for(
+            Broker::Takes,
+            update_said("fetching", 812, EARLIER),
+            Some(dir.path()),
+            0,
+            update_acked("update.started"),
+        )
+        .await;
+        let (seen, lines) = updating_for(
+            Broker::DropsEndUnacked,
+            update_said("idle", 813, Some(("rolled-back", ROUND))),
+            Some(dir.path()),
+            0,
+            update_acked("update.ended"),
+        )
+        .await;
+        let ended = told_kind(&seen, "update.ended");
+        assert!(ended.len() >= 2, "{ended:?} {lines:?}");
+        assert!(
+            ended.iter().all(|reply| reply["data"]["round"] == ROUND
+                && reply["data"]["outcome"] == "rolled-back")
+        );
+        let connects = seen
+            .iter()
+            .filter(|seen| matches!(seen, Seen::Connect { .. }))
+            .count();
+        assert_eq!(connects, 2, "{seen:?}");
+        let kept = std::fs::read_to_string(dir.path().join(crate::update_events::FILE)).unwrap();
+        assert!(kept.contains("\"rounds\":[]"), "{kept}");
     }
 }

@@ -12,8 +12,10 @@
 //! in, for head pitch, head roll, base yaw, shoulder and elbow, `step_ms`
 //! apart. A move is held to what the built-in clips promise: it begins and
 //! ends at nothing, lasts 1.5 to 10 s, takes no joint farther than
-//! [`FARTHEST`] and asks none to go faster than [`FASTEST`]. One that does
-//! not is refused with the reason, and the others are still taken. It is
+//! [`FARTHEST`] (the base's yaw: the lamp's own yaw reach, `--reach`'s last
+//! number, [`check_within`]) and asks none to go faster than [`FASTEST`].
+//! One that does not is refused with the reason, and the others are still
+//! taken. It is
 //! asked for by name as a gesture is (`{"gesture":"wiggle"}` on the mood
 //! socket), and played as one, only while the lamp stands.
 //!
@@ -30,9 +32,113 @@ use std::{
     path::{Path, PathBuf},
 };
 
-/// The farthest a move may take each joint from the pose, in counts: head
-/// pitch, head roll, base yaw, shoulder, elbow. As the built-in clips.
-pub const FARTHEST: [i16; 5] = [200, 200, 150, 350, 350];
+/// The farthest a move may take each joint from the pose, in counts, for any
+/// lamp: head pitch, head roll, base yaw, shoulder, elbow. As the built-in
+/// clips, but the base's yaw: the built-in clips keep to 150, a move to its
+/// lamp's own yaw reach ([`farthest`]), at most the 250 any lamp may be given
+/// (`Tuning::REACH_CAP`; 22 degrees), so that what does not know the lamp (a
+/// skill's load, the door's pre-check, the SDKs) never refuses what the body
+/// would take.
+pub const FARTHEST: [i16; 5] = [200, 200, 250, 350, 350];
+/// [`FARTHEST`]'s base yaw, as a reach.
+pub const YAW_REACH_ANY: u16 = 250;
+/// The base's yaw reach a body-side caller that was not given the lamp's own
+/// is held to: what the built-in clips keep to, and what a move was held to
+/// before the reach (the Reviewer-lead's P3 on ten/move-reach). Only the
+/// door's pre-check and a skill's load, which cannot know the lamp, ask
+/// [`YAW_REACH_ANY`], through [`check`].
+pub const YAW_REACH_DEFAULT: u16 = 150;
+
+/// [`FARTHEST`] for a lamp whose base reaches `yaw_reach` counts either way
+/// (`--reach`'s last number): never past it, and never past the most a lamp
+/// may be given.
+pub fn farthest(yaw_reach: u16) -> [i16; 5] {
+    let mut farthest = FARTHEST;
+    farthest[2] = i16::try_from(yaw_reach.min(YAW_REACH_ANY)).unwrap_or(250);
+    farthest
+}
+/// The most a move may take each joint from the pose on a lamp that is on
+/// its hardware ranges (the person, 14:04 on 10 Nov: 90% of them): what a
+/// check that does not know the lamp asks when the lamp may be one of those
+/// ([`Reach::ANY`]: the door with `LAMP_BODY_APP_REACH` on, the SDKs), more
+/// than any lamp's 90% of its own range, so that nothing refuses what the
+/// body would take. The body judges the move against its own [`Reach`].
+pub const CEILING: [u16; 5] = [1_300, 1_300, 1_300, 1_000, 1_000];
+
+/// How far a move may take each joint from the pose on one lamp, in counts
+/// on each side (pitch, roll, yaw, shoulder, elbow; `low` toward fewer
+/// counts, `high` toward more: for the head's pitch, up is fewer).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Reach {
+    pub low: [u16; 5],
+    pub high: [u16; 5],
+}
+
+impl Reach {
+    /// What a check that does not know the lamp asks when it may be on its
+    /// hardware ranges: [`CEILING`] each side.
+    pub const ANY: Self = Self {
+        low: CEILING,
+        high: CEILING,
+    };
+
+    /// Today's: [`FARTHEST`] each side with the base's yaw at `yaw_reach`
+    /// ([`farthest`]).
+    pub fn today(yaw_reach: u16) -> Self {
+        let farthest = farthest(yaw_reach).map(i16::unsigned_abs);
+        Self {
+            low: farthest,
+            high: farthest,
+        }
+    }
+
+    /// 90% of a lamp's hardware range from its pose, each joint on each
+    /// side, never rounded up: `low_room` and `high_room` are the counts
+    /// from the pose to the joint's own limit toward fewer and toward more
+    /// counts (the servos' stored ranges for the head and the base, the
+    /// arm's window for the shoulder and the elbow).
+    pub fn of_hardware(low_room: [u16; 5], high_room: [u16; 5]) -> Self {
+        let share = |room: u16| u16::try_from(u32::from(room) * 90 / 100).unwrap_or(u16::MAX);
+        Self {
+            low: low_room.map(share),
+            high: high_room.map(share),
+        }
+    }
+}
+
+/// `LAMP_BODY_APP_REACH=on` (the person, 14:04 on 10 Nov: "unblock all, or
+/// cap at 90% of the hardware limit; we're building toys for dev"): what a
+/// computer's move may take each joint is 90% of the joint's hardware range
+/// from its pose (`moves::Reach::of_hardware`), on each side, read at start
+/// (the servos' own stored ranges for the head and the base, the arm's window
+/// for the shoulder and the elbow), instead of the caps every lamp has. For
+/// the dev lamps (75c9, a63e) until the hardware team signs the numbers; it
+/// reads the servos' own ranges, so it turns on [`OWN_RANGES`] too. The lamp's
+/// own life (its moods, its eyes, its built-in clips), the tipping rule, the
+/// heat stop and every speed and acceleration cap are as they were.
+pub const APP_REACH: &str = "LAMP_BODY_APP_REACH";
+
+/// Whether a value of [`APP_REACH`] turns the app's reach on.
+pub fn app_reach_from(value: Option<&str>) -> bool {
+    value == Some("on")
+}
+
+/// What the door's pre-check (lamp-control) holds a computer's move to, from
+/// its own environment as the body reads its own: [`Reach::ANY`] with
+/// `LAMP_BODY_APP_REACH=on` (a dev lamp, whose body judges the move against
+/// its own hardware as it begins), else today's, the yaw at 250, the most any
+/// lamp had. Read once.
+pub fn door_reach() -> Reach {
+    static DOOR: std::sync::OnceLock<Reach> = std::sync::OnceLock::new();
+    *DOOR.get_or_init(|| {
+        if app_reach_from(std::env::var(APP_REACH).ok().as_deref()) {
+            Reach::ANY
+        } else {
+            Reach::today(YAW_REACH_ANY)
+        }
+    })
+}
+
 /// The fastest a move may ask each joint to go, counts a second, with a
 /// count of rounding either way at each end of a step. As the built-in
 /// clips.
@@ -222,6 +328,11 @@ pub struct Sent {
     kept: Vec<&'static Clip>,
     replaced: usize,
     files: Vec<&'static str>,
+    /// The base's yaw reach a move is held to; none is [`YAW_REACH_DEFAULT`].
+    yaw_reach: Option<u16>,
+    /// Each joint's reach, when the lamp has been given one (the person,
+    /// 14:04 on 10 Nov): in place of `yaw_reach`.
+    reach: Option<Reach>,
 }
 
 impl Sent {
@@ -231,6 +342,42 @@ impl Sent {
         Self {
             files: files.moves.iter().map(|clip| clip.name).collect(),
             ..Self::default()
+        }
+    }
+
+    /// Held to this lamp's own reach of every joint.
+    #[must_use]
+    pub fn reach(reach: Reach) -> Self {
+        Self {
+            reach: Some(reach),
+            ..Self::default()
+        }
+    }
+
+    /// The same, for a body that also read moves from `--moves`.
+    #[must_use]
+    pub fn reach_besides(reach: Reach, files: &Loaded) -> Self {
+        Self {
+            reach: Some(reach),
+            ..Self::besides(files)
+        }
+    }
+
+    /// Held to this lamp's own yaw reach, not the most any lamp may have.
+    #[must_use]
+    pub fn within(yaw_reach: u16) -> Self {
+        Self {
+            yaw_reach: Some(yaw_reach),
+            ..Self::default()
+        }
+    }
+
+    /// The same, for a body that also read moves from `--moves`.
+    #[must_use]
+    pub fn within_besides(yaw_reach: u16, files: &Loaded) -> Self {
+        Self {
+            yaw_reach: Some(yaw_reach),
+            ..Self::besides(files)
         }
     }
 
@@ -253,7 +400,10 @@ impl Sent {
     fn keep(&mut self, sent: serde_json::Value) -> Result<&'static Clip, String> {
         let sent: Move =
             serde_json::from_value(sent).map_err(|error| format!("not a move: {error}"))?;
-        check(&sent).map_err(|why| format!("move {:?}: {why}", sent.name))?;
+        let reach = self
+            .reach
+            .unwrap_or_else(|| Reach::today(self.yaw_reach.unwrap_or(YAW_REACH_DEFAULT)));
+        check_reach(&sent, &reach).map_err(|why| format!("move {:?}: {why}", sent.name))?;
         if self.files.contains(&sent.name.as_str()) {
             return Err(format!(
                 "move {:?}: a --moves file's move has the name",
@@ -302,6 +452,17 @@ impl Sent {
 /// depends on how many were left there. The moves live as long as the body:
 /// they are read once, at start.
 pub fn load(folder: &Path) -> io::Result<Loaded> {
+    load_within(folder, YAW_REACH_DEFAULT)
+}
+
+/// [`load`], each move held to this lamp's own yaw reach ([`check_within`]).
+pub fn load_within(folder: &Path, yaw_reach: u16) -> io::Result<Loaded> {
+    load_reach(folder, &Reach::today(yaw_reach))
+}
+
+/// [`load`], each move held to this lamp's own reach of every joint
+/// ([`check_reach`]).
+pub fn load_reach(folder: &Path, reach: &Reach) -> io::Result<Loaded> {
     let mut files = Vec::new();
     for (looked, entry) in fs::read_dir(folder)?.enumerate() {
         let too_many = if looked >= MOST_ENTRIES {
@@ -344,7 +505,7 @@ pub fn load(folder: &Path) -> io::Result<Loaded> {
     let mut loaded = Loaded::default();
     for path in files {
         let taken = read(&path).and_then(|file| {
-            check(&file)?;
+            check_reach(&file, reach)?;
             // The first file in name order keeps the name.
             if loaded.named(&file.name).is_some() {
                 return Err(format!("{:?} is already another file's move", file.name));
@@ -378,6 +539,23 @@ pub fn read(path: &Path) -> Result<Move, String> {
 /// built-in clips keep. Whether it may play now, from the pose it is in
 /// (the anti-tip rule), is the body's to judge as it begins.
 pub fn check(file: &Move) -> Result<(), String> {
+    check_within(file, YAW_REACH_ANY)
+}
+
+/// [`check`] for a lamp whose base reaches `yaw_reach` counts either way:
+/// the body's own (`--reach`), which holds a move past it to the same as
+/// the lamp's look. A move at the reach is taken, one past it is refused
+/// with the reach in its words; the other joints and every speed keep their
+/// bounds, so a wider sway is only slower.
+pub fn check_within(file: &Move, yaw_reach: u16) -> Result<(), String> {
+    check_reach(file, &Reach::today(yaw_reach))
+}
+
+/// [`check`] for a lamp with its own reach of every joint on each side
+/// ([`Reach`]): a move at a reach is taken, one past it is refused with the
+/// reach in its words; every speed and the length keep their bounds, so a
+/// wider move is only slower.
+pub fn check_reach(file: &Move, reach: &Reach) -> Result<(), String> {
     let name = &file.name;
     if name.is_empty()
         || name.len() > 32
@@ -410,12 +588,23 @@ pub fn check(file: &Move) -> Result<(), String> {
     let step = f32::from(file.step_ms) / 1_000.0;
     for (at, pair) in frames.windows(2).enumerate() {
         for joint in 0..5 {
-            if pair[1][joint].unsigned_abs() > FARTHEST[joint].unsigned_abs() {
+            let offset = pair[1][joint];
+            let side = if offset < 0 {
+                reach.low[joint]
+            } else {
+                reach.high[joint]
+            };
+            if offset.unsigned_abs() > side {
                 return Err(format!(
-                    "frame {} takes joint {joint} {} counts, farther than {}",
+                    "frame {} takes joint {joint} {} counts, farther than {}{}",
                     at + 1,
                     pair[1][joint],
-                    FARTHEST[joint]
+                    side,
+                    if joint == 2 {
+                        ", this lamp's yaw reach (--reach)"
+                    } else {
+                        ", this lamp's reach"
+                    }
                 ));
             }
             let speed = (f32::from(pair[1][joint]) - f32::from(pair[0][joint])).abs() / step;
@@ -551,8 +740,8 @@ mod tests {
             ),
             (
                 "far.json",
-                good("far").replace("[40,0,0,0,0]", "[40,0,151,0,0]"),
-                "farther than 150",
+                good("far").replace("[40,0,0,0,0]", "[201,0,0,0,0]"),
+                "farther than 200",
             ),
             (
                 "fast.json",
@@ -626,6 +815,211 @@ mod tests {
         assert_eq!(loaded.named("wiggle").unwrap().duration_us(), 1_500_000);
     }
 
+    /// A 2 s sway of the base, `reach` counts either way, 250 ms a step and no
+    /// step over `reach / 2`: well inside the joint's speed.
+    fn sway(name: &str, reach: i16) -> Move {
+        let half = reach / 2;
+        let yaw = [0, half, reach, half, 0, -half, -reach, -half, 0];
+        Move {
+            name: name.into(),
+            step_ms: 250,
+            frames: yaw.iter().map(|yaw| [0, 0, *yaw, 0, 0]).collect(),
+        }
+    }
+
+    /// The person, 12:36 on 10 Nov: a move was held to 150 counts of yaw
+    /// (13 degrees) whatever the lamp's own reach; the lamps are set to 250
+    /// (`--reach`, 22 degrees). The base takes what its reach allows and no
+    /// more, as slowly as the speed caps ask, and a refusal names the reach.
+    #[test]
+    fn a_sway_is_taken_to_the_lamps_yaw_reach_and_refused_past_it_with_the_reach() {
+        for reach in [150u16, 200, 250] {
+            let at = i16::try_from(reach).unwrap();
+            assert_eq!(check_within(&sway("at", at), reach), Ok(()), "{reach}");
+            let why = check_within(&sway("past", at + 2), reach).unwrap_err();
+            assert!(
+                why.contains(&format!("farther than {reach}")) && why.contains("reach"),
+                "{why}"
+            );
+        }
+        // The old 150 case is taken where the reach allows, and not where it doesn't.
+        assert_eq!(check_within(&sway("old", 150), 250), Ok(()));
+        assert_eq!(check_within(&sway("wide", 250), 250), Ok(()));
+        assert!(check_within(&sway("wide", 250), 150).is_err());
+        // Another joint keeps its own bound, whatever the reach: pitch 201.
+        let mut pitch = sway("pitch", 100);
+        pitch.frames[2][0] = 201;
+        assert!(
+            check_within(&pitch, 250)
+                .unwrap_err()
+                .contains("farther than 200")
+        );
+        // Never past the most a lamp can be given: 250 is the reach cap.
+        assert_eq!(check_within(&sway("cap", 250), 400), Ok(()));
+        assert!(check_within(&sway("capped", 252), 400).is_err());
+        // What does not know the lamp (a skill's load, the door) asks no more than the cap.
+        assert_eq!(check(&sway("any", 250)), Ok(()));
+        assert!(check(&sway("any", 252)).is_err());
+        // A faster sway is refused on speed, not on reach: the caps hold.
+        let mut quick = sway("quick", 250);
+        quick.step_ms = 100;
+        quick.frames.extend([[0; 5]; 8]);
+        assert!(
+            check_within(&quick, 250)
+                .unwrap_err()
+                .contains("faster than 1000")
+        );
+    }
+
+    /// An 8 s lean of one joint, `reach` counts to one side and back, a second a step and no
+    /// step over `reach / 2`: `joint` is pitch, roll, yaw, shoulder, elbow; `sign` the side.
+    fn lean(name: &str, joint: usize, reach: i16, sign: i16) -> Move {
+        let half = sign * (reach / 2);
+        let full = sign * reach;
+        let at = [0, half, full, half, 0, half, full, half, 0];
+        Move {
+            name: name.into(),
+            step_ms: 1_000,
+            frames: at
+                .iter()
+                .map(|count| {
+                    let mut frame = [0; 5];
+                    frame[joint] = *count;
+                    frame
+                })
+                .collect(),
+        }
+    }
+
+    /// The person, 14:04 on 10 Nov: an app's cap per joint is 90% of that joint's hardware range
+    /// from home, on each side as the hardware has it (75c9's own ranges, read on 10 Nov: yaw
+    /// 820-3268 from 2012, roll 897-3153 from 2059, pitch 1457-3029 from 1791).
+    #[test]
+    fn a_lamps_reach_is_90_percent_of_its_hardware_from_the_pose_on_each_side() {
+        let reach = Reach::of_hardware(
+            [334, 1_162, 1_192, 983, 983],
+            [1_238, 1_094, 1_256, 420, 420],
+        );
+        // Pitch (up is fewer counts), roll, yaw, shoulder, elbow; never rounded up.
+        assert_eq!(reach.low, [300, 1_045, 1_072, 884, 884]);
+        assert_eq!(reach.high, [1_114, 984, 1_130, 378, 378]);
+    }
+
+    #[test]
+    fn a_move_is_held_to_each_joints_reach_on_each_side_and_the_speed_caps_still_hold() {
+        let reach = Reach::of_hardware(
+            [334, 1_162, 1_192, 983, 983],
+            [1_238, 1_094, 1_256, 420, 420],
+        );
+        for joint in 0..5 {
+            for (sign, side) in [(-1i16, reach.low), (1, reach.high)] {
+                let most = i16::try_from(side[joint]).unwrap();
+                assert_eq!(
+                    check_reach(&lean("at", joint, most, sign), &reach),
+                    Ok(()),
+                    "joint {joint} side {sign}"
+                );
+                let why = check_reach(&lean("past", joint, most + 2, sign), &reach).unwrap_err();
+                assert!(
+                    why.contains(&format!(
+                        "joint {joint} {} counts, farther than {most}",
+                        sign * (most + 2)
+                    )) && why.contains("reach"),
+                    "{why}"
+                );
+            }
+        }
+        // The other side of the same joint is its own: yaw may go 1,130 up and only 1,072 down.
+        assert!(check_reach(&lean("up", 2, 1_130, 1), &reach).is_ok());
+        assert!(check_reach(&lean("down", 2, 1_130, -1), &reach).is_err());
+        // A wider sway is only slower: a quick one is refused on speed, not reach.
+        let mut quick = lean("quick", 2, 1_000, 1);
+        quick.step_ms = 100;
+        quick.frames.extend([[0; 5]; 8]);
+        assert!(
+            check_reach(&quick, &reach)
+                .unwrap_err()
+                .contains("faster than 1000")
+        );
+        // Not knowing the lamp (a door with the switch on): the ceiling, the same either side.
+        assert!(
+            check_reach(
+                &lean("any", 2, i16::try_from(CEILING[2]).unwrap(), -1),
+                &Reach::ANY
+            )
+            .is_ok()
+        );
+        assert!(
+            check_reach(
+                &lean("any", 2, i16::try_from(CEILING[2]).unwrap() + 2, 1),
+                &Reach::ANY
+            )
+            .is_err()
+        );
+        // Today's reach is unchanged: 200, 200, the yaw reach, 350, 350.
+        assert_eq!(Reach::today(250).high, [200, 200, 250, 350, 350]);
+        assert_eq!(Reach::today(250).low, [200, 200, 250, 350, 350]);
+        assert_eq!(Reach::today(150).high[2], 150);
+        assert_eq!(Reach::today(400).high[2], 250);
+    }
+
+    #[test]
+    fn a_sent_move_and_a_folder_are_held_to_a_reach_given_per_joint() {
+        let reach = Reach::of_hardware(
+            [334, 1_162, 1_192, 983, 983],
+            [1_238, 1_094, 1_256, 420, 420],
+        );
+        let sent_text =
+            |file: &Move| format!("{{\"move\":{}}}", serde_json::to_string(file).unwrap());
+        let wide = sent_text(&lean("roll", 1, 900, -1));
+        assert!(Sent::reach(reach).take(wide.as_bytes()).unwrap().is_ok());
+        let why = Sent::default().take(wide.as_bytes()).unwrap().unwrap_err();
+        assert!(why.contains("farther than 200"), "{why}");
+        let folder = Folder::new("reach-each");
+        folder.write(
+            "roll.json",
+            &serde_json::to_string(&lean("roll", 1, 900, -1)).unwrap(),
+        );
+        assert_eq!(load_reach(&folder.0, &reach).unwrap().moves.len(), 1);
+        assert!(load_within(&folder.0, 250).unwrap().moves.is_empty());
+    }
+
+    #[test]
+    fn a_sent_move_and_a_folder_are_held_to_the_reach_they_were_given() {
+        let sent_text = |reach: i16| {
+            let file = sway("sway", reach);
+            format!("{{\"move\":{}}}", serde_json::to_string(&file).unwrap())
+        };
+        let wide = sent_text(220);
+        // Not given the lamp's reach, a body-side caller stays at the old 150.
+        let why = Sent::default().take(wide.as_bytes()).unwrap().unwrap_err();
+        assert!(why.contains("farther than 150"), "{why}");
+        assert!(
+            Sent::default()
+                .take(sent_text(150).as_bytes())
+                .unwrap()
+                .is_ok()
+        );
+        assert!(Sent::within(250).take(wide.as_bytes()).unwrap().is_ok());
+        let why = Sent::within(150)
+            .take(wide.as_bytes())
+            .unwrap()
+            .unwrap_err();
+        assert!(
+            why.contains("farther than 150") && why.contains("reach"),
+            "{why}"
+        );
+        let folder = Folder::new("reach");
+        folder.write(
+            "sway.json",
+            &serde_json::to_string(&sway("sway", 220)).unwrap(),
+        );
+        assert_eq!(load_within(&folder.0, 250).unwrap().moves.len(), 1);
+        let narrow = load_within(&folder.0, 150).unwrap();
+        assert!(narrow.moves.is_empty() && narrow.refused[0].1.contains("farther than 150"));
+        assert!(load(&folder.0).unwrap().moves.is_empty());
+    }
+
     #[test]
     fn a_move_sent_whole_is_checked_as_a_file_is_and_kept_once() {
         let mut sent = Sent::default();
@@ -684,10 +1078,10 @@ mod tests {
         assert!(why.contains("a --moves file's move has the name"), "{why}");
         let mut sent = Sent::default();
         // One the body cannot play is refused with why.
-        let far = datagram.replace("[40,0,0,0,0]", "[40,0,151,0,0]");
+        let far = datagram.replace("[40,0,0,0,0]", "[201,0,0,0,0]");
         let why = sent.take(far.as_bytes()).unwrap().unwrap_err();
         assert!(
-            why.contains("\"wiggle\"") && why.contains("farther than 150"),
+            why.contains("\"wiggle\"") && why.contains("farther than 200"),
             "{why}"
         );
         let nod = format!("{{\"move\":{}}}", good("nod"));

@@ -482,7 +482,8 @@ fn head_pats_response_is_chosen_in_its_file() {
 /// The owner, 19 Oct: core skills are always on the lamp, as a phone's own
 /// apps; the rest are installed. Desk tutor and its marks wait for the full
 /// look in the product. The four wellbeing nudges are core since 25 Oct
-/// (the owner: "do all of them"), and Sit back since #5208. Every one says its version.
+/// (the owner: "do all of them"), Sit back since #5208, and the FAQ since
+/// #5790. Every one says its version.
 #[test]
 fn every_skill_folder_says_its_kind_and_version() {
     let skills: Vec<_> = lamp_skills::load_each(&skills_root())
@@ -503,6 +504,7 @@ fn every_skill_folder_says_its_kind_and_version() {
             "comfort-break",
             "dance",
             "dusty-air",
+            "faq",
             "feelings",
             "head-pat",
             "head-pat-wiggle",
@@ -540,7 +542,10 @@ fn every_skill_folder_says_its_kind_and_version() {
             "guard-mode",
             "look-for-things",
             "meal-check",
+            "morning-agenda",
+            "morning-mail",
             "quiet-focus",
+            "tomorrows-plan",
             "who-was-here"
         ]
     );
@@ -560,16 +565,17 @@ fn every_skill_folder_says_its_kind_and_version() {
             .filter(|skill| !skill.enabled)
             .map(|skill| skill.name.as_str())
             .collect::<Vec<_>>(),
-        ["bedtime-morning", "comfort-break"],
-        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207)"
+        ["comfort-break"],
+        "every existing scene and skill retains its enabled default; Comfort break is on only by its [present] (#5207); Bedtime and Morning is on since #5753"
     );
 }
 
 #[test]
 fn disabled_skills_enter_neither_tools_nor_body_metadata() {
     let dir = tempfile::tempdir().unwrap();
-    let bedtime = load(&skills_root().join("bedtime-morning")).unwrap();
-    assert!(!bedtime.enabled);
+    // Comfort break, disabled by its own file (on only by its `[present]`).
+    let core = load(&skills_root().join("comfort-break")).unwrap();
+    assert!(!core.enabled);
     let disabled = load(&skill_with(
         dir.path(),
         "disabled-body",
@@ -590,7 +596,7 @@ fn disabled_skills_enter_neither_tools_nor_body_metadata() {
     .unwrap();
     // Passing the full inventory directly must not advertise disabled
     // tools or include their body grant in the text-origin restriction.
-    let mut inventory = vec![bedtime, disabled];
+    let mut inventory = vec![core, disabled];
     assert_eq!(tools_file(&inventory), serde_json::json!({"tools":[]}));
     inventory.push(quiet);
     assert_eq!(
@@ -869,7 +875,8 @@ fn a_read_step_reads_only_what_its_permissions_list() {
             "speak = true\nservices = { google_calendar = \"write\" }\n",
             "",
             CALENDAR,
-            "only \"read\"; a skill never writes to a service",
+            // A write is #6066's, and only with its switch on.
+            "a skill's writes are off on this lamp (LAMP_SKILL_WRITES is not on)",
         ),
         (
             "send-only",
@@ -1911,6 +1918,8 @@ fn the_program_timed(
         }
     });
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command.args([
         "--dir".as_ref(),
         root.join("skills").as_os_str(),
@@ -2389,6 +2398,37 @@ fn a_sound_is_asked_of_the_voice_and_its_refusal_is_said_in_the_event() {
         "sound: refused (the lamp is speaking)"
     );
     assert_eq!(refused.lights.len(), 0, "nothing made with a sound refused");
+}
+
+/// A skill's reminder (#6066): its run asks the actions part for what is set
+/// before it sets anything, and with a list it can't read sets nothing.
+const REMINDS: &str = r#"
+[trigger]
+topic = "humans/faces/tracked"
+when = "appears"
+[ask]
+policy = "hello"
+[[do]]
+remind = { at = "22:00", words = "Time to drink some water." }
+[permissions]
+topics = ["humans/faces/tracked"]
+actions = ["set_reminder"]
+"#;
+
+#[test]
+fn a_remind_step_is_made_through_the_actions_part() {
+    let seen = the_program_with(REMINDS, true, &[], 3, 1, 4);
+    assert_eq!(stages(&seen.events).last(), Some(&SkillStage::Done));
+    let done = &seen.events[3].why;
+    assert!(
+        done.contains("remind at 22:00: not set, what is set could not be read"),
+        "{done}"
+    );
+    assert_eq!(seen.lights.len(), 1, "{:?}", seen.lights);
+    let asked: serde_json::Value = serde_json::from_str(&seen.lights[0]).unwrap();
+    assert_eq!(asked["name"], "list_reminders");
+    assert!(asked.get("caller").is_none());
+    assert!(seen.asked.is_none(), "a remind says nothing itself");
 }
 
 #[test]
@@ -3041,6 +3081,92 @@ fn an_unknown_holds_condition_holds_only_while_its_topic_has_said_nothing() {
         let bad = skill_with(dir.path(), "bad", &toml(extra));
         assert!(load(&bad).unwrap_err().contains(why), "{extra}");
     }
+}
+
+/// #6543: `unknown = "holds_stale"` holds while its topic has said nothing
+/// and on a value that has run out; a fresh value is judged on itself, and
+/// after running out a fresh one begins its `for` from that value, not
+/// from the old one's. `"holds"` still stays closed on a value that ran out.
+#[test]
+fn an_unknown_holds_stale_condition_holds_on_a_topic_never_said_or_run_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let toml = |extra: &str| {
+        format!(
+            "[trigger]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n\
+             [[while]]\ntopic = \"memory/rules\"\nfield = \"keep_light_on\"\nnot_equals = true\n{extra}\
+             [ask]\npolicy = \"nudge\"\n[[do]]\nlight = {{ dim = 1 }}\n"
+        )
+    };
+    let stale = skill_with(dir.path(), "stale", &toml("unknown = \"holds_stale\"\n"));
+    let timed = skill_with(
+        dir.path(),
+        "timed",
+        &toml("unknown = \"holds_stale\"\nfor = \"10s\"\n"),
+    );
+    let holds = skill_with(dir.path(), "holds", &toml("unknown = \"holds\"\n"));
+    let high = r#"{"co2_ppm":1300,"feel":"stuffy"}"#;
+    let on = br#"{"keep_light_on":true}"#;
+    let off = br#"{"keep_light_on":false}"#;
+    // (skill, the rules said as (at s, value, lasting ms), when the air
+    // asks, whether it runs.)
+    type Said<'a> = &'a [(u64, &'a [u8], Option<u64>)];
+    let cases: [(&Path, Said, u64, bool, &str); 10] = [
+        (&stale, &[], 1, true, "never said"),
+        (&timed, &[], 1, true, "never said, with for"),
+        (&stale, &[(0, on, None)], 1, false, "fresh, holding not"),
+        (&stale, &[(0, off, None)], 1, true, "fresh, holding"),
+        (&stale, &[(0, on, Some(1_000))], 5, true, "ran out"),
+        (&holds, &[(0, off, Some(1_000))], 5, false, "holds, ran out"),
+        (
+            &stale,
+            &[(0, off, Some(1_000)), (10, on, None)],
+            12,
+            false,
+            "fresh again, holding not",
+        ),
+        (
+            &stale,
+            &[(0, on, Some(1_000)), (10, off, None)],
+            12,
+            true,
+            "fresh again, holding",
+        ),
+        // The old value began the clock at 0 s: 12 s would be long enough
+        // by it, but the clock begins again at the new value's 10 s.
+        (
+            &timed,
+            &[(0, off, Some(1_000)), (10, off, None)],
+            12,
+            false,
+            "fresh again, for not yet",
+        ),
+        (
+            &timed,
+            &[(0, off, Some(1_000)), (10, off, None)],
+            21,
+            true,
+            "fresh again, for since the new value",
+        ),
+    ];
+    for (skill, said, asked, runs, why) in cases {
+        let mut engine = Engine::new(vec![load(skill).unwrap()], true);
+        for (at, value, lasting) in said {
+            engine.observe("memory/rules", at * 1_000_000, value, *lasting);
+        }
+        let ran = !engine
+            .observe("air/state", asked * 1_000_000, high.as_bytes(), None)
+            .is_empty();
+        assert_eq!(ran, runs, "{why}");
+    }
+    // With present it is refused.
+    let bad = skill_with(
+        dir.path(),
+        "bad",
+        "[trigger]\ntopic = \"air/state\"\nfield = \"co2_ppm\"\nabove = 1200\n\
+         [[while]]\ntopic = \"humans/faces/tracked\"\npresent = true\nunknown = \"holds_stale\"\n\
+         [ask]\npolicy = \"nudge\"\n[[do]]\nlight = { dim = 1 }\n",
+    );
+    assert!(load(&bad).unwrap_err().contains("without present"));
 }
 
 /// #1672: `through` goes with a field's `equals` and a `for`, `broken_by`
@@ -3790,6 +3916,7 @@ fn an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted() 
     let clock = Clock::at(root);
     let mut running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 skills.as_os_str(),
@@ -3838,6 +3965,7 @@ fn an_installable_skill_goes_on_and_off_a_running_lamp_with_nothing_restarted() 
     settled(&["dance"]);
     let command = |args: &[&OsStr]| {
         let out = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args(args)
             .output()
             .unwrap();
@@ -3967,6 +4095,7 @@ fn a_declared_tool_is_in_the_tools_file_and_a_call_runs_the_skills_steps() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -4396,6 +4525,7 @@ fn a_repeat_call_with_only_made_steps_is_refused_while_its_run_is_under_way() {
         let worker = scope.spawn(move || one_action_reply(actions, &cancelled, None));
         running = Some(Running(
             Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+                .env("LAMP_SKILLS_ANY_ASKER", "on")
                 .args([
                     "--dir".as_ref(),
                     root.join("skills").as_os_str(),
@@ -4494,6 +4624,7 @@ fn a_repeat_tool_call_holds_the_runs_pose_again_and_only_that() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -4649,6 +4780,8 @@ fn asking_with(
         skill_with(&root.join("skills"), "hello", hello);
     }
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command
         .args([
             "--dir".as_ref(),
@@ -5877,6 +6010,8 @@ fn the_dance_asking(
     StandInBody::run(mood, &bus, says, clock.clone(), took, moved, lost);
     let tools = root.join("tools");
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command
         .args([
             "--dir".as_ref(),
@@ -6445,6 +6580,7 @@ fn the_program_dances_again_on_dance_again_but_not_on_a_noise() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -6741,6 +6877,51 @@ fn the_light_going_out_is_loaded_with_its_fade_and_refused_with_anything_else() 
             "slow-colour",
             r#"{ colour = "warm", over = "30s" }"#,
             "over goes with out = true",
+        ),
+    ] {
+        let refused = load(&with(name, light)).unwrap_err();
+        assert!(refused.contains(why), "{name}: {refused}");
+    }
+}
+
+/// lamp-9adf, 11 Nov 17:0x: "blink the light green twice when I arrive" was
+/// made as an `out` step with a colour and a pattern, refused on every
+/// repair. The making model's brief (`make_skill_local::BLINK`) now says a
+/// blink or a flash is one colour step with a soft pulse: that step loads,
+/// and a blink pattern or an `out` with a colour is still refused.
+#[test]
+fn a_blink_asked_of_a_made_skill_is_a_pulse_and_never_an_out_with_a_colour() {
+    let dir = tempfile::tempdir().unwrap();
+    let with = |name: &str, light: &str| {
+        skill_with(
+            dir.path(),
+            name,
+            &OUT_WHILE.replace(
+                r#"light = { out = true, over = "30s", until = "ends" }"#,
+                &format!("light = {light}"),
+            ),
+        )
+    };
+    load(&with(
+        "pulse",
+        r#"{ colour = "green", level = 3, for = "5s", pattern = { kind = "pulse" } }"#,
+    ))
+    .unwrap();
+    for (name, light, why) in [
+        (
+            "out-green",
+            r#"{ out = true, colour = "green", pattern = { kind = "pulse" } }"#,
+            "out takes no colour",
+        ),
+        (
+            "blink",
+            r#"{ colour = "green", level = 3, for = "5s", pattern = { kind = "blink" } }"#,
+            "no blink, flash or rainbow",
+        ),
+        (
+            "faint",
+            r#"{ colour = "green", level = 1, for = "5s", pattern = { kind = "pulse" } }"#,
+            "a pulse is seen at level 2 and up",
         ),
     ] {
         let refused = load(&with(name, light)).unwrap_err();
@@ -7659,6 +7840,8 @@ fn the_program_with_items(
         }
     });
     let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+    // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+    command.env("LAMP_SKILLS_ANY_ASKER", "on");
     command.args([
         "--dir".as_ref(),
         root.join("skills").as_os_str(),
@@ -7814,6 +7997,7 @@ fn quiet_hours_keep_their_clock_hours_across_summer_time_in_the_lamps_zone() {
 /// within 5 s. One that starts serving instead is ended and fails the test.
 fn refused(args: &[&str]) -> (Option<i32>, String) {
     let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .env("LAMP_SKILLS_ANY_ASKER", "on")
         .args(args)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::piped())
@@ -7895,6 +8079,7 @@ fn the_tools_socket_lost_is_made_again_and_the_folder_gone_ends_lamp_skills() {
     let tools = run.join("tools");
     let clock = Clock::at(root);
     let mut child = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .env("LAMP_SKILLS_ANY_ASKER", "on")
         .args([
             "--dir".as_ref(),
             root.join("skills").as_os_str(),
@@ -8095,6 +8280,7 @@ impl ToolProgram {
         let clock = Clock::at(&root);
         let running = Running(
             Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+                .env("LAMP_SKILLS_ANY_ASKER", "on")
                 .args([
                     "--dir".as_ref(),
                     root.join("skills").as_os_str(),
@@ -8563,6 +8749,343 @@ show = "short"
     );
     program.clock.skip(Duration::from_secs(5));
     assert_eq!(program.colours(0), Vec::<String>::new());
+}
+
+/// A show after the model's line, as light-show has it (#5745).
+const SHOW_AFTER_SAY: &str = r#"
+tool = "light_show"
+[[do]]
+say = "Say the show is starting."
+[[do]]
+after = "say"
+show = "short"
+"#;
+
+/// How the model's line after a call is cut in the #5745 cases, as
+/// lamp-52e6's request 30 was at 13:48:35: the voice speaking, then
+/// listening 590 ms in, on a sound before it has any words.
+#[derive(Clone, Copy, PartialEq)]
+enum AfterCut {
+    /// Nothing heard; the voice says the line again 4 s later, to its end.
+    SaidAgain,
+    /// A finished "stop" heard after the cut.
+    Words,
+    /// Nothing at all for 6 s.
+    Nothing,
+    /// The line said again, and "no, not that" heard before its end.
+    WordsWhileSaidAgain,
+    StaleWhileSaidAgain,
+    MalformedStateWhileSaidAgain,
+    ThinkingWhileSaidAgain,
+    SpeakingTimeoutWhileSaidAgain,
+    MalformedWordsWhileSaidAgain,
+    MalformedWordsAtResting,
+}
+
+impl ToolProgram {
+    /// The voice now `state`.
+    fn voice_is(&mut self, state: lamp_msgs::Voice) {
+        self.voice.publish_json(1, &VoiceState { state }).unwrap();
+        // The program looks at the voice every 20 ms.
+        std::thread::sleep(Duration::from_millis(100));
+    }
+
+    /// The call of `tool`, asked in turn 30, with its line cut as `how`:
+    /// the colours asked for after it, and the run's done event.
+    fn cut_after(&mut self, tool: &str, how: AfterCut) -> (Vec<String>, SkillEvent) {
+        use lamp_msgs::Voice::{Listening, Resting, Speaking};
+        let bus = Bus::new(self._dir.path().join("bus")).unwrap();
+        let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+        self.heard_in("lamp, can you do it", Some(30));
+        self.voice_is(Listening);
+        assert_eq!(self.call(tool, "{}")["ok"], true);
+        self.voice_is(Speaking);
+        self.clock.skip(Duration::from_millis(590));
+        self.voice_is(Listening);
+        // The sound's turn: nothing heard in it.
+        self.heard_in("", Some(31));
+        match how {
+            AfterCut::Words => self.heard_in("stop", Some(31)),
+            AfterCut::Nothing => {
+                // Said once a second, as the voice says its state.
+                for _ in 0..7 {
+                    self.clock.skip(Duration::from_secs(1));
+                    self.voice_is(Listening);
+                }
+            }
+            AfterCut::SaidAgain
+            | AfterCut::WordsWhileSaidAgain
+            | AfterCut::StaleWhileSaidAgain
+            | AfterCut::MalformedStateWhileSaidAgain
+            | AfterCut::ThinkingWhileSaidAgain
+            | AfterCut::SpeakingTimeoutWhileSaidAgain
+            | AfterCut::MalformedWordsWhileSaidAgain
+            | AfterCut::MalformedWordsAtResting => {
+                self.clock.skip(Duration::from_secs(2));
+                self.voice_is(Listening);
+                self.clock.skip(Duration::from_secs(2));
+                self.voice_is(Speaking);
+                // Nothing is made while the line is said again.
+                assert_eq!(
+                    self.colours_within(0, Duration::from_millis(300)),
+                    Vec::<String>::new()
+                );
+                if how == AfterCut::WordsWhileSaidAgain {
+                    self.heard_in("no, not that", Some(32));
+                }
+                match how {
+                    AfterCut::StaleWhileSaidAgain => {
+                        // said_lately uses real wall time, not this fixture's
+                        // clock: no heartbeat and no Resting for over 3 s.
+                        std::thread::sleep(Duration::from_millis(3_200));
+                    }
+                    AfterCut::MalformedStateWhileSaidAgain => {
+                        self.voice
+                            .publish_json(1, &serde_json::json!({"state": "unknown"}))
+                            .unwrap();
+                    }
+                    AfterCut::ThinkingWhileSaidAgain => {
+                        self.voice_is(lamp_msgs::Voice::Thinking);
+                        self.clock.skip(Duration::from_secs(5));
+                    }
+                    AfterCut::SpeakingTimeoutWhileSaidAgain => {
+                        // The retained Speaking heartbeat is still fresh in
+                        // real time; only the line's fake deadline passes.
+                        self.clock.skip(Duration::from_secs(181));
+                    }
+                    AfterCut::MalformedWordsWhileSaidAgain | AfterCut::MalformedWordsAtResting => {
+                        // Valid bus envelope, invalid Speech payload. This
+                        // is a parse failure, not a Subscriber I/O error.
+                        self.heard
+                            .lock()
+                            .unwrap()
+                            .as_mut()
+                            .unwrap()
+                            .publish_json(1, &serde_json::json!({"text": 17, "finished": true}))
+                            .unwrap();
+                        if how == AfterCut::MalformedWordsWhileSaidAgain {
+                            self.clock.skip(Duration::from_millis(100));
+                            std::thread::sleep(Duration::from_millis(100));
+                        }
+                        // In the boundary case there is no intentional wait
+                        // between malformed words and the terminal state.
+                        self.voice_is(Resting);
+                    }
+                    _ => {
+                        self.clock.skip(Duration::from_millis(1_200));
+                        self.voice_is(Resting);
+                    }
+                }
+            }
+        }
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let done = loop {
+            assert!(Instant::now() < deadline, "the run never ended");
+            self.clock.skip(Duration::from_millis(500));
+            if let Some(message) = events.recv(Duration::from_millis(100)).unwrap() {
+                let event: SkillEvent = message.parse().unwrap();
+                if event.stage == SkillStage::Done {
+                    break event;
+                }
+            }
+        };
+        (self.colours_within(0, Duration::ZERO), done)
+    }
+}
+
+/// #5745, lamp-52e6 at 13:48:35: a sound with no words cut the light
+/// show's line 590 ms in, and the voice said the line again 4 s later. The
+/// show is played when that line ends.
+#[test]
+fn a_say_cut_by_a_sound_with_no_words_is_said_again_and_its_after_steps_are_made() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::SaidAgain);
+    assert_eq!(
+        colours.first().map(String::as_str),
+        Some("purple"),
+        "{}",
+        done.why
+    );
+    assert!(
+        done.why
+            .contains("a cut with no words: the line was said again, then made"),
+        "{}",
+        done.why
+    );
+}
+
+/// A person who speaks over the line still cancels what comes after it.
+#[test]
+fn a_say_cut_by_words_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::Words);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+/// A cut that neither words nor the line said again follow within 6 s is
+/// dropped, as before.
+#[test]
+fn a_cut_that_never_settles_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::Nothing);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+/// Words that come while the line is said again (late speech-to-text)
+/// still cancel what comes after it.
+#[test]
+fn words_heard_after_the_line_is_said_again_still_cancel() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::WordsWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+/// Host-only cancellation timing; excludes setup and the heartbeat TTL.
+#[test]
+#[ignore = "manual host latency diagnostic"]
+fn resumed_say_unknown_state_first_and_repeated_cancellation_latency() {
+    use lamp_msgs::Voice::{Listening, Speaking};
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let bus = Bus::new(program._dir.path().join("bus")).unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "latency").unwrap();
+    for label in ["first", "repeated"] {
+        program.heard_in("lamp, can you do it", Some(30));
+        program.voice_is(Listening);
+        assert_eq!(program.call("light_show", "{}")["ok"], true);
+        program.voice_is(Speaking);
+        program.clock.skip(Duration::from_millis(590));
+        program.voice_is(Listening);
+        program.heard_in("", Some(31));
+        program.clock.skip(Duration::from_secs(2));
+        program.voice_is(Listening);
+        program.clock.skip(Duration::from_secs(2));
+        program.voice_is(Speaking);
+        let began = Instant::now();
+        program
+            .voice
+            .publish_json(1, &serde_json::json!({"state": "unknown"}))
+            .unwrap();
+        let done = loop {
+            assert!(began.elapsed() < Duration::from_secs(2), "no cancellation");
+            if let Some(message) = events.recv(Duration::from_millis(20)).unwrap() {
+                let event: SkillEvent = message.parse().unwrap();
+                if event.stage == SkillStage::Done {
+                    break event;
+                }
+            }
+        };
+        let elapsed = began.elapsed();
+        eprintln!("resumed cancellation {label}: {} us", elapsed.as_micros());
+        assert!(
+            done.why.contains("nothing after it is made"),
+            "{}",
+            done.why
+        );
+        assert!(program.colours_within(0, Duration::ZERO).is_empty());
+        assert!(elapsed < Duration::from_millis(250), "{label}: {elapsed:?}");
+    }
+}
+
+#[test]
+fn a_resumed_say_with_a_stale_heartbeat_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::StaleWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_with_malformed_state_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::MalformedStateWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_still_thinking_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::ThinkingWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_still_speaking_at_timeout_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::SpeakingTimeoutWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_with_malformed_words_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::MalformedWordsWhileSaidAgain);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+#[test]
+fn a_resumed_say_with_malformed_words_at_resting_makes_nothing_after_it() {
+    let mut program = ToolProgram::with("show", SHOW_AFTER_SAY, &[("short", SHORT_SHOW)]);
+    let (colours, done) = program.cut_after("light_show", AfterCut::MalformedWordsAtResting);
+    assert!(colours.is_empty(), "{colours:?}; {}", done.why);
+    assert!(
+        done.why.contains("nothing after it is made"),
+        "{}",
+        done.why
+    );
+}
+
+/// Dance has the same `after = "say"`: a sound with no words over "let's
+/// dance" still ends in its warm glow and dance, through its own folder.
+#[test]
+fn a_dance_cut_by_a_sound_with_no_words_still_dances() {
+    let dance = fs::read_to_string(skills_root().join("dance/skill.toml")).unwrap();
+    let mut program = ToolProgram::with("dance", &dance, &[]);
+    let (colours, done) = program.cut_after("dance", AfterCut::SaidAgain);
+    assert_eq!(
+        colours.first().map(String::as_str),
+        Some("warm"),
+        "{}",
+        done.why
+    );
 }
 
 /// #1679: the loader holds the new steps to what they are for: a kept
@@ -9779,10 +10302,92 @@ fn exact_words_reach_the_voice_unchanged_at_their_priority() {
     assert_eq!(asked["expires_in_ms"], 120_000);
     assert_eq!(asked["skill"], "hello");
     assert!(asked.get("note").is_none(), "{asked}");
+    // #5999: a made skill's words are no fixed line: they stay a `text` the
+    // voice says through its turn, translated and kept in the thread, never
+    // its exact path.
+    assert!(asked.get("exact").is_none(), "{asked}");
     let done = &seen.events[3].why;
     assert!(done.contains("light warm: done"), "{done}");
     assert!(done.contains("say: spoken"), "{done}");
     assert!(done.contains("light given back to on blue at 3"), "{done}");
+}
+
+/// #5999: the skills' word-for-word lines (Smoky air's, Dusty air's and each
+/// of Head pat's) reach the voice as its exact words (`exact: true`), which
+/// the voice takes as a line said as written, never a chat turn the model
+/// may decline or reword; and each is one of the voice's fixed lines, so it
+/// is said in the owner's language and kept in the thread as the lamp's.
+#[test]
+fn the_skills_word_for_word_lines_reach_the_voice_as_exact_fixed_lines() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
+    let (mut exact_asks, mut fixed_lines) = (0, 0);
+    for name in ["smoky-air", "dusty-air", "head-pat"] {
+        let file: toml::Table =
+            toml::from_str(&fs::read_to_string(root.join(name).join("skill.toml")).unwrap())
+                .unwrap();
+        let say = file["do"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find_map(|step| step.get("say"))
+            .and_then(toml::Value::as_table)
+            .unwrap_or_else(|| panic!("{name} says a table"))
+            .clone();
+        let lines: Vec<String> = match &say["text"] {
+            toml::Value::String(line) => vec![line.clone()],
+            toml::Value::Array(lines) => lines
+                .iter()
+                .map(|line| line.as_str().unwrap().to_owned())
+                .collect(),
+            other => panic!("{name}: {other:?}"),
+        };
+        let quoted: Vec<String> = lines.iter().map(|line| format!("'''{line}'''")).collect();
+        let mut table = match quoted.as_slice() {
+            [one] => format!("text = {one}"),
+            many => format!("text = [{}]", many.join(", ")),
+        };
+        if let Some(priority) = say.get("priority").and_then(toml::Value::as_integer) {
+            table.push_str(&format!(", priority = {priority}"));
+        }
+        if let Some(expires) = say.get("expires").and_then(toml::Value::as_str) {
+            table.push_str(&format!(", expires = \"{expires}\""));
+        }
+        let skill = format!(
+            "[trigger]\ntopic = \"humans/faces/tracked\"\nwhen = \"appears\"\n[ask]\npolicy = \"hello\"\n\
+             [[do]]\nsay = {{ {table} }}\n"
+        );
+        let seen = the_program_with(
+            &skill,
+            true,
+            &[r#"{"event":"begun","at_us":5}"#, r#"{"outcome":"spoken"}"#],
+            3,
+            1,
+            4,
+        );
+        let wire = seen
+            .asked
+            .unwrap_or_else(|| panic!("{name}: nothing asked"));
+        let asked: serde_json::Value = serde_json::from_str(&wire).unwrap();
+        let text = asked["text"].as_str().unwrap_or_default();
+        assert!(lines.iter().any(|line| line == text), "{name}: {asked}");
+        assert!(asked.get("note").is_none(), "{name}: {asked}");
+        // It still waits for the room's quiet its priority buys, as a say.
+        assert_eq!(asked["quiet"], true, "{name}: {asked}");
+        // The voice's own reading of the ask: the exact path, no chat turn.
+        let request = lamp_voice::say::parse_from(&wire, lamp_voice::say::Caller::Other).unwrap();
+        if asked["exact"] == true
+            && request.words == lamp_voice::say::Words::Exact(text.into())
+            && request.quiet
+            && request.words.turn().is_none()
+        {
+            exact_asks += 1;
+        }
+        fixed_lines += lines
+            .iter()
+            .filter(|line| lamp_voice::language::is_fixed(line))
+            .count();
+    }
+    assert_eq!((exact_asks, fixed_lines), (3, 9));
 }
 
 /// A nudge started by a stuffy room, as the nudges' limits are tested with
@@ -10286,6 +10891,48 @@ fn stop(engine: &mut Engine, how: &str, at_s: u64) -> Result<String, String> {
         })
 }
 
+/// The tools file's `core` names a core skill's `[stop]` function, shared
+/// with an installable skill or not, and `stay_plugged_in` with the core
+/// unplug skill, so the voice's `use_skill` lines keep them whole past
+/// their bound; an installable skill's own `[stop]` is not named.
+#[test]
+fn the_tools_files_core_names_a_core_skills_stop_and_stay_plugged_in() {
+    let dir = tempfile::tempdir().unwrap();
+    let installable = load(&stoppable(dir.path())).unwrap();
+    assert_eq!(installable.kind, SkillKind::Installable);
+    let meal = load(&skills_root().join("meal-check")).unwrap();
+    let sip = load(&skills_root().join("sip-of-water")).unwrap();
+    let unplug = load(&skills_root().join("prepare-unplug")).unwrap();
+    let tools = tools_file(&[installable, meal, sip, unplug]);
+    assert_eq!(
+        tools["core"],
+        serde_json::json!(["prepare_to_unplug", "stay_plugged_in", "wellbeing_nudges"]),
+        "{tools}"
+    );
+}
+
+/// #5747: lamp-52e6 heard "Lamp, I'm unplugging you now." twice and the
+/// model answered in words, no call: the line said only "will unplug". The
+/// line the model is given names the present tense and the call comes
+/// first, and still keeps out a quoted or example sentence.
+#[test]
+fn the_unplug_line_names_the_present_tense_and_the_call_before_words() {
+    let unplug = load(&skills_root().join("prepare-unplug")).unwrap();
+    let tools = tools_file(&[unplug]);
+    let line = tools["tools"][0]["description"].as_str().unwrap();
+    assert_eq!(tools["tools"][0]["name"], "prepare_to_unplug", "{tools}");
+    for wanted in [
+        "I'm unplugging you now",
+        "I'm going to unplug you",
+        "I'll unplug you",
+        "turning you off",
+        "before saying anything else",
+        "quoted/example unplug sentence",
+    ] {
+        assert!(line.contains(wanted), "{wanted}: {line}");
+    }
+}
+
 /// #1685: a skill's `[stop]` is one function for the model, its choice
 /// `how`: `snooze` until the next local morning, `off` until it is asked
 /// for again, `on` to have it again. It stops only what the skill starts
@@ -10370,6 +11017,7 @@ fn a_skills_stop_is_one_function_held_to_its_rules() {
     );
     fs::remove_dir_all(dir.path().join("zz-other")).unwrap();
     let listed = Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+        .env("LAMP_SKILLS_ANY_ASKER", "on")
         .args(["list".as_ref(), "--dir".as_ref(), dir.path().as_os_str()])
         .output()
         .unwrap();
@@ -10523,6 +11171,7 @@ fn stop_program(root: &Path, start: u32) -> (Running, Bus, PathBuf) {
     let tools = root.join(format!("tools{start}"));
     let running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -10640,8 +11289,11 @@ fn the_program_keeps_a_skill_off_across_a_restart() {
     assert_eq!(fs::read_to_string(root.join("state/off")).unwrap(), "");
 }
 
-/// #1685, the program: a snooze is in memory only, so after a restart the
-/// skill nudges again, and nothing was written.
+/// #1685, the program: a snooze is kept only beside the holds in the
+/// runtime folder, through a short restart on the same boot ("A hold kept
+/// across a restart"); a start with another runtime folder, as after a
+/// reboot, forgets it, and the skill nudges again. Nothing was written to
+/// state.
 #[test]
 fn the_program_forgets_a_snooze_at_a_restart() {
     // Short: a socket's whole path has to fit in 103 bytes.
@@ -10997,6 +11649,7 @@ fn guard_mode_texts_a_visit_on_messages_out_and_ends_on_the_askers_face() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -11207,6 +11860,8 @@ fn guard_mode_from_the_app_is_the_owners_alone_and_the_switch_closed_ends_it() {
         let tools = root.join("tools");
         let clock = Clock::at(root);
         let mut command = Command::new(env!("CARGO_BIN_EXE_lamp-skills"));
+        // The tests' stand-in for lamp-voice's cgroup: their calls are the voice's.
+        command.env("LAMP_SKILLS_ANY_ASKER", "on");
         command
             .args([
                 "--dir".as_ref(),
@@ -11514,6 +12169,7 @@ fn guard_mode_counts_only_while_its_mark_shows_and_asks_for_it_again() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -11716,6 +12372,7 @@ fn guard_mode_pauses_under_the_persons_light_until_they_ask_again() {
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -11943,6 +12600,7 @@ fn guard_mode_counts_nothing_once_the_ring_has_not_confirmed_its_mark_for_30_s()
     let clock = Clock::at(root);
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 root.join("skills").as_os_str(),
@@ -13448,7 +14106,7 @@ fn unplug_words_are_the_granted_skills_own() {
     .unwrap_err();
     assert!(why.contains("only with that grant"), "{why}");
     // A line that isn't words.
-    let check = "check = \"Say exactly: I can't get up by myself; I need to be checked.\"";
+    let check = "check = \"I can't get up by myself; I need to be checked.\"";
     for bad in [
         "\"\"".to_owned(),
         "\"a\\u0007b\"".to_owned(),
@@ -13661,6 +14319,7 @@ fn unplug_core_is_installed_but_hidden_and_uncallable_with_switch_off() {
     let tools = dir.path().join("tools");
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 skills.as_os_str(),
@@ -13723,6 +14382,7 @@ fn unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt()
     say.set_nonblocking(true).unwrap();
     let _running = Running(
         Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
             .args([
                 "--dir".as_ref(),
                 skills.as_os_str(),
@@ -13836,6 +14496,355 @@ fn unplug_tool_returns_before_folding_and_says_ready_only_after_render_receipt()
             .unwrap(),
         request
     );
+}
+
+/// What the product's `prepare-unplug` asks before it turns the lamp off,
+/// as its `skill.toml` words it (#5774's P2).
+const ASK_OFF: &str = "Shall I turn myself off now";
+/// What it says when an update holds the turn-off (#5763's call (a), point
+/// 5; #5777's P2: it stands up and asks to be told again).
+const UPDATING: &str = "ask me again once it's done";
+/// The change helper's refusal while an update installs.
+const INSTALLING: &str = "an update is being installed: try again once it is done";
+
+/// A lamp-skills with `LAMP_UNPLUG=on` and a turn-off socket (the product's
+/// setup change helper, #5763's P1), driven to a confirmed fold: a running
+/// lamp, its storage still written, must never say "You can unplug me now".
+/// The helper answers each line with the next of `answers` (the last again
+/// after them). `heard`, when given, is a line the person says that many ms
+/// after the lamp asks whether to turn off (past the echo tail at 1.5 s, or
+/// inside it). With `busy`, the room is busy throughout. Runs `for_s`
+/// seconds; returns what the helper was asked, every say asked, and whether
+/// the fold was cancelled (the lamp stood up).
+fn unplug_with_turn_off(
+    answers: &[serde_json::Value],
+    heard: Option<(&str, u64)>,
+    busy: bool,
+    for_s: u64,
+) -> (Vec<String>, Vec<serde_json::Value>, bool) {
+    use lamp_body::unplug::{Phase, Request, State};
+    use lamp_bus::Kind;
+    use serde_json::{Value, json};
+    let dir = tempfile::Builder::new()
+        .prefix("uf")
+        .tempdir_in("/tmp")
+        .unwrap();
+    let skills = dir.path().join("skills");
+    copy(
+        &skills_root().join("prepare-unplug"),
+        &skills.join("prepare-unplug"),
+    );
+    let root = dir.path().join("bus");
+    let bus = Bus::new(&root).unwrap();
+    let tools = dir.path().join("tools");
+    let say_socket = dir.path().join("say.sock");
+    let say = UnixListener::bind(&say_socket).unwrap();
+    say.set_nonblocking(true).unwrap();
+    let off_socket = dir.path().join("change.sock");
+    let helper = UnixListener::bind(&off_socket).unwrap();
+    helper.set_nonblocking(true).unwrap();
+    let _running = Running(
+        Command::new(env!("CARGO_BIN_EXE_lamp-skills"))
+            .env("LAMP_SKILLS_ANY_ASKER", "on")
+            .args([
+                "--dir".as_ref(),
+                skills.as_os_str(),
+                "--bus-root".as_ref(),
+                root.as_os_str(),
+                "--tools-dir".as_ref(),
+                tools.as_os_str(),
+                "--say-socket".as_ref(),
+                say_socket.as_os_str(),
+            ])
+            .env("LAMP_UNPLUG", "on")
+            .env(lamp_skills::unplug::OFF_SOCKET_ENVIRONMENT, &off_socket)
+            .spawn()
+            .unwrap(),
+    );
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while !tools.join("tools.json").exists() || !tools.join("call.sock").exists() {
+        assert!(Instant::now() < deadline, "skill never became available");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let mut voice = bus
+        .publisher_declared(Speech::TOPICS[0], &Speech::declaration(), "voice")
+        .unwrap();
+    let mut room = bus
+        .publisher_declared(
+            lamp_msgs::RoomState::TOPIC,
+            &lamp_msgs::RoomState::declaration(),
+            "voice",
+        )
+        .unwrap();
+    if busy {
+        room.publish_json(
+            lamp_ipc::monotonic_us(),
+            &lamp_msgs::RoomState {
+                state: lamp_msgs::Room::Busy,
+                another_voice: None,
+            },
+        )
+        .unwrap();
+    }
+    let mut caller = UnixStream::connect(tools.join("call.sock")).unwrap();
+    caller
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    writeln!(
+        caller,
+        "{}",
+        json!({"op":"call","name":"prepare_to_unplug","args":{}})
+    )
+    .unwrap();
+    let mut line = String::new();
+    BufReader::new(caller).read_line(&mut line).unwrap();
+    let response: Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(response["ok"], true, "{response}");
+    let request = loop {
+        if let Some(message) = bus.latest(Request::TOPIC).unwrap() {
+            break message.parse::<Request>().unwrap();
+        }
+        assert!(Instant::now() < deadline, "no body request");
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let mut body = bus
+        .publisher_declared(State::TOPIC, &State::declaration(), "body")
+        .unwrap();
+    let mut expression = bus
+        .publisher(
+            lamp_skills::unplug::EXPRESSION_TOPIC,
+            Kind::Latest,
+            "expression",
+        )
+        .unwrap();
+    expression.expires_after(Some(Duration::from_millis(500)));
+    let mut ring = bus
+        .publisher(lamp_skills::unplug::RING_TOPIC, Kind::Latest, "ring")
+        .unwrap();
+    ring.expires_after(Some(Duration::from_millis(500)));
+    let state = State {
+        request: request.request.clone(),
+        phase: Phase::Ready,
+        why: String::new(),
+    };
+    let asleep = json!({"request":request.request,"asleep":true});
+    let (mut asked, mut said) = (Vec::new(), Vec::new());
+    let mut answers = answers.iter();
+    let mut answer = answers.next().unwrap().clone();
+    let mut heard_at = None;
+    // Every say asked and every helper line, answered, for `for_s` s of proof.
+    let until = Instant::now() + Duration::from_secs(for_s);
+    while Instant::now() < until {
+        let now = lamp_ipc::monotonic_us();
+        // The body keeps its proof until a cancel stands it up.
+        if bus
+            .latest(lamp_body::unplug::CANCEL_TOPIC)
+            .unwrap()
+            .is_none()
+        {
+            body.publish_json(now, &state).unwrap();
+            expression.publish_json(now, &asleep).unwrap();
+            ring.publish_json(now, &asleep).unwrap();
+        }
+        if let Ok((stream, _)) = helper.accept() {
+            stream.set_nonblocking(false).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            asked.push(line.trim().to_owned());
+            writeln!(&stream, "{answer}").unwrap();
+            if let Some(next) = answers.next() {
+                answer = next.clone();
+            }
+        }
+        if let Ok((stream, _)) = say.accept() {
+            stream.set_nonblocking(false).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            let ask: Value = serde_json::from_str(&line).unwrap();
+            // #5777 (lamp-52e6, 10 Nov 12:43): the chat model refused the
+            // ask as a note ("it isn't mine to say") and the stay note was
+            // dropped as user_interrupted. Every line is the voice's exact
+            // words, never a note the model may decline or reword.
+            assert_eq!(ask["exact"], true, "{ask}");
+            assert!(ask.get("note").is_none(), "{ask}");
+            if let Some((_, after_ms)) = heard
+                && ask["text"]
+                    .as_str()
+                    .is_some_and(|text| text.contains(ASK_OFF))
+            {
+                heard_at = Some(Instant::now() + Duration::from_millis(after_ms));
+            }
+            said.push(ask);
+            // Begun, then spoken, as the voice answers: a stay cancels at its begun.
+            writeln!(&stream, "{}", json!({"event":"begun"})).unwrap();
+            writeln!(&stream, "{}", json!({"outcome":"spoken"})).unwrap();
+        }
+        if let (Some(at), Some((text, _))) = (heard_at, heard)
+            && Instant::now() >= at
+        {
+            heard_at = None;
+            voice
+                .publish_json(
+                    lamp_ipc::monotonic_us(),
+                    &Speech {
+                        text: text.into(),
+                        finished: true,
+                        locale: None,
+                        request: None,
+                    },
+                )
+                .unwrap();
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let stood = bus
+        .latest(lamp_body::unplug::CANCEL_TOPIC)
+        .unwrap()
+        .is_some();
+    (asked, said, stood)
+}
+
+/// Each say's note, or its text, in order.
+fn notes(said: &[serde_json::Value]) -> Vec<String> {
+    said.iter()
+        .map(|ask| {
+            ask["note"]
+                .as_str()
+                .or(ask["text"].as_str())
+                .unwrap_or_default()
+                .to_owned()
+        })
+        .collect()
+}
+
+/// #5774's P2: a confirmed fold turns the lamp off only after it asked and
+/// heard a spoken yes, the lamp's one yes (`first_stand::is_yes`). The ask
+/// is said before the runner, which says the last words itself.
+#[test]
+fn a_lamp_with_a_turn_off_socket_turns_off_at_the_fold_only_after_a_spoken_yes() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"done":{"shutting_down":true}})],
+        Some(("yes", 1_700)),
+        false,
+        5,
+    );
+    let notes = notes(&said);
+    assert_eq!(notes.len(), 1, "{notes:?}");
+    assert!(notes[0].contains(ASK_OFF), "{notes:?}");
+    assert!(notes.iter().all(|note| !note.contains("unplug me now")));
+    assert_eq!(asked, [r#"{"shutdown":"lamp"}"#], "said: {notes:?}");
+    assert!(!stood);
+}
+
+/// #5774's P2: a false fold (a TV's "I'm unplugging you", "I'm unplugging
+/// the kettle") that hears no yes never powers off: it says it will stay
+/// and stands up, as a "never mind" does.
+#[test]
+fn a_fold_that_hears_no_yes_stands_up_and_never_turns_off() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"done":{"shutting_down":true}})],
+        Some(("no, the kettle", 1_700)),
+        false,
+        5,
+    );
+    let notes = notes(&said);
+    assert!(asked.is_empty(), "asked {asked:?}, said {notes:?}");
+    // Said as written in the skill's file, word for word (#5777).
+    assert_eq!(
+        notes,
+        [
+            "My arm is folded. Shall I turn myself off now? Say yes, and I will.",
+            "Okay, I'll stay."
+        ]
+    );
+    assert_eq!(said[1]["priority"], 8, "{said:?}");
+    assert!(stood, "{notes:?}");
+}
+
+/// Refused, the lamp says not to unplug it yet and stands up as after
+/// "never mind": nothing kept holds it folded.
+#[test]
+fn a_refused_turn_off_says_not_to_unplug_yet_and_never_says_unplug_me_now() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"refused":"the change helper is busy"})],
+        Some(("yes, go ahead", 1_700)),
+        false,
+        5,
+    );
+    assert_eq!(asked, [r#"{"shutdown":"lamp"}"#]);
+    let notes = notes(&said);
+    assert!(notes.iter().all(|note| !note.contains("unplug me now")));
+    assert_eq!(notes.len(), 2, "{notes:?}");
+    assert!(notes[1].contains("please don't unplug me yet"), "{notes:?}");
+    // lamp-52e6, build 11913: the kept request held it folded until a reboot.
+    assert!(
+        stood,
+        "a turn-off not taken left the fold latched: {notes:?}"
+    );
+}
+
+/// #5777's P2: an update holds the turn-off, and an install round restarts
+/// lamp-skills, so no wait for it may live in lamp-skills (one did: after
+/// "keep me plugged in" a restart left the lamp folded, never off and never
+/// up). Refused for an update, the lamp says it can't turn off yet, stands
+/// up at once and asks to be told again: nothing is left waiting, so a
+/// restart mid-update leaves nothing undone. The helper is asked once.
+#[test]
+fn a_turn_off_held_by_an_update_stands_up_at_once_and_asks_to_be_told_again() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[
+            serde_json::json!({"refused": INSTALLING}),
+            serde_json::json!({"done":{"shutting_down":true}}),
+        ],
+        Some(("yes", 1_700)),
+        false,
+        6,
+    );
+    let notes = notes(&said);
+    assert_eq!(asked, [r#"{"shutdown":"lamp"}"#], "said: {notes:?}");
+    assert_eq!(notes.len(), 2, "{notes:?}");
+    assert!(notes[1].contains(UPDATING), "{notes:?}");
+    assert!(stood, "the fold was left latched: {notes:?}");
+}
+
+/// #5777's P3: a yes in a busy room (`room/state`) is not taken: the lamp
+/// stays and stands up, never off.
+#[test]
+fn a_yes_in_a_busy_room_stands_up_and_never_turns_off() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"done":{"shutting_down":true}})],
+        Some(("yes", 1_700)),
+        true,
+        5,
+    );
+    let notes = notes(&said);
+    assert!(asked.is_empty(), "asked {asked:?}, said {notes:?}");
+    assert!(notes[1].contains("Okay, I'll stay"), "{notes:?}");
+    assert!(stood);
+}
+
+/// #5777's P3: a yes heard inside the ask's echo tail (1.5 s) is the lamp's
+/// own, never taken; with no other line in the 30 s wait the lamp stays and
+/// stands up.
+#[test]
+fn a_yes_in_the_echo_tail_is_not_taken_and_the_wait_ends_standing_up() {
+    let (asked, said, stood) = unplug_with_turn_off(
+        &[serde_json::json!({"done":{"shutting_down":true}})],
+        Some(("yes", 500)),
+        false,
+        34,
+    );
+    let notes = notes(&said);
+    assert!(asked.is_empty(), "asked {asked:?}, said {notes:?}");
+    assert_eq!(notes.len(), 2, "{notes:?}");
+    assert!(notes[1].contains("Okay, I'll stay"), "{notes:?}");
+    assert!(stood);
 }
 
 #[test]
@@ -14871,4 +15880,146 @@ light = { colour = "warm" }
         );
         assert_eq!((seen.looked, seen.lights.len()), (None, 0));
     }
+}
+
+/// The `when` lines (#6218, `LAMP_USE_SKILL_SUMMARY`): off, the tools file
+/// is as before, with no `when`; on, it maps exactly the tools that have
+/// one, a skill's, the wellbeing skills' `[stop]` function's and
+/// `stay_plugged_in`'s.
+#[test]
+fn the_when_lines_come_only_with_the_summary_switch() {
+    use lamp_skills::{WHEN_MOST_BYTES, tools_file_summary, tools_file_with, unplug};
+    let dir = tempfile::tempdir().unwrap();
+    let skills = dir.path().join("skills");
+    // A comfort break ships off and `load_all` leaves it out; the water
+    // skill is on, so its `[stop]` function is told.
+    for name in ["dance", "faq", "pose", "prepare-unplug", "sip-of-water"] {
+        copy(&skills_root().join(name), &skills.join(name));
+    }
+    skill_with(
+        &skills,
+        "a-wave",
+        "tool = \"wave\"\n[permissions]\nbody = true\nspeak = true\n[[do]]\nsay = \"Say you will.\"\n",
+    );
+    let (loaded, errors) = load_all(&skills);
+    assert!(errors.is_empty(), "{errors:?}");
+    let off = tools_file_summary(&loaded, false, false, false);
+    assert_eq!(off, tools_file_with(&loaded, false, false));
+    assert!(off.get("when").is_none(), "{off}");
+    let on = tools_file_summary(&loaded, false, false, true);
+    let mut without = on.clone();
+    without.as_object_mut().unwrap().remove("when");
+    assert_eq!(without, off, "on adds the when lines only");
+    let when = on["when"].as_object().unwrap();
+    let names: Vec<&str> = when.keys().map(String::as_str).collect();
+    assert_eq!(
+        names,
+        [
+            "dance",
+            "lamp_help",
+            "prepare_to_unplug",
+            "set_pose",
+            unplug::STAY_TOOL,
+            "wellbeing_nudges"
+        ],
+        "every tool with a when, and not wave"
+    );
+    assert_eq!(when[unplug::STAY_TOOL], unplug::STAY_WHEN);
+    for (tool, line) in when {
+        let line = line.as_str().unwrap();
+        assert!(
+            !line.is_empty() && line.len() <= WHEN_MOST_BYTES,
+            "{tool}: {line}"
+        );
+    }
+    // A skill with no when loads as before, and adds no when.
+    let wave = loaded.iter().find(|skill| skill.name == "a-wave").unwrap();
+    assert_eq!(wave.when, None);
+    let alone = tools_file_summary(std::slice::from_ref(wave), false, false, true);
+    assert!(alone.get("when").is_none(), "{alone}");
+}
+
+/// Every product skill's `when` and every `[stop]` `when` is at most
+/// [`lamp_skills::WHEN_MOST_BYTES`], and the wellbeing skills say the same.
+#[test]
+fn every_when_in_the_repo_is_within_its_bound() {
+    // Every skill, a disabled one too (a comfort break ships off).
+    let loaded: Vec<lamp_skills::Skill> = lamp_skills::load_each(&skills_root())
+        .into_iter()
+        .map(|(folder, skill)| skill.unwrap_or_else(|why| panic!("{}: {why}", folder.display())))
+        .collect();
+    let mut stops = std::collections::BTreeSet::new();
+    for skill in &loaded {
+        let stop = skill.stop.as_ref().and_then(|stop| stop.when.as_deref());
+        for line in skill.when.iter().map(String::as_str).chain(stop) {
+            assert!(
+                line.len() <= lamp_skills::WHEN_MOST_BYTES,
+                "{}: {line}",
+                skill.name
+            );
+        }
+        if let Some(stop) = &skill.stop
+            && stop.tool == "wellbeing_nudges"
+        {
+            stops.insert(stop.when.clone());
+        }
+    }
+    // Each of the eight wellbeing skills loaded, and all say one when.
+    assert_eq!(
+        loaded
+            .iter()
+            .filter(|skill| skill
+                .stop
+                .as_ref()
+                .is_some_and(|stop| stop.tool == "wellbeing_nudges"))
+            .count(),
+        8
+    );
+    assert_eq!(stops.len(), 1, "{stops:?}");
+    assert!(stops.iter().all(Option::is_some));
+}
+
+/// A `when` over [`lamp_skills::WHEN_MOST_BYTES`] is left out at load, in
+/// `SKILL.md` or in `[stop]`, and the skill loads as without one (Twelve's
+/// P3 on #6521: never a refusal, so the switch off changes nothing); one
+/// at the bound is kept.
+#[test]
+fn a_when_over_its_bound_is_left_out() {
+    let most = lamp_skills::WHEN_MOST_BYTES;
+    let dir = tempfile::tempdir().unwrap();
+    let skill = skill_with(
+        dir.path(),
+        "a-wave",
+        "tool = \"wave\"\n[permissions]\nbody = true\nspeak = true\n[[do]]\nsay = \"Say you will.\"\n",
+    );
+    let front = |when: &str| {
+        fs::write(
+            skill.join("SKILL.md"),
+            format!("---\nname: a-wave\ndescription: A test.\nwhen: {when}\n---\n"),
+        )
+        .unwrap();
+        load(&skill)
+    };
+    assert_eq!(
+        front(&"w".repeat(most)).unwrap().when,
+        Some("w".repeat(most))
+    );
+    assert_eq!(front(&"w".repeat(most + 1)).unwrap().when, None);
+
+    let folder = dir.path().join("comfort-break");
+    copy(&skills_root().join("comfort-break"), &folder);
+    let toml = fs::read_to_string(folder.join("skill.toml")).unwrap();
+    let from = toml
+        .lines()
+        .find(|line| line.starts_with("when = \"When asked to snooze"))
+        .unwrap()
+        .to_owned();
+    fs::write(
+        folder.join("skill.toml"),
+        toml.replace(&from, &format!("when = \"{}\"", "w".repeat(most + 1))),
+    )
+    .unwrap();
+    let stop = load(&folder).unwrap().stop.unwrap();
+    assert_eq!(stop.tool, "wellbeing_nudges");
+    assert_eq!(stop.when, None);
 }

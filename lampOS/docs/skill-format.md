@@ -34,12 +34,20 @@ A packaged skill adds `lamp-skill.json`, with `format: 1`, the skill's
 `crates/skills/src/package.rs`): the Store's, or for a package its author
 shares, the author's own, carrying their public key (`lamp-skills pack
 --key-file KEY --author`; skills.md, "A shared package"). A folder with a `run.py`, or any script,
-is refused: script skills are a later format.
+is refused: script skills are a later format, except the `scripts/` of a skill whose `[[do]]` has a
+`task = { task, run }` (format 2, with its top-level `grants`; skills.md, "A skill's task"): `lamp
+skill check` holds that as the lamp does, and a push may carry it.
 
 **`SKILL.md`** starts with front matter between two `---` lines. Two keys
 are read and both are required:
 - `name`: the folder's own name, 1 to 64 characters of `a-z`, `0-9` and `-`;
 - `description`: one line, what the skill does.
+
+One more is read when there: `when`, one line of at most 200 bytes saying
+only when the model calls the skill's tool and when not, and any rule on
+what the lamp says as it calls. With `LAMP_USE_SKILL_SUMMARY=on` the voice
+lists it in place of the description (#6218, skills.md, "Tools for the
+model"); a longer one is left out with a journal line, and the skill loads as without it.
 
 Other front-matter lines and the body are for people.
 
@@ -102,7 +110,7 @@ outside ASCII can pass the schema and still be too long on the lamp.
 | `[budget]` | `{ group, per_hour 1–6, gap, give_back_unsaid }` | runs an hour shared by every skill of the group; `gap` (1 m to 1 h), the least time between two of them; `give_back_unsaid`, a run that said nothing gives its place back (#5207) |
 | `[rest]` | `{ after_ignored 1–5, within }` | rests until the next morning after runs nobody noticed |
 | `[present]` | `enabled`, `trigger`, `while`, `most_a_day`, `active`, `quiet`, `budget`, `rest`, `ask`, `do` | with `LAMP_NUDGES_PRESENT=on`, each key stands in for the file's own, whole; read, checked and ignored without it (#5207) |
-| `[stop]` | `{ tool, about }` | a function the model calls to snooze it or turn it off |
+| `[stop]` | `{ tool, about, when? }` | a function the model calls to snooze it or turn it off; `when`, at most 200 bytes, as `SKILL.md`'s (#6218) |
 | `[search]` | `{ looks 1–8, give_up, found, note, walk, looked }` | a search a person asked for, its looks and what the model is told past the last (look-for-things) |
 | `[history]` | `{ topic = "room/presence", within, words }` | the room's presence over the last hours, for the model (who-was-here) |
 | `[watch]` | `{ every, asked_within, if_heard, most, mark, words }` | a watch the skill's tool turns on and off, with a faint `mark` light while on (guard-mode). Needs `light`, `messages` and `known_faces`; no trigger and no steps |
@@ -151,8 +159,9 @@ Keys of a trigger:
 - Timing: `for` (the test holds this long), `absent_for`, `gap`,
   `cooldown`, `wait` (at most 1 h), `rise = { by, within }`,
   `rearm` (`"leaves"`, `"ends"`, or `{ above | below, for }`).
-- `during` (a window), `once_per_day` (with a `name` and `during`),
-  `unless_heard`.
+- `during` (a window), `days` (with `during`: `["mon", "fri"]`,
+  `"weekdays"` or `"weekend"`, the days the window opens on),
+  `once_per_day` (with a `name` and `during`), `unless_heard`.
 - `yields_to = { skill, trigger }`: it gives way to another skill's
   trigger.
 - `sooner = { topic, field, above, for }`: a shorter `for` while that
@@ -170,7 +179,8 @@ Keys of a trigger:
 
 A `[[while]]` condition takes `topic`, `field`, `equals`, `not_equals`,
 `above`, `below`, `for`, `present = true` or `faces_at_most` (1 to 8) on
-`humans/faces/tracked`, `unknown = "holds"`, and `through` with
+`humans/faces/tracked`, `unknown = "holds"` or `unknown = "holds_stale"`
+(#6543: also holds on a value that has run out), and `through` with
 `broken_by`.
 
 ### Steps: the actions

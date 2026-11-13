@@ -307,9 +307,23 @@ impl Service {
         before_restriction: &mut impl FnMut(),
     ) {
         self.volume_required = wanted.is_some();
+        // At start, the level a cap lowered before a restart is handed back to
+        // the control, so its release still gives it back (#6479).
+        let mut restored = false;
+        if self.applied.is_none()
+            && let Some(kept) = self
+                .controller
+                .as_ref()
+                .and_then(caps::Controller::given_back)
+            && let Some(volume) = sound.as_mut()
+        {
+            volume.restore_lowered(kept);
+            restored = true;
+        }
         // With no restriction at a fresh start, there is no hardware change
-        // or confirmation to obtain. Avoid polling the ordinary mixer.
-        if self.applied.is_none() && wanted.is_none() {
+        // or confirmation to obtain. Avoid polling the ordinary mixer, unless
+        // a cap that ended while Actions was down left a level to give back.
+        if self.applied.is_none() && wanted.is_none() && !restored {
             self.applied = Some(None);
             return;
         }
@@ -410,6 +424,14 @@ impl Service {
             (self.clock)().at_us,
             before_restriction,
         );
+        // Kept on each change, a person's one too (it forgets the level), so
+        // a restart finds what this process would have given back.
+        if let (Some(controller), Some(volume)) = (self.controller.as_mut(), sound.as_ref())
+            && let Err(error) = controller.keep_given_back(volume.lowered())
+        {
+            eprintln!("lamp-actions: the volume to give back was not kept: {error}");
+            self.failed = true;
+        }
         let was = self.published;
         self.published = self.publish(&snapshot).is_ok();
         if was != self.published {
@@ -807,6 +829,99 @@ mod tests {
         let got = bench.ask(json!({"op":"caps_get"}));
         assert_eq!(got["snapshot"]["active"][0]["token"], "one");
         assert!(got.get("volume").is_none());
+    }
+
+    /// Actions restarted under the night cap (#6479): a new service and a new
+    /// control over the same store and mixer, as after a reboot at 03:38.
+    fn restarted(bench: Bench) -> Bench {
+        let Bench {
+            _root,
+            config,
+            time,
+            mixer,
+            service,
+            ..
+        } = bench;
+        // The old process lets go of the store before the new one opens it.
+        drop(service);
+        let clock = time.clone();
+        let service =
+            Service::with_clock(&config, "fixture-host", move || *clock.lock().unwrap()).unwrap();
+        let sound = Some(Volume::new(mixer.clone(), 100));
+        Bench {
+            _root,
+            config,
+            time,
+            mixer,
+            sound,
+            service,
+        }
+    }
+
+    fn release(bench: &mut Bench) {
+        let reply = bench.ask(json!({"op":"caps_remove","source":"bedtime","token":"one"}));
+        assert_eq!(reply["accepted"], true, "{reply}");
+    }
+
+    #[test]
+    fn the_level_a_cap_lowered_is_given_back_after_a_restart_under_it() {
+        for expired_while_down in [false, true] {
+            let mut bench = Bench::new(false);
+            bench.service.tick(&mut bench.sound).unwrap();
+            bench.ask(json!({"op":"caps_put","cap":request("one", WALL)}));
+            assert_eq!(bench.mixer.raw.load(Ordering::SeqCst), 40);
+            if expired_while_down {
+                bench.advance(61_000_000);
+            }
+            let mut bench = restarted(bench);
+            bench.service.tick(&mut bench.sound).unwrap();
+            assert!(bench.service.ready());
+            if !expired_while_down {
+                assert_eq!(bench.mixer.raw.load(Ordering::SeqCst), 40);
+                release(&mut bench);
+            }
+            assert_eq!(bench.mixer.raw.load(Ordering::SeqCst), 80);
+            assert_eq!(bench.sound.as_ref().unwrap().lowered(), None);
+            bench.advance(EVERY_US);
+            bench.service.tick(&mut bench.sound).unwrap();
+            let bench = restarted(bench);
+            assert_eq!(
+                bench.service.controller.as_ref().unwrap().given_back(),
+                None,
+                "once given back, it is forgotten"
+            );
+        }
+    }
+
+    #[test]
+    fn a_persons_change_after_a_restart_under_the_cap_stands_at_its_release() {
+        let mut bench = Bench::new(false);
+        bench.service.tick(&mut bench.sound).unwrap();
+        bench.ask(json!({"op":"caps_put","cap":request("one", WALL)}));
+        let mut bench = restarted(bench);
+        bench.service.tick(&mut bench.sound).unwrap();
+        let _ = bench.sound.as_mut().unwrap().down();
+        assert_eq!(bench.mixer.raw.load(Ordering::SeqCst), 20);
+        bench.advance(EVERY_US);
+        bench.service.tick(&mut bench.sound).unwrap();
+        // A second restart reads what the person's change left kept: nothing.
+        let mut bench = restarted(bench);
+        bench.service.tick(&mut bench.sound).unwrap();
+        release(&mut bench);
+        assert_eq!(bench.mixer.raw.load(Ordering::SeqCst), 20);
+    }
+
+    /// A store an older build wrote has no level to give back: the lift
+    /// leaves the Speaker where the cap left it, as before #6479.
+    #[test]
+    fn with_no_kept_level_the_release_leaves_the_mixer_as_it_is() {
+        let mut bench = Bench::new(true);
+        bench.mixer.raw.store(40, Ordering::SeqCst);
+        bench.service.tick(&mut bench.sound).unwrap();
+        assert_eq!(bench.sound.as_ref().unwrap().lowered(), None);
+        release(&mut bench);
+        assert_eq!(bench.mixer.raw.load(Ordering::SeqCst), 40);
+        assert_eq!(bench.mixer.writes.load(Ordering::SeqCst), 0);
     }
 
     #[test]

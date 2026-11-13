@@ -41,9 +41,10 @@ coord_pr_comments() {
   $PYTHON -I $TOOLS_DIR/markers.py --merge $2.c $2.r > $2.new && mv $2.new $2; local e=$?; rm -f $2.c $2.r; return $e
 }
 
-# The Queue's issues, oldest first: #4710 hit GitHub's 2,500-comment limit on 5 Nov and the Queue goes on in #5385.
+# The Queue's issues, oldest first: #4710 hit GitHub's 2,500-comment limit on 5 Nov and the Queue went on in #5385,
+# which hit it on 10 Nov, and #6059, which hit it on 13 Nov; the Queue goes on in #6811 (#6809, opened beside it the same minute, is read too).
 # The one place their numbers live: every one is read, so a HOLD on an older one still counts; the bot posts on the last.
-COORD_QUEUE_ISSUES=(4710 5385)
+COORD_QUEUE_ISSUES=(4710 5385 6059 6809 6811)
 COORD_QUEUE_POST=${COORD_QUEUE_ISSUES[-1]}
 
 # coord_queue OUT: the comments of the last 3 days on every Queue issue, where Queue HOLDs are posted, as one list of
@@ -109,6 +110,39 @@ coord_same_patch() {
   return 0
 }
 
+# coord_red_checks_jq: a jq filter over `gh pr view --json statusCheckRollup` printing "ok", or "red <name>, ..." for
+# every check COMPLETED with anything but SUCCESS (FAILURE, CANCELLED, TIMED_OUT, STARTUP_FAILURE, ACTION_REQUIRED,
+# ERROR, a null conclusion). SKIPPED and NEUTRAL never ran by design; a check still running is not red. A commit
+# status reads as a check (its state). 12 Nov (#6556 B): the train bot's eligible() sits out a PR whose head has any.
+coord_red_checks_jq='[(.statusCheckRollup // [])[]
+  | {n: (.name // .context // "?"),
+     s: (if .__typename == "StatusContext" then (if .state == "PENDING" or .state == "EXPECTED" then "PENDING" else "COMPLETED" end) else (.status // "") end),
+     c: (if .__typename == "StatusContext" then .state else .conclusion end)}
+  | select(.s == "COMPLETED" and .c != "SUCCESS" and .c != "SKIPPED" and .c != "NEUTRAL")]
+  | if length == 0 then "ok" else "red " + (map(.n) | join(", ")) end'
+# coord_arm64_green_jq: over the same JSON, "ok" when the PR's own ARM64 run is there and all green: its (build) and
+# (release) jobs and every shard (k/N), one N, at least one shard, each COMPLETED with SUCCESS; else "waiting <what>".
+# 12 Nov (#6556, train 841): #6572's head had no ARM64 pull_request run at the cut, and its release job went red after.
+coord_arm64_green_jq='[(.statusCheckRollup // [])[] | select((.name // "") | startswith("lampOS — build and test on Linux ARM64 ("))
+  | {j: (.name | capture("\\((?<j>[^()]*)\\)$").j), ok: (.status == "COMPLETED" and .conclusion == "SUCCESS")}] as $a
+  | [$a[] | .j | select(test("^[0-9]+/[0-9]+$"))] as $sh
+  | ([$sh[] | split("/")[1]] | unique) as $n
+  | [ (if any($a[]; .j == "build") then empty else "no (build)" end),
+      (if any($a[]; .j == "release") then empty else "no (release)" end),
+      (if ($n | length) == 1 and ($sh | unique | length) == ($n[0] | tonumber) then empty else "shards " + ($sh | join(",") | if . == "" then "none" else . end) end),
+      ($a[] | select(.ok | not) | "(\(.j)) not green") ]
+  | if length == 0 then "ok" else "waiting " + join(", ") end'
+# coord_arm_takes COMMIT [LAMP_VOICE]: true when the ARM64 run takes a file COMMIT changes from its merge base with
+# LAMP_VOICE (default origin/lamp-voice), by lampos-arm64.yml's pull_request paths at COMMIT, as merge-when-green.sh
+# reads them. Fails closed (true) when the files or the paths can't be read. Leaves the caller's coord_*_pats alone.
+coord_arm_takes() {
+  local b files f; local -a coord_arm_pats coord_sdk_pats
+  b=$(git merge-base ${2:-origin/lamp-voice} $1 2>/dev/null) && files=$(git diff --no-renames --name-only $b $1 2>/dev/null) && [[ -n $files ]] || return 0
+  coord_inputs_init $1; (( ${#coord_arm_pats} )) || return 0
+  for f in ${(f)files}; do coord_takes $f coord_arm_pats && return 0; done
+  return 1
+}
+
 # coord_head PR: prints the PR's head sha, or fails when it can't be read or its head is in another repository
 # (a fork's PR is never carried, whatever its markers say).
 coord_head() {
@@ -121,14 +155,19 @@ coord_head() {
 
 # ---- Build inputs and lanes (#5212 parts 2 and 3), shared by behind-unrelated.sh, merge-when-green.sh, lane.sh and
 # train-bot.sh, so "what the ARM64 run takes" is one test everywhere.
-# coord_wf_paths REF WORKFLOW: the pull_request `paths` of .github/workflows/WORKFLOW at REF, one pattern a line (the
-# block list form both workflows use). Prints nothing when it can't be read.
+# coord_wf_paths REF WORKFLOW [KEY]: the pull_request `paths` (or KEY, e.g. `paths-ignore`) of
+# .github/workflows/WORKFLOW at REF, one pattern a line. Prints nothing when it can't be read. 12 Nov (#6556 B, the
+# Reviewer-lead's P3 on #6586): an inline list (`paths-ignore: ['lampOS/**', ...]`, as ci.yml writes it) reads as the
+# block list form does.
 coord_wf_paths() {
-  git show "$1:.github/workflows/$2" 2>/dev/null | awk '
+  git show "$1:.github/workflows/$2" 2>/dev/null | awk -v key="${3:-paths}" '
+    function emit(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); gsub(/^'\''|'\''$/, "", s); gsub(/^"|"$/, "", s); if (s != "") print s }
     /^  pull_request:/ { pr = 1; next }
     pr && /^  [^ #]/ { pr = 0 }
-    pr && /^    paths:/ { p = 1; next }
-    pr && p && /^      - / { s = $0; sub(/^      - /, "", s); sub(/[[:space:]]+#.*$/, "", s); gsub(/^'\''|'\''$/, "", s); gsub(/^"|"$/, "", s); print s; next }
+    pr && $0 ~ ("^    " key ":[[:space:]]*\\[") {
+      s = $0; sub(/^[^[]*\[/, "", s); sub(/\].*$/, "", s); n = split(s, a, ","); for (k = 1; k <= n; k++) emit(a[k]); next }
+    pr && $0 ~ ("^    " key ":[[:space:]]*(#.*)?$") { p = 1; next }
+    pr && p && /^      - / { s = $0; sub(/^      - /, "", s); sub(/[[:space:]]+#.*$/, "", s); emit(s); next }
     pr && p && /^[[:space:]]*(#|$)/ { next }
     pr && p && /^    [^ ]/ { p = 0 }'
 }
@@ -155,6 +194,86 @@ coord_inputs_init() {
   for p in ${(f)"$(coord_wf_paths $1 lampos-sdk.yml)"}; do
     if [[ $p == '!'* ]]; then coord_sdk_pats+="-$(coord_glob_re ${p#!})"; else coord_sdk_pats+="+$(coord_glob_re $p)"; fi
   done
+}
+# coord_wf_pats_init REF WORKFLOW: any one workflow's pull_request paths at REF into coord_wf_pats, as
+# coord_inputs_init reads the two. 12 Nov (#6556 B): the train bot reads the paths of a train's red workflow (SDK, doc
+# links, virtual lamp) to find the carried PRs that workflow takes. Empty when they can't be read.
+# 12 Nov (the Reviewer-lead's P3 on #6586): a workflow with only `paths-ignore` (ci.yml's V1 checks) takes a file none
+# of those patterns match: "+" everything, then a "-" for each, so a PR is taken when some changed file is not ignored.
+# A workflow with a pull_request trigger and neither list takes every PR: that names nobody here (empty), so the bot
+# stops for the first builder rather than sit out a whole train.
+coord_wf_pats_init() {
+  local p ign; typeset -ga coord_wf_pats; coord_wf_pats=()
+  for p in ${(f)"$(coord_wf_paths $1 $2)"}; do
+    if [[ $p == '!'* ]]; then coord_wf_pats+="-$(coord_glob_re ${p#!})"; else coord_wf_pats+="+$(coord_glob_re $p)"; fi
+  done
+  (( ${#coord_wf_pats} )) && return 0
+  ign=(${(f)"$(coord_wf_paths $1 $2 paths-ignore)"}); (( ${#ign} )) || return 0
+  coord_wf_pats=('+^.*$'); for p in $ign; do coord_wf_pats+="-$(coord_glob_re $p)"; done
+}
+# coord_red_jobs SHA LOG: every failed (or timed-out) job of every workflow run on SHA, one "<workflow path> <job name>"
+# a line, with each such job's own log appended to LOG. 12 Nov (#6556 B, train 833): a job's log is served as soon as
+# that job ends, while `gh run view --log-failed` serves nothing until the whole run has, and since #6513 a run's other
+# shards run on after one fails.
+# Returns 3 when any red job's log came back empty (just ended, not served yet), else 0.
+coord_red_jobs() {
+  local r rid rpath j one empty=0
+  for r in ${(f)"$(gh api "repos/$REPO/actions/runs?head_sha=$1&per_page=50" --jq '.workflow_runs[]|"\(.id) \(.path)"' 2>/dev/null)"}; do
+    rid=${r%% *}; rpath=${r#* }; [[ $rid == <-> ]] || continue
+    for j in ${(f)"$(gh api "repos/$REPO/actions/runs/$rid/jobs?per_page=100" --paginate --jq '.jobs[]|select(.conclusion=="failure" or .conclusion=="timed_out")|"\(.id) \(.name)"' 2>/dev/null)"}; do
+      [[ ${j%% *} == <-> ]] || continue
+      print -r -- "$rpath ${j#* }"
+      one=$(gh api "repos/$REPO/actions/jobs/${j%% *}/logs" 2>/dev/null)
+      if [[ -n $one ]]; then print -r -- $one >> $2; else empty=1; fi
+    done
+  done
+  (( empty )) && return 3
+  return 0
+}
+# coord_red_jobs_wait SHA LOG: coord_red_jobs, looked at again while any red job's log came back empty, at most
+# COORD_RED_TRIES looks (default 3) COORD_RED_WAIT_S apart (default 20; the tests set 0); LOG holds the last look's.
+# 12 Nov (the Reviewer-lead's P3 on #6586): one empty log among several used to be read as no failing test named.
+coord_red_jobs_wait() {
+  local i out rc
+  for (( i = 1; i <= ${COORD_RED_TRIES:-3}; i++ )); do
+    : > $2; out=$(coord_red_jobs $1 $2); rc=$?
+    (( rc == 3 && i < ${COORD_RED_TRIES:-3} )) || break
+    sleep ${COORD_RED_WAIT_S:-20}
+  done
+  [[ -n $out ]] && print -r -- $out
+  return 0
+}
+# coord_prs_taken REF WORKFLOW PR...: the PRs (of those given) with a file WORKFLOW's pull_request paths at REF take,
+# one a line. 12 Nov (#6556 B): a train red only in that workflow sits them out. Nothing when the paths can't be read.
+coord_prs_taken() {
+  local ref=$1 wf=$2 p f; shift 2
+  coord_wf_pats_init $ref $wf; (( ${#coord_wf_pats} )) || return 0
+  for p in "$@"; do
+    for f in ${(f)"$(gh pr diff $p -R $REPO --name-only 2>/dev/null)"}; do coord_takes $f coord_wf_pats && { print -r -- $p; break; }; done
+  done
+  return 0
+}
+# coord_sit_out SITOUT CARRIED TOLD WHY PR...: sit each PR out on the head the train carried (CARRIED: "<PR> <head>"
+# lines, written as the train was built), one "<PR> <head>" line in SITOUT, and comment on it once per head, with WHY,
+# keyed in TOLD. 12 Nov (the Reviewer-lead's P3s on #6586): the head fetched after the failure could be a push made
+# while the train ran, which then sat out unseen; and a red virtual lamp (lampos-sim.yml takes lampOS/crates/**) sits
+# out every crate PR, so each one is told why and that a push brings it back. A PR missing from CARRIED is skipped.
+coord_sit_out() {
+  local so=$1 cf=$2 tf=$3 why=$4 p ch; shift 4
+  for p in "$@"; do
+    ch=$(awk -v p=$p '$1 == p { print $2; exit }' $cf 2>/dev/null); [[ -n $ch ]] || continue
+    grep -qx "$p $ch" $so 2>/dev/null || print -r -- "$p $ch" >> $so
+    print -r -- $p
+    grep -qx "$p sitout-told $ch" $tf 2>/dev/null && continue
+    gh pr comment $p -R $REPO --body "Train bot, $(date +%H:%M): $why This PR sits out at ${ch:0:9} with no HOLD, and the next push to it brings it back. If the failure isn't this PR's, a push of the same patch (a rebase onto lamp-voice) is enough." >/dev/null \
+      && print -r -- "$p sitout-told $ch" >> $tf
+  done
+}
+# coord_sitout_trim SITOUT OPEN: keep only SITOUT's lines whose PR is in OPEN ("<PR> <head> ..." lines, the round's open
+# PRs) at that same head, so a closed PR or a pushed one leaves the file.
+coord_sitout_trim() {
+  [[ -s $1 ]] || return 0
+  awk 'NR == FNR { h[$1] = $2; next } ($1 in h) && h[$1] == $2' $2 $1 > $1.new && mv $1.new $1
 }
 # coord_takes FILE ARRAY: does the workflow whose patterns are in ARRAY (coord_inputs_init) take FILE? The last
 # pattern that matches decides, as GitHub's own filter does.

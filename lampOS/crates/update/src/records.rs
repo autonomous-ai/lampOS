@@ -38,6 +38,17 @@ pub struct Build {
     pub commit: String,
 }
 
+/// Cut-shorts in a row of the same build that refuse it (#6266).
+pub const CUT_SHORTS_REFUSE: u32 = 3;
+
+/// A build whose switches were cut short in a row, and how often.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CutShort {
+    pub sequence: u64,
+    pub commit: String,
+    pub times: u32,
+}
+
 /// A build that was switched to and put back.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Refusal {
@@ -45,6 +56,43 @@ pub struct Refusal {
     pub commit: String,
     pub why: String,
     pub at_unix_ms: u64,
+    /// Why, as a fixed name for the app ([`lamp_msgs::UpdateRefused::REASONS`]);
+    /// absent in an entry written before (#6266): [`Refusal::reason`] then reads
+    /// it from `why`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// The boot it was refused on, when the kernel said one: a `held`
+    /// refusal gets one more try on another boot (#6266, [`State::lapse_held`]).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boot_id: Option<String>,
+    /// This refusal is of a build already tried once more after a `held` one:
+    /// final.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub retried: bool,
+}
+
+impl Refusal {
+    /// The refusal's fixed name for the app (#6266): the one kept, or for an
+    /// entry written before, read from its `why`: a part held still by a
+    /// passing local state (`judge::HELD`), switches cut short in a row, or
+    /// `other`.
+    pub fn reason(&self) -> &'static str {
+        let name = self.kind.as_deref().and_then(|kind| {
+            lamp_msgs::UpdateRefused::REASONS
+                .iter()
+                .find(|n| **n == kind)
+        });
+        if let Some(name) = name {
+            return name;
+        }
+        if self.why.contains(crate::judge::HELD) {
+            "held"
+        } else if self.why.ends_with(" times in a row") {
+            "cut_short"
+        } else {
+            "other"
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -79,6 +127,17 @@ pub struct State {
     pub models: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub models_before: BTreeMap<String, String>,
+    /// The build whose switches were cut short in a row, and how often
+    /// (#6266). A cut-short says nothing of the build, so it is tried again;
+    /// only `CUT_SHORTS_REFUSE` in a row refuse it. A finished switch or a
+    /// different build starts it again. Absent from a state written before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cut_short: Option<CutShort>,
+    /// Builds whose `held` refusal was lapsed and tried once more (#6266): a
+    /// refusal of one of them is final, so a passing local state that comes
+    /// back is not retried for ever. Absent from a state written before.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub held_retried: Vec<u64>,
     /// Fields a later build wrote that this one does not know: kept as
     /// they were across a save, for that build to read again (#1505).
     #[serde(flatten)]
@@ -86,18 +145,93 @@ pub struct State {
 }
 
 impl State {
+    /// How long a `held` refusal stands before its one more try.
+    pub const HELD_RETRY_AFTER_MS: u64 = 24 * 60 * 60 * 1000;
+
+    /// A refusal because a part was held by a passing local state (a kept
+    /// unplug request, `held`) is no fault of the build: it gets one more try
+    /// after 24 hours or on another boot than the one it was made on
+    /// (#6266). Its refusal is dropped and said as `Some(why it is lapsed)`;
+    /// the build is noted in `held_retried`, so a refusal of it again is
+    /// final. A real fault (`part_unwell`, `cut_short`, `other`), a refusal
+    /// already tried once more, one made now on this boot, and a boot not
+    /// known never lapse.
+    pub fn lapse_held(
+        &mut self,
+        sequence: u64,
+        now_ms: u64,
+        boot: Option<&str>,
+    ) -> Option<&'static str> {
+        let refusal = self.refusal(sequence)?;
+        if refusal.reason() != "held" || refusal.retried || self.held_retried.contains(&sequence) {
+            return None;
+        }
+        let day = now_ms.saturating_sub(refusal.at_unix_ms) >= Self::HELD_RETRY_AFTER_MS;
+        let reboot = matches!((&refusal.boot_id, boot), (Some(then), Some(now)) if then != now);
+        let after = if reboot {
+            "a reboot"
+        } else if day {
+            "24 hours"
+        } else {
+            return None;
+        };
+        self.refused.retain(|refusal| refusal.sequence != sequence);
+        self.held_retried.push(sequence);
+        let extra = self.held_retried.len().saturating_sub(MOST_REFUSED);
+        self.held_retried.drain(..extra);
+        Some(after)
+    }
+
+    /// The owner's retry (#6266): the refusal of `sequence` dropped, so the next
+    /// round takes the build again. Whether there was one.
+    pub fn forget_refusal(&mut self, sequence: u64) -> bool {
+        let before = self.refused.len();
+        self.refused.retain(|refusal| refusal.sequence != sequence);
+        self.refused.len() != before
+    }
+
     pub fn refusal(&self, sequence: u64) -> Option<&Refusal> {
         self.refused
             .iter()
             .find(|refusal| refusal.sequence == sequence)
     }
 
+    /// One more cut-short of `build` counted: one, unless the last were of
+    /// the same build. How many in a row now.
+    pub fn count_cut_short(&mut self, build: &Build) -> u32 {
+        let times = match &self.cut_short {
+            Some(cut) if cut.sequence == build.sequence && cut.commit == build.commit => {
+                cut.times.saturating_add(1)
+            }
+            _ => 1,
+        };
+        self.cut_short = Some(CutShort {
+            sequence: build.sequence,
+            commit: build.commit.clone(),
+            times,
+        });
+        times
+    }
+
     pub fn refuse(&mut self, build: &Build, why: &str) {
+        self.refuse_as(build, why, None, None);
+    }
+
+    /// [`Self::refuse`] with the fixed name for the app ([`Refusal::reason`])
+    /// and the boot it happened on. A build's earlier refusal is replaced, and
+    /// one of a build whose `held` refusal was already given its one more try
+    /// is final ([`State::lapse_held`]).
+    pub fn refuse_as(&mut self, build: &Build, why: &str, kind: Option<&str>, boot: Option<&str>) {
+        self.refused
+            .retain(|refusal| refusal.sequence != build.sequence);
         self.refused.push(Refusal {
             sequence: build.sequence,
             commit: build.commit.clone(),
             why: why.to_owned(),
             at_unix_ms: unix_ms(),
+            kind: kind.map(str::to_owned),
+            boot_id: boot.map(str::to_owned),
+            retried: self.held_retried.contains(&build.sequence),
         });
         let extra = self.refused.len().saturating_sub(MOST_REFUSED);
         self.refused.drain(..extra);
@@ -170,6 +304,13 @@ pub struct Journal {
     /// before.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skills: Vec<SkillBack>,
+    /// Why the build was being put back, when a put-back for a fault of the
+    /// build (a part not well, a failed watch) could not put every file back
+    /// and left the journal (#6266). Its recovery refuses the build for this
+    /// reason; a journal without it was cut short, which refuses nothing
+    /// until the third in a row. Absent from a journal written before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refusing: Option<String>,
 }
 
 impl Journal {
@@ -422,6 +563,29 @@ impl Records {
         write_whole(&self.folder.join("journal.json"), &bytes, 0o600)
     }
 
+    /// The journal of a switch, if any, marked with why its build is being
+    /// put back ([`Journal::refusing`]). Only that member is added: every
+    /// other one, a later build's included, is kept as it was.
+    pub fn mark_journal_refusing(&self, why: &str) -> io::Result<()> {
+        let path = self.folder.join("journal.json");
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+            Err(error) => return Err(error),
+        };
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&bytes).map_err(io::Error::other)?;
+        let Some(members) = value.as_object_mut() else {
+            return Err(io::Error::other("the journal is not an object"));
+        };
+        if members.get("refusing").and_then(serde_json::Value::as_str) == Some(why) {
+            return Ok(());
+        }
+        members.insert("refusing".into(), serde_json::Value::from(why));
+        let bytes = serde_json::to_vec_pretty(&value).map_err(io::Error::other)?;
+        write_whole(&path, &bytes, 0o600)
+    }
+
     pub fn clear_journal(&self) -> io::Result<()> {
         match fs::remove_file(self.folder.join("journal.json")) {
             Err(error) if error.kind() != io::ErrorKind::NotFound => Err(error),
@@ -482,6 +646,43 @@ impl Records {
         self.log_entry(serde_json::json!({"at_unix_ms": unix_ms(), "event": event, "line": line}));
     }
 
+    /// What a round said, in one line of the log (#6266 5b): `lines`, in
+    /// order. Not a round's end (no `"round"`), so `last_round` passes it over.
+    pub fn log_lines(&self, event: &str, lines: &[String]) {
+        self.log_entry(
+            serde_json::json!({"at_unix_ms": unix_ms(), "event": event, "lines": lines}),
+        );
+    }
+
+    /// The newest `lines` entry the log holds, newest file first: its event
+    /// and lines. A line cut short or broken is passed over (#6266 5b).
+    ///
+    /// It reads the whole log file (at most 1 MiB, then the one before it)
+    /// each time it is asked, and a failing round asks once, every 15
+    /// minutes: nothing at that pace. A faster pace (a round every few
+    /// seconds, or a caller that asks per line) needs the last kept lines in
+    /// memory, as `Run` keeps `lines`, and not this read.
+    pub fn last_lines(&self) -> Option<(String, Vec<String>)> {
+        for name in ["log.jsonl", "log.jsonl.1"] {
+            let Ok(bytes) = fs::read(self.folder.join(name)) else {
+                continue;
+            };
+            let found = bytes.rsplit(|byte| *byte == b'\n').find_map(|line| {
+                let entry: serde_json::Value = serde_json::from_slice(line).ok()?;
+                let lines = entry["lines"]
+                    .as_array()?
+                    .iter()
+                    .map(|one| one.as_str().map(str::to_owned))
+                    .collect::<Option<Vec<_>>>()?;
+                Some((entry["event"].as_str()?.to_owned(), lines))
+            });
+            if found.is_some() {
+                return found;
+            }
+        }
+        None
+    }
+
     /// A round's end in the log, marked as one and with the build it was
     /// about: what `update/status` says as the last result, read back when
     /// lamp-update starts again (#2194, `crate::status`).
@@ -511,11 +712,15 @@ impl Records {
     /// build and time. Lines a round did not write are passed over.
     pub fn last_round(&self) -> Option<(String, Option<u64>, u64)> {
         for name in ["log.jsonl", "log.jsonl.1"] {
-            let Ok(text) = fs::read_to_string(self.folder.join(name)) else {
+            // As bytes, a line at a time: a write cut short (power lost) can
+            // leave a broken last line, even one that stops inside a
+            // character, and that one line must not make the whole log
+            // unreadable (#6266).
+            let Ok(bytes) = fs::read(self.folder.join(name)) else {
                 continue;
             };
-            let found = text.lines().rev().find_map(|line| {
-                let entry: serde_json::Value = serde_json::from_str(line).ok()?;
+            let found = bytes.rsplit(|byte| *byte == b'\n').find_map(|line| {
+                let entry: serde_json::Value = serde_json::from_slice(line).ok()?;
                 (entry["round"] == true).then(|| {
                     (
                         entry["event"].as_str().unwrap_or_default().to_owned(),
@@ -537,15 +742,40 @@ impl Records {
         if fs::metadata(&path).is_ok_and(|found| found.len() > MOST_LOG_BYTES) {
             let _ = fs::rename(&path, self.folder.join("log.jsonl.1"));
         }
+        // A last line cut short by a power loss has no newline: a line written
+        // after it must start on a line of its own, or both would be lost to
+        // one broken line (#6266).
+        let cut = ends_cut(&path);
         if let Ok(mut file) = OpenOptions::new()
             .append(true)
             .create(true)
             .mode(0o600)
             .open(&path)
         {
-            let _ = writeln!(file, "{entry}");
+            let _ = if cut {
+                writeln!(file, "\n{entry}")
+            } else {
+                writeln!(file, "{entry}")
+            };
         }
     }
+}
+
+/// Whether the file at `path` has a last line with no newline: a write cut
+/// short. Reads only its last byte; a file that is not there or empty is not.
+fn ends_cut(path: &Path) -> bool {
+    use std::io::{Read as _, Seek as _, SeekFrom};
+    let Ok(mut file) = File::open(path) else {
+        return false;
+    };
+    let Ok(length) = file.metadata().map(|meta| meta.len()) else {
+        return false;
+    };
+    if length == 0 || file.seek(SeekFrom::Start(length - 1)).is_err() {
+        return false;
+    }
+    let mut last = [0u8; 1];
+    file.read_exact(&mut last).is_ok() && last[0] != b'\n'
 }
 
 #[cfg(test)]
@@ -609,8 +839,14 @@ mod tests {
             installed: Some(build.clone()),
             ..State::default()
         };
-        for _ in 0..40 {
-            state.refuse(&build, "why");
+        for sequence in 0..40 {
+            state.refuse(
+                &Build {
+                    sequence,
+                    commit: "c".repeat(40),
+                },
+                "why",
+            );
         }
         assert_eq!(state.refused.len(), MOST_REFUSED);
         records.save_state(&state).unwrap();
@@ -648,6 +884,7 @@ mod tests {
             }],
             models: Vec::new(),
             settings: false,
+            refusing: None,
         };
         records.save_journal(&journal).unwrap();
         assert_eq!(records.journal().unwrap(), Some(journal));
@@ -752,6 +989,9 @@ mod tests {
                 commit: "d90cc8b8e".into(),
             }),
             refused: vec![Refusal {
+                kind: None,
+                boot_id: None,
+                retried: false,
                 sequence: 4573,
                 commit: "c902a95cf".into(),
                 why: "lamp-voice.service was not well within a minute".into(),
@@ -771,6 +1011,8 @@ mod tests {
                 "e".repeat(64),
             )]
             .into(),
+            cut_short: None,
+            held_retried: Vec::new(),
             later: Default::default(),
         };
         let journal = Journal {
@@ -800,6 +1042,7 @@ mod tests {
                 wrote: "9".repeat(64),
                 made: Vec::new(),
             }],
+            refusing: None,
         };
         (state, journal)
     }
@@ -895,5 +1138,51 @@ mod tests {
                 "{day}"
             );
         }
+    }
+
+    /// A log whose last line was cut short by a power loss (#6266): the round's
+    /// end before it is still read back, even if the cut stopped inside a
+    /// character; and the next line written starts on a line of its own, so it
+    /// is read too and not lost with the broken one.
+    #[test]
+    fn a_broken_last_line_is_skipped_and_the_next_line_is_not_lost_with_it() {
+        let folder = tempfile::tempdir().unwrap();
+        let records = Records::new(folder.path().to_owned());
+        records.log_round("switched", "build 5 switched", Some(5));
+        assert_eq!(records.last_round().map(|r| r.0), Some("switched".into()));
+        let log = folder.path().join("log.jsonl");
+        // A write cut inside a JSON line: valid text, no newline.
+        {
+            use std::io::Write as _;
+            let mut file = fs::OpenOptions::new().append(true).open(&log).unwrap();
+            file.write_all(b"{\"at_unix_ms\":1,\"event\":\"refus")
+                .unwrap();
+        }
+        let before = records.last_round().expect("the round before the cut");
+        assert_eq!((before.0.as_str(), before.1), ("switched", Some(5)));
+        // The next round's end is written on a line of its own and is read back.
+        records.log_round("refused", "build 6 refused", Some(6));
+        let after = records.last_round().expect("the new round's end");
+        assert_eq!((after.0.as_str(), after.1), ("refused", Some(6)));
+        let text = fs::read_to_string(&log).unwrap();
+        assert_eq!(text.lines().count(), 3, "{text}");
+        assert!(text.ends_with('\n'));
+
+        // A cut inside a multi-byte character: not text at all, and the one
+        // line does not make the whole log unreadable.
+        {
+            use std::io::Write as _;
+            let mut file = fs::OpenOptions::new().append(true).open(&log).unwrap();
+            file.write_all(b"{\"line\":\"caf\xc3").unwrap();
+        }
+        let again = records.last_round().expect("still readable");
+        assert_eq!((again.0.as_str(), again.1), ("refused", Some(6)));
+        records.log_round("switched", "build 7", Some(7));
+        assert_eq!(records.last_round().map(|r| r.1), Some(Some(7)));
+        // A whole log and an empty or missing one read as before.
+        assert!(!ends_cut(&log));
+        assert!(!ends_cut(&folder.path().join("none")));
+        fs::write(folder.path().join("empty"), b"").unwrap();
+        assert!(!ends_cut(&folder.path().join("empty")));
     }
 }

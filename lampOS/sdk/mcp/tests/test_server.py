@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
-from lampos import Keyring, Lamp, schema
+from lampos import Keyring, Lamp, LampError, schema
 from lampos.testing import FAKE_JPEG, FakeLamp
 from mcp.shared.memory import create_connected_server_and_client_session
 from pydantic import AnyUrl
@@ -20,19 +20,27 @@ from pydantic import AnyUrl
 from lamp_mcp.server import Limits, build, gestures
 
 ALL = {
-    "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_play", "lamp_joints",
+    "lamp_state", "lamp_wait_for", "lamp_express", "lamp_gesture", "lamp_look", "lamp_move", "lamp_move_poses", "lamp_play", "lamp_joints",
     "lamp_light", "lamp_ring", "lamp_say", "lamp_volume", "lamp_sound", "lamp_upload_sound", "lamp_sounds", "lamp_remove_sound",
     "lamp_end_turn",
     "lamp_events", "lamp_stop",
 }
 # The schema's ops a tool doesn't send itself: pairing and hello are the
 # SDK's, before any tool; leases go with each body tool; the camera's stream
-# is for a program, not a tool (`lamp_camera_snapshot` gives one picture).
-NOT_A_TOOL = {"pair", "hello", "lease.take", "lease.renew", "lease.release", "camera.stream"}
+# is for a program, not a tool (`lamp_camera_snapshot` gives one picture), and
+# so is the microphone's. A linked service's read and write are a skill
+# run's alone, on lamp-control's run socket with its one-run token (#6432):
+# a paired computer is refused them, so no tool sends them.
+# The speaker's is sent by `lamp_play_audio`, through the SDK.
+NOT_A_TOOL = {
+    "pair", "hello", "lease.take", "lease.renew", "lease.release", "camera.stream", "microphone.stream",
+    "service.read", "service.write",
+}
 # Offered only with both body and look.
 FOLLOW = {"lamp_follow_hand", "lamp_follow_stop"}
 # Offered only with hear (starting a turn with speak too).
 TURN = {"lamp_start_turn", "lamp_set_listening"}
+NOTES = {"lamp_notes_set", "lamp_notes_get", "lamp_notes_delete", "lamp_notes_list"}
 
 
 def run(coroutine):
@@ -132,6 +140,10 @@ def test_every_op_of_the_schema_is_sent_by_a_tool(tmp_path):
         "sound.upload": "lamp.upload_sound(",
         "sound.list": "lamp.sounds(",
         "sound.remove": "lamp.remove_sound(",
+        "notes.set": "lamp.notes_set(",
+        "notes.delete": "lamp.notes_delete(",
+        "notes.list": "lamp.notes_list(",
+        "speaker.stream": "lamp.speaker_stream(",
     }
     sent = set()
     for op in schema.ops():
@@ -144,14 +156,29 @@ def test_every_op_of_the_schema_is_sent_by_a_tool(tmp_path):
 
 def test_play_joints_and_sound_each_send_their_op(tmp_path):
     async def go():
-        async with connected(tmp_path, grants=("body", "speak")) as (fake, _, session):
+        async with connected(tmp_path, grants=("body", "speak", "skills", "light")) as (fake, _, session):
+            # A move recorded in a pushed skill (`moves/wave.json`), played by name.
+            skill = tmp_path / "desk-wave"
+            (skill / "moves").mkdir(parents=True)
+            (skill / "SKILL.md").write_text("---\nname: desk-wave\ndescription: A test skill.\n---\n")
+            (skill / "skill.toml").write_text('version = "0.1.0"\n[permissions]\nlight = true\n')
+            frames = [[0, 0, count, 0, 0] for count in (0, 50, 100, 50, 0, 50, 100, 50, 0)]
+            (skill / "moves" / "wave.json").write_text(json.dumps({"name": "wave", "step_ms": 1000, "frames": frames}))
+            pushed = await session.call_tool("lamp_skill_push", {"folder": str(skill)})
+            assert not pushed.isError, text(pushed)
             assert not (await session.call_tool("lamp_play", {"name": "wave"})).isError
             assert fake.asked("play") == [{"name": "wave"}]
-            joints = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "elbow": -5})
+            assert not (await session.call_tool("lamp_play", {"name": "wave", "skill": "desk-wave"})).isError
+            assert fake.asked("play")[-1] == {"name": "wave", "skill": "desk-wave"}
+            # The door takes yaw and pitch today; roll, shoulder and elbow wait
+            # for the body's goal stream (parts.rs), in its words.
+            elbow = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "elbow": -5})
+            assert elbow.isError and "waits for the body's goal stream for roll, shoulder and elbow" in text(elbow), text(elbow)
+            joints = await session.call_tool("lamp_joints", {"within_ms": 800, "pitch": 10, "yaw": -5})
             assert not joints.isError, text(joints)
             [asked] = fake.asked("joints")
             # Under a body lease of its own, named in the request.
-            assert asked["targets"] == {"pitch": 10, "elbow": -5} and asked["within_ms"] == 800
+            assert asked["targets"] == {"pitch": 10, "yaw": -5} and asked["within_ms"] == 800
             assert asked["lease"].startswith("l_")
             none = await session.call_tool("lamp_joints", {"within_ms": 800})
             assert none.isError and "needs at least one of" in text(none)
@@ -164,10 +191,10 @@ def test_play_joints_and_sound_each_send_their_op(tmp_path):
 def test_body_tools_in_a_row_reuse_the_held_lease_rather_than_be_refused_busy(tmp_path):
     """A move handed to the body leaves its lease to lapse; the next body tool
     renews and uses it, since the lamp refuses a second take even from its
-    own holder."""
+    own holder. On a lamp from before #4209 (no `motion_done`)."""
 
     async def go():
-        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+        async with connected(tmp_path, auto_done=False, motion_done=False) as (fake, _, session):
             plain = fake._ok
 
             async def handed(ws, id_, **fields):
@@ -180,9 +207,61 @@ def test_body_tools_in_a_row_reuse_the_held_lease_rather_than_be_refused_busy(tm
             for _ in range(2):
                 moved = await session.call_tool("lamp_move", {"step_ms": 500, "frames": frames})
                 assert not moved.isError, text(moved)
-            played = await session.call_tool("lamp_play", {"name": "wave"})
+            played = await session.call_tool("lamp_look", {"at": "ahead"})
             assert not played.isError, text(played)
             assert len(fake.asked("lease.take")) == 1 and len(fake.asked("lease.renew")) == 2
+
+    run(go())
+
+
+def test_lamp_say_returns_when_taken_and_with_wait_once_said(tmp_path):
+    """`lamp_say` never says "said" before the lamp has said it: without
+    `wait` it returns at once as taken; with `wait`, at the say's `done`:
+    "said" when it finished, else how and why."""
+
+    async def go():
+        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+            taken = await session.call_tool("lamp_say", {"text": "Build passed."})
+            assert text(taken).startswith("taken"), text(taken)
+            call = asyncio.create_task(session.call_tool("lamp_say", {"text": "Done.", "wait": True}))
+            while len(fake.asked("say")) < 2:
+                await asyncio.sleep(0.01)
+            await asyncio.sleep(0.2)
+            assert not call.done(), "a wait that ended before the say's done"
+            await fake.done([r["id"] for r in fake.requests if r["op"] == "say"][-1])
+            assert text(await call) == "said"
+            call = asyncio.create_task(session.call_tool("lamp_say", {"text": "Later.", "wait": True}))
+            while len(fake.asked("say")) < 3:
+                await asyncio.sleep(0.01)
+            await fake.done([r["id"] for r in fake.requests if r["op"] == "say"][-1], "dropped", "dropped: the lamp is private")
+            assert text(await call) == "dropped: dropped: the lamp is private"
+
+    run(go())
+
+
+def test_a_motion_tool_returns_at_the_motions_done_where_the_lamp_says_motion_done(tmp_path):
+    """#4209: a lamp that tells a motion's end (`motion_done`) has
+    `lamp_gesture` and `lamp_move` return once it ended, saying how, so an
+    agent's next motion doesn't cut it short and a drop reaches it."""
+
+    async def go():
+        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+            frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
+            call = asyncio.create_task(session.call_tool("lamp_gesture", {"name": "nod"}))
+            while not fake.asked("gesture"):
+                await asyncio.sleep(0.01)
+            await asyncio.sleep(0.2)
+            assert not call.done(), "the gesture's tool ended before its done"
+            await fake.done(next(r["id"] for r in fake.requests if r["op"] == "gesture"))
+            assert text(await call) == "nod finished"
+            call = asyncio.create_task(session.call_tool("lamp_move", {"step_ms": 500, "frames": frames}))
+            while not fake.asked("move"):
+                await asyncio.sleep(0.01)
+            asked = next(r["id"] for r in fake.requests if r["op"] == "move")
+            await fake.done(asked, "dropped", "dropped: the person is using the lamp")
+            result = await call
+            assert not result.isError
+            assert text(result) == "move dropped: dropped: the person is using the lamp"
 
     run(go())
 
@@ -192,8 +271,8 @@ def test_a_done_that_comes_before_its_answer_is_read_still_ends_the_tool(tmp_pat
         # The fake says `done` right after its answer.
         async with connected(tmp_path, grants=("body",)) as (fake, _, session):
             started = asyncio.get_running_loop().time()
-            played = await session.call_tool("lamp_play", {"name": "wave"})
-            assert not played.isError and text(played) == "play finished"
+            played = await session.call_tool("lamp_look", {"at": "ahead"})
+            assert not played.isError and "finished" in text(played), text(played)
             assert asyncio.get_running_loop().time() - started < 5
             assert fake.asked("lease.release") and not fake.leases
 
@@ -204,10 +283,14 @@ def test_a_lamp_that_doesnt_route_them_says_so_as_the_tools_error(tmp_path):
     from lampos.testing import LAMP_CONTROL_REFUSES
 
     async def go():
-        async with connected(tmp_path, grants=("body", "speak"), refuses=LAMP_CONTROL_REFUSES) as (fake, _, session):
-            for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 5})):
+        async with connected(
+            tmp_path, grants=("body", "speak"), refuses=LAMP_CONTROL_REFUSES
+        ) as (fake, _, session):
+            for tool, arguments in (("lamp_play", {"name": "wave"}), ("lamp_joints", {"pitch": 0, "roll": 1})):
                 result = await session.call_tool(tool, arguments)
                 assert result.isError and "refused: not routed yet" in text(result), (tool, text(result))
+            # Yaw and pitch alone go, as on a stable lamp.
+            assert not (await session.call_tool("lamp_joints", {"yaw": 0, "pitch": 1})).isError
             # The hum is routed, as lamp-control's `sound` is (#4228).
             assert not (await session.call_tool("lamp_sound", {"name": "hum"})).isError
             assert fake.asked("sound") == [{"name": "hum"}]
@@ -241,6 +324,263 @@ def test_lamp_events_gives_what_the_lamp_said_since_a_seq_and_waits_for_one(tmp_
     run(go())
 
 
+async def restart(fake: FakeLamp) -> None:
+    """The lamp restarts, as on every update: each connection closes."""
+    for ws in list(fake._connections):
+        await ws.close(1012, "the lamp restarts")
+
+
+def test_lamp_mcp_connects_again_after_the_lamp_restarts(tmp_path):
+    """Every update restarts the lamp and closes the connection: lamp-mcp
+    connects again by itself, makes its subscriptions again, and its tools
+    work as before."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("look", "light")) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05, 0.1))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    await session.call_tool("lamp_events", {})
+                    await until(lambda: len(fake.asked("subscribe")) >= 1)
+                    await fake.emit("person.arrived", count=1, near=0.3)
+                    said = json.loads(text(await session.call_tool("lamp_events", {"since": 0, "wait_s": 5})))
+                    assert [e["ev"] for e in said["events"]] == ["person.arrived"]
+
+                    subscribed = len(fake.asked("subscribe"))
+                    await restart(fake)
+                    await until(lambda: lamp.connections == 2 and len(fake.asked("subscribe")) > subscribed)
+                    await fake.emit("person.arrived", count=2, near=0.3)
+                    said = json.loads(text(await session.call_tool("lamp_events", {"since": 1, "wait_s": 5})))
+                    assert [(e["ev"], e["count"]) for e in said["events"]] == [("person.arrived", 2)]
+                    result = await session.call_tool("lamp_light", {"colour": "blue", "level": 2})
+                    assert not result.isError, text(result)
+                    assert fake.asked("light")[-1]["colour"] == "blue"
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_the_first_lamp_events_while_the_lamp_is_away_still_streams_after_it_is_back(tmp_path):
+    """Second's first P2 on #5830: `lamp_events` asked first while the lamp is
+    restarting keeps its subscriptions, so they are made again once it's back."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("look", "light")) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.5,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    await restart(fake)
+                    away = json.loads(text(await session.call_tool("lamp_events", {})))
+                    assert away["events"] == []
+                    await until(lambda: lamp.connections == 2 and fake.asked("subscribe"))
+                    await fake.emit("person.arrived", count=1, near=0.3)
+                    said = json.loads(text(await session.call_tool("lamp_events", {"since": 0, "wait_s": 5})))
+                    assert [e["ev"] for e in said["events"]] == ["person.arrived"]
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_a_wait_that_ends_during_the_replay_is_not_made_again():
+    """Second's second P2 on #5830: while one subscription is being made again,
+    a wait that ends takes its own off, and the replay doesn't bring it back."""
+    from lamp_mcp.relink import Relink
+
+    class Old:
+        def __init__(self):
+            self.closed = asyncio.Event()
+
+        def on(self, event, handler, *, phrases=None):
+            return asyncio.sleep(0)
+
+        def off(self, event, handler):
+            pass
+
+        async def wait_closed(self):
+            await self.closed.wait()
+
+        async def close(self):
+            pass
+
+    class New(Old):
+        def __init__(self):
+            super().__init__()
+            self.gate = asyncio.Event()
+            self.handlers = []
+
+        async def _on(self, event, handler, phrases):
+            self.handlers.append((event, handler))
+            if event == "touch":
+                await self.gate.wait()
+
+        def on(self, event, handler, *, phrases=None):
+            return self._on(event, handler, phrases)
+
+        def off(self, event, handler):
+            # As the SDK's: quiet for a handler it doesn't have.
+            if (event, handler) in self.handlers:
+                self.handlers.remove((event, handler))
+
+    async def go():
+        old, new = Old(), New()
+
+        async def again():
+            return new
+
+        lamp = Relink(again, old, pauses=(0.01,))
+        touch = lambda event: None  # noqa: E731
+        phrase = lambda event: None  # noqa: E731
+        await lamp.on("touch", touch)
+        await lamp.on("phrase.heard", phrase, phrases=["good night lamp"])
+        old.closed.set()
+        await until(lambda: new.handlers)
+        # The phrase wait ends while touch is still being made again.
+        lamp.off("phrase.heard", phrase)
+        new.gate.set()
+        await until(lambda: lamp.connections == 2)
+        await asyncio.sleep(0.05)
+        assert new.handlers == [("touch", touch)]
+        await lamp.close()
+
+    run(go())
+
+
+def test_a_wait_begun_before_a_restart_never_takes_a_done_from_the_new_connection(tmp_path):
+    """Second's P2 on #5830: request numbers start over on a new connection,
+    so a `done` handler is never made again there. A turn wait begun before
+    the restart ends `closed` with its connection; the new connection's
+    request 1 finishing doesn't end it as "turn finished"."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("speak", "hear"), auto_done=False) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    turn = asyncio.create_task(session.call_tool("lamp_start_turn", {"prompt": "First line.", "wait": True}))
+                    await until(lambda: fake.asked("turn.start"))
+                    await restart(fake)
+                    ended = await asyncio.wait_for(turn, 5)
+                    assert ended.isError and "closed" in text(ended), text(ended)
+                    await until(lambda: lamp.connections == 2)
+                    said = await session.call_tool("lamp_say", {"text": "Second line."})
+                    assert not said.isError, text(said)
+                    first = [r for r in fake.received if r.get("op") == "say"][-1]["id"]
+                    await fake.done(first)
+                    await asyncio.sleep(0.1)
+                    assert not lamp._held or all(event not in ("done", "lease") for event, _, _ in lamp._held)
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_a_move_wait_begun_before_a_restart_ends_closed_and_never_takes_a_new_done(tmp_path):
+    """Second's HOLD on #5835: a `lamp_move` waiting for its motion's `done`
+    (lease request 1, move request 2) ends `closed` when its connection
+    ends; the new connection's request 2 (a say) finishing never makes it
+    say "move finished"."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("body", "speak"), auto_done=False) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    frames = [[0, 0, 0, 0, 0], [20, 0, 30, 0, 0], [20, 0, 30, 0, 0], [0, 0, 0, 0, 0]]
+                    move = asyncio.create_task(session.call_tool("lamp_move", {"step_ms": 500, "frames": frames}))
+                    await until(lambda: fake.asked("move"))
+                    old = [r for r in fake.received if r.get("op") == "move"][-1]["id"]
+                    await restart(fake)
+                    ended = await asyncio.wait_for(move, 5)
+                    assert ended.isError and "closed" in text(ended), text(ended)
+                    await until(lambda: lamp.connections == 2)
+                    for line in ("One.", "Two."):
+                        said = await session.call_tool("lamp_say", {"text": line})
+                        assert text(said).startswith("taken"), text(said)
+                    new = [r for r in fake.received if r.get("op") == "say"][-1]["id"]
+                    # The collision Second forced: the new say has the old move's number.
+                    assert new == old, (new, old)
+                    await fake.done(new)
+                    await asyncio.sleep(0.1)
+                    assert not lamp._held or all(event not in ("done", "lease") for event, _, _ in lamp._held)
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_a_say_wait_begun_before_a_restart_ends_closed_and_never_takes_a_new_done(tmp_path):
+    """Second's train #5852 case for #5849: `lamp_say(wait=True)` asked on one
+    connection ends `closed` when that connection ends; the new connection's
+    request 1 (another line) finishing never makes it say "said"."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("speak", "hear"), auto_done=False) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                server = build(lamp, client="test laptop")
+                async with create_connected_server_and_client_session(server._mcp_server) as session:
+                    first = asyncio.create_task(session.call_tool("lamp_say", {"text": "First line.", "wait": True}))
+                    await until(lambda: fake.asked("say"))
+                    await restart(fake)
+                    ended = await asyncio.wait_for(first, 5)
+                    assert ended.isError and "closed" in text(ended), text(ended)
+                    await until(lambda: lamp.connections == 2)
+                    second = await session.call_tool("lamp_say", {"text": "Second line."})
+                    assert text(second).startswith("taken"), text(second)
+                    asked = [r for r in fake.received if r.get("op") == "say"][-1]["id"]
+                    await fake.done(asked)
+                    await asyncio.sleep(0.1)
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
+def test_lamp_mcp_stops_connecting_again_once_its_computer_is_unpaired(tmp_path):
+    """A hello the lamp refuses can't mend by connecting again: lamp-mcp says
+    so once and stops trying, and its tools answer `closed`."""
+    from lamp_mcp.relink import Relink
+
+    async def go():
+        async with FakeLamp(grants=("light",)) as fake:
+            ring = Keyring(tmp_path)
+            await Lamp.pair(fake.code, fake.host, pin=fake.pin, port=fake.port, name="test laptop", keyring=ring)
+            lamp = await Relink.connect(keyring=ring, pauses=(0.05,))
+            try:
+                fake.clients.clear()  # the owner removed this computer
+                await restart(fake)
+                await until(lambda: lamp.gave_up is not None)
+                assert lamp.gave_up.code == "unpaired"
+                with pytest.raises(LampError) as closed:
+                    await lamp.light("blue", 2, 1000)
+                assert closed.value.code == "closed"
+            finally:
+                await lamp.close()
+
+    run(go())
+
+
 def test_lamp_events_never_hears_what_the_grants_dont_allow(tmp_path):
     async def go():
         async with connected(tmp_path, grants=("body",)) as (fake, _, session):
@@ -249,6 +589,35 @@ def test_lamp_events_never_hears_what_the_grants_dont_allow(tmp_path):
             heard = {e for s in fake.subscribed.values() for e in s}
             assert "touch" in heard and "button" in heard
             assert not heard & {"person.arrived", "hand", "name.heard", "sound.heard", "phrase.heard"}
+
+    run(go())
+
+
+def test_the_three_events_lamp_control_gives_a_grant_are_asked_for_only_with_it(tmp_path):
+    """`EVENT_NEEDS` lacked `body.state` (body), `volume.changed` (speak) and `lamp.said` (speech) while lamp-control's
+    `EventKind::needs` has them, so the server asked for all three whatever the pairing held, and `lamp_wait_for` let them
+    through to the lamp (the GUIDE audit, 13 Nov)."""
+    three = {"body.state", "volume.changed", "lamp.said"}
+
+    async def go():
+        async with connected(tmp_path, grants=("light",)) as (fake, _, session):
+            await session.call_tool("lamp_events", {})
+            await until(lambda: any(fake.subscribed.values()))
+            heard = {e for s in fake.subscribed.values() for e in s}
+            assert "touch" in heard and not heard & three, heard & three
+            for event in sorted(three):
+                refused = await session.call_tool("lamp_wait_for", {"events": [event], "timeout_s": 1})
+                assert refused.isError and "no_grant" in text(refused), (event, text(refused))
+            assert not any(r["op"] == "subscribe" and set(r["events"]) & three for r in fake.requests)
+        async with connected(tmp_path / "all", grants=("body", "speak", "speech")) as (fake, _, session):
+            await session.call_tool("lamp_events", {})
+            await until(lambda: three <= {e for s in fake.subscribed.values() for e in s})
+        # One grant of the three gives that event and no other.
+        async with connected(tmp_path / "speak", grants=("speak",)) as (fake, _, session):
+            await session.call_tool("lamp_events", {})
+            await until(lambda: any(fake.subscribed.values()))
+            heard = {e for s in fake.subscribed.values() for e in s}
+            assert "volume.changed" in heard and not heard & {"body.state", "lamp.said"}, heard
 
     run(go())
 
@@ -350,10 +719,11 @@ def test_a_lease_whose_action_is_refused_or_never_ends_is_not_listed_held(tmp_pa
 
 def test_an_action_handed_to_a_part_ends_at_once(tmp_path):
     """blue's P3 on #3813: lamp-control answers `move` with `{"to": "body"}`
-    and sends no `done`, so the tool doesn't wait out its lease."""
+    and sends no `done` on a lamp from before #4209 (no `motion_done`), so
+    the tool doesn't wait out its lease."""
 
     async def go():
-        async with connected(tmp_path, auto_done=False) as (fake, _, session):
+        async with connected(tmp_path, auto_done=False, motion_done=False) as (fake, _, session):
             plain = fake._ok
 
             async def handed(ws, id_, **fields):
@@ -367,6 +737,68 @@ def test_an_action_handed_to_a_part_ends_at_once(tmp_path):
             result = await session.call_tool("lamp_move", {"step_ms": 500, "frames": frames})
             assert not result.isError and text(result).startswith("move taken by the body")
             assert asyncio.get_running_loop().time() - started < 5
+
+    run(go())
+
+
+def test_a_light_kept_for_seconds_is_asked_again_until_its_time_or_a_stop(tmp_path):
+    """The desk-app friction log, 10 Nov: a light could not be held past 30 s without calling again."""
+
+    async def go():
+        async with connected(tmp_path) as (fake, lamp, session):
+            lamp.limits["hold_max_ms"] = 2000  # a lamp that holds a light 2 s, so the test needn't wait 15 s
+            result = await session.call_tool("lamp_light", {"colour": "warm", "level": 2, "keep_for_s": 4.5})
+            assert not result.isError and "kept for 4.5 s" in text(result)
+            assert len(fake.asked("light")) == 1 and fake.asked("light")[0]["for_ms"] == 2000
+            await asyncio.sleep(5.5)
+            asks = fake.asked("light")
+            assert len(asks) >= 3, asks  # at 0 s, 1 s, 2 s, 3 s, 4 s: the last for what was left
+            assert all(a["for_ms"] <= 2000 for a in asks) and asks[-1]["for_ms"] < 2000
+            count = len(asks)
+            await asyncio.sleep(1.5)
+            assert len(fake.asked("light")) == count  # over, nothing asks again
+            # A stop ends a kept light at once.
+            await session.call_tool("lamp_light", {"colour": "blue", "level": 2, "keep_for_s": 60})
+            before = len(fake.asked("light"))
+            await session.call_tool("lamp_stop", {})
+            await asyncio.sleep(2.5)
+            assert len(fake.asked("light")) == before
+
+    run(go())
+
+
+def test_a_kept_light_ends_on_an_express(tmp_path):
+    """eighth's P3 on #6170: an express lights too, so a kept colour must not come back over it."""
+
+    async def go():
+        async with connected(tmp_path, grants=("body", "light", "speak", "look")) as (fake, lamp, session):
+            lamp.limits["hold_max_ms"] = 2000
+            await session.call_tool("lamp_light", {"colour": "warm", "level": 2, "keep_for_s": 60})
+            await session.call_tool("lamp_express", {"feeling": "glad"})
+            before = len(fake.asked("light"))
+            await asyncio.sleep(2.5)
+            assert len(fake.asked("light")) == before  # nothing asks the colour again over the express
+
+    run(go())
+
+
+def test_every_time_argument_says_its_unit_in_the_tool_description(tmp_path):
+    """The desk-app friction log, 10 Nov: the tools mix `for_ms`, `seconds`, `wait_s` and `timeout_s`, and an agent
+    guessed `seconds` for a light. Each such tool says its unit, so a guess is one read away."""
+
+    async def go():
+        async with connected(tmp_path) as (_, _, session):
+            tools = {t.name: t for t in (await session.list_tools()).tools}
+            for name, argument, unit in (
+                ("lamp_light", "for_ms", "milliseconds"),
+                ("lamp_light", "keep_for_s", "seconds"),
+                ("lamp_ring", "for_ms", "milliseconds"),
+                ("lamp_events", "wait_s", "seconds"),
+                ("lamp_wait_for", "timeout_s", "seconds"),
+                ("lamp_follow_hand", "seconds", "seconds"),
+            ):
+                if name in tools:  # a tool that is offered only with its grant
+                    assert argument in tools[name].description and unit in tools[name].description, name
 
     run(go())
 
@@ -637,12 +1069,60 @@ def test_the_lamps_limits_are_kept_here_too():
         limits.take("gesture")
 
 
-def test_an_unpaired_computer_is_told_in_one_line(tmp_path, monkeypatch):
+def test_an_unpaired_computer_is_told_in_one_line_and_exits_with_its_own_code(tmp_path, monkeypatch, capsys):
+    """An MCP client strips the environment, so LAMPOS_HOME is lost and the pairing isn't found; the client sees only
+    'Connection closed'. The one stderr line says which folder was looked in and how to point at the right one."""
     from lamp_mcp.server import main
 
+    monkeypatch.delenv("LAMPOS_HOME", raising=False)
     monkeypatch.setenv("HOME", str(tmp_path))
-    with pytest.raises(SystemExit, match=r"^lamp-mcp: not_paired: .*lamp pair"):
+    with pytest.raises(SystemExit) as stopped:
         main([])
+    assert stopped.value.code == 2
+    said = capsys.readouterr().err.strip()
+    assert said.startswith("lamp-mcp: not_paired: ") and "lamp pair" in said, said
+    assert "\n" not in said
+    assert str(tmp_path / ".config" / "lampos") in said and "--home" in said and "LAMPOS_HOME" in said
+
+
+def test_python_dash_m_runs_lamp_mcp_with_no_path_needed():
+    """An MCP client config can name the venv's python and `-m lamp_mcp`, which needs no PATH; both forms run main()."""
+    import os
+    import subprocess
+    import sys
+
+    src = str(Path(__file__).resolve().parents[1] / "src")
+    sdk = str(Path(__file__).resolve().parents[2] / "python" / "src")
+    env = {"PYTHONPATH": os.pathsep.join([src, sdk]), "HOME": "/nonexistent"}
+    for args in (["-m", "lamp_mcp"], ["-m", "lamp_mcp.server"]):
+        ran = subprocess.run([sys.executable, *args, "--help"], env=env, capture_output=True, text=True, timeout=30)
+        assert ran.returncode == 0 and "usage: lamp-mcp" in ran.stdout and "--home" in ran.stdout, (args, ran.stderr)
+
+
+def test_home_points_at_the_pairing_folder_when_the_client_strips_the_environment(tmp_path, monkeypatch, capsys):
+    import lamp_mcp.server as server_module
+
+    seen = {}
+
+    async def serve(lamp_id, client):
+        import os
+
+        seen["home"] = os.environ.get("LAMPOS_HOME")
+
+    monkeypatch.delenv("LAMPOS_HOME", raising=False)
+    monkeypatch.setattr(server_module, "serve", serve)
+    server_module.main(["--home", str(tmp_path / "pairs")])
+    assert seen["home"] == str(tmp_path / "pairs")
+    # Not given: the environment's own, or the default, is left alone.
+    monkeypatch.setenv("LAMPOS_HOME", "/from/env")
+    server_module.main([])
+    assert seen["home"] == "/from/env"
+    # An unpaired --home is the one the line names.
+    monkeypatch.undo()
+    monkeypatch.setenv("HOME", str(tmp_path))
+    with pytest.raises(SystemExit) as stopped:
+        server_module.main(["--home", str(tmp_path / "nowhere")])
+    assert stopped.value.code == 2 and str(tmp_path / "nowhere") in capsys.readouterr().err
 
 
 def test_verbose_turns_the_sdks_debug_log_on_and_stdout_stays_the_mcp_stream(monkeypatch, capsys):
@@ -662,7 +1142,7 @@ def test_verbose_turns_the_sdks_debug_log_on_and_stdout_stays_the_mcp_stream(mon
     server_module.main(["--verbose"])
     assert seen["log"] == "debug"
     assert capsys.readouterr().out == ""
-EVERY_GRANT = ("body", "light", "speak", "look", "hear", "sound")
+EVERY_GRANT = ("body", "light", "speak", "look", "hear", "sound", "notes")
 
 
 def test_an_argument_a_tool_does_not_take_is_refused(tmp_path):
@@ -676,7 +1156,7 @@ def test_an_argument_a_tool_does_not_take_is_refused(tmp_path):
                 assert tool.inputSchema.get("additionalProperties") is False, tool.name
             wrong = await session.call_tool("lamp_light", {"colour": "warm", "for_s": 5})
             assert wrong.isError
-            assert text(wrong) == "bad_request: lamp_light takes no for_s; it takes colour, for_ms, level, pattern"
+            assert text(wrong) == "bad_request: lamp_light takes no for_s; it takes colour, for_ms, keep_for_s, level, pattern"
             assert fake.asked("light") == []
             stop = await session.call_tool("lamp_stop", {"now": True})
             assert stop.isError
@@ -725,7 +1205,7 @@ def test_the_readme_gives_every_tool_its_parameters_defaults_and_every_resource(
         readme = (Path(__file__).parents[1] / "README.md").read_text()
         async with connected(tmp_path, grants=EVERY_GRANT) as (_, _, session):
             listed = (await session.list_tools()).tools
-            assert {tool.name for tool in listed} == ALL | FOLLOW | TURN == set(rows)
+            assert {tool.name for tool in listed} == ALL | FOLLOW | TURN | NOTES == set(rows)
             for tool in listed:
                 by_parameter = {row[1].strip("`"): row for row in rows[tool.name]}
                 properties = tool.inputSchema.get("properties", {})
@@ -891,7 +1371,7 @@ def test_a_second_follow_is_busy_and_follow_stop_ends_the_first(tmp_path):
     run(go())
 
 
-GRANT_WORDS = {"body", "light", "speak", "look", "hear", "sound"}
+GRANT_WORDS = {"body", "light", "speak", "look", "hear", "sound", "notes"}
 
 
 def readme_grants(cell: str) -> set[str]:
@@ -931,6 +1411,7 @@ def test_the_readme_lease_column_is_the_servers_own(tmp_path):
     calls = {
         "lamp_look": {"at": "ahead"},
         "lamp_move": {"step_ms": 100, "frames": [[0, 0, 0, 0, 0], [5, 0, 0, 0, 0], [0, 0, 0, 0, 0]]},
+        "lamp_move_poses": {"poses": [{"pitch": 5}]},
         "lamp_gesture": {"name": "nod"},
         "lamp_light": {"colour": "warm"},
         "lamp_ring": {"rgb": "#ff8000"},
@@ -1014,6 +1495,36 @@ def test_a_clip_is_uploaded_from_a_file_played_listed_and_removed(tmp_path):
     run(go())
 
 
+def test_the_notes_tools_keep_read_list_and_drop_this_computers_own_notes(tmp_path):
+    names = {"lamp_notes_set", "lamp_notes_get", "lamp_notes_delete", "lamp_notes_list"}
+
+    async def go():
+        # Offered with the notes grant only.
+        async with connected(tmp_path / "none", grants=("speak",)) as (_, _, session):
+            assert not names & {tool.name for tool in (await session.list_tools()).tools}
+        async with connected(tmp_path / "lamp", grants=("notes",)) as (fake, _, session):
+            assert names <= {tool.name for tool in (await session.list_tools()).tools}
+            kept = await session.call_tool("lamp_notes_set", {"key": "mood", "value": {"calm": [1, 2, 3]}})
+            assert not kept.isError, text(kept)
+            assert json.loads(text(kept)) == {"key": "mood", "bytes": 16}
+            got = await session.call_tool("lamp_notes_get", {"key": "mood"})
+            assert json.loads(text(got)) == {"found": True, "value": {"calm": [1, 2, 3]}}
+            missing = await session.call_tool("lamp_notes_get", {"key": "nope"})
+            assert json.loads(text(missing)) == {"found": False}
+            await session.call_tool("lamp_notes_set", {"key": "mode", "value": 7})
+            listed = json.loads(text(await session.call_tool("lamp_notes_list", {"prefix": "mo"})))
+            assert listed["keys"] == [{"key": "mode", "bytes": 1}, {"key": "mood", "bytes": 16}]
+            assert (listed["count"], listed["total"]) == (2, 2)
+            assert json.loads(text(await session.call_tool("lamp_notes_delete", {"key": "mood"}))) == {"deleted": True}
+            assert json.loads(text(await session.call_tool("lamp_notes_delete", {"key": "mood"}))) == {"deleted": False}
+            bad = await session.call_tool("lamp_notes_set", {"key": "a b", "value": 1})
+            assert bad.isError and "bad_request" in text(bad)
+            big = await session.call_tool("lamp_notes_set", {"key": "big", "value": "x" * 16_400})
+            assert big.isError and "bad_request" in text(big) and "16384" in text(big)
+
+    run(go())
+
+
 def test_the_skill_tools_push_list_and_remove_with_the_skills_grant_only(tmp_path):
     def skill(name: str, rules: str) -> Path:
         path = tmp_path / "skills" / name
@@ -1091,7 +1602,13 @@ def test_lamp_ring_lights_the_ring_in_a_computers_own_colours(tmp_path):
             assert not (await session.call_tool("lamp_ring", {"rgb": "#0000ff"})).isError
             asked = fake.asked("light")
             assert asked[0]["pixels"][0] == "#ff0000" and asked[0]["brightness"] == 50 and asked[0]["for_ms"] == 30000
-            assert asked[1]["rgb"] == "#0000ff"
+            assert asked[1]["rgb"] == "#0000ff" and "fade_ms" not in asked[1]
+            # How slowly the ring comes into the light, for either form (the SDK's `fade_ms`).
+            assert not (await session.call_tool("lamp_ring", {"rgb": "#00ff00", "fade_ms": 5_000})).isError
+            assert not (await session.call_tool("lamp_ring", {"pixels": pixels, "fade_ms": 2_000})).isError
+            asked = fake.asked("light")
+            assert asked[2]["rgb"] == "#00ff00" and asked[2]["fade_ms"] == 5_000
+            assert asked[3]["pixels"][0] == "#ff0000" and asked[3]["fade_ms"] == 2_000
             for wrong in ({}, {"rgb": "#0000ff", "pixels": pixels}, {"pixels": pixels[:31]}):
                 assert (await session.call_tool("lamp_ring", wrong)).isError, wrong
 
@@ -1121,5 +1638,46 @@ def test_without_speak_volume_is_neither_offered_nor_listed(tmp_path):
             assert "lamp_volume" not in names
             uris = {str(r.uri) for r in (await session.list_resources()).resources}
             assert "lamp://state/volume" not in uris
+
+    run(go())
+
+
+def test_lamp_joints_waits_for_the_bodys_done_as_lamp_look_does(tmp_path):
+    """lamp-control sends `joints`' yaw and pitch as the holder's look, and its
+    `done` follows (body_lease.rs): the tool says finished, or dropped with the
+    body's why, and lets go of its lease at once."""
+    async def go():
+        async with connected(tmp_path, grants=("body",)) as (fake, _, session):
+            joints = await session.call_tool("lamp_joints", {"within_ms": 500, "pitch": 3, "yaw": -4})
+            assert not joints.isError and text(joints) == "joints finished", text(joints)
+            assert fake.asked("lease.release")
+            # A body that refuses it (its lease suspended by a conversation)
+            # says so in the tool's answer instead of "taken".
+            fake.auto_done = False
+            call = asyncio.create_task(session.call_tool("lamp_joints", {"pitch": 1}))
+            while len(fake.asked("joints")) < 2:
+                await asyncio.sleep(0.01)
+            await fake.done(fake.requests[-1]["id"], "dropped", "the body is not held")
+            result = await call
+            assert text(result) == "joints dropped: the body is not held", text(result)
+
+    run(go())
+
+
+def test_a_move_through_poses_is_the_sdks_frames_and_a_pose_it_cant_make_is_refused_before_sending(tmp_path):
+    from lampos import poses_to_frames
+
+    async def go():
+        async with connected(tmp_path, grants=("body",)) as (fake, _, session):
+            refused = await session.call_tool("lamp_move_poses", {"poses": [{"pitch": 130}]})
+            assert refused.isError
+            assert text(refused).endswith("bad_request: pose 1: pitch 130° is farther than a move may take it, 114.3° either way")
+            assert "bad_request: bad_request" not in text(refused)
+            assert not fake.asked("move") and not fake.asked("lease.take")
+            moved = await session.call_tool("lamp_move_poses", {"poses": [{"pitch": 10}, {"yaw": -8}], "hold_ms": 200})
+            assert not moved.isError, text(moved)
+            sent = fake.asked("move")
+            assert len(sent) == 1 and sent[0]["step_ms"] == 50
+            assert sent[0]["frames"] == poses_to_frames([{"pitch": 10}, {"yaw": -8}], hold_ms=200)
 
     run(go())

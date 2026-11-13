@@ -241,8 +241,12 @@ glance.
 Task 36 (#714), in [alive.md](alive.md): with an `alive` part in the
 catalogue ([`alive-behaviours.json`](../crates/expression/alive-behaviours.json),
 lamp-4ace's catalogue with one), a resting lamp's head lifts and settles
-with the ring's own breath and now and then drifts a little, none of it
-while a face stays close and still under the light; late at night with
+with the ring's own breath and now and then drifts a little (none of it
+while a face stays close and still under the light, but only with the
+optional `alive.work` in the catalogue, and that gate is PARKED (#5955):
+off on every lamp, since an updated lamp keeps the `work` its install wrote;
+the product has none, so the breath and drift go on with someone working
+close and still); late at night with
 nobody seen for 15 minutes it bows into a slow breath that no sound or talk
 breaks; its name, a touch, a reminder coming due or its own answer wake it
 with a 2.7 s stretch. Asleep, no clip begins and the voice's posture gives

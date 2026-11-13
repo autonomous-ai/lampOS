@@ -57,6 +57,7 @@ impl Store {
                     framing: None,
                     offered_at_unix_s: None,
                     later_offers: 0,
+                    ended_at_unix_ms: None,
                 },
             );
         }
@@ -103,7 +104,17 @@ impl Store {
             Onboarding::with_storage(self.path.join("progress.json"), self.owner.client());
         walk.unix_clock = clock;
         walk.set_near_available(true);
+        // PARKED (#4080): these tests keep the three-call bar and the
+        // sentence part tested; `teaching` is the shipped step.
+        walk.near.three_calls = true;
+        walk.counted = false;
         walk.drain_storage_for_test(now);
+        walk
+    }
+    /// A cycle of the shipped step: teaching the call (#4080).
+    fn teaching(&self, now: u64) -> Onboarding {
+        let mut walk = self.cycle(now);
+        walk.near.three_calls = false;
         walk
     }
 }
@@ -439,7 +450,7 @@ fn a_call_heard_by_text_and_by_the_detector_is_one_try() {
     }
     let prompt = play(&mut walk, 60 * S, 1_760_000_060_000, 3);
     room(&mut walk, &prompt, 2_400, 21.0);
-    name(&mut walk, &prompt, 1_000, 0.98);
+    name(&mut walk, &prompt, 1_600, 0.98);
     by_text(&mut walk, &prompt, 4_000);
     assert_eq!(
         judge(&mut walk, &prompt)["why"],
@@ -533,11 +544,11 @@ fn a_weak_hearing_with_words_pending_waits_for_them() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);
     let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
-    room(&mut walk, &prompt, 1_400, 22.0);
-    name(&mut walk, &prompt, 1_000, 0.9);
-    walk.near_call_line_ended(prompt.ended_us + 1_000_000);
-    assert_eq!(tick_at(&mut walk, &prompt, 2_300_000, 500_000), None);
-    by_text(&mut walk, &prompt, 1_000);
+    room(&mut walk, &prompt, 2_400, 22.0);
+    name(&mut walk, &prompt, 2_000, 0.9);
+    walk.near_call_line_ended(prompt.ended_us + 2_000_000);
+    assert_eq!(tick_at(&mut walk, &prompt, 3_300_000, 500_000), None);
+    by_text(&mut walk, &prompt, 2_000);
     assert_eq!(tick_at(&mut walk, &prompt, 7_299_999, 500_000), None);
     let judged =
         tick_at(&mut walk, &prompt, 7_300_000, 500_000).expect("judged at the window's end");
@@ -545,9 +556,9 @@ fn a_weak_hearing_with_words_pending_waits_for_them() {
     assert_eq!(judged["heard_by"], "text");
     // Words that never come: judged at the wait's end, the hearing refused.
     let prompt = play(&mut walk, 30 * S, 1_760_000_030_000, 2);
-    room(&mut walk, &prompt, 1_400, 22.0);
-    name(&mut walk, &prompt, 1_000, 0.9);
-    walk.near_call_line_ended(prompt.ended_us + 1_000_000);
+    room(&mut walk, &prompt, 2_400, 22.0);
+    name(&mut walk, &prompt, 2_000, 0.9);
+    walk.near_call_line_ended(prompt.ended_us + 2_000_000);
     assert_eq!(tick_at(&mut walk, &prompt, 8_799_999, 500_000), None);
     let judged = tick_at(&mut walk, &prompt, 8_800_000, 500_000).expect("judged at the wait's end");
     assert_eq!(judged["accepted"], false, "{judged}");
@@ -628,11 +639,12 @@ fn the_lamp_speaking_spoils_only_the_half_second_before_to_a_second_after() {
         speaking: false,
     });
     assert_eq!(judge(&mut walk, &prompt)["accepted"], true);
-    // The prompt's own tail: a name heard 0.3 s after it ended.
+    // The prompt's own tail: a name heard 0.3 s after it ended is the
+    // lamp's own (`ECHO_TAIL_MS`), not heard as a call at all.
     let prompt = play(&mut walk, 50 * S, 1_760_000_050_000, 3);
     room(&mut walk, &prompt, 400, 21.0);
     name(&mut walk, &prompt, 300, 0.98);
-    assert_eq!(judge(&mut walk, &prompt)["why"], "the lamp was speaking");
+    assert_eq!(judge(&mut walk, &prompt)["why"], "the name wasn't heard");
 }
 
 /// A name begun `before_ms` before the prompt's end, its final hearing
@@ -647,18 +659,16 @@ fn over(walk: &mut Onboarding, prompt: &Prompt, before_ms: u64, heard_after_ms: 
     ));
 }
 
-/// lamp-52e6, row 10: names begun 237 to 478 ms before the prompt's end. A
-/// name begun over the prompt's last word, up to 0.5 s before its end, that
-/// ended after it is the person answering early: its reply is held, but its
-/// sound sits under the lamp's own voice and the ears' 0.5 s tail, so it is
-/// not a try. The prompt is offered again with its own number, under the
-/// re-offers' cap; no rise is read from the room after it. One begun
-/// earlier, or over by the end, is not the call.
+/// lamp-52e6, 9 Nov, scene B: the lamp's own "Hey Lamp" heard as its name
+/// over the prompt's last word. A detector's hearing begun before the
+/// prompt's end is the lamp's own voice (`ECHO_TAIL_MS`): never a call, nor
+/// a reason to offer the prompt again; the try is judged without it. Its
+/// reply is still held.
 #[test]
-fn a_name_begun_over_the_prompts_last_word_is_offered_again_not_measured() {
+fn a_name_begun_over_the_prompts_last_word_is_not_a_call_nor_offered_again() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);
-    for (turn, before_ms, again) in [(1, 237, true), (2, 478, true), (3, 500, false)] {
+    for (turn, before_ms) in [(1, 237), (2, 478), (3, 500)] {
         let at = turn * 20 * S;
         let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
         // The call's 20 dB inside the ears' own-voice tail, the room's
@@ -668,15 +678,14 @@ fn a_name_begun_over_the_prompts_last_word_is_offered_again_not_measured() {
         assert!(walk.near_holds_reply(prompt.ended_us - 100_000, prompt.ended_us + S));
         let judged = judge(&mut walk, &prompt);
         assert_eq!(judged["accepted"], false, "{before_ms}: {judged}");
-        assert_eq!(judged["why"], "answered_early");
-        assert_eq!(judged["prompt"], 1);
-        assert_eq!(judged["offered_again"], again);
+        assert_eq!(judged["why"], "the name wasn't heard");
+        assert_eq!(judged["prompt"], turn);
+        assert!(judged.get("offered_again").is_none(), "{judged}");
         assert!(judged.get("rise_db").is_none(), "{judged}");
     }
     assert!(walk.kept().near_call_tries.is_empty());
-    // The third counts, and ends the name part: a call heard is asked for
-    // again twice at most (#5563).
-    assert_eq!(walk.kept().near_call_prompts, 1);
+    // Three prompts spent, none a call: the name part ends.
+    assert_eq!(walk.kept().near_call_prompts, 3);
     settle(&mut walk, 70 * S);
     assert_eq!(named(&walk), Some(Outcome::Failed));
     let store = Store::new(None);
@@ -706,13 +715,13 @@ fn the_lamps_own_last_word_or_echo_heard_as_its_name_is_not_a_call() {
     room(&mut walk, &prompt, 7_000, 2.0);
     over(&mut walk, &prompt, 300, 150, 0.99);
     let judged = judge(&mut walk, &prompt);
-    assert_eq!(judged["why"], "answered_early", "{judged}");
-    assert_eq!(judged["offered_again"], true);
+    assert_eq!(judged["why"], "the name wasn't heard", "{judged}");
+    assert!(judged.get("offered_again").is_none(), "{judged}");
     let prompt = play(&mut walk, 30 * S, 1_760_000_030_000, 2);
     room(&mut walk, &prompt, 7_000, 2.0);
     name(&mut walk, &prompt, 200, 0.99);
     let judged = judge(&mut walk, &prompt);
-    assert_eq!(judged["why"], "the lamp was speaking", "{judged}");
+    assert_eq!(judged["why"], "the name wasn't heard", "{judged}");
     assert!(walk.kept().near_call_tries.is_empty());
 }
 
@@ -814,22 +823,13 @@ fn a_call_after_a_prompt_said_with_a_gap_is_a_try() {
 /// was judged says the first line again.
 #[test]
 fn each_call_prompt_answers_the_last_try_and_only_the_first_explains() {
-    assert!(NEAR_FIRST.contains("say 'Hey Lamp'"), "{NEAR_FIRST}");
-    assert!(
-        NEAR_FIRST.contains("I'll ask until I've heard you three times."),
-        "{NEAR_FIRST}"
-    );
-    assert_eq!(
-        lamp_near_call::TRIES,
-        3,
-        "the line says how many calls it takes"
-    );
+    assert!(NEAR_FIRST.contains("start with 'Hey Lamp'"), "{NEAR_FIRST}");
     assert!(
         NEAR_AGAIN.contains("\"Got it. Say 'Hey Lamp' once more.\""),
         "{NEAR_AGAIN}"
     );
     assert!(
-        NEAR_MISSED.contains("\"I didn't catch that. Say 'Hey Lamp' again, from your seat.\""),
+        NEAR_MISSED.contains("\"I didn't catch that. Try once more when I stop talking.\""),
         "{NEAR_MISSED}"
     );
     let store = Store::new(None);
@@ -846,10 +846,10 @@ fn each_call_prompt_answers_the_last_try_and_only_the_first_explains() {
         prompt.words, NEAR_FIRST,
         "the cut first prompt, offered again"
     );
-    // Answered over its last word: not caught.
+    // Its own last word heard as the name: not caught.
     room(&mut walk, &prompt, 300, 20.0);
     over(&mut walk, &prompt, 300, 200, 0.98);
-    assert_eq!(judge(&mut walk, &prompt)["why"], "answered_early");
+    assert_eq!(judge(&mut walk, &prompt)["why"], "the name wasn't heard");
     let prompt = play(&mut walk, 40 * S, 1_760_000_040_000, 3);
     assert_eq!(prompt.words, NEAR_MISSED);
     room(&mut walk, &prompt, 2_400, 22.0);
@@ -961,16 +961,17 @@ fn a_heard_call_is_answered_at_once_not_after_seven_seconds() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);
     let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
-    room(&mut walk, &prompt, 1_400, 22.0);
-    // Begun 1 s after the prompt's end, its final hearing at 1.6 s.
-    name(&mut walk, &prompt, 1_000, 0.98);
-    let heard_us = prompt.ended_us + 1_600_000;
-    assert_eq!(tick_at(&mut walk, &prompt, 2_299_999, 500_000), None);
-    let judged = tick_at(&mut walk, &prompt, 2_300_000, 500_000).expect("judged");
+    room(&mut walk, &prompt, 2_000, 22.0);
+    // Begun 1.6 s after the prompt's end, past its echo tail, its final
+    // hearing at 2.2 s.
+    name(&mut walk, &prompt, 1_600, 0.98);
+    let heard_us = prompt.ended_us + 2_200_000;
+    assert_eq!(tick_at(&mut walk, &prompt, 2_899_999, 500_000), None);
+    let judged = tick_at(&mut walk, &prompt, 2_900_000, 500_000).expect("judged");
     assert_eq!(judged["accepted"], true, "{judged}");
     assert_eq!(judged["rise_db"].as_f64().unwrap() as f32, 22.0);
     // Not with less than half a second of quiet: the person may go on.
-    let now = prompt.ended_us + 2_300_000;
+    let now = prompt.ended_us + 2_900_000;
     walk.tick(now, 499_999, true, false, face(), true);
     walk.drain_storage_for_test(now);
     assert!(walk.pending().invitations.is_empty());
@@ -985,8 +986,8 @@ fn a_heard_call_is_answered_at_once_not_after_seven_seconds() {
     let latency_us = now - heard_us;
     eprintln!("how_you_sound: the answer is ready {latency_us} us after the call was heard");
     assert!(latency_us <= S, "{latency_us}");
-    // Its answer played; a call over its last word: the same verdict as
-    // before, at 1.3 s.
+    // Its answer played; its own last word heard as the name is no call:
+    // judged at the window's end, a miss.
     let boot = BootId::new([3; 16]).unwrap();
     assert!(walk.bind_invitation(token, boot, 2));
     set_clock(1_760_000_030_000);
@@ -999,11 +1000,10 @@ fn a_heard_call_is_answered_at_once_not_after_seven_seconds() {
     };
     room(&mut walk, &prompt, 300, 20.0);
     over(&mut walk, &prompt, 300, 200, 0.98);
-    assert_eq!(tick_at(&mut walk, &prompt, 1_299_999, 500_000), None);
-    let judged = tick_at(&mut walk, &prompt, 1_300_000, 500_000).expect("judged");
-    assert_eq!(judged["why"], "answered_early", "{judged}");
-    assert_eq!(judged["offered_again"], true);
-    assert_eq!(next_words(&mut walk, 32 * S), NEAR_MISSED);
+    assert_eq!(tick_at(&mut walk, &prompt, 7_299_999, 500_000), None);
+    let judged = tick_at(&mut walk, &prompt, 7_300_000, 500_000).expect("judged");
+    assert_eq!(judged["why"], "the name wasn't heard", "{judged}");
+    assert_eq!(next_words(&mut walk, 38 * S), NEAR_MISSED);
 }
 
 /// Nothing heard: the try is judged as before, at the window's end, its rise
@@ -1246,8 +1246,10 @@ fn persisted_samples_are_validated_on_load() {
         |p| p.near_call_tries[0].score = Some(0.9),
         |p| p.near_call_prompts = 6,
         |p| p.near_call_prompts = 2,
+        // Done with no sentence and no accepted call (#4080: one call is
+        // enough while teaching it).
         |p| {
-            p.near_call_tries.pop();
+            p.near_call_tries.clear();
             p.steps.insert(
                 Step::HowYouSound.name().into(),
                 Kept {
@@ -1256,6 +1258,7 @@ fn persisted_samples_are_validated_on_load() {
                     framing: None,
                     offered_at_unix_s: None,
                     later_offers: 0,
+                    ended_at_unix_ms: None,
                 },
             );
         },
@@ -1660,7 +1663,8 @@ fn a_sentence_said_close_with_its_words_covering_it_ends_the_step_done_and_keeps
             "privacy_discard_pending",
             "privacy_invitation_tries",
             "sentence_prompts",
-            "steps"
+            "steps",
+            "walk_id"
         ]
     );
 }
@@ -1828,9 +1832,13 @@ fn calls_answered_at_the_prompts_end_leave_no_bar_and_the_seats_sentence_still_p
         }
         assert_eq!(
             whys,
-            ["answered_early", "answered_early", "answered_early",]
+            [
+                "the name wasn't heard",
+                "the name wasn't heard",
+                "the name wasn't heard",
+            ]
         );
-        assert_eq!(walk.kept().near_call_prompts, 1);
+        assert_eq!(walk.kept().near_call_prompts, 3);
         assert!(settle(&mut walk, 110 * S).is_empty());
         assert!(!store.near_file().exists());
         ask(&mut walk, 120 * S, 6);
@@ -1968,6 +1976,7 @@ fn a_later_re_offer_of_how_you_sound_begins_with_the_call_part() {
             framing: None,
             offered_at_unix_s: None,
             later_offers: 0,
+            ended_at_unix_ms: None,
         },
     );
     walk.begin_later_offer(Step::HowYouSound);
@@ -1977,7 +1986,11 @@ fn a_later_re_offer_of_how_you_sound_begins_with_the_call_part() {
     assert!(walk.desired.near_call_tries.is_empty());
     walk.desired.steps.remove(Step::HowYouSound.name());
     let first = play(&mut walk, 200 * S, 1_760_000_200_000, 6);
-    assert!(first.words.contains("how you call me"), "{}", first.words);
+    assert!(
+        first.words.contains("start with 'Hey Lamp'"),
+        "{}",
+        first.words
+    );
     assert!(!first.words.contains("sentence"), "{}", first.words);
 }
 
@@ -2258,16 +2271,16 @@ fn a_heard_call_is_asked_for_again_twice_at_most() {
     let store = Store::new(None);
     let mut walk = store.cycle(S);
     assert_eq!(call(&mut walk, 10 * S, 22.0, 1)["accepted"], true);
-    for (turn, at) in [(2, 30 * S), (3, 50 * S)] {
+    for (turn, at) in [(2, 30 * S), (3, 50 * S), (4, 70 * S)] {
         let prompt = play(&mut walk, at, 1_760_000_000_000 + at / 1_000, turn);
-        room(&mut walk, &prompt, 300, 20.0);
-        over(&mut walk, &prompt, 300, 200, 0.98);
-        assert_eq!(judge(&mut walk, &prompt)["why"], "answered_early");
+        room(&mut walk, &prompt, 2_400, 20.0);
+        name(&mut walk, &prompt, 2_000, 0.98);
+        name(&mut walk, &prompt, 4_000, 0.98);
+        assert_eq!(
+            judge(&mut walk, &prompt)["why"],
+            "the name was heard more than once"
+        );
     }
-    let prompt = play(&mut walk, 70 * S, 1_760_000_070_000, 4);
-    room(&mut walk, &prompt, 7_000, 2.0);
-    name(&mut walk, &prompt, 200, 0.99);
-    assert_eq!(judge(&mut walk, &prompt)["why"], "the lamp was speaking");
     settle(&mut walk, 90 * S);
     assert_eq!(named(&walk), Some(Outcome::Failed));
     assert!(
@@ -2277,4 +2290,195 @@ fn a_heard_call_is_asked_for_again_twice_at_most() {
             .all(|invitation| invitation.attempt > lamp_near_call::MOST_PROMPTS as u64),
         "no call prompt after the third heard call refused"
     );
+}
+
+/// #4080: one accepted call ends the step, its line said, with no second
+/// call asked, no bar and no sentence.
+#[test]
+fn one_accepted_call_ends_how_you_sound() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    assert_eq!(call(&mut walk, 10 * S, 22.4, 1)["accepted"], true);
+    let notes = settle(&mut walk, 20 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Done));
+    assert_eq!(notes, [NEAR_DONE]);
+    assert_eq!(walk.pending().invitations.len(), 0);
+    assert_eq!(walk.kept().near_call_prompts, 1);
+}
+
+/// #4080: a missed call gets exactly one reminder, then the walk moves on.
+#[test]
+fn a_missed_call_gets_one_remind_then_the_walk_moves_on() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    let miss = |walk: &mut Onboarding, at: u64, turn: u64| {
+        let prompt = play(walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(walk, &prompt, 2_400, 22.0);
+        // Heard, but not surely: a try, refused.
+        name(walk, &prompt, 2_000, 0.3);
+        let judged = judge(walk, &prompt);
+        assert_eq!(judged["accepted"], false, "{judged}");
+        prompt.words
+    };
+    assert_eq!(miss(&mut walk, 10 * S, 1), NEAR_FIRST);
+    assert_eq!(miss(&mut walk, 30 * S, 2), NEAR_MISSED);
+    let notes = settle(&mut walk, 50 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    assert_eq!(notes, [NEAR_FAILED]);
+    assert_eq!(walk.pending().invitations.len(), 0);
+    assert_eq!(walk.kept().near_call_prompts, 2);
+}
+
+/// #4080, the lead's rule: no call heard gets one reminder, then the step
+/// fails with its "redo the setup later" line and the walk moves on.
+#[test]
+fn no_call_heard_is_reminded_once_then_fails_and_the_walk_moves_on() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    let silent = |walk: &mut Onboarding, at: u64, turn: u64| {
+        let prompt = play(walk, at, 1_760_000_000_000 + at / 1_000, turn);
+        room(walk, &prompt, 2_400, 2.0);
+        let judged = judge(walk, &prompt);
+        assert_eq!(judged["accepted"], false, "{judged}");
+        prompt.words
+    };
+    assert_eq!(silent(&mut walk, 10 * S, 1), NEAR_FIRST);
+    assert_eq!(silent(&mut walk, 30 * S, 2), NEAR_MISSED);
+    let notes = settle(&mut walk, 50 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Failed));
+    assert_eq!(notes, [NEAR_FAILED]);
+    assert_eq!(walk.pending().invitations.len(), 0);
+}
+
+/// #4080: a skip asked for in the step ends it, said, and the walk moves on.
+#[test]
+fn a_skip_while_teaching_the_call_moves_the_walk_on() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    offer(&mut walk, 10 * S);
+    report_skip(&walk);
+    let notes = settle(&mut walk, 20 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Skipped));
+    assert_eq!(notes, [HOW_YOU_SOUND_SKIPPED]);
+    assert_eq!(walk.pending().invitations.len(), 0);
+}
+
+/// The Reviewer-lead's P2 on #5809: on the shipped order "how you sound"
+/// is the last step, so its skip says its own line and then the walk's
+/// closing line, never the skip alone.
+#[test]
+fn a_skip_of_the_last_step_still_ends_with_the_closing_line() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    walk.definition =
+        Arc::new(skill::parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap());
+    assert_eq!(walk.definition.order.last(), Some(&Step::HowYouSound));
+    walk.finish(Step::Touch, Outcome::Done, None, S);
+    walk.drain_storage_for_test(S);
+    offer(&mut walk, 10 * S);
+    report_skip(&walk);
+    let notes = settle(&mut walk, 20 * S);
+    assert_eq!(outcome(&walk), Some(Outcome::Skipped));
+    assert_eq!(notes, [HOW_YOU_SOUND_SKIPPED, skill::PREFERENCES_DONE]);
+}
+
+/// The walk on the shipped order, past touch: "how you sound" is its last
+/// step, taught as shipped.
+fn shipped_last(store: &Store) -> Onboarding {
+    let mut walk = store.teaching(S);
+    walk.definition =
+        Arc::new(skill::parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap());
+    assert_eq!(walk.definition.order.last(), Some(&Step::HowYouSound));
+    walk.finish(Step::Touch, Outcome::Done, None, S);
+    walk.drain_storage_for_test(S);
+    walk.owed = None;
+    walk.owed_after = None;
+    walk
+}
+
+/// lamp-52e6, 9 Nov: a walk ending on "how you sound" done says its line,
+/// then the walk's closing, with the owner's name when it knows it.
+#[test]
+fn a_walk_ending_on_how_you_sound_done_says_the_closing_after_its_line() {
+    for (owner, closing) in [
+        (None, skill::PREFERENCES_DONE.to_owned()),
+        (
+            Some("Walter"),
+            in_language::with_name(skill::PREFERENCES_DONE, Some("Walter")),
+        ),
+    ] {
+        let store = Store::new(None);
+        let mut walk = shipped_last(&store);
+        walk.desired.owner = owner.map(str::to_owned);
+        assert_eq!(call(&mut walk, 10 * S, 22.4, 1)["accepted"], true);
+        let mut notes = settle(&mut walk, 20 * S);
+        notes.extend(settle(&mut walk, 30 * S));
+        assert_eq!(outcome(&walk), Some(Outcome::Done));
+        assert_eq!(notes, [NEAR_DONE.to_owned(), closing], "{owner:?}");
+    }
+}
+
+/// The Reviewer-lead on #5809: with "how you sound" not available, the
+/// walk's last offered step is touch, and its end says the closing.
+#[test]
+fn a_walk_without_how_you_sound_ends_with_the_closing_after_touch() {
+    let store = Store::new(None);
+    let mut walk = store.teaching(S);
+    walk.definition =
+        Arc::new(skill::parse(include_str!("../../../../skills/onboarding/skill.toml")).unwrap());
+    walk.set_near_available(false);
+    walk.desired.owner = Some("Walter".into());
+    walk.finish(Step::Touch, Outcome::Done, None, S);
+    walk.drain_storage_for_test(S);
+    let mut notes = settle(&mut walk, 10 * S);
+    notes.extend(settle(&mut walk, 20 * S));
+    assert_eq!(
+        notes.last().map(String::as_str),
+        Some(in_language::with_name(skill::PREFERENCES_DONE, Some("Walter")).as_str()),
+        "{notes:?}"
+    );
+    assert_eq!(
+        notes
+            .iter()
+            .filter(|note| note.contains("All done"))
+            .count(),
+        1,
+        "{notes:?}"
+    );
+}
+
+/// lamp-52e6, 9 Nov, scene B (a): the lamp's own "Hey Lamp" heard 1.1 s
+/// after its prompt, at 0.96, with nobody speaking, is no call; a call
+/// begun past the echo tail, at 2.5 s, is judged on its score.
+#[test]
+fn a_name_heard_in_the_prompts_echo_tail_is_never_a_call() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play(&mut walk, 10 * S, 1_760_000_010_000, 1);
+    room(&mut walk, &prompt, 1_400, 22.0);
+    name(&mut walk, &prompt, 1_100, 0.96);
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], false, "{judged}");
+    let prompt = play(&mut walk, 30 * S, 1_760_000_030_000, 2);
+    room(&mut walk, &prompt, 2_800, 22.0);
+    name(&mut walk, &prompt, 2_500, 0.96);
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], true, "{judged}");
+}
+
+/// lamp-52e6, 9 Nov, scene B (b): the lamp's own "Hey Lamp" heard over its
+/// prompt, which played with a gap, is not a reason to play it again: the
+/// next prompt is the miss's, never the same one offered again.
+#[test]
+fn the_lamps_own_name_over_a_gapped_prompt_does_not_replay_it() {
+    let store = Store::new(None);
+    let mut walk = store.cycle(S);
+    let prompt = play_as(&mut walk, 10 * S, 1_760_000_010_000, 1, Delivery::Gapped);
+    room(&mut walk, &prompt, 7_000, 2.0);
+    over(&mut walk, &prompt, 300, 200, 0.997);
+    let judged = judge(&mut walk, &prompt);
+    assert_eq!(judged["accepted"], false, "{judged}");
+    assert!(judged.get("offered_again").is_none(), "{judged}");
+    assert_eq!(walk.kept().near_call_prompts, 1);
+    assert_eq!(next_words(&mut walk, 20 * S), NEAR_MISSED);
 }

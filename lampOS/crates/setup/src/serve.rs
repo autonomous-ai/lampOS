@@ -15,7 +15,7 @@ use std::{
     fmt,
     fs::{self, OpenOptions},
     io::{self, Write},
-    os::unix::fs::OpenOptionsExt,
+    os::unix::fs::{OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     sync::{Arc, Mutex, mpsc},
     thread,
@@ -63,6 +63,18 @@ fn default_own_keys() -> PathBuf {
 }
 fn default_control_dropin() -> PathBuf {
     crate::change::CONTROL_DROPIN.into()
+}
+fn default_agent_dropin() -> PathBuf {
+    crate::change::AGENT_DROPIN.into()
+}
+fn default_agent_group_file() -> PathBuf {
+    "/etc/group".into()
+}
+fn default_agent_folder() -> PathBuf {
+    lamp_msgs::local_agent::SOCKET_DIR.into()
+}
+fn default_monitor_dropin() -> PathBuf {
+    crate::change::MONITOR_DROPIN.into()
 }
 fn default_consent() -> PathBuf {
     lamp_msgs::consent::FOLDER.into()
@@ -143,6 +155,25 @@ pub struct Config {
     /// there, root's, 0644. The reset's plan removes it.
     #[serde(default = "default_control_dropin")]
     pub control_dropin: PathBuf,
+    /// lamp-control's second drop-in, the owner's local agent switch from the
+    /// app (`crate::change`): the user, group and folder of the agent's socket
+    /// while it is there, root's, 0644. The reset's plan removes it.
+    #[serde(default = "default_agent_dropin")]
+    pub agent_dropin: PathBuf,
+    /// Where the groups are read (`/etc/group`), and the agent's socket folder
+    /// (`/run/lampos-agent`, made by the tmpfiles line the installer writes):
+    /// the local agent is turned on only where both are there, since a unit
+    /// naming a group or a folder the lamp lacks does not start, and the
+    /// developer door with it. Read, never written.
+    #[serde(default = "default_agent_group_file")]
+    pub agent_group_file: PathBuf,
+    #[serde(default = "default_agent_folder")]
+    pub agent_folder: PathBuf,
+    /// lamp-peek's drop-in, the owner's dev monitor from the app
+    /// (`monitor.set`, `crate::change`, #5883): `LAMP_PEEK=monitor` while it
+    /// is there, root's, 0644. The reset's plan removes it.
+    #[serde(default = "default_monitor_dropin")]
+    pub monitor_dropin: PathBuf,
     /// The folder of the owner's face expressions and room sounds yeses
     /// (`lamp_msgs::consent::FOLDER`, 0750 `root:lampos`), written from the
     /// app's `consent.set` (`crate::change`, #5500) and by the voice's
@@ -170,7 +201,7 @@ pub struct Config {
 }
 
 /// The configuration's fields, as [`read`] knows them.
-pub const FIELDS: [&str; 24] = [
+pub const FIELDS: [&str; 28] = [
     "listen",
     "marker",
     "credential",
@@ -190,6 +221,10 @@ pub const FIELDS: [&str; 24] = [
     "language",
     "own_keys",
     "control_dropin",
+    "agent_dropin",
+    "agent_group_file",
+    "agent_folder",
+    "monitor_dropin",
     "consent",
     "web_start",
     "web_stop",
@@ -228,6 +263,10 @@ impl Config {
             &self.language,
             &self.own_keys,
             &self.control_dropin,
+            &self.agent_dropin,
+            &self.agent_group_file,
+            &self.agent_folder,
+            &self.monitor_dropin,
             &self.consent,
         ] {
             if !path.is_absolute() {
@@ -698,6 +737,16 @@ pub trait Save {
     /// just before the marker: best effort, it never fails setup. Nothing
     /// by default: only [`Files`] sets it, and [`NetworkOnly`] never does.
     fn first_volume(&mut self) {}
+    /// The first update after this setup (#6284, `LAMP_FIRST_UPDATE=on`),
+    /// just before the marker: best effort, it never fails setup. Nothing
+    /// by default: only [`Files`] writes it, and [`NetworkOnly`] never does.
+    fn first_update(&mut self) {}
+    /// Just after the marker: the parts `lampos.target` wants and does not
+    /// run, started ([`crate::parts`]), so a part skipped at boot before the
+    /// marker was there does not wait for the next reboot. Best effort, it
+    /// never fails setup. Nothing by default: only [`Files`] starts them,
+    /// and [`NetworkOnly`] never does.
+    fn start_parts(&mut self) {}
     /// Whether a person's own keys are taken (#2094, `LAMP_OWN_KEYS=on`).
     /// Off by default: nothing is checked, kept or said.
     fn own_keys_on(&self) -> bool {
@@ -794,7 +843,11 @@ fn stage_private(path: &Path, bytes: &[u8]) -> io::Result<PathBuf> {
     stage(path, bytes, 0o600)
 }
 
-/// `bytes` in a new temporary file beside `path` with `mode`, synced.
+/// `bytes` in a new temporary file beside `path` with `mode`, synced. The mode
+/// is set on the open file itself, after the open: `open(.., mode)` is cut by
+/// the process's umask, so a helper run by hand under `umask 077` wrote a 0644
+/// drop-in 0600 (the lead's run on lamp-75c9, 13 Nov), where the unit's 0022
+/// gave 0644. A file's mode is the one asked for, whatever the umask.
 pub(crate) fn stage(path: &Path, bytes: &[u8], mode: u32) -> io::Result<PathBuf> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
@@ -806,7 +859,11 @@ pub(crate) fn stage(path: &Path, bytes: &[u8], mode: u32) -> io::Result<PathBuf>
         .create_new(true)
         .mode(mode)
         .open(&temporary)?;
-    if let Err(why) = file.write_all(bytes).and_then(|()| file.sync_all()) {
+    if let Err(why) = file
+        .set_permissions(fs::Permissions::from_mode(mode))
+        .and_then(|()| file.write_all(bytes))
+        .and_then(|()| file.sync_all())
+    {
         let _ = fs::remove_file(&temporary);
         return Err(why);
     }
@@ -904,6 +961,18 @@ impl Files<'_> {
         let temporary = stage(&self.0.control_dropin, bytes, 0o644)?;
         put_in_place(&temporary, &self.0.control_dropin)
     }
+
+    /// lamp-control's second drop-in (the local agent switch), as the first.
+    pub fn agent_dropin(&mut self, bytes: &[u8]) -> io::Result<()> {
+        let temporary = stage(&self.0.agent_dropin, bytes, 0o644)?;
+        put_in_place(&temporary, &self.0.agent_dropin)
+    }
+
+    /// lamp-peek's drop-in (`monitor.set`, #5883), as lamp-control's.
+    pub fn monitor_dropin(&mut self, bytes: &[u8]) -> io::Result<()> {
+        let temporary = stage(&self.0.monitor_dropin, bytes, 0o644)?;
+        put_in_place(&temporary, &self.0.monitor_dropin)
+    }
 }
 
 impl Save for Files<'_> {
@@ -994,6 +1063,28 @@ impl Save for Files<'_> {
                 eprintln!("lamp-setup: {line}");
             });
         }
+    }
+    fn first_update(&mut self) {
+        use crate::first_update;
+        if first_update::on(std::env::var(first_update::ENVIRONMENT).ok().as_deref()) {
+            let path = first_update::beside(&self.0.marker);
+            match first_update::write(&path, SystemTime::now()) {
+                Ok(()) => eprintln!(
+                    "lamp-setup: the first update is owed: {} written",
+                    path.display()
+                ),
+                Err(error) => eprintln!(
+                    "lamp-setup: the first update's file was not written ({error}): the lamp starts without it"
+                ),
+            }
+        }
+    }
+    fn start_parts(&mut self) {
+        crate::parts::start(
+            crate::reset::query::read,
+            crate::reset::run_within,
+            |line| eprintln!("lamp-setup: {line}"),
+        );
     }
     fn own_keys_on(&self) -> bool {
         crate::keys::on(std::env::var(crate::keys::ENVIRONMENT).ok().as_deref())
@@ -1177,7 +1268,12 @@ pub fn run(
             // The volume before the marker, which starts the voice, so its
             // first line is already at it (#5551).
             .map(|()| save.first_volume())
-            .and_then(|()| save.marker());
+            .map(|()| save.first_update())
+            .and_then(|()| save.marker())
+            // Just after the marker: what lampos.target wants and does not
+            // run, started, since the path's start of a target already
+            // active pulls nothing in again (crate::parts).
+            .map(|()| save.start_parts());
             if save.keeps_settings() {
                 let mut status = status.lock().unwrap();
                 status.share_reports = saved.is_ok() && reports_kept;
@@ -1310,6 +1406,49 @@ fn phones_within(command: &mut std::process::Command, within: Duration) -> Optio
 mod tests {
     use super::*;
     use std::{process::Command, time::Instant};
+
+    /// `stage` makes the mode it is asked for under any umask: 0644 under 077 (a helper run by hand as root), 0600 under 0, and
+    /// under the unit's 022. The umask belongs to the whole process, and a test that changes it makes the other tests' files and
+    /// folders wrong while it does (a first cut failed two reset tests that way), so the body runs in a child of this test binary
+    /// that runs this one test and nothing else.
+    #[test]
+    fn stage_sets_the_asked_mode_whatever_the_umask() {
+        const NAME: &str = "serve::tests::stage_sets_the_asked_mode_whatever_the_umask";
+        if std::env::var_os("LAMP_STAGE_MODE_CHILD").is_none() {
+            let me = std::env::current_exe().unwrap();
+            let out = Command::new(me)
+                .args(["--exact", NAME, "--test-threads=1", "--nocapture"])
+                .env("LAMP_STAGE_MODE_CHILD", "1")
+                .output()
+                .unwrap();
+            let said = String::from_utf8_lossy(&out.stdout).into_owned()
+                + &String::from_utf8_lossy(&out.stderr);
+            assert!(out.status.success(), "{said}");
+            assert!(said.contains("1 passed"), "the child ran the test: {said}");
+            return;
+        }
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir =
+            std::env::temp_dir().join(format!("lamp-setup-stage-mode-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        for (umask, mode) in [
+            (0o077, 0o644),
+            (0o022, 0o644),
+            (0o000, 0o600),
+            (0o077, 0o600),
+            (0o277, 0o640),
+        ] {
+            let before = rustix::process::umask(rustix::fs::Mode::from_raw_mode(umask));
+            let made = stage(&dir.join("sub").join("file"), b"x\n", mode);
+            rustix::process::umask(before);
+            let temporary = made.unwrap();
+            let got = fs::metadata(&temporary).unwrap().permissions().mode() & 0o777;
+            assert_eq!(got, mode, "umask {umask:o} asked {mode:o}");
+            assert_eq!(fs::read(&temporary).unwrap(), b"x\n");
+            fs::remove_file(&temporary).unwrap();
+        }
+        let _ = fs::remove_dir_all(&dir);
+    }
 
     const STATIONS: &str =
         "printf 'Station aa:bb (on wlan0)\\n\\trx: 1\\nStation cc:dd (on wlan0)\\n'";

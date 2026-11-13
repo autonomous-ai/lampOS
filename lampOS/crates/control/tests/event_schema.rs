@@ -179,7 +179,7 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         ("humans/faces/tracked", json!({"faces": []}), 17 * S),
         ("room/stood_up", json!({"side": "left"}), 18 * S),
         ("room/stood_up", json!({}), 18 * S),
-        ("name/heard", json!({}), 19 * S),
+        ("name/heard", json!({"score": 0.94, "ago_ms": 75}), 19 * S),
         (
             "ears/classes",
             json!({"scores": {"music": 0.9, "door": 0.7}}),
@@ -190,6 +190,16 @@ fn every_event_from_the_bus_validates_against_the_schema() {
         ("controls/gesture", json!({"gesture": "multi_tap"}), 21 * S),
         ("controls/gesture", json!({"gesture": "pet"}), 21 * S),
         ("controls/gesture", json!({"gesture": "long_press"}), 21 * S),
+        (
+            "controls/touch",
+            json!({"enabled": true, "source": "head", "gesture": "tap", "released_us": 1}),
+            21 * S,
+        ),
+        (
+            "controls/pet",
+            json!({"enabled": true, "session_id": "s", "contact_id": 5, "ended": false}),
+            21 * S,
+        ),
         ("voice/state", json!({"state": "listening"}), 22 * S),
         ("voice/state", json!({"state": "resting"}), 23 * S),
         ("lamp/pause", json!({"paused": true}), 24 * S),
@@ -411,4 +421,24 @@ fn get_body_and_volume_validate_against_the_schema() {
     let mut extra = body.clone();
     extra["joints"]["yaw"]["torque"] = json!(true);
     assert!(holds(&root, &state["body"], &extra, "body").is_err());
+}
+
+/// A microphone block's header and its end, as `lamp_control::microphone`
+/// sends them, are the schema's.
+#[test]
+fn a_microphone_blocks_header_and_its_end_are_the_schemas() {
+    let root = schema();
+    let event = &root["$defs"]["event"];
+    let check = |value: Value| holds(&root, event, &value, "event");
+    let header = json!({"ev": "microphone.audio", "sequence": 12, "lost": 0, "sample_rate": 16000,
+                        "channels": 1, "format": "s16le", "bytes": 640});
+    assert_eq!(check(header.clone()), Ok(()));
+    let mut no_lost = header;
+    no_lost.as_object_mut().unwrap().remove("lost");
+    assert!(check(no_lost).is_err());
+    assert_eq!(
+        check(json!({"ev": "microphone.ended", "why": lamp_control::microphone::NOT_SHARED})),
+        Ok(())
+    );
+    assert!(check(json!({"ev": "microphone.ended"})).is_err());
 }

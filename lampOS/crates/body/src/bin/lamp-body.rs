@@ -11,7 +11,7 @@ did, a head or base joint that a hand stops and still pushes a second later make
 and base let go (torque off on those three; the shoulder and the elbow keep holding, so a
 standing lamp stays up), held again 5 s later where they lie (an overload: all five, 120 s);
 a hand never ends the run, and a head roll or base found beyond 400 counts of home at start is
-taken hold of where it lies. With --overload release, any joint that\nreads a load of 800 of 1000 (80% of --force-limit for a joint held to one) for 1.5 s has\ntorque switched off on all five, so the lamp slumps; 120 s later each is held where it is\n(its goal, then torque on) and the head is brought home as --wake does; a shoulder left\nup over an elbow that fell is first lowered folded, and otherwise the arm waits where it\nslumped until the lamp is next asked to stand; a second time within ten\nminutes ends the run with torque off. With --rest-glance on, a lamp at rest takes what\nExpression asks of the head (50 counts of pitch, 25 of roll at most, never the base or the arm)\nand comes back to rest when it runs out. --pitch-window is this lamp's own window for the\nhead's pitch while it is beside the base (by default lamp-4ace's, 1740,2030): never under\nthe head's floor (1670), around --home's pitch, and inside the servo's own limits or it does\nnot start. With --look-at-name on, the lamp's name heard on the bus\n(name/heard) while it does not speak is taken as being spoken to for two seconds: it rises,\nlooks up and turns to a face at once; with nobody in view it glances a little to one side and\nthe other once it stands, and lets it go. At most once in ten seconds. Stops at the first surprise, holding\nwhere it is, then, as the old runtime did, lets go: torque off on all five. Ends on SIGINT or SIGTERM after easing back to where it started, still holding (one asked while a slumped lamp's shoulder is being lowered holds where it is instead, and the next start lowers it); with\n--let-go-at-stop on (the factory's, off unless given) a lamp that got down, its head home and\nits arm folded, is then let go, torque off on all five, so that it can be read at rest.\nThe mood socket takes datagrams of JSON: {\"mood\":\"resting|listening|thinking|speaking\",\"level\":0..255}.\nA lamp standing at its full height also makes a gesture asked for there: {\"gesture\":\"nod\"}\n(nod, headshake, greeting, laugh, shy, stretching); a folded one with --stand stands up for it\nfirst, unless paused, held by a hand or slumped, and the journal says why each was taken or dropped. With --moves, the moves in that folder\n(NAME.json, docs/body.md) are read at start and asked for by name the same way; one this body\ncannot play is refused with why, and a folder that cannot be read leaves the body's own.\nA skill sends its own move whole, {\"move\":{\"name\":...,\"step_ms\":...,\"frames\":[...]}}, held to the same\nbounds and played the same way; one it cannot play is dropped with why.\nWith --arbitration on (off unless given), a gesture or a move may also say who asks,\n\"source\" (free text) and \"priority\" (person, safety, conversation, skill or idle;\nconversation without one). One asked while another plays ends it if asked higher, easing\nout as a dropped gesture does, and is dropped otherwise (\"dropped: busy, conversation\");\na hand on the lamp drops any (\"dropped: held by a hand\"). Off, \"source\" and\n\"priority\" are read and not weighed, so a caller may always say them. Either way, a\nskill's or idle gesture playing ends, eased out, when a conversation begins or a hand holds the head;\nwith LAMP_GESTURE_PAUSE=on, listening only pauses it: it ends when the lamp answers or after 3 s, and\ngoes on where it was if the lamp rests again sooner. A gesture or move lamp-control sends with \"replace\":true\n(a paired computer's) ends a skill's or idle one playing, eased out, and plays after it; never while someone\nis talking with the lamp or over a gesture paused for that talk (\"dropped: the person is using the lamp\").\nWith --caller-caps on (off unless given; phase 0 of the lamp programming protocol, #3504), the kernel names\nwho sent each datagram, never the datagram: a gesture or a move is held to the most its systemd unit\nmay ask at, run as that unit's user (lamp-voice person; lamp-cloud and lamp-actions conversation;\nlamp-skills and lamp-control skill; lamp-addons and lamp-expression idle; root's other helpers what they\nask; anyone else idle), its source is that unit's name before what it said, and a cut is said once a\nminute per unit; the gaze socket takes a sight only from lamp-eyes, lamp-skills or root, and drops\nany other, said once a minute.\nWith --lease-socket (the product unit passes /run/lampos-body/lease.sock; #3504, phase 0), lamp-control may hold the body for a\nwhile so that the lamp's own life stands back: one holder at a time, lamp-control.service as lampos or root,\nnamed by the kernel; lines of JSON, {\"hold\":{\"for_ms\":1..30000}} or {\"let_go\":true}, each answered, and\na change said unasked: {\"lease\":\"held\"}, {\"lease\":\"suspended\",\"why\":\"conversation\"}, {\"lease\":\"lost\",\"why\":\nhand|slumped|private|paused|asleep|lapsed}, {\"lease\":\"free\"} or {\"lease\":\"refused\",\"why\":...}. While held, no shift at rest\nand nothing from Expression; a hold not renewed lapses, and its holder gone ends it. While held, the holder\nmay say where the head looks, {\"look\":{\"yaw\":Y,\"pitch\":P}} in degrees from the pose (or with \"from\":\"home\",\nfrom the found home, the pose's offset taken off, inside the body's own bounds) or {\"look\":\"ahead\"}, inside the reach from the pose,\nanswered once {\"look\":\"there\",...} or {\"look\":\"cut_short\",\"why\":...}; and {\"limp\":true} lets base yaw go\n(torque off, for a move recorded by hand) until {\"limp\":false} or any end of the hold takes it back where it lies, and the head goes back when the lease ends.\nWith LAMP_BODY_OWN_RANGES=on, each joint's own stored limits are read at start: a home, folded arm,\nstand or pitch window outside them does not start, and a head or base goal outside them (less 20)\nends the run; a joint storing 0..=4095 keeps its guard as before.\nWith LAMP_BODY_STRAIN_GUARD=on, a standing shoulder or elbow over --arm-strain-load (450) for\n--arm-strain-seconds (30) sits the lamp down, a joint 8 degrees warmer within 5 min while under 55 is\nsaid on the bus, and a second hot or strained sit-down within an hour seats it, its arm let go, until\na head pad or button is held a second, a self-test starts or it is started again; each joint's\nhighest load and temperature each day are kept in /var/lib/lampos-body/peaks/ for 30 days.\nWith LAMP_NIGHT_STAYS_FOLDED=on, while Expression says asleep (expression/state) and the lamp is folded,\nthe night's sleep is latched: the voice listening or thinking alone, or its name heard but not taken by Expression, leaves it folded;\na tap, a face, an answer or Expression waking stand it as ever, and the latch lets go once Expression has not said asleep for 120 s with the voice at rest.\n--hold-from FILE is for tests on a lamp only: while FILE's first word is held, the head's pitch is\ntaken as held by a hand (its goal kept where it is, torque and giving way untouched), and the\njournal says the hand is from a test input; free, another word or no file is no hand. No product unit passes it.\nAt power-up, with --wake on and --stand, the arm's force limit is --recover-force (--force-limit unless given) from before\nanything is taken hold of until the lamp is folded (register 48 starts from the servo's own limit after a power cut),\nits load stop --recover-load (the standing load unless given), its fold at --recover-speed (40) counts a second and\nits wake at the same when given (20 otherwise); a stop\ninside that recovery holds all five where they are, torque kept on, and the arm is let go for a hand only within 150\ncounts of folded (#5693).\nPrints one JSON report when it ends.\n";
+taken hold of where it lies. With --overload release, any joint that\nreads a load of 800 of 1000 (80% of --force-limit for a joint held to one) for 1.5 s has\ntorque switched off on all five, so the lamp slumps; 120 s later each is held where it is\n(its goal, then torque on) and the head is brought home as --wake does; a shoulder left\nup over an elbow that fell is first lowered folded, and otherwise the arm waits where it\nslumped until the lamp is next asked to stand; a second time within ten\nminutes ends the run with torque off. With --rest-glance on, a lamp at rest takes what\nExpression asks of the head (50 counts of pitch, 25 of roll at most, never the base or the arm)\nand comes back to rest when it runs out. --pitch-window is this lamp's own window for the\nhead's pitch while it is beside the base (by default lamp-4ace's, 1740,2030): never under\nthe head's floor (1670), around --home's pitch, and inside the servo's own limits or it does\nnot start. With --look-at-name on, the lamp's name heard on the bus\n(name/heard) while it does not speak is taken as being spoken to for two seconds: it rises,\nlooks up and turns to a face at once; with nobody in view it glances a little to one side and\nthe other once it stands, and lets it go. At most once in ten seconds; with\nLAMP_NAME_WORDLESS_BAR=on, only a hearing at 0.99 or more is a call. Stops at the first surprise, holding\nwhere it is, then, as the old runtime did, lets go: torque off on all five. Ends on SIGINT or SIGTERM after easing back to where it started, still holding (one asked while a slumped lamp's shoulder is being lowered holds where it is instead, and the next start lowers it); with\n--let-go-at-stop on (the factory's, off unless given) a lamp that got down, its head home and\nits arm folded, is then let go, torque off on all five, so that it can be read at rest.\nThe mood socket takes datagrams of JSON: {\"mood\":\"resting|listening|thinking|speaking\",\"level\":0..255}.\nA lamp standing at its full height also makes a gesture asked for there: {\"gesture\":\"nod\"}\n(nod, headshake, greeting, laugh, shy, stretching); a folded one with --stand stands up for it\nfirst, unless paused, held by a hand or slumped, and the journal says why each was taken or dropped. With --moves, the moves in that folder\n(NAME.json, docs/body.md) are read at start and asked for by name the same way; one this body\ncannot play is refused with why, and a folder that cannot be read leaves the body's own.\nA skill sends its own move whole, {\"move\":{\"name\":...,\"step_ms\":...,\"frames\":[...]}}, held to the same\nbounds and played the same way; one it cannot play is dropped with why.\nWith --arbitration on (off unless given), a gesture or a move may also say who asks,\n\"source\" (free text) and \"priority\" (person, safety, conversation, skill or idle;\nconversation without one). One asked while another plays ends it if asked higher, easing\nout as a dropped gesture does, and is dropped otherwise (\"dropped: busy, conversation\");\na hand on the lamp drops any (\"dropped: held by a hand\"). Off, \"source\" and\n\"priority\" are read and not weighed, so a caller may always say them. Either way, a\nskill's or idle gesture playing ends, eased out, when a conversation begins or a hand holds the head;\nwith LAMP_GESTURE_PAUSE=on, listening only pauses it: it ends when the lamp answers or after 3 s, and\ngoes on where it was if the lamp rests again sooner. A gesture or move lamp-control sends with \"replace\":true\n(a paired computer's) ends a skill's or idle one playing, eased out, and plays after it; never while someone\nis talking with the lamp or over a gesture paused for that talk (\"dropped: the person is using the lamp\").\nWith --caller-caps on (off unless given; phase 0 of the lamp programming protocol, #3504), the kernel names\nwho sent each datagram, never the datagram: a gesture or a move is held to the most its systemd unit\nmay ask at, run as that unit's user (lamp-voice person; lamp-cloud and lamp-actions conversation;\nlamp-skills and lamp-control skill; lamp-addons and lamp-expression idle; root's other helpers what they\nask; anyone else idle), its source is that unit's name before what it said, and a cut is said once a\nminute per unit; the gaze socket takes a sight only from lamp-eyes, lamp-skills or root, and drops\nany other, said once a minute.\nWith --lease-socket (the product unit passes /run/lampos-body/lease.sock; #3504, phase 0), lamp-control may hold the body for a\nwhile so that the lamp's own life stands back: one holder at a time, lamp-control.service as lampos or root,\nnamed by the kernel; lines of JSON, {\"hold\":{\"for_ms\":1..30000}} or {\"let_go\":true}, each answered, and\na change said unasked: {\"lease\":\"held\"}, {\"lease\":\"suspended\",\"why\":\"conversation\"}, {\"lease\":\"lost\",\"why\":\nhand|slumped|private|paused|asleep|lapsed}, {\"lease\":\"free\"} or {\"lease\":\"refused\",\"why\":...}. While held, no shift at rest\nand nothing from Expression; a hold not renewed lapses, and its holder gone ends it. While held, the holder\nmay say where the head looks, {\"look\":{\"yaw\":Y,\"pitch\":P}} in degrees from the pose (or with \"from\":\"home\",\nfrom the found home, the pose's offset taken off, inside the body's own bounds) or {\"look\":\"ahead\"}, inside the reach from the pose,\nanswered once {\"look\":\"there\",...} or {\"look\":\"cut_short\",\"why\":...}; and {\"limp\":true} lets base yaw go\n(torque off, for a move recorded by hand) until {\"limp\":false} or any end of the hold takes it back where it lies, and the head goes back when the lease ends.\nWith LAMP_BODY_OWN_RANGES=on, each joint's own stored limits are read at start: a home, folded arm,\nstand or pitch window outside them does not start, and a head or base goal outside them (less 20)\nends the run; a joint storing 0..=4095 keeps its guard as before.\nWith LAMP_BODY_STRAIN_GUARD=on, a standing shoulder or elbow over --arm-strain-load (450) for\n--arm-strain-seconds (30) sits the lamp down, a joint 8 degrees warmer within 5 min while under 55 is\nsaid on the bus, and a second hot or strained sit-down within an hour seats it, its arm let go, until\na head pad or button is held a second, a self-test starts or it is started again; each joint's\nhighest load and temperature each day are kept in /var/lib/lampos-body/peaks/ for 30 days.\nWith LAMP_NIGHT_STAYS_FOLDED=on, while Expression says asleep (expression/state) and the lamp is folded,\nthe night's sleep is latched: the voice listening or thinking alone, or its name heard but not taken by Expression, leaves it folded;\na tap, a face, an answer or Expression waking stand it as ever, and the latch lets go once Expression has not said asleep for 120 s with the voice at rest.\n--hold-from FILE is for tests on a lamp only: while FILE's first word is held, the head's pitch is\ntaken as held by a hand (its goal kept where it is, torque and giving way untouched), and the\njournal says the hand is from a test input; free, another word or no file is no hand. No product unit passes it.\nAt power-up, with --wake on and --stand, the arm's force limit is --recover-force (--force-limit unless given) from before\nanything is taken hold of until the lamp is folded (register 48 starts from the servo's own limit after a power cut),\nits load stop --recover-load (the standing load unless given), its fold at --recover-speed (40) counts a second and\nits wake at the same when given (20 otherwise); a stop\ninside that recovery holds all five where they are, torque kept on, and the arm is let go for a hand only within 150\ncounts of folded (#5693).\nPrints one JSON report when it ends.\n";
 
 #[derive(Debug)]
 struct Arguments {
@@ -62,6 +62,10 @@ struct Arguments {
     caller_caps: bool,
     /// `--lease-socket` (#3504, phase 0): where lamp-control holds the body.
     lease_socket: Option<PathBuf>,
+    /// `--lease-holder-uid N`: a caller running as this uid may also hold the
+    /// body by `--lease-socket`, whatever its unit. For the virtual lamp
+    /// (`lamp-sim`), where nothing runs under systemd; no product unit passes it.
+    lease_holder_uid: Option<u32>,
     /// `--hold-from FILE`: a hand on the head from a test input (#2668),
     /// for tests on a lamp only; no product unit passes it.
     hold_from: Option<PathBuf>,
@@ -215,6 +219,7 @@ fn parse_with(
     let mut arbitration = None;
     let mut caller_caps = None;
     let mut lease_socket = None;
+    let mut lease_holder_uid = None;
     let mut hold_from = None;
     while let Some(key) = args.next() {
         if key == "--help" {
@@ -259,6 +264,7 @@ fn parse_with(
                 || arbitration.is_some()
                 || caller_caps.is_some()
                 || lease_socket.is_some()
+                || lease_holder_uid.is_some()
                 || hold_from.is_some()
                 || args.next().is_some()
             {
@@ -517,6 +523,13 @@ fn parse_with(
             Some("--lease-socket") if lease_socket.is_none() => {
                 lease_socket = Some(PathBuf::from(value));
             }
+            Some("--lease-holder-uid") if lease_holder_uid.is_none() => {
+                // Not 0: root may hold already, and a uid of 0 here would read as a typo.
+                lease_holder_uid = match value.to_str().and_then(|text| text.parse::<u32>().ok()) {
+                    Some(uid) if uid != 0 => Some(uid),
+                    _ => return Err("--lease-holder-uid is a user id above 0"),
+                };
+            }
             Some("--arbitration") if arbitration.is_none() => {
                 arbitration = Some(match value.to_str() {
                     Some("on") => true,
@@ -721,10 +734,14 @@ fn parse_with(
         arbitration: arbitration.unwrap_or(false),
         caller_caps: caller_caps.unwrap_or(false),
         lease_socket,
+        lease_holder_uid,
         hold_from,
     };
     if result.limp && result.give_way.is_none() {
         return Err("--limp on needs --give-way return or stay");
+    }
+    if result.lease_holder_uid.is_some() && result.lease_socket.is_none() {
+        return Err("--lease-holder-uid needs --lease-socket");
     }
     if result.stand_roll.is_some() && result.standing.is_none() {
         return Err("--stand-roll needs --stand");
@@ -996,11 +1013,18 @@ fn slumped_now(glimpse: &lamp_body::body::Glimpse) -> bool {
 }
 
 /// Who may hold the body by `--lease-socket`: `lamp-control.service` run
-/// as `lampos`, or root, as the kernel names them (#3504, phase 0).
+/// as `lampos`, or root, as the kernel names them (#3504, phase 0); and,
+/// only when `--lease-holder-uid` is given (the virtual lamp), any caller
+/// running as `extra`.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
-fn holder_may(caller: Option<&lamp_ipc::caller::Caller>, lampos: Option<u32>) -> bool {
+fn holder_may(
+    caller: Option<&lamp_ipc::caller::Caller>,
+    lampos: Option<u32>,
+    extra: Option<u32>,
+) -> bool {
     caller.is_some_and(|caller| {
         caller.uid == 0
+            || Some(caller.uid) == extra
             || (Some(caller.uid) == lampos
                 && caller.unit.as_deref() == Some("lamp-control.service"))
     })
@@ -1029,6 +1053,13 @@ struct LeaseDoor {
     reach: lamp_body::lease::Reach,
     /// The holder's pose of the head's roll and the arm.
     posing: lamp_body::lease::Posing,
+    /// The newest face the eyes showed, for a look at it (kept while the
+    /// body is held too), and the gaze's measure of the picture (counts of
+    /// yaw and pitch from an edge to the middle); none until measured.
+    face: Option<lamp_body::lease::FaceSeen>,
+    picture: Option<[f32; 2]>,
+    /// Where the head looked at the last step, to tell when it is moving.
+    looked: Option<[f32; 2]>,
 }
 
 // Used by the Linux body and its Linux-only test.
@@ -1060,6 +1091,9 @@ impl LeaseDoor {
             lease: Default::default(),
             looking: Default::default(),
             posing: Default::default(),
+            face: None,
+            picture: None,
+            looked: None,
             limping: Default::default(),
             reach: lamp_body::lease::Reach {
                 yaw: 0.0,
@@ -1103,6 +1137,36 @@ impl LeaseDoor {
     /// Whether the holder has let the base go limp, while it holds the body.
     fn limp(&self, now: std::time::Instant) -> bool {
         self.lease.holds(now) && self.limping.on()
+    }
+
+    /// The eyes' newest word: a face seen is kept for a look at it, with
+    /// where the head looked when it was seen (`look`: yaw and pitch counts
+    /// from the pose's own direction, as the body applies them), nobody seen
+    /// clears it (it is not a face in view any more). A picture taken while
+    /// the head was moving (`look` changed since the last word) is not kept:
+    /// it shows the face from somewhere between.
+    fn sight(
+        &mut self,
+        seen: Option<lamp_body::gaze::Seen>,
+        look: [f32; 2],
+        now: std::time::Instant,
+    ) {
+        let still = self
+            .looked
+            .is_none_or(|before| (0..2).all(|axis| (look[axis] - before[axis]).abs() < 1.0));
+        self.looked = Some(look);
+        match seen {
+            Some(lamp_body::gaze::Seen { face: Some(sight) }) if still => {
+                self.face = Some(lamp_body::lease::FaceSeen {
+                    x: sight.x,
+                    y: sight.y,
+                    at: now,
+                    head: look,
+                });
+            }
+            Some(lamp_body::gaze::Seen { face: None }) => self.face = None,
+            _ => {}
+        }
     }
 
     fn aim(&self, now: std::time::Instant) -> Option<[f32; 2]> {
@@ -1154,9 +1218,27 @@ impl LeaseDoor {
                 && self.lease.holds(now)
                 && self.limping.on()
             {
-                let said = lamp_body::lease::Limping::look_refused();
+                let said = lamp_body::lease::Limping::look_refused(&line[..end]);
                 look_answered(&said);
                 out += &said;
+            } else if lamp_body::lease::Looking::is_face(&line[..end]) {
+                // A look at the face in view: one turn by the gaze's measure.
+                let held = self.lease.holds(now);
+                let answer = self.looking.ask_face(
+                    &line[..end],
+                    held,
+                    self.reach,
+                    now,
+                    self.face,
+                    self.picture,
+                );
+                if answer.is_none() {
+                    eprintln!("lamp-body: a holder's look at a face taken");
+                }
+                if let Some(said) = answer {
+                    look_answered(&said);
+                    out += &said;
+                }
             } else if lamp_body::lease::Looking::is_look(&line[..end]) {
                 let held = self.lease.holds(now);
                 let answer = self.looking.ask(&line[..end], held, self.reach, now);
@@ -1412,14 +1494,31 @@ impl Hush {
     }
 }
 
+/// `LAMP_BODY_APP_REACH=on` (`body::APP_REACH`).
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn app_reach_on() -> bool {
+    lamp_body::moves::app_reach_from(std::env::var(lamp_body::moves::APP_REACH).ok().as_deref())
+}
+
+/// The base's yaw reach a move is held to: `--reach`'s last number, the
+/// lamp's own; a body started without `--reach` keeps to what it did before
+/// moves were held to the reach: 150 counts.
+#[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
+fn moves_yaw_reach(reach: Option<[u16; 4]>) -> u16 {
+    reach.map_or(lamp_body::moves::YAW_REACH_DEFAULT, |reach| reach[3])
+}
+
 /// The moves in `--moves`, read once at start. A refused move and a folder
 /// that cannot be read are said, and the body runs with what it has.
 #[cfg_attr(not(any(target_os = "linux", test)), allow(dead_code))]
-fn moves_of(folder: Option<&std::path::Path>) -> lamp_body::moves::Loaded {
+fn moves_of(
+    folder: Option<&std::path::Path>,
+    reach: &lamp_body::moves::Reach,
+) -> lamp_body::moves::Loaded {
     let Some(folder) = folder else {
         return lamp_body::moves::Loaded::default();
     };
-    match lamp_body::moves::load(folder) {
+    match lamp_body::moves::load_reach(folder, reach) {
         Ok(loaded) => {
             for (path, why) in &loaded.refused {
                 eprintln!("lamp-body: move {} refused: {why}", path.display());
@@ -1563,7 +1662,28 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     };
     use std::{io::Write, os::unix::net::UnixDatagram};
 
-    let unplug = lamp_body::unplug::Adapter::from_environment()?;
+    // A kept unplug request holds the body here, up and with no actuator
+    // access, until a reboot clears it: exiting instead restart-looped it
+    // (#5777's P1). systemd hears it ready and alive, and why it is still.
+    let unplug = {
+        let notify = lamp_keeper::Notify::from_environment();
+        let mut said: Option<String> = None;
+        lamp_body::unplug::Adapter::held(|error| {
+            let why = error.to_string();
+            if said.as_deref() != Some(why.as_str()) {
+                eprintln!(
+                    "lamp-body: held, nothing moves: {why}; only a matching cancel before a failure, or a reboot, lets it start (unplug.md)"
+                );
+                notify.status(&format!("held, nothing moves: {why}"));
+                if said.is_none() {
+                    notify.ready();
+                }
+                said = Some(why);
+            }
+            notify.alive();
+            true
+        })?
+    };
     struct SignalMask(SigSet);
     impl Drop for SignalMask {
         fn drop(&mut self) {
@@ -1611,10 +1731,19 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 "lamp-body: the body may be held by lamp-control at {} (lampos {lampos:?})",
                 path.display()
             );
-            Some(LeaseDoor::bind(
+            let extra = arguments.lease_holder_uid;
+            if let Some(uid) = extra {
+                eprintln!("lamp-body: and by any caller running as uid {uid} (--lease-holder-uid)");
+            }
+            let mut door = LeaseDoor::bind(
                 path,
-                Box::new(move |caller| holder_may(caller, lampos)),
-            )?)
+                Box::new(move |caller| holder_may(caller, lampos, extra)),
+            )?;
+            door.picture = arguments
+                .gaze
+                .as_ref()
+                .map(|choice| choice.turn.map(f32::from));
+            Some(door)
         }
         None => None,
     };
@@ -1633,8 +1762,19 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     // The body's last step, for a holder's look to be there.
     let lease_seen = std::cell::Cell::new(None);
     let lease_aimed = std::cell::Cell::new(None);
+    // Where the head looks as the body applies it, to place a face seen.
+    let lease_looked = std::cell::Cell::new([0.0f32; 2]);
     let lease_posed = std::cell::Cell::new(None);
-    let moves = moves_of(arguments.moves.as_deref());
+    // What a move is held to as it is taken: the lamp's own yaw reach, or with
+    // `LAMP_BODY_APP_REACH` the most any lamp may be given (`Reach::ANY`),
+    // the body judging the move against the 90% of its own hardware as it
+    // begins (`body::app_reach_of`).
+    let moves_reach = if app_reach_on() {
+        lamp_body::moves::Reach::ANY
+    } else {
+        lamp_body::moves::Reach::today(moves_yaw_reach(arguments.reach))
+    };
+    let moves = moves_of(arguments.moves.as_deref(), &moves_reach);
     // `--hold-from` (#2668): a hand on the head from a test input, for
     // tests on a lamp only; what it says this step, for the journal.
     let mut hold = arguments
@@ -1713,7 +1853,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let woken = std::cell::Cell::new(false);
     let mut unknown_said = Hush::default();
     // A skill's move sent whole, played as a gesture (docs/body.md).
-    let mut moves_sent = lamp_body::moves::Sent::besides(&moves);
+    let mut moves_sent = lamp_body::moves::Sent::reach_besides(moves_reach, &moves);
     let mut datagram = vec![0u8; lamp_body::moves::MOST_DATAGRAM];
     // When a skill last said `reading` (`of_this_step`).
     let mut reading_at: Option<std::time::Instant> = None;
@@ -1860,6 +2000,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     })?;
     // The head's tilt, for a lamp that has stood up.
     let limits = Limits {
+        yaw_unset: arguments.reach.is_none(),
         stand_roll: arguments.stand_roll.map_or(folded.stand_roll, f32::from),
         head_stall_load: arguments.head_stall_load.unwrap_or(limits.head_stall_load),
         force: arguments.force_limit,
@@ -1886,8 +2027,14 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 .ok()
                 .as_deref(),
         ),
+        // The app's reach reads the servos' own ranges, so it turns them on.
         own_ranges: lamp_body::body::own_ranges_from(
             std::env::var(lamp_body::body::OWN_RANGES).ok().as_deref(),
+        ) || lamp_body::body::app_reach_from(
+            std::env::var(lamp_body::body::APP_REACH).ok().as_deref(),
+        ),
+        app_reach: lamp_body::body::app_reach_from(
+            std::env::var(lamp_body::body::APP_REACH).ok().as_deref(),
         ),
         strain_guard: lamp_body::body::strain_guard_from(
             std::env::var(lamp_body::body::STRAIN_GUARD).ok().as_deref(),
@@ -2024,6 +2171,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         // there, or stopped short, by where it was sent (lamp-75c9, 7 Nov).
         lease_seen.set(Some((glimpse.wanted, glimpse.positions)));
         lease_aimed.set(glimpse.look_aimed);
+        lease_looked.set(glimpse.look);
         lease_posed.set(Some(lamp_body::lease::PoseSeen {
             posed: match (glimpse.posed, glimpse.unposed) {
                 (Some(posed), None) => Ok(posed),
@@ -2404,10 +2552,22 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     });
     // The lamp's name, heard, if it is to turn to a call.
     let mut name = if arguments.look_at_name {
-        match lamp_bus::Bus::from_environment().and_then(|bus| lamp_body::name_in::NameIn::on(&bus))
+        // `LAMP_NAME_WORDLESS_BAR=on` (#5385): only a sure hearing.
+        let bar = lamp_body::name_in::bar_from(
+            std::env::var(lamp_body::name_in::WORDLESS_ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        );
+        match lamp_bus::Bus::from_environment()
+            .and_then(|bus| lamp_body::name_in::NameIn::on(&bus, bar))
         {
             Ok(name) => {
-                eprintln!("lamp-body: it turns to a call, from name/heard");
+                match bar {
+                    Some(bar) => eprintln!(
+                        "lamp-body: it turns to a call, from name/heard, heard at {bar} or more (LAMP_NAME_WORDLESS_BAR)"
+                    ),
+                    None => eprintln!("lamp-body: it turns to a call, from name/heard"),
+                }
                 Some(name)
             }
             Err(error) => {
@@ -2530,6 +2690,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                         asleep: asleep.get(),
                     };
                     let now = std::time::Instant::now();
+                    door.sight(asked.seen, lease_looked.get(), now);
                     door.looking.applied(lease_aimed.get());
                     if door.turn(around, now, lease_seen.get(), lease_posed.get()) {
                         lamp_body::body::Asked {
@@ -3357,9 +3518,17 @@ mod tests {
         ] {
             assert!(with(refused).is_err(), "{refused:?}");
         }
-        let unread = moves_of(Some(std::path::Path::new("/nonexistent/lamp-moves")));
+        let today = lamp_body::moves::Reach::today(250);
+        let unread = moves_of(
+            Some(std::path::Path::new("/nonexistent/lamp-moves")),
+            &today,
+        );
         assert!(unread.moves.is_empty());
-        assert!(moves_of(None).moves.is_empty());
+        assert!(moves_of(None, &today).moves.is_empty());
+        // A move is held to the lamp's own yaw reach: `--reach`'s last number,
+        // or the built-in clips' 150 without one.
+        assert_eq!(moves_yaw_reach(Some([150, 15, 1, 250])), 250);
+        assert_eq!(moves_yaw_reach(None), 150);
     }
 
     /// Turning to a call is on or off, and off unless given.
@@ -3592,6 +3761,7 @@ mod tests {
                     unit: unit.map(str::to_owned),
                 }),
                 lampos,
+                None,
             )
         };
         assert!(may(Some("lamp-control.service"), 990));
@@ -3599,15 +3769,69 @@ mod tests {
         assert!(!may(Some("lamp-control.service"), 1000));
         assert!(!may(Some("lamp-skills.service"), 990));
         assert!(!may(None, 990));
-        assert!(!holder_may(None, lampos));
+        assert!(!holder_may(None, lampos, None));
         assert!(!holder_may(
             Some(&Caller {
                 pid: 7,
                 uid: 990,
                 unit: Some("lamp-control.service".into())
             }),
+            None,
             None
         ));
+    }
+
+    /// `--lease-holder-uid N` lets a caller of that uid hold the body, whatever its unit,
+    /// and nobody else; without it nothing changes.
+    #[test]
+    fn a_lease_holder_uid_lets_in_that_uid_only() {
+        use lamp_ipc::caller::Caller;
+        let caller = |uid, unit: Option<&str>| Caller {
+            pid: 7,
+            uid,
+            unit: unit.map(str::to_owned),
+        };
+        let lampos = Some(990);
+        assert!(holder_may(Some(&caller(1000, None)), lampos, Some(1000)));
+        assert!(holder_may(
+            Some(&caller(1000, Some("x.service"))),
+            None,
+            Some(1000)
+        ));
+        assert!(!holder_may(Some(&caller(1001, None)), lampos, Some(1000)));
+        assert!(!holder_may(Some(&caller(1000, None)), lampos, None));
+        assert!(!holder_may(None, lampos, Some(1000)));
+    }
+
+    #[test]
+    fn the_lease_holder_uid_is_a_user_id_above_0_given_once_with_a_lease_socket() {
+        let with = |more: &[&'static str]| parse(args(&[&FULL[..], more].concat()));
+        let socket = &["--lease-socket", "/run/lampos-body/lease.sock"][..];
+        assert_eq!(with(socket).unwrap().unwrap().lease_holder_uid, None);
+        assert_eq!(
+            with(&[socket, &["--lease-holder-uid", "1000"][..]].concat())
+                .unwrap()
+                .unwrap()
+                .lease_holder_uid,
+            Some(1000)
+        );
+        for refused in [
+            &["--lease-holder-uid", "1000"][..],
+            &["--lease-socket", "/a", "--lease-holder-uid", "0"],
+            &["--lease-socket", "/a", "--lease-holder-uid", "x"],
+            &["--lease-socket", "/a", "--lease-holder-uid", "-1"],
+            &["--lease-socket", "/a", "--lease-holder-uid"],
+            &[
+                "--lease-socket",
+                "/a",
+                "--lease-holder-uid",
+                "5",
+                "--lease-holder-uid",
+                "6",
+            ],
+        ] {
+            assert!(with(refused).is_err(), "{refused:?}");
+        }
     }
 
     /// While its holder has the base limp, a look is refused, never a
@@ -3637,7 +3861,7 @@ mod tests {
             .write_all(b"{\"hold\":{\"for_ms\":5000}}\n{\"limp\":true}\n{\"look\":{\"yaw\":10,\"pitch\":0}}\n")
             .unwrap();
         assert!(door.turn(quiet, now, None, None));
-        assert_eq!(said(), "{\"lease\":\"held\"}\n");
+        assert_eq!(said(), "{\"lease\":\"held\",\"tags\":true}\n");
         assert_eq!(said(), "{\"limp\":\"on\"}\n");
         assert_eq!(
             said(),
@@ -3692,7 +3916,7 @@ mod tests {
         assert!(door.turn(quiet, now, None, None));
         line.clear();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         let aim = door.aim(now).unwrap();
         assert!(aim[0] == 0.0 && (aim[1] + 113.8).abs() < 0.1, "{aim:?}");
         let there = ([1678, 2060, 2012], [1680, 2060, 2012]);
@@ -3715,6 +3939,87 @@ mod tests {
 
     /// The door takes a holder's pose only while held, answers it once the
     /// arm is there, as the body kept it, and lets it go with the lease.
+    /// A look at a face over the real socket (row 34): one turn toward the
+    /// face the eyes last showed, by the gaze's measure; "no face in view"
+    /// before any is seen, and once the eyes say nobody is there.
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn the_lease_door_looks_once_at_the_face_the_eyes_last_showed() {
+        use lamp_body::gaze::{Seen, Sight};
+        use lamp_body::lease::{Around, Reach};
+        use std::io::{BufRead, BufReader, Write};
+        use std::os::unix::net::UnixStream;
+        let directory = std::env::temp_dir().join(format!("lamp-body-face-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("lease.sock");
+        let mut door = LeaseDoor::bind(&path, Box::new(|caller| caller.is_some())).unwrap();
+        door.reach = Reach {
+            yaw: 480.0,
+            up: 150.0,
+            down: 15.0,
+        };
+        door.picture = Some([342.0, 200.0]);
+        let quiet = Around::default();
+        let now = std::time::Instant::now();
+        let mut holder = UnixStream::connect(&path).unwrap();
+        let mut heard = BufReader::new(holder.try_clone().unwrap());
+        let mut said = || {
+            let mut line = String::new();
+            heard.read_line(&mut line).unwrap();
+            line
+        };
+        // Held, but no face seen yet: refused, nothing aimed.
+        holder
+            .write_all(b"{\"hold\":{\"for_ms\":5000}}\n{\"look\":\"face\"}\n")
+            .unwrap();
+        assert!(door.turn(quiet, now, None, None));
+        assert_eq!(said(), "{\"lease\":\"held\",\"tags\":true}\n");
+        assert_eq!(
+            said(),
+            "{\"look\":\"refused\",\"why\":\"no face in view\"}\n"
+        );
+        assert_eq!(door.aim(now), None);
+        // A face half across to the right: one turn of 171 counts of yaw.
+        let face = |x| {
+            Some(Seen {
+                face: Some(Sight {
+                    x,
+                    y: 0.0,
+                    size: 0.2,
+                    turned: 0.0,
+                }),
+            })
+        };
+        door.sight(face(0.5), [0.0; 2], now);
+        holder.write_all(b"{\"look\":\"face\"}\n").unwrap();
+        assert!(door.turn(quiet, now, None, None));
+        let aim = door.aim(now).unwrap();
+        assert!((aim[0] - 171.0).abs() < 0.6 && aim[1] == 0.0, "{aim:?}");
+        // Nobody there any more, and the eyes say so: a later look is refused.
+        door.looking.end("test");
+        door.sight(Some(Seen { face: None }), [0.0; 2], now);
+        holder.write_all(b"{\"look\":\"face\"}\n").unwrap();
+        door.turn(quiet, now, None, None);
+        assert!(said().contains("no face in view"));
+        // The head 20 degrees right when the picture was taken (the lamp's
+        // own gaze put it there before the lease): a face in the middle keeps
+        // it there; a picture taken while the head moved is not kept.
+        let twenty = 20.0 * lamp_body::lease::COUNTS_PER_DEGREE;
+        door.looking.end("test");
+        door.sight(face(0.0), [twenty, 0.0], now);
+        door.sight(face(0.0), [twenty, 0.0], now);
+        holder.write_all(b"{\"look\":\"face\"}\n").unwrap();
+        door.turn(quiet, now, None, None);
+        let aim = door.aim(now).unwrap();
+        assert!((aim[0] - twenty).abs() < 0.6, "{aim:?}");
+        door.looking.end("test");
+        door.sight(Some(Seen { face: None }), [twenty, 0.0], now);
+        door.sight(face(0.0), [twenty + 50.0, 0.0], now);
+        assert_eq!(door.face, None, "taken while the head moved: not kept");
+        let _ = std::fs::remove_dir_all(&directory);
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn the_lease_door_poses_its_holders_arm_and_says_when_it_is_there() {
@@ -3761,7 +4066,7 @@ mod tests {
         ));
         line.clear();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         assert_eq!(door.pose(now), Some([0.0, 30.0, 20.0]));
         for _ in 0..=THERE_STEPS {
             door.turn(
@@ -3805,7 +4110,7 @@ mod tests {
         holder.write_all(b"{\"hold\":{\"for_ms\":5000}}\n").unwrap();
         assert!(door.turn(quiet, now, None, None));
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         // A conversation suspends it, said unasked.
         let talking = Around {
             conversation: true,
@@ -3814,11 +4119,14 @@ mod tests {
         assert!(!door.turn(talking, now, None, None));
         line.clear();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"suspended\",\"why\":\"conversation\"}\n");
+        assert_eq!(
+            line,
+            "{\"lease\":\"suspended\",\"why\":\"conversation\",\"tags\":true}\n"
+        );
         assert!(door.turn(quiet, now, None, None));
         line.clear();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         // A second holder is refused while there is one.
         let other = UnixStream::connect(&path).unwrap();
         assert!(door.turn(quiet, now, None, None));
@@ -3987,7 +4295,7 @@ mod tests {
         let mut heard = BufReader::new(holder.try_clone().unwrap());
         let mut line = String::new();
         heard.read_line(&mut line).unwrap();
-        assert_eq!(line, "{\"lease\":\"held\"}\n");
+        assert_eq!(line, "{\"lease\":\"held\",\"tags\":true}\n");
         door.ended(Some("slumped"));
         line.clear();
         heard.read_line(&mut line).unwrap();
@@ -4167,6 +4475,131 @@ mod tests {
         assert_eq!(gaze.turn, [755, 555]);
         assert_eq!(gaze.reach, [480, 120], "the unit's own --gaze-reach");
         assert!(looked.unmeasured_gaze_socket.is_none());
+    }
+
+    /// The kept poses files (tests/fixtures/stores, #5759) whose names start
+    /// with `prefix`: what a lamp already holds, as its day's writer or a
+    /// person wrote it.
+    fn kept_poses_files(prefix: &str) -> Vec<(String, String)> {
+        let folder = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/stores");
+        let mut kept: Vec<(String, String)> = std::fs::read_dir(folder)
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .is_some_and(|name| name.starts_with(prefix))
+            })
+            .map(|path| {
+                let name = path.file_name().unwrap().to_string_lossy().into_owned();
+                (name, std::fs::read_to_string(&path).unwrap())
+            })
+            .collect();
+        kept.sort();
+        kept
+    }
+
+    /// `BODY_POSES` as systemd's `EnvironmentFile=` gives it: the one line,
+    /// its double quotes taken off.
+    fn poses_of(lamp_env: &str) -> &str {
+        lamp_env
+            .lines()
+            .find_map(|line| line.strip_prefix("BODY_POSES=\"")?.strip_suffix('"'))
+            .expect("a kept poses file has BODY_POSES")
+    }
+
+    /// `unit`'s `ExecStart` with `poses` for `$BODY_POSES`, split on
+    /// whitespace as systemd splits it unquoted, read as the body reads it.
+    fn started_by(unit: &str, poses: &str) -> Result<Option<Arguments>, &'static str> {
+        let exec = unit
+            .lines()
+            .find_map(|line| line.strip_prefix("ExecStart="))
+            .expect("the unit has an ExecStart");
+        let words: Vec<String> = exec
+            .split_whitespace()
+            .skip(1)
+            .flat_map(|word| match word {
+                "$BODY_EXTRA" => Vec::new(),
+                "$BODY_POSES" => poses.split_whitespace().map(str::to_owned).collect(),
+                "%H" | "@UNIT_ID@" => vec!["lamp-a63e".to_owned()],
+                "@SERVO_DEVICE@" => vec!["/dev/ttyACM0".to_owned()],
+                "@MOTOR_LOCK_DIR@" => vec!["/var/lib/lampos-locks/motor".to_owned()],
+                word => vec![word.to_owned()],
+            })
+            .collect();
+        parse_with(words.iter().map(OsString::from), Some(poses))
+    }
+
+    /// Each later build's body must start on every poses file a lamp holds,
+    /// or every lamp holding that shape stops moving after the update: the
+    /// product's `lamp.env` from the product unit, and the generic
+    /// package's seated `measured.env` from its own unit (#2163).
+    #[test]
+    fn the_body_starts_on_every_kept_poses_file() {
+        const PRODUCT: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/product/lamp-body.service"
+        ));
+        const GENERIC: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../deploy/units/lamp-body.service"
+        ));
+        let lamp_envs = kept_poses_files("lamp-env-");
+        let measured = kept_poses_files("measured-env-");
+        assert!(
+            lamp_envs.len() >= 4 && !measured.is_empty(),
+            "{lamp_envs:?} {measured:?}"
+        );
+        for (unit, kept) in [(PRODUCT, lamp_envs), (GENERIC, measured)] {
+            for (name, text) in kept {
+                let poses = poses_of(&text);
+                let read = started_by(unit, poses)
+                    .unwrap_or_else(|why| panic!("{name}: {why}"))
+                    .unwrap_or_else(|| panic!("{name}: read as help"));
+                // Written out by hand, not read back through the parser's own
+                // helpers: a reader that changes what a kept number means fails.
+                let (home, stand, pitch_window, gaze) = match name.as_str() {
+                    "lamp-env-06c1-by-hand-2026-10-16" => (
+                        [1772, 2057, 2034],
+                        Some(([2050, 2059], [1772, 2057, 2034, 2657, 2602])),
+                        (1670, 1995),
+                        Some([782, 557]),
+                    ),
+                    "lamp-env-fc4b-factory-2026-10-30" => (
+                        [1817, 2085, 2028],
+                        Some(([2048, 1946], [1772, 2085, 2028, 2621, 2558])),
+                        (1740, 2030),
+                        Some([755, 555]),
+                    ),
+                    "lamp-env-standing-2026-11-09" => (
+                        [1772, 2057, 2034],
+                        Some(([2050, 2059], [1772, 2057, 2034, 2657, 2602])),
+                        (1740, 2030),
+                        None,
+                    ),
+                    "lamp-env-stood-swept-2026-11-09" => (
+                        [1772, 2057, 2034],
+                        Some(([2050, 2059], [1772, 2057, 2034, 2633, 2603])),
+                        (1740, 2030),
+                        None,
+                    ),
+                    "measured-env-seated-2026-11-09" => {
+                        ([1772, 2057, 2034], None, (1740, 2030), None)
+                    }
+                    _ => panic!("{name}: a kept poses file with no numbers pinned here"),
+                };
+                assert_eq!(read.home, Some(home), "{name}");
+                assert_eq!(
+                    read.standing
+                        .map(|standing| (standing.folded, standing.pose)),
+                    stand,
+                    "{name}"
+                );
+                assert_eq!(read.pitch_window, Some(pitch_window), "{name}");
+                assert_eq!(read.gaze.map(|gaze| gaze.turn), gaze, "{name}");
+                assert!(read.torque_on, "{name}");
+            }
+        }
     }
 
     #[test]

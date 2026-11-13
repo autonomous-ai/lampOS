@@ -1074,13 +1074,15 @@ pub fn install(skills: &Path, state: Option<&Path>, from: &Path) -> Result<Strin
     )
 }
 
-/// A skill made on this lamp by voice (`lamp_voice::made_skill`, #1685),
-/// put on at its person's spoken yes, which is bound to its package's
-/// SHA-256 (the lead, 20 Oct 08:37 on #1711): the voice asks with that hash
-/// alone. The package is the one the voice's made-skills folder `made`
-/// names with that hash in its index; its bytes are read once and hashed,
-/// and those same bytes are then read as a package, so what goes on is what
-/// the person said yes to. Its `skill.toml` is held again to a made skill's
+/// A skill made on this lamp by voice or in the app
+/// (`lamp_voice::made_skill`, #1685), put on as soon as the voice kept and
+/// checked it, with no spoken yes (the owner, 10 Nov: a made skill goes on
+/// with no spoken yes; the app's MAKE IT and the voice ask are the ask, #5977),
+/// bound to its package's SHA-256: the voice asks with that hash alone.
+/// The package is the one the voice's made-skills folder `made` names with
+/// that hash in its index; its bytes are read once and hashed, and those
+/// same bytes are then read as a package, so what goes on is what was
+/// kept and checked. Its `skill.toml` is held again to a made skill's
 /// cap (`lamp_voice::made_skill::capped`: light, body, two topics), or a
 /// skill written in the app's (`lamp_voice::made_skill::written_capped`:
 /// one function whose answer is the person's instructions), and its
@@ -1099,12 +1101,13 @@ pub fn install_made(
     install_made_at(skills, state, made, sha256, wait, now_unix_ms)
 }
 
-/// [`install_made`] at `now_unix_ms`: only the made skill the lamp asked
-/// about last, within `lamp_voice::made_skill::PUT_ON_WITHIN` and not yet
-/// on, as the voice's own `put_on` (the first builder on #2602, 22 Oct
-/// 10:1x). A kept SHA-256 asked for later, or one not asked about at all,
-/// puts nothing on, whoever asks. The time is the helper's, never the
-/// asker's.
+/// [`install_made`] at `now_unix_ms`: only a made skill the voice marked
+/// to go on (`lamp_voice::made_skill::goes_on`, its narrow "put on as made"
+/// entry, written right before it asks) within
+/// `lamp_voice::made_skill::GOES_ON_WITHIN` and not yet on (the first
+/// builder on #2602, 22 Oct 10:1x, kept for the mark). A kept SHA-256 asked
+/// for later, or one never marked, puts nothing on, whoever asks. The time
+/// is the helper's, never the asker's.
 pub fn install_made_at(
     skills: &Path,
     state: Option<&Path>,
@@ -1134,12 +1137,10 @@ pub fn install_made_at(
     else {
         return Err("not installed: no made skill is kept with that SHA-256".into());
     };
-    if lamp_voice::made_skill::waiting(made, now_unix_ms).map(|(_, asked)| asked)
-        != Some(sha256.to_owned())
-    {
+    if lamp_voice::made_skill::going_on(made, sha256, now_unix_ms).is_none() {
         return Err(format!(
-            "not installed: the lamp didn't ask about that made skill last, within {} s",
-            lamp_voice::made_skill::PUT_ON_WITHIN.as_secs()
+            "not installed: the lamp didn't mark that made skill to go on, within {} s",
+            lamp_voice::made_skill::GOES_ON_WITHIN.as_secs()
         ));
     }
     let path = made.join(file);
@@ -1176,9 +1177,20 @@ pub fn install_made_at(
     // one to its own (`put_on_cap`).
     let added = added_from_file(&card("SKILL.md"));
     if added {
-        lamp_voice::made_skill::capped_added(&card("skill.toml"))
+        lamp_voice::made_skill::capped_added(&card("skill.toml")).map(|_| ())
     } else {
-        lamp_voice::made_skill::put_on_cap(&card("skill.toml"))
+        // Its code too, as it was taken (#6307): its count, sizes and
+        // endings, and its task step's file among them.
+        lamp_voice::made_skill::put_on_cap(&card("skill.toml")).and_then(|(_, uses)| {
+            lamp_voice::made_skill::put_on_scripts(
+                &card("skill.toml"),
+                &uses,
+                package
+                    .files
+                    .iter()
+                    .map(|(path, bytes)| (path.as_str(), bytes.as_slice())),
+            )
+        })
     }
     .map_err(|refused| format!("not installed: {}", refused.0))?;
     if !made_here(&card("SKILL.md")) {
@@ -1192,8 +1204,8 @@ pub fn install_made_at(
         return Err(format!("not installed: {name:?} is not a skill's name"));
     }
     let _held = locked_within(skills, wait)?;
-    // A person's yes to their own made skill never takes the place of a
-    // skill they put on another way (Guard mode, Look for my keys, one from
+    // A person's own made skill never takes the place of a skill they put
+    // on another way (Guard mode, Look for my keys, one from
     // a store) without a word (the reviewer's P3 on #2414): only one made
     // here is replaced, and the one in the way is named.
     let there = skills.join(&name);
@@ -1213,7 +1225,7 @@ pub fn install_made_at(
     }
     let swept = swept(skills);
     let files = std::mem::take(&mut package.files);
-    // What binds these bytes is the person's yes, by their SHA-256, not a
+    // What binds these bytes is their SHA-256, kept and checked here, not a
     // signature (the reviewer's P3 on #2414).
     put_in(
         skills,
@@ -1228,10 +1240,7 @@ pub fn install_made_at(
     .map(|said| {
         said.replace(
             NO_SIGNATURE,
-            &format!(
-                "bound to the person's yes by its SHA-256, {}",
-                &sha256[..12]
-            ),
+            &format!("made here and bound by its SHA-256, {}", &sha256[..12]),
         )
     })
 }
@@ -1355,7 +1364,20 @@ pub fn grants_asked(skill: &Skill) -> Vec<(&'static str, &'static str)> {
     ]
     .into_iter()
     .filter_map(|(asked, grant)| asked.then_some(grant))
-    .collect()
+    // A `do.task`'s script's grants (#6305): a computer pushes one only
+    // with every grant its script would reach.
+    .chain(skill.grants.iter().filter_map(|grant| {
+        Some((
+            lamp_voice::skill_task_yes::grant_named(grant)?,
+            lamp_voice::skill_task_yes::grant_words(grant)?,
+        ))
+    }))
+    .fold(Vec::new(), |mut asked, grant| {
+        if !asked.iter().any(|(name, _)| *name == grant.0) {
+            asked.push(grant);
+        }
+        asked
+    })
 }
 
 /// The pushed skill of `push`'s one push in flight, put into the developer
@@ -1529,6 +1551,18 @@ pub fn install_pushed_at(
     })();
     let _ = fs::remove_dir_all(&checking);
     let skill = checked?;
+    // A linked service's grant is a skill run's alone, from the owner's yes
+    // to a Store or made skill: a paired computer is never given one, so it
+    // never pushes one (#6432).
+    if let Some(grant) = skill
+        .grants
+        .iter()
+        .find(|grant| lamp_voice::made_skill::service_grant(grant).is_some())
+    {
+        return Err(format!(
+            "not installed: it asks {grant}, a linked service's grant (a skill run's alone), which this computer was not granted"
+        ));
+    }
     let asks = grants_asked(&skill);
     if let Some(shown) = &kept.asks
         && !shown
@@ -1916,9 +1950,12 @@ pub struct Pushes<'a> {
 /// Which part asked the manage helper, by its unit ([`asker_of`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Asker {
-    /// `lamp-cloud` (the owner's app) or the voice: the Store's requests,
-    /// made skills and the app's off and on.
+    /// `lamp-cloud` (the owner's app): the Store's requests and the app's
+    /// off and on.
     App,
+    /// The voice: what `App` asks, and made skills. The person's yes to a
+    /// skill's task (#6305) is recorded by lamp-control, never here.
+    Voice,
     /// `lamp-control`, a paired computer's door: the pushed requests only.
     Control,
     /// Any peer, with [`ANY_ASKER`] on, as in the tests.
@@ -2132,13 +2169,14 @@ fn pushed_request(
                 return Err(format!("{name:?} is not a skill's name"));
             }
             match pushed_from(&pushes.dev.join(name)) {
-                Some(from) if from.client == asker => taken_off(pushes.dev, None, name, Some(wait))
-                    .map(|left| {
+                Some(from) if from.client == asker => {
+                    taken_off(pushes.dev, None, name, Some(wait), Some(&asker)).map(|left| {
                         if let Some(left) = left {
                             eprintln!("lamp-skills: asked: removed {name}, but {left}");
                         }
                         serde_json::Value::from(removed_said(name))
-                    }),
+                    })
+                }
                 Some(_) => Err("not removed: another computer pushed that skill".into()),
                 None => Err(format!("no skill {name} pushed from this computer")),
             }
@@ -2400,7 +2438,7 @@ fn moved_in(
 /// first ([`super::CAMERA_FILE`]), so a skill put on again by that name
 /// asks again.
 pub fn remove(skills: &Path, state: Option<&Path>, name: &str) -> Result<String, String> {
-    match taken_off(skills, state, name, None)? {
+    match taken_off(skills, state, name, None, None)? {
         None => Ok(removed_said(name)),
         Some(left) => Err(format!("removed {name}, but {left}")),
     }
@@ -2469,10 +2507,10 @@ pub fn cannot_turn_off(name: &str, permissions: &super::Permissions) -> Option<S
 /// a `[stop]`'s off and on keep it: in `state`'s [`super::OFF_FILE`],
 /// written whole by the same writer ([`super::keep_names`]), which the
 /// running program reads again within 2 s and at a start, and which a
-/// round never touches. A core skill shipped off is turned on in its own
-/// `skill.toml`, as by hand, and kept in [`super::ON_FILE`] so a round
-/// keeps it on (#2585); turned off again, its name leaves `on`, its file
-/// is off again, and it is in `off`. A skill that is part of the lamp
+/// round never touches. A core skill turned on is kept in
+/// [`super::ON_FILE`] so a round keeps it on (#2585, #5744), and one shipped
+/// off is turned on in its own `skill.toml`, as by hand; turned off
+/// again, its name leaves `on`, its file is off again, and it is in `off`. A skill that is part of the lamp
 /// itself is refused ([`cannot_turn_off`]), and so is one that does not
 /// load. The folder's lock is waited for at most `wait`.
 pub fn turn(
@@ -2523,10 +2561,13 @@ pub fn turn(
     if offs.remove(name) {
         super::keep_names(&off_file, &offs).map_err(|error| failed(&off_file, error))?;
     }
+    // Every turn-on of a core skill is the person's, kept in `on` even when
+    // its file is already on (the build shipped it on): a later build that
+    // ships it off must not take it back (#5744).
+    if skill.kind == SkillKind::Core && ons.insert(name.to_owned()) {
+        super::keep_names(&on_file, &ons).map_err(|error| failed(&on_file, error))?;
+    }
     if !skill.enabled {
-        if skill.kind == SkillKind::Core && ons.insert(name.to_owned()) {
-            super::keep_names(&on_file, &ons).map_err(|error| failed(&on_file, error))?;
-        }
         let text = fs::read_to_string(&toml).map_err(|error| failed(&toml, error))?;
         rewrite(lamp_update::product_skills::turned_on(&text))?;
     }
@@ -2570,6 +2611,7 @@ fn taken_off(
     state: Option<&Path>,
     name: &str,
     wait: Option<Duration>,
+    pushed_by: Option<&str>,
 ) -> Result<Option<String>, String> {
     if !skill_name_ok(name) {
         return Err(format!(
@@ -2594,6 +2636,17 @@ fn taken_off(
         None => locked(skills)?,
         Some(wait) => locked_within(skills, wait)?,
     };
+    // A computer's own remove: who pushed the folder is checked again under
+    // the lock, since the folder may have been replaced while this waited
+    // for it (the owner removed it, and another computer pushed the same
+    // name): never another computer's push (Second's P2 on #5819).
+    if let Some(asker) = pushed_by {
+        match pushed_from(&target) {
+            Some(from) if from.client == asker => {}
+            Some(_) => return Err("not removed: another computer pushed that skill".into()),
+            None => return Err(format!("no skill {name} pushed from this computer")),
+        }
+    }
     if kind_of(&target) == SkillKind::Core {
         return Err(format!(
             "{name} is a core skill: it comes with the lamp and can't be removed"
@@ -2609,6 +2662,18 @@ fn taken_off(
         let mut yes = super::read_names(&file).map_err(failed)?;
         if yes.remove(name) {
             super::keep_names(&file, &yes).map_err(failed)?;
+        }
+        // And the owner's yes to its task (#6305), likewise: lamp-control
+        // keeps it, so it is asked to take it back. lamp-control off or not
+        // reached removes the skill still (no task runs without it), and
+        // the journal says the yes may stay.
+        if let Err(why) = lamp_voice::skill_task_yes::forget_by(
+            Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
+            name,
+        ) {
+            eprintln!(
+                "lamp-skills: {name}: its task's yes, if any, was not taken back from lamp-control: {why}"
+            );
         }
     }
     // Gone at once for the running program, then deleted.
@@ -2880,14 +2945,14 @@ pub const MANAGE_SOCKET: &str = "/run/lampos-skills-manage/manage.sock";
 /// The units that may ask the manage helper, where the system's manager
 /// puts them (each one's `Slice=` in its product unit): `lamp-cloud`, for
 /// the app's remove and a Store install, and `lamp-voice`, for a made
-/// skill's spoken yes (#1685). Any other part in the group `lampos` may
+/// skill put on once kept (#1685). Any other part in the group `lampos` may
 /// connect, but is refused before its line is read (the reviewer's P3 on
 /// #2429), as the keys helper does (`lamp_setup::keys`, #2167).
-pub const ASKERS: [&str; 3] = [
-    APP_LINK,
-    "/lampos.slice/lampos-voice.slice/lamp-voice.service",
-    CONTROL,
-];
+pub const ASKERS: [&str; 3] = [APP_LINK, VOICE_LINK, CONTROL];
+/// `lamp-voice`, where the system's manager puts it: also the only peer
+/// whose requested-audio contexts and private audio ops lamp-skills' call
+/// socket takes (#6128, `watch::from_the_voice`).
+pub const VOICE_LINK: &str = "/lampos.slice/lampos-voice.slice/lamp-voice.service";
 /// `lamp-cloud`, the owner's app's link, where the system's manager puts
 /// it: also the only peer whose `guard.on` and `guard.off` lamp-skills'
 /// call socket takes (#2562, `watch::from_the_app`).
@@ -2905,12 +2970,15 @@ pub fn from_an_asker(cgroup: &str) -> bool {
 }
 
 /// Which of [`ASKERS`] `/proc/<pid>/cgroup`'s text puts the process in,
-/// if any: lamp-control's own requests are not the app's.
+/// if any: lamp-control's own requests are not the app's, and the voice's
+/// yes to a skill's task is the voice's alone.
 pub fn asker_of(cgroup: &str) -> Option<Asker> {
     if from_one_of(cgroup, &[CONTROL]) {
         Some(Asker::Control)
+    } else if from_one_of(cgroup, &[VOICE_LINK]) {
+        Some(Asker::Voice)
     } else {
-        from_one_of(cgroup, &ASKERS[..2]).then_some(Asker::App)
+        from_one_of(cgroup, &[APP_LINK]).then_some(Asker::App)
     }
 }
 
@@ -2977,8 +3045,77 @@ pub const ASKED_MOST: u64 = 4_096;
 /// What the manage helper says of a line that is no request.
 pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
     {\"install\": {\"url\": URL, \"sha256\": HASH, \"name\": NAME, \"version\": VERSION}}, all but url optional, \
-    {\"install_made\": SHA256}, {\"off\": NAME}, {\"on\": NAME}, {\"camera\": NAME}, {\"camera_off\": NAME} \
-    or {\"forget_counts\": {}}";
+    {\"install_made\": SHA256}, {\"off\": NAME}, {\"on\": NAME}, {\"camera\": NAME}, {\"camera_off\": NAME}, \
+    {\"task_asks\": NAME} or {\"forget_counts\": {}}";
+
+/// The folder of the skill `name`: the skills folder's, else, with `dev`,
+/// the developer folder's (pushed); and whether it is pushed.
+fn task_folder(skills: &Path, dev: Option<&Path>, name: &str) -> Option<(PathBuf, bool)> {
+    let here = skills.join(name);
+    if here.join("skill.toml").is_file() {
+        return Some((here, false));
+    }
+    let pushed = dev?.join(name);
+    pushed
+        .join("skill.toml")
+        .is_file()
+        .then_some((pushed, true))
+}
+
+/// The skill `name`'s `do.task` as the voice says it back (#6305,
+/// `{"task_asks": NAME}`): `{"name", "sha256", "grants", "task", "from",
+/// "package"}`, its folder hashed now ([`crate::task::folder_sha256`]),
+/// where its script came from and the SHA-256 of the package it went on as
+/// ([`installed_from`], null for none). Whether the owner agreed is lamp-control's to say,
+/// never this helper's (`lamp_voice::skill_task_yes::agreed_by`).
+/// `{"task": null}` for a skill with no `do.task`, or none of that name.
+/// Refused with the switch off, or for a skill that may not carry one
+/// ([`crate::task::origin_refuses`]).
+pub fn task_asks(
+    skills: &Path,
+    dev: Option<&Path>,
+    name: &str,
+) -> Result<serde_json::Value, String> {
+    if !crate::task::on() {
+        return Err(lamp_voice::skill_task_yes::OFF.to_owned());
+    }
+    if !skill_name_ok(name) {
+        return Err(NOT_A_NAME.to_owned());
+    }
+    let none = serde_json::json!({ "task": null });
+    let Some((folder, pushed)) = task_folder(skills, dev, name) else {
+        return Ok(none);
+    };
+    let skill = super::load(&folder).map_err(|why| format!("{name} does not load: {why}"))?;
+    let Some(step) = skill.task_step() else {
+        return Ok(none);
+    };
+    if let Some(why) = crate::task::origin_refuses(&folder, pushed) {
+        return Err(why);
+    }
+    let sha256 = crate::task::folder_sha256(&folder)?;
+    let from = if pushed {
+        // "your computer NAME", or "your computer" when no name came with
+        // the push: never "your computer a computer", which no read-back
+        // says word for word, so no first yes was taken (#6715).
+        match super::pushed_computer(&folder) {
+            Some(computer) => format!("your computer {computer}"),
+            None => "your computer".to_owned(),
+        }
+    } else if crate::task::made_with_code(&folder, pushed) {
+        crate::task::FROM_MADE.to_owned()
+    } else {
+        "the Skills Store".to_owned()
+    };
+    Ok(serde_json::json!({
+        "name": name,
+        "sha256": sha256,
+        "grants": skill.grants,
+        "task": step.task,
+        "from": from,
+        "package": installed_from(&folder).map(|installed| installed.sha256),
+    }))
+}
 
 /// One request to the manage helper, read from `input`, done in `skills`,
 /// and answered on `output` in one line: `{"done": WHAT}` or
@@ -2995,9 +3132,9 @@ pub const NOT_A_REQUEST: &str = "a request is one line, {\"remove\": NAME}, \
 ///   [`install_from_url`]: only
 ///   over https, only signed with the Store's key, never core.
 ///   Without a `store`, refused;
-/// - `{"install_made": SHA256}`, a skill made here by voice put on from the
-///   voice's made-skills folder `made`, at its person's spoken yes
-///   ([`install_made`]);
+/// - `{"install_made": SHA256}`, a skill made here put on from the
+///   voice's made-skills folder `made` as soon as the voice kept it and
+///   marked it to go on, with no spoken yes ([`install_made`]);
 /// - `{"off": NAME}` or `{"on": NAME}`, the app's off and on (#2815), kept
 ///   in `state` (the running program's `--state-dir`) by [`turn`]: a skill
 ///   that is part of the lamp itself is refused with why;
@@ -3045,13 +3182,22 @@ pub fn asked(
     let done: Result<serde_json::Value, String> = match pushed_asked {
         // Skills pushed from a computer (#3869), asked by lamp-control.
         Some((key, value)) => match pushes {
-            Some(pushes) if pushes.asker == Asker::App => Err(NOT_ITS_REQUEST.to_owned()),
+            Some(pushes) if matches!(pushes.asker, Asker::App | Asker::Voice) => {
+                Err(NOT_ITS_REQUEST.to_owned())
+            }
             Some(pushes) => pushed_request(skills, state, pushes, key, value, lock_wait),
             None => Err(PUSH_OFF.to_owned()),
         },
         None if pushes.is_some_and(|pushes| pushes.asker == Asker::Control) => {
             Err(NOT_ITS_REQUEST.to_owned())
         }
+        // A skill's task read back (#6305): what the voice says of it.
+        None if only("task_asks").is_some() => match only("task_asks") {
+            Some(serde_json::Value::String(name)) => {
+                task_asks(skills, pushes.map(|pushes| pushes.dev), name)
+            }
+            _ => Err(NOT_A_REQUEST.to_owned()),
+        },
         None => match (only("remove"), install) {
             _ if only("install_made").is_some() => match only("install_made") {
                 Some(serde_json::Value::String(sha256)) => {
@@ -3096,7 +3242,7 @@ pub fn asked(
             // Renamed aside is removed: where it was set aside, and why it
             // was not then deleted, go to the journal alone.
             (Some(serde_json::Value::String(name)), _) => {
-                taken_off(skills, Some(state), name, Some(lock_wait)).map(|left| {
+                taken_off(skills, Some(state), name, Some(lock_wait), None).map(|left| {
                     if let Some(left) = left {
                         eprintln!("lamp-skills: asked: removed {name}, but {left}");
                     }
@@ -3200,6 +3346,78 @@ pub fn list(skills: &Path) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A pushed folder named `name` in `dev`, said as pushed by `client`.
+    fn pushed_folder(dev: &Path, name: &str, client: &str) {
+        let folder = dev.join(name);
+        fs::create_dir_all(&folder).unwrap();
+        fs::write(folder.join("skill.toml"), "version = \"1.0.0\"\n").unwrap();
+        let from = PushedFrom {
+            computer: client.to_owned(),
+            client: client.to_owned(),
+            sha256: "0".repeat(64),
+            at_unix_ms: 1,
+            author: None,
+            author_fingerprint: None,
+        };
+        fs::write(
+            folder.join(crate::PUSHED_FROM),
+            serde_json::to_vec(&from).unwrap(),
+        )
+        .unwrap();
+    }
+
+    /// Second's P2 on #5819: a computer's remove checks who pushed the
+    /// folder under the lock, so a folder another computer pushed is never
+    /// taken off in its name.
+    #[test]
+    fn a_computers_remove_refuses_a_folder_another_computer_pushed() {
+        let dev = std::env::temp_dir().join(format!("remove-owner-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dev);
+        fs::create_dir_all(&dev).unwrap();
+        pushed_folder(&dev, "desk-wave", "c_b");
+        let refused = taken_off(&dev, None, "desk-wave", None, Some("c_a")).unwrap_err();
+        assert_eq!(refused, "not removed: another computer pushed that skill");
+        assert!(dev.join("desk-wave").exists());
+        let _ = fs::remove_dir_all(&dev);
+    }
+
+    /// The race itself: A's remove waits for the folder's lock; meanwhile,
+    /// under that lock, A's skill is replaced by B's of the same name. When
+    /// A's remove gets the lock it finds B's and leaves it.
+    #[test]
+    fn a_remove_waiting_for_the_lock_leaves_a_replacement_by_another_computer() {
+        let dev = std::env::temp_dir().join(format!("remove-race-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dev);
+        fs::create_dir_all(&dev).unwrap();
+        pushed_folder(&dev, "desk-wave", "c_a");
+        let held = locked(&dev).unwrap();
+        let waiting = {
+            let dev = dev.clone();
+            std::thread::spawn(move || {
+                taken_off(
+                    &dev,
+                    None,
+                    "desk-wave",
+                    Some(Duration::from_secs(5)),
+                    Some("c_a"),
+                )
+            })
+        };
+        std::thread::sleep(Duration::from_millis(200));
+        // Under the lock: A's taken off by the owner, B's put on.
+        fs::remove_dir_all(dev.join("desk-wave")).unwrap();
+        pushed_folder(&dev, "desk-wave", "c_b");
+        drop(held);
+        let answer = waiting.join().unwrap();
+        assert_eq!(
+            answer.unwrap_err(),
+            "not removed: another computer pushed that skill"
+        );
+        let still = pushed_from(&dev.join("desk-wave")).unwrap();
+        assert_eq!(still.client, "c_b");
+        let _ = fs::remove_dir_all(&dev);
+    }
 
     /// The person's no to reports: the manage helper deletes the skills'
     /// run totals and the voice's made-skill counts, and says so.

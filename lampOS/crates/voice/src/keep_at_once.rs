@@ -10,8 +10,11 @@
 //! With the switch on, on the second route, a spoken line that only asks to
 //! keep something ([`only_keeps`]: every sentence of it a plain ask to keep,
 //! `remember::asked::asks_to_keep`, or a word of thanks or a greeting, and
-//! no question or further ask in it) whose round 1 called `remember` alone,
-//! with no words of its own, is answered with [`KEPT`] as soon as every
+//! no question or further ask in it: no "?", no question word or shape in
+//! English or Vietnamese, [`asks_a_question`]) whose round 1 called
+//! `remember` alone, with no words of its own, and whose kept text holds
+//! every content word of the line ([`covers`], a "not" and a single letter
+//! among them), is answered with [`KEPT`] as soon as every
 //! call came back kept plainly ([`kept_plainly`]), and the turn ends there:
 //! no second round. Anything else goes on exactly as without the switch:
 //! a keep that failed, was refused, held for a yes, doubted, or told with a
@@ -22,8 +25,13 @@
 //! before the call as they always do: the line is said only of an answer
 //! the memory gave.
 //!
-//! In English only: with an owner's language chosen, such turns wait for
-//! the model's words as without the switch.
+//! With an owner's language chosen, [`KEPT`] is said in it
+//! (`language::FIXED_LINES`) only from its clip rendered ahead as the
+//! worker starts, as the wordless cut-in lines are; until that clip is
+//! kept, the turn waits for round 2 as without the switch. The ask to keep
+//! is still recognised by its English words only (`asks_to_keep`): a keep
+//! asked in another language goes to round 2 as without the switch;
+//! recognising it there is a follow-up.
 //!
 //! Off, nothing changes. On, a turn does a few word searches, no I/O.
 use serde_json::Value;
@@ -65,6 +73,60 @@ const ASKING: &[&str] = &[
     "look", "check", "find", "give", "read", "start", "stop", "search", "dim", "brighten",
 ];
 
+/// Words that ask a question wherever they stand in the line, heard with
+/// or without a "?" (speech to text often drops it): English and
+/// Vietnamese, accents kept as heard (Thirteen's P3 on #5565: "… in the
+/// drawer where are they" is a question made only of common words).
+const QUESTION_WORDS: &[&str] = &[
+    "what", "what's", "whats", "where", "where's", "wheres", "when", "when's", "whens", "who",
+    "who's", "whos", "whom", "whose", "why", "how", "how's", "hows", "which", "gì", "đâu", "nào",
+    "sao", "ai", "mấy", "hả", "nhỉ",
+];
+/// A question's opening shape: one of these followed by one of
+/// [`ASKED_OF`] ("… do you", "… is it", "… can you").
+const QUESTION_OPENS: &[&str] = &[
+    "do", "does", "did", "can", "could", "will", "would", "should", "is", "are", "was", "were",
+    "am",
+];
+const ASKED_OF: &[&str] = &["you", "i", "we", "they", "he", "she", "it", "there"];
+/// Vietnamese words that ask how long or how much after "bao" ("bao giờ",
+/// "bao nhiêu", "bao lâu").
+const BAO_ASKS: &[&str] = &["giờ", "nhiêu", "lâu"];
+/// Vietnamese particles that ask a yes or no when they end a sentence
+/// ("… phải không", "… chưa"); inside one they say "not" or "not yet".
+const ASKS_AT_THE_END: &[&str] = &["không", "chưa"];
+
+/// Words that say "not", kept as content by [`covers`] (Thirteen's P3 on
+/// #5565: "I don't like tea" kept "Likes tea." must not be confirmed). An
+/// "n't" ends a word too ([`not_in`]).
+const NOT_WORDS: &[&str] = &[
+    "not", "no", "never", "nor", "neither", "none", "nothing", "nobody", "nowhere", "cannot",
+    "dont", "doesnt", "didnt", "cant", "wont", "isnt", "arent", "wasnt", "werent", "hasnt",
+    "havent", "hadnt", "shouldnt", "wouldnt", "couldnt", "mustnt", "không", "chẳng", "chả", "chưa",
+    "đừng",
+];
+
+/// Whether `said` asks a question anywhere in it, with or without a "?":
+/// a question word ([`QUESTION_WORDS`], "bao giờ"), a question's opening
+/// shape ("do you", "is it"), or a Vietnamese "không" or "chưa" ending a
+/// sentence. Leans to "yes": a keep sent to round 2 only costs the round.
+pub fn asks_a_question(said: &str) -> bool {
+    let words = crate::known_faces::lower_words(said);
+    let asks = words
+        .iter()
+        .any(|word| QUESTION_WORDS.contains(&word.as_str()))
+        || words.windows(2).any(|pair| {
+            (QUESTION_OPENS.contains(&pair[0].as_str()) && ASKED_OF.contains(&pair[1].as_str()))
+                || (pair[0] == "bao" && BAO_ASKS.contains(&pair[1].as_str()))
+        });
+    asks || said
+        .split([
+            '.', '!', ';', ',', '\u{3002}', '\u{FF01}', '\u{FF1B}', '\u{FF0C}',
+        ])
+        .filter_map(|sentence| crate::known_faces::lower_words(sentence).pop())
+        .any(|last| ASKS_AT_THE_END.contains(&last.as_str()))
+}
+
 /// Whether the switch is on in this process.
 pub fn on() -> bool {
     std::env::var(ENVIRONMENT).ok().as_deref() == Some("on")
@@ -78,7 +140,10 @@ pub fn on() -> bool {
 /// keep sent to round 2 only costs the round.
 pub fn only_keeps(said: &str) -> bool {
     let said = said.replace('\u{2019}', "'").replace(" - ", ", ");
-    if said.contains(['?', '\u{FF1F}']) || !crate::remember::asked::asks_to_keep(&said) {
+    if said.contains(['?', '\u{FF1F}'])
+        || asks_a_question(&said)
+        || !crate::remember::asked::asks_to_keep(&said)
+    {
         return false;
     }
     let filler = |words: &[String]| words.iter().all(|word| FILLER.contains(&word.as_str()));
@@ -134,25 +199,58 @@ const LEAD_INS: &[&[&str]] = &[
 /// ("The user likes tea"), and "also" or "too".
 const KEEPS_NOTHING: &[&str] = &[
     "im", "ive", "ll", "ve", "re", "don", "myself", "user", "person", "also", "too", "an", "rằng",
-    "giúp",
+    "giúp", "i", "a",
 ];
+
+/// The contractions' tails taken off a word before it is compared: what
+/// they add is the person or the tense ("I'm", "I'd", "we'll"), or a
+/// possessive. An "n't" says "not" ([`not_in`]).
+const TAILS: &[&str] = &["'s", "'m", "'d", "'ll", "'ve", "'re"];
+
+/// A word that says "not" ([`NOT_WORDS`], or one ending "n't"): its stem
+/// as the word to compare ("don't" "do", "can't" and "cannot" "can",
+/// "won't" "will"), or the word itself when it has none.
+fn not_in(word: &str) -> Option<&str> {
+    let stem = match word.strip_suffix("n't") {
+        Some(stem) => stem,
+        None if word == "cannot" => "can",
+        None if NOT_WORDS.contains(&word) => match word.strip_suffix("nt") {
+            Some(stem) if word.len() > 3 => stem,
+            _ => word,
+        },
+        None => return None,
+    };
+    Some(match stem {
+        "ca" => "can",
+        "wo" => "will",
+        "sha" => "shall",
+        stem => stem,
+    })
+}
 
 /// A text's words as the coverage compares them ([`covers`]): lowercased
 /// and folded as the memory's search folds them (`remember::about_fold`:
 /// NFC, `đ` as `d`, no accents), split at anything not a letter or digit,
-/// a possessive's `'s` and a plural's `s` taken off (`remember::plural_off`),
-/// one letter alone dropped unless a digit.
+/// a contraction's tail ([`TAILS`]) and a plural's `s` taken off
+/// (`remember::plural_off`). A word that says "not" ([`not_in`]) gives its
+/// stem and "not", so "don't", "do not" and "doesn't" compare alike. One
+/// letter alone is a word ("blood type O", "row F"; Thirteen's P3 on #5565).
 fn compared(words: &[String]) -> Vec<String> {
     words
         .iter()
         .flat_map(|word| {
-            let word = word.strip_suffix("'s").unwrap_or(word);
+            let not = not_in(word);
+            let word = not.unwrap_or_else(|| {
+                TAILS
+                    .iter()
+                    .find_map(|tail| word.strip_suffix(tail))
+                    .unwrap_or(word)
+            });
             crate::remember::about_fold(word)
                 .split(|c: char| !c.is_alphanumeric())
-                .filter(|piece| {
-                    piece.chars().count() >= 2 || piece.chars().any(|c| c.is_ascii_digit())
-                })
+                .filter(|piece| !piece.is_empty())
                 .map(|piece| crate::remember::plural_off(piece).to_owned())
+                .chain(not.map(|_| "not".to_owned()))
                 .collect::<Vec<_>>()
         })
         .collect()
@@ -188,10 +286,17 @@ pub fn covers(said: &str, kept: &[&str]) -> bool {
         .iter()
         .flat_map(|text| compared(&crate::known_faces::lower_words(text)))
         .collect();
+    // A question word, an ask's verb and a "not" are content even where
+    // the memory's search counts them common: "… where are they", "… tell
+    // me about it" and "I don't like tea" each need the kept text to hold
+    // them (Thirteen's P3s on #5565).
     let nothing: Vec<String> = crate::remember::SEARCH_COMMON
         .iter()
         .chain(FILLER)
         .chain(KEEPS_NOTHING)
+        .filter(|word| {
+            !QUESTION_WORDS.contains(word) && !ASKING.contains(word) && !NOT_WORDS.contains(word)
+        })
         .map(|word| crate::remember::about_fold(word))
         .collect();
     let content: Vec<String> = compared(&heard)
@@ -202,8 +307,9 @@ pub fn covers(said: &str, kept: &[&str]) -> bool {
 }
 
 /// Whether one `remember` answer is a plain keep the lamp may confirm
-/// itself: kept, with nothing for the model to say (no note, no correction,
-/// nothing held, no error). A keep for them alone is plain unless the line
+/// itself: kept, with nothing for the model to say (no note, no correction
+/// or `replaced` one, whose round 2 says what changed, nothing held, no
+/// error; Thirteen's P3 on #5565). A keep for them alone is plain unless the line
 /// asked to keep it for everyone, which its round 2 must answer.
 pub fn kept_plainly(told: &Value, said: &str) -> bool {
     let Some(fields) = told.as_object() else {
@@ -221,7 +327,7 @@ pub fn kept_plainly(told: &Value, said: &str) -> bool {
         })
     };
     fields.keys().all(|key| match key.as_str() {
-        "remembered" | "id" | "replaced" => true,
+        "remembered" | "id" => true,
         "kept_for" => !for_everyone(),
         _ => false,
     })
@@ -279,7 +385,6 @@ mod tests {
         for told in [
             json!({"remembered": true}),
             json!({"remembered": true, "id": 4}),
-            json!({"remembered": true, "replaced": 3}),
             json!({"remembered": true, "kept_for": "Kept for them alone"}),
         ] {
             assert!(kept_plainly(&told, said), "{told}");
@@ -290,6 +395,8 @@ mod tests {
             json!({"remembered": true, "note": "Already kept: tell them you already knew it."}),
             json!({"remembered": true, "held": true}),
             json!({"remembered": true, "not_replaced": 3}),
+            // A correction (Thirteen's P3 on #5565): round 2 says what changed.
+            json!({"remembered": true, "replaced": 3}),
             json!({"ok": true}),
             json!("kept"),
         ] {
@@ -363,6 +470,90 @@ mod tests {
             "Remember that I like tea and my kids are Ann and Bob",
             &["Likes tea.", "Kids are Ann and Bob."]
         ));
+    }
+
+    #[test]
+    fn a_question_made_only_of_common_words_goes_to_round_2() {
+        // Thirteen's P3 on #5565 (and the Reviewer-lead's): heard with no
+        // "?", no comma and no joining word, each word of the ask common.
+        for said in [
+            "Remember my keys are in the drawer where are they",
+            "Remember that I like tea how about you",
+            "Remember that I like tea what about you",
+            "Remember that my dentist is on Tuesday is it",
+            "Remember that I like tea do you",
+            "Remember that I like tea can you",
+            "Remember that I like tea tell me about it",
+            "Remember that my dentist is on Tuesday who is it with",
+            "Remember that my dentist is on Tuesday when is that",
+            // Vietnamese: a question word, or a "không" / "chưa" that ends
+            // the line.
+            "Nhớ là chìa khóa ở trong ngăn kéo đâu rồi",
+            "Nhớ là mình thích trà còn bạn thích gì",
+            "Nhớ là mình thích trà bạn có biết không",
+            "Nhớ là lịch nha sĩ vào thứ ba phải không.",
+        ] {
+            // The Vietnamese lines are not read as an ask to keep yet
+            // (English ask words only): their question is caught on its own.
+            if said.starts_with("Nhớ") {
+                assert!(asks_a_question(said), "{said}");
+            }
+            for kept in [
+                "Keys are in the drawer.",
+                "Likes tea.",
+                "The user likes tea.",
+                "Their dentist is on Tuesday.",
+                "Chìa khóa ở trong ngăn kéo.",
+                "Thích trà.",
+                "Lịch nha sĩ vào thứ ba.",
+            ] {
+                assert!(!at_once(said, &[kept]), "{said} / {kept}");
+            }
+        }
+        // A question word anywhere asks: the line goes to round 2 even when
+        // the model kept it whole, and an ask's verb is content.
+        assert!(asks_a_question("Remember that I like tea how about you"));
+        assert!(asks_a_question("Nhớ là mình thích trà phải không"));
+        assert!(!asks_a_question("Remember that I like tea and coffee"));
+        assert!(!asks_a_question("Nhớ là mình không ăn cay nhé"));
+        assert!(!covers(
+            "Remember that I like tea tell me about it",
+            &["Likes tea."]
+        ));
+    }
+
+    #[test]
+    fn a_negation_or_a_letter_the_call_did_not_keep_goes_to_round_2() {
+        // Thirteen's P3 on #5565: "not" and a single letter are content.
+        for (said, kept) in [
+            ("Remember that I don't like tea", "Likes tea."),
+            ("Remember that I do not like tea", "Likes tea."),
+            ("Remember that I never drink coffee", "Drinks coffee."),
+            ("Remember that I dont eat pork", "Eats pork."),
+            ("Remember that I can't swim", "Can swim."),
+            ("Remember my blood type is O", "Blood type is A."),
+            ("Remember my blood type is O", "Blood type is B."),
+            ("Remember that my flat is 4B", "Flat is 4."),
+            ("Remember that my seat is row F", "Seat is row G."),
+        ] {
+            assert!(only_keeps(said), "{said}");
+            assert!(!covers(said, &[kept]), "{said} / {kept}");
+        }
+        // Kept with its negation or its letter, it stays fast.
+        for (said, kept) in [
+            ("Remember that I don't like tea", "Doesn't like tea."),
+            ("Remember that I don't like tea", "Does not like tea."),
+            ("Remember that I do not like tea", "Doesn't like tea."),
+            ("Remember that I can't swim", "Can't swim."),
+            ("Remember that I can't swim", "Cannot swim."),
+            ("Remember that I never drink coffee", "Never drinks coffee."),
+            ("Remember my blood type is O", "Blood type is O."),
+            ("Remember that my seat is row F", "Seat is row F."),
+            ("Remember that I'm vegan", "Is vegan."),
+            ("Remember that I'd like oat milk", "Would like oat milk."),
+        ] {
+            assert!(covers(said, &[kept]), "{said} / {kept}");
+        }
     }
 
     #[test]

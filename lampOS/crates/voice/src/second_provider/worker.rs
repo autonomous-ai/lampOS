@@ -33,6 +33,8 @@ use std::{
 mod carry_window;
 mod held_colleagues;
 #[cfg(test)]
+mod made_line;
+#[cfg(test)]
 mod memory_note_retries;
 
 /// The coordinator renews authority at least this often.
@@ -261,6 +263,11 @@ impl Gate {
             | ProviderInput::TurnOpened {
                 request,
                 privacy_generation,
+            }
+            | ProviderInput::WalkUnderWay {
+                request,
+                privacy_generation,
+                ..
             }
             | ProviderInput::WokenByName {
                 request,
@@ -1844,13 +1851,19 @@ async fn air_task(bus: lamp_bus::Bus, air: Arc<Mutex<crate::air_told::AirTold>>)
 /// Memory's forgets (`memory/forgot`, from the app or by voice) reach the
 /// conversation's thread and running summary
 /// ([`crate::conversation_summary::memory_forgot`]), looked at every half
-/// second, off any turn's path (the reviewer-lead's P2 on #4479).
-async fn forgot_task(mut forgot: crate::bus_out::ForgotIn) {
+/// second, off any turn's path (the reviewer-lead's P2 on #4479). With the
+/// summary off (`summary` false) they still drop a write waiting for its
+/// send (`conversation_summary::memory_forgot_waiting`, #5968).
+async fn forgot_task(mut forgot: crate::bus_out::ForgotIn, summary: bool) {
     let mut every = tokio::time::interval(Duration::from_millis(500));
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
         every.tick().await;
-        crate::conversation_summary::memory_forgot(&mut forgot, monotonic_us());
+        if summary {
+            crate::conversation_summary::memory_forgot(&mut forgot, monotonic_us());
+        } else {
+            crate::conversation_summary::memory_forgot_waiting(&mut forgot, monotonic_us());
+        }
     }
 }
 
@@ -2060,6 +2073,11 @@ pub fn serve(
     // A skill made by the lamp's own model asks this worker's chat.
     if files.tools.make_skill {
         crate::make_skill_local::set_config(config.clone());
+        // And, with `LAMP_MAKE_SKILL_AGENT`, a make it didn't make goes to
+        // the lamp's agent through this worker's tasks part.
+        if let Some(place) = &files.tools.tasks {
+            crate::make_skill_agent::set_tasks_dir(place.directory.clone());
+        }
     }
     if own_key_report(own_keys_on, config.hosted.own_deepseek.is_some()).is_some() {
         report_own_key(
@@ -2188,6 +2206,18 @@ pub fn serve(
         let (declared, searched) = (declared.clone(), searched.clone());
         move || chat_tools(&declared, &searched, false)
     });
+    // Functions offered only while they apply (#6218, off unless set).
+    let they_apply = std::env::var(WHILE_THEY_APPLY_ENVIRONMENT).ok().as_deref() == Some("on");
+    if they_apply {
+        eprintln!(
+            "lamp-voice second: setup's step is offered only while the walk is under way ({WHILE_THEY_APPLY_ENVIRONMENT})"
+        );
+    }
+    let declare = if they_apply {
+        while_they_apply(declare)
+    } else {
+        declare
+    };
     // Texts from the Autonomous app (#1673): a client of their own, on the
     // same model, beside the spoken turns.
     let texts = match (&files.bus_root, files.messages) {
@@ -2218,6 +2248,11 @@ pub fn serve(
     // A forget called unasked is held for their yes (`LAMP_FORGET_ASKED`):
     // the forget functions say so to spoken turns.
     let spoken_declare = with_held_forgets(spoken_declare);
+    let spoken_declare = if they_apply {
+        while_they_apply(spoken_declare)
+    } else {
+        spoken_declare
+    };
     // A few emotion tags, given to the voice only when it reads them
     // (ElevenLabs, with a model that reads them, the speech socket's too),
     // with `LAMP_SECOND_SPEECH_TAGS=on` (#2901).
@@ -2337,6 +2372,34 @@ pub fn serve(
         );
         crate::tools::schedule_asked::force()
     });
+    // A line that is only a plain question about the person's reminders must
+    // call list_reminders (`LAMP_REMINDERS_ASKED`).
+    let list = crate::tools::reminders_asked::on().then(|| {
+        eprintln!(
+            "lamp-voice second: a line that is only a plain question about the person's reminders must call {} in its first round ({})",
+            crate::tools::reminders_asked::LIST,
+            crate::tools::reminders_asked::ENVIRONMENT
+        );
+        crate::tools::reminders_asked::force()
+    });
+    let set = first_force(set, list);
+    // A line that is only a plain ask for a light scene or a light show, or
+    // only a plain question about the lamp itself, must call its skill
+    // (`LAMP_SKILL_ASKED`, #5744, #5745).
+    let skill = crate::tools::skill_asked::on().then(|| {
+        eprintln!(
+            "lamp-voice second: a line that plainly asks for a light scene or a light show, or plainly asks about the lamp itself, must call {}, {} or {} in its first round ({})",
+            crate::tools::skill_asked::SCENE,
+            crate::tools::skill_asked::SHOW,
+            crate::tools::skill_asked::HELP,
+            crate::tools::skill_asked::ENVIRONMENT
+        );
+        let offered: Option<crate::tools::skill_asked::Offered> = tools
+            .use_skill
+            .then(|| Arc::new(crate::tools::skill_asked::offered_now(tools.clone())) as _);
+        crate::tools::skill_asked::force(offered)
+    });
+    let set = first_force(set, skill);
     let net = match first_force(named, first_force(remember, first_force(keep, set))) {
         Some(force) => net.forcing(force),
         None => net,
@@ -2497,6 +2560,16 @@ pub fn serve(
             "lamp-voice second: a turn that is the known face's own person is told their name, as the Live route tells it (LAMP_SECOND_FACE_NAME)"
         );
     }
+    // With it, the eyes' faces in view, so a turn with a face at the lamp
+    // and nobody known is told so (#5750, "who is this?").
+    let nobody_known_bus = known_name
+        .then(|| {
+            files
+                .bus_root
+                .as_deref()
+                .and_then(|root| lamp_bus::Bus::new(root).ok())
+        })
+        .flatten();
     // The typed name, told only to the owner's line, with
     // LAMP_PERSON_NAME_OWNER_ONLY=on (#2602): out of the character, and
     // judged each turn on its own person and the faces in view. Keyed on
@@ -2568,6 +2641,11 @@ pub fn serve(
     // never by `LAMP_SERVICES`, which isn't in its environment.
     let services_on = tools.services.is_some();
     let services_folder = tools.services.clone();
+    // A made skill's sends told at the next heard line (#6066), with
+    // `LAMP_SKILL_WRITES=on` and the services' folder.
+    if let Some(folder) = services_folder.clone() {
+        crate::skill_writes_told::start(folder, std::path::Path::new(crate::made_skill::DIRECTORY));
+    }
     if services_on {
         if let Some(bus) = files
             .bus_root
@@ -2580,6 +2658,8 @@ pub fn serve(
     }
     let another_voice = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let another_voice_told = another_voice.clone();
+    // Whether anything tracks it: set where the one-face rule takes the flag.
+    let another_voice_tracked = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let no_owner = NoOwnerTold::default();
     let told_for = memory_context_carried(
         sessions,
@@ -2600,7 +2680,11 @@ pub fn serve(
             // or without `go_to_sleep`, how instead (#4595).
             let offered = crate::tools::skill_tools(&skills_told);
             let mut skills = if skills_told.use_skill {
-                crate::use_skill::section(crate::use_skill::offered(&offered))
+                crate::use_skill::section_told(
+                    crate::use_skill::offered(&offered),
+                    &crate::tools::core_skills(&skills_told),
+                    &crate::tools::skill_whens(&skills_told),
+                )
             } else {
                 String::new()
             };
@@ -2630,17 +2714,17 @@ pub fn serve(
                     // app is named from the next (Reviewer-three's P3 on
                     // #4476). The owner who_you_are kept is the other name
                     // they may go by, and a forget clears it at once.
-                    let owner = crate::person::by_default_owner(
-                        crate::person::now(),
-                        crate::known_faces::owner_now(),
-                    );
+                    let typed = crate::person::now();
+                    let from_setup = typed.is_some();
+                    let owner =
+                        crate::person::by_default_owner(typed, crate::known_faces::owner_now());
                     if let Some(line) = no_owner.line(owner.is_some()) {
                         eprintln!("{line}");
                     }
                     let (name, owners) = owner?;
-                    Some((name, owners, bus))
+                    Some((name, owners, bus, from_setup))
                 })
-                .map(|(name, owners, bus)| {
+                .map(|(name, owners, bus, from_setup)| {
                     let name = name.as_str();
                     let faces = bus
                         .as_ref()
@@ -2682,9 +2766,19 @@ pub fn serve(
                         }
                         None => {
                             // Said without the name, so a miss shows whether
-                            // the reply was told it (lamp-29e7, 29 Oct, #4118).
+                            // the reply was told it (lamp-29e7, 29 Oct, #4118),
+                            // and where it came from and why (B5186).
                             eprintln!(
-                                "lamp-voice second: the owner is named by default to this reply (LAMP_PERSON_NAME_BY_DEFAULT)"
+                                "lamp-voice second: the owner is named by default to this reply: {}, their name {} (LAMP_PERSON_NAME_BY_DEFAULT)",
+                                crate::person::named_by_default_because(
+                                    &owners,
+                                    known_now.as_deref()
+                                ),
+                                if from_setup {
+                                    "typed at setup"
+                                } else {
+                                    "kept with their face at who_you_are"
+                                }
                             );
                             format!("\n\n{}", crate::person::by_default(name))
                         }
@@ -2701,7 +2795,12 @@ pub fn serve(
                 // which #4090 and #4132 give the owner alone, through the
                 // typed name (the readers' HOLDs on #4158: a silent known
                 // guest's nod would name an off-camera caller's answer).
-                + &known_name_told(known_name, who.as_deref(), named.as_deref());
+                + &known_name_told(known_name, who.as_deref(), named.as_deref())
+                + &nobody_known_told(
+                    known_name,
+                    who.as_deref(),
+                    nobody_known_bus.as_ref().and_then(crate::known_faces::faces_in_view),
+                );
             // Beside the character, where the instruction had it: told after
             // the exchanges, the model used it for the owner a third as
             // often (EN, the #2602 probe).
@@ -2821,15 +2920,21 @@ pub fn serve(
             crate::services::Linked::new(folder)
         });
     let has_tasks = tools.tasks.is_some();
+    // The tasks part, for a heard plain no to a task read back (#6582).
+    let tasks_declined = tools.tasks.clone();
     // Whom a line's words ask by name, with `LAMP_TASKS_NAMED_ASK=on`: its
     // forced call goes to that one, and the journal says so (#1722).
     let named_ask = tools
         .tasks
         .clone()
         .filter(|_| crate::agent_tasks::named_ask_on());
-    // Made by the lamp's own model.
-    let making_skills = tools.make_skill;
+    // The agent a line's words name for the work, with the tasks part: a
+    // round 1 that hands nothing over is asked again once (#6547 (1b)).
+    let named_agent = tools.tasks.clone();
     let declines = tools.decline;
+    // A skill the heard words ask what it uses, by name, read back in code
+    // with the voice's own `make_skill` (V2 on #6413).
+    let reads_back_by_words = tools.make_skill;
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
     // (#1712).
@@ -2964,6 +3069,21 @@ pub fn serve(
     }
     if let Some(linked) = linked_told.clone() {
         engine = engine.telling_what_is_linked(linked_noting(linked));
+    }
+    // The owner's recent service records, told beside the owner's own line
+    // (`LAMP_SERVICE_RECORDS_TOLD=on`, with `LAMP_SERVICE_RECORDS=on`).
+    if crate::service_records::told::on() {
+        eprintln!(
+            "lamp-voice second: the owner's spoken line is told their recent service records, the status only when someone else may be here; no other line is (LAMP_SERVICE_RECORDS_TOLD)"
+        );
+        engine = engine.telling_service_records(records_noting());
+        // After a start the voice holds none: the owner's are asked of the
+        // memory now, beside the turns, so the first turn is told them.
+        for owner in crate::person::owner_ids() {
+            if let Some(person) = crate::service_records::told::person_for(&owner) {
+                crate::service_records::told::load_ahead(&person);
+            }
+        }
     }
     // What memory holds that may fit a spoken turn's words (#2176 row 5c,
     // `LAMP_SECOND_MEMORY_HITS=on`, Days only, on in the product since the
@@ -3132,6 +3252,17 @@ pub fn serve(
         HISTORY_KEEPS_CALLS.store(true, std::sync::atomic::Ordering::Release);
     }
     engine = engine.keeping_calls(keeps_calls);
+    // The exchanges a stored running note holds are told in it alone, not
+    // again as the thread's lines and history (#6218,
+    // `LAMP_HISTORY_AFTER_NOTE=on`).
+    if std::env::var(crate::second_provider::HISTORY_AFTER_NOTE_ENVIRONMENT)
+        .is_ok_and(|value| value == "on")
+    {
+        eprintln!(
+            "lamp-voice second: the exchanges a stored running note holds are told in it alone, not again as history (LAMP_HISTORY_AFTER_NOTE)"
+        );
+        HISTORY_AFTER_NOTE.store(true, std::sync::atomic::Ordering::Release);
+    }
     if std::env::var(crate::second_provider::CONVERSATION_CARRIES_ENVIRONMENT)
         .is_ok_and(|value| value == "on")
     {
@@ -3149,6 +3280,27 @@ pub fn serve(
                 "lamp-voice second: a carried line's keep waits for that person's yes, their face seen saying it (LAMP_CONVERSATION_CARRIED_SAVES)"
             );
             engine = engine.saving_carried(true);
+        }
+        // A line carried in full is read and kept as its person's, as a lone
+        // known face's line is, forgets refused (the memory owner's decision
+        // of 9 Nov): its keep written at once, not held for a yes.
+        if std::env::var(crate::second_provider::CONVERSATION_CARRIED_MEMORY_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a carried line is read and kept as that person's, a keep written at once; no forget, correction, rule or yes runs on it, never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
+            );
+            engine = engine.reading_carried(true);
+        }
+        // A 0-word line that cut a line their own face was seen saying
+        // answers its words in their scope (S1, 10 Nov rerun).
+        if std::env::var(crate::second_provider::HELD_WORDS_SEEN_ENVIRONMENT)
+            .is_ok_and(|value| value == "on")
+        {
+            eprintln!(
+                "lamp-voice second: a 0-word line answering words their own face was seen saying answers them in their scope (LAMP_HELD_WORDS_SEEN)"
+            );
+            engine = engine.answering_held_words_seen(true);
         }
     }
     // Where the eyes read speaking (`LAMP_EYES_SPEAKING=on`, #2377): a held
@@ -3480,29 +3632,38 @@ pub fn serve(
         }
         engine = engine.undoing_doubted_keeps(by_id);
     }
+    if reads_back_by_words {
+        engine = engine.reading_back_by_words(Arc::new(crate::make_skill_local::read_back_heard));
+    }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {
             crate::agent_tasks::named_ask(&place, words)
         }));
     }
-    // A hand-over waiting for its yes, with the tasks part (#1712).
-    // And a made skill waiting for its yes to be put on (`crate::made_skill`),
-    // or made and not yet asked about.
-    if has_tasks || making_skills {
-        engine = engine.noting_a_task_waiting(Arc::new(move |request| {
-            crate::agent_tasks::pending_note(request, Instant::now()).or_else(|| {
-                making_skills
-                    .then(|| {
-                        let now_unix_ms = SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map_or(0, |since| since.as_millis() as u64);
-                        let directory = std::path::Path::new(crate::made_skill::DIRECTORY);
-                        crate::made_skill::waiting_note(directory, now_unix_ms).or_else(|| {
-                            crate::make_skill_local::untold_note(directory, now_unix_ms)
-                        })
-                    })
-                    .flatten()
-            })
+    // With the setup walk: a line that spells the person's name while "who
+    // you are" is open is told the read-back to say, the name as a word
+    // (#5580 row 2). The walk's file is read only for such a line.
+    if crate::onboarding::file_from_environment().is_some() {
+        engine = engine.noting_a_spelled_name(Arc::new(crate::onboarding::spelled_name_note_now));
+    }
+    // A hand-over waiting for its yes, with the tasks part (#1712). A made
+    // skill waits for nothing: it goes on as soon as it is kept (the owner,
+    // 10 Nov), so it is never noted.
+    if has_tasks {
+        engine = engine.noting_a_task_waiting(Arc::new(move |request, words: &str| {
+            crate::agent_tasks::pending_note(request, words, Instant::now())
+        }));
+    }
+    // A heard plain no to a task read back drops it, in the tasks part too
+    // (#6582).
+    if let Some(place) = tasks_declined {
+        engine = engine.declining_a_task_waiting(Arc::new(move |request, words: &str| {
+            crate::agent_tasks::declined(&place, request, words)
+        }));
+    }
+    if let Some(place) = named_agent {
+        engine = engine.catching_named_agents(Arc::new(move |words: &str| {
+            crate::agent_tasks::named_for_work(&place, words)
         }));
     }
     // A look reads the eyes' look file with the Live route's bounds: a full
@@ -3623,18 +3784,18 @@ pub fn serve(
     }
     engine = engine.saying_at_once(say_at_once);
     // A line that only asks to keep something, kept plainly, answered at
-    // once with no second round (`LAMP_KEEP_ANSWERS_AT_ONCE=on`, C59). The
-    // line is English: with an owner's language chosen it waits as before.
-    let keep_with_call = crate::keep_at_once::on();
-    let keep_at_once = keep_with_call && language.is_none();
+    // once with no second round (`LAMP_KEEP_ANSWERS_AT_ONCE=on`, C59). In
+    // an owner's language, only from its clip rendered ahead in it.
+    let keep_at_once = crate::keep_at_once::on();
     if keep_at_once {
         eprintln!(
-            "lamp-voice second: a line that only asks to keep something, kept plainly, is answered at once with \"{}\" and no second round (LAMP_KEEP_ANSWERS_AT_ONCE)",
-            crate::keep_at_once::KEPT
-        );
-    } else if keep_with_call {
-        eprintln!(
-            "lamp-voice second: the keep's own line is English, and the owner's language is {language:?}; keep turns wait for the model's words as without LAMP_KEEP_ANSWERS_AT_ONCE"
+            "lamp-voice second: a line that only asks to keep something, kept plainly, is answered at once with \"{}\" and no second round (LAMP_KEEP_ANSWERS_AT_ONCE){}",
+            crate::language::fixed_in(language, crate::keep_at_once::KEPT),
+            if language.is_some() {
+                ", from its clip rendered ahead; until then round 2 answers"
+            } else {
+                ""
+            }
         );
     }
     engine = engine.keeping_at_once(keep_at_once);
@@ -3694,6 +3855,16 @@ pub fn serve(
         );
     }
     engine = engine.resuming_after_wordless_cut_ins(wordless_resumes);
+    // Each chat request of a cut-in's turn journals its prompt, the words
+    // people said among it: a debug switch for test lamps, never while
+    // private or muted (`LAMP_CUT_IN_PROMPT_LOG=on`, #6218).
+    let prompt_log = crate::cut_in_prompt_log::on();
+    if prompt_log {
+        eprintln!(
+            "lamp-voice second: each chat request of a turn begun over the lamp's answer journals each message's role and first 80 characters, the words people said among them; a debug switch for test lamps only, silent while private or muted (LAMP_CUT_IN_PROMPT_LOG)"
+        );
+    }
+    engine = engine.logging_cut_in_prompts(prompt_log);
     // An answer to the lamp's own question is never left in silence by an
     // empty reply: the lamp asks to hear it again, once
     // (`LAMP_ANSWER_ASK_AGAIN=on`, Queue #4710 item 3). It reads the
@@ -3708,6 +3879,19 @@ pub fn serve(
         );
     }
     engine = engine.asking_again_for_answers(answer_again);
+    // An ask cut short by a line let out whose answer only declines is
+    // answered in its place, never let go silently
+    // (`LAMP_CUT_ASK_ANSWERED=on`, #5961).
+    let cut_ask_answered = std::env::var(crate::second_provider::CUT_ASK_ANSWERED_ENVIRONMENT)
+        .ok()
+        .as_deref()
+        == Some("on");
+    if cut_ask_answered {
+        eprintln!(
+            "lamp-voice second: words cut short by a line let out are answered in its place when its answer only declines (LAMP_CUT_ASK_ANSWERED)"
+        );
+    }
+    engine = engine.answering_cut_words_a_decline_leaves(cut_ask_answered);
     // The lamp's own written turns, news above all, may begin later than a
     // spoken one (`LAMP_SECOND_WRITTEN_WAIT=on`; #1854's follow-up).
     let written_wait = std::env::var(crate::second_provider::WRITTEN_WAIT_ENVIRONMENT)
@@ -3721,6 +3905,19 @@ pub fn serve(
         );
     }
     engine = engine.waiting_for_written(written_wait);
+    // A lamp the backend places in mainland China waits longer for a first
+    // round (#6414); read once at the worker's start.
+    let in_china =
+        crate::second_provider::in_china(crate::second_provider::region_from_file().as_deref());
+    if in_china {
+        let (spoken, after_cue) = crate::second_provider::begin_limits(true);
+        eprintln!(
+            "lamp-voice second: region CN: a first round may begin as late as {} ms, {} ms after the wait's sound",
+            spoken.as_millis(),
+            after_cue.as_millis()
+        );
+    }
+    engine = engine.in_china(in_china);
     // A first round with no response head goes once more on a new connection
     // (`LAMP_SECOND_CHAT_SECOND_TRY=on`; #4710).
     let second_try = crate::second_provider::second_try_on(
@@ -3755,6 +3952,7 @@ pub fn serve(
                 .is_ok_and(|value| value == "on"),
             files.room_file.as_deref(),
             files.bus_root.as_deref(),
+            Some((another_voice_tracked.clone(), another_voice.clone())),
         ));
     }
     // The rule's own, for `voice/remarked` below (#4175).
@@ -3770,8 +3968,9 @@ pub fn serve(
             heeding.telling_another_voice(another_voice.clone());
         }
         // The connected services ask whose voice a line is in
-        // (`crate::services::VoiceAsk`): a send only in the voice that asked,
-        // a read in full only in the conversation's.
+        // (`crate::services::VoiceAsk`): a read in full only in the
+        // conversation's or the owner's enrolled one, and a send begun in
+        // the echo tail of the lamp's words only in the asker's.
         {
             let heeding = heeding.clone();
             crate::services::judging_voices(Arc::new(move |ask| {
@@ -4334,6 +4533,7 @@ pub fn serve(
                     eprintln!(
                         "lamp-voice second: a known person's keep on a line no face was seen speaking is theirs, its reads the room's, when their known face was the one face in view and no other voice was heard in the conversation (LAMP_PERSON_SCOPE_ONE_FACE)"
                     );
+                    another_voice_tracked.store(true, std::sync::atomic::Ordering::Release);
                     engine = engine.scoping_by_one_face(another_voice.clone());
                     // Read as theirs too, forgets refused (#5522).
                     if std::env::var(
@@ -4471,6 +4671,34 @@ pub fn serve(
                 );
             }
         }
+        // A line that was only the lamp's name, with no words back, is a
+        // call only on a sure hearing (`LAMP_NAME_WORDLESS_BAR`, #5385).
+        if crate::second_provider::wordless_call::on(
+            std::env::var(crate::second_provider::wordless_call::ENVIRONMENT)
+                .ok()
+                .as_deref(),
+        ) {
+            match files
+                .bus_root
+                .as_deref()
+                .map(crate::second_provider::wordless_call::Hearings::on)
+            {
+                Some(Ok(hearings)) => {
+                    eprintln!(
+                        "lamp-voice second: a line that is only the lamp's name, with no words back, is answered as a call only when lamp-name heard it at {} or more (LAMP_NAME_WORDLESS_BAR)",
+                        crate::second_provider::wordless_call::BAR
+                    );
+                    engine = engine
+                        .holding_a_wordless_call(Arc::new(move |window| hearings.best(window)));
+                }
+                Some(Err(why)) => eprintln!(
+                    "lamp-voice second: a wordless call is answered as before: lamp-name's hearings cannot be taken from the bus: {why} (LAMP_NAME_WORDLESS_BAR)"
+                ),
+                None => eprintln!(
+                    "lamp-voice second: a wordless call is answered as before: no bus to read lamp-name's hearings from (LAMP_NAME_WORDLESS_BAR)"
+                ),
+            }
+        }
         // In a busy room, a line going on waits for the Policy (#1522), as
         // on the Live route: with the rule and the bus.
         if files.going_on_asks
@@ -4531,6 +4759,10 @@ pub fn serve(
                 Arc::new(move || another.load(std::sync::atomic::Ordering::Acquire)),
             );
         }
+        // A carried line read as its person's only where the same-voice
+        // check runs (`LAMP_CONVERSATION_CARRIED_MEMORY`, Jarvis's P2 on
+        // #5842): without it no other voice could ever show.
+        engine = engine.reading_carried_where_heard(hears);
         remarked_by = Some(heeding.clone());
         // A line begun in a computer's turn is a call, as on the Live route.
         let opening = heeding.clone();
@@ -4626,16 +4858,17 @@ pub fn serve(
         );
         runtime.spawn(seems_task(bus, told));
     }
-    // Memory's forgets, with the running summary on and the bus: a forget
-    // from the app drops the conversation's notes as one by voice does.
-    if crate::conversation_summary::on()
-        && let Some(forgot) = files
-            .bus_root
-            .as_deref()
-            .and_then(|root| lamp_bus::Bus::new(root).ok())
-            .and_then(|bus| crate::bus_out::ForgotIn::on(&bus).ok())
+    // Memory's forgets, with the bus: with the running summary on, a forget
+    // from the app drops the conversation's notes as one by voice does; on
+    // or off, it drops a write waiting for its send (Reviewer-two's HOLD on
+    // #5968 at `8c1cbd4268`).
+    if let Some(forgot) = files
+        .bus_root
+        .as_deref()
+        .and_then(|root| lamp_bus::Bus::new(root).ok())
+        .and_then(|bus| crate::bus_out::ForgotIn::on(&bus).ok())
     {
-        runtime.spawn(forgot_task(forgot));
+        runtime.spawn(forgot_task(forgot, crate::conversation_summary::on()));
     }
     if let Some((chat, root)) = texts {
         let (character, tools) = texts_from;
@@ -5071,7 +5304,8 @@ async fn run_call(
         }
         return ToolAnswer::plain(search.answer(&call.name, &call.args).await);
     }
-    tokio::task::spawn_blocking(move || {
+    let made = call.name == crate::made_skill::MAKE;
+    let running = move || {
         use crate::tools::Route;
         let route = crate::tools::route(&settings, &call.name);
         // The Live route's line for a call the Policy held and then
@@ -5115,9 +5349,78 @@ async fn run_call(
                 scope.as_ref(),
             )),
         }
-    })
-    .await
-    .unwrap_or_else(|_| ToolAnswer::plain(crate::tools::unavailable()))
+    };
+    // A skill made by voice goes on to the end if a cut ends its turn, and
+    // its line is then said through the say service ([`made_running`]), at
+    // the product's socket: a worker is given no `LAMP_SAY_SOCKET`.
+    if made {
+        return made_running(request, running, |line| {
+            crate::app_make::say_line_at(Path::new(crate::say::DEFAULT_SOCKET), &line);
+        })
+        .await;
+    }
+    tokio::task::spawn_blocking(running)
+        .await
+        .unwrap_or_else(|_| ToolAnswer::plain(crate::tools::unavailable()))
+}
+
+/// A voice [`crate::made_skill::MAKE`] of `request`, `work`, run on the
+/// blocking pool: its answer given to its turn while the turn waits for
+/// it, nothing else said. The model of its next round says the line. A
+/// turn cut while the skill is made (lamp-9adf, 11 Nov 02:16 and 02:19:
+/// the lamp's own echo cut "I'll make it", the skill was made and put on,
+/// and the person never heard so) gives that round no answer: the make
+/// goes on, and its line ([`crate::make_skill_local::take_said_line`]) is
+/// given to `say` on a thread of its own, once. Under way, and until that
+/// line is said, the make is [`crate::make_skill_local::Pending`].
+fn made_running(
+    request: u64,
+    work: impl FnOnce() -> crate::tools::ToolAnswer + Send + 'static,
+    say: impl FnOnce(String) + Send + 'static,
+) -> impl std::future::Future<Output = crate::tools::ToolAnswer> {
+    let pending = crate::make_skill_local::Pending::begin();
+    let (given, answered) = tokio::sync::oneshot::channel();
+    // Held by the turn while it waits: gone once the turn is cut, so the
+    // make says no waiting line to nobody (`LAMP_MAKE_SKILL_AGENT`).
+    let turn = std::sync::Arc::new(());
+    let watched = std::sync::Arc::downgrade(&turn);
+    tokio::task::spawn_blocking(move || {
+        crate::make_skill_local::set_turn(watched);
+        // Nothing an earlier call left on this thread is taken as this one's.
+        let _ = crate::make_skill_local::take_said_line();
+        let answer = work();
+        let line = crate::make_skill_local::take_said_line();
+        if given.send(answer).is_ok() {
+            drop(pending);
+            return;
+        }
+        let Some(line) = line else {
+            eprintln!(
+                "lamp-voice second: request {request}: its turn was cut while make_skill ran, and nothing was made to say"
+            );
+            return;
+        };
+        eprintln!(
+            "lamp-voice second: request {request}: its turn was cut while make_skill ran: the made skill's line is said through the say service"
+        );
+        let saying = std::thread::Builder::new()
+            .name("lamp-voice-made-line".into())
+            .spawn(move || {
+                say(line);
+                drop(pending);
+            });
+        if saying.is_err() {
+            eprintln!(
+                "lamp-voice second: request {request}: the made skill's line couldn't be said: no thread"
+            );
+        }
+    });
+    async move {
+        let _turn = turn;
+        answered
+            .await
+            .unwrap_or_else(|_| crate::tools::ToolAnswer::plain(crate::tools::unavailable()))
+    }
 }
 
 /// The Policy's decisions for the lamp's actions on this route, when they
@@ -5170,6 +5473,70 @@ fn with_name_signal(
         declared.push(crate::attention::name_tool());
         declared
     })
+}
+
+/// The switch for functions offered only while they apply (#6218, the
+/// base request's PR 5): only the exact value `on`; off, every request is
+/// given what it was before.
+pub(crate) const WHILE_THEY_APPLY_ENVIRONMENT: &str = "LAMP_SECOND_WHILE_THEY_APPLY";
+
+/// `declare`'s functions, those that apply to nothing now left out
+/// ([`applying`]), read as each request is made.
+fn while_they_apply(
+    declare: crate::second_provider::net::Declare,
+) -> crate::second_provider::net::Declare {
+    Arc::new(move || applying(declare(), crate::onboarding::under_way_now()))
+}
+
+/// `tools` without `setup_step` unless the walk is under way (`walk`,
+/// [`crate::onboarding::under_way_now`], told to this worker with each turn):
+/// it reports the end of a step the walk leads, and outside the walk none
+/// is led, so it is 830 bytes of every request for nothing. `redo_setup`
+/// stays, to lead a step again; a late `setup_step` is routed by its name
+/// and answered by the walk's runner as before.
+pub(crate) fn applying(mut tools: Vec<lamp_gemini::Tool>, walk: bool) -> Vec<lamp_gemini::Tool> {
+    if !walk {
+        tools.retain(|tool| tool.name != crate::onboarding::STEP);
+    }
+    tools
+}
+
+#[cfg(test)]
+mod while_they_apply_tests {
+    use super::*;
+
+    fn names(tools: &[lamp_gemini::Tool]) -> Vec<String> {
+        tools.iter().map(|tool| tool.name.clone()).collect()
+    }
+
+    /// Outside the walk `setup_step` is left out and `redo_setup` stays;
+    /// while it is under way both are given, as with the switch off (#6218).
+    #[test]
+    fn setup_step_is_offered_only_while_the_walk_is_under_way() {
+        let mut declared = vec![lamp_gemini::Tool {
+            name: "light_on".into(),
+            description: "Turn the light on.".into(),
+            parameters: None,
+            silent: false,
+        }];
+        declared.extend(crate::onboarding::tools());
+        let all = names(&declared);
+        let source = declared.clone();
+        let declare = while_they_apply(Arc::new(move || source.clone()));
+        crate::onboarding::set_under_way(false);
+        assert_eq!(
+            names(&declare()),
+            ["light_on", crate::onboarding::REDO],
+            "outside the walk"
+        );
+        crate::onboarding::set_under_way(true);
+        assert_eq!(names(&declare()), all, "while the walk is under way");
+        crate::onboarding::set_under_way(false);
+        assert_eq!(names(&applying(declared.clone(), true)), all);
+        // A late call is still the walk's: routed by its name, whatever the
+        // request was given.
+        assert!(crate::onboarding::is_tool(crate::onboarding::STEP));
+    }
 }
 
 /// Spoken turns' forget functions say that one called unasked is held for
@@ -5243,6 +5610,10 @@ pub(crate) fn keeping_room(
     ends_sooner: bool,
     room_file: Option<&Path>,
     bus_root: Option<&Path>,
+    another_voice: Option<(
+        Arc<std::sync::atomic::AtomicBool>,
+        Arc<std::sync::atomic::AtomicBool>,
+    )>,
 ) -> Box<dyn FnMut(u64) + Send> {
     let mut kept_boot = None;
     if let Ok(mut room) = crate::room_told::room().lock() {
@@ -5279,7 +5650,14 @@ pub(crate) fn keeping_room(
         };
         let now = room.at(now_us);
         if let Some(out) = out.as_mut() {
-            out.tell(now, now_us);
+            // The one-face rule's record, said only where something tracks it
+            // (`tracked`); without, nothing proves there is no other voice.
+            let another = another_voice.as_ref().and_then(|(tracked, flag)| {
+                tracked
+                    .load(std::sync::atomic::Ordering::Acquire)
+                    .then(|| flag.load(std::sync::atomic::Ordering::Acquire))
+            });
+            out.tell_with(now, another, now_us);
         }
         if let Some((path, boot)) = &kept_boot
             && now_us.saturating_sub(saved_at_us) >= 1_000_000
@@ -5334,6 +5712,34 @@ pub(crate) fn linked_noting(
         eprintln!(
             "lamp-voice second: request {request}: the owner's line is told {} service(s) linked in the app",
             names.len()
+        );
+        Some(note)
+    })
+}
+
+/// The note for the owner's spoken line with their recent service records
+/// (`LAMP_SERVICE_RECORDS_TOLD=on`, `crate::service_records::told`): the
+/// services' owner check (`services::owner_of`), in full only as a read
+/// is (`services::records_in_full`) or in the private room;
+/// journalled by count, never by content.
+pub(crate) fn records_noting() -> crate::second_provider::Remembered {
+    Arc::new(move |request, _words, lease| {
+        let owner = crate::services::owner_of(lease)?;
+        let in_full = crate::services::records_in_full(lease?.key().request, &owner);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |since| u64::try_from(since.as_millis()).unwrap_or(0));
+        let offset = crate::local_time::system().map_or(0, |zone| zone.offset_minutes_at(now));
+        let note = crate::service_records::told::note_now(Some(&owner), in_full, now, offset)?;
+        eprintln!(
+            "lamp-voice second: request {request}: the owner's line is told {} service record(s), {}, {} bytes (LAMP_SERVICE_RECORDS_TOLD)",
+            note.lines().filter(|line| line.starts_with("- ")).count(),
+            if in_full {
+                "in full"
+            } else {
+                "the status only"
+            },
+            note.len()
         );
         Some(note)
     })
@@ -5411,8 +5817,32 @@ pub(crate) fn known_name_told(on: bool, who: Option<&Path>, person: Option<&str>
     if person != Some(crate::known_faces::memory_person(&name).as_str()) {
         return String::new();
     }
+    // Where a told name came from, never the name (B5186).
+    eprintln!(
+        "lamp-voice second: the seen speaker's known face's name is told to this reply (LAMP_SECOND_FACE_NAME)"
+    );
     format!("\n\n{}", crate::known_faces::note(&name))
 }
+
+/// What a turn is told when the eyes see a face at the lamp (`in_view`) and
+/// know nobody (#5750): no known file and no unsure hold of one, so "who is
+/// this?" is answered "I don't know them" with no call, and a face from a
+/// photo still waiting for its yes stays unnamed. Never a name, a count or
+/// anything of who anyone else is. With [`known_name_told`]'s switch.
+// ponytail: a known face in its first second, before the eyes decide, reads
+// as nobody known; a hold on the eyes' own first decision if that shows.
+pub(crate) fn nobody_known_told(on: bool, who: Option<&Path>, in_view: Option<usize>) -> String {
+    let Some(who) = who.filter(|_| on && in_view.unwrap_or(0) > 0) else {
+        return String::new();
+    };
+    if crate::known_faces::known_now(who).is_some() || crate::speaking_faces::known_unsure(who) {
+        return String::new();
+    }
+    format!("\n\n{NOBODY_KNOWN}")
+}
+
+/// [`nobody_known_told`]'s line.
+pub(crate) const NOBODY_KNOWN: &str = "(The face at the lamp is not anyone the lamp knows.)";
 
 /// What a Live session is told of the moment beside what it hears, told
 /// here in each turn's system message, since each chat starts with nothing:
@@ -6740,7 +7170,9 @@ fn to_the_end(said_ago: Option<Duration>, ended_ago: Option<Duration>) -> Option
 /// goes on only by the thread's window or the person's call
 /// (`thread_or_call`), and then only [`BUSY_GOING_ON_FOR`] from the end of
 /// the lamp's last words (`said_ago`) or [`CALL_CARRIES_FOR`] from the
-/// call (`called_ago`). The quiet room's [`AFTER_THE_LAMPS_WORDS`]
+/// call (`called_ago`); or, while a skill's yes is awaited after its
+/// say-back (`yes_going_on`, #6749 C), the thread's 45 s from that
+/// answer's end as played. The quiet room's [`AFTER_THE_LAMPS_WORDS`]
 /// ([`going_on_from`]) never counts there: after an answer of 30 s or more
 /// it let office talk out in the 15 s after the words (the first builder's
 /// agent on #2032, 03:09). When none is going on, the journal says why,
@@ -6752,14 +7184,15 @@ fn went_on_told(
     said_ago: Option<Duration>,
     called_ago: Option<Duration>,
     left_alone: Option<usize>,
-    thread_or_call: bool,
+    (thread_or_call, yes_going_on): (bool, bool),
     ran_for: Duration,
 ) -> Signs {
     let busy = signs.room == crate::room_told::Room::Busy;
     if busy {
-        signs.going_on &= thread_or_call
-            && (said_ago.is_some_and(|ago| ago <= BUSY_GOING_ON_FOR)
-                || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR));
+        signs.going_on &= yes_going_on
+            || thread_or_call
+                && (said_ago.is_some_and(|ago| ago <= BUSY_GOING_ON_FOR)
+                    || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR));
     }
     if !signs.going_on {
         let ago = |ago: Option<Duration>, what: &str| {
@@ -8390,7 +8823,7 @@ impl Heeding {
             over_the_lamps_voice,
         } = heard
         {
-            self.tell_a_waiting_write(over_the_lamps_voice);
+            self.tell_a_waiting_write(request, over_the_lamps_voice);
         }
         self.printing(request, heard);
     }
@@ -8398,11 +8831,16 @@ impl Heeding {
     /// A line began: a write waiting for its "send" is timed from here, not
     /// from when its words come, and told if it began within the tail of the
     /// lamp's words (`crate::services`).
-    fn tell_a_waiting_write(&self, over_the_lamps_voice: bool) {
+    fn tell_a_waiting_write(&self, request: u64, over_the_lamps_voice: bool) {
         let in_tail = self.said_until_us.is_some_and(|until_us| {
             monotonic_us() <= until_us.saturating_add(super::own_echo::TAIL_US)
         });
-        crate::services::voice_began(over_the_lamps_voice, in_tail, std::time::Instant::now());
+        crate::services::voice_began(
+            request,
+            over_the_lamps_voice,
+            in_tail,
+            std::time::Instant::now(),
+        );
     }
 
     /// A spoken line's sound, for the same-voice check: judged only if it
@@ -8427,7 +8865,7 @@ impl Heeding {
                     crate::untied_going_on::in_grace(monotonic_us(), until_us)
                 }))
             .then_some(request);
-            self.tell_a_waiting_write(over_the_lamps_voice);
+            self.tell_a_waiting_write(request, over_the_lamps_voice);
         }
         if matches!(heard, Heard::BeganOverTheWaitSound) {
             self.began_over = None;
@@ -9523,6 +9961,22 @@ impl Heeding {
         };
         let said_going_on = said_going_on
             || at_start(held_ago).is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
+        // A skill's yes awaited after its say-back said whole (#6749 C): the
+        // thread's window counts from the end of that answer as played, not
+        // from its start, in a busy room too, and the line answers the
+        // lamp's own ask. A long read-back and a repair used up the 45 s
+        // from the answer's start, and the "Yes." 8 s after its end was
+        // held (9adf, 13 Nov).
+        let yes_awaited = crate::skill_write_yes::answer_awaited(request, now);
+        let yes_going_on =
+            yes_awaited && at_start(said_ago).is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
+        if yes_going_on && !said_going_on {
+            eprintln!(
+                "lamp-voice second: request {request}: a skill's yes is awaited: the conversation goes on {} s from the end of its say-back as played (#6749)",
+                crate::thread::GOING_ON_FOR.as_secs()
+            );
+        }
+        let said_going_on = said_going_on || yes_going_on;
         let going_on = going_on_from(said_going_on, at_start(said_ago), at_start(called_ago));
         // `LAMP_NAME_OR_FOLLOW_UP`: whether the line is a follow-up begun
         // while the lamp's words played or soon after them, or its call,
@@ -9538,7 +9992,7 @@ impl Heeding {
         let mut signs = Signs {
             room: crate::room_told::Room::Unknown,
             going_on,
-            lamp_asked,
+            lamp_asked: lamp_asked || yes_awaited,
             turned: None,
             names: Vec::new(),
             near: self
@@ -9622,7 +10076,7 @@ impl Heeding {
             // Oct, follow-ups begun about 7 s after their asks, as the
             // answers played, went unanswered.
             if switch && signs.room == crate::room_told::Room::Busy {
-                signs.going_on = goes || carry;
+                signs.going_on = goes || carry || yes_going_on && !talked_past;
                 if carry && !goes {
                     // Its start decides, as a follow-up's does: a line begun
                     // in the window may be judged after it.
@@ -9658,7 +10112,7 @@ impl Heeding {
                 said_ago,
                 called_ago,
                 left_alone,
-                thread_or_call,
+                (thread_or_call, yes_going_on),
                 line_ran,
             )
         };
@@ -9813,9 +10267,9 @@ impl Heeding {
             attention.name_heard_scored(at_us, score);
         }
         attention.heard(heard);
-        // A read-back asks for its "send", however its last sentence reads
-        // (`services::send_awaited`).
-        let lamp_asked = signs.lamp_asked || crate::services::send_awaited(heard);
+        // A read-back asks for an answer, however its last sentence reads
+        // (`services::answer_awaited`).
+        let lamp_asked = signs.lamp_asked || crate::services::answer_awaited(heard);
         attention.lamp_asked(lamp_asked);
         let busy = signs.room == crate::room_told::Room::Busy;
         attention.set_near(signs.near);
@@ -12098,7 +12552,7 @@ pub(crate) fn steady_first_message_withheld(
 /// and the exchanges as messages, both `whose` alone (a person's memory id,
 /// or none for the room), under the thread's one lock; with a name
 /// `withheld`, said in neither.
-fn thread_and_history(
+pub(crate) fn thread_and_history(
     used: usize,
     file: Option<&Path>,
     whose: Option<&str>,
@@ -12110,8 +12564,19 @@ fn thread_and_history(
         whose,
         withheld,
         ROOM_LINES_TOLD.load(std::sync::atomic::Ordering::Acquire),
+        HISTORY_AFTER_NOTE.load(std::sync::atomic::Ordering::Acquire),
     )
 }
+
+/// `LAMP_HISTORY_AFTER_NOTE=on` (#6218), set once as the worker starts
+/// ([`serve`]): the exchanges the scope's running note holds, once a job
+/// that gave them had that note kept (`crate::thread::Thread::folded`),
+/// are left out of the thread's lines and the history (their kept calls
+/// with them) of a turn told that note, so the same talk is not told
+/// twice. A turn told no note, or a note of another lineage, is told
+/// every exchange as before.
+pub(crate) static HISTORY_AFTER_NOTE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
 
 /// `LAMP_CONVERSATION_ROOM_LINES_TOLD=on` (#4339), set once as the worker
 /// starts ([`serve`]): a person's turn is also given the room's exchanges of
@@ -12129,21 +12594,29 @@ pub(crate) const SAID_IN_THE_ROOM: &str = "(said in the room)";
 /// person's history (`whose` some) then takes the room's exchanges of the
 /// same conversation too, marked; the thread's text and the running
 /// summary stay the scope's own, and a turn of the room's is told only
-/// the room's, as ever. In memory, under the thread's one lock: no new
-/// read on the reply's path.
+/// the room's, as ever. With `after_note` as [`HISTORY_AFTER_NOTE`], the
+/// exchanges the running note told here holds are left out of both. In
+/// memory, under the thread's one lock: no new read on the reply's path.
 fn thread_and_history_told(
     used: usize,
     file: Option<&Path>,
     whose: Option<&str>,
     withheld: Option<&str>,
     room_lines: bool,
+    after_note: bool,
 ) -> (String, Vec<Message>) {
     let room = lamp_gemini::MAX_INSTRUCTION_BYTES.saturating_sub(used);
     let now = Instant::now();
     // The scope's own running summary first, within the room, never
     // another scope's (`LAMP_CONVERSATION_SUMMARY`); a name withheld is
-    // taken out of it as out of the thread.
-    let summary = crate::conversation_summary::told(whose, now, room);
+    // taken out of it as out of the thread. The lineage of the note told
+    // (`LAMP_HISTORY_AFTER_NOTE`): none when none is, so nothing is left
+    // out for it.
+    let (summary, note) = if after_note {
+        crate::conversation_summary::told_with_lineage(whose, now, room)
+    } else {
+        (crate::conversation_summary::told(whose, now, room), None)
+    };
     let summary = match withheld {
         Some(name) if !summary.is_empty() => crate::person::without_name(&summary, name),
         _ => summary,
@@ -12151,12 +12624,16 @@ fn thread_and_history_told(
     let room = room.saturating_sub(summary.len());
     let (thread, recent) = crate::thread::current(file, |thread| {
         (
-            thread.recall_for(whose, now, room),
+            thread.recall_after_note(whose, now, room, note),
             match whose {
-                Some(person) if room_lines => {
-                    thread.recent_with_room_lines(person, now, HISTORY_WITHIN, HISTORY_EXCHANGES)
-                }
-                _ => thread.recent_for(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES),
+                Some(person) if room_lines => thread.recent_with_room_lines_after_note(
+                    person,
+                    now,
+                    HISTORY_WITHIN,
+                    HISTORY_EXCHANGES,
+                    note,
+                ),
+                _ => thread.recent_after_note(whose, now, HISTORY_WITHIN, HISTORY_EXCHANGES, note),
             },
         )
     })
@@ -12219,7 +12696,13 @@ pub(crate) fn texts_ends(
         // the Reviewer-lead's P3 on #4629).
         let offered = crate::tools::skill_tools(&told);
         let mut skills = if told.use_skill {
-            crate::use_skill::section(&offered)
+            // `when` lines as on a spoken turn, so a skill is told whole
+            // once, in its answer (Twelve's P3 on #6521).
+            crate::use_skill::section_told(
+                &offered,
+                &crate::tools::core_skills(&told),
+                &crate::tools::skill_whens(&told),
+            )
         } else {
             String::new()
         };
@@ -12381,7 +12864,8 @@ pub(crate) const KEPT_CALL_RESULT: &str = "(done earlier; its result was not kep
 /// With `keeps_calls`, an exchange whose turn ran functions has them before
 /// the lamp's words: an assistant message with the calls (each with the
 /// arguments it was kept with, `second_provider::kept_args`; no words),
-/// each call's result as [`KEPT_CALL_RESULT`], as a chat round with calls
+/// each call's result as [`KEPT_CALL_RESULT`], or a service write's status
+/// ([`crate::thread::KeptCall::result`]), as a chat round with calls
 /// goes. The person's words, or the note, stay first.
 fn messages_marked(
     exchange: crate::thread::Recent,
@@ -12404,6 +12888,11 @@ fn messages_marked(
         messages.push(Message::system(SAID_IN_THE_ROOM.to_owned()));
     }
     if keeps_calls && !exchange.calls.is_empty() {
+        let results: Vec<&str> = exchange
+            .calls
+            .iter()
+            .map(|call| call.result.unwrap_or(KEPT_CALL_RESULT))
+            .collect();
         let calls: Vec<crate::second_provider::net::ToolCall> = exchange
             .calls
             .into_iter()
@@ -12418,7 +12907,8 @@ fn messages_marked(
         messages.extend(
             calls
                 .into_iter()
-                .map(|call| Message::tool(call.id, KEPT_CALL_RESULT)),
+                .zip(results)
+                .map(|(call, result)| Message::tool(call.id, result)),
         );
     }
     messages.push(Message::assistant(exchange.lamp));
@@ -12433,6 +12923,18 @@ fn messages_marked(
 /// and 300 s); the thread keeps that many ([`crate::thread`]).
 pub const HISTORY_EXCHANGES: usize = 12;
 pub const HISTORY_WITHIN: Duration = Duration::from_secs(600);
+
+/// A piece of the lamp's words of `request` that skips the thread
+/// (`guard`), journalled while a skill's yes waits (#6715): such words
+/// never count toward its say-back. The empty last piece says nothing.
+fn skipped(request: u64, guard: &str, text: &str) {
+    if text.is_empty() {
+        return;
+    }
+    if let Some(line) = crate::skill_write_yes::skipped_line(request, guard) {
+        eprintln!("{line}");
+    }
+}
 
 /// Keep what a turn's output says in the thread, as the Live route keeps
 /// its transcripts: the person's words, the lamp's (not the announcement),
@@ -12471,10 +12973,13 @@ fn keep_scoped(
     // kept out too: nothing said off camera is journalled as theirs; only a
     // keep their own face is seen saying yes to is written (the first
     // builder's call on #4508).
+    // A carried line read as its person's (`LAMP_CONVERSATION_CARRIED_MEMORY`)
+    // is kept out too: its keep is written, its exchange never journalled.
     if let Some(lease) = lease
-        && lease
+        && (lease
             .scope()
             .is_some_and(crate::memory_scope::ScopeSnapshot::held)
+            || lease.reads_carried())
     {
         crate::remember::held_by_gap(lease.key().request);
     }
@@ -12508,6 +13013,7 @@ fn keep_scoped(
             // A done forget's answer may name what went: said, but never
             // the thread's ([`crate::remember::forgetting_reply`]).
             if crate::remember::forgetting_reply(*request) {
+                skipped(*request, "a forget's answer", text);
                 return;
             }
             // Sentences come trimmed, those after the first with a space
@@ -12520,9 +13026,11 @@ fn keep_scoped(
                 match lease {
                     Some(lease) => {
                         if lease.key().request != *request {
+                            skipped(*request, "the lease is another request's", &text);
                             return;
                         }
                         let Some(scope) = lease.scope() else {
+                            skipped(*request, "the lease has no scope", &text);
                             return;
                         };
                         // A room's line `named_alone` named (no face seen
@@ -12539,7 +13047,7 @@ fn keep_scoped(
                         );
                         // A held or carried line is told in the thread,
                         // never folded into a summary or talk note.
-                        if scope.held() {
+                        if scope.held() || lease.reads_carried() {
                             thread.held_for(*request);
                         }
                     }
@@ -12753,9 +13261,36 @@ pub async fn run(
                 break;
             };
             if gate.admits(monotonic_us(), &command)? {
+                // A skill with code of its own made from the app, said back
+                // in this written request (#6307): its yes awaited from it
+                // on, as a voice make's is, or, outside the private room
+                // with the owner not seen alone, not said back. Before the
+                // thread keeps the note. Never an add-on's quoted line.
+                let mut command = command;
+                if let ProviderInput::Written {
+                    request,
+                    text,
+                    quoted: false,
+                    ..
+                } = &mut command
+                {
+                    *text = crate::make_skill_local::app_code_asked_here(
+                        *request,
+                        std::mem::take(text),
+                    );
+                    // A skill's task with no yes, said back unasked as its
+                    // trigger fired (#6071's V2): its yes awaited from this
+                    // request on, only for the very note the say service
+                    // kept.
+                    *text = crate::skill_task_yes::asked_in_here(*request, std::mem::take(text));
+                }
                 // A written request is kept for the thread as the note it
                 // is, with the answer to it (`Thread::written`).
                 sign_in_written(&command);
+                // A skill run's write read back waits for its yes (#6432).
+                if let ProviderInput::Written { request, text, .. } = &command {
+                    crate::run_write_yes::written(*request, text);
+                }
                 if let Ok(mut thread) = crate::thread::THREAD.lock() {
                     keep_written(&mut thread, &command, engine.scopes_context());
                 }
@@ -13382,6 +13917,112 @@ mod tests {
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     }
 
+    /// #6749 C, 9adf on 13 Nov: a code make's 477-char read-back and a
+    /// repair, its answer begun 56 s before the "Yes.", its words ended 8 s
+    /// before it, in a busy room: the thread's 45 s from the answer's start
+    /// had passed, the call too, so the yes was held ("no conversation going
+    /// on … where it goes on 15 s", then "a busy room"). While the skill's
+    /// yes is awaited after its say-back said whole, the window counts from
+    /// the end of those words, and the "Yes." answers the lamp's own ask: it
+    /// is let out, by the route's own windows and with
+    /// `LAMP_NAME_OR_FOLLOW_UP` alike. Without the wait, or past the 45 s
+    /// from the words' end, or with the say-back cut, it is held as before.
+    #[test]
+    fn a_yes_after_a_long_read_back_counts_from_its_end_in_a_busy_room() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let _clock = clock_with_history();
+        let s = Duration::from_secs;
+        let say_back = "it reads the processor's temperature every minute and sets the light \
+             to red above sixty degrees, blue below forty and white between them, using the \
+             light and the system's sensors, from code of its own that the lamp checked, said \
+             back to you now in full so you know exactly what it does before it runs any of it \
+             at all, and it keeps running only while you have it on, until you turn it off or \
+             ask me to remove it, which you can do at any time by asking me in a few words.";
+        assert!(say_back.len() > 400, "a long read-back");
+        // `wait`: none, said whole, or said cut. `follow_up`: the switch.
+        let judged = |wait: Option<bool>, ended_ago: u64, follow_up: bool| {
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            {
+                let mut told = crate::room_told::room().lock().unwrap();
+                for other in 901..=903 {
+                    told.unanswered(other, monotonic_us());
+                }
+                assert_eq!(told.at(monotonic_us()), crate::room_told::Room::Busy);
+            }
+            let asked = Instant::now() - s(60);
+            let answered = Instant::now() - s(56);
+            if let Some(cut) = wait {
+                crate::skill_write_yes::wait_for_yes(
+                    crate::skill_write_yes::Asks {
+                        skill: "temperature-light".into(),
+                        sha256: "ab".repeat(32),
+                        writes: Vec::new(),
+                        say_back: say_back.into(),
+                        grants: Some(vec!["light".into()]),
+                        code: true,
+                    },
+                    1,
+                    answered,
+                );
+                if cut {
+                    crate::skill_write_yes::lamp_cut(1);
+                }
+            }
+            let mut thread = crate::thread::Thread::new();
+            thread.person(
+                "Make a skill that checks the processor temperature.",
+                true,
+                asked,
+            );
+            thread.lamp(
+                1,
+                &format!("I made temperature light: {say_back}"),
+                answered,
+            );
+            *crate::thread::THREAD.lock().unwrap() = thread;
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if follow_up {
+                heeding.needing_name_or_follow_up();
+            }
+            heeding.called_at = Some(asked);
+            let now_us = monotonic_us();
+            heeding.lamp_did(crate::second_provider::Did::Said(
+                1,
+                now_us - ended_ago * 1_000_000,
+            ));
+            let held = heeding.heed(2, (now_us - 600_000, now_us), "Yes.", None);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            crate::skill_write_yes::clear_for_test();
+            held
+        };
+        for follow_up in [false, true] {
+            assert_eq!(
+                judged(Some(false), 8, follow_up),
+                None,
+                "{follow_up}: the yes 8 s after the say-back's end is let out"
+            );
+            assert_eq!(
+                judged(Some(false), 30, follow_up),
+                None,
+                "{follow_up}: 30 s after its end, inside the 45 s"
+            );
+            assert!(
+                judged(None, 8, follow_up).is_some(),
+                "{follow_up}: no yes awaited: held as before"
+            );
+            assert!(
+                judged(Some(true), 8, follow_up).is_some(),
+                "{follow_up}: the say-back cut: held as before"
+            );
+            assert!(
+                judged(Some(false), 50, follow_up).is_some(),
+                "{follow_up}: past 45 s from its end: held"
+            );
+        }
+    }
+
     /// The turn's own call carries no conversation past the close: a call
     /// let out at or before it is not `called_ago`; one after it is.
     #[test]
@@ -13492,8 +14133,30 @@ mod tests {
             continues_from: None,
             soft_lead_us: 0,
         };
-        assert!(went_on_told(5, busy(), said_ago, None, None, true, Duration::ZERO).going_on);
-        assert!(!went_on_told(5, busy(), Some(s(18)), None, None, true, Duration::ZERO).going_on);
+        assert!(
+            went_on_told(
+                5,
+                busy(),
+                said_ago,
+                None,
+                None,
+                (true, false),
+                Duration::ZERO
+            )
+            .going_on
+        );
+        assert!(
+            !went_on_told(
+                5,
+                busy(),
+                Some(s(18)),
+                None,
+                None,
+                (true, false),
+                Duration::ZERO
+            )
+            .going_on
+        );
         // No words in the thread: none, whatever was played.
         assert_eq!(to_the_end(None, Some(s(1))), None);
         assert_eq!(to_the_end(Some(s(30)), None), Some(s(30)));
@@ -13539,7 +14202,7 @@ mod tests {
                 Some(s(said)),
                 called.map(s),
                 None,
-                true,
+                (true, false),
                 Duration::ZERO,
             )
             .going_on
@@ -13563,7 +14226,7 @@ mod tests {
                 Some(s(10)),
                 None,
                 None,
-                false,
+                (false, false),
                 Duration::ZERO,
             )
             .going_on
@@ -17332,7 +17995,7 @@ mod tests {
             Some(Duration::from_secs(5)),
             None,
             None,
-            true,
+            (true, false),
             Duration::ZERO,
         );
         assert!(window.going_on, "inside the busy room's 15 s");
@@ -19526,6 +20189,7 @@ mod tests {
     #[test]
     fn an_answer_ends_when_its_sound_has_all_been_played() {
         let audio = |request, samples: usize| ProviderOutput::Audio {
+            spoken: true,
             request,
             sequence: 0,
             provider_event_at_us: 0,
@@ -20962,6 +21626,7 @@ mod tests {
     /// thread, and its mark goes with the turn.
     #[test]
     fn a_forget_confirmation_cannot_reenter_the_next_turns_history() {
+        let _one = crate::provider_worker::tests::one_thread();
         let request = u64::MAX - 704;
         let mut thread = crate::thread::THREAD.lock().unwrap();
         let before = std::mem::take(&mut *thread);
@@ -20979,9 +21644,8 @@ mod tests {
             None,
             None,
         );
-        // Only this turn's words are looked for: the thread is the process's
-        // own, and another test's turn may write to it between these lines
-        // (it failed so in a module run beside #4700's turns, 31 Oct).
+        // Only the forgotten reply is checked. The shared conversation
+        // stays protected through the complete fixture and its restoration.
         assert!(
             !crate::thread::THREAD
                 .lock()
@@ -21147,7 +21811,7 @@ mod tests {
                 .cloned()
                 .collect()
         };
-        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true);
+        let (_, theirs) = thread_and_history_told(0, None, Some(&a), None, true, false);
         assert_eq!(
             users(&theirs),
             [
@@ -21157,18 +21821,18 @@ mod tests {
             ],
             "A's turn: the room's line among A's, marked"
         );
-        let (_, rooms) = thread_and_history_told(0, None, None, None, true);
+        let (_, rooms) = thread_and_history_told(0, None, None, None, true, false);
         assert_eq!(
             users(&rooms),
             [Message::user("Can you look it up?")],
             "the room's turn: never A's"
         );
-        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true);
+        let (_, others) = thread_and_history_told(0, None, Some(&b), None, true, false);
         assert!(
             others.is_empty(),
             "B's turn: neither A's nor A's conversation's"
         );
-        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false);
+        let (_, off) = thread_and_history_told(0, None, Some(&a), None, false, false);
         assert_eq!(
             users(&off),
             [
@@ -21178,8 +21842,137 @@ mod tests {
             "off: A's alone"
         );
         crate::thread::THREAD.lock().unwrap().forget();
-        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true);
+        let (_, forgotten) = thread_and_history_told(0, None, Some(&a), None, true, false);
         assert!(forgotten.is_empty(), "a forget drops the room's lines too");
+    }
+
+    /// #6218 (`LAMP_HISTORY_AFTER_NOTE`): a person's conversation of twelve
+    /// exchanges, the oldest seven given to the running summary. With the
+    /// note kept and the switch on, those seven are left out of the thread's
+    /// lines and the history, the newest five told, the note told; off, or
+    /// with the job never folding (dropped or failed), everything is told
+    /// byte for byte as before. With the room's lines told, a room's line
+    /// among the folded ones stays: the room's note is never told here.
+    #[test]
+    fn exchanges_a_stored_note_holds_are_told_in_it_alone() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let tom = crate::remember::person_id("Fold Tom");
+        let note = |_: &str| Some("Current activity: none\nKey facts:\n- NOTE-HOLDS".to_owned());
+        let sized = |told: &(String, Vec<Message>)| {
+            told.0.len() + serde_json::to_string(&told.1).unwrap().len()
+        };
+        // Tom's exchanges, the room's one among them at `room_at`, the
+        // first batch given to the summary and, with `fold`, its note kept
+        // and folded; then the rest. Each told as `told` gives it.
+        let told_with = |room_at: Option<u64>,
+                         fold: bool,
+                         told: &dyn Fn() -> (String, Vec<Message>)|
+         -> (String, Vec<Message>) {
+            // A forget elsewhere in the run may clear the notes in between:
+            // made again, a few times at most.
+            for _ in 0..5 {
+                let now = Instant::now();
+                let mut thread = crate::thread::THREAD.lock().unwrap();
+                thread.forget();
+                let add = |thread: &mut crate::thread::Thread, request: u64| {
+                    let whose = (room_at != Some(request)).then_some(tom.as_str());
+                    thread.person(&format!("Tom asks question {request:02}?"), true, now);
+                    thread.lamp_for(
+                        request,
+                        &format!("The lamp answers question {request:02} at some length."),
+                        now,
+                        whose,
+                    );
+                };
+                // Eleven of Tom's: the oldest seven are due.
+                let first = 11 + u64::from(room_at.is_some());
+                for request in 1..=first {
+                    add(&mut thread, request);
+                }
+                let due = thread.summary_due(crate::conversation_summary::KEEP_VERBATIM, now);
+                drop(thread);
+                for due in due {
+                    if fold {
+                        crate::conversation_summary::summarize_now_here(
+                            due.whose,
+                            due.exchanges,
+                            &note,
+                            now,
+                        );
+                    } else {
+                        // The note kept, but not from this job (it was
+                        // dropped or failed): nothing folded.
+                        crate::conversation_summary::summarize_now_here(
+                            due.whose,
+                            vec![(0, "other".into(), "other".into())],
+                            &note,
+                            now,
+                        );
+                    }
+                }
+                let mut thread = crate::thread::THREAD.lock().unwrap();
+                add(&mut thread, first + 1);
+                drop(thread);
+                let told = told();
+                if told.0.contains("NOTE-HOLDS") {
+                    return told;
+                }
+            }
+            panic!("the note was never kept");
+        };
+        let off = || thread_and_history_told(0, None, Some(&tom), None, false, false);
+        let on = || thread_and_history_told(0, None, Some(&tom), None, false, true);
+        let off_folded = told_with(None, true, &off);
+        let off_unfolded = told_with(None, false, &off);
+        assert_eq!(off_folded, off_unfolded, "off: byte for byte as before");
+        let on_unfolded = told_with(None, false, &on);
+        assert_eq!(on_unfolded, off_unfolded, "nothing folded: as before");
+        let on_folded = told_with(None, true, &on);
+        let (text, history) = &on_folded;
+        let history_text = serde_json::to_string(history).unwrap();
+        assert!(text.contains("Earlier in this conversation"), "{text}");
+        assert!(text.contains("NOTE-HOLDS"), "{text}");
+        for request in 1..=7 {
+            let line = format!("question {request:02}");
+            assert!(!text.contains(&line), "{line} in {text}");
+            assert!(!history_text.contains(&line), "{line} in {history_text}");
+        }
+        for request in 8..=12 {
+            let line = format!("question {request:02}");
+            assert!(text.contains(&line), "{line} not in {text}");
+            assert!(history_text.contains(&line), "{line} not in {history_text}");
+        }
+        assert_eq!(history.len(), 10, "five exchanges, two messages each");
+        println!(
+            "LAMP_HISTORY_AFTER_NOTE: 12 exchanges, 7 folded: off {} bytes, on {} bytes, {} saved",
+            sized(&off_folded),
+            sized(&on_folded),
+            sized(&off_folded) - sized(&on_folded)
+        );
+        // The room's lines told: the room's line at 3, among Tom's folded
+        // ones, stays, marked; Tom's folded ones leave.
+        let rooms_on = || thread_and_history_told(0, None, Some(&tom), None, true, true);
+        let rooms_off = || thread_and_history_told(0, None, Some(&tom), None, true, false);
+        let (_, rooms) = told_with(Some(3), true, &rooms_on);
+        let rooms_text = serde_json::to_string(&rooms).unwrap();
+        assert!(
+            rooms_text.contains(&format!("{SAID_IN_THE_ROOM} Tom asks question 03?")),
+            "{rooms_text}"
+        );
+        for request in [1, 2, 4, 5, 6, 7, 8] {
+            let line = format!("question {request:02}");
+            assert!(!rooms_text.contains(&line), "{line} in {rooms_text}");
+        }
+        for request in 9..=13 {
+            let line = format!("question {request:02}");
+            assert!(rooms_text.contains(&line), "{line} not in {rooms_text}");
+        }
+        assert_eq!(
+            told_with(Some(3), true, &rooms_off),
+            told_with(Some(3), false, &rooms_off),
+            "off with the room's lines: as before"
+        );
+        crate::thread::THREAD.lock().unwrap().forget();
     }
 
     /// #3997's cut-in proposal: an answer cut while it played and kept as
@@ -21229,6 +22022,7 @@ mod tests {
                 id: "kept-7-0".into(),
                 name: "volume_down".into(),
                 args: serde_json::json!({}),
+                result: None,
             }],
             ..crate::thread::Recent::default()
         };
@@ -21286,6 +22080,7 @@ mod tests {
                 id: "kept-3-0".into(),
                 name: "light_colour".into(),
                 args: serde_json::json!({"colour": "red"}),
+                result: None,
             }],
             ..crate::thread::Recent::default()
         };
@@ -21413,6 +22208,99 @@ mod tests {
                 ),
                 Message::tool("kept-7-0", KEPT_CALL_RESULT),
                 Message::assistant("Timer set. It rings at 9:34 am."),
+            ]
+        );
+    }
+
+    /// lamp-06c1 at 11913 (11 Nov): the second write of a kind in a
+    /// conversation was read back by the model itself, no call, copying
+    /// the earlier read-backs told as words alone. A thread with a write
+    /// prepared and then sent tells each as a `service_write` call with no
+    /// one's words in it and its status as its result, before the lamp's
+    /// words.
+    #[test]
+    fn a_kept_service_write_reaches_the_next_turns_history_as_a_call() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let now = Instant::now();
+        let asked = serde_json::json!({"service": "google_calendar", "action": "create_event",
+            "title": "lamp night test", "start": "2026-11-12T21:00:00+07:00"});
+        let yes =
+            serde_json::json!({"service": "google_calendar", "send_id": "v1-1", "said": "yes"});
+        let read_back = "Add an event to your Google Calendar (primary): \"lamp night test\". Shall I go ahead?";
+        let keep = |request: u64, args: &serde_json::Value, told: serde_json::Value| {
+            let kept = crate::second_provider::kept_args(crate::services::WRITE, args)
+                .expect("a write's call is kept");
+            let result = crate::second_provider::kept_result(crate::services::WRITE, &told);
+            crate::thread::THREAD.lock().unwrap().called_told(
+                request,
+                crate::services::WRITE,
+                &kept,
+                result,
+            );
+        };
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            thread.forget();
+            thread.person("Add lamp night test tomorrow at 9 PM.", true, now);
+        }
+        keep(
+            7,
+            &asked,
+            serde_json::json!({"read_back": read_back, "send_id": "v1-1", "sent": false}),
+        );
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .lamp_for(7, read_back, now, None);
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .person("Yes.", true, now);
+        keep(8, &yes, serde_json::json!({"sent": true}));
+        crate::thread::THREAD
+            .lock()
+            .unwrap()
+            .lamp_for(8, "Added.", now, None);
+        let recent = crate::thread::THREAD.lock().unwrap().recent_for(
+            None,
+            now,
+            HISTORY_WITHIN,
+            HISTORY_EXCHANGES,
+        );
+        let told: Vec<Message> = recent
+            .into_iter()
+            .flat_map(|exchange| messages_told(exchange, true))
+            .collect();
+        crate::thread::THREAD.lock().unwrap().forget();
+        let call = |id: &str, args: serde_json::Value| crate::second_provider::net::ToolCall {
+            id: id.into(),
+            name: crate::services::WRITE.into(),
+            args,
+            extra: None,
+        };
+        assert_eq!(
+            told,
+            [
+                Message::user("Add lamp night test tomorrow at 9 PM."),
+                Message::assistant_calls(
+                    None,
+                    &[call(
+                        "kept-7-0",
+                        serde_json::json!({"service": "google_calendar", "action": "create_event"})
+                    )]
+                ),
+                Message::tool("kept-7-0", crate::second_provider::WRITE_PREPARED),
+                Message::assistant(read_back),
+                Message::user("Yes."),
+                Message::assistant_calls(
+                    None,
+                    &[call(
+                        "kept-8-0",
+                        serde_json::json!({"service": "google_calendar", "send_id": "v1-1"})
+                    )]
+                ),
+                Message::tool("kept-8-0", crate::second_provider::WRITE_DONE),
+                Message::assistant("Added."),
             ]
         );
     }
@@ -21758,7 +22646,7 @@ mod tests {
         let path = dir.join("room.json");
         let first = path.clone();
         std::thread::spawn(move || {
-            let mut tick = super::keeping_room(false, false, false, Some(&first), None);
+            let mut tick = super::keeping_room(false, false, false, Some(&first), None, None);
             let now = monotonic_us();
             {
                 let mut room = crate::room_told::room().lock().unwrap();
@@ -21776,7 +22664,7 @@ mod tests {
         assert!(path.exists(), "the room went to its file");
         let second = path.clone();
         let taken = std::thread::spawn(move || {
-            let _tick = super::keeping_room(false, false, false, Some(&second), None);
+            let _tick = super::keeping_room(false, false, false, Some(&second), None, None);
             let mut room = crate::room_told::room().lock().unwrap();
             room.at(monotonic_us())
         })
@@ -22163,6 +23051,54 @@ mod tests {
         // The face gone: no known file.
         std::fs::remove_file(&known).unwrap();
         assert_eq!(known_name_told(true, Some(&known), Some(&pippa)), "");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// #5750 (row-5750b S2, a stranger at the lamp asked "who is this?"): a
+    /// face in view and nobody known is told so, after the memory; a known
+    /// face, an unsure hold of one, nobody in view, no look, no eyes or the
+    /// switch off are told nothing. Made-up names.
+    #[test]
+    fn a_face_at_the_lamp_that_nobody_knows_is_told_so() {
+        let dir = std::env::temp_dir().join(format!("lv-nobody-known-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir(&dir).unwrap();
+        let known = dir.join("known");
+        let told = nobody_known_told(true, Some(&known), Some(1));
+        assert_eq!(told, format!("\n\n{NOBODY_KNOWN}"));
+        let message = system_message(
+            "You are a lamp.",
+            None,
+            &format!("\n\nYour memory\n- tea, no sugar{told}"),
+            None,
+            None,
+        );
+        assert!(
+            message
+                .text
+                .contains("- tea, no sugar\n\n(The face at the lamp is not anyone"),
+            "{}",
+            message.text
+        );
+        for (on, who, in_view) in [
+            (false, Some(known.as_path()), Some(1)),
+            (true, None, Some(1)),
+            (true, Some(known.as_path()), Some(0)),
+            (true, Some(known.as_path()), None),
+        ] {
+            assert_eq!(
+                nobody_known_told(on, who, in_view),
+                "",
+                "{on} {who:?} {in_view:?}"
+            );
+        }
+        // A known face: their name is told instead, never this.
+        std::fs::write(&known, "Pippa").unwrap();
+        assert_eq!(nobody_known_told(true, Some(&known), Some(1)), "");
+        // An unsure hold of a known face is not nobody (#5738).
+        std::fs::remove_file(&known).unwrap();
+        std::fs::write(crate::speaking_faces::known_unsure_of(&known), "Pippa").unwrap();
+        assert_eq!(nobody_known_told(true, Some(&known), Some(1)), "");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -25952,7 +26888,13 @@ mod tests {
                 )
                 .unwrap();
                 rooms
-                    .publish_json(monotonic_us(), &RoomState { state: room })
+                    .publish_json(
+                        monotonic_us(),
+                        &RoomState {
+                            state: room,
+                            another_voice: None,
+                        },
+                    )
                     .unwrap();
                 let now = monotonic_us();
                 heeding.keep_unjudged(request, (now.saturating_sub(1_000_000), now));
@@ -26725,7 +27667,7 @@ mod tests {
         let _one = crate::provider_worker::tests::one_thread();
         let busy_after_three = |cut_ins_not_talk: bool| {
             std::thread::spawn(move || {
-                let _tick = super::keeping_room(false, cut_ins_not_talk, false, None, None);
+                let _tick = super::keeping_room(false, cut_ins_not_talk, false, None, None, None);
                 let mut room = crate::room_told::room().lock().unwrap();
                 let now = monotonic_us();
                 for request in 1..=3 {
@@ -26760,7 +27702,7 @@ mod tests {
         // after it or not at all.
         let room_at = |ends_sooner: bool, answered: Option<u64>, end: u64| {
             std::thread::spawn(move || {
-                let _tick = super::keeping_room(true, false, ends_sooner, None, None);
+                let _tick = super::keeping_room(true, false, ends_sooner, None, None, None);
                 let mut room = crate::room_told::room().lock().unwrap();
                 let start = 1_000 * S;
                 for request in 1..=3 {
@@ -27190,14 +28132,16 @@ mod tests {
             assert_eq!(heeding.conversation_note_for(9).is_some(), !held, "{heard}");
         }
         // #5553: the same lone words are the person's while a write waits
-        // for its "send", and a plain send alone.
+        // for the answer its read-back asked for, whatever they say: the
+        // model judges them (the owner, 10 Nov).
         for (heard, waiting, held) in [
             ("Send it.", true, false),
             ("Send it.", false, true),
-            ("Oh wow.", true, true),
+            ("Oh wow.", true, false),
         ] {
             crate::services::pending_for_test(waiting.then(|| crate::services::Pending {
                 began_clear: true,
+                service: "gmail".to_owned(),
                 ..crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
             }));
             let mut heeding = super::Heeding::new(false, false, None, None);
@@ -27216,6 +28160,7 @@ mod tests {
         for (ended_ago_us, held) in [(0, true), (10_000_000, false)] {
             crate::services::pending_for_test(Some(crate::services::Pending {
                 spoken_from: Some(Instant::now() - Duration::from_secs(60)),
+                service: "gmail".to_owned(),
                 ..crate::services::Pending::new("id", 8, Instant::now(), "Send an email.", "ann")
             }));
             let mut heeding = super::Heeding::new(false, false, None, None);
@@ -28371,7 +29316,7 @@ mod tests {
         let root = std::env::temp_dir().join(format!("lamp-second-room-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(&root).unwrap();
-        let mut tick = super::keeping_room(false, false, false, None, Some(&root));
+        let mut tick = super::keeping_room(false, false, false, None, Some(&root), None);
         tick(monotonic_us());
         let told = lamp_bus::Bus::new(&root)
             .unwrap()
@@ -29376,6 +30321,8 @@ mod memory_observer {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
+            harness_status: false,
             sign_in: false,
             sign_in_app: false,
         };
@@ -29644,6 +30591,8 @@ mod memory_observer {
             questions: false,
             now: false,
             one_yes: false,
+            reply_named: false,
+            harness_status: false,
             sign_in: false,
             sign_in_app: false,
         };

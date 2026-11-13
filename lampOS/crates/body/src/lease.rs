@@ -9,7 +9,8 @@
 //!
 //! Each is answered with one [`Said`], and a change while held is said the
 //! same way, unasked:
-//! - `{"lease":"held"}`;
+//! - `{"lease":"held","tags":true}` (`tags`: a look or pose line may carry
+//!   `"tag":N`, said back in every answer to it);
 //! - `{"lease":"suspended","why":"conversation"}`, while someone talks to
 //!   the lamp, and `held` again after;
 //! - `{"lease":"lost","why":"hand|slumped|private|paused|asleep|lapsed"}`: a hand on
@@ -117,20 +118,29 @@ pub struct Said {
     pub lease: State,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub why: Option<&'static str>,
+    /// `true` with each hold: this body takes a `tag` on a holder's look
+    /// and pose lines and says it back in every answer to that line
+    /// ([`with_tag`]), so lamp-control tags its lines only for a body that
+    /// says so (an older body answers in order, one line at a time).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<bool>,
 }
 
 impl Said {
     const HELD: Said = Said {
         lease: State::Held,
         why: None,
+        tags: Some(true),
     };
     const SUSPENDED: Said = Said {
         lease: State::Suspended,
         why: Some("conversation"),
+        tags: Some(true),
     };
     const FREE: Said = Said {
         lease: State::Free,
         why: None,
+        tags: None,
     };
 
     pub fn lost(why: &'static str) -> Said {
@@ -140,6 +150,7 @@ impl Said {
         Said {
             lease: State::Lost,
             why: Some(why),
+            tags: None,
         }
     }
 
@@ -147,6 +158,7 @@ impl Said {
         Said {
             lease: State::Refused,
             why: Some(why),
+            tags: None,
         }
     }
 
@@ -274,6 +286,10 @@ pub struct Reach {
 #[serde(deny_unknown_fields)]
 struct LookLine {
     look: LookValue,
+    /// lamp-control's request, echoed in every answer to this line.
+    #[serde(default)]
+    #[allow(dead_code)]
+    tag: Option<u64>,
 }
 
 #[derive(Deserialize)]
@@ -312,6 +328,25 @@ struct Owed {
     /// The look as the body last applied it, after the joints' own bounds
     /// (counts, yaw and pitch): what `there` says, when the body said it.
     applied: Option<[f32; 2]>,
+    /// The line's `tag`, echoed in its answer.
+    tag: Option<u64>,
+}
+
+/// How long a sight of a face is a face in view: the gaze's own
+/// (`gaze::LOST_US`).
+pub const FACE_IN_VIEW: Duration = Duration::from_secs(6);
+
+/// The newest face the eyes showed: where across the picture and down it
+/// (-1 left or top, 1 right or bottom, as `gaze::Sight`), when, and where the
+/// head looked when the picture was taken (yaw and pitch counts from the
+/// pose's own direction, the frame of a look's aim): the face is that far
+/// from where the head was then, wherever it has been since.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FaceSeen {
+    pub x: f32,
+    pub y: f32,
+    pub at: Instant,
+    pub head: [f32; 2],
 }
 
 /// The holder's look: where the head is asked to look, and the answer
@@ -335,9 +370,11 @@ impl Looking {
     /// A look from the holder ([`Looking::is_look`]): its answer now, if one
     /// is due now (a refusal, or the look it replaces cut short).
     pub fn ask(&mut self, line: &[u8], held: bool, reach: Reach, now: Instant) -> Option<String> {
+        let tag = tag_of(line);
         let (at, from_home) = match serde_json::from_slice::<LookLine>(line) {
             Ok(LookLine {
                 look: LookValue::Angles(Angles { yaw, pitch, from }),
+                ..
             }) if yaw.is_finite()
                 && pitch.is_finite()
                 && from.as_deref().is_none_or(|from| from == "home") =>
@@ -346,17 +383,22 @@ impl Looking {
             }
             Ok(LookLine {
                 look: LookValue::Word(word),
+                ..
             }) if word == "ahead" => ([0.0, 0.0], false),
             _ => {
-                return Some(refused(
-                    "a look is {\"yaw\":Y,\"pitch\":P} in degrees, or \"ahead\"",
+                return Some(with_tag(
+                    refused("a look is {\"yaw\":Y,\"pitch\":P} in degrees, or \"ahead\""),
+                    tag,
                 ));
             }
         };
         if !held {
-            return Some(refused("the body is not held"));
+            return Some(with_tag(refused("the body is not held"), tag));
         }
-        let before = self.asked.take().map(|_| cut_short("another look"));
+        let before = self
+            .asked
+            .take()
+            .map(|owed| with_tag(cut_short("another look"), owed.tag));
         // Degrees to counts: the base turns right with more counts (every
         // measured `--gaze` yaw is positive: more counts bring a face from the
         // picture's right edge to its middle; on lamp-75c9 on 28 Oct fewer
@@ -391,8 +433,71 @@ impl Looking {
             positions: None,
             short: [0.0; 2],
             applied: None,
+            tag,
         });
         before
+    }
+
+    /// Whether a holder's look is `{"look":"face"}`, for [`Looking::ask_face`].
+    pub fn is_face(line: &[u8]) -> bool {
+        matches!(
+            serde_json::from_slice::<LookLine>(line),
+            Ok(LookLine { look: LookValue::Word(word), .. }) if word == "face"
+        )
+    }
+
+    /// A look at the face in view (`{"look":"face"}`): one turn toward it,
+    /// from where the head looked when the picture was taken, by the gaze's own measure of the
+    /// picture (`turn`: counts of yaw and of pitch that bring a face from the
+    /// right and the bottom edge to the middle). Sent on as the angles that
+    /// turn comes to, so everything a look is (the reach, `clamped`, the
+    /// `done`) is as for any look. Refused, and nothing aimed, when the body
+    /// is not held, the lamp's gaze is not measured, a look is still under
+    /// way (the picture was taken while the head moved), or no face was seen
+    /// in the last [`FACE_IN_VIEW`]. One glance: it never searches.
+    pub fn ask_face(
+        &mut self,
+        line: &[u8],
+        held: bool,
+        reach: Reach,
+        now: Instant,
+        face: Option<FaceSeen>,
+        turn: Option<[f32; 2]>,
+    ) -> Option<String> {
+        let tag = tag_of(line);
+        let refuse = |why: &str| Some(with_tag(refused(why), tag));
+        if !held {
+            return refuse("the body is not held");
+        }
+        let Some(turn) = turn else {
+            return refuse("this lamp's gaze is not measured, so it cannot look at a face");
+        };
+        if self.asked.is_some() {
+            return refuse("another look is still under way");
+        }
+        let Some(face) = face.filter(|face| {
+            face.x.is_finite()
+                && face.y.is_finite()
+                && now.saturating_duration_since(face.at) <= FACE_IN_VIEW
+        }) else {
+            return refuse("no face in view");
+        };
+        // From where the head looked when the picture was taken (not the last
+        // look's aim: the lamp's own life or gaze may have moved it before
+        // the lease), the picture's offset of the face in counts.
+        let counts = [
+            face.head[0] + turn[0] * face.x.clamp(-1.0, 1.0),
+            face.head[1] + turn[1] * face.y.clamp(-1.0, 1.0),
+        ];
+        let angles = serde_json::json!({
+            "yaw": counts[0] / COUNTS_PER_DEGREE,
+            "pitch": -counts[1] / COUNTS_PER_DEGREE,
+        });
+        let mut asked = serde_json::json!({ "look": angles });
+        if let Some(tag) = tag {
+            asked["tag"] = serde_json::json!(tag);
+        }
+        self.ask(asked.to_string().as_bytes(), held, reach, now)
     }
 
     /// Where the head is asked to look, as the body's `Asked::aim` takes it.
@@ -433,7 +538,10 @@ impl Looking {
             if why != "conversation" {
                 self.aim = None;
             }
-            return self.asked.take().map(|_| cut_short(why));
+            return self
+                .asked
+                .take()
+                .map(|owed| with_tag(cut_short(why), owed.tag));
         }
         let asked = self.asked.as_mut()?;
         if let Some((goals, positions)) = seen {
@@ -503,22 +611,29 @@ impl Looking {
                 let stopped_off = off
                     .iter()
                     .any(|short| short.abs() > 0.5 * COUNTS_PER_DEGREE);
-                return Some(there(reached, asked.clamped || cut || stopped_off));
+                return Some(with_tag(
+                    there(reached, asked.clamped || cut || stopped_off),
+                    asked.tag,
+                ));
             }
         }
         if now.duration_since(asked.since) >= LONGEST_LOOK {
             let short = asked.short;
+            let tag = asked.tag;
             self.asked = None;
             let worst = short
                 .iter()
                 .fold(0.0_f32, |worst, short| worst.max(short.abs()));
-            return Some(cut_short(&if worst > f32::from(REST_SLACK) {
-                format!(
-                    "not there in time: stopped {worst:.0} counts short of the look; something holds the head or base"
-                )
-            } else {
-                "not there in time: still moving".to_owned()
-            }));
+            return Some(with_tag(
+                cut_short(&if worst > f32::from(REST_SLACK) {
+                    format!(
+                        "not there in time: stopped {worst:.0} counts short of the look; something holds the head or base"
+                    )
+                } else {
+                    "not there in time: still moving".to_owned()
+                }),
+                tag,
+            ));
         }
         None
     }
@@ -527,7 +642,9 @@ impl Looking {
     /// back to the pose's own direction, and a look owed is cut short.
     pub fn end(&mut self, why: &'static str) -> Option<String> {
         self.aim = None;
-        self.asked.take().map(|_| cut_short(why))
+        self.asked
+            .take()
+            .map(|owed| with_tag(cut_short(why), owed.tag))
     }
 }
 
@@ -541,11 +658,19 @@ pub const POSE_SAG_WITHIN: f32 = 50.0;
 /// How near (degrees) the pose the body applies must be to the asked one,
 /// for `there` to say it as asked rather than `clamped`.
 const POSE_KEPT_WITHIN: f32 = 0.5;
+/// How near (degrees) a joint must have reached the pose asked, as its
+/// position says, for `there` not to say `clamped`: one stopped farther short
+/// (its own weight at a stand: 3.5 degrees of the elbow on lamp-75c9) is said.
+const POSE_SHORT_WITHIN: f32 = 2.0;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct PoseLine {
     pose: PoseJoints,
+    /// lamp-control's request, echoed in every answer to this line.
+    #[serde(default)]
+    #[allow(dead_code)]
+    tag: Option<u64>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
@@ -562,8 +687,14 @@ struct PoseOwed {
     since: Instant,
     settled: u32,
     arm_goals: Option<[u16; 2]>,
+    /// The roll's goal the step before: a roll still easing is not settled.
+    roll_goal: Option<u16>,
     /// The roll's and the arm's positions the step before.
     positions: Option<[u16; 3]>,
+    /// The joints the line named (roll, shoulder, elbow): the only ones `clamped` judges.
+    named: [bool; 3],
+    /// The line's `tag`, echoed in its answer.
+    tag: Option<u64>,
 }
 
 /// The holder's pose of the head's roll and the arm ([`Posing::ask`]), in
@@ -605,26 +736,33 @@ impl Posing {
         now_posed: Result<[f32; 3], &'static str>,
         now: Instant,
     ) -> Option<String> {
+        let tag = tag_of(line);
         let joints = match serde_json::from_slice::<PoseLine>(line) {
-            Ok(PoseLine { pose }) if pose != PoseJoints::default() => pose,
+            Ok(PoseLine { pose, .. }) if pose != PoseJoints::default() => pose,
             _ => {
-                return Some(pose_refused(
-                    "a pose is {\"roll\":R,\"shoulder\":S,\"elbow\":E} in degrees, one at least",
+                return Some(with_tag(
+                    pose_refused(
+                        "a pose is {\"roll\":R,\"shoulder\":S,\"elbow\":E} in degrees, one at least",
+                    ),
+                    tag,
                 ));
             }
         };
         let named = [joints.roll, joints.shoulder, joints.elbow];
         if named.iter().flatten().any(|degrees| !degrees.is_finite()) {
-            return Some(pose_refused("a pose's degrees are numbers"));
+            return Some(with_tag(pose_refused("a pose's degrees are numbers"), tag));
         }
         if !held {
-            return Some(pose_refused("the body is not held"));
+            return Some(with_tag(pose_refused("the body is not held"), tag));
         }
         let posed = match now_posed {
             Ok(posed) => posed,
-            Err(why) => return Some(pose_refused(why)),
+            Err(why) => return Some(with_tag(pose_refused(why), tag)),
         };
-        let before = self.asked.take().map(|_| pose_cut_short("another pose"));
+        let before = self
+            .asked
+            .take()
+            .map(|owed| with_tag(pose_cut_short("another pose"), owed.tag));
         let kept = self.pose.unwrap_or(posed);
         self.pose = Some(std::array::from_fn(|index| {
             named[index].unwrap_or(kept[index])
@@ -633,7 +771,10 @@ impl Posing {
             since: now,
             settled: 0,
             arm_goals: None,
+            roll_goal: None,
             positions: None,
+            named: named.map(|joint| joint.is_some()),
+            tag,
         });
         before
     }
@@ -656,15 +797,19 @@ impl Posing {
             if why != "conversation" {
                 self.pose = None;
             }
-            return self.asked.take().map(|_| pose_cut_short(why));
+            return self
+                .asked
+                .take()
+                .map(|owed| with_tag(pose_cut_short(why), owed.tag));
         }
         let asked = self.asked.as_mut()?;
+        let tag = asked.tag;
         if let Some(seen) = seen {
             let posed = match seen.posed {
                 Ok(posed) => posed,
                 Err(why) => {
                     self.asked = None;
-                    return Some(pose_cut_short(why));
+                    return Some(with_tag(pose_cut_short(why), tag));
                 }
             };
             // Each joint has arrived near its goal, or stopped where its
@@ -684,23 +829,38 @@ impl Posing {
             });
             let still = asked.arm_goals.is_some_and(|before| {
                 (0..2).all(|index| before[index].abs_diff(seen.arm_goals[index]) <= 1)
-            });
+            }) && asked
+                .roll_goal
+                .is_some_and(|before| before.abs_diff(seen.roll.0) <= 1);
             asked.arm_goals = Some(seen.arm_goals);
+            asked.roll_goal = Some(seen.roll.0);
             asked.positions = Some(positions);
             let near = arrived;
             asked.settled = if near && still { asked.settled + 1 } else { 0 };
             if asked.settled >= THERE_STEPS {
+                let named = asked.named;
                 self.asked = None;
                 let wanted = self.pose.unwrap_or(posed);
-                let clamped =
-                    (0..3).any(|index| (posed[index] - wanted[index]).abs() > POSE_KEPT_WITHIN);
+                // `clamped` is the body keeping the pose off what was asked, or a joint
+                // stopped short of it, measured from where it reached (banana's run on
+                // lamp-75c9: "elbow back" asked 43.0, there at 39.5, said unclamped).
+                // A joint the line did not name is not judged: a standing arm sags on its own
+                // weight (banana's P2 on cdaa6ed2a5).
+                let clamped = (0..3).any(|index| {
+                    (posed[index] - wanted[index]).abs() > POSE_KEPT_WITHIN
+                        || (named[index]
+                            && (seen.reached[index] - wanted[index]).abs() > POSE_SHORT_WITHIN)
+                });
                 // Said as reached: a developer sees the sag.
-                return Some(pose_there(seen.reached, clamped));
+                return Some(with_tag(pose_there(seen.reached, clamped), tag));
             }
         }
         if now.duration_since(asked.since) >= LONGEST_POSE {
             self.asked = None;
-            return Some(pose_cut_short("not there in time: something holds the arm"));
+            return Some(with_tag(
+                pose_cut_short("not there in time: something holds the arm"),
+                tag,
+            ));
         }
         None
     }
@@ -709,7 +869,9 @@ impl Posing {
     /// pose owed is cut short.
     pub fn end(&mut self, why: &'static str) -> Option<String> {
         self.pose = None;
-        self.asked.take().map(|_| pose_cut_short(why))
+        self.asked
+            .take()
+            .map(|owed| with_tag(pose_cut_short(why), owed.tag))
     }
 }
 
@@ -777,8 +939,8 @@ impl Limping {
 
     /// A look asked while the base is limp: refused, never a no-op on the
     /// base and then a jerk when its torque comes back.
-    pub fn look_refused() -> String {
-        refused(LIMP_REFUSES)
+    pub fn look_refused(line: &[u8]) -> String {
+        with_tag(refused(LIMP_REFUSES), tag_of(line))
     }
 
     /// Whether base yaw is let go now, as the body's `Asked::limp` takes it.
@@ -810,6 +972,32 @@ fn line(value: serde_json::Value) -> String {
     let mut line = value.to_string();
     line.push('\n');
     line
+}
+
+/// The `tag` a holder's look or pose line carries, if any: lamp-control's
+/// request, echoed in every answer to that line, so it never pins one line's
+/// answer on another. A line refused at once can overtake one still owed
+/// (Second's P2 on #5855).
+fn tag_of(line: &[u8]) -> Option<u64> {
+    serde_json::from_slice::<serde_json::Value>(line)
+        .ok()?
+        .get("tag")?
+        .as_u64()
+}
+
+/// `answer` with the `tag` of the line it answers, when it had one; as it is
+/// otherwise, so a line without `tag` is answered as before.
+fn with_tag(answer: String, tag: Option<u64>) -> String {
+    let Some(tag) = tag else {
+        return answer;
+    };
+    match serde_json::from_str::<serde_json::Value>(&answer) {
+        Ok(mut value) => {
+            value["tag"] = serde_json::json!(tag);
+            line(value)
+        }
+        Err(_) => answer,
+    }
 }
 
 fn there(degrees: [f32; 2], clamped: bool) -> String {
@@ -1141,7 +1329,7 @@ mod tests {
         let now = Instant::now();
         assert!(!lease.holds(now));
         let held = lease.ask(br#"{"hold":{"for_ms":5000}}"#, QUIET, now);
-        assert_eq!(held.line(), said(r#"{"lease":"held"}"#));
+        assert_eq!(held.line(), said(r#"{"lease":"held","tags":true}"#));
         assert!(lease.holds(now + Duration::from_millis(4999)));
         // Renewed before it lapses, it holds on.
         let later = now + Duration::from_millis(4000);
@@ -1177,7 +1365,7 @@ mod tests {
         let suspended = lease.step(talking, now).unwrap();
         assert_eq!(
             suspended.line(),
-            said(r#"{"lease":"suspended","why":"conversation"}"#)
+            said(r#"{"lease":"suspended","why":"conversation","tags":true}"#)
         );
         assert!(!lease.holds(now), "the conversation has the body");
         assert_eq!(lease.step(talking, now), None, "said once");
@@ -1538,6 +1726,110 @@ mod tests {
         assert_eq!(posing.pose(), None, "the lease's end lets the pose go");
     }
 
+    /// Lead, 16:10 on 10 Nov, from banana's run on lamp-75c9: "elbow back" was asked 43.0 and said there at
+    /// 39.5 with `clamped` false. `clamped` is measured from where the joint reached as well as from the
+    /// pose the body wrote: a joint stopped short of what was asked (by more than `POSE_SHORT_WITHIN`,
+    /// here its own weight at a stand) says `clamped`, and one within it does not.
+    #[test]
+    fn a_pose_that_stopped_short_of_what_was_asked_says_clamped() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        for (reached_elbow, clamped) in [(39.5, true), (42.5, false), (47.0, true), (43.0, false)] {
+            posing.ask(
+                br#"{"pose":{"elbow":43.0}}"#,
+                true,
+                Ok([0.0, 52.7, 43.0]),
+                now,
+            );
+            let mut answer = None;
+            for _ in 0..=THERE_STEPS {
+                let there = Some(PoseSeen {
+                    reached: [0.0, 52.7, reached_elbow],
+                    ..seen([0.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+                });
+                answer = posing.step(Ok(()), there, now);
+            }
+            let answer = value(&answer.expect("there"));
+            assert_eq!(answer["pose"], "there");
+            assert_eq!(answer["elbow"], reached_elbow, "{answer}");
+            assert_eq!(
+                answer["clamped"], clamped,
+                "reached {reached_elbow}: {answer}"
+            );
+        }
+    }
+
+    /// Banana's P2 on cdaa6ed2a5: only the joints the line named are judged. An elbow-only pose on an
+    /// arm whose shoulder sags 3 degrees on its own weight at the stand is not `clamped` for the shoulder.
+    #[test]
+    fn a_pose_judges_only_the_joints_it_named_for_clamped() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        posing.ask(
+            br#"{"pose":{"elbow":43.0}}"#,
+            true,
+            Ok([0.0, 52.7, 43.0]),
+            now,
+        );
+        let mut answer = None;
+        for _ in 0..=THERE_STEPS {
+            let there = Some(PoseSeen {
+                reached: [0.0, 49.6, 43.0],
+                ..seen([0.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+            });
+            answer = posing.step(Ok(()), there, now);
+        }
+        let answer = value(&answer.expect("there"));
+        assert_eq!(answer["shoulder"], 49.6);
+        assert_eq!(answer["clamped"], false, "{answer}");
+        // The named joint short is still said.
+        posing.ask(
+            br#"{"pose":{"elbow":43.0}}"#,
+            true,
+            Ok([0.0, 52.7, 43.0]),
+            now,
+        );
+        let mut answer = None;
+        for _ in 0..=THERE_STEPS {
+            let there = Some(PoseSeen {
+                reached: [0.0, 49.6, 39.5],
+                ..seen([0.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+            });
+            answer = posing.step(Ok(()), there, now);
+        }
+        assert_eq!(value(&answer.expect("there"))["clamped"], true);
+    }
+
+    /// Banana's P3 on cdaa6ed2a5: a roll whose goal is still easing is not settled, so its `there` is never
+    /// judged mid-ease.
+    #[test]
+    fn a_pose_is_not_there_while_the_rolls_goal_still_moves() {
+        let now = Instant::now();
+        let mut posing = Posing::default();
+        posing.ask(
+            br#"{"pose":{"roll":5.0}}"#,
+            true,
+            Ok([0.0, 52.7, 43.0]),
+            now,
+        );
+        for step in 0..=THERE_STEPS * 2 {
+            let easing = Some(PoseSeen {
+                roll: (2_044 + 5 * step as u16, 2_044 + 5 * step as u16),
+                ..seen([5.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+            });
+            assert_eq!(posing.step(Ok(()), easing, now), None, "step {step}");
+        }
+        let mut answer = None;
+        for _ in 0..=THERE_STEPS + 1 {
+            let still = Some(PoseSeen {
+                roll: (2_100, 2_100),
+                ..seen([5.0, 52.7, 43.0], [2_650, 2_600]).unwrap()
+            });
+            answer = answer.or(posing.step(Ok(()), still, now));
+        }
+        assert_eq!(value(&answer.expect("there once still"))["pose"], "there");
+    }
+
     /// A limp is taken only while held, said at once, and any end of the
     /// hold takes it back, said once with why; it never comes back by itself.
     #[test]
@@ -1578,5 +1870,260 @@ mod tests {
 
     fn said_line(text: &str) -> String {
         text.to_owned() + "\n"
+    }
+
+    /// Second's P2 on #5855: a line refused at once overtakes one still
+    /// owed, so each answer says which line it answers by the `tag` it came
+    /// with. A accepted, B refused while A is owed, then A cut: each answer
+    /// carries its own line's `tag`, and a line without `tag` is answered as
+    /// before.
+    #[test]
+    fn each_look_and_pose_answer_carries_its_own_lines_tag() {
+        let now = Instant::now();
+        let mut looking = Looking::default();
+        assert_eq!(
+            looking.ask(br#"{"look":{"yaw":5,"pitch":2},"tag":1}"#, true, REACH, now),
+            None
+        );
+        // B refused at once, while A is owed: B's tag, not A's.
+        let b = value(
+            &looking
+                .ask(br#"{"look":"sideways","tag":2}"#, true, REACH, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (b["look"].as_str(), b["tag"].as_u64()),
+            (Some("refused"), Some(2))
+        );
+        let b = value(
+            &looking
+                .ask(br#"{"look":"ahead","tag":3}"#, false, REACH, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (b["look"].as_str(), b["tag"].as_u64()),
+            (Some("refused"), Some(3))
+        );
+        // A still owed, then cut: A's tag.
+        let a = value(&looking.end("let go").unwrap());
+        assert_eq!(
+            (a["look"].as_str(), a["tag"].as_u64()),
+            (Some("cut_short"), Some(1))
+        );
+        // A replaced by C: A's cut_short with A's tag, at C's ask.
+        looking.ask(br#"{"look":"ahead","tag":4}"#, true, REACH, now);
+        let a = value(
+            &looking
+                .ask(br#"{"look":{"yaw":1,"pitch":1},"tag":5}"#, true, REACH, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (a["look"].as_str(), a["tag"].as_u64()),
+            (Some("cut_short"), Some(4))
+        );
+        let c = value(&looking.step(Err("hand"), None, now).unwrap());
+        assert_eq!(c["tag"].as_u64(), Some(5));
+        // A line without tag: answered as before, with no tag.
+        looking.ask(br#"{"look":"ahead"}"#, true, REACH, now);
+        let old = looking.end("let go").unwrap();
+        assert_eq!(old, said(r#"{"look":"cut_short","why":"let go"}"#));
+
+        let mut posing = Posing::default();
+        let has = Ok([0.0, 52.7, 48.5]);
+        assert_eq!(
+            posing.ask(br#"{"pose":{"shoulder":30},"tag":7}"#, true, has, now),
+            None
+        );
+        let b = value(
+            &posing
+                .ask(br#"{"pose":{"elbow":10},"tag":8}"#, false, has, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (b["pose"].as_str(), b["tag"].as_u64()),
+            (Some("refused"), Some(8))
+        );
+        let b = value(
+            &posing
+                .ask(
+                    br#"{"pose":{"elbow":10},"tag":9}"#,
+                    true,
+                    Err("the lamp is not standing still at its full height"),
+                    now,
+                )
+                .unwrap(),
+        );
+        assert_eq!(
+            (b["pose"].as_str(), b["tag"].as_u64()),
+            (Some("refused"), Some(9))
+        );
+        let a = value(
+            &posing
+                .ask(br#"{"pose":{"elbow":5},"tag":10}"#, true, has, now)
+                .unwrap(),
+        );
+        assert_eq!(
+            (a["pose"].as_str(), a["tag"].as_u64()),
+            (Some("cut_short"), Some(7))
+        );
+        let a = value(&posing.end("let go").unwrap());
+        assert_eq!(
+            (a["pose"].as_str(), a["tag"].as_u64()),
+            (Some("cut_short"), Some(10))
+        );
+        posing.ask(br#"{"pose":{"elbow":5}}"#, true, has, now);
+        assert!(value(&posing.end("let go").unwrap()).get("tag").is_none());
+        // A tag that isn't an unsigned 64-bit integer refuses the line,
+        // and that refusal carries no tag (Second's P3 on #5880).
+        for bad in [
+            &br#"{"look":"ahead","tag":"7"}"#[..],
+            br#"{"look":"ahead","tag":-1}"#,
+            br#"{"look":"ahead","tag":1.5}"#,
+        ] {
+            let answer = value(&Looking::default().ask(bad, true, REACH, now).unwrap());
+            assert_eq!(answer["look"], "refused");
+            assert!(answer.get("tag").is_none());
+        }
+        let answer = value(
+            &Posing::default()
+                .ask(br#"{"pose":{"elbow":5},"tag":"7"}"#, true, has, now)
+                .unwrap(),
+        );
+        assert_eq!(answer["pose"], "refused");
+        assert!(answer.get("tag").is_none());
+        // While limp, a look refused with its own tag.
+        assert_eq!(
+            value(&Limping::look_refused(br#"{"look":"ahead","tag":11}"#))["tag"],
+            11
+        );
+        assert!(
+            value(&Limping::look_refused(br#"{"look":"ahead"}"#))
+                .get("tag")
+                .is_none()
+        );
+    }
+
+    /// Row 34 (the guide): a look at the face in view is one turn toward it
+    /// by the gaze's measure, as any look; and refused, nothing aimed, when
+    /// there is no face to look at.
+    #[test]
+    fn a_look_at_a_face_turns_once_toward_it_and_never_searches() {
+        const TURN: [f32; 2] = [342.0, 200.0];
+        let now = Instant::now();
+        let seen = |x: f32, y: f32, ago_ms: u64| {
+            Some(FaceSeen {
+                x,
+                y,
+                at: now - Duration::from_millis(ago_ms),
+                head: [0.0; 2],
+            })
+        };
+        let face = br#"{"look":"face","tag":4}"#;
+        assert!(Looking::is_face(face));
+        assert!(!Looking::is_face(br#"{"look":"ahead"}"#));
+        assert!(!Looking::is_face(br#"{"look":{"yaw":1,"pitch":2}}"#));
+
+        // A face half across the picture to the right, a bit above the
+        // middle: 171 counts of yaw, 40 of pitch (head up), taken as the
+        // angles they come to, and the usual `done` follows.
+        let mut looking = Looking::default();
+        assert_eq!(
+            looking.ask_face(face, true, REACH, now, seen(0.5, -0.2, 100), Some(TURN)),
+            None
+        );
+        let aim = looking.aim().unwrap();
+        assert!((aim[0] - 171.0).abs() < 0.6, "{aim:?}");
+        assert!((aim[1] + 40.0).abs() < 0.6, "{aim:?}");
+        assert!(!looking.from_home());
+
+        // Not asked again while it is under way; the answer is tagged.
+        let said = value(
+            &looking
+                .ask_face(face, true, REACH, now, seen(0.5, -0.2, 100), Some(TURN))
+                .unwrap(),
+        );
+        assert_eq!(
+            (said["look"].clone(), said["tag"].clone()),
+            ("refused".into(), 4.into())
+        );
+        assert_eq!(said["why"], "another look is still under way");
+
+        // No face, a stale one, a body not held, a gaze not measured: refused
+        // with why, and nothing aimed or changed.
+        for (held, sight, turn, why) in [
+            (true, None, Some(TURN), "no face in view"),
+            (true, seen(0.0, 0.0, 6_001), Some(TURN), "no face in view"),
+            (true, seen(f32::NAN, 0.0, 10), Some(TURN), "no face in view"),
+            (
+                false,
+                seen(0.0, 0.0, 10),
+                Some(TURN),
+                "the body is not held",
+            ),
+            (
+                true,
+                seen(0.0, 0.0, 10),
+                None,
+                "this lamp's gaze is not measured, so it cannot look at a face",
+            ),
+        ] {
+            let mut looking = Looking::default();
+            let said = value(
+                &looking
+                    .ask_face(face, held, REACH, now, sight, turn)
+                    .unwrap(),
+            );
+            assert_eq!(said["look"], "refused", "{why}");
+            assert_eq!(said["why"], why);
+            assert_eq!(looking.aim(), None);
+        }
+
+        // From where the head looked when the picture was taken, not from
+        // home nor the last look's aim (the lead's P2): with the head 20
+        // degrees right of home when the lease was taken, a face at the
+        // middle of the picture keeps the head there, and one half across
+        // adds its half-picture to it.
+        let twenty = 20.0 * COUNTS_PER_DEGREE;
+        let from_there = |x: f32| {
+            Some(FaceSeen {
+                x,
+                y: 0.0,
+                at: now,
+                head: [twenty, 0.0],
+            })
+        };
+        let mut looking = Looking::default();
+        assert_eq!(
+            looking.ask_face(face, true, REACH, now, from_there(0.0), Some(TURN)),
+            None
+        );
+        let aim = looking.aim().unwrap();
+        assert!(
+            (aim[0] - twenty).abs() < 0.6,
+            "{aim:?}: stays 20 degrees right"
+        );
+        assert_eq!(looking.asked().unwrap().0[0].round(), 20.0);
+        let mut looking = Looking::default();
+        looking.ask_face(face, true, REACH, now, from_there(0.5), Some(TURN));
+        let aim = looking.aim().unwrap();
+        assert!((aim[0] - (twenty + 171.0)).abs() < 0.6, "{aim:?}");
+        // A look before it (another aim) changes nothing of where the picture
+        // was taken from.
+        let mut looking = Looking::default();
+        looking.ask(br#"{"look":{"yaw":-30,"pitch":0}}"#, true, REACH, now);
+        looking.asked = None; // answered
+        looking.ask_face(face, true, REACH, now, from_there(0.0), Some(TURN));
+        assert!((looking.aim().unwrap()[0] - twenty).abs() < 0.6);
+        let mut looking = Looking::default();
+        looking.ask_face(
+            face,
+            true,
+            REACH,
+            now,
+            seen(1.0, 0.0, 10),
+            Some([900.0, 200.0]),
+        );
+        assert_eq!(looking.aim().unwrap()[0], REACH.yaw);
+        assert!(looking.asked().unwrap().1, "clamped");
     }
 }

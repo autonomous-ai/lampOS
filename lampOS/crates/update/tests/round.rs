@@ -53,6 +53,8 @@ mod models_file;
 #[path = "round/asleep_quiet.rs"]
 mod asleep_quiet;
 
+#[path = "round/cut_short.rs"]
+mod cut_short;
 #[path = "round/product_adds.rs"]
 mod product_adds;
 #[path = "round/product_carrier.rs"]
@@ -61,10 +63,14 @@ mod product_carrier;
 mod product_companions;
 #[path = "round/recover_start.rs"]
 mod recover_start;
+#[path = "round/reset_hold.rs"]
+mod reset_hold;
 #[path = "round/restart_order.rs"]
 mod restart_order;
 #[path = "round/restart_quiet.rs"]
 mod restart_quiet;
+#[path = "round/round_lines.rs"]
+mod round_lines;
 #[path = "round/self_after_parts.rs"]
 mod self_after_parts;
 #[path = "round/self_cuts.rs"]
@@ -251,9 +257,19 @@ struct FakeSystemd {
     crashing: Vec<String>,
     /// Starts rejected by an unmet condition: systemctl succeeds, unit stays inactive.
     condition_skipped: Vec<String>,
+    /// Each unit's `StatusText`, kept across its restarts as a held body's
+    /// kept unplug request is (#5777).
+    status: BTreeMap<String, String>,
+    /// Units held from their next restart on (#6113).
+    held_at_restart: Vec<String>,
     /// Explicit manager facts, independent of the filesystem classifier.
     setup_properties: Option<String>,
     remove_setup_marker_on_query: bool,
+    /// After setup's next restart, its next `systemctl show` finds it ended
+    /// by itself with this `Result`, and the marker written when the bool
+    /// says so: setup finishing inside the watch (#6820).
+    setup_ends_in_watch: Option<(&'static str, bool)>,
+    setup_ends_armed: bool,
     /// `systemctl show` fails from the first restart on.
     unreachable_after_restart: bool,
     unreachable: bool,
@@ -272,6 +288,9 @@ struct FakeSystemd {
     back_began: Option<u64>,
     /// The next reload stops the round dead, as a power cut would.
     cut_at_reload: bool,
+    /// Run at each reload and restart with the call as recorded: true stops
+    /// the round dead there, as a power cut would.
+    at_call: Option<AtCall>,
     /// Independent recovery must be explicitly armed by a self-update fixture.
     self_recovery: Result<(), String>,
     self_recovery_queries: usize,
@@ -279,7 +298,16 @@ struct FakeSystemd {
     start_refused: Option<String>,
 }
 
+/// What [`FakeSystemd::at_call`] runs at each reload and restart.
+type AtCall = Box<dyn FnMut(&str) -> bool>;
+
 impl FakeSystemd {
+    fn cut_at(&mut self, call: &str) {
+        if self.at_call.as_mut().is_some_and(|at| at(call)) {
+            panic!("the lamp lost power");
+        }
+    }
+
     fn start(&mut self, unit: &str) {
         let text = fs::read_to_string(self.root.join("etc/systemd/system").join(unit)).unwrap();
         if unit.ends_with(".socket") || unit.ends_with(".timer") {
@@ -363,6 +391,25 @@ impl Systemd for FakeSystemd {
             self.failing -= 1;
             return Err("systemctl did not answer within 5 s".into());
         }
+        if self.setup_ends_armed && units.iter().any(|unit| unit == "lamp-setup.service") {
+            self.setup_ends_armed = false;
+            let (result, marker) = self.setup_ends_in_watch.take().unwrap();
+            if marker {
+                let done = self.root.join("var/lib/lampos-setup/done");
+                fs::create_dir_all(done.parent().unwrap()).unwrap();
+                fs::write(done, "done\n").unwrap();
+            }
+            self.units.insert(
+                "lamp-setup.service".into(),
+                Running {
+                    active: "inactive".into(),
+                    sub: "dead".into(),
+                    result: result.into(),
+                    condition: "yes".into(),
+                    ..Running::default()
+                },
+            );
+        }
         Ok(units
             .iter()
             .map(|unit| {
@@ -379,6 +426,7 @@ impl Systemd for FakeSystemd {
                     restarts: running.restarts,
                     result: running.result,
                     condition: running.condition,
+                    status: self.status.get(unit).cloned().unwrap_or_default(),
                 }
             })
             .collect())
@@ -389,18 +437,24 @@ impl Systemd for FakeSystemd {
         if std::mem::take(&mut self.cut_at_reload) {
             panic!("the lamp lost power");
         }
+        self.cut_at("reload");
         Ok(())
     }
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
         self.calls.borrow_mut().push(format!("restart {unit}"));
+        self.cut_at(&format!("restart {unit}"));
         if unit == apply::UNIT {
             return self.applier.as_mut().map_or(Ok(()), |applier| applier());
         }
         self.restarted_at.push((unit.to_owned(), self.now.get()));
+        if self.held_at_restart.iter().any(|name| name == unit) {
+            self.status.insert(unit.to_owned(), HELD_STATUS.into());
+        }
         self.unreachable |= self.unreachable_after_restart;
         self.failing += std::mem::take(&mut self.failing_after_restart);
         self.start(unit);
+        self.setup_ends_armed |= unit == "lamp-setup.service" && self.setup_ends_in_watch.is_some();
         Ok(())
     }
 
@@ -428,6 +482,17 @@ impl Systemd for FakeSystemd {
             }
         };
         self.units.insert(unit.to_owned(), running);
+        Ok(())
+    }
+
+    fn start_added(&mut self, unit: &str) -> Result<(), String> {
+        self.calls
+            .borrow_mut()
+            .push(format!("start --no-block {unit}"));
+        if let Some(why) = &self.start_refused {
+            return Err(why.clone());
+        }
+        self.start(unit);
         Ok(())
     }
 
@@ -620,8 +685,12 @@ impl Lamp {
             lines_asked: Vec::new(),
             crashing: Vec::new(),
             condition_skipped: Vec::new(),
+            status: BTreeMap::new(),
+            held_at_restart: Vec::new(),
             setup_properties: None,
             remove_setup_marker_on_query: false,
+            setup_ends_in_watch: None,
+            setup_ends_armed: false,
             unreachable_after_restart: false,
             unreachable: false,
             failing_after_restart: 0,
@@ -630,6 +699,7 @@ impl Lamp {
             writer: None,
             back_began: None,
             cut_at_reload: false,
+            at_call: None,
             self_recovery: Err("lamp-update-back.timer is not active".into()),
             self_recovery_queries: 0,
             start_refused: None,
@@ -662,6 +732,7 @@ impl Lamp {
             product_settings: false,
             writer_from: None,
             image: false,
+            first_update: false,
         };
         Self {
             _folder: folder,
@@ -1785,9 +1856,11 @@ fn a_switch_cut_short_is_put_back_at_the_next_start() {
     );
     assert_eq!(lamp.calls(), ["reload", "restart lamp-voice.service"]);
     assert!(!lamp.exists("/var/lib/lampos-update/journal.json"));
-    // Build 2 is not taken again once published.
+    // A cut-short says nothing of build 2: it is not refused, and taken
+    // once published (#6266).
+    assert!(lamp.state()["refused"].as_array().is_none_or(Vec::is_empty));
     build_two(&mut lamp);
-    assert!(matches!(lamp.round(), Outcome::Refused(why) if why.contains("was put back")));
+    assert_eq!(lamp.round(), Outcome::Switched(2));
 }
 
 /// Tests' P3 on #4431: a cut just after the round stopped the voice first
@@ -1927,6 +2000,67 @@ fn a_part_its_own_condition_skips_at_the_restart_keeps_the_build() {
     assert_eq!(lamp.systemd.units["lamp-body.service"].active, "inactive");
     assert!(lamp.state()["refused"].as_array().is_none_or(Vec::is_empty));
     // A part that fails at the same restart still puts the build back.
+    let mut lamp = Lamp::new();
+    lamp.systemd.crashing.push("lamp-body.service".into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    assert!(matches!(lamp.round(), Outcome::RolledBack { .. }));
+}
+
+/// What a lamp-body held after a failed unplug fold tells systemd (#5777).
+const HELD_STATUS: &str =
+    "held, nothing moves: startup motion inhibited: unplug request r1 is still kept";
+
+/// #6113: a body held before the update, up and still after a failed unplug
+/// fold, is held after it too, with systemd calling it active. Putting the
+/// build back would fix nothing: the build is kept, and the round says held.
+#[test]
+fn a_body_held_before_the_update_keeps_the_build_and_says_held() {
+    let mut lamp = Lamp::new();
+    lamp.systemd
+        .status
+        .insert("lamp-body.service".into(), HELD_STATUS.into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    let outcome = lamp.round();
+    assert_eq!(outcome.kind(), "held", "{outcome}");
+    assert_eq!(outcome.sequence(), Some(2));
+    assert!(
+        outcome
+            .to_string()
+            .contains("held: lamp-body.service held, nothing moves: startup motion inhibited"),
+        "{outcome}"
+    );
+    assert_eq!(lamp.state()["installed"]["sequence"], 2);
+    assert!(lamp.state()["refused"].as_array().is_none_or(Vec::is_empty));
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("held, nothing moves")),
+        "{:?}",
+        lamp.said
+    );
+    assert!(
+        lamp.read("/var/lib/lampos-update/log.jsonl")
+            .contains("\"event\":\"held\"")
+    );
+}
+
+/// #6113: held only after the switch is this build's doing, as far as the
+/// round can tell: put back, as a part not well is. A body not held that
+/// the new build breaks is put back as before.
+#[test]
+fn a_body_held_or_broken_only_after_the_update_is_put_back() {
+    let mut lamp = Lamp::new();
+    lamp.systemd
+        .held_at_restart
+        .push("lamp-body.service".into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    let outcome = lamp.round();
+    let Outcome::RolledBack { why, .. } = &outcome else {
+        panic!("{outcome:?}");
+    };
+    assert!(why.contains("held, nothing moves"), "{why}");
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+
     let mut lamp = Lamp::new();
     lamp.systemd.crashing.push("lamp-body.service".into());
     lamp.publish(2, &[("lamp-body", "body 2")], &[]);
@@ -2722,13 +2856,97 @@ fn the_apps_off_and_on_hold_through_a_round_and_a_restart() {
     build_with_product_skills(&mut lamp, 3, "voice 1", &checks, &product);
     assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
     assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_off);
-    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "");
+    // Reminders' turn-on is the person's too, kept though its file is on.
+    assert_eq!(
+        fs::read_to_string(state_dir.join("on")).unwrap(),
+        "reminders\n"
+    );
     assert_eq!(
         fs::read_to_string(state_dir.join("off")).unwrap(),
         "dance\n"
     );
     let (running, off) = restarted(&lamp);
     assert_eq!((running, off), (names("reminders"), names("dance")));
+}
+
+/// #5744's readers: the app's off then on of a core skill the build shipped
+/// on is the person's choice, kept in `on` though its file never changed,
+/// so the next build that ships it off leaves it on. One no one touched
+/// goes off with that build. Off again in the app, it stays off.
+#[test]
+fn the_apps_off_then_on_outlives_the_next_build_shipping_it_off() {
+    let repo = |path: &str| {
+        fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../skills")
+                .join(path),
+        )
+        .unwrap()
+    };
+    let off = |text: &str| format!("{}{text}", lamp_update::install::OFF_LINE);
+    let (dance_on, reminders_on) = (repo("dance/skill.toml"), repo("reminders/skill.toml"));
+    let (dance_off, reminders_off) = (off(&dance_on), off(&reminders_on));
+    let (dance_md, reminders_md) = (repo("dance/SKILL.md"), repo("reminders/SKILL.md"));
+    let shipped_on = [
+        ("dance/skill.toml", dance_on.as_str()),
+        ("dance/SKILL.md", dance_md.as_str()),
+        ("reminders/skill.toml", reminders_on.as_str()),
+        ("reminders/SKILL.md", reminders_md.as_str()),
+    ];
+    let mut lamp = Lamp::new().with_skills(&skills_with_checks("1", ""), &[]);
+    for (path, text) in &shipped_on {
+        lamp.put_skill_file(path, text);
+    }
+    lamp.record_as_installs(&shipped_on);
+    let state_dir = lamp.root.join("var/lib/lampos-skills-state");
+    fs::create_dir_all(&state_dir).unwrap();
+    let names = |text: &str| -> Vec<String> { text.lines().map(str::to_owned).collect() };
+
+    assert_eq!(app_turns(&lamp, "off", "dance"), "turned dance off");
+    assert_eq!(app_turns(&lamp, "on", "dance"), "turned dance on");
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_on);
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "dance\n");
+
+    let product = bundle(&[
+        ("dance/skill.toml", dance_off.as_str()),
+        ("dance/SKILL.md", dance_md.as_str()),
+        ("reminders/skill.toml", reminders_off.as_str()),
+        ("reminders/SKILL.md", reminders_md.as_str()),
+    ]);
+    build_with_product_skills(
+        &mut lamp,
+        2,
+        "voice 1",
+        &skills_with_checks("2", ""),
+        &product,
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_on);
+    assert_eq!(
+        lamp.skill_file("reminders/skill.toml").unwrap(),
+        reminders_off
+    );
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "dance\n");
+    assert_eq!(restarted(&lamp), (names("dance"), vec![]));
+
+    // Off again in the app: off, out of `on`, and off through a round.
+    assert_eq!(app_turns(&lamp, "off", "dance"), "turned dance off");
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_off);
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "");
+    build_with_product_skills(
+        &mut lamp,
+        3,
+        "voice 1",
+        &skills_with_checks("3", ""),
+        &product,
+    );
+    assert_eq!(lamp.round(), Outcome::Switched(3), "{:?}", lamp.said);
+    assert_eq!(lamp.skill_file("dance/skill.toml").unwrap(), dance_off);
+    assert_eq!(fs::read_to_string(state_dir.join("on")).unwrap(), "");
+    assert_eq!(
+        fs::read_to_string(state_dir.join("off")).unwrap(),
+        "dance\n"
+    );
 }
 
 /// The guard stays the net: a skill of the person's that the new
@@ -2939,6 +3157,14 @@ impl lamp_update::install::Host for InstallHost {
         Ok(())
     }
 
+    fn add_agent_user(&mut self, user: &str, _: &str) -> Result<(), String> {
+        let passwd = self.0.join("etc/passwd");
+        let mut text = fs::read_to_string(&passwd).unwrap_or_default();
+        text.push_str(&format!("{user}:x:998:998::/home/{user}:/bin/bash\n"));
+        fs::write(passwd, text).unwrap();
+        Ok(())
+    }
+
     fn enable(&mut self, _: &[String]) -> Result<(), String> {
         Ok(())
     }
@@ -2968,6 +3194,10 @@ impl lamp_update::install::Host for InstallHost {
     }
 
     fn restart(&mut self, _: &str) -> Result<(), String> {
+        Ok(())
+    }
+
+    fn refresh(&mut self, _: &[&str]) -> Result<(), String> {
         Ok(())
     }
 
@@ -3261,6 +3491,7 @@ fn update_unit(active: &str, sub: &str) -> UnitState {
         restarts: 0,
         result: String::new(),
         condition: String::new(),
+        status: String::new(),
     }
 }
 
@@ -5024,6 +5255,55 @@ fn a_product_lamp_without_a_tmpfiles_record_takes_the_builds_tmpfiles() {
     assert_eq!(lamp.read(TMPFILES_CONF), new);
     assert_eq!(*tmpfiles.borrow(), [TMPFILES_CONF]);
     assert_eq!(lamp.state()["settings"][TMPFILES_CONF], sha(&new));
+}
+
+/// #6607: lamp-update's own switch file. A lamp in a home has none, and its
+/// unit lacks the switches, so both read off. A build carrying the file
+/// waits while the settings writer is older than this lamp-update; once it
+/// is refreshed, the round writes the file, and the switches read again
+/// after that round are on and differ from the start's: lamp-update starts
+/// itself again (`switches::restart_for`), with no reboot.
+#[test]
+fn a_round_writes_update_env_after_the_writer_refresh_and_the_switches_turn_on() {
+    use lamp_update::switches::{UpdateSwitches, restart_for, update_switches};
+    let (mut lamp, _) = lamp_with_settings();
+    let unset = |_: &str| None;
+    let started = update_switches(&lamp.root, true, unset);
+    assert_eq!(started, UpdateSwitches::default());
+    let on = lamp_update::install::UPDATE_SETTING.1;
+    publish_settings(&mut lamp, 2, vec![Setting::new(manifest::UPDATE_ENV, on)]);
+    let back = lamp
+        .root
+        .join(lamp_update::own::BACK.trim_start_matches('/'));
+    fs::create_dir_all(back.parent().unwrap()).unwrap();
+    fs::write(&back, "old writer").unwrap();
+    lamp.config.writer_from = Some(lamp_update::writer_swap::Running::new(
+        b"lamp-update 1".to_vec(),
+    ));
+    let waits = lamp.round();
+    assert!(
+        matches!(&waits, Outcome::Refused(why) if why.contains("settings writer is older")
+            && why.contains(manifest::UPDATE_ENV)),
+        "{waits:?}"
+    );
+    assert!(!lamp.exists(manifest::UPDATE_ENV));
+    assert!(!restart_for(
+        started,
+        update_switches(&lamp.root, true, unset)
+    ));
+    // Refreshed to it, the round writes the file.
+    fs::write(&back, "lamp-update 1").unwrap();
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read(manifest::UPDATE_ENV), on);
+    let now = update_switches(&lamp.root, true, unset);
+    assert_eq!(
+        now,
+        UpdateSwitches {
+            engines: true,
+            tasks: true
+        }
+    );
+    assert!(restart_for(started, now));
 }
 
 /// The first builder on #4710: a lamp installed before a build turned the

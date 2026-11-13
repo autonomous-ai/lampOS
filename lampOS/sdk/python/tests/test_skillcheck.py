@@ -80,8 +80,14 @@ def test_a_script_is_refused(tmp_path):
     assert "run.py: a script; script skills are a later format" in check(folder).errors
 
 
+def plays(*names: str) -> str:
+    """Rules whose `[[do]]` play these moves: the lamp loads them with the
+    skill, so a move that fails refuses the skill."""
+    return 'version = "0.1.0"\n[permissions]\nlight = true\n' + "".join(f'[[do]]\nbody = {{ move = "{name}" }}\n' for name in names)
+
+
 def test_sounds_and_moves_are_held_to_the_lamps_bounds(tmp_path):
-    folder = skill(tmp_path / "noisy")
+    folder = skill(tmp_path / "noisy", rules=plays("sway"))
     sound(folder / "sounds" / "ok.wav", seconds=1.0)
     sound(folder / "sounds" / "long.wav", seconds=3.5)
     sound(folder / "sounds" / "stereo.wav", seconds=1.0, channels=2)
@@ -154,7 +160,7 @@ def test_nothing_in_a_folder_makes_the_check_raise(tmp_path):
 
 
 def test_an_unreadable_file_is_an_error_not_a_raise(tmp_path):
-    folder = skill(tmp_path / "locked")
+    folder = skill(tmp_path / "locked", rules=plays("locked"))
     (folder / "moves").mkdir()
     locked = folder / "moves" / "locked.json"
     locked.write_text(json.dumps(move("locked")))
@@ -176,7 +182,7 @@ def test_the_command_goes_on_past_a_folder_it_cant_read(tmp_path, capsys):
 
 
 def test_moves_are_held_as_the_body_holds_them(tmp_path):
-    folder = skill(tmp_path / "mover")
+    folder = skill(tmp_path / "mover", rules=plays("ok", "extra", "nameless", "nod", "fast", "short", "far", "rest"))
     (folder / "moves").mkdir()
     cases = {
         "ok": move("ok"),
@@ -200,6 +206,26 @@ def test_moves_are_held_as_the_body_holds_them(tmp_path):
     assert said("short") == ["moves/short.json: it lasts 500 ms, not 1500 to 10000"]
     assert any("farther than 200" in line for line in said("far"))
     assert said("rest") == ["moves/rest.json: it does not begin and end at nothing"]
+
+
+def test_a_recorded_move_the_skill_does_not_play_is_a_warning_never_stricter_than_the_lamp(tmp_path):
+    """The lamp installs a skill whose unplayed moves/ files fail the body's
+    check and leaves them out of `play`: the check says so, and goes on."""
+    folder = skill(tmp_path / "recorded")
+    (folder / "moves").mkdir()
+    (folder / "moves" / "ok.json").write_text(json.dumps(move("ok")))
+    (folder / "moves" / "far.json").write_text(json.dumps(move("far", frames=[[0] * 5, [300, 0, 0, 0, 0], [0] * 5, [0] * 5, [0] * 5])))
+    report = check(folder)
+    assert report.ok, report.errors
+    (said,) = [line for line in report.warnings if line.startswith("moves/far.json")]
+    assert "farther than" in said and "leaves it out" in said
+    assert not [line for line in report.warnings if line.startswith("moves/ok.json")]
+    # Played by the skill's own rules, the same file refuses the skill.
+    played = check(skill(tmp_path / "played", rules=plays("far")))
+    assert played.ok  # no file: the rule's move is missing is the lamp's load to say
+    (tmp_path / "played" / "moves").mkdir()
+    (tmp_path / "played" / "moves" / "far.json").write_text(json.dumps(move("far", frames=[[0] * 5, [300, 0, 0, 0, 0], [0] * 5, [0] * 5, [0] * 5])))
+    assert any(line.startswith("moves/far.json") and "farther than" in line for line in check(tmp_path / "played").errors)
 
 
 def test_a_script_without_a_suffix_is_refused(tmp_path):
@@ -238,7 +264,7 @@ def test_the_first_name_line_is_the_name_even_empty(tmp_path):
 
 
 def test_a_directory_named_as_a_move_is_not_a_file(tmp_path):
-    folder = skill(tmp_path / "dirmove")
+    folder = skill(tmp_path / "dirmove", rules=plays("x"))
     (folder / "moves" / "x.json").mkdir(parents=True)
     assert "moves/x.json: not a file" in check(folder).errors
 
@@ -280,3 +306,149 @@ def test_the_command_names_the_format(tmp_path, capsys):
     folder = skill(tmp_path / "two", rules='format = 2\nversion = "1.0.0"\n')
     assert main(["skill", "check", str(folder)]) == 0
     assert "two: ok, format 2" in capsys.readouterr().out
+
+
+# A skill whose task hands a script to the lamp's agent (`do.task`, format 2): the lamp takes it from a pushed
+# package (lamp-75c9, 13 Nov, stable 12587: `blue-task`, asks light, on), so the check off the lamp must never
+# refuse what the lamp accepts, and must refuse what the lamp refuses in the lamp's own words
+# (crates/skills lib.rs `do.task` rules, task.rs `run_ok` and `grants_of`).
+TASK_RULES = (
+    'format = 2\nversion = "1.0.0"\ngrants = ["light"]\ntool = "blue_task"\n\n[permissions]\nlight = true\n\n'
+    '[[do]]\ntask = { task = "Breathe the light blue for a few seconds", run = "scripts/main.py" }\n'
+)
+
+
+def task_skill(folder: Path, *, rules: str = TASK_RULES, run: str = "scripts/main.py", script: str | None = "print('x')\n") -> Path:
+    folder = skill(folder, rules=rules)
+    if script is not None:
+        target = folder / run
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(script)
+    return folder
+
+
+def test_a_skill_with_a_task_and_its_script_passes(tmp_path):
+    report = check(task_skill(tmp_path / "blue-task"))
+    assert report.ok, report.errors
+    assert report.format == 2
+
+
+def test_a_script_beside_a_task_is_taken_under_scripts_only(tmp_path):
+    folder = task_skill(tmp_path / "blue-task")
+    (folder / "scripts" / "helper.py").write_text("print('h')\n")
+    assert check(folder).ok
+    (folder / "extra.py").write_text("print('e')\n")
+    assert any("extra.py: a script" in e for e in check(folder).errors)
+
+
+def test_a_script_with_no_task_is_still_refused(tmp_path):
+    folder = skill(tmp_path / "plain")
+    (folder / "scripts").mkdir()
+    (folder / "scripts" / "main.py").write_text("print('x')\n")
+    assert any("scripts/main.py: a script" in e for e in check(folder).errors)
+
+
+@pytest.mark.parametrize(
+    "rules, says",
+    [
+        (TASK_RULES + '[[do]]\ntask = { task = "again", run = "scripts/main.py" }\n', "one task"),
+        (TASK_RULES.replace('grants = ["light"]\n', ""), None),  # no grants listed: the lamp takes a task with none
+        ('version = "1.0.0"\ngrants = ["light"]\n[[do]]\nsay = "Hi."\n', "only beside one"),
+        (TASK_RULES.replace('["light"]', '["skills"]'), "never a script's"),
+        (TASK_RULES.replace('["light"]', '["telepathy"]'), "is not a grant"),
+        (TASK_RULES.replace('["light"]', '["light", "light"]'), "listed twice"),
+        (TASK_RULES.replace("Breathe the light blue for a few seconds", ""), "task is 1 to 500 bytes"),
+        (TASK_RULES.replace("Breathe the light blue for a few seconds", "x" * 501), "task is 1 to 500 bytes"),
+        (TASK_RULES.replace("Breathe the light blue for a few seconds", "a\\u0007b"), "task is 1 to 500 bytes"),
+        (TASK_RULES.replace('task = {', 'light = { colour = "blue" }\ntask = {'), "alone in its [[do]] table"),
+        (TASK_RULES.replace('version = "1.0.0"', 'version = "1.0.0"\nkind = "addon"'), "only an installable skill"),
+    ],
+)
+def test_what_the_lamp_refuses_of_a_task_is_refused_in_its_words(tmp_path, rules, says):
+    report = check(task_skill(tmp_path / "blue-task", rules=rules))
+    if says is None:
+        assert report.ok, report.errors
+    else:
+        assert any(says in e for e in report.errors), report.errors
+
+
+@pytest.mark.parametrize(
+    "run",
+    ["main.py", "scripts", "../main.py", "scripts/../main.py", "scripts/.hidden.py", "/scripts/main.py", "scripts\\\\main.py", "scripts/a/b/c/d.py", "other/main.py"],
+)
+def test_a_run_outside_scripts_or_hidden_or_too_deep_is_refused(tmp_path, run):
+    report = check(task_skill(tmp_path / "blue-task", rules=TASK_RULES.replace("scripts/main.py", run), script=None))
+    assert any("do.task: run" in e for e in report.errors), report.errors
+
+
+def test_a_run_missing_or_a_link_is_refused(tmp_path):
+    missing = check(task_skill(tmp_path / "missing", script=None))
+    assert any("is not in the skill's folder" in e for e in missing.errors), missing.errors
+    folder = task_skill(tmp_path / "linked")
+    (folder / "scripts" / "real.py").write_text("print('r')\n")
+    (folder / "scripts" / "main.py").unlink()
+    os.symlink("real.py", folder / "scripts" / "main.py")
+    assert any("a link" in e for e in check(folder).errors)
+
+
+MORNING_MAIL = (
+    'version = "1.0.0"\ngrants = ["gmail-read", "gmail-write"]\ntool = "morning_mail"\n[permissions]\ntopics = ["clock/local"]\n'
+    '[[do]]\ntask = { task = "Sum up this morning\'s mail and send it to me", run = "scripts/main.py" }\n'
+)
+
+
+def test_a_linked_services_grants_pass_the_check_with_a_warning_and_a_push_of_them_is_refused(tmp_path):
+    from lampos.push import asks_beyond
+
+    folder = task_skill(tmp_path / "morning-mail", rules=MORNING_MAIL)
+    report = check(folder)
+    assert report.ok, report.errors
+    assert sum("only a Store or made skill carries one" in w for w in report.warnings) == 2
+    # The lamp refuses a push that names one, whatever the pairing holds (package.rs, #6432), in its words.
+    code, why = asks_beyond(folder, ["skills", "light", "body", "speak", "look"])
+    assert code == "no_grant"  # package.rs gives no_grant to a refusal ending ", which this computer was not granted"
+    assert why == "not installed: it asks gmail-read, a linked service's grant (a skill run's alone), which this computer was not granted"
+    for bad in ("myspace-read", "gmail-app-read", "gmail-delete", "-read"):
+        refused = check(task_skill(tmp_path / f"b{abs(hash(bad))}", rules=MORNING_MAIL.replace("gmail-write", bad)))
+        assert any("is not a grant" in e for e in refused.errors), (bad, refused.errors)
+    twice = check(task_skill(tmp_path / "twice", rules=MORNING_MAIL.replace("gmail-write", "gmail-read")))
+    assert any("listed twice" in e for e in twice.errors)
+
+
+@pytest.mark.parametrize("run", ["scripts//main.py", "scripts/./main.py", "scripts/main.py/"])
+def test_a_run_the_lamp_folds_to_a_plain_path_passes(tmp_path, run):
+    # Rust's Path::components drops empty and "." parts, so the lamp takes these as scripts/main.py.
+    report = check(task_skill(tmp_path / "blue-task", rules=TASK_RULES.replace("scripts/main.py", run)))
+    assert report.ok, report.errors
+
+
+def test_a_leading_dot_slash_run_is_still_refused(tmp_path):
+    report = check(task_skill(tmp_path / "blue-task", rules=TASK_RULES.replace("scripts/main.py", "./scripts/main.py")))
+    assert any("do.task: run" in e for e in report.errors), report.errors
+
+
+def test_a_push_of_a_task_skill_holds_each_grant_its_script_asks_of_the_pairing(tmp_path):
+    from lampos.push import asks_beyond
+
+    folder = task_skill(tmp_path / "blue-task")
+    assert asks_beyond(folder, ["skills", "light"]) is None
+    code, why = asks_beyond(folder, ["skills"])
+    assert code == "no_grant" and "light" in why
+    camera = task_skill(tmp_path / "pics", rules=TASK_RULES.replace('["light"]', '["camera"]'))
+    assert asks_beyond(camera, ["skills", "light"]) is None, "a picture is held for the owner's yes, never refused here"
+
+
+def test_a_task_skill_packs_and_the_fake_lamp_takes_the_push(tmp_path):
+    import asyncio
+
+    from lampos import Lamp
+    from lampos.testing import FakeLamp
+
+    folder = task_skill(tmp_path / "blue-task")
+
+    async def go():
+        async with FakeLamp(grants=("light", "skills")) as fake:
+            async with await fake.connect() as lamp:
+                return await lamp.push_skill(folder)
+
+    assert asyncio.run(go()).get("name") == "blue-task"

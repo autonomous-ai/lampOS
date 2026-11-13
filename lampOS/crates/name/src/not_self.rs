@@ -37,6 +37,23 @@ pub const NEAR: Duration = Duration::from_secs(3);
 /// How far back the spans of speaking are kept: longer than a hearing
 /// lasts before it is said (`said.rs`, 0.8 s) and its first sign.
 const KEPT: Duration = Duration::from_secs(10);
+/// How long before the name's own hearing a near hearing (`--near`) may
+/// have begun and still be the same call (#6114): a call's score climbs
+/// past the near bar a step or a few before the name's.
+pub const CALL_LEAD: Duration = Duration::from_millis(500);
+
+/// When the call a name hearing that began at `name` heard began (#6114):
+/// the near hearing's start, when one is going on and began up to
+/// [`CALL_LEAD`] before it, else the name's own. One call is judged from
+/// its first sound by both bars: on 52e6 on 12 Nov the near hearing, begun
+/// before the lamp spoke, went out at 0.972 while the name's, begun a step
+/// later inside the lamp's speech, was passed over, and no request opened.
+pub fn call_began(name: Instant, near: Option<Instant>) -> Instant {
+    match near {
+        Some(near) if near <= name && name.saturating_duration_since(near) <= CALL_LEAD => near,
+        _ => name,
+    }
+}
 
 /// When the lamp spoke, as `voice/state` said it.
 #[derive(Debug, Default)]
@@ -133,6 +150,32 @@ mod tests {
 
     fn ms(n: u64) -> Duration {
         Duration::from_millis(n)
+    }
+
+    /// #6114, cause 2 (the lamp began to speak inside the call): the near
+    /// bar's hearing begins at the call's first sound, before the lamp
+    /// spoke; the name's begins later, at its first score over 0.9, after
+    /// the lamp began. One call is let through or passed over as one.
+    #[test]
+    fn issue_6114_one_call_is_judged_once_whichever_bar_it_began_at() {
+        let start = Instant::now();
+        let mut speaking = Speaking::default();
+        speaking.saw(false, start);
+        let near_began = start + ms(1_000);
+        speaking.saw(true, start + ms(1_120));
+        let name_began = start + ms(1_160);
+        let now = start + ms(1_400);
+        let near_through = speaking.lets_through(now - near_began, now);
+        let call = call_began(name_began, Some(near_began));
+        let name_through = speaking.lets_through(now - call, now);
+        assert!(
+            near_through && name_through,
+            "near {near_through}, name {name_through}"
+        );
+        // A near begun long before, or none, leaves the name's own start.
+        assert_eq!(call_began(name_began, Some(start)), name_began);
+        assert_eq!(call_began(name_began, None), name_began);
+        assert_eq!(call_began(near_began, Some(name_began)), near_began);
     }
 
     /// The two cases asked for on #705: a hearing that began inside the

@@ -5,9 +5,12 @@ what an office lamp sees and is doing. It came out of `where_you_sit` failing
 twice on lamp-52e6 on 20 Oct 2026. The cause was a person sitting to the side,
 and only a Mac's camera pointed at the lamp showed it.
 
-It is **off unless `LAMP_PEEK=on`**. It is **never in `deploy/product`**, and
-**never on a person's lamp**: putting it there would loosen privacy, which is
-the owner's call.
+It is **off unless `LAMP_PEEK=on`**. The office page (`on`) is **never on a
+person's lamp**: putting it there would loosen privacy, which is the owner's
+call. Monitor mode (`LAMP_PEEK=monitor`, [below](#monitor-mode-lamp_peekmonitor-5883-first-piece))
+is the way the owner's own lamp offers it: `deploy/product/lamp-peek.service`
+is on every lamp with neither set, and only the owner's switch in the app
+writes `monitor` (#5883).
 
 ## The one page
 
@@ -290,7 +293,7 @@ and it is not started again, since on port 80 it would keep the port from
 setup, which ends serving at once on a port still held (`serve.rs`). It
 comes back at the lamp's next boot once setup is done. Before this, an
 in-place reset on such a lamp left setup with no page on the hotspot
-(#4536). Product lamps don't install it. It has no `Conflicts=`
+(#4536). The product's unit (`deploy/product/lamp-peek.service`, monitor mode only) sits outside `lampos.target` for the same reasons. It has no `Conflicts=`
 with `lamp-setup.service`: both are wanted by `multi-user.target`, and at
 boot after a reset systemd would keep this unit's start and drop setup's,
 and then this unit's condition fails and nothing listens (the reviewer on
@@ -325,6 +328,60 @@ token, or with one too short, it refuses to start (exit 2).
 - Without the token, a request gets only the form: nothing of the lamp.
 - Every answer is `Cache-Control: no-store`, `Referrer-Policy: no-referrer`,
   `X-Frame-Options: DENY`.
+
+## Monitor mode: `LAMP_PEEK=monitor` (#5883, first piece)
+
+A developer who owns the lamp opens the same page from a computer or phone
+on the same Wi-Fi, by a one-time link from the app. The product installs
+`deploy/product/lamp-peek.service` (outside `lampos.target`, as `lampos`)
+with no `LAMP_PEEK`, so nothing listens; lamp-cloud's `monitor.set` (with
+`LAMP_APP_MONITOR=on`, cloud.md, "The dev monitor") has root's helper write
+the drop-in below and restart it, or stop it and remove the drop-in, and
+`monitor.link` asks the admin socket for the code. The timeline and camera
+frames are later pieces of #5883's plan. **Off by default:** with `LAMP_PEEK` unset, or anything but `on` or
+`monitor` exactly, the binary ends at once, nothing listens and no admin
+socket is made.
+
+```ini
+# /etc/systemd/system/lamp-peek.service.d/monitor.conf
+[Service]
+Environment=LAMP_PEEK=monitor
+```
+
+- **Where:** `0.0.0.0:80` unless `LAMP_PEEK_LISTEN` says otherwise, so the
+  page is `http://lamp-xxxx.local/`. The static token is not read: no
+  `/token` form or `Authorization` header opens it.
+- **Local network only.** A request from a peer outside 10/8, 172.16/12,
+  192.168/16, 169.254/16, fe80::/10, fc00::/7 or loopback (IPv4 mapped in
+  IPv6 read as IPv4) gets 403 and nothing of the lamp. `Host` must be the
+  lamp's host name, its `.local` name (`/proc/sys/kernel/hostname`), or the
+  address the request came to, with or without a port; any other name gets
+  403 (DNS rebinding). Both checks come before anything else, on every path.
+- **The way in, a one-time code.** lamp-cloud asks on the admin socket,
+  `/run/lampos-peek/admin.sock` (`LAMP_PEEK_ADMIN_SOCKET`; the unit's
+  `RuntimeDirectory=lampos-peek`, mode 0700, socket 0600: the lamp's user
+  and root only). Each connection gets one code, 32 random bytes as 64 hex
+  digits, followed by a newline. A code is good **once**, for **5 minutes**
+  (`monitor::CODE_LASTS`); at most 8 wait at once, the oldest going first.
+- **The link carries the code in its fragment**, `http://lamp-xxxx.local/in#<code>`,
+  so it is never in a request line or a log. `/in`'s few lines of script
+  wipe the fragment from the address and history, post the code once
+  (`POST /in`, `code=...`), and open `/`. A code in the address (`?code=`)
+  is refused (400) and not spent.
+- **A session cookie, in memory only:** `peek_session=<64 hex>; HttpOnly;
+  SameSite=Strict; Path=/`, a random value, not the code. It opens every
+  view and the stream. Sessions end after 12 hours, when peek stops or
+  restarts (nothing is written), or when the switch goes off; a stream
+  already open ends with its session, checked before each push and again
+  before a push's sections are sent; a push still reading when the session
+  ends is dropped there and sends nothing. At most 4 are
+  open; a fifth code gets 429 and is kept for when one ends.
+- A used, expired or unknown code gets 401: "This link was used or is out of
+  date: get a new one in the app." Without a session, every view gets 401 and
+  only "Open the dev monitor from its link in the app."
+- **Plain HTTP, as V1's monitor was:** on the home network the cookie
+  crosses in clear; anyone on that Wi-Fi who reads it can open the page
+  until it ends.
 
 ## What it cannot see
 
@@ -415,6 +472,30 @@ own, and asks for it over HTTP:
   setup condition, no `Conflicts=` with setup, and its one capability.
 - `the_units_are_read_once_however_many_ask_at_once`: four asking at once
   while the rows have run out make one read.
+- Monitor mode (#5883):
+  - `monitor_mode_is_off_by_default_and_nothing_listens`: `LAMP_PEEK`
+    unset, `off`, `MONITOR` or `monitor ` ends the binary at 0; nothing
+    answers on the port and no admin socket is made.
+  - `monitor_mode_refuses_an_off_lan_peer_and_a_foreign_host`: a peer at
+    203.0.113.9 gets 403 on every view, `/in` and the stream; from the
+    LAN, `Host` other than the lamp's names or address gets 403, and the
+    lamp's own gets the way in, the views 401 without a session.
+  - `monitor_mode_a_code_opens_once_and_its_cookie_dies_with_a_restart`:
+    the binary on a real socket; the admin socket is 0600; `?code=` is 400;
+    the code posted once sets the cookie, which opens every view; posted
+    again it is 401; the token's form opens nothing; after a restart the
+    cookie gets 401.
+  - `monitor_mode_an_open_stream_ends_with_its_session`: an open `/events`
+    ends when its session does; then `/bus` with the cookie is 401.
+  - `monitor_mode_a_session_ending_during_a_read_sends_nothing_read_after`:
+    units read slowly, returning a row of their own 1 s after the session's
+    end; the stream ends within 500 ms of the end without that row, and
+    `/bus` is 401.
+  - `monitor::tests`: a code works once; on a fake clock it is good at
+    4:59 and refused at 5:00; a fifth browser is refused and sessions end at
+    12 h; a new gate (a restart) knows no session or code; the LAN and
+    `Host` tables.
+  - `tests::only_monitor_asks_for_monitor_mode`.
 - `units::tests::a_command_past_its_deadline_is_killed_and_tells_nothing`:
   a command that ends tells its output; `sleep 30` with a 200 ms deadline
   tells nothing, well within 5 s; past the deadline none is started.

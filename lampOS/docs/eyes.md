@@ -771,7 +771,7 @@ this room" until someone asks to be recognised.
   remembered, and at the first look after someone is remembered at the
   lamp, so the known file names them within one look, not two seconds
   later (#3108; `who::recognise_due`). With `LAMP_FACE_REFOUND=on` (off
-  unless set, #4486) a check is also due at once when the near face's
+  unless set, #4486; on in the product unit since C65) a check is also due at once when the near face's
   passing id is not among the ids a print was read for (the newest 16), so
   a face turned away and back, which comes back with a new id, is known in
   its first look. A face too small to be near has no near id and forces
@@ -1135,7 +1135,9 @@ times in a day and a half, and a line said while the file named nobody,
 with their face still in view, is the room's.
 
 **The followed id** (#4885), only with both `LAMP_FACE_KNOWN_HOLD=on` and
-`LAMP_FACE_REFOUND=on` (off unless set; `bus_out::follows_from_environment`).
+`LAMP_FACE_REFOUND=on` (off unless set, both on in the product unit,
+`LAMP_FACE_REFOUND` since C65, the memory owner's call;
+`bus_out::follows_from_environment`).
 A face turned away and back usually comes back on a new passing id, and the
 hold, which needs the match's id, let them go. With both on:
 
@@ -1149,7 +1151,12 @@ hold, which needs the match's id, let them go. With both on:
   face whose new id follows the id at the match (`who::Held::follow`), a
   print of that face at least 0.30 alike to the held person makes the new
   id the match's (`who::Held::carry`), and the known face beside the known
-  file is rewritten to it with the name as it was. Until such a print, the
+  file is rewritten to it with the name as it was. A new id always comes
+  after a look with a near face but not the match's id, so that print must
+  first read at least 0.363 (`SAME_PERSON`) to the eyes' own print of them
+  (`who::Held::printed`, #5546): someone else beside their lost id, alike
+  enough to their kept prints, is still let go
+  (`a_followed_id_after_its_gap_carries_only_a_print_read_as_theirs`). Until such a print, the
   new id is another id: seen but not printed (turned, too small), it lets
   them go at once and the known file is removed, as before the followed id,
   so their name never goes on an id no print has shown is theirs (the
@@ -1470,6 +1477,9 @@ With the switch:
   spelled name back as a name only, never as letters nor as a choice
   between the name and its spelling (`SAY_IT_BACK`, `NOT_HEARD`,
   `NOT_HEARD_SPELLED`, `NEAR_TO`); `NOT_HEARD_SAY_AGAIN` says no name back.
+  At setup, with the onboarding nudge off, a person's line that spells
+  their name is told the read-back to say beside it, the name as a word
+  ([onboarding.md](onboarding.md), #5580 row 2).
 
   Why the turn in hand, from lamp-4ace on 16 October at 16:46 (the first
   builder on #1057, the records described without the words): a
@@ -1505,23 +1515,54 @@ With the switch:
     nothing is sent and the model is told to say the name back and ask if
     it is right (`SAY_IT_BACK`). The voice keeps that refused save
     (`second_provider::HeldSave`, as a held forget is kept) and runs it
-    itself on the person's next turn when that turn is a plain yes to the
-    read-back (`known_faces::held_save_verdict`, which judges a name held
+    itself once the person agrees to their face being kept
+    (`known_faces::face_agreed`): a plain yes to the face question after
+    the name's yes, or a yes to the read-back whose own words ask for the
+    face ("Yes. That's right. Please remember my face."). A plain yes to
+    the read-back alone keeps it held and the model is told to ask "May I
+    remember your face, so I know you next time?" first; anything but a
+    plain yes to that drops it (the first builder's HOLD on #5700: the
+    walk keeps a face only after a clear yes to that question). The name
+    is judged as `known_faces::held_save_verdict` judges it (a name held
     as letters, "J-A-N-E", as the word they make, "Jane", as the run
-    does: Fifth's P2 on #5580), through the same runner
+    does: Fifth's P2 on #5580). It runs through the same runner
     and check as a model call, so it counts as the walk's face save; the
     model is told the face is kept, or, when the eyes keep nothing, that it
     was not kept and why, and a model call after it gets
     `ALREADY_KEPT`, never a second save. A correction, a spelling, another
-    name, a no, a new save call, a second face seen speaking the yes (or,
-    where the eyes read speaking, the speaker not seen saying it), a line
-    held by a face's gap, another session or 45 s (`HELD_SAVE_FOR`) drops
-    it (lamp-52e6, 5 Nov, #5391's check: "Walter. Have I got that
-    right?" "Yes, that's my name." made no call and kept no face). A
-    plain yes dropped for the second face or the speaker not seen saying
-    it is told to the model as a face not kept, and why, so it makes up no
-    reason of its own (lamp-52e6, 5 Nov, Fifth's run B on #5415: "I need
-    to know who you are first"). While
+    name, a no, a new save call, a second face seen speaking the yes, a
+    line held by a face's gap, another session or 45 s (`HELD_SAVE_FOR`)
+    drops it (lamp-52e6, 5 Nov, #5391's check: "Walter. Have I got that
+    right?" "Yes, that's my name." made no call and kept no face). A yes
+    no face was seen saying, even with no face in view, still runs it
+    (the lead, 9 Nov: the owner may not face the lamp; when the eyes then
+    find no face, the model is told it was not kept, and why). A plain
+    yes dropped for the second face is told to the model as a face not
+    kept, and why, so it makes up no reason of its own (lamp-52e6, 5 Nov,
+    Fifth's run B on #5415: "I need to know who you are first"). With nothing held, while "who you are"
+    is still open and no face was kept in the last 45 s, a plain yes to
+    the name the lamp's last answer said back, the name the person's line
+    before gave (`known_faces::read_back_name`), has the model told to ask
+    the face question, and a plain yes to that question (or a yes to the
+    read-back that asks for the face itself) runs the same save with no
+    model call at all, through the same gates (`second_provider::yes_save`,
+    `known_faces::face_agreed_name`); a model save of that name within
+    45 s after it gets `ALREADY_KEPT` (#5684: "Name is Walter.", "Walter,
+    did I get that right?", "Yes. That's my name." with no call ended the
+    step with the name only). The face question is known in English and
+    Vietnamese; in another language its yes still waits on the model's
+    call. It is a line that asks leave to remember their face ("May I",
+    "Can I", "Shall I", "Do you want me to" … then "remember your face"
+    or "remember the face"), with nothing in it that turns it round or
+    makes it a choice ("not", a "n't" word, "never", "forget", "rather",
+    "unless", "instead", "or", "without", "skip", "no"; in Vietnamese
+    "nhớ khuôn mặt" with "đừng", "quên", "chẳng", "hay" or "hoặc"
+    anywhere, or "không"/"chưa" before that "nhớ"), so a yes to "Would
+    you rather I didn't remember your face?" or "May I remember just
+    your name, without your face?" keeps nothing (Fourteen's HOLDs on
+    #5720). A read-back and the face question in one line
+    ("Walter, did I get that right? May I remember your face?" "Yes.")
+    is neither, so its face waits on the model's call. While
     it is held, the onboarding walk keeps "who you are" open for it, up to
     45 s (`onboarding::face_save_held`, `FACE_SAVE_HELD_US`), instead of
     ending it done with the name only 15 s after the lamp's read-back
@@ -1675,7 +1716,11 @@ With the switch:
     it changed, without the old name, which can't be shown to whoever
     is speaking. A turn proven someone else's (faces seen saying it while
     the eyes know who is in view and none is the asker's, or another
-    known face alone in view) is told nothing. The eyes read who said
+    known face alone in view) is told nothing. A forget (`forget`,
+    `forget_everything` or `forget_my_face`) ends the held rename and this
+    note once it is let run, before it is awaited, on that turn and every
+    later one, even if the turn is then revoked or dropped
+    (`held_rename::forgot`). The eyes read who said
     each line while the note waits. The only wait left on a yes is the eyes' own (`DEADLINE`, 6
     s; about 2 s on 29e7), under the wait sound. Off, everything is byte
     for byte as before. Tests: `known_faces::tests::the_29e7_yeses_to_a_rename_are_agreed_by_their_guards`,
@@ -1907,6 +1952,17 @@ introduction. Both the heard line and raw requested name are limited to
 4 KiB. Existing spelling and letter-count checks still apply. A word name
 that collides with the refusal vocabulary needs a spelling-only response.
 Earlier exchanges and model-supplied face identifiers are not evidence.
+At setup (while "who you are" is open), a name alone keeps no face
+(B3472, after #3472): the same line must also give the speaker's own leave
+for their face. Either it asks to keep their own face ("My name is Kess,
+remember my face."), or the lamp's last line was setup's face question
+("May I remember your face, so I know you next time?") and the line agrees
+to it without asking anything ("Yes, my name is Kess."). A refusal word
+anywhere in the line, someone else's face ("remember her face") or a plain
+"I'm Kess." refuses before Eyes is asked, and the model is told to ask the
+face question and wait for a yes that includes the name. The lamp's last
+line is its own words and never supplies a name. Past setup, and with the
+switch off, nothing changes.
 With `LAMP_MEMORY_ROOM_SPEAKER` also on, its background attribution keeps
 this same request's enrollment proof through the live scope check. It does
 not replace the proof with visibility or a room speaker. A cancelled,
@@ -2106,7 +2162,8 @@ looking.
 
 ### A face from a photo (`--photo-dir`, faces from a photo)
 
-Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given, which needs the
+Off unless `lamp-eyes --photo-dir ABSOLUTE_PATH` is given (the product unit
+gives `--photo-dir /run/lampos-photos` since 9 Nov, #5750), which needs the
 recogniser (`--recogniser`, `--people`, `--who-socket`). On a lamp the
 folder is `/run/lampos-photos` (`lampos`'s, 0700), made at boot by the
 product's tmpfiles and belonging to neither the eyes' unit nor lamp-cloud's
@@ -2138,7 +2195,9 @@ kept **unconfirmed**, until its person says yes at the lamp:
   `people.json`. An older build never reads it, so never takes it for
   someone who asked. At most 20. It's **never named, counted, greeted or
   used for "who is this?"**: recognition, the known file, `humans/familiar`
-  and the hello read the people's file only. The answer is
+  and the hello read the people's file only. With such a face at the lamp the
+  second voice is told only that it is not anyone the lamp knows
+  (`worker::nobody_known_told`, #5750). The answer is
   `{"added":NAME,"unconfirmed":true}`. A face already someone's who asked is
   theirs: `{"remembered":NAME}` for the same name, `known_as` for another.
 - **When it's at the lamp:** recognition finds nobody who asked, but an
@@ -2211,15 +2270,25 @@ kept **unconfirmed**, until its person says yes at the lamp:
     five at most, as one remembered at the lamp keeps, and the remembering's
     own answers. A yes the store refuses (`full`)
     leaves it unconfirmed as it was.
-  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`).
+  - `{"photo_no":NAME}` deletes it (`{"let_go":true}`); `{"let_go":false}`
+    when there was no such face, and `storage` when the deletion couldn't be
+    saved. The voice says "let go" only on `{"let_go":true}`.
   - **No answer:** once asked, a face not seen for 20 s, the meeting over,
     is let go (`photo::unanswered`, `MEETING_GAP_US`).
   - **"Forget my face"** deletes it too.
 - **Never confirmed:** deleted 30 days after it was added
   (`UNCONFIRMED_FOR_S`), looked at once a second. A `.from-photos` file that
   can't be read is removed, so no print sits out of that reach.
-- **The product reset** wipes `<people>.from-photos` with `people.json`
-  (`reset-plan-product.json`).
+- **A deletion not saved** (a no, a meeting's end, the 30 days, "forget my
+  face") deletes nothing: the face stays in memory as on disk, and the next
+  no, look or forget tries again (`photo::Unconfirmeds::let_go`, `expire`).
+- **Its staging copy** `<people>.from-photos.new`: a save writes it, then
+  renames it over the file. A write or rename that fails removes it, and one
+  a crash left is removed at the next start (`Unconfirmeds::open`). One that
+  can't be removed then is tried again on every look, about once a second,
+  whether or not any face from a photo is kept (`expire`).
+- **The product reset** wipes `<people>.from-photos` and
+  `<people>.from-photos.new` with `people.json` (`reset-plan-product.json`).
 - **The answers** are the voice's: `photos_off`, `not_a_name`, `unreadable`
   (no file, a link, too large, not a JPEG), `no_face`, `too_far`,
   `two_faces`, `known_as`, `full`, `not_here`, `not_asked`, `not_that_face`,
@@ -2241,7 +2310,14 @@ socket; `crates/voice/src/photo_faces.rs`):
   was asked isn't asked again, even after the voice restarts. The
   voice then says, once, as its own written turn (`photo_face_ask`): "Someone
   added your face from a photo, as NAME. Shall I remember you?" It doesn't
-  use the name as theirs unless they agree.
+  use the name as theirs unless they agree. In English these are the lamp's
+  own words, said as they are with no chat (`photo_faces::turn`,
+  `onboarding::said_as_is`), so nothing in the thread changes them: on
+  lamp-52e6 (10 Nov, #5907) the model, writing the ask, once said "I didn't
+  catch that. Try once more when I stop talking." and, for a photo added
+  again after a no, "I already asked, and you said no", and the yes after
+  that was never taken. In another language, or for a name with a `"`, the
+  model still says the question in its own words.
 - **Their spoken answer** calls `photo_face_yes` or `photo_face_no`. These
   run in the provider's worker, a process apart from the coordinator that
   asked, so they take the face from the eyes, the unconfirmed one
@@ -2681,6 +2757,49 @@ Arithmetic on the looks the eyes already make, and with the recogniser the
 few prints above, on frames the eyes already have: no model or frame is
 added. Its cost on a lamp is #1678's CPU run; how well the states are told
 apart is its scripted sitting.
+
+#### A sitting kept across a restart
+
+`sitting_s` is counted in the eyes' memory from the sitting's first face,
+so before this every restart of lamp-eyes (an update restarts it, several
+times a day) began it at 0, and every nudge that waits on it (a sip of
+water after 50 minutes, rest your eyes after 45, stand up after 100, a
+comfort break after 90) waited its whole time again. Now, while activity is
+said, the eyes keep the sitting in `/run/lampos-eyes-kept/sitting.json`
+(`crates/eyes/src/sitting.rs`): written at once when a sitting begins, ends
+(removed) or changes its baseline or state, and every 30 s while it goes on;
+0600, written whole beside it and moved over it, never through a link. The
+folder is `lampos`'s, 0700, made at boot by the product's tmpfiles
+(install.md), on tmpfs, so a reboot empties it. It is not the eyes'
+runtime folder `/run/lampos-eyes`, which a restart still empties, so no
+sight frame, full look or known file outlives the run that wrote it. The
+file holds the boot id, when it was written, when the sitting began, when
+and where the sitter's face was last seen (its box and pitch), the
+sitting's baseline and the state said, on the bus's monotonic clock. Never
+a print, a yawn count or a picture: after a restart the yawns begin at 0,
+and with the recogniser the sitter's prints are taken again.
+
+At the start it is read only if it is this boot's
+(`/proc/sys/kernel/random/boot_id`) and was written within the sitting's
+two-minute gap (`RoomActivity::SITTING_GAP_S`), and taken back only at the
+run's first look, only if the sitter was last seen within that gap of the
+look and a near face of that look is at the sitter's place, or where they
+sat. The restart's seconds then count as a gap in the sitting, exactly as a
+look away of as long does, so `sitting_s` is never longer than a sitting
+the eyes could have seen. A file of another boot, an older one, nobody at
+the first look, or a face elsewhere: nothing is taken, and the sitting
+begins at that look as before. With `LAMP_ACTIVITY=on` and the recogniser
+(the sitter told by face) it is never taken back: their prints are never
+written, so after a restart no print could tell them from someone else
+sitting down in their place (`LAMP_ACTIVITY=place`, the product's, takes it
+back by place). Until the first look has tried it, the file is left as it
+is, so a second restart before the camera opens does not lose it. With no
+look within the gap (the camera closed), it is let go and the file removed.
+A reset that starts setup in place empties the folder (`reset::VOLATILE`,
+setup.md). The journal says what was kept and whether it was taken back.
+Pure tests in `sitting.rs`: kept across a 10 s restart on one boot; not past
+the gap, across a boot, or without the sitter at their place; told by face,
+someone else at the place begins a new sitting.
 
 #### A sitting's yawns (`LAMP_EYES_YAWN=on`, #3709)
 

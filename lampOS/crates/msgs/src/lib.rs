@@ -123,15 +123,30 @@ pub mod owner_place;
 /// `docs/chosen-voice.md`).
 pub mod chosen_voice;
 
+/// The local agent's user, group, socket folder and drop-in text (the owner's
+/// switch, `docs/control.md`).
+pub mod local_agent;
+
 /// The face expressions and room sounds yeses, kept for the eyes and the
 /// ears, given by voice or in the app (#5500, `docs/onboarding.md`).
 pub mod consent;
+
+/// Whether Harness's own self-update is held: on the stable feed and any
+/// other, not on the lamp-voice feed (the canary, #6300). Decided here for
+/// lamp-tasks and lamp-update both.
+pub mod harness_hold;
 
 /// The safe shutdown's line (#3697, `docs/shutdown.md`): said by
 /// `lamp-setup shutdown-now` and rendered ahead into the voice's speech
 /// cache, which is keyed by these exact words, so both take them from here.
 /// The ring's unplug light is soft green.
 pub const GOING_TO_SLEEP: &str = "Going to sleep now. Unplug me when my light turns green.";
+
+/// The factory reset's line (#5929, V1's "Factory reset starting"): said by
+/// `lamp-setup reset-now` when the reset button is let go after its 5 s,
+/// before the reset stops the voice, played from the voice's speech cache,
+/// which is keyed by these exact words.
+pub const RESET_STARTING: &str = "Factory reset starting.";
 
 /// The sleep line (#3748, `docs/controls.md`): said by a hand's hold on the
 /// head with `LAMP_SLEEP_LINE=on`, played from the voice's speech cache
@@ -188,6 +203,16 @@ impl Audio {
     /// voice publishes here only while every subscriber is the name
     /// listener (`lamp-name --sleep-source`); any other stops it.
     pub const SLEEP_TOPIC: &str = "mic2/sleep_audio";
+    /// Sound a paired computer sends to the lamp's speaker (`speaker.stream`,
+    /// docs/control.md "The speaker"): the same header and `json+pcm` payload
+    /// as a microphone's block, 24 kHz mono S16LE (the voice's speaker path),
+    /// published by lamp-control alone and read by the voice only while it
+    /// holds that computer's open stream. A block is 10 to 100 ms long, not
+    /// the microphone's fixed 20 ms.
+    pub const SPEAKER_TOPIC: &str = "speaker/audio";
+    /// The speaker path's sample rate, in hertz: the only one on
+    /// [`Audio::SPEAKER_TOPIC`].
+    pub const SPEAKER_SAMPLE_RATE: u32 = 24_000;
     /// The bus's label for a payload made by [`Audio::block`].
     pub const ENCODING: &str = "json+pcm";
     pub const S16LE: &str = "S16LE";
@@ -195,6 +220,12 @@ impl Audio {
     /// A stream: each block is over when it has been sent. One every 20 ms.
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Event).every(Duration::from_millis(20))
+    }
+
+    /// A stream to the speaker: blocks of 10 to 100 ms, so one at least every
+    /// 100 ms while a stream runs.
+    pub fn speaker_declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event).every(Duration::from_millis(100))
     }
 
     /// A message's payload: this header, a line end, then `samples`.
@@ -664,6 +695,15 @@ pub enum Room {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RoomState {
     pub state: Room,
+    /// Whether the conversation has shown another person than the one it
+    /// began with (a voice printed as another's, or two faces seen speaking
+    /// a line): `Some(false)` is a tracker saying there was none, `Some(true)`
+    /// that there was. Absent when nothing tracks it (the rule is off, or the
+    /// publisher is the Live worker): no proof either way. Read by
+    /// lamp-voice's reply scope (`scope: owner`), which needs it present and
+    /// false, aged as `state` is.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub another_voice: Option<bool>,
 }
 
 impl RoomState {
@@ -731,6 +771,150 @@ impl VoiceRemarked {
     pub fn declaration() -> Declaration {
         Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
     }
+}
+
+/// Who had the lamp say a line (`voice/line`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineBy {
+    /// The lamp's own words: its answers, its fixed phrases.
+    Lamp,
+    /// A paired computer's `say`, word for word.
+    Computer,
+    /// A skill's `say`.
+    Skill,
+}
+
+/// Where a line's words came from (`voice/line`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineSource {
+    /// The model's answer: the provider's transcript of it.
+    Reply,
+    /// Words as sent, rendered straight through the speech service.
+    Exact,
+    /// A fixed line played from the speech cache.
+    Cached,
+    /// A line recorded at build time.
+    Recording,
+}
+
+/// A line the lamp says (`voice/line`, #4209): once, when it begins to play
+/// (a reply: when it has played to its end or been cut). The lamp's own words, or the
+/// words a computer or a skill had it say, never a person's.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SaidLine {
+    pub text: String,
+    pub by: LineBy,
+    pub source: LineSource,
+    /// The computer's name (its pairing's) or the skill's, when `by` says.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub app: Option<String>,
+    /// The request this answers, as `voice/said` numbers it, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request: Option<u64>,
+    /// A reply that was cut short (talked over, stopped, or the voice
+    /// went on): `text` is what the model wrote, which the lamp may not
+    /// have said in full. Absent when the line played to its end.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub cut: bool,
+    /// `owner` on a reply said while the owner was alone in view, every
+    /// moment of it (`voice/src/said_scope.rs`): the only reply a computer
+    /// may be told (lamp-control's `lamp.said`). Absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<LineScope>,
+}
+
+/// Whose a line is ([`SaidLine::scope`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LineScope {
+    Owner,
+}
+
+impl SaidLine {
+    pub const TYPE: &str = "lamp_msgs/SaidLine";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "voice/line";
+
+    /// One a line, as it begins: no period is promised.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+/// The lamp's lines (`voice/line`), apart from the first topics.
+pub fn line_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(SaidLine::TOPIC, SaidLine::declaration())]
+}
+
+/// A hand in view (`humans/hands/tracked`, #4375's follow a hand): the
+/// palm's centre from the picture's left and top and its width, each a share
+/// of the picture's width or height, whether the hand is open, and how sure
+/// the tracker is. Never the picture or its keypoints. One a look while a
+/// hand is wanted and seen ([`HandsWanted`]); none while it isn't, and a
+/// hand not heard of for a second is gone (lamp-control, `watch::HAND_GONE`).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct HandTrack {
+    pub x: f32,
+    pub y: f32,
+    pub size: f32,
+    pub open: bool,
+    pub confidence: f32,
+}
+
+impl HandTrack {
+    pub const TYPE: &str = "lamp_msgs/HandTrack";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "humans/hands/tracked";
+
+    /// One a look, no period promised: a hand seen, not a state kept.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+
+    /// Every share is from 0 to 1.
+    pub fn check(&self) -> Result<(), Invalid> {
+        for (name, value) in [
+            ("x", self.x),
+            ("y", self.y),
+            ("size", self.size),
+            ("confidence", self.confidence),
+        ] {
+            if !(0.0..=1.0).contains(&value) {
+                return invalid(format!("hand {name} is {value}: from 0 to 1"));
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Whether anyone wants a hand looked for (`humans/hands/wanted`): lamp-control
+/// says `true` while a computer's `look` at `hand` stands, `false` when it
+/// ends. The eyes look for a hand only while it is true, so with nobody
+/// wanting one nothing runs and nothing is published.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HandsWanted {
+    pub wanted: bool,
+}
+
+impl HandsWanted {
+    pub const TYPE: &str = "lamp_msgs/HandsWanted";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "humans/hands/wanted";
+
+    /// The newest says it: a latecomer reads whether one is wanted now.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Latest)
+    }
+}
+
+/// The hand-follow's two topics, apart from the first topics.
+pub fn hand_topics() -> Vec<(&'static str, Declaration)> {
+    vec![
+        (HandTrack::TOPIC, HandTrack::declaration()),
+        (HandsWanted::TOPIC, HandsWanted::declaration()),
+    ]
 }
 
 /// The voice's turns' verdicts (#1155), apart from the first topics.
@@ -1327,6 +1511,156 @@ pub struct UpdateStatus {
     /// over it, and a status without it reads as before.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub round: Option<UpdateRound>,
+    /// The agents (engines) the lamp's Harness has, by name (#6240): only
+    /// with lamp-update's `LAMP_APP_ENGINES=on`, else absent. `hermes` and
+    /// `openclaw` always, from their install records, and every other
+    /// engine Harness says the lamp's own machine has (the lead's rule of
+    /// 12 Nov: no fixed list). An older reader passes over it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub engines: Option<BTreeMap<String, EngineInstall>>,
+    /// The newest build the lamp refused (put back and not tried again) that is
+    /// newer than the one it runs (#6266), so the app can say that an update is
+    /// blocked, and why, and offer a retry. Absent when none is. An older
+    /// reader passes over it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refused: Option<UpdateRefused>,
+}
+
+/// A refused build, for the app (#6266): `reason` one of
+/// [`UpdateRefused::REASONS`], a fixed name and never the refusal's own text,
+/// which names paths and parts. The owner's retry (`update.check` with
+/// `retry` set to `sequence`) drops it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdateRefused {
+    pub sequence: u64,
+    pub reason: String,
+    pub at_unix_ms: u64,
+}
+
+impl UpdateRefused {
+    /// `cut_short`: switches cut short (power lost, a reboot) three times in a
+    /// row; `held`: a part held still by a passing local state (a kept unplug
+    /// request) right after the switch; `part_unwell`: a part not well after
+    /// it; `other`: anything else (the switch's own steps, the quiet moment).
+    pub const REASONS: [&str; 4] = ["cut_short", "held", "part_unwell", "other"];
+
+    /// Whether the fields are ones lamp-update could have said.
+    pub fn check(&self) -> bool {
+        Self::REASONS.contains(&self.reason.as_str())
+    }
+}
+
+/// One agent (engine) of the lamp's Harness, for the app (#6240): `state`
+/// one of [`EngineInstall::STATES`], `version` with `installed` only,
+/// `reason` with `failed` only and always with it, one of
+/// [`EngineInstall::REASONS`], never free text. `at_unix_ms` is when the
+/// install's record last changed, absent when there is none.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EngineInstall {
+    pub state: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub at_unix_ms: Option<u64>,
+}
+
+impl EngineInstall {
+    /// Turned off on this lamp; missing; missing, and the app's tap waits
+    /// for lamp-update's next round; being put there; being put there,
+    /// frozen while someone speaks; there; the last try failed.
+    pub const STATES: [&str; 7] = [
+        "off",
+        "not_installed",
+        "waiting",
+        "installing",
+        "frozen",
+        "installed",
+        "failed",
+    ];
+    /// Why the last try failed, for the app: too little memory or disk,
+    /// no user namespace for the agent, stopped as the voice was not quiet
+    /// too long, stopped as the voice's privacy reading was lost, or any
+    /// other failure.
+    pub const REASONS: [&str; 6] = [
+        "no_memory",
+        "no_space",
+        "no_userns",
+        "interrupted",
+        "privacy_lost",
+        "failed",
+    ];
+
+    /// Whether every field is one lamp-update could have said: a known
+    /// `state`, a `reason` only with `failed` (and always with it) and from
+    /// the list, a `version` only with `installed`, of letters, digits and
+    /// dots.
+    pub fn check(&self) -> bool {
+        Self::STATES.contains(&self.state.as_str())
+            && match &self.reason {
+                None => self.state != "failed",
+                Some(reason) => self.state == "failed" && Self::REASONS.contains(&reason.as_str()),
+            }
+            && self.version.as_ref().is_none_or(|version| {
+                self.state == "installed"
+                    && !version.is_empty()
+                    && version.len() <= 64
+                    && version
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b == b'.')
+            })
+    }
+}
+
+/// The app's install of a missing agent (`update/engine_install`, #6240):
+/// lamp-cloud asks `lamp-update serve` to install `engine` at its next
+/// round, past the install's own quiet-stretch and clock windows; the
+/// round's other rules and the install's own floors, freeze and privacy
+/// stop stay. Said once for each ask lamp-cloud takes, at most one a
+/// minute. Only a `serve` with `LAMP_APP_ENGINES=on` subscribes.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EngineInstallAsk {
+    pub engine: String,
+}
+
+impl EngineInstallAsk {
+    pub const TYPE: &str = "lamp_msgs/EngineInstallAsk";
+    pub const VERSION: u32 = 1;
+    pub const TOPIC: &str = "update/engine_install";
+    /// The least time between two asks taken, on either side: lamp-cloud
+    /// refuses an ask sooner, and `serve` drops one.
+    pub const AGAIN_AFTER: Duration = Duration::from_secs(60);
+
+    /// A stream with no period, as [`UpdateCheck`]: nothing is kept, so a
+    /// lamp-update that starts later never takes an old ask for a new one.
+    pub fn declaration() -> Declaration {
+        Declaration::new(Self::TYPE, Self::VERSION, Kind::Event)
+    }
+}
+
+impl UpdateStatus {
+    /// Whether the round under way goes to a build newer than the one the
+    /// lamp runs (#6284): said from the moment the round has read and
+    /// checked the channel's build, before anything is fetched, and through
+    /// every phase after. A round that only checks and finds the lamp
+    /// current never says it.
+    pub fn brings_a_build(&self) -> bool {
+        if self.now == "idle" {
+            return false;
+        }
+        if self.now != "checking" {
+            return true;
+        }
+        self.round
+            .as_ref()
+            .and_then(|round| round.target.as_ref())
+            .is_some_and(|target| {
+                self.running
+                    .as_ref()
+                    .is_none_or(|running| target.sequence > running.sequence)
+            })
+    }
 }
 
 /// A round under way (#5473): when it began (its `checking`), when the step
@@ -1353,7 +1687,11 @@ pub struct UpdateRound {
 /// never free text. `revision` goes up by one at each change of this
 /// object and never on a read. `version` is `harness version`'s `a.b.c`,
 /// with `installed` only; `pinned` says whether the install went through
-/// the pinned manifest.
+/// the pinned manifest. `from_version` (#5957) is the older Harness a
+/// newer pin is moving the lamp from: with `installing` while it moves
+/// (its message then says Harness is being updated), and with `failed` and
+/// `upgrade` when the move failed and that version was put back. Absent
+/// otherwise, and in a record written before it, which reads as before.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HarnessInstall {
     pub install: String,
@@ -1365,6 +1703,8 @@ pub struct HarnessInstall {
     pub pinned: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_version: Option<String>,
     pub message: String,
 }
 
@@ -1377,8 +1717,9 @@ impl HarnessInstall {
     /// Harness's installer failed or left no `harness`, no `lampos` user,
     /// the one-shot unit not started, the pinned files not handed to the
     /// installer (no listener on 127.0.0.1, or no file for its script),
-    /// a pinned install's `harness version` not the pinned one.
-    pub const ERRORS: [&str; 9] = [
+    /// a pinned install's `harness version` not the pinned one, a move to
+    /// a newer pinned Harness that failed, the older one put back (#5957).
+    pub const ERRORS: [&str; 10] = [
         "pin_unreadable",
         "pin_fetch",
         "pin_mismatch",
@@ -1388,11 +1729,19 @@ impl HarnessInstall {
         "not_started",
         "serve",
         "version",
+        "upgrade",
     ];
 
     /// The words the app shows for `install` and `error`, as they are.
     pub fn message_for(install: &str, error: Option<&str>) -> &'static str {
+        Self::message_of(install, error, false)
+    }
+
+    /// [`Self::message_for`], and for an `installing` that moves an older
+    /// Harness to a newer pin (`from_version` set, #5957) its own words.
+    pub fn message_of(install: &str, error: Option<&str>, upgrading: bool) -> &'static str {
         match (install, error) {
+            ("installing", _) if upgrading => "Updating Harness on the lamp.",
             ("absent", _) => "Harness will be installed once the lamp is online.",
             ("installing", _) => "Installing Harness on the lamp.",
             ("installed", _) => "Harness is installed. Sign in to hand tasks over.",
@@ -1405,6 +1754,9 @@ impl HarnessInstall {
             (_, Some("timeout")) => "Installing Harness took too long. Try again.",
             (_, Some("version")) => {
                 "Harness was installed, but not at the version this lamp expects."
+            }
+            (_, Some("upgrade")) => {
+                "Harness couldn't be updated, so the lamp keeps the version it had."
             }
             _ => "Harness couldn't be installed on the lamp. Try again.",
         }
@@ -1419,28 +1771,63 @@ impl HarnessInstall {
             version: None,
             pinned: None,
             error: error.map(str::to_owned),
+            from_version: None,
             message: Self::message_for(install, error).to_owned(),
+        }
+    }
+
+    /// `installing`, moving the Harness at `from_version` to a newer pin
+    /// (#5957), pinned, at revision 0.
+    pub fn upgrading(from_version: &str, at_unix_ms: u64) -> Self {
+        Self {
+            pinned: Some(true),
+            from_version: Some(from_version.to_owned()),
+            message: Self::message_of("installing", None, true).to_owned(),
+            ..Self::new("installing", None, at_unix_ms)
+        }
+    }
+
+    /// `failed` with `upgrade`: the move from `from_version` failed, and
+    /// that version was put back (#5957), pinned, at revision 0.
+    pub fn upgrade_failed(from_version: &str, at_unix_ms: u64) -> Self {
+        Self {
+            pinned: Some(true),
+            from_version: Some(from_version.to_owned()),
+            ..Self::new("failed", Some("upgrade"), at_unix_ms)
         }
     }
 
     /// Whether every field is one lamp-update could have said: a known
     /// `install`, an `error` only with `failed` (and always with it) and
     /// from the list, the message for them, a version only with
-    /// `installed` and only digits and dots.
+    /// `installed` and only digits and dots, a `from_version` only with
+    /// `installing` or a `failed` `upgrade` (#5957), digits and dots too.
     pub fn check(&self) -> bool {
+        let plain = |version: &str| {
+            !version.is_empty()
+                && version.len() <= 32
+                && version.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+        };
         Self::INSTALL.contains(&self.install.as_str())
             && match &self.error {
                 None => self.install != "failed",
                 Some(error) => self.install == "failed" && Self::ERRORS.contains(&error.as_str()),
             }
-            && self.message == Self::message_for(&self.install, self.error.as_deref())
+            && self.message
+                == Self::message_of(
+                    &self.install,
+                    self.error.as_deref(),
+                    self.from_version.is_some(),
+                )
             && match &self.version {
                 None => true,
+                Some(version) => self.install == "installed" && plain(version),
+            }
+            && match &self.from_version {
+                None => true,
                 Some(version) => {
-                    self.install == "installed"
-                        && !version.is_empty()
-                        && version.len() <= 32
-                        && version.bytes().all(|b| b.is_ascii_digit() || b == b'.')
+                    (self.install == "installing" || self.error.as_deref() == Some("upgrade"))
+                        && plain(version)
                 }
             }
     }
@@ -1528,7 +1915,14 @@ impl UpdateStatus {
 /// that came while a round ran, and takes at most one a minute. An older
 /// lamp-update never subscribes, so it never hears one.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct UpdateCheck {}
+pub struct UpdateCheck {
+    /// The owner's retry of a refused build (#6266, `update.check` with `retry`
+    /// set to its sequence): lamp-update drops that refusal, if it is one,
+    /// before the round. Absent for a plain check; an older lamp-update that
+    /// does not know it reads a plain check.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retry: Option<u64>,
+}
 
 impl UpdateCheck {
     pub const TYPE: &str = "lamp_msgs/UpdateCheck";
@@ -1967,6 +2361,13 @@ pub fn sleep_audio_topics() -> Vec<(&'static str, Declaration)> {
     vec![(Audio::SLEEP_TOPIC, Audio::declaration())]
 }
 
+/// Sound a computer plays through the lamp's speaker (`speaker/audio`),
+/// separate from the original seventeen: lamp-control publishes it and the
+/// voice reads it only while it holds that computer's open stream.
+pub fn speaker_audio_topics() -> Vec<(&'static str, Declaration)> {
+    vec![(Audio::SPEAKER_TOPIC, Audio::speaker_declaration())]
+}
+
 /// Semantic room sound is separate from the original topics and level/onset.
 pub fn sound_class_topics() -> Vec<(&'static str, Declaration)> {
     vec![(SoundClasses::TOPIC, SoundClasses::declaration())]
@@ -1987,6 +2388,7 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(name_topics())
         .chain(stop_topics())
         .chain(sleep_audio_topics())
+        .chain(speaker_audio_topics())
         .chain(mute_topics())
         .chain(tasks_topics())
         .chain(logging_topics())
@@ -1996,7 +2398,9 @@ pub fn declaration_of(topic: &str) -> Option<Declaration> {
         .chain(online_topics())
         .chain(arrival_topics())
         .chain(turn_topics())
+        .chain(hand_topics())
         .chain(tone_topics())
+        .chain(line_topics())
         .chain(skill_ask_topics())
         .chain(addon_topics())
         .chain(privacy_topics())
@@ -2309,9 +2713,23 @@ mod tests {
             (Room::Quiet, "quiet"),
             (Room::Busy, "busy"),
         ] {
-            round_trip(&RoomState { state }, &format!("{{\"state\":\"{word}\"}}"));
+            round_trip(
+                &RoomState {
+                    state,
+                    another_voice: None,
+                },
+                &format!("{{\"state\":\"{word}\"}}"),
+            );
         }
         assert!(serde_json::from_str::<RoomState>("{\"state\":\"loud\"}").is_err());
+        // The tracker's word is optional and only said when there is one.
+        round_trip(
+            &RoomState {
+                state: Room::Quiet,
+                another_voice: Some(false),
+            },
+            "{\"state\":\"quiet\",\"another_voice\":false}",
+        );
     }
 
     /// #4175: a remark held, as Expression's glance reads it.
@@ -2354,6 +2772,137 @@ mod tests {
         assert_eq!(
             declaration_of(VoiceTurn::TOPIC),
             Some(VoiceTurn::declaration())
+        );
+    }
+
+    /// A line the lamp says (`voice/line`, #4209): its words, who had it say
+    /// them, and where they came from. The lamp's own words only: never a
+    /// person's. Its own topic, known by name.
+    #[test]
+    fn a_line_the_lamp_says_names_who_had_it_say_them() {
+        round_trip(
+            &SaidLine {
+                text: "Good morning.".into(),
+                by: LineBy::Lamp,
+                source: LineSource::Reply,
+                app: None,
+                request: Some(7),
+                cut: false,
+                scope: None,
+            },
+            "{\"text\":\"Good morning.\",\"by\":\"lamp\",\"source\":\"reply\",\"request\":7}",
+        );
+        round_trip(
+            &SaidLine {
+                text: "It is a long".into(),
+                by: LineBy::Lamp,
+                source: LineSource::Reply,
+                app: None,
+                request: Some(8),
+                cut: true,
+                scope: None,
+            },
+            "{\"text\":\"It is a long\",\"by\":\"lamp\",\"source\":\"reply\",\"request\":8,\"cut\":true}",
+        );
+        round_trip(
+            &SaidLine {
+                text: "Build passed.".into(),
+                by: LineBy::Computer,
+                source: LineSource::Exact,
+                app: Some("desk-wave".into()),
+                request: None,
+                cut: false,
+                scope: None,
+            },
+            "{\"text\":\"Build passed.\",\"by\":\"computer\",\"source\":\"exact\",\"app\":\"desk-wave\"}",
+        );
+        for (source, word) in [
+            (LineSource::Reply, "reply"),
+            (LineSource::Exact, "exact"),
+            (LineSource::Cached, "cached"),
+            (LineSource::Recording, "recording"),
+        ] {
+            round_trip(
+                &SaidLine {
+                    text: "x".into(),
+                    by: LineBy::Skill,
+                    source,
+                    app: Some("reminder".into()),
+                    request: None,
+                    cut: false,
+                    scope: None,
+                },
+                &format!(
+                    "{{\"text\":\"x\",\"by\":\"skill\",\"source\":\"{word}\",\"app\":\"reminder\"}}"
+                ),
+            );
+        }
+        assert!(
+            serde_json::from_str::<SaidLine>(
+                "{\"text\":\"x\",\"by\":\"person\",\"source\":\"reply\"}"
+            )
+            .is_err(),
+            "a person is never who had the lamp say a line"
+        );
+        assert_eq!(SaidLine::declaration().kind, Kind::Event);
+        assert_eq!(line_topics(), [(SaidLine::TOPIC, SaidLine::declaration())]);
+        assert!(
+            first_topics()
+                .iter()
+                .all(|(topic, _)| *topic != SaidLine::TOPIC)
+        );
+        assert_eq!(
+            declaration_of(SaidLine::TOPIC),
+            Some(SaidLine::declaration())
+        );
+    }
+
+    /// A hand in view and whether one is wanted (`humans/hands/tracked`,
+    /// `humans/hands/wanted`): shares from 0 to 1, its own topics, known by
+    /// name; the JSON is what lamp-control's `Hand::of` reads.
+    #[test]
+    fn a_hand_in_view_and_whether_one_is_wanted() {
+        round_trip(
+            &HandTrack {
+                x: 0.5,
+                y: 0.25,
+                size: 0.125,
+                open: true,
+                confidence: 0.75,
+            },
+            "{\"x\":0.5,\"y\":0.25,\"size\":0.125,\"open\":true,\"confidence\":0.75}",
+        );
+        round_trip(&HandsWanted { wanted: true }, "{\"wanted\":true}");
+        let hand = |x, y, size, confidence| HandTrack {
+            x,
+            y,
+            size,
+            open: false,
+            confidence,
+        };
+        assert!(hand(0.0, 1.0, 0.5, 1.0).check().is_ok());
+        for bad in [
+            hand(-0.01, 0.5, 0.5, 0.5),
+            hand(0.5, 1.01, 0.5, 0.5),
+            hand(0.5, 0.5, f32::NAN, 0.5),
+            hand(0.5, 0.5, 0.5, 2.0),
+        ] {
+            assert!(bad.check().is_err(), "{bad:?}");
+        }
+        assert_eq!(HandTrack::declaration().kind, Kind::Event);
+        assert_eq!(HandsWanted::declaration().kind, Kind::Latest);
+        assert_eq!(
+            declaration_of(HandTrack::TOPIC),
+            Some(HandTrack::declaration())
+        );
+        assert_eq!(
+            declaration_of(HandsWanted::TOPIC),
+            Some(HandsWanted::declaration())
+        );
+        assert!(
+            first_topics()
+                .iter()
+                .all(|(topic, _)| { *topic != HandTrack::TOPIC && *topic != HandsWanted::TOPIC })
         );
     }
 
@@ -3045,6 +3594,39 @@ mod tests {
         );
     }
 
+    /// `speaker/audio`: a computer's sound to the speaker, the microphone's
+    /// block under another topic and a longer period (blocks of up to 100 ms),
+    /// a payload the same `json+pcm` as a microphone's, and not one of the
+    /// original topics.
+    #[test]
+    fn the_speaker_audio_topic_is_a_microphone_block_to_the_speaker() {
+        let declared = declaration_of(Audio::SPEAKER_TOPIC).unwrap();
+        assert_eq!(
+            (
+                declared.type_name.as_str(),
+                declared.kind,
+                declared.period_ms
+            ),
+            (Audio::TYPE, Kind::Event, Some(100))
+        );
+        assert!(
+            !first_topics()
+                .iter()
+                .any(|(name, _)| *name == Audio::SPEAKER_TOPIC)
+        );
+        assert!(!Audio::TOPICS.contains(&Audio::SPEAKER_TOPIC));
+        let header = Audio {
+            sample_rate: Audio::SPEAKER_SAMPLE_RATE,
+            channels: 1,
+            sample_format: Audio::S16LE.into(),
+            sequence: 7,
+        };
+        let samples = [1u8, 2, 3, 4];
+        let payload = header.block(&samples).unwrap();
+        let (back, got) = Audio::split(&payload).unwrap();
+        assert_eq!((back, got), (header, &samples[..]));
+    }
+
     /// `muted_by` (#4332) is said in snake_case, only while muted, and
     /// agrees with a sleep's reason. A voice before it, without the field,
     /// still parses, and a reader that knows only `muted` and `reason`
@@ -3265,7 +3847,8 @@ mod tests {
     /// field is read as before.
     #[test]
     fn an_update_check_is_an_empty_stream_and_nothing_is_kept() {
-        round_trip(&UpdateCheck {}, "{}");
+        round_trip(&UpdateCheck::default(), "{}");
+        round_trip(&UpdateCheck { retry: Some(12226) }, "{\"retry\":12226}");
         let declared = UpdateCheck::declaration();
         assert_eq!(
             (declared.type_name.as_str(), declared.kind),
@@ -3288,6 +3871,8 @@ mod tests {
             last: None,
             harness: None,
             round: None,
+            engines: None,
+            refused: None,
         };
         round_trip(&idle, r#"{"running":null,"now":"idle","last":null}"#);
         let fetching = UpdateStatus {
@@ -3324,6 +3909,128 @@ mod tests {
         assert_eq!(serde_json::from_str::<Older>(text).unwrap().now, "fetching");
     }
 
+    /// #6240: `engines` is absent unless set, so a status without it reads
+    /// and writes as before; with it, each engine by name, its optional
+    /// fields left out when none, and only what lamp-update could say passes.
+    #[test]
+    fn an_update_status_carries_engines_only_when_set_and_checked() {
+        let without = UpdateStatus {
+            running: None,
+            now: "idle".into(),
+            last: None,
+            harness: None,
+            round: None,
+            engines: None,
+            refused: None,
+        };
+        round_trip(&without, r#"{"running":null,"now":"idle","last":null}"#);
+        let installed = EngineInstall {
+            state: "installed".into(),
+            version: Some("0.22.2".into()),
+            reason: None,
+            at_unix_ms: Some(7),
+        };
+        round_trip(
+            &UpdateStatus {
+                engines: Some(BTreeMap::from([("hermes".into(), installed.clone())])),
+                refused: None,
+                ..without.clone()
+            },
+            r#"{"running":null,"now":"idle","last":null,"engines":{"hermes":{"state":"installed","version":"0.22.2","at_unix_ms":7}}}"#,
+        );
+        round_trip(
+            &EngineInstall {
+                state: "off".into(),
+                version: None,
+                reason: None,
+                at_unix_ms: None,
+            },
+            r#"{"state":"off"}"#,
+        );
+        assert!(installed.check());
+        for state in EngineInstall::STATES {
+            let one = EngineInstall {
+                state: state.into(),
+                version: None,
+                reason: (state == "failed").then(|| "no_memory".into()),
+                at_unix_ms: None,
+            };
+            assert!(one.check(), "{state}");
+        }
+        let failed = EngineInstall {
+            state: "failed".into(),
+            version: None,
+            reason: Some("failed".into()),
+            at_unix_ms: Some(1),
+        };
+        for reason in EngineInstall::REASONS {
+            assert!(
+                EngineInstall {
+                    reason: Some(reason.into()),
+                    ..failed.clone()
+                }
+                .check(),
+                "{reason}"
+            );
+        }
+        for bad in [
+            EngineInstall {
+                state: "gone".into(),
+                ..installed.clone()
+            },
+            EngineInstall {
+                reason: None,
+                ..failed.clone()
+            },
+            EngineInstall {
+                reason: Some("/var/lib/x".into()),
+                ..failed.clone()
+            },
+            EngineInstall {
+                reason: Some("pin_mismatch".into()),
+                ..failed.clone()
+            },
+            EngineInstall {
+                reason: Some("failed".into()),
+                ..installed.clone()
+            },
+            EngineInstall {
+                version: Some("1.0".into()),
+                ..failed.clone()
+            },
+            EngineInstall {
+                version: Some("0.22.2 /x".into()),
+                ..installed.clone()
+            },
+            EngineInstall {
+                version: Some(String::new()),
+                ..installed.clone()
+            },
+        ] {
+            assert!(!bad.check(), "{bad:?}");
+        }
+    }
+
+    /// #6240: the app's install ask is an event on its own topic, kept by
+    /// nobody, at most one a minute.
+    #[test]
+    fn an_engine_install_ask_is_an_event_with_its_own_topic() {
+        round_trip(
+            &EngineInstallAsk {
+                engine: "hermes".into(),
+            },
+            r#"{"engine":"hermes"}"#,
+        );
+        let declared = EngineInstallAsk::declaration();
+        assert_eq!(
+            (declared.type_name.as_str(), declared.kind),
+            (EngineInstallAsk::TYPE, Kind::Event)
+        );
+        assert_eq!(declared.period(), None);
+        assert_ne!(EngineInstallAsk::TOPIC, UpdateCheck::TOPIC);
+        assert_eq!(EngineInstallAsk::AGAIN_AFTER, Duration::from_secs(60));
+    }
+
     /// #5197: `harness` is absent unless set, so a status without it reads
     /// and writes as before; with it, only what lamp-update could say passes.
     #[test]
@@ -3334,6 +4041,8 @@ mod tests {
             last: None,
             harness: None,
             round: None,
+            engines: None,
+            refused: None,
         };
         round_trip(&without, r#"{"running":null,"now":"idle","last":null}"#);
         let installed = HarnessInstall {
@@ -3387,6 +4096,65 @@ mod tests {
             HarnessInstall {
                 version: Some("1.2.3 /x".into()),
                 ..installed.clone()
+            },
+        ] {
+            assert!(!bad.check(), "{bad:?}");
+        }
+    }
+
+    /// #5957: a move to a newer pin says `from_version` with `installing`
+    /// (its own words) and with a `failed` `upgrade`; nowhere else. A record
+    /// written before the field reads as before.
+    #[test]
+    fn a_harness_upgrade_says_from_version_only_where_it_belongs() {
+        let moving = HarnessInstall {
+            revision: 5,
+            ..HarnessInstall::upgrading("0.5.39", 9)
+        };
+        assert!(moving.check());
+        round_trip(
+            &moving,
+            r#"{"install":"installing","revision":5,"at_unix_ms":9,"pinned":true,"from_version":"0.5.39","message":"Updating Harness on the lamp."}"#,
+        );
+        let failed = HarnessInstall::upgrade_failed("0.5.39", 9);
+        assert!(failed.check());
+        assert_eq!(
+            failed.message,
+            "Harness couldn't be updated, so the lamp keeps the version it had."
+        );
+        let old: HarnessInstall = serde_json::from_str(
+            r#"{"install":"installed","revision":3,"at_unix_ms":7,"version":"0.5.39","pinned":true,"message":"Harness is installed. Sign in to hand tasks over."}"#,
+        )
+        .unwrap();
+        assert!(old.check());
+        assert_eq!(old.from_version, None);
+        assert!(
+            !serde_json::to_string(&old)
+                .unwrap()
+                .contains("from_version")
+        );
+        for bad in [
+            HarnessInstall {
+                from_version: Some("0.5.39".into()),
+                ..old.clone()
+            },
+            HarnessInstall {
+                from_version: Some("0.5.39".into()),
+                ..HarnessInstall::new("failed", Some("installer"), 1)
+            },
+            HarnessInstall {
+                from_version: Some("0.5 /x".into()),
+                ..moving.clone()
+            },
+            // The upgrade's words without its `from_version`, and the
+            // plain words with it.
+            HarnessInstall {
+                from_version: None,
+                ..moving.clone()
+            },
+            HarnessInstall {
+                from_version: Some("0.5.39".into()),
+                ..HarnessInstall::new("installing", None, 1)
             },
         ] {
             assert!(!bad.check(), "{bad:?}");
@@ -3525,6 +4293,42 @@ mod tests {
             assert_eq!(declaration.type_name, type_name);
             assert_eq!(declaration.version, version);
             assert!(type_name.starts_with("lamp_msgs/"));
+        }
+    }
+}
+
+#[cfg(test)]
+mod update_status_tests {
+    use super::*;
+
+    fn status(now: &str, running: u64, target: Option<u64>) -> UpdateStatus {
+        let build = |sequence| UpdateBuild {
+            sequence,
+            commit: "4a39f04".into(),
+        };
+        UpdateStatus {
+            running: Some(build(running)),
+            now: now.into(),
+            last: None,
+            harness: None,
+            engines: None,
+            refused: None,
+            round: (now != "idle").then(|| UpdateRound {
+                started_at_unix_ms: 1,
+                step_started_at_unix_ms: 1,
+                target: target.map(build),
+            }),
+        }
+    }
+
+    #[test]
+    fn a_round_brings_a_build_once_its_newer_target_is_read() {
+        assert!(!status("idle", 812, None).brings_a_build());
+        assert!(!status("checking", 812, None).brings_a_build());
+        assert!(!status("checking", 812, Some(812)).brings_a_build());
+        assert!(status("checking", 812, Some(813)).brings_a_build());
+        for now in ["fetching", "switching", "watching", "restoring"] {
+            assert!(status(now, 812, None).brings_a_build(), "{now}");
         }
     }
 }

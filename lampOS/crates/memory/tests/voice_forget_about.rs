@@ -355,7 +355,74 @@ fn a_topic_forget_that_matched_nothing_keeps_the_night_off_that_days_lines() {
     };
     let records = |answer: Value| answer["input"]["records"].as_array().map_or(0, Vec::len);
     let (told, ok) = client.run_for(&call(FORGET, json!({"about":"sister"})), BUDGET, Some(ANA));
-    assert!(ok && told["forgotten"] == false, "{told}");
+    // The line itself goes too now (lamp-06c1, 11 Nov), and the night
+    // still passes over the day.
+    assert!(
+        ok && told["forgotten"] == true && told["exchanges"] == 1,
+        "{told}"
+    );
     assert_eq!(prepare(ANA), json!({"ok":true,"reason":"nothing"}));
     assert_eq!(records(prepare(BINH)), 1);
+}
+
+/// Friday's step 6 on lamp-06c1 (11 Nov): a calendar event talked about
+/// and moved, never kept, then "forget the recheck party". Recall found
+/// the talk about it all the same, from the exchanges. Now those of theirs
+/// that name it go; their other talk, and another person's about the same
+/// party, stay. A made-up party.
+#[test]
+fn forget_about_takes_that_persons_talk_about_it_from_recall() {
+    assert!(switch_forget_about(true));
+    let fixture = Fixture::new_with("talk", |store, now| {
+        let ana = Person::new(ANA).unwrap();
+        let binh = Person::new(BINH).unwrap();
+        for (heard, said) in [
+            (
+                "synthetic: put the Friday Recheck Party on my calendar for Sunday",
+                "Done, the recheck party is on Sunday.",
+            ),
+            (
+                "synthetic: move it to Monday at 7 PM",
+                "Moved the recheck parties to Monday at 7 PM.",
+            ),
+            ("synthetic: my coffee is black", "Noted."),
+        ] {
+            store.append(&ana, now - 1, heard, said, &[]).unwrap();
+        }
+        store
+            .append(
+                &binh,
+                now - 1,
+                "synthetic: the recheck party sounds fun",
+                "It does.",
+                &[],
+            )
+            .unwrap();
+    });
+    let client = DaysClient::new(fixture.socket.clone()).unwrap();
+    let recall = |person: &str, about: &str| -> String {
+        let (told, ok) =
+            client.run_for(&call(RECALL, json!({"about":about})), BUDGET, Some(person));
+        assert!(ok, "{told}");
+        told.to_string()
+    };
+    assert!(recall(ANA, "recheck party").contains("Recheck Party"));
+
+    let (told, ok) = client.run_for(
+        &call(FORGET, json!({"about":"the recheck party"})),
+        BUDGET,
+        Some(ANA),
+    );
+    assert!(
+        ok && told["forgotten"] == true && told["exchanges"] == 2,
+        "{told}"
+    );
+    assert!(
+        !told.to_string().to_lowercase().contains("sunday"),
+        "{told}"
+    );
+    let after = recall(ANA, "recheck party");
+    assert!(!after.to_lowercase().contains("recheck"), "{after}");
+    assert!(recall(ANA, "coffee").contains("coffee is black"));
+    assert!(recall(BINH, "recheck party").contains("sounds fun"));
 }

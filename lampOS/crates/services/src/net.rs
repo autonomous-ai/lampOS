@@ -32,6 +32,9 @@ pub struct Call {
     pub url: String,
     pub headers: Vec<(String, String)>,
     pub body: Option<Vec<u8>>,
+    /// The most of the answer's body read: [`BODY_MOST`], or more for one
+    /// call that needs it (a PDF attachment's data, `mail::PDF_FETCH`).
+    pub most: usize,
 }
 
 impl fmt::Debug for Call {
@@ -156,10 +159,12 @@ impl Http for Https {
             .connect_timeout(CONNECT_WITHIN)
             .build()
             .map_err(|_| "HTTPS client setup".to_owned())?;
+        let most = call.most;
         let method = match call.method {
             Method::Get => reqwest::Method::GET,
             Method::Post => reqwest::Method::POST,
             Method::Patch => reqwest::Method::PATCH,
+            Method::Delete => reqwest::Method::DELETE,
         };
         let mut request = client.request(method, &call.url);
         for (name, value) in &call.headers {
@@ -187,9 +192,9 @@ impl Http for Https {
             .map_err(|_| "the service didn't answer in time".to_owned())?
             .map_err(|_| "the service's answer broke off".to_owned())?
         {
-            let room = BODY_MOST.saturating_sub(body.len());
+            let room = most.saturating_sub(body.len());
             body.extend_from_slice(&chunk[..chunk.len().min(room)]);
-            if body.len() >= BODY_MOST {
+            if body.len() >= most {
                 break;
             }
         }
@@ -211,6 +216,7 @@ mod tests {
             url: url.into(),
             headers: vec![("authorization".into(), "Bearer planted-4710".into())],
             body: None,
+            most: BODY_MOST,
         }
     }
 

@@ -2,7 +2,10 @@
 # merge-when-green.sh on a train with no ARM64 run, and train-bot.sh's DRY=1 round with the lane on and off. A temporary
 # git repository and a stand-in `gh` on PATH. Needs git, zsh and jq.
 # Run from the repo root: python3 -I -m pytest -q .github/tools/coordination/tests
-import json, os, shutil, subprocess, tempfile, time, unittest
+import json, os, re, shutil, subprocess, tempfile, time, unittest
+
+# The Queue issues, read from lib.sh as the bot reads them, so a new Queue issue needs no test change.
+QUEUE = tuple(int(n) for n in re.search(r"^COORD_QUEUE_ISSUES=\(([0-9 ]+)\)", open(os.path.join(os.path.dirname(__file__), "..", "lib.sh")).read(), re.M).group(1).split())
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LIB = os.path.join(HERE, "lib.sh")
@@ -45,7 +48,7 @@ echo "$*" >> "$FAKE_DIR/calls.log"
 case "$*" in
   "pr diff"*) cat "$FAKE_DIR/files.txt" ;;
   *collaborators*) echo w1 ;;
-  *issues/4710/comments*|*issues/5385/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; [ -f "$FAKE_DIR/queue-fail-$n" ] && exit 1; cat "$FAKE_DIR/queue-$n.json" 2>/dev/null; exit 0 ;;
+  *issues/4710/comments*|*issues/5385/comments*|*issues/6059/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; [ -f "$FAKE_DIR/queue-fail-$n" ] && exit 1; cat "$FAKE_DIR/queue-$n.json" 2>/dev/null; exit 0 ;;
   *issues/*/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; cat "$FAKE_DIR/comments-$n.json" ;;
   *"--state all"*) echo 23 ;;
   *"--json headRefName --jq"*) cat "$FAKE_DIR/open.txt" 2>/dev/null ;;
@@ -55,7 +58,7 @@ case "$*" in
   *"--json body"*) echo '{"login":"","body":"","pr_body":true}' ;;
   *title,createdAt*) n=$(echo "$*" | sed -E 's/^pr view ([0-9]+).*/\1/'); if [ -f "$FAKE_DIR/title-$n.txt" ]; then cat "$FAKE_DIR/title-$n.txt"; else printf 'lampOS: a change\t2026-11-04T01:00:00Z\n'; fi ;;
   *headRefOid*) cat "$FAKE_DIR/head.txt" ;;
-  *statusCheckRollup*) cat "$FAKE_DIR/checks.json" ;;
+  *statusCheckRollup*) n=$(echo "$*" | sed -E 's/^pr view ([0-9]+).*/\1/'); if [ -f "$FAKE_DIR/checks-$n.json" ]; then cat "$FAKE_DIR/checks-$n.json"; elif [ -f "$FAKE_DIR/checks.json" ]; then cat "$FAKE_DIR/checks.json"; else echo '{"statusCheckRollup":[]}'; fi ;;
   "run list"*) echo 0 ;;
   "pr merge"*) if [ -n "$FAKE_MERGE_5XX" ]; then n=$(cat "$FAKE_DIR/5xx" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "$FAKE_DIR/5xx"
                  [ "$n" -le "$FAKE_MERGE_5XX" ] && { [ -n "$FAKE_ON_5XX" ] && sh -c "$FAKE_ON_5XX"; echo "HTTP 502: Bad Gateway (https://api.github.com/graphql)" >&2; exit 1; }
@@ -66,6 +69,9 @@ esac
 """
 ARM_CHECKS = [{"__typename": "CheckRun", "name": "build and test", "status": "COMPLETED", "conclusion": "SUCCESS"},
               {"__typename": "CheckRun", "name": "clippy", "status": "COMPLETED", "conclusion": "SUCCESS"}]
+# A PR's own ARM64 run with every job green, as the train bot needs it on a PR the ARM64 run takes (#6556, train 841).
+ARM = "lampOS — build and test on Linux ARM64 (%s)"
+ARM_GREEN = [{"__typename": "CheckRun", "name": ARM % j, "status": "COMPLETED", "conclusion": "SUCCESS"} for j in ("build", "release", "1/1")]
 CI_CHECKS = [{"__typename": "CheckRun", "name": "Go (system) — build · vet · test", "status": "COMPLETED", "conclusion": "SUCCESS"},
              {"__typename": "CheckRun", "name": "Python (hal) — unit tests · syntax", "status": "COMPLETED", "conclusion": "SUCCESS"}]
 TOOL = ".github/tools/coordination/x.sh"
@@ -414,6 +420,7 @@ class BotDryRound(Repo):
         self.fakefile("prs.txt", "7\n8\n9\n")
         self.fakefile("heads.txt", "".join("%d %s\n" % (n, open(os.path.join(self.fake, "head-%d.txt" % n)).read().strip())
                                            for n in (7, 8, 9)))
+        self.fakefile("checks-8.json", json.dumps({"statusCheckRollup": ARM_GREEN}))
         if before:
             before()
         env = dict(self.env, DRY="1", WORKTREE=os.path.join(self.tmp, "wt"), WORKTREE_NC=os.path.join(self.tmp, "wtnc"), **extra)
@@ -530,14 +537,14 @@ class BotDryRound(Repo):
         self.assertIn("#8: its commits can't be listed", r.stdout)
 
     def test_either_queue_unread_makes_nothing_eligible(self):
-        for issue in (4710, 5385):
+        for issue in QUEUE:
             for f in os.listdir(self.fake):
                 if f.startswith("queue-fail-"):
                     os.unlink(os.path.join(self.fake, f))
             self.fakefile("queue-fail-%d" % issue, "")
             shutil.rmtree(self.state, ignore_errors=True)
             r, lines = self.bot()
-            self.assertIn("the Queue's (#4710, #5385) comments can't be fetched: no PR is eligible", r.stderr)
+            self.assertIn("the Queue's (%s) comments can't be fetched: no PR is eligible" % ", ".join("#%d" % n for n in QUEUE), r.stderr)
             self.assertNotIn("would carry", " ".join(lines))
             self.assertNothingChanged()
 
@@ -558,7 +565,7 @@ class CoordQueue(Repo):
         self.assertEqual([json.loads(l)["body"] for l in lines], ["old", "new"])
 
     def test_either_issue_failing_fails_with_no_file(self):
-        for issue in (4710, 5385):
+        for issue in QUEUE:
             self.fakefile("queue-fail-%d" % issue, "")
             rc, lines = self.queue()
             self.assertNotEqual(rc, 0)
@@ -567,7 +574,7 @@ class CoordQueue(Repo):
 
     def test_the_bot_posts_on_the_last_issue(self):
         r = run(["zsh", "-c", 'TOOLS_DIR=%s; source %s; print -r -- $COORD_QUEUE_POST ${(j:,:)COORD_QUEUE_ISSUES}' % (HERE, LIB)], self.work, env=self.env)
-        self.assertEqual(r.stdout.split(), ["5385", "4710,5385"])
+        self.assertEqual(r.stdout.split(), [str(QUEUE[-1]), ",".join(map(str, QUEUE))])
 
     def test_a_refused_queue_post_is_logged_not_dropped(self):
         # The Reviewer-lead's P3 on #5390: when the Queue issue is full, the bot's post fails; it is said, not lost.
@@ -580,7 +587,7 @@ class CoordQueue(Repo):
             f.write("#!/bin/sh\nexit 1\n")
         os.chmod(os.path.join(gh_fails, "gh"), 0o755)
         r = run(["zsh", "-c", fn], self.work, env=dict(self.env, PATH=gh_fails + os.pathsep + self.env["PATH"]))
-        self.assertIn("said: the Queue (#5385) refused the bot's post", r.stdout + r.stderr)
+        self.assertIn("said: the Queue (#%d) refused the bot's post" % QUEUE[-1], r.stdout + r.stderr)
         self.assertIn("train 9 merged", r.stdout + r.stderr)
 
 

@@ -107,6 +107,14 @@ fn not_kept(name: &str) -> Value {
     }
 }
 
+/// A correction: kept, and the old one replaced (Thirteen's P3 on #5565).
+fn replaced(name: &str) -> Value {
+    match name {
+        "remember" => json!({"remembered": true, "id": 8, "replaced": 7}),
+        _ => json!({"ok": true}),
+    }
+}
+
 fn already(name: &str) -> Value {
     match name {
         "remember" => {
@@ -191,10 +199,11 @@ fn turns_it_does_not_answer_go_on_byte_for_byte_as_off() {
         fn() -> Vec<net::Result<ChatEvent>>,
         fn(&str) -> Value,
     );
-    let cases: [Case; 8] = [
+    let cases: [Case; 11] = [
         ("failed", DENTIST, || calling(&["remember"]), failed),
         ("not kept", DENTIST, || calling(&["remember"]), not_kept),
         ("already kept", DENTIST, || calling(&["remember"]), already),
+        ("a correction", DENTIST, || calling(&["remember"]), replaced),
         (
             "more asked",
             "Remember that my dentist is on Tuesday. What's the weather?",
@@ -206,6 +215,21 @@ fn turns_it_does_not_answer_go_on_byte_for_byte_as_off() {
             // the call did not keep.
             "a further ask the call did not keep",
             "Remember that my dentist is on Tuesday and explain gravity to me",
+            || calling(&["remember"]),
+            kept,
+        ),
+        (
+            // Thirteen's P3 on #5565: a question made only of common words,
+            // heard with no "?".
+            "a question made only of common words",
+            "Remember that my dentist is on Tuesday where is it",
+            || calling(&["remember"]),
+            kept,
+        ),
+        (
+            // Thirteen's P3 on #5565: a "not" the kept text dropped.
+            "a negation the call did not keep",
+            "Remember that my dentist is not on Tuesday.",
             || calling(&["remember"]),
             kept,
         ),
@@ -334,4 +358,110 @@ async fn the_timing_replay_shows_a_keep_as_fast_as_a_plain_answer_less_round_one
         keep_on <= plain + ms(406 + 39 + 58 + 20),
         "{plain:?} {keep_on:?}"
     );
+}
+
+/// One keep turn on [`DENTIST`], kept plainly, the switch on, in the
+/// owner's `language`. With `rendered`, [`KEPT`]'s clip is rendered ahead
+/// first, and the voice then never answers that line, so the line can be
+/// said only from the clip. Without, in a language, the voice never gives
+/// the line any sound, so it is never rendered. With what the voice was
+/// asked to say.
+async fn keep_turn_in(
+    language: Option<crate::language::Language>,
+    rendered: bool,
+) -> (Went, Vec<String>) {
+    let line = crate::language::fixed_in(language, KEPT);
+    let script = Arc::new(Script {
+        heard: Mutex::new([Ok(DENTIST.to_owned())].into()),
+        chats: Mutex::new([calling(&["remember"]), words(ROUND_TWO)].into()),
+        silent_once: Mutex::new(if rendered || language.is_none() {
+            vec![]
+        } else {
+            vec![line; 4]
+        }),
+        ..Script::default()
+    });
+    let ran: Arc<Mutex<Vec<String>>> = Arc::default();
+    let seen = ran.clone();
+    let tools: ToolRunner = Arc::new(move |_, _, name, _| {
+        let answer = kept(&name);
+        seen.lock().unwrap().push(name);
+        Box::pin(async move { answer })
+    });
+    let mut engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(Instant::now),
+    )
+    .announcing(false)
+    .keeping_at_once(true)
+    .in_language(language);
+    let _release = if rendered {
+        engine.render_lines();
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while engine.shared.fixed_clips.kept(KEPT).is_none() {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("the keep's line is rendered ahead in the owner's language");
+        let (release, stuck) = tokio::sync::oneshot::channel::<()>();
+        *script.speech_hold.lock().unwrap() = Some((line, stuck));
+        Some(release)
+    } else {
+        None
+    };
+    engine.submit(start(1));
+    engine.submit(audio(1, 1));
+    engine.submit(end(1));
+    let labels = turn(&mut engine).await;
+    let asked = script.asked.lock().unwrap().clone();
+    let ran = ran.lock().unwrap().clone();
+    let spoken = script.spoken.lock().unwrap().clone();
+    (Went { labels, asked, ran }, spoken)
+}
+
+/// With an owner's language, the keep's line rendered ahead in it is said
+/// at once from its clip, and no round 2 is asked: "Được, mình sẽ nhớ điều
+/// đó." for a Vietnamese owner.
+#[tokio::test]
+async fn in_the_owners_language_the_rendered_line_is_said_with_no_second_round() {
+    use crate::language::Language;
+    let line = crate::language::fixed_in(Some(Language::Vietnamese), KEPT);
+    assert_eq!(line, "Được, mình sẽ nhớ điều đó.");
+    let (went, _) = keep_turn_in(Some(Language::Vietnamese), true).await;
+    assert_eq!(went.said(), vec![line], "{went:?}");
+    assert!(
+        went.labels.contains(&format!("audio:{}", line.len())),
+        "{went:?}"
+    );
+    assert!(
+        !went.labels.iter().any(|label| label.contains(KEPT)),
+        "{went:?}"
+    );
+    assert_eq!(went.asked.len(), 1, "{went:?}");
+    assert_eq!(went.ran, vec!["remember"]);
+    assert_eq!(went.labels.last().map(String::as_str), Some("complete"));
+}
+
+/// Its line not rendered yet in the owner's language: the turn waits for
+/// round 2 as without the switch, never the English line.
+#[tokio::test]
+async fn in_the_owners_language_a_line_not_rendered_waits_for_round_two() {
+    use crate::language::Language;
+    let (went, _) = keep_turn_in(Some(Language::Vietnamese), false).await;
+    assert_eq!(went.said(), vec![ROUND_TWO], "{went:?}");
+    assert_eq!(went.asked.len(), 2, "{went:?}");
+    assert_eq!(went.ran, vec!["remember"]);
+}
+
+/// In English nothing changes: the line is asked of the voice as the
+/// turn's piece, at once, with no round 2.
+#[tokio::test]
+async fn in_english_the_line_is_said_by_the_voice_as_before() {
+    let (went, spoken) = keep_turn_in(None, false).await;
+    assert_eq!(went.said(), vec![KEPT], "{went:?}");
+    assert_eq!(went.asked.len(), 1, "{went:?}");
+    assert_eq!(spoken, vec![KEPT.to_owned()], "{went:?}");
 }

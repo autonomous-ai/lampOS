@@ -35,14 +35,14 @@ const USAGE: &str = "usage: lamp-skills [--dir DIR] [--bus-root DIR] [--gaze-soc
                      [--mood-socket PATH] [--actions-socket PATH] [--say-socket PATH] \
                      [--tools-dir DIR] [--state-dir DIR] [--boot-id ID] [--clock-control PATH] \
                      [--known-file PATH] (or LAMP_SKILLS_KNOWN_FILE) [--daily-state PATH] (or LAMP_SKILLS_DAILY_FILE)\n       \
-                     [--dev-dir DIR] (or LAMP_SKILLS_DEV_DIR)\n       \
+                     [--dev-dir DIR] (or LAMP_SKILLS_DEV_DIR) [--tasks-socket PATH] (or LAMP_SKILLS_TASKS_SOCKET)\n       \
                      [--zone system|NAME | --utc-offset-minutes N] [--trust-clock]\n       \
                      lamp-skills test SKILL_DIR...\n       \
                      lamp-skills install [--dir DIR] [--state-dir DIR] SKILL_DIR|PACKAGE.tar\n       \
                      lamp-skills remove [--dir DIR] [--state-dir DIR] NAME\n       \
                      lamp-skills list [--dir DIR]\n       \
                      lamp-skills pack [--out DIR] [--key-file PRIVATE [--author]] SKILL_DIR\n       \
-                     lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH]";
+                     lamp-skills asked [--dir DIR] [--state-dir DIR] [--key-file PATH] [--push-dir DIR] [--dev-dir DIR]";
 /// The daily journal's file, as the product unit passes it; `--daily-state`
 /// wins when both are given.
 const DAILY_ENVIRONMENT: &str = "LAMP_SKILLS_DAILY_FILE";
@@ -52,6 +52,10 @@ const KNOWN_ENVIRONMENT: &str = "LAMP_SKILLS_KNOWN_FILE";
 /// The developer folder, as the product unit passes it; `--dev-dir` wins
 /// when both are given.
 const DEV_DIR_ENVIRONMENT: &str = "LAMP_SKILLS_DEV_DIR";
+/// lamp-tasks' socket for a skill's `do.task` (#6305, its hand-over #6306),
+/// as a unit would pass it; `--tasks-socket` wins when both are given. No
+/// unit passes either yet: a task is then said not handed over.
+const TASKS_SOCKET_ENVIRONMENT: &str = "LAMP_SKILLS_TASKS_SOCKET";
 /// Where the product keeps its skills (`deploy/product/lamp-skills.service`):
 /// the core ones `lamp-update install` writes and the installable ones.
 const SKILLS_DIR: &str = "/var/lib/lampOS/skills";
@@ -109,6 +113,9 @@ const SPEAK_BEGIN: Duration = Duration::from_secs(5);
 /// The longest a tool's line is waited for once the voice has stopped
 /// speaking but not ended its turn (`thinking`).
 const LINE_LONGEST: Duration = Duration::from_secs(4);
+/// The longest a cut line is watched for what it was (#5745): words heard,
+/// or the line said again in a wordless sound's place.
+const CUT_SETTLES: Duration = Duration::from_secs(6);
 /// How often the voice's state, the hand and the pause are read while a run
 /// waits on them.
 const POLL: Duration = Duration::from_millis(20);
@@ -137,6 +144,9 @@ struct May {
     permissions: Permissions,
     /// With the `prepare_unplug` grant, the skill's own words (#940).
     unplug: Option<lamp_skills::UnplugLines>,
+    /// A skill made on this lamp (`made: here`, `lamp_skills::usage::made_by`):
+    /// its say is asked `made`, quoted with no functions (#6062).
+    made: bool,
 }
 
 impl May {
@@ -178,6 +188,7 @@ fn main() -> ExitCode {
     let mut clock_control = None;
     let mut known_file = None;
     let mut dev_dir = None;
+    let mut tasks_socket = None;
     let mut daily_state = None;
     let mut trust_clock = false;
     let mut offset = None;
@@ -243,6 +254,7 @@ fn main() -> ExitCode {
             "--clock-control" => clock_control = Some(value),
             "--known-file" => known_file = Some(value),
             "--dev-dir" => dev_dir = Some(value),
+            "--tasks-socket" => tasks_socket = Some(value),
             "--daily-state" if daily_state.is_none() => daily_state = Some(value),
             _ => {
                 eprintln!("{USAGE}");
@@ -278,6 +290,7 @@ fn main() -> ExitCode {
     // the daily journal comes: an `Environment=` line an older binary
     // ignores, never a flag that would end it.
     let dev_dir = flag_or_environment(dev_dir, DEV_DIR_ENVIRONMENT);
+    let tasks_socket = flag_or_environment(tasks_socket, TASKS_SOCKET_ENVIRONMENT);
     let ask = std::env::var("LAMP_SKILLS_ASK").unwrap_or_default();
     let options = Options {
         tools,
@@ -294,6 +307,7 @@ fn main() -> ExitCode {
         local_time,
         known_file,
         dev_dir,
+        tasks_socket,
     };
     match serve(&dir, root, &sockets, &options) {
         Ok(()) => ExitCode::SUCCESS,
@@ -344,6 +358,11 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
     // `asked`: the Store's public key a package must be
     // signed with. `pack`: the private key it is signed with, if any.
     let mut key_file: Option<PathBuf> = None;
+    // `asked`: where lamp-control keeps a pushed package for the helper and
+    // where a pushed skill is kept. A desktop lamp (lamp-sim) has neither
+    // `/var/lib` folder, so it names its own; the product unit never passes
+    // them, and with none they are the constants.
+    let (mut push_dir, mut dev_dir): (Option<PathBuf>, Option<PathBuf>) = (None, None);
     // `pack --author`: the signature carries the author's public key, for a
     // package they share (`package::author_signature_for`).
     let mut author = false;
@@ -354,6 +373,22 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             "--dir" if command != "pack" => &mut dir,
             "--out" if command == "pack" => &mut out,
             "--state-dir" if matches!(command, "asked" | "remove" | "install") => &mut state,
+            "--push-dir" if command == "asked" => {
+                let Some(value) = given.next() else {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                };
+                push_dir = Some(value.into());
+                continue;
+            }
+            "--dev-dir" if command == "asked" => {
+                let Some(value) = given.next() else {
+                    eprintln!("{USAGE}");
+                    return ExitCode::from(2);
+                };
+                dev_dir = Some(value.into());
+                continue;
+            }
             "--author" if command == "pack" => {
                 author = true;
                 continue;
@@ -444,6 +479,7 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                     None
                 }
             };
+            let (pushes_push, pushes_dev) = asked_folders(push_dir, dev_dir);
             let store = web.as_mut().map(|web| package::Store {
                 key_file,
                 channel: web,
@@ -455,8 +491,8 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
                 package::ASKED_LOCK_WAIT,
                 store,
                 Some(package::Pushes {
-                    dev: Path::new(lamp_skills::PUSHED_DIR),
-                    push: Path::new(package::PUSH_DIR),
+                    dev: &pushes_dev,
+                    push: &pushes_push,
                     asker,
                     key_file: &store_key_file,
                 }),
@@ -504,6 +540,16 @@ fn manage(command: &str, given: &[String]) -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+/// The folders the manage helper's pushed requests use: lamp-control's push
+/// and the pushed skills' own, or the product's when none is given
+/// (`asked --push-dir`, `--dev-dir`, for a desktop lamp only).
+fn asked_folders(push: Option<PathBuf>, dev: Option<PathBuf>) -> (PathBuf, PathBuf) {
+    (
+        push.unwrap_or_else(|| PathBuf::from(package::PUSH_DIR)),
+        dev.unwrap_or_else(|| PathBuf::from(lamp_skills::PUSHED_DIR)),
+    )
 }
 
 /// What the folder holds, to see that it changed: every file but the tests,
@@ -615,6 +661,9 @@ struct Options {
     /// the lamp (`lamp-eyes --known-file`), for a watch to tell a known face
     /// from one it does not know, and the person who asked from anyone else.
     known_file: Option<PathBuf>,
+    /// `--tasks-socket` or `LAMP_SKILLS_TASKS_SOCKET`: lamp-tasks' socket a
+    /// skill's `do.task` is handed over on (#6305, #6306).
+    tasks_socket: Option<PathBuf>,
 }
 
 /// A skip of the clock asked on `--clock-control`, and where to say it is
@@ -856,6 +905,16 @@ fn serve(
     options: &Options,
 ) -> io::Result<()> {
     let tools = options.tools.as_deref();
+    // The tools' folder is kept through a restart for its holds
+    // (`RuntimeDirectoryPreserve=restart`, `lamp_skills::holds`), and with it
+    // the last run's `tools.json`: let go at once, before anything else, so
+    // a session the voice opens now is never offered a tool this run may not
+    // have (an update's dropped or renamed one). The first load writes it
+    // again, a moment on; until then the voice has none, as when the folder
+    // went with each restart.
+    if let Some(tools) = tools {
+        forget_tools(tools);
+    }
     let (skip_ask, ask_policy) = (options.ask == "skip", options.ask == "policy");
     let bus = match root {
         Some(root) => Bus::new(root)?,
@@ -1004,6 +1063,41 @@ fn serve(
             Err(error) => eprintln!("lamp-skills: the skills turned off not read: {error}"),
         }
     }
+    // A long held trigger kept across a short restart (an update's), in the
+    // runtime folder beside the tools: tmpfs, so never across a reboot, and
+    // taken back only on the same boot (`lamp_skills::holds`).
+    if let Some(tools) = tools {
+        let boot = match options.boot_id.as_deref() {
+            Some(id) => Ok(id.to_owned()),
+            None => std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
+                .map(|id| id.trim().to_owned())
+                .map_err(|error| format!("the boot not known ({error}): supply --boot-id")),
+        };
+        match boot.and_then(|boot| {
+            if boot.is_empty() {
+                Err("the boot not known".to_owned())
+            } else {
+                Ok(boot)
+            }
+        }) {
+            Ok(boot) => {
+                let file = tools.join(lamp_skills::holds::FILE);
+                match engine.keep_holds_in(file.clone(), boot, clock::now_us()) {
+                    Ok(read) => eprintln!(
+                        "lamp-skills: the long holds kept in {}: {read} read from before",
+                        file.display()
+                    ),
+                    Err(error) => eprintln!(
+                        "lamp-skills: the long holds kept in {}; none read: {error}",
+                        file.display()
+                    ),
+                }
+            }
+            Err(error) => {
+                eprintln!("lamp-skills: the long holds not kept across a restart: {error}")
+            }
+        }
+    }
     // Each run counted by where its skill came from, added to the state
     // folder's totals at most once a minute, for lamp-cloud's opt-in health
     // report to read (`lamp_skills::usage`, `docs/cloud.md`).
@@ -1063,6 +1157,13 @@ fn serve(
         runs: RefCell::default(),
         permissions: RefCell::new(HashMap::new()),
         unplug: RefCell::default(),
+        made: RefCell::default(),
+        tasks: RefCell::new(Tasks {
+            of: HashMap::new(),
+            state: options.state.clone(),
+            socket: options.tasks_socket.clone(),
+            say: sockets.say.clone(),
+        }),
         looks: RefCell::new(HashMap::new()),
         watching: RefCell::new(Watching {
             // Arrivals by sound only with LAMP_GUARD_SOUNDS=on (#2562), and
@@ -1100,7 +1201,7 @@ fn serve(
     }
     let (ask, asks) = waking::<ToolAsk>(&waker);
     if let Some(tools) = tools {
-        listen(tools, ask.clone(), audio.clone())?;
+        listen(tools, ask.clone(), audio.clone(), runner.bus.clone())?;
     }
     let (skip, skips) = waking::<Skip>(&waker);
     if let Some(path) = &options.clock_control {
@@ -1116,6 +1217,8 @@ fn serve(
     // a skill for this run of the program, not at every reload (Thirteen's
     // P3 on #5402).
     let mut order_said: HashSet<String> = HashSet::new();
+    // A made skill whose old limits are ignored, said once a run.
+    let mut shed_said: HashSet<String> = HashSet::new();
     // Night sleep's live claim (#940), with routines on: said at each
     // reload, every minute and when its rest path goes down or comes back,
     // so Expression knows the night is a skill's. Its third part is why the
@@ -1155,7 +1258,15 @@ fn serve(
         sample_clock(&mut engine, &runner, clock::now_us());
         while let Ok(event) = done.try_recv() {
             let skill = event.skill.clone();
+            let unwritten = lamp_skills::service_write::waiting(&event.why);
             publish(&mut out, event);
+            // A write waiting for the owner's yes made nothing: what its
+            // start spent is given back (#6066, lamp-9adf 12 Nov).
+            if unwritten && engine.unwritten(&skill) {
+                eprintln!(
+                    "lamp-skills: {skill} sent nothing: its group's hour, cooldown, day's count and rest are given back"
+                );
+            }
             // A trigger's run that said nothing gives its place in its
             // group's hour back, where the group says so (#5207).
             if runs.unsaid(&skill)
@@ -1255,6 +1366,19 @@ fn serve(
                         skill.name
                     );
                 }
+                // A made skill's old default limits, ignored as it loads
+                // with LAMP_MADE_SKILL_LOOSE on, its folder left as it is
+                // (`lamp_skills::shed_made_manners`). Its name alone.
+                for skill in skills.iter().filter(|skill| {
+                    !skill.manners_shed.is_empty() && shed_said.insert(skill.name.clone())
+                }) {
+                    eprintln!(
+                        "lamp-skills: {}: made here, {}=on: the lamp's old {} ignored, its files as they are",
+                        skill.name,
+                        lamp_voice::made_skill::LOOSE_ENVIRONMENT,
+                        skill.manners_shed.join(" and ")
+                    );
+                }
                 // Keep the previous accepted generation intact if its
                 // cap declarations cannot be installed as one bounded set.
                 // The earlier asset scan still revokes changed media;
@@ -1284,6 +1408,21 @@ fn serve(
                 *runner.permissions.borrow_mut() = skills
                     .iter()
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
+                    .collect();
+                *runner.made.borrow_mut() = made_here(&skills, dir);
+                // A pushed skill's folder is the developer folder's.
+                runner.tasks.borrow_mut().of = skills
+                    .iter()
+                    .filter(|skill| skill.task_step().is_some())
+                    .filter_map(|skill| {
+                        let folder = lamp_skills::task::folder_of(
+                            dir,
+                            options.dev_dir.as_deref(),
+                            &skill.name,
+                            skill.pushed_by.is_some(),
+                        )?;
+                        Some((skill.name.clone(), (folder, skill.grants.clone())))
+                    })
                     .collect();
                 if let Some(counting) = &counting {
                     *runner.runs.borrow_mut() = skills
@@ -1367,7 +1506,7 @@ fn serve(
                 }
             }
             if let Some(tools) = tools {
-                keep_tools(tools, &ask, &engine, &audio)?;
+                keep_tools(tools, &ask, &engine, &audio, &runner.bus)?;
             }
             let _ = out.alive();
         }
@@ -1496,6 +1635,8 @@ fn serve(
         for run in engine.tick(clock::now_us()) {
             handle(run, &mut runs, &mut out, &runner);
         }
+        // The long holds written when they changed, or every 30 s.
+        engine.keep_holds(clock::now_us());
         watch_look(&mut out, &runner);
     }
 }
@@ -1751,6 +1892,12 @@ struct Runner {
     permissions: RefCell<HashMap<String, Permissions>>,
     /// By skill, its `[unplug]` words, as of the last load (#940).
     unplug: RefCell<HashMap<String, lamp_skills::UnplugLines>>,
+    /// The skills made on this lamp, as of the last load (#6062): their
+    /// says are asked quoted, with no functions ([`say_ask`]).
+    made: RefCell<HashSet<String>>,
+    /// The skills with a `do.task` (#6305), as of the last load, and where
+    /// their tasks are handed over.
+    tasks: RefCell<Tasks>,
     /// By skill, the looks its search under way has taken (#1685).
     looks: RefCell<HashMap<String, u32>>,
     /// The watches (guard mode), their marks and their texts.
@@ -1758,6 +1905,19 @@ struct Runner {
     /// With `LAMP_ADDONS=on`: where the add-ons' proposals are written, and
     /// their limits (`docs/addons.md`).
     proposals: Option<Arc<Mutex<Proposals>>>,
+}
+
+/// The skills with a `do.task` (#6305): by skill, its folder and its
+/// grants, as of the last load; and the program's `--state-dir`, where the
+/// runs' ledger is (the owner's yes is lamp-control's), lamp-tasks'
+/// socket, and the voice's say service, which asks for a missing yes aloud
+/// (#6071's V2).
+#[derive(Default)]
+struct Tasks {
+    of: HashMap<String, (PathBuf, Vec<String>)>,
+    state: Option<PathBuf>,
+    socket: Option<PathBuf>,
+    say: PathBuf,
 }
 
 /// `addon/proposal`, written for the add-ons, and what they proposed lately.
@@ -2337,6 +2497,7 @@ impl Runner {
                 .cloned()
                 .unwrap_or_default(),
             unplug: self.unplug.borrow().get(skill).cloned(),
+            made: self.made.borrow().contains(skill),
         };
         sockets
     }
@@ -2432,6 +2593,28 @@ fn start(
     if let Some(runs) = runner.runs.borrow().get(&skill) {
         runs.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     }
+    // A task handed to the lamp's agent (#6305) goes on its own thread, as
+    // long as lamp-tasks takes to answer (its run's end, at most
+    // `task::RUN_MOST`): the run's other steps (light, cue, say) are made
+    // at once beside it, and its outcome is the journal's.
+    let (tasks, calls): (Vec<Call>, Vec<Call>) = calls
+        .into_iter()
+        .partition(|call| matches!(call, Call::Task(_)));
+    let handed = !tasks.is_empty();
+    for call in tasks {
+        let Call::Task(step) = call else { continue };
+        hand_task(&skill, *step, &runner.tasks.borrow());
+    }
+    if handed && calls.is_empty() {
+        let _ = made.send(());
+        let _ = runner.finished.send(SkillEvent {
+            skill,
+            stage: SkillStage::Done,
+            why: "its do.task goes on on its own".into(),
+            allowed: None,
+        });
+        return made_rx;
+    }
     // A read of a linked service (#5288) is its skill's whole run: on a
     // thread of its own, as long as its gate's wait, and nothing is made
     // with it.
@@ -2447,6 +2630,23 @@ fn start(
         let _ = made.send(());
         std::thread::spawn(move || {
             let why = read_service(&skill, &read, &sockets, bus, known_file, local_time);
+            let _ = finished.send(SkillEvent {
+                skill,
+                stage: SkillStage::Done,
+                why,
+                allowed: None,
+            });
+        });
+        return made_rx;
+    }
+    // A write to a linked service (#6066) is its skill's whole run: on a
+    // thread of its own, as long as `lamp-services` takes to answer.
+    if let [Call::ServiceWrite(write)] = calls.as_slice() {
+        let write = (**write).clone();
+        let (sockets, finished) = (runner.sockets_for(&skill), runner.finished.clone());
+        let _ = made.send(());
+        std::thread::spawn(move || {
+            let why = write_service(&skill, &write, &sockets);
             let _ = finished.send(SkillEvent {
                 skill,
                 stage: SkillStage::Done,
@@ -3055,6 +3255,20 @@ fn write_tools(dir: &Path, engine: &Engine) {
     }
 }
 
+/// The last run's `tools.json` in `dir` removed, at the start ([`serve`]):
+/// none there is nothing to do.
+fn forget_tools(dir: &Path) {
+    let path = dir.join("tools.json");
+    match std::fs::remove_file(&path) {
+        Ok(()) => eprintln!(
+            "lamp-skills: {} from before the restart let go: written again at the first load",
+            path.display()
+        ),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => eprintln!("lamp-skills: {} not let go: {error}", path.display()),
+    }
+}
+
 /// The tools' folder looked after at a look. Inside the actions part's
 /// folder, systemd removed it at each of actions' restarts, and the voice
 /// had no skill functions until lamp-skills restarted (lamp-4ace, 19 Oct
@@ -3071,6 +3285,7 @@ fn keep_tools(
     asks: &Waking<ToolAsk>,
     engine: &Engine,
     audio: &Arc<Mutex<Authority>>,
+    bus: &Bus,
 ) -> io::Result<()> {
     if dir.join("call.sock").exists() {
         return Ok(());
@@ -3084,7 +3299,7 @@ fn keep_tools(
             ),
         ));
     }
-    listen(dir, asks.clone(), audio.clone())?;
+    listen(dir, asks.clone(), audio.clone(), bus.clone())?;
     write_tools(dir, engine);
     eprintln!(
         "lamp-skills: {} had no call.sock: made again",
@@ -3152,10 +3367,47 @@ fn from_the_app(stream: &UnixStream) -> bool {
     }
 }
 
+/// Whether the peer on `stream` is lamp-voice, by its credentials
+/// (`SO_PEERCRED`) and its cgroup ([`watch::from_the_voice`]), as
+/// [`from_the_app`] tells lamp-cloud; or, with `LAMP_SKILLS_ANY_ASKER=on`
+/// in this program's own environment, any peer, for the tests. Peer
+/// credentials are read on Linux only; elsewhere no peer is the voice.
+fn from_the_voice(stream: &UnixStream) -> bool {
+    if std::env::var(lamp_skills::package::ANY_ASKER).as_deref() == Ok("on") {
+        return true;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        rustix::net::sockopt::socket_peercred(stream).is_ok_and(|peer| {
+            std::fs::read_to_string(format!("/proc/{}/cgroup", peer.pid.as_raw_nonzero()))
+                .is_ok_and(|cgroup| watch::from_the_voice(&cgroup))
+        })
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = stream;
+        false
+    }
+}
+
 /// Listens on `dir/call.sock` as the actions part does: one line in
 /// (`{"op":"call","name":...,"args":{...}}`), one line out, the main loop
 /// answering. And the owner's app's `{"op":"guard","turn":...}` ([`app_turn`]).
-fn listen(dir: &Path, asks: Waking<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io::Result<()> {
+///
+/// The caller is told apart (#6128): only lamp-voice's unit
+/// ([`from_the_voice`]) has its `requested_audio_context` taken and its
+/// `audio_authorize` and `audio_finish` served, as those are the voice's
+/// socket receipts. Any other peer (lamp-tasks' `skill call`, the lamp's
+/// Hermes) has its context dropped, so a requested sound answers as with
+/// none, its audio ops refused ([`watch::NOT_THE_VOICE`]), and its `call`
+/// refused while the lamp is private ([`lamp_skills::routine::kept_asleep`],
+/// [`watch::PRIVATE_FOR_OTHERS`]).
+fn listen(
+    dir: &Path,
+    asks: Waking<ToolAsk>,
+    audio: Arc<Mutex<Authority>>,
+    bus: Bus,
+) -> io::Result<()> {
     std::fs::create_dir_all(dir)?;
     let socket = dir.join("call.sock");
     let _ = std::fs::remove_file(&socket);
@@ -3170,10 +3422,22 @@ fn listen(dir: &Path, asks: Waking<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io
                 let mut line = String::new();
                 BufReader::new((&stream).take(8_192)).read_line(&mut line)?;
                 let call: serde_json::Value = serde_json::from_str(&line).unwrap_or_default();
+                let voice = from_the_voice(&stream);
                 if matches!(
                     call["op"].as_str(),
                     Some("audio_authorize" | "audio_finish")
                 ) {
+                    if !voice {
+                        eprintln!(
+                            "lamp-skills: {} refused: the peer is not the voice",
+                            call["op"].as_str().unwrap_or_default()
+                        );
+                        return writeln!(
+                            &stream,
+                            "{}",
+                            json!({"ok": false, "error": watch::NOT_THE_VOICE})
+                        );
+                    }
                     let result = serde_json::from_value::<RequestedAudioOperation>(call)
                         .map_err(|_| "invalid private audio operation".to_owned())
                         .and_then(|op| {
@@ -3190,6 +3454,14 @@ fn listen(dir: &Path, asks: Waking<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io
                 }
                 let context = match call.get("requested_audio_context") {
                     None => None,
+                    // Another program's context is no receipt of the voice:
+                    // dropped, so the call answers as with none.
+                    Some(_) if !voice => {
+                        eprintln!(
+                            "lamp-skills: a requested audio context from a peer that is not the voice dropped"
+                        );
+                        None
+                    }
                     Some(context) => {
                         match serde_json::from_value::<RequestedAudioContext>(context.clone()) {
                             Ok(context) if context.check().is_ok() => Some(context),
@@ -3203,6 +3475,19 @@ fn listen(dir: &Path, asks: Waking<ToolAsk>, audio: Arc<Mutex<Authority>>) -> io
                         }
                     }
                 };
+                // Another program's call is served only on a fresh privacy
+                // reading that permits capture: a missing or stale one is
+                // private too. The voice holds its own turns to privacy.
+                if !voice
+                    && call["op"].as_str() == Some("call")
+                    && let Some(why) = lamp_skills::routine::private_for_others(&bus)
+                {
+                    eprintln!(
+                        "lamp-skills: a call from a peer that is not the voice refused: {why}"
+                    );
+                    let error = format!("{}: {why}", watch::PRIVATE_FOR_OTHERS);
+                    return writeln!(&stream, "{}", json!({"ok": false, "error": error}));
+                }
                 let (reply, told) = mpsc::channel();
                 let admission = Admission::default();
                 // A tool's call never names the app's kinds: those come by
@@ -3294,6 +3579,17 @@ fn prepare_unplug(skill: &str, sockets: &Sockets, bus: &Bus) -> String {
     }
     let failure = loop {
         match unplug::read(bus, &request, since, clock::now_us()) {
+            // A product lamp turns off at the fold (#5763's P1): a running
+            // lamp, its storage still written, never says it may be unplugged.
+            // Only after a spoken yes (#5774's P2: a voice turn-off only
+            // with one, shutdown.md): a false fold stands up, never off.
+            Ok(Progress::Ready) if std::env::var_os(unplug::OFF_SOCKET_ENVIRONMENT).is_some() => {
+                let socket = std::env::var_os(unplug::OFF_SOCKET_ENVIRONMENT).unwrap_or_default();
+                return match yes_to_turn_off(skill, sockets, bus) {
+                    Ok(()) => turn_off(sockets, bus, &request, since, Path::new(&socket)),
+                    Err(why) => not_turned_off(sockets, bus, &request, &why),
+                };
+            }
             Ok(Progress::Ready) => {
                 // Recheck after the socket opens, immediately before sending.
                 // The voice must not queue a readiness claim for a later scene.
@@ -3361,24 +3657,135 @@ fn stay_call((name, args, _, reply, admission): ToolAsk, engine: &Engine, runner
         .map(|lines| lines.stay.clone())
         .unwrap_or_default();
     std::thread::spawn(move || {
-        let outcome = stay(&sockets, &bus, &request, &line);
+        let outcome = never_mind(&sockets, &bus, &request, &line);
         eprintln!("lamp-skills: {name}: {outcome}");
     });
+}
+
+/// A spoken "never mind": the person is there and asked, so the cancel is
+/// published before the line, which may never begin (lamp-52e6, builds
+/// 12130 and 12200). It needs no run under way, only the kept request
+/// (`may_stay`).
+fn never_mind(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
+    stay_even_unsaid(sockets, bus, request, line, Cancel::First)
+}
+
+/// No yes to the turn-off ask: the stay line, then it stands. A heard no
+/// ([`HEARD_NO`]) stands first, the line after, even if it never begins: the
+/// person is there and said no (lamp-52e6, builds 12130 and 12200). Other
+/// words (a TV, someone else talking), silence, or a yes not taken keep the
+/// line-first rule of [`stay`]: a person mid-unplug hears it before the arm
+/// moves (the Reviewer-lead's P2 on #6519).
+fn not_turned_off(sockets: &Sockets, bus: &Bus, request: &str, why: &str) -> String {
+    let line = sockets
+        .may
+        .unplug
+        .as_ref()
+        .map(|lines| lines.stay.clone())
+        .unwrap_or_default();
+    format!(
+        "unplug: not turned off: {why}; {}",
+        stay_even_unsaid(
+            sockets,
+            bus,
+            request,
+            &line,
+            if why == HEARD_NO {
+                Cancel::First
+            } else {
+                Cancel::AfterLine
+            }
+        )
+    )
 }
 
 /// The line first; only once it has begun is the cancel published, and the
 /// body waits a further 3 s before any motion. A line never begun cancels
 /// nothing: a person mid-unplug must hear it before the arm moves.
 fn stay(sockets: &Sockets, bus: &Bus, request: &str, line: &str) -> String {
+    stay_even_unsaid(sockets, bus, request, line, Cancel::AfterLine)
+}
+
+/// When [`stay_even_unsaid`] publishes the cancel that stands the lamp up.
+#[derive(Clone, Copy, PartialEq)]
+enum Cancel {
+    /// Once the line has begun; a line never begun cancels nothing.
+    AfterLine,
+    /// Once the line has begun, or after it if it never began: a turn-off
+    /// that failed never leaves the lamp kept folded.
+    EvenUnsaid,
+    /// Before the line: the person is there and asked to stay (a heard "no",
+    /// a spoken "never mind"), so the lamp stands at once and the line plays
+    /// when the voice is free. When the voice model opened its own turn, the
+    /// exact line waits until it expires (30 s), and a cancel after it held
+    /// the arm down that long (lamp-52e6, build 12200, #6515).
+    First,
+}
+
+/// The stay lines being asked, by bus and request: a heard "no", a "never
+/// mind" and the timeout racing for the same request say the line once
+/// (the Reviewer-lead's P3 on #6519). A claim lasts while its line is asked.
+static SAYING: Mutex<Vec<(PathBuf, String)>> = Mutex::new(Vec::new());
+
+/// [`stay`], with the cancel published as `when` says.
+fn stay_even_unsaid(
+    sockets: &Sockets,
+    bus: &Bus,
+    request: &str,
+    line: &str,
+    when: Cancel,
+) -> String {
     let mut cancelled = None;
-    let outcome = say(
-        &sockets.say,
-        "staying plugged in",
-        &sockets.may.skill,
-        json!({"note": line, "priority": 8}),
-        &[],
-        || cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us())),
-    );
+    let claim = (bus.root().to_owned(), request.to_owned());
+    if when != Cancel::EvenUnsaid {
+        let mut saying = SAYING
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let kept = lamp_body::unplug::Request {
+            request: request.to_owned(),
+        };
+        // Already cancelled, by another stay: its line is the one said.
+        if lamp_body::unplug::cancelled(bus, &kept) {
+            return format!("{request} was already cancelled; its stay line is said once");
+        }
+        if when == Cancel::First {
+            cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
+        }
+        // Another stay's line is being asked: it is the one said.
+        if saying.contains(&claim) {
+            return match cancelled {
+                Some(Ok(())) => {
+                    format!("cancel published for {request}; its stay line is already asked")
+                }
+                Some(Err(error)) => format!("the cancel was not published: {error}"),
+                None => format!("{request}'s stay line is already asked"),
+            };
+        }
+        saying.push(claim.clone());
+    }
+    let outcome = match sockets.may.refuses(&Call::Say(String::new())) {
+        Some(refused) if when != Cancel::AfterLine => refused,
+        _ => say(
+            &sockets.say,
+            "staying plugged in",
+            &sockets.may.skill,
+            exact(line, 8),
+            &[],
+            || {
+                // A cancel that failed before the line is tried again.
+                if !matches!(cancelled, Some(Ok(()))) {
+                    cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
+                }
+            },
+        ),
+    };
+    SAYING
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .retain(|other| *other != claim);
+    if when == Cancel::EvenUnsaid && cancelled.is_none() {
+        cancelled = Some(lamp_skills::unplug::cancel(bus, request, clock::now_us()));
+    }
     match cancelled {
         Some(Ok(())) if failed_after_cancel(bus, request) => format!(
             "{outcome}; cancel published for {request}; it then failed: {}",
@@ -3424,7 +3831,7 @@ fn say_check(sockets: &Sockets) -> String {
         &sockets.say,
         "unplug needs checking",
         &sockets.may.skill,
-        json!({"note": lines.check, "priority": 8}),
+        exact(&lines.check, 8),
         &[],
         || {},
     )
@@ -3486,6 +3893,21 @@ fn ready_for(ready_since: &mut Option<u64>, ready: bool, now: u64, wait: Duratio
     now.saturating_sub(*ready_since.get_or_insert(now)) >= wait.as_micros() as u64
 }
 
+/// A line of the skill's `[unplug]` words as the voice's exact words
+/// (#5777): rendered as written, never a note the chat model may decline or
+/// reword, and waiting while the person talks rather than dropped as
+/// `user_interrupted` (lamp-52e6, 10 Nov 12:43: the ask refused, the stay
+/// dropped). The readiness line stays guarded text (`say_unplug_ready`).
+/// A file from before them, which a lamp may keep (`UnplugLines::built_in`),
+/// wrote its lines as notes: their "Say exactly: " is never read out.
+fn exact(line: &str, priority: u8) -> serde_json::Value {
+    let line = ["Say exactly: ", "Say briefly: "]
+        .iter()
+        .find_map(|note| line.strip_prefix(note))
+        .unwrap_or(line);
+    json!({"text": line, "exact": true, "priority": priority})
+}
+
 fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
     if let Some(why) = sockets.may.refuses(&Call::Say(String::new())) {
         return why;
@@ -3497,9 +3919,185 @@ fn say_unplug_failure(skill: &str, sockets: &Sockets) -> String {
         &sockets.say,
         "unplug preparation failed",
         skill,
-        json!({"note": lines.failed, "priority": 5}),
+        exact(&lines.failed, 5),
         &[],
         || {},
+    )
+}
+
+/// Setup's change helper's request for the app's Turn off
+/// (`lamp_keeper::restart::SHUTDOWN_REQUEST`; lamp-skills doesn't depend
+/// on the keeper) and how long its answer is waited for (lamp-cloud's
+/// `RESTART_WAIT`: the helper reads one line and checks one lock).
+const TURN_OFF_REQUEST: &str = r#"{"shutdown":"lamp"}"#;
+const TURN_OFF_WAIT: Duration = Duration::from_secs(2);
+/// How long a spoken yes to the turn-off is waited for, once the ask's
+/// words have ended (#5774's P2).
+const OFF_YES_WAIT: Duration = Duration::from_secs(30);
+/// The helper's refusal while an update installs
+/// (`lamp_keeper::restart::INSTALLING`). An install round restarts
+/// lamp-skills, so nothing may wait here for the update to end (#5777's
+/// P2): the lamp says `updating`, stands up at once, and is asked again.
+const OFF_UPDATING: &str = "an update is being installed: try again once it is done";
+
+/// At a proven fold with a turn-off socket: the skill's `ask_off` said,
+/// then a spoken yes waited for, judged by the lamp's one spoken yes
+/// (`first_stand::is_yes`, as the first stand's): a short line opening
+/// with yes, heard 1.5 s or more after the ask's words ended (never their
+/// echo), in a room that isn't busy, within [`OFF_YES_WAIT`]. The first
+/// finished line after the ask decides: any other words are no yes. In a
+/// language other than English nothing is asked, since the yes is heard by
+/// English words only: the lamp stays (#5774's P2).
+/// Words at the turn-off ask that are no yes and no "no" (a TV, someone
+/// else talking): the line first, as silence.
+const NOT_A_YES: &str = "words that aren't a yes were heard";
+/// A spoken no at the turn-off ask ([`says_no`]): it stands first.
+const HEARD_NO: &str = "a spoken no was heard";
+
+/// Whether `heard` is a short line opening with a no ("No.", "Nope, stay",
+/// "Don't", "Not now", "Never mind"): as short as a yes, so a TV's long line
+/// that happens to open with "no" stays [`NOT_A_YES`].
+fn says_no(heard: &str) -> bool {
+    let words: Vec<String> = heard
+        .split_whitespace()
+        .map(|word| {
+            word.replace('\u{2019}', "'")
+                .trim_matches(|c: char| !c.is_alphanumeric() && c != '\'')
+                .to_lowercase()
+        })
+        .filter(|word| !word.is_empty())
+        .collect();
+    words.len() <= 5
+        && words.first().is_some_and(|first| {
+            ["no", "nope", "nah", "not", "never"].contains(&first.as_str())
+                || first.ends_with("n't")
+        })
+}
+
+fn yes_to_turn_off(skill: &str, sockets: &Sockets, bus: &Bus) -> Result<(), String> {
+    use lamp_body::first_stand;
+    let lines = sockets
+        .may
+        .unplug
+        .as_ref()
+        .ok_or("the skill says no [unplug] words")?;
+    if let Some(refused) = sockets.may.refuses(&Call::Say(String::new())) {
+        return Err(refused);
+    }
+    if first_stand::speaks_other_than_english(first_stand::language_text().as_deref()) {
+        return Err("a spoken yes is heard in English words only".into());
+    }
+    // Subscribed before the ask, so no line after it is missed.
+    let mut heard = bus
+        .subscribe(Speech::TOPICS[0], "skills_unplug_yes")
+        .map_err(|error| format!("voice/heard not read: {error}"))?;
+    let said = say(
+        &sockets.say,
+        "unplug: turn-off asked",
+        skill,
+        exact(&lines.ask_off, 8),
+        &[],
+        || {},
+    );
+    if !said.ends_with(": spoken") {
+        return Err(said);
+    }
+    let opens = lamp_ipc::monotonic_us().saturating_add(first_stand::ECHO_TAIL_US);
+    let until = Instant::now() + OFF_YES_WAIT;
+    let (mut line, mut early) = (String::new(), false);
+    while Instant::now() < until {
+        let Some(message) = receive(&mut heard, Duration::from_millis(200)) else {
+            continue;
+        };
+        let Ok(speech) = message.parse::<Speech>() else {
+            continue;
+        };
+        early |= message.header.at_us < opens;
+        line.push_str(&speech.text);
+        if !speech.finished {
+            continue;
+        }
+        let text = std::mem::take(&mut line);
+        if std::mem::take(&mut early)
+            || text.trim().is_empty()
+            || first_stand::is_echo(&text, &lines.ask_off)
+        {
+            continue;
+        }
+        if !first_stand::is_yes(&text) {
+            return Err(if says_no(&text) { HEARD_NO } else { NOT_A_YES }.into());
+        }
+        let busy = bus
+            .latest(lamp_msgs::RoomState::TOPIC)
+            .ok()
+            .flatten()
+            .filter(|message| !message.expired)
+            .and_then(|message| message.parse::<lamp_msgs::RoomState>().ok())
+            .is_some_and(|room| room.state == lamp_msgs::Room::Busy);
+        return if busy {
+            Err("a yes in a busy room is not taken".into())
+        } else {
+            Ok(())
+        };
+    }
+    Err(format!("no spoken yes within {} s", OFF_YES_WAIT.as_secs()))
+}
+
+/// At a confirmed fold, with a turn-off socket: Ready read once more, then
+/// the helper asked to turn the lamp off, as the app's Turn off asks. Its
+/// runner (`lamp-setup shutdown-now`) says the last words, stops every
+/// part, lets the arm go, lights green, syncs and powers off. Refused or
+/// not reached: the `not_off` note, and it stands up as after "never mind",
+/// the cancel published even if the note never began.
+fn turn_off(sockets: &Sockets, bus: &Bus, request: &str, since: u64, socket: &Path) -> String {
+    let asked = || -> io::Result<serde_json::Value> {
+        let mut stream = UnixStream::connect(socket)?;
+        stream.set_write_timeout(Some(TURN_OFF_WAIT))?;
+        stream.set_read_timeout(Some(TURN_OFF_WAIT))?;
+        if lamp_skills::unplug::read(bus, request, since, clock::now_us())?
+            != lamp_skills::unplug::Progress::Ready
+        {
+            return Err(io::Error::other("the fold was no longer proven"));
+        }
+        writeln!(stream, "{TURN_OFF_REQUEST}")?;
+        let mut line = String::new();
+        BufReader::new(stream.take(64 * 1_024)).read_line(&mut line)?;
+        Ok(serde_json::from_str(&line)?)
+    };
+    let why = match asked() {
+        Ok(answer) if answer["done"]["shutting_down"] == true => {
+            return format!("unplug: folded for {request}; the lamp turns off (setup's shutdown)");
+        }
+        // An update installing: it can't turn off now, so it says so, stands
+        // up at once as a "never mind" does, and asks to be told again;
+        // nothing is left waiting for the update's restart to lose.
+        Ok(answer) if answer["refused"] == OFF_UPDATING => {
+            let line = sockets
+                .may
+                .unplug
+                .as_ref()
+                .map(|lines| lines.updating.clone())
+                .unwrap_or_default();
+            return format!(
+                "unplug: an update holds the turn-off; {}",
+                stay(sockets, bus, request, &line)
+            );
+        }
+        Ok(answer) => format!("the turn-off was not taken: {answer}"),
+        Err(error) => format!("the turn-off could not be asked: {error}"),
+    };
+    // Not off: the note, then it stands up as a "never mind" makes it, even
+    // when the note never began; a kept request would hold it folded until
+    // a reboot (lamp-52e6, build 11913).
+    let note = sockets
+        .may
+        .unplug
+        .as_ref()
+        .map(|lines| lines.not_off.clone())
+        .unwrap_or_default();
+    format!(
+        "unplug: not turned off: {why}; {}",
+        stay_even_unsaid(sockets, bus, request, &note, Cancel::EvenUnsaid)
     )
 }
 
@@ -3722,7 +4320,7 @@ fn perform(
     // it plays at once or refuses at once, with why.
     let asking = calls.iter().find_map(|call| match call {
         Call::Say(_) | Call::Words(_) => {
-            say_ask(call, sockets.may.permissions.who).map(|ask| ("say", ask))
+            say_ask(call, sockets.may.permissions.who, sockets.may.made).map(|ask| ("say", ask))
         }
         Call::SayFrom(source, _) => {
             // Share the item identity encoding with replay: task news names
@@ -4151,6 +4749,12 @@ impl SearchStop {
             return voice_listening(bus).then(|| "the voice is listening to someone".into());
         };
         let asked = self.asked.as_ref();
+        Self::spoke(heard, asked, false).then(|| "someone spoke to the lamp".into())
+    }
+
+    /// Whether words of a turn later than `asked` came on `heard` since the
+    /// last look: only finished ones when `finished`.
+    fn spoke(heard: &mut Subscriber, asked: Option<&(String, u64)>, finished: bool) -> bool {
         let later = |boot: &str, speech: &Speech| match (speech.request, asked) {
             (Some(turn), Some((was, asked))) if was == boot => turn > *asked,
             _ => true,
@@ -4158,12 +4762,32 @@ impl SearchStop {
         while let Some(message) = receive(heard, Duration::ZERO) {
             let boot = message.header.boot.clone();
             if message.parse::<Speech>().is_ok_and(|speech| {
-                later(&boot, &speech) && speech.text.chars().any(char::is_alphanumeric)
+                (speech.finished || !finished)
+                    && later(&boot, &speech)
+                    && speech.text.chars().any(char::is_alphanumeric)
             }) {
-                return Some("someone spoke to the lamp".into());
+                return true;
             }
         }
-        None
+        false
+    }
+
+    /// Whether a finished line of words came since the last look (#5745);
+    /// none when `voice/heard` can't be read.
+    fn words(&mut self) -> Option<bool> {
+        let asked = self.asked.as_ref();
+        let heard = self.heard.as_mut()?;
+        while let Some(message) = heard.recv(Duration::ZERO).ok()? {
+            let speech = message.parse::<Speech>().ok()?;
+            let later = match (speech.request, asked) {
+                (Some(turn), Some((boot, asked))) if boot == &message.header.boot => turn > *asked,
+                _ => true,
+            };
+            if speech.finished && later && speech.text.chars().any(char::is_alphanumeric) {
+                return Some(true);
+            }
+        }
+        Some(false)
     }
 }
 
@@ -4271,7 +4895,18 @@ fn held_back(sent: &mut Sent, bus: &Bus) -> Option<String> {
 /// speaking then. At most SAY_TIMEOUT in all. What it waited for, in words,
 /// and whether the line was cut: a line said to its end leaves the voice
 /// `resting`, one the person spoke over leaves it `listening`.
+///
+/// The voice stops its line on a sound, before it has any words (#5745:
+/// lamp-52e6, 13:48:35, a wordless sound 590 ms into the light show's
+/// line). So a cut is watched for at most CUT_SETTLES: finished words heard
+/// of a later turn than the call's are a person speaking, and the line
+/// stays cut; the voice speaking again with none is the line said again
+/// in the sound's place, once. That replay must reach fresh Resting;
+/// unknown state, unreadable words or a deadline cannot complete it.
+/// Neither within CUT_SETTLES, or the voice not known: cut.
 fn spoken(bus: &Bus) -> (String, bool) {
+    // Subscribed before the line: words heard over it are kept for the cut.
+    let mut heard = SearchStop::new(bus);
     let state = || said_lately::<VoiceState>(bus, VoiceState::TOPIC).map(|now| now.state);
     let asked = clock::now();
     let elapsed = |since: Instant| clock::now().saturating_duration_since(since);
@@ -4296,30 +4931,116 @@ fn spoken(bus: &Bus) -> (String, bool) {
             Some(_) => clock::sleep(POLL),
         }
     }
-    let begun = clock::now();
-    let cut = loop {
+    // The line from `begun` to its end: whether it was cut, or none if the
+    // voice was still speaking at SAY_TIMEOUT. Each look also asks `spoke`,
+    // which ends the wait as a cut.
+    let line = |begun: Instant, spoke: &mut dyn FnMut() -> bool| loop {
         let now = state();
         let over = match now {
             Some(Voice::Speaking) => false,
             Some(Voice::Thinking) => elapsed(begun) >= LINE_LONGEST,
             _ => true,
         };
-        if over {
-            break now == Some(Voice::Listening);
+        if over || spoke() {
+            break Some(!over || now == Some(Voice::Listening));
         }
         if elapsed(begun) >= SAY_TIMEOUT {
-            return ("after the say: the voice was still speaking".into(), false);
+            break None;
         }
         clock::sleep(POLL);
     };
-    (
-        format!(
-            "after the say: spoken from {} ms after the call, the turn over {} ms later",
-            (begun - asked).as_millis(),
-            elapsed(begun).as_millis()
-        ),
-        cut,
-    )
+    let still = || {
+        (
+            "after the say: the voice was still speaking".to_owned(),
+            false,
+        )
+    };
+    let begun = clock::now();
+    let Some(cut) = line(begun, &mut || false) else {
+        return still();
+    };
+    let how = format!(
+        "after the say: spoken from {} ms after the call, the turn over {} ms later",
+        (begun - asked).as_millis(),
+        elapsed(begun).as_millis()
+    );
+    if !cut {
+        return (how, false);
+    }
+    let cut_at = clock::now();
+    loop {
+        match heard.words() {
+            Some(true) => return (format!("{how}; cut by words"), true),
+            None => return (format!("{how}; cut, and voice/heard can't be read"), true),
+            Some(false) => {}
+        }
+        match state() {
+            Some(Voice::Speaking) => break,
+            None => {
+                return (
+                    format!("{how}; cut, and the voice's state is not known"),
+                    true,
+                );
+            }
+            Some(_) if elapsed(cut_at) >= CUT_SETTLES => {
+                return (
+                    format!(
+                        "{how}; cut, nothing settled within {} s",
+                        CUT_SETTLES.as_secs()
+                    ),
+                    true,
+                );
+            }
+            Some(_) => clock::sleep(POLL),
+        }
+    }
+    let resumed = clock::now();
+    loop {
+        match heard.words() {
+            Some(true) => return (format!("{how}; cut by words"), true),
+            None => return (format!("{how}; cut, and voice/heard can't be read"), true),
+            Some(false) => {}
+        }
+        if elapsed(resumed) >= SAY_TIMEOUT {
+            return (
+                format!("{how}; cut: the line said again did not finish in time"),
+                true,
+            );
+        }
+        match state() {
+            Some(Voice::Resting) => {
+                // Drain again at completion: words arriving with Resting
+                // still cancel. A failed read is not an empty queue.
+                return match heard.words() {
+                    Some(false) => (
+                        format!("{how}; a cut with no words: the line was said again, then made"),
+                        false,
+                    ),
+                    Some(true) => (format!("{how}; cut by words"), true),
+                    None => (format!("{how}; cut, and voice/heard can't be read"), true),
+                };
+            }
+            Some(Voice::Listening) => {
+                return (
+                    format!("{how}; cut again: the line said again was cut too"),
+                    true,
+                );
+            }
+            None => {
+                return (
+                    format!("{how}; cut, and the voice's state is not known"),
+                    true,
+                );
+            }
+            Some(Voice::Thinking) if elapsed(resumed) >= LINE_LONGEST => {
+                return (
+                    format!("{how}; cut: the line said again never reached resting"),
+                    true,
+                );
+            }
+            Some(_) => clock::sleep(POLL),
+        }
+    }
 }
 
 /// The light as it was before the run, from the light shown now: off, or
@@ -4597,6 +5318,117 @@ fn read_service(
     service_read::run(read, &mut room)
 }
 
+/// A skill's `do.task` that came due (#6305, [`lamp_skills::task`]),
+/// handed over on a thread of its own ([`lamp_skills::task::hand`]): only
+/// with the switch on and the owner's yes for its folder as it is now and
+/// its grants, one at a time a skill, within the day's bounds; with no yes,
+/// the voice is asked to say the read-back and ask for it (`task_yes`,
+/// [`lamp_skills::task::ask_yes`]). The journal says what became of it,
+/// never the task's words.
+fn hand_task(skill: &str, step: lamp_skills::task::TaskStep, tasks: &Tasks) {
+    let Some((folder, grants)) = tasks.of.get(skill).cloned() else {
+        eprintln!("lamp-skills: skill:{skill}: do.task: not handed over: its folder is not known");
+        return;
+    };
+    let (state, socket, skill) = (tasks.state.clone(), tasks.socket.clone(), skill.to_owned());
+    let say_socket = tasks.say.clone();
+    std::thread::spawn(move || {
+        // The owner's yes is lamp-control's, only asked here.
+        let place = lamp_skills::task::Place {
+            state: state.as_deref(),
+            control: Path::new(lamp_voice::skill_task_yes::CONTROL_SOCKET),
+            socket: socket.as_deref(),
+        };
+        // The yes asked aloud: the voice builds the read-back itself from
+        // the skill on the lamp; this asks only for it, by the skill's name.
+        let ask = json!({
+            "task_yes": true,
+            "priority": lamp_voice::say::NORMAL_PRIORITY,
+            "expires_in_ms": lamp_skills::task::ASK_EXPIRES_MS,
+        });
+        let say_yes = || say(&say_socket, "say", &skill, ask, &[], || {});
+        let said = lamp_skills::task::hand(
+            &skill,
+            &step,
+            &folder,
+            &grants,
+            place,
+            unix_ms(),
+            hand_over,
+            say_yes,
+        );
+        eprintln!("lamp-skills: skill:{skill}: {said}");
+    });
+}
+
+/// One hand-over line to lamp-tasks at `socket`, and its answer, read when
+/// the run ends, at most [`lamp_skills::task::RUN_MOST`] later.
+fn hand_over(socket: &Path, line: &str) -> Result<String, String> {
+    let exchange = || -> io::Result<String> {
+        let mut stream = UnixStream::connect(socket)?;
+        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+        stream.set_read_timeout(Some(lamp_skills::task::RUN_MOST))?;
+        stream.write_all(format!("{line}\n").as_bytes())?;
+        let mut answer = String::new();
+        BufReader::new(stream.take(8_192)).read_line(&mut answer)?;
+        Ok(answer)
+    };
+    let answer = exchange().map_err(|error| format!("lamp-tasks couldn't be reached: {error}"))?;
+    lamp_skills::task::answered(&answer)
+}
+
+/// A skill's write to a linked service that came due (#6066,
+/// [`lamp_skills::service_write`]): held to its permissions and its switch,
+/// then sent as its exact content on `lamp-services`' tools socket, which
+/// sends it only as the owner said yes to it. The journal's words: the
+/// outcome only, never a recipient or a text. A refusal that says its link
+/// is gone or another's stops the skill's writes until this program starts
+/// again.
+fn write_service(
+    skill: &str,
+    write: &lamp_skills::service_write::WriteStep,
+    sockets: &Sockets,
+) -> String {
+    use lamp_skills::service_write;
+    if !service_write::on() {
+        return format!("not made: {} is not on", service_write::ENVIRONMENT);
+    }
+    if service_write::stopped(skill) {
+        return "not made: its writes are stopped: its link changed or is gone".into();
+    }
+    if let Some(why) = sockets
+        .may
+        .refuses(&Call::ServiceWrite(Box::new(write.clone())))
+    {
+        return why;
+    }
+    let services = std::env::var_os(SERVICES_SOCKET_ENVIRONMENT)
+        .map_or_else(|| PathBuf::from(SERVICES_SOCKET), PathBuf::from);
+    let asked = || -> io::Result<serde_json::Value> {
+        let mut stream = UnixStream::connect(&services)?;
+        stream.set_read_timeout(Some(SERVICES_TIMEOUT))?;
+        stream.set_write_timeout(Some(ACTIONS_TIMEOUT))?;
+        writeln!(stream, "{}", write.line(skill))?;
+        let mut line = String::new();
+        BufReader::new(stream.take(16 * 1_024)).read_line(&mut line)?;
+        serde_json::from_str(&line)
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+    };
+    let answer = match asked() {
+        Err(error) => Err(format!(
+            "not sent: the lamp's services were not reached ({})",
+            error.kind()
+        )),
+        Ok(answer) if answer["ok"] == true => Ok(answer["result"].clone()),
+        Ok(answer) => Err(answer["error"].as_str().unwrap_or("refused").to_owned()),
+    };
+    let (said, stops) = service_write::outcome(answer, &write.service);
+    if stops {
+        service_write::stop(skill);
+    }
+    said
+}
+
 /// The lamp as a skill's read sees it ([`lamp_skills::service_read::Room`]).
 struct LampRoom {
     skill: String,
@@ -4756,6 +5588,11 @@ impl lamp_skills::service_read::Room for LampRoom {
             eprintln!("lamp-skills: a read told not linked not kept: {error}");
         }
     }
+
+    // One read at a time on the lamp, every skill's (#5618).
+    fn turns(&self) -> Option<&'static lamp_skills::service_read::Turns> {
+        Some(&lamp_skills::service_read::TURNS)
+    }
 }
 
 /// Makes one call and says how it went. A gesture or a move says it is
@@ -4900,8 +5737,33 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         Call::Propose(_) => "propose: written by the run on addon/proposal".into(),
         Call::Ends => "its trigger ended".into(),
         Call::ServiceRead(_) => "read: made by its own run, behind its gate".into(),
+        Call::ServiceWrite(_) => "write: made by its own run, as the owner said yes".into(),
+        Call::Task(_) => "do.task: handed over on its own, beside the run".into(),
+        Call::Remind(remind) => {
+            // One set at a time, all skills: the list read for the same
+            // words and the set it allows are never split by another's.
+            let mut tally = REMINDS
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let said = lamp_skills::remind::set(
+                &sockets.actions,
+                &sockets.may.skill,
+                &sockets.may.permissions,
+                remind,
+                &mut tally,
+                clock::now_us(),
+            );
+            if said.contains(": refused, ") {
+                eprintln!("lamp-skills: skill:{}: {said}", sockets.may.skill);
+            }
+            said
+        }
     }
 }
+
+/// Each skill's reminders set within the last day
+/// ([`lamp_skills::remind::MOST_A_DAY`]). Kept while the program runs.
+static REMINDS: Mutex<lamp_skills::remind::Tally> = Mutex::new(lamp_skills::remind::Tally::new());
 
 /// The stand a person asked for (#4135): one `body/stand_asked`, kept by
 /// the bus, published only with the body's own switch on here too.
@@ -4946,7 +5808,32 @@ fn action(sockets: &Sockets, name: &str, args: serde_json::Value) -> io::Result<
 /// written at its priority and expiry (#1684). A note, never exact words,
 /// from a skill given `who` asks the voice to tell it who is at the lamp
 /// (#2825); any other say never is, so no other skill's words name anyone.
-fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
+/// The skills of `skills` made on this lamp, by their folders in `dir`
+/// (`made: here` on the card, [`lamp_skills::usage::made_by`]), never a
+/// core skill (#6062).
+fn made_here(skills: &[lamp_skills::Skill], dir: &Path) -> HashSet<String> {
+    skills
+        .iter()
+        .filter(|skill| {
+            skill.kind != lamp_skills::SkillKind::Core
+                && lamp_skills::usage::made_by(&dir.join(&skill.name)).is_some()
+        })
+        .map(|skill| skill.name.clone())
+        .collect()
+}
+
+/// The say service's ask for a say `call`. A skill made on this lamp
+/// (`made`, #6062) asks with `made`: the voice takes only its exact text,
+/// framed as quoted and untrusted, with no functions and no memory, so its
+/// words never run as an instruction; its note is refused there.
+/// A step's own words (`text`) that are one of the voice's fixed lines
+/// (`lamp_voice::language::is_fixed`: Smoky air's, Dusty air's, Head pat's)
+/// go as the voice's exact words (#5999, as #5777's unplug lines), said as
+/// written in the owner's language, never a chat turn the model may decline
+/// or reword, and `quiet`: they still wait for the room's quiet their
+/// priority buys. Any other skill's `text` (a made, routine or Store
+/// skill's) stays a say the voice translates and keeps in its thread.
+fn say_ask(call: &Call, who: bool, made: bool) -> Option<serde_json::Value> {
     let (mut ask, note) = match call {
         Call::Say(note) => (
             json!({"note": note, "priority": lamp_skills::SAY_PRIORITY}),
@@ -4955,8 +5842,19 @@ fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
         Call::Words(words) => (words.ask(), !words.exact),
         _ => return None,
     };
-    if who && note {
+    if made {
+        ask["made"] = json!(true);
+    } else if who && note {
         ask["who"] = json!(true);
+    }
+    // A made skill's text goes `made` alone, never exact (#6062).
+    if !made
+        && let Call::Words(words) = call
+        && words.exact
+        && lamp_voice::language::is_fixed(&words.words)
+    {
+        ask["exact"] = json!(true);
+        ask["quiet"] = json!(true);
     }
     Some(ask)
 }
@@ -4964,6 +5862,61 @@ fn say_ask(call: &Call, who: bool) -> Option<serde_json::Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// No `--push-dir` or `--dev-dir` is today's paths; a given one is used.
+    #[test]
+    fn the_helpers_pushed_folders_are_the_products_unless_a_desktop_names_its_own() {
+        let (push, dev) = asked_folders(None, None);
+        assert_eq!(push, Path::new("/var/lib/lampos-control/push"));
+        assert_eq!(dev, Path::new("/var/lib/lampOS/skills-dev"));
+        let (push, dev) = asked_folders(Some("/a/push".into()), Some("/a/dev".into()));
+        assert_eq!((push, dev), ("/a/push".into(), "/a/dev".into()));
+    }
+
+    /// No file lampOS deploys passes `--push-dir` or `--dev-dir` (a desktop
+    /// lamp's own folders, for `lamp-skills asked`).
+    #[test]
+    fn nothing_deployed_passes_the_desktop_push_folders() {
+        let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy");
+        let (mut folders, mut files) = (vec![deploy], 0);
+        while let Some(folder) = folders.pop() {
+            for entry in std::fs::read_dir(&folder).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    folders.push(path);
+                } else if let Ok(text) = std::fs::read_to_string(&path) {
+                    files += 1;
+                    // A unit's `ExecStart=` may continue over a backslash and a newline:
+                    // read it as the one line systemd runs.
+                    let text = text.replace("\\\n", " ");
+                    for flag in ["--push-dir", "--dev-dir"] {
+                        assert!(
+                            !text
+                                .lines()
+                                .any(|line| line.contains("lamp-skills asked")
+                                    && line.contains(flag)),
+                            "{} passes {flag} to the manage helper",
+                            path.display()
+                        );
+                    }
+                }
+            }
+        }
+        assert!(files > 0, "no file under deploy/");
+    }
+
+    /// #5777: an unplug line is exact words; a kept file's note prefix is
+    /// never read out.
+    #[test]
+    fn an_unplug_line_is_exact_words_and_a_kept_files_note_prefix_is_never_said() {
+        for line in ["Okay, I'll stay.", "Say exactly: Okay, I'll stay."] {
+            assert_eq!(
+                exact(line, 8),
+                json!({"text": "Okay, I'll stay.", "exact": true, "priority": 8})
+            );
+        }
+        assert_eq!(exact("Say briefly: Wait.", 5)["text"], "Wait.");
+    }
 
     /// #5288's gate: a line on `voice/heard`, an event the bus keeps no
     /// latest of, reaches the read's gate as a voice heard just now
@@ -5035,12 +5988,12 @@ mod tests {
                 question,
             })
         };
-        let first = say_ask(&words(true), true).unwrap();
+        let first = say_ask(&words(true), true, false).unwrap();
         assert_eq!(
             (first["who"].clone(), first["question"].clone()),
             (json!(true), json!(true))
         );
-        let plain = say_ask(&words(false), true).unwrap();
+        let plain = say_ask(&words(false), true, false).unwrap();
         assert_eq!(plain["who"], true);
         assert!(plain.get("question").is_none());
     }
@@ -5277,6 +6230,7 @@ mod tests {
                 skill: "test".into(),
                 permissions,
                 unplug: Some(unplug_lines()),
+                made: false,
             },
         }
     }
@@ -5301,11 +6255,17 @@ mod tests {
             unplug_lines(),
             lamp_skills::UnplugLines {
                 ready: "My arm is folded. You can unplug me now.".into(),
-                failed: "Say briefly: I could not confirm a safe folded position. Please do not unplug yet."
+                failed: "I could not confirm a safe folded position. Please do not unplug yet."
                     .into(),
-                stay: "Say exactly: Okay, I'll stay.".into(),
-                timeout: "Say exactly: I'm still plugged in, so I'm getting back up.".into(),
-                check: "Say exactly: I can't get up by myself; I need to be checked.".into(),
+                stay: "Okay, I'll stay.".into(),
+                timeout: "I'm still plugged in, so I'm getting back up.".into(),
+                check: "I can't get up by myself; I need to be checked.".into(),
+                // #5763: said when a confirmed fold could not turn the lamp off.
+                not_off:
+                    "I couldn't turn myself off just now, so please don't unplug me yet."
+                        .into(),
+                ask_off: "My arm is folded. Shall I turn myself off now? Say yes, and I will.".into(),
+                updating: "I'm in the middle of an update, so I can't turn myself off yet. I'll get back up; ask me again once it's done.".into(),
             }
         );
     }
@@ -5436,7 +6396,11 @@ mod tests {
                 BufReader::new(&stream).read_line(&mut line).unwrap();
                 let asked: serde_json::Value = serde_json::from_str(&line).unwrap();
                 heard.push((
-                    asked["note"].as_str().unwrap().to_owned(),
+                    asked["text"]
+                        .as_str()
+                        .filter(|_| asked["exact"] == true)
+                        .unwrap()
+                        .to_owned(),
                     cancels(&bus).is_some(),
                 ));
                 let mut stream = &stream;
@@ -5531,6 +6495,220 @@ mod tests {
         assert!(cancels(&bus).is_none());
     }
 
+    /// A say service whose every line expires unbegun, as the voice answered
+    /// the stay line on lamp-52e6 (build 12130).
+    fn expiring(listener: UnixListener) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            while let Ok((stream, _)) = listener.accept() {
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                let mut stream = &stream;
+                writeln!(stream, "{}", json!({"outcome": "expired"})).unwrap();
+            }
+        })
+    }
+
+    /// lamp-52e6, build 12130: "No." to the turn-off ask, the stay line
+    /// expired and nothing was cancelled, so the lamp stayed folded. A
+    /// heard no stands even unsaid; silence, and words that are no yes and
+    /// no "no" (a TV, someone else: the Reviewer-lead's P2 on #6519), still
+    /// cancel nothing before the line.
+    #[test]
+    fn a_heard_no_stands_even_when_the_stay_line_expires() {
+        let dir = tempfile::Builder::new()
+            .prefix("uh")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let _voice = expiring(UnixListener::bind(dir.path().join("say.sock")).unwrap());
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let silent = not_turned_off(&sockets, &bus, "r1", "no spoken yes within 30 s");
+        assert!(silent.contains("nothing cancelled"), "{silent}");
+        let other = not_turned_off(&sockets, &bus, "r1", NOT_A_YES);
+        assert!(other.contains("nothing cancelled"), "{other}");
+        assert!(cancels(&bus).is_none());
+        let outcome = not_turned_off(&sockets, &bus, "r1", HEARD_NO);
+        assert!(outcome.contains("expired"), "{outcome}");
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert!(cancels(&bus).is_some());
+    }
+
+    /// lamp-52e6, build 12200 (#6515): the model answered "No." with its own
+    /// turn, the exact stay line waited 30 s to expire, and the arm stayed
+    /// down that long. A heard "no" cancels before its line; the model's
+    /// `stay_plugged_in` on the same "No." then finds it cancelled and does
+    /// not say the line again.
+    #[test]
+    fn a_heard_no_cancels_before_its_line_and_says_it_once() {
+        let dir = tempfile::Builder::new()
+            .prefix("uf")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = not_turned_off(&sockets, &bus, "r1", HEARD_NO);
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        let again = never_mind(&sockets, &bus, "r1", &unplug_lines().stay);
+        assert!(again.contains("already cancelled"), "{again}");
+        assert_eq!(
+            heard.join().unwrap(),
+            [(unplug_lines().stay, true)],
+            "the cancel was out before the line reached the voice, and the line came once"
+        );
+        assert_eq!(cancels(&bus), Some(1));
+    }
+
+    /// Only a short line opening with a no is a heard no; a TV's or another
+    /// person's words are not (the Reviewer-lead's P2 on #6519).
+    #[test]
+    fn a_no_is_a_short_line_opening_with_one() {
+        for no in [
+            "No.",
+            "Nope, stay.",
+            "Don\u{2019}t.",
+            "Not now",
+            "Never mind",
+        ] {
+            assert!(says_no(no), "{no}");
+        }
+        for not in [
+            "I'm unplugging the kettle",
+            "No way he scored from there, unbelievable",
+            "Hmm",
+            "",
+        ] {
+            assert!(!says_no(not), "{not}");
+        }
+    }
+
+    /// While the timeout's line is being asked, a "never mind" stands the
+    /// lamp up but does not say the line again (the Reviewer-lead's P3 on
+    /// #6519); a second timeout says nothing either.
+    #[test]
+    fn a_stay_line_being_asked_is_said_once() {
+        let dir = tempfile::Builder::new()
+            .prefix("uk")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let claim = (bus.root().to_owned(), "r1".to_owned());
+        SAYING.lock().unwrap().push(claim.clone());
+        let timeout = stay(&sockets, &bus, "r1", &unplug_lines().stay);
+        assert!(timeout.contains("already asked"), "{timeout}");
+        assert!(cancels(&bus).is_none());
+        let outcome = never_mind(&sockets, &bus, "r1", &unplug_lines().stay);
+        SAYING.lock().unwrap().retain(|other| *other != claim);
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert!(outcome.contains("already asked"), "{outcome}");
+        assert_eq!(cancels(&bus), Some(1));
+    }
+
+    /// A spoken "never mind" cancels before its line too.
+    #[test]
+    fn a_never_mind_cancels_before_its_line() {
+        let dir = tempfile::Builder::new()
+            .prefix("ug")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = never_mind(&sockets, &bus, "r1", &unplug_lines().stay);
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert_eq!(heard.join().unwrap(), [(unplug_lines().stay, true)]);
+    }
+
+    /// Silence at the turn-off ask keeps the line first: nobody asked to
+    /// stay, and someone may be unplugging it, hands at the arm.
+    #[test]
+    fn silence_at_the_ask_says_its_line_before_the_cancel() {
+        let dir = tempfile::Builder::new()
+            .prefix("ui")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = not_turned_off(&sockets, &bus, "r1", "no spoken yes within 30 s");
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert_eq!(heard.join().unwrap(), [(unplug_lines().stay, false)]);
+    }
+
+    /// The same lamp: "never mind" 75 s after the ask had ended. No run is
+    /// under way, only the kept request; it is taken and stands the lamp up
+    /// even when its line expires.
+    #[test]
+    fn a_never_mind_after_the_ask_ended_stands_even_unsaid() {
+        let dir = tempfile::Builder::new()
+            .prefix("um")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let _voice = expiring(UnixListener::bind(dir.path().join("say.sock")).unwrap());
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let request = lamp_skills::unplug::may_stay(&bus, clock::now_us(), false).unwrap();
+        let outcome = never_mind(&sockets, &bus, &request, &unplug_lines().stay);
+        assert!(outcome.contains("expired"), "{outcome}");
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert!(cancels(&bus).is_some());
+    }
+
+    /// lamp-52e6 on build 11913: a turn-off not taken left the request
+    /// kept, and the lamp folded until a reboot. Not off, it says so and
+    /// stands up as after "never mind".
+    #[test]
+    fn a_turn_off_not_taken_says_not_off_then_stands() {
+        let dir = tempfile::Builder::new()
+            .prefix("uo")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let heard = voice(
+            UnixListener::bind(dir.path().join("say.sock")).unwrap(),
+            bus.clone(),
+        );
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = turn_off(&sockets, &bus, "r1", 0, &dir.path().join("no-helper.sock"));
+        assert!(outcome.contains("unplug: not turned off"), "{outcome}");
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert_eq!(heard.join().unwrap(), [(unplug_lines().not_off, false)]);
+        assert!(cancels(&bus).is_some());
+    }
+
+    /// The same when the note never begins (it expired, or the voice was
+    /// not reached): the request is still cancelled, never kept.
+    #[test]
+    fn a_turn_off_not_taken_stands_even_when_its_note_expires() {
+        let dir = tempfile::Builder::new()
+            .prefix("ue")
+            .tempdir_in("/tmp")
+            .unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        latched(&bus, "ready");
+        let sockets = nowhere(dir.path(), unplug_grants());
+        let outcome = turn_off(&sockets, &bus, "r1", 0, &dir.path().join("no-helper.sock"));
+        assert!(outcome.contains("cancel published for r1"), "{outcome}");
+        assert!(cancels(&bus).is_some());
+    }
+
     #[test]
     fn the_timeout_fires_once_and_never_from_failed() {
         let dir = tempfile::Builder::new()
@@ -5613,6 +6791,8 @@ mod tests {
             ends: RefCell::default(),
             looks: RefCell::default(),
             unplug: RefCell::default(),
+            made: RefCell::default(),
+            tasks: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),
@@ -5656,6 +6836,57 @@ mod tests {
         }
     }
 
+    /// #6062: a skill made on this lamp (`made: here` on its card) has its
+    /// say asked `made`, its exact text quoted with no functions in the
+    /// voice, never told who is there; the same skill not made here, and a
+    /// built-in one, is asked as before.
+    #[test]
+    fn a_made_skills_say_is_asked_made_and_another_as_before() {
+        const TOML: &str = "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\n\
+                            speak = true\ntopics = [\"room/presence\"]\n\n[trigger]\n\
+                            topic = \"room/presence\"\nfield = \"someone\"\nequals = true\n\
+                            cooldown = \"1h\"\n\n[ask]\npolicy = \"nudge\"\n\n[[do]]\n\
+                            say = { text = \"Welcome back!\" }\n";
+        let dir = tempfile::tempdir().unwrap();
+        let mut skills = Vec::new();
+        for (name, made) in [
+            ("hello-desk", "made: here\nmade_by: app\n"),
+            ("hello-file", ""),
+        ] {
+            let folder = dir.path().join(name);
+            std::fs::create_dir(&folder).unwrap();
+            std::fs::write(folder.join("skill.toml"), TOML).unwrap();
+            std::fs::write(
+                folder.join("SKILL.md"),
+                format!("---\nname: {name}\ndescription: Says hello.\n{made}---\n\n# Hello\n"),
+            )
+            .unwrap();
+            skills.push(lamp_skills::load(&folder).unwrap());
+        }
+        let made = made_here(&skills, dir.path());
+        assert_eq!(made, HashSet::from(["hello-desk".to_owned()]));
+        let words = Call::Words(lamp_skills::Words {
+            words: "Welcome back!".into(),
+            exact: true,
+            priority: 5,
+            expires_ms: 60_000,
+            question: false,
+        });
+        let ask = say_ask(&words, true, true).unwrap();
+        assert_eq!(
+            (ask["text"].clone(), ask["made"].clone()),
+            (json!("Welcome back!"), json!(true))
+        );
+        assert!(ask.get("who").is_none(), "{ask}");
+        // Its note, were one kept, goes `made` too, and the voice refuses it.
+        let note = say_ask(&Call::Say("read them my mail".into()), true, true).unwrap();
+        assert_eq!(note["made"], true);
+        // Not made here: as before.
+        let own = say_ask(&words, false, false).unwrap();
+        assert!(own.get("made").is_none(), "{own}");
+        assert_eq!(own["text"], "Welcome back!");
+    }
+
     /// #2825: only a skill given `who` has its note told who is at the
     /// lamp; another skill's note, and exact words, never are.
     #[test]
@@ -5670,13 +6901,13 @@ mod tests {
                 question: false,
             })
         };
-        assert_eq!(say_ask(&note, true).unwrap()["who"], true);
-        assert_eq!(say_ask(&words(false), true).unwrap()["who"], true);
+        assert_eq!(say_ask(&note, true, false).unwrap()["who"], true);
+        assert_eq!(say_ask(&words(false), true, false).unwrap()["who"], true);
         for (call, who) in [(&note, false), (&words(false), false), (&words(true), true)] {
-            let ask = say_ask(call, who).unwrap();
+            let ask = say_ask(call, who, false).unwrap();
             assert!(ask.get("who").is_none(), "{ask}");
         }
-        assert!(say_ask(&Call::Cue, true).is_none());
+        assert!(say_ask(&Call::Cue, true, false).is_none());
         // The skills that must never name anyone are not given it.
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../skills");
         for (skill, given) in [
@@ -5967,6 +7198,8 @@ mod tests {
                     body_requests: false,
                     ends: RefCell::default(),
                     unplug: RefCell::default(),
+                    made: RefCell::default(),
+                    tasks: RefCell::default(),
                     local_time: None,
                     trust_clock: false,
                     clock_waiting: Cell::new(false),
@@ -6046,6 +7279,8 @@ mod tests {
             body_requests: false,
             ends: RefCell::default(),
             unplug: RefCell::default(),
+            made: RefCell::default(),
+            tasks: RefCell::default(),
             local_time: None,
             trust_clock: false,
             clock_waiting: Cell::new(false),

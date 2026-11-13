@@ -16,16 +16,20 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// What the probe connects to: two public name servers, on 443 only. Never
+/// What the probe connects to: three public name servers, on 443 only. Never
 /// port 53: a router that forces its own resolver redirects 53 to itself,
 /// and that resolver answers with the WAN down, so a dead network would
 /// read as online (the reviewer on #1247). Any answering is enough (the
-/// first builder on #830, 17 Oct). IPv4 only.
-pub const TARGETS: [&str; 2] = ["1.1.1.1:443", "8.8.8.8:443"];
+/// first builder on #830, 17 Oct). 223.5.5.5 (AliDNS) is first so a lamp in
+/// mainland China, where the other two may be blocked or slow, still finds
+/// the internet (#6414). IPv4 only.
+pub const TARGETS: [&str; 3] = ["223.5.5.5:443", "1.1.1.1:443", "8.8.8.8:443"];
 /// How often the internet is asked while the link is down.
 pub const PROBE_EVERY: Duration = Duration::from_secs(30);
-/// How long one probe may take, for all targets at once.
-pub const PROBE_WITHIN: Duration = Duration::from_secs(2);
+/// How long one probe may take, for all targets at once: 4 s, so a
+/// connection that takes 3 s across a slow border (#6414) still counts.
+/// Only a failing probe waits this long; one answering ends at once.
+pub const PROBE_WITHIN: Duration = Duration::from_secs(4);
 /// With the idle probe (`--reach-idle on`, #1844), how often the internet
 /// is asked once a probe found it not answering, so its coming back is
 /// seen in seconds: on lamp-06c1 the Wi-Fi was back 38 s before the lamp
@@ -328,6 +332,14 @@ mod tests {
         let targets = targets();
         assert!(targets.len() >= 2);
         assert!(targets.iter().all(|target| target.port() == 443));
+    }
+
+    /// #6414: a target that answers only after 3 s (a slow border) is still
+    /// counted, and a target reachable from mainland China is asked.
+    #[test]
+    fn a_target_answering_after_three_seconds_is_within_the_bound() {
+        assert!(PROBE_WITHIN > Duration::from_secs(3), "{PROBE_WITHIN:?}");
+        assert!(TARGETS.contains(&"223.5.5.5:443"));
     }
 
     #[test]

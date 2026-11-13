@@ -168,6 +168,7 @@ impl SharedMetadata {
                             "onboarding_invitation",
                             "lamp_leads_setup",
                             "photo_face_ask",
+                            "run_write_read_back",
                             "schedule_reminder",
                             "fixture_at_ms",
                             "head_wake_cue",

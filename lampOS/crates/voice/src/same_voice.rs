@@ -146,9 +146,11 @@ pub const DIFFERENT_BELOW: f32 = 0.30;
 /// 0.95 (`docs/same-voice.md`). The same proof moves a line into one
 /// person's memory (`LAMP_MEMORY_FOLLOWS_FACE`, #2176).
 pub const SAME_FROM: f32 = 0.70;
-/// The linked services' bar (`LAMP_SAME_VOICE_FOR=services`): a send's
-/// voice against the owner's (`services::gate`) and a read said in full
-/// (`services::read_in_full`) pass at or over this. Looser than
+/// The linked services' bar (`LAMP_SAME_VOICE_FOR=services`): a read said
+/// in full (`services::read_in_full`) passes at or over this, and so does a
+/// send only in a line begun in the echo tail of the lamp's words with any of
+/// them (`services::Turn::in_echo_tail`); any other send is held to no voice
+/// since the owner's call of 10 Nov. Looser than
 /// [`SAME_FROM`], which the conversation's rules keep, because most owners
 /// are alone with the lamp (the owner, 4 Nov): a lower bar keeps the owner
 /// from being refused while still turning away a clearly different voice.
@@ -298,9 +300,9 @@ enum PrintsFor {
     Every,
     /// `services` exactly: the linked services' judging alone.
     Services,
-    /// Any other value: nothing, as without a model. With no print a send
-    /// is refused as a voice not heard and a read is brief
-    /// (`crate::services::gate`, `crate::services::read_in_full`), and
+    /// Any other value: nothing, as without a model. With no print a read
+    /// is brief (`crate::services::read_in_full`), a send in the echo tail
+    /// of the lamp's words is refused (`crate::services::gate`), and
     /// every conversation rule reads none: closed, never every use.
     Nothing,
 }

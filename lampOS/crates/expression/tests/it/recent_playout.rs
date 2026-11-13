@@ -125,7 +125,10 @@ impl Harness {
                 at,
                 Input::Room {
                     stamp,
-                    value: RoomState { state: room },
+                    value: RoomState {
+                        state: room,
+                        another_voice: None,
+                    },
                 },
             )
             .unwrap();

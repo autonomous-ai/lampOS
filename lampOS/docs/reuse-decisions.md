@@ -1,5 +1,34 @@
 # Reuse decisions: V1, ROS 2 and existing Rust systems
 
+## Keep retirement before requested music; distinguish cues (2026-11-10)
+
+V1 `hal/drivers/voice/music_service.py` waits while TTS is speaking before
+music, polling up to 100 times at 100 ms and then waiting another 500 ms.
+It checks stop before taking the speaker. Keep speech-before-music and stop
+handling; reuse lampOS's existing owner, lease, cancellation and actual
+speaker-retirement gate instead of adding that polling delay. This repair
+only distinguishes answer PCM from local wait cues/announcements and binds
+the music noun to the requested object. A transcript may exist without TTS
+PCM, so it cannot supply confirmation evidence. Live model answer audio
+retains its existing eligibility. No device timing or acoustic parity is
+claimed by the host fixtures; see [requested audio](requested-audio.md).
+
+## A Gmail PDF attachment's text through pdf-extract, in a child (#5826, 2026-11-09)
+
+Reuse `pdf-extract` 0.12.1 on `lopdf` 0.42 (MIT, pure Rust, from crates.io and
+pinned in `Cargo.lock`, as the workspace's other unpatched dependencies; no
+`vendor/` snapshot, which holds patched crates only) rather than writing a PDF
+text extractor. lopdf alone was measured too: it is most of the size (its
+decryption is not optional), and pdf-extract adds about 60 KB to it for words
+spaced as laid out, so lopdf alone saves nothing worth its plainer text. Both
+panic and recurse on hostile input and lopdf inflates streams without a bound,
+so the parse runs only in a child of the service's own binary, killed at 2 s,
+its memory capped at 128 MiB (`RLIMIT_AS` and `RLIMIT_DATA`, set before it
+runs), its environment cleared, after a bounded inflate count and a 2 MB input
+limit; nothing of it runs in the service. The release binary grows by about 1.5 MB on an aarch64-darwin host,
+over the ~1 MB asked; the lamp's own size and time are not measured yet. See
+[services](services.md) ("A PDF").
+
 ## Bind signed source to saved ordinary decisions without another executor (2026-10-28)
 
 Reuse the full existing Ed25519 manifest verifier at its compiled capability,
@@ -2292,3 +2321,28 @@ this projection's narrower explicit budgets, followed by authoritative serde
 seeds. Retain complete original bytes and copy only selected facts. No new JSON
 parser, State store, dependency, missing-file inference, filesystem reader or
 shared privileged framework is introduced. See the [projection profile](ordinary-product-context.md).
+
+## Require a completed replay before after-say actions (2026-11-10)
+
+For the #5902 carry, inspected V1 `hal/drivers/motors/range_demo.py`
+(`_wait_for_tts`, `run`) and `hal/test/test_range_demo.py`. V1 bounds its
+best-effort speaking-flag wait and checks an abort event before each leg;
+missing TTS and timeout permit the performance to proceed. Its test helper
+stubs sleeps and body arrival. This is a baseline for bounded waits and
+cancellation, not evidence of resumed-speech completion.
+
+Keep the existing lampOS initial-line behavior and six-second window for a
+wordless cut to resume, with at most one replay. Change only that replay's
+completion: require a fresh explicit `Resting` state and a successful final
+read of heard words. Unknown/stale/malformed state, unreadable heard data,
+another cut, and the existing 180-second speech deadline cancel the after
+steps. The four-second initial-line Thinking fallback is not proof that a
+replay finished. Reuse the current bus subscriber, state freshness check and
+20 ms poll; introduce no retry, thread, network call or additional wait.
+
+Host target: under 250 ms from publishing invalid resumed state to the
+cancelled run's done event, first and repeated calls. Measured locally:
+21.638 ms first / 14.232 ms repeated; see the [verification record](verification/after-say-recovery-20261110/README.md). The three-second heartbeat
+freshness window is separate from reaction time. Tests using authored bus
+events cannot establish acoustic or motor latency; no device run has been
+performed for this carry.

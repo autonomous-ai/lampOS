@@ -1,0 +1,31 @@
+[package]
+name = "lamp-sim"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+# The virtual desktop lamp (docs/simulator-lamp.md): the hardware edge of a
+# lamp that runs on a desktop. The real lamp-control and lamp-body run as they
+# are; this crate stands in for what they touch: the servo bus (a simulated
+# STS3215 chain on a pty), the ring, the voice and the speaker's volume.
+
+[[bin]]
+name = "lamp-sim"
+path = "src/main.rs"
+
+[dependencies]
+lamp-bus = { path = "../bus" }
+lamp-ipc = { path = "../ipc" }
+lamp-msgs = { path = "../msgs" }
+serde.workspace = true
+serde_json.workspace = true
+# The developer's voice keys file (keys.rs): the workspace's own toml line, as control, skills and voice have it.
+toml = { version = "1", default-features = false, features = ["parse", "serde", "std"] }
+# The eyes' own JPEG decoder and encoder: the warped camera picture.
+zune-jpeg = "=0.4.21"
+jpeg-encoder = "=0.7.1"
+rustix = { version = "=1.1.5", features = ["fs", "pty", "termios", "event", "process"] }
+
+[lints]
+workspace = true

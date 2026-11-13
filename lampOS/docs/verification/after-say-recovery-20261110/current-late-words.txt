@@ -1,0 +1,10 @@
+
+running 1 test
+lamp-skills: the skills a person turned off kept in /tmp/tpvtSv3B/state: []
+lamp-skills: skills from /tmp/tpvtSv3B/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 699 ms later; cut by words; the line was cut (the voice went from speaking to listening): nothing after it is made
+.
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 429 filtered out; finished in 1.57s
+

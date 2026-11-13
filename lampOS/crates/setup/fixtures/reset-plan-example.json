@@ -8,12 +8,14 @@
     "/var/lib/lampos-eyes/people.json.repair.new",
     "/var/lib/lampos-eyes/set-aside",
     "/var/lib/lampos-eyes/people.json.from-photos",
+    "/var/lib/lampos-eyes/people.json.from-photos.new",
     "/var/lib/lampos-eyes/seems.log",
     "/var/lib/lampos-eyes/glance.log",
     "/var/lib/lampos-eyes/owner-voice.json",
     "/var/lib/lampos-eyes/owner-voice.json.new",
     "/var/lib/lampos-tasks/store",
     "/var/lib/lampos-tasks/targets.json",
+    "/var/lib/lampos-tasks/harnesses/lamp-tasks",
     "/var/lib/lampos-tasks/.harness/auth",
     "/var/lib/lampos-tasks/.harness/connections",
     "/var/lib/lampos-tasks/.harness/computer-id",
@@ -53,6 +55,8 @@
     "/etc/lampOS/person/name",
     "/etc/lampOS/person/place",
     "/etc/systemd/system/lamp-control.service.d/developer.conf",
+    "/etc/systemd/system/lamp-control.service.d/agent.conf",
+    "/etc/systemd/system/lamp-peek.service.d/monitor.conf",
     "/etc/wpa_supplicant/wpa_supplicant-wlan0.conf"
   ],
   "stop": [

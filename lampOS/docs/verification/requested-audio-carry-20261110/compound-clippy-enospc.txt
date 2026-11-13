@@ -1,0 +1,4 @@
+error: could not compile `lamp-voice` (lib) due to 1 previous error
+error: failed to write query cache to `/Users/d/code/autonomous-os/lampOS/target/debug/incremental/lamp_voice-254uykdiowv1t/s-ho0t2z0mpj-05z6bxu-working/query-cache.bin`: No space left on device (os error 28)
+
+error: could not compile `lamp-voice` (lib test) due to 1 previous error

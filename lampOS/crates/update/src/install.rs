@@ -140,14 +140,20 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-control.service",
         include_str!("../../../deploy/product/lamp-control.service"),
     ),
+    // The owner's dev monitor (#5883, docs/peek.md): outside the target,
+    // off unless the owner's switch writes LAMP_PEEK=monitor.
+    (
+        "lamp-peek.service",
+        include_str!("../../../deploy/product/lamp-peek.service"),
+    ),
     (
         "lamp-skills.service",
         include_str!("../../../deploy/product/lamp-skills.service"),
     ),
     // The skills' manage helper (#1722, #2414): root's, started by its
     // socket for each connection, so the socket is enabled and the template
-    // never is. lamp-cloud's skills.remove and a made skill's spoken yes
-    // (#1685) ask it.
+    // never is. lamp-cloud's skills.remove and a made skill going on once
+    // kept (#1685, #5977) ask it.
     (
         "lamp-skills-manage.socket",
         include_str!("../../../deploy/product/lamp-skills-manage.socket"),
@@ -250,10 +256,21 @@ pub const PRODUCT: &[(&str, &str)] = &[
         include_str!("../../../deploy/product/lamp-waking.service"),
     ),
     // Setup's hotspot again when a set-up lamp's saved network is gone
-    // (#3020); off unless `LAMP_WIFI_RECOVERY=on`.
+    // (#3020); `LAMP_WIFI_RECOVERY=on` in the unit (#5758).
     (
         "lamp-setup-recover.service",
         include_str!("../../../deploy/product/lamp-setup-recover.service"),
+    ),
+    // China's name and time servers on a lamp placed in China only
+    // (#6256, #6414, [`region_servers`]): at boot and on each region change.
+    // Its unit is lamp-update's own to a round ([`REGION_UNIT`]).
+    (
+        "lamp-region.service",
+        include_str!("../../../deploy/product/lamp-region.service"),
+    ),
+    (
+        "lamp-region.path",
+        include_str!("../../../deploy/product/lamp-region.path"),
     ),
 ];
 
@@ -278,8 +295,10 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-memory.service",
     "lamp-mood.service",
     "lamp-name.service",
+    "lamp-peek.service",
     "lamp-policy.service",
     "lamp-records.service",
+    "lamp-region.service",
     "lamp-schedule.service",
     "lamp-selftest.service",
     "lamp-services.service",
@@ -305,11 +324,10 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// The skills every lamp receives: each a folder of `lampOS/skills/`, put in
 /// `/var/lib/lampOS/skills/` whole but for its `tests/` ([`SETTINGS`]).
 /// Every core skill is one (the owner: core skills are always installed;
-/// `tests/install.rs` holds the two lists equal). Those not in
-/// [`PRODUCT_SKILLS_OFF`] keep their folders' own default: Bedtime and
-/// Morning disabled by its own `enabled = false` until its lamp comparison
-/// (#1672), Light show enabled since #5745, Light scenes and Point the
-/// light since #5744, and Comfort break
+/// `tests/install.rs` holds the two lists equal). Twenty-seven keep their
+/// folders' own default: twenty-six enabled (Bedtime and Morning since #5753,
+/// with `LAMP_OUTPUT_CAPS=on` in the product units; Light show since #5745,
+/// Light scenes and Point the light since #5744; Music sway since #5770), and Comfort break
 /// by its own but on by its `[present]` with `LAMP_NUDGES_PRESENT=on`, which
 /// the product's skills units set (#5207); those of
 /// [`PRODUCT_SKILLS_OFF`] are installed disabled until their lamp checks,
@@ -318,7 +336,7 @@ pub const EXIT_NOTE: &str = include_str!("../../../deploy/product/exit-note.conf
 /// the voice's own hello is off in `lamp-voice.service`, and its reminders
 /// and task news wait for the skill's ask (`LAMP_SCHEDULE_SPEAK=skill`,
 /// `LAMP_TASK_NEWS=skill`). Prepare-to-unplug is installed but hidden and
-/// inactive unless `LAMP_UNPLUG=on`.
+/// inactive unless `LAMP_UNPLUG=on`, which the product's units set (#5747).
 pub const PRODUCT_SKILLS: &[&str] = &[
     "welcome-back",
     "reminders",
@@ -338,10 +356,12 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // The startle (#2822): Expression's glance at a sudden sound, its move
     // read from this skill's file when Expression starts.
     "startle",
-    // Music sway and watch you leave (#2834): core skills on in the product,
-    // each reading what the product's units turn on (the ears' sound
-    // classes behind the privacy route, the eyes' activity).
+    // Watch you leave (#2834): a core skill on in the product, reading the
+    // eyes' activity (`LAMP_ACTIVITY=place` in lamp-eyes).
     "watch-you-leave",
+    // Music sway (#2834): on in the product, reading the ears' sound
+    // classes (`LAMP_EARS_CLASSES=on` in lamp-ears since #5748, with the
+    // pinned YAMNet install places, #6232).
     "music-sway",
     // The wellbeing nudges (#1685), each saying one short line since the
     // owner's 25 Oct "talk to the user": water, the eyes, standing up and
@@ -368,6 +388,12 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     // yes after the lamp check on lamp-06c1 (29 Oct).
     "head-pat",
     "head-pat-wiggle",
+    // How to use the lamp (#5790): asked "how do I...", "what can you do",
+    // it answers from its own product knowledge (`knowledge.md`), reached
+    // through `use_skill`; it only tells, and changes nothing.
+    "faq",
+    // Stand by voice (#4135): Pose's `set_pose`, on in the product.
+    "pose",
     // A light show a person asks for (#1679): on in the product since
     // #5745, its played row on lamp-52e6 with it (trials.sh's light-show).
     "light-show",
@@ -377,7 +403,6 @@ pub const PRODUCT_SKILLS: &[&str] = &[
     "point-light",
     // Installed disabled ([`PRODUCT_SKILLS_OFF`]).
     "light-out",
-    "pose",
     "smoky-air",
     "dusty-air",
     "feelings",
@@ -391,9 +416,9 @@ pub const PRODUCT_SKILLS: &[&str] = &[
 pub const PRODUCT_SKILLS_OFF: &[(&str, &str)] = &[
     (
         "light-out",
-        "it reads `room/presence`, which the eyes say only with `LAMP_PRESENCE=on` (#1677), off \
-         until the light going out and coming back has been seen on a lamp: someone reading face \
-         down at the desk must never lose their light",
+        "not yet seen on a lamp (#1677): the eyes say `room/presence` in the product since \
+         `LAMP_PRESENCE=on` (#4955), but the light going out and coming back waits for its own \
+         lamp check: someone reading face down at the desk must never lose their light",
     ),
     // #1679's three core skills come with the product: Light show since
     // #5745, Light scenes and Point the light since #5744.
@@ -449,10 +474,9 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     ),
     (
         "guard-mode",
-        "an installable skill (#1685), not yet tried on a lamp: it needs `room/presence` \
-         (`LAMP_PRESENCE=on`), and its texts reach the phone only with `LAMP_SKILL_MESSAGES=on` \
-         (skills' lines alone) or `LAMP_MESSAGES=on` in `lamp-cloud`, either of which carries \
-         `messages/out` up as unasked news",
+        "an installable skill (#1685): its owner puts it on from the Skills Store; the product \
+         has what it needs, `room/presence` (`LAMP_PRESENCE=on`) and its texts carried up as \
+         unasked news with `LAMP_SKILL_MESSAGES=on` in `lamp-cloud` (#5752)",
     ),
     (
         "laugh-glance",
@@ -472,6 +496,24 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
         "an installable skill, not yet tried on a lamp (#3504): V1's meal reminder, which its \
          owner chooses; a played check on a lamp comes first",
     ),
+    // Installable reads of a linked service (V1's Store skills ported,
+    // #5385, 6 Nov): each owner chooses them from the Skills Store, and a
+    // read needs that owner's own linked account.
+    (
+        "morning-agenda",
+        "an installable skill from the Skills Store: today's Google Calendar read once a morning, \
+         which needs its owner's calendar linked",
+    ),
+    (
+        "morning-mail",
+        "an installable skill from the Skills Store: the newest mail's senders and subjects read \
+         once a morning, which needs its owner's Gmail linked",
+    ),
+    (
+        "tomorrows-plan",
+        "an installable skill from the Skills Store: tomorrow's Google Calendar read once an \
+         evening, which needs its owner's calendar linked",
+    ),
     (
         "quiet-focus",
         "an installable skill, not yet tried on a lamp: one warm word when they look up after 45 \
@@ -479,9 +521,9 @@ pub const NOT_PRODUCT_SKILLS: &[(&str, &str)] = &[
     ),
     (
         "who-was-here",
-        "an installable skill, not yet tried on a lamp (#1685): it reads `room/presence`, which the \
-         eyes say only with `LAMP_PRESENCE=on`, and its function would put a product session past \
-         its 32 without `LAMP_USE_SKILL=on`",
+        "an installable skill, offered by the Store (#5751, the first builder's ruling of 9 Nov): \
+         installing it is the owner's yes to being told who was at the lamp; the product runs what \
+         it reads (`LAMP_PRESENCE=on`, `LAMP_USE_SKILL=on`), times only",
     ),
 ];
 
@@ -555,7 +597,7 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("night-sleep", "SKILL.md"),
     skill_file!("not-feeling-well", "skill.toml"),
     skill_file!("not-feeling-well", "SKILL.md"),
-    // Core skill #1674 is installed but not advertised until LAMP_UNPLUG=on.
+    // Core skill #1674 is installed but not advertised until LAMP_UNPLUG=on (set in the product, #5747).
     skill_file!("prepare-unplug", "skill.toml"),
     skill_file!("prepare-unplug", "SKILL.md"),
     skill_file!("startle", "skill.toml"),
@@ -593,6 +635,9 @@ pub const SETTINGS: &[(&str, &str)] = &[
     skill_file!("light-scenes", "SKILL.md"),
     skill_file!("point-light", "skill.toml"),
     skill_file!("point-light", "SKILL.md"),
+    skill_file!("faq", "skill.toml"),
+    skill_file!("faq", "SKILL.md"),
+    skill_file!("faq", "knowledge.md"),
     skill_file!("light-show", "skill.toml"),
     skill_file!("light-show", "SKILL.md"),
     skill_file!("light-show", "shows/calm.toml"),
@@ -633,6 +678,10 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "ca5d00537b7b28afcffc8465df192928ebdde49411310b0706b83977505e74f1", // #5883: the owner's dev monitor (lamp-peek's drop-in)
+    "857a152d4b052f9dffc5cdeed5817b6590405806d32bfd5318d3922a7c89b7fa", // #6343: Hermes's and OpenClaw's work folder
+    "b3fc8a01c4e8efb457ddbf784bff558bc6bd52d2a4c1770f7512f79c78789041", // the owner's local agent switch: its drop-in (agent.conf)
+    "74178b7911c982cc32f3210b78b1bc9a6120fd2f5ddc52ff83e367e2f8e9090a", // #5750: the faces from photos' staging copy
     "4687f342dab4edfd70004ff4d6f18a54a6113e6ba6f2d5e9f63a86ef185a3687", // #5394: the chosen voice and character words
     "fa963c7f7e338734ee8e0bee6fd6e47b5f5a7fe9493cd957def3c68200c21c19", // the owner's developer setting (lamp-control's drop-in) forgotten on reset
     "af538415909f6e577ac58d9a1cac26fed42949bc44c375581139b587d67a2445", // lamp-control's state (paired computers) forgotten on reset
@@ -727,10 +776,20 @@ pub const MODELS_SETTING: (&str, &str) = (
     include_str!("../../../deploy/product/settings/models.env"),
 );
 
+/// lamp-update's own switch file a build carries (`manifest::UPDATE_ENV`,
+/// from updater 12, #6607): `LAMP_APP_ENGINES` and `LAMP_SKILL_TASKS` on.
+/// Read by lamp-update itself, so a lamp in a home takes them with no change
+/// to its own unit. Install doesn't write it: the product unit it writes
+/// sets both, which wins over the file.
+pub const UPDATE_SETTING: (&str, &str) = (
+    manifest::UPDATE_ENV,
+    include_str!("../../../deploy/product/settings/update.env"),
+);
+
 /// The product's settings as a build carries them (#1680, crate::apply):
 /// every one of [`SETTINGS`], the tmpfiles, the Store's switch file
-/// (`manifest::STORE_ENV`) and the models switch file ([`MODELS_SETTING`]),
-/// 0644. Never setup's, the
+/// (`manifest::STORE_ENV`), the models switch file ([`MODELS_SETTING`])
+/// and lamp-update's own switch file ([`UPDATE_SETTING`]), 0644. Never setup's, the
 /// voice's service, the keys or the zone, which are the lamp's; nor the
 /// product skills' files, which a round places from the build's
 /// `lamp-product-skills` (crate::product_skills) and the skills guard judges.
@@ -745,7 +804,7 @@ pub fn product_settings() -> Vec<manifest::Setting> {
                 .iter()
                 .filter(|(path, _)| *path == manifest::STORE_ENV),
         )
-        .chain([&MODELS_SETTING])
+        .chain([&MODELS_SETTING, &UPDATE_SETTING])
         .map(|(path, text)| manifest::Setting::new(path, text))
         .collect()
 }
@@ -775,6 +834,125 @@ pub fn store_key_setting(deploy: &Path) -> Result<Option<manifest::Setting>, Str
     };
     manifest::read_public_keys(&text).map_err(|why| format!("{}: {why}", source.display()))?;
     Ok(Some(manifest::Setting::new(STORE_KEY_SETTING, &text)))
+}
+
+/// openresolv's settings: which name servers `/etc/resolv.conf` lists.
+pub const RESOLVCONF_PATH: &str = "/etc/resolvconf.conf";
+/// The name servers after the router's on a lamp the backend places in
+/// China (#6256, #6414): AliDNS and DNSPod, then Cloudflare's and Google's.
+/// Appended, never `name_servers=`, which openresolv puts before the
+/// router's: glibc asks only the first three, the first one first, and
+/// waits 5 s on one that is dropped, as 1.1.1.1 is in China. Never on any
+/// other lamp: there a lookup its router misses would go to Alibaba and
+/// Tencent (the Reviewer-lead's privacy HOLD on #6386).
+pub const NAME_SERVERS: &str = r#"name_servers_append="223.5.5.5 119.29.29.29 1.1.1.1 8.8.8.8""#;
+/// The V2 image's line (`scripts/imager/build-orangepi-v2.sh`): every other
+/// lamp's fallback, put back in place of [`NAME_SERVERS`] on a lamp the
+/// backend no longer places in China.
+pub const NAME_SERVERS_IMAGE: &str = r#"name_servers="1.1.1.1 8.8.8.8""#;
+
+/// `/etc/resolvconf.conf` from what it holds now (`None`: no file), with
+/// `line` in place of the first `name_servers*` line and any other one
+/// gone, or `line` last when there is none; every other line kept. A file
+/// that holds it already comes back unchanged.
+pub fn resolvconf_fixed(now: Option<&str>, line: &str) -> String {
+    let mut fixed = String::new();
+    let mut placed = false;
+    for kept in now.unwrap_or_default().lines() {
+        if kept.trim_start().starts_with("name_servers") {
+            if !placed {
+                fixed.push_str(line);
+                fixed.push('\n');
+                placed = true;
+            }
+            continue;
+        }
+        fixed.push_str(kept);
+        fixed.push('\n');
+    }
+    if !placed {
+        fixed.push_str(line);
+        fixed.push('\n');
+    }
+    fixed
+}
+
+/// systemd-timesyncd's drop-in, on a lamp the backend places in China only
+/// (#6256, #6414): Debian's pool, then servers that answer in China.
+/// `FallbackNTP`, never `NTP=`, so a server the network gives still comes
+/// first; timesyncd moves on in seconds from one that does not answer.
+pub const TIMESYNCD_PATH: &str = "/etc/systemd/timesyncd.conf.d/lampos.conf";
+pub const TIMESYNCD: &str = "# lamp-update region (#6256): time servers that answer in China, on a lamp placed there.\n\
+[Time]\n\
+FallbackNTP=0.debian.pool.ntp.org 1.debian.pool.ntp.org ntp.aliyun.com ntp.tencent.com cn.pool.ntp.org\n";
+
+/// The region file lamp-cloud keeps from the ping's reply (#6414), `CN` or
+/// empty: the voice's `REGION_FILE` (a test holds the two equal; the voice
+/// is not this program's to link).
+pub const REGION_FILE: &str = "/var/lib/lampos-cloud/region";
+
+/// The region's one-shot: it starts `update/current`, so a round never
+/// counts it as a part of its own (`round::installed_units`).
+pub const REGION_UNIT: &str = "lamp-region.service";
+
+/// The name and time servers for the region the backend places the lamp
+/// in (#6256, #6414), read from [`REGION_FILE`]. `CN`: [`NAME_SERVERS`]
+/// in [`RESOLVCONF_PATH`] and [`TIMESYNCD`] written. Anything else, or a
+/// missing or unreadable file: the lamp's fallback is left as it is, but
+/// a [`NAME_SERVERS`] line goes back to [`NAME_SERVERS_IMAGE`] and the
+/// drop-in is removed. `resolvconf -u` and `systemctl try-restart
+/// systemd-timesyncd` run only after a change; one that fails is said.
+/// Run by install and by `lamp-region.service` (at boot, and on each
+/// change of the region file through `lamp-region.path`).
+pub fn region_servers(
+    root: &Path,
+    host: &mut dyn Host,
+    changed: &mut Vec<String>,
+    say: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    // As the voice's `in_china`: only `CN`, trimmed.
+    let china = fs::read_to_string(on(root, REGION_FILE)).is_ok_and(|text| text.trim() == "CN");
+    match fs::read_to_string(on(root, RESOLVCONF_PATH)) {
+        Err(error) if error.kind() != io::ErrorKind::NotFound => {
+            say(&format!("{RESOLVCONF_PATH} kept, unread: {error}"));
+        }
+        read => {
+            let now = read.ok();
+            let ours = now
+                .as_deref()
+                .is_some_and(|text| text.lines().any(|line| line.trim() == NAME_SERVERS));
+            let line = if china {
+                Some(NAME_SERVERS)
+            } else {
+                ours.then_some(NAME_SERVERS_IMAGE)
+            };
+            let fixed = line.map(|line| resolvconf_fixed(now.as_deref(), line));
+            if let Some(fixed) = fixed.filter(|fixed| now.as_deref() != Some(fixed)) {
+                put(root, RESOLVCONF_PATH, fixed.as_bytes(), 0o644, changed)?;
+                if let Err(why) = host.refresh(&["resolvconf", "-u"]) {
+                    say(&format!("resolvconf -u: {why}"));
+                }
+            }
+        }
+    }
+    let wrote = changed.len();
+    if china {
+        put(root, TIMESYNCD_PATH, TIMESYNCD.as_bytes(), 0o644, changed)?;
+    } else {
+        match fs::remove_file(on(root, TIMESYNCD_PATH)) {
+            Ok(()) => changed.push(format!("removed {TIMESYNCD_PATH}")),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(format!("{TIMESYNCD_PATH}: {error}")),
+        }
+    }
+    // timesyncd reads it on a restart; one not running is left so, as on a
+    // lamp whose clock is chrony's.
+    if changed.len() > wrote
+        && let Err(why) = host.refresh(&["systemctl", "try-restart", "systemd-timesyncd"])
+    {
+        say(&format!("systemctl try-restart systemd-timesyncd: {why}"));
+    }
+    Ok(())
 }
 
 /// `/etc/tmpfiles.d/lampos.conf`: the bus root and the locks.
@@ -893,7 +1071,7 @@ const HARNESS_DONE: &str = "harness-at-boot";
 /// Binaries a build carries that live in another part's folder: the voice
 /// starts its turn-end worker from its own (docs/endpoint-detection.md). A
 /// build without one is refused whole.
-const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
+pub(crate) const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 
 /// Tools put beside a part when the build carries them, and left out, said
 /// once, when it does not: the factory's steps run the body's from the
@@ -902,7 +1080,8 @@ const BESIDE: &[(&str, &[&str])] = &[("lamp-voice", &["lamp-turn-end"])];
 /// does (the reviewer on #2249). The voice starts its same-voice check
 /// from its own folder, and only when `LAMP_SAME_VOICE_MODEL` is set
 /// (docs/same-voice.md); a build from before it shipped must still install.
-const BESIDE_IF_CARRIED: &[(&str, &[&str])] = &[
+/// A round puts them beside too when the build carries them (crate::round).
+pub(crate) const BESIDE_IF_CARRIED: &[(&str, &[&str])] = &[
     ("lamp-body", &["lamp-body-measure", "lamp-body-mood"]),
     ("lamp-voice", &["lamp-same-voice"]),
 ];
@@ -946,6 +1125,7 @@ pub(crate) fn enabled() -> Vec<String> {
             "lamp-selftest.timer",
             "lamp-update-back.timer",
             "lampos-setup-done.path",
+            "lamp-region.path",
             "lamp-skills-manage.socket",
             "lamp-setup-change.socket",
             "lamp-setup-wifi.socket",
@@ -986,6 +1166,11 @@ pub fn parts() -> Vec<Part> {
 pub trait Host {
     /// A system user with its own group, no login and no home, in `groups`.
     fn add_user(&mut self, name: &str, groups: &[String]) -> Result<(), String>;
+    /// The local agent's user (`docs/control.md`, "The local agent"): the
+    /// group `group` made if the image has none, and `user` made in it with a
+    /// home of its own and a shell, which a coding agent needs, and no
+    /// password. Never `lampos`.
+    fn add_agent_user(&mut self, user: &str, group: &str) -> Result<(), String>;
     /// `systemctl daemon-reload`, then `systemctl enable` each unit.
     fn enable(&mut self, units: &[String]) -> Result<(), String>;
     /// `systemd-tmpfiles --create` of one file.
@@ -1014,6 +1199,9 @@ pub trait Host {
     fn harness_version(&mut self, user: &str, home: &str) -> Result<String, String>;
     /// `systemctl restart` of one unit.
     fn restart(&mut self, unit: &str) -> Result<(), String>;
+    /// `argv` run to its end: what install asks after changing a system
+    /// file that is not the product's (`resolvconf -u`, #6256).
+    fn refresh(&mut self, argv: &[&str]) -> Result<(), String>;
     /// The sha256 of the `lamp-update` running this install, as hex: install
     /// writes the units it carries itself ([`PRODUCT`]), so one that is not
     /// the build's own is said ([`not_the_builds_updater`], #3733).
@@ -1043,6 +1231,23 @@ impl Host for System {
             command.args(["--groups", &groups.join(",")]);
         }
         run(command.arg(name))
+    }
+
+    fn add_agent_user(&mut self, user: &str, group: &str) -> Result<(), String> {
+        // `groupadd` ends 9 when the group is there already: made only if not.
+        let there = fs::read_to_string("/etc/group").is_ok_and(|text| {
+            text.lines()
+                .any(|line| line.split(':').next() == Some(group))
+        });
+        if !there {
+            run(Command::new("groupadd").args(["--system", group]))?;
+        }
+        let mut command = Command::new("useradd");
+        command.args(["--create-home", "--user-group", "--shell", "/bin/bash"]);
+        run(command.arg(user))?;
+        // `useradd --groups` did not put the user in the group on lamp-75c9
+        // (12:57 run, 11 Nov): said again, as its own step.
+        run(Command::new("usermod").args(["--append", "--groups", group, user]))
     }
 
     fn enable(&mut self, units: &[String]) -> Result<(), String> {
@@ -1077,6 +1282,11 @@ impl Host for System {
 
     fn restart(&mut self, unit: &str) -> Result<(), String> {
         run(Command::new("systemctl").args(["restart", unit]))
+    }
+
+    fn refresh(&mut self, argv: &[&str]) -> Result<(), String> {
+        let (program, args) = argv.split_first().ok_or("nothing to run")?;
+        run(Command::new(program).args(args))
     }
 
     fn running_sha256(&mut self) -> Result<String, String> {
@@ -1160,22 +1370,53 @@ pub const VERSION_WITHIN: Duration = Duration::from_secs(30);
 /// be slow.
 pub const INSTALLER_WITHIN: Duration = Duration::from_secs(15 * 60);
 
+/// The longest one stage of Hermes's installer may take (#5978): the
+/// installer's own [`INSTALLER_WITHIN`] and the most the one-shot may be
+/// kept frozen while someone speaks
+/// ([`crate::hermes_schedule::MOST_FROZEN`]), as the clock goes on while it
+/// is frozen. On c0a4 (11 Nov) a products stage frozen 21 min was taken for
+/// timed out the moment it thawed.
+pub const HERMES_STAGE_WITHIN: Duration =
+    Duration::from_secs(INSTALLER_WITHIN.as_secs() + crate::hermes_schedule::MOST_FROZEN.as_secs());
+
 /// Every step through it gets [`RESTART_WITHIN`], but Harness's installer,
-/// which fetches, gets [`INSTALLER_WITHIN`].
+/// which fetches, gets [`INSTALLER_WITHIN`], and a stage of Hermes's,
+/// which may be frozen too, [`HERMES_STAGE_WITHIN`]; each of OpenClaw's
+/// long steps (#6226, [`crate::openclaw_install::runs_long_step`]) its
+/// own hard [`crate::openclaw_install::STEP_WITHIN`].
 pub fn output_of(argv: &[String]) -> Result<String, String> {
-    output_of_within(
-        argv,
-        if runs_installer(argv) {
-            INSTALLER_WITHIN
-        } else {
-            RESTART_WITHIN
-        },
-    )
+    output_of_within(argv, bound_of(argv))
+}
+
+/// How long [`output_of`] waits for `argv`.
+pub fn bound_of(argv: &[String]) -> Duration {
+    if crate::openclaw_install::runs_long_step(argv) {
+        crate::openclaw_install::STEP_WITHIN
+    } else if runs_hermes_stage(argv) {
+        HERMES_STAGE_WITHIN
+    } else if runs_installer(argv) {
+        INSTALLER_WITHIN
+    } else {
+        RESTART_WITHIN
+    }
+}
+
+/// Whether `argv` runs one stage of Hermes's checked installer, `bash
+/// <dir>/`[`crate::hermes_install::INSTALLER_FILE`] `--stage …`.
+pub fn runs_hermes_stage(argv: &[String]) -> bool {
+    let hermes = format!("/{}", crate::hermes_install::INSTALLER_FILE);
+    argv.windows(2)
+        .any(|pair| pair[0] == "bash" && pair[1].ends_with(&hermes))
 }
 
 /// Whether `argv` runs Harness's installer: the CDN's piped to `sh`, or a
-/// pinned install's checked copy, `sh <dir>/`[`PINNED_INSTALLER`].
+/// pinned install's checked copy, `sh <dir>/`[`PINNED_INSTALLER`]; or one
+/// stage of Hermes's checked copy, `bash <dir>/`
+/// [`crate::hermes_install::INSTALLER_FILE`] `--stage …` (#5978).
 pub fn runs_installer(argv: &[String]) -> bool {
+    if runs_hermes_stage(argv) {
+        return true;
+    }
     match argv {
         [.., sh, file] if sh == "sh" && file.ends_with(&format!("/{PINNED_INSTALLER}")) => true,
         [.., last] => last.contains(HARNESS_INSTALLER),
@@ -1183,7 +1424,7 @@ pub fn runs_installer(argv: &[String]) -> bool {
     }
 }
 
-fn output_of_within(argv: &[String], within: Duration) -> Result<String, String> {
+pub(crate) fn output_of_within(argv: &[String], within: Duration) -> Result<String, String> {
     let shown = argv.join(" ");
     query::output_and_stderr_within(
         Command::new(&argv[0]).args(&argv[1..]),
@@ -1456,9 +1697,13 @@ pub struct Install {
 
 impl Install {
     fn on(&self, path: &str) -> PathBuf {
-        self.root
-            .join(path.trim_start_matches('/').trim_end_matches('/'))
+        on(&self.root, path)
     }
+}
+
+/// `path` on the lamp, under `root`.
+fn on(root: &Path, path: &str) -> PathBuf {
+    root.join(path.trim_start_matches('/').trim_end_matches('/'))
 }
 
 /// What an install did.
@@ -1550,7 +1795,7 @@ pub fn install(
     // Each file is written whole; one that fails leaves those before it
     // new and the rest as they were.
     for (path, bytes) in &for_systemd {
-        put(config, path, bytes, 0o644, &mut changed)
+        put(&config.root, path, bytes, 0o644, &mut changed)
             .map_err(|why| format!("units not all written: {why}"))?;
     }
     // The tmpfiles are install's, recorded as the settings are, so a
@@ -1720,12 +1965,23 @@ pub fn install(
              # Written by lamp-update install from the system's zone; setup writes it again.\n\
              LAMP_ZONE={zone}\nLAMP_UTC_OFFSET_MINUTES={offset}\n"
         );
-        put(config, ZONE_PATH, text.as_bytes(), 0o644, &mut changed)?;
+        put(
+            &config.root,
+            ZONE_PATH,
+            text.as_bytes(),
+            0o644,
+            &mut changed,
+        )?;
     }
     if !config.on("/etc/lampOS/body/lamp.env").exists() {
         say(
             "the body waits for this lamp's own poses in /etc/lampOS/body/lamp.env (docs/install.md)",
         );
+    }
+    // Side files, not the product's: a write that fails is said, never the
+    // end of the install.
+    if let Err(why) = region_servers(&config.root, host, &mut changed, say) {
+        say(&format!("the region's name and time servers: {why}"));
     }
 
     let before = state.clone();
@@ -1890,6 +2146,20 @@ fn before_units(
             changed.push(format!("made the user {user}"));
         }
     }
+    // The local agent's user and group, on every lamp (a round never makes a
+    // user, so one already in a home gets them when `install` runs again): nothing listens on its socket until the owner
+    // turns the switch on in the app. The names are constants, never `lampos`.
+    {
+        use lamp_msgs::local_agent::{GROUP, USER as AGENT};
+        if !has_user(config, AGENT) {
+            host.add_agent_user(AGENT, GROUP)?;
+            // Said now as well as listed: a lamp-update that is not the
+            // build's own hands over by `exec` below, which drops this list
+            // (the run on lamp-75c9, 11 Nov: the user was made, no line came).
+            say(&format!("made the user {AGENT} in the group {GROUP}"));
+            changed.push(format!("made the user {AGENT} in the group {GROUP}"));
+        }
+    }
 
     // Every part's build beside nothing, then its link.
     let mut wanted = Vec::new();
@@ -1957,7 +2227,7 @@ fn before_units(
         // writer that is gone: cleared once it is in place, the record
         // last (crate::writer_swap::forget_writer, #5539).
         let writer_changed = fs::read(config.on(crate::own::BACK)).map_or(true, |now| now != bytes);
-        put(config, crate::own::BACK, &bytes, 0o755, &mut changed)?;
+        put(&config.root, crate::own::BACK, &bytes, 0o755, &mut changed)?;
         if crate::writer_swap::forget_writer(
             &config.root,
             records.folder(),
@@ -2281,7 +2551,7 @@ pub fn settings_with_mode(
                 // Its bytes are install's, so its mode is too: a default
                 // written closed by something before install (lamp-cb94's,
                 // 0600) is opened, or the parts run as `lampos` never read it.
-                set_mode(config, path, text.as_bytes(), mode, changed)?;
+                set_mode(&config.root, path, text.as_bytes(), mode, changed)?;
                 state.settings.insert((*path).to_owned(), default);
             }
             // A product skill's file is the build's, never the lamp's own
@@ -2336,7 +2606,7 @@ pub fn settings_with_mode(
         }
         persist(state)?;
         for (path, text, default) in writes {
-            put(config, path, text.as_bytes(), mode, changed)?;
+            put(&config.root, path, text.as_bytes(), mode, changed)?;
             state.settings.insert(path.to_owned(), default);
         }
     }
@@ -2372,7 +2642,7 @@ fn reset_plan(
     match now {
         None if !config.setup => return Ok(()),
         Some(now) if now == new => {
-            set_mode(config, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
+            set_mode(&config.root, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
         }
         _ => {
             let was = state
@@ -2390,7 +2660,7 @@ fn reset_plan(
             .map_err(|error| format!("{path}: {error}"))?;
             state.settings_writing.insert(path.to_owned(), new.clone());
             persist(state)?;
-            put(config, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
+            put(&config.root, path, RESET_PLAN.as_bytes(), 0o644, changed)?;
             state.settings_writing.remove(path);
         }
     }
@@ -2540,15 +2810,15 @@ fn link(
 
 /// A file written whole, only if it is not already exactly this.
 fn put(
-    config: &Install,
+    root: &Path,
     path: &str,
     bytes: &[u8],
     mode: u32,
     changed: &mut Vec<String>,
 ) -> Result<(), String> {
-    let at = config.on(path);
+    let at = on(root, path);
     if fs::read(&at).is_ok_and(|now| now == bytes) {
-        return set_mode(config, path, bytes, mode, changed);
+        return set_mode(root, path, bytes, mode, changed);
     }
     let failed = |error: io::Error| format!("{path}: {error}");
     if let Some(parent) = at.parent() {
@@ -2571,7 +2841,7 @@ fn put(
 /// reviewer on #1293). A link is left as it is: its target is not
 /// install's to open or close (Nine on #1293).
 fn set_mode(
-    config: &Install,
+    root: &Path,
     path: &str,
     bytes: &[u8],
     mode: u32,
@@ -2582,7 +2852,7 @@ fn set_mode(
     let mut file = match fs::OpenOptions::new()
         .read(true)
         .custom_flags(flags.bits() as i32)
-        .open(config.on(path))
+        .open(on(root, path))
     {
         Ok(file) => file,
         Err(error) if error.raw_os_error() == Some(rustix::io::Errno::LOOP.raw_os_error()) => {
@@ -3226,10 +3496,15 @@ mod tests {
         // Setup, its reset, the waking face, its recovery (#3020) and
         // setup's three helpers (the names', the Wi-Fi's and its boot
         // restore) share one binary, and so do the air and its bus clock,
-        // the skills and their manage helper, and the eyes and their camera
-        // helper (#2892); every other service is a part.
+        // the skills and their manage helper, the eyes and their camera
+        // helper (#2892), and lamp-update and its region one-shot (#6256);
+        // every other service is a part.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
-        assert_eq!(parts.len(), services - 9, "every product service is a part");
+        assert_eq!(
+            parts.len(),
+            services - 10,
+            "every product service is a part"
+        );
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");
@@ -3255,6 +3530,46 @@ mod tests {
             !enabled().iter().any(|name| name.contains('@')),
             "{:?}",
             enabled()
+        );
+    }
+
+    /// Nine's wall (a) on #3504: skill push is on in the product. The
+    /// developers' door passes `--manage-socket` at the very socket the
+    /// skills' manage helper listens on, and is ordered after it, so a
+    /// paired computer's `skill.push` reaches the helper on every lamp.
+    #[test]
+    fn the_door_passes_the_skills_manage_socket_it_listens_on() {
+        let unit = |wanted: &str| {
+            PRODUCT
+                .iter()
+                .find(|(name, _)| *name == wanted)
+                .map(|(_, text)| *text)
+                .unwrap_or_else(|| panic!("{wanted} is not installed"))
+        };
+        let listen = unit("lamp-skills-manage.socket")
+            .lines()
+            .find_map(|line| line.strip_prefix("ListenStream="))
+            .expect("the manage socket's ListenStream");
+        let control = unit("lamp-control.service");
+        let exec = control
+            .lines()
+            .find(|line| line.starts_with("ExecStart="))
+            .expect("lamp-control's ExecStart");
+        let words: Vec<&str> = exec.split_whitespace().collect();
+        let manage = words
+            .windows(2)
+            .find(|pair| pair[0] == "--manage-socket")
+            .map(|pair| pair[1]);
+        assert_eq!(manage, Some(listen), "{exec}");
+        let after = control
+            .lines()
+            .find(|line| line.starts_with("After="))
+            .expect("lamp-control's After");
+        assert!(
+            after
+                .split_whitespace()
+                .any(|unit| unit.ends_with("lamp-skills-manage.socket")),
+            "{after}"
         );
     }
 

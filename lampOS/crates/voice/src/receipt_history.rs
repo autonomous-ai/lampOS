@@ -57,7 +57,14 @@ pub(crate) const LAST_WORDS: &str = "last_words";
 /// A say cut by its own asker's cancel on the say socket (a paired
 /// computer's `stop`): the cut revokes the speaker as a hand's Stop does.
 pub(crate) const ASKER_STOPPED: &str = crate::say::ASKER_STOPPED;
-pub(crate) const LOCAL_CANCELS: [&str; 10] = [
+/// A computer's stream replaced by a later one, and one ended because a
+/// timer, alarm or reminder fell due (`end_stream_for`): the cut revokes the
+/// speaker first, as a hand's Stop does, so the queued sound it drops is
+/// expected (lamp-75c9, 13 Nov: a replaced stream's queued audio came as a
+/// cancelled tail and ended the voice).
+pub(crate) const STREAM_REPLACED: &str = "stream_replaced";
+pub(crate) const STREAM_REMINDER_DUE: &str = "stream_reminder_due";
+pub(crate) const LOCAL_CANCELS: [&str; 12] = [
     LAST_WORDS,
     HEAD_SLEEP,
     SOFTWARE_MUTED,
@@ -68,6 +75,8 @@ pub(crate) const LOCAL_CANCELS: [&str; 10] = [
     BODY_PUSHED,
     CONTROL_ENDED,
     ASKER_STOPPED,
+    STREAM_REPLACED,
+    STREAM_REMINDER_DUE,
 ];
 
 impl ReceiptHistory {
@@ -141,7 +150,11 @@ impl ReceiptHistory {
             // audio it then drops is theirs: on 16 Oct at 12:20 a head tap
             // during a story ended the voice and it came back muted.
             // An answer cut as the speaker's authority lapsed (#1178) is
-            // revoked by that cut too.
+            // revoked by that cut too. So is a requested recording revoked
+            // mid-play (a muted or silent speaker, Skills' refusal, another
+            // privacy generation) and a reply cut by a privacy gap: on
+            // lamp-52e6 on 10 Nov a mute 10 s into relaxing music ended the
+            // voice with the rest of its frames (#5764).
             expected_discard: matches!(
                 reason,
                 "user_interrupted"
@@ -149,6 +162,8 @@ impl ReceiptHistory {
                     | "deadline_cancelled"
                     | "service_stopped"
                     | "speaker_lapsed"
+                    | "requested_audio_revoked"
+                    | "privacy_gap"
             ) || LOCAL_CANCELS.contains(&reason),
         });
         entry.terminal = true;
@@ -383,6 +398,8 @@ mod tests {
             ("software_muted", true),
             ("capture_gap", true),
             ("asker_stopped", true),
+            ("requested_audio_revoked", true),
+            ("privacy_gap", true),
             ("reminder_authority_lost", false),
             ("playback_discarded", false),
         ] {

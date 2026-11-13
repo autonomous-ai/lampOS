@@ -23,7 +23,7 @@ from importlib import resources
 from pathlib import Path
 from typing import Any
 
-from .moves import MOVE_FARTHEST, MOVE_FASTEST, MOVE_LASTS_MS, MOVE_STEP_MS
+from .moves import MOVE_FASTEST, MOVE_LASTS_MS, MOVE_STEP_MS, SKILL_FARTHEST
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -31,11 +31,24 @@ else:  # pragma: no cover - Python 3.10
     import tomli as tomllib
 
 NAME = re.compile(r"^[a-z0-9-]{1,64}$")
-# Script skills are a later format: a folder holding one is refused, found by
-# its suffix, its executable bit or a `#!` line.
+# A script is refused, found by its suffix, its executable bit or a `#!` line, except in `scripts/` of a skill
+# whose `do.task` hands one to the lamp's agent (format 2; docs/skills.md, "A skill's task").
 SCRIPTS = {".py", ".sh", ".js", ".mjs", ".ts", ".rb", ".pl", ".lua", ".exe", ".bin"}
 # The files the lamp reads, never through a link (`O_NOFOLLOW`, lamp-skills).
 READ_ON_THE_LAMP = ("SKILL.md", "skill.toml", "moves", "sounds", "lights", "shows")
+# A `do.task`, as lamp-skills holds it (crates/skills task.rs: `MOST_TASK_BYTES`, `run_ok`, `grants_of`;
+# lamp_voice::skill_task_yes::GRANTS and NEVER).
+TASK_SCRIPTS = "scripts"
+TASK_MOST_BYTES = 500
+TASK_GRANTS = ("body", "light", "speak", "look", "hear", "sound", "air", "device", "camera", "microphone", "notes", "speech")
+# A linked service's grants (`gmail-read`, `github-write`): a Store or made skill's task may name them with
+# `LAMP_AGENT_SERVICES=on` (lamp_voice::made_skill SERVICE_GRANT_CODES, service_grant); a push from a computer is
+# always refused for one (package.rs, #6432), by `asks_beyond`. The check itself only warns: the folder is a valid
+# skill, only not one a computer may push.
+SERVICE_CODES = (
+    "gmail", "google_calendar", "google_drive", "figma", "github", "linear", "asana",
+    "ahrefs", "facebook", "slack", "mondaydotcom", "hubspot", "amplitude", "notion",
+)
 SOUND_MOST_S = 3.0
 SOUND_RATE = 24_000
 # A move, as lamp-body's `moves::check` holds it (crates/body/src/moves.rs).
@@ -192,9 +205,10 @@ def _is_script(path: Path) -> bool:
         return False
 
 
-def _walk(folder: Path, report: Report) -> None:
+def _walk(folder: Path, report: Report, task_scripts: bool = False) -> None:
     """Every entry, links not followed: a link the lamp would read is an
-    error, any other a warning; a script anywhere is refused."""
+    error, any other a warning; a script is refused, but under `scripts/`
+    of a skill with a `do.task`."""
     for root, dirs, files in os.walk(folder, followlinks=False):
         for name in sorted(dirs + files):
             path = Path(root) / name
@@ -207,6 +221,8 @@ def _walk(folder: Path, report: Report) -> None:
                 elif not read:
                     report.warnings.append(f"{where}: a link; the lamp won't follow it, and the Store won't pack it")
             elif name in files and _is_script(path):
+                if task_scripts and where.parts[0] == TASK_SCRIPTS and len(where.parts) > 1:
+                    continue
                 report.errors.append(f"{where}: a script; script skills are a later format")
 
 
@@ -258,9 +274,9 @@ def _move(path: Path, where: Path, report: Report) -> None:
     step = step_ms / 1_000
     for at, (before, after) in enumerate(zip(frames, frames[1:]), start=1):
         for joint in range(5):
-            if abs(after[joint]) > MOVE_FARTHEST[joint]:
+            if abs(after[joint]) > SKILL_FARTHEST[joint]:
                 report.errors.append(
-                    f"{where}: frame {at} takes joint {joint} {after[joint]} counts, farther than {MOVE_FARTHEST[joint]}"
+                    f"{where}: frame {at} takes joint {joint} {after[joint]} counts, farther than {SKILL_FARTHEST[joint]}"
                 )
                 return
             speed = abs(after[joint] - before[joint]) / step
@@ -272,12 +288,43 @@ def _move(path: Path, where: Path, report: Report) -> None:
                 return
 
 
-def _files(folder: Path, report: Report) -> None:
-    _walk(folder, report)
+def _referenced_moves(rules: object) -> set[str]:
+    """The moves a skill's own rules play (`do.body.move`): the lamp loads
+    these with the skill and refuses the skill if one fails."""
+    found: set[str] = set()
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "move" and isinstance(value, str):
+                    found.add(value)
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(rules)
+    return found
+
+
+def _files(folder: Path, report: Report, referenced: frozenset[str] | set[str] = frozenset(), task_scripts: bool = False) -> None:
+    _walk(folder, report, task_scripts)
     for path in sorted((folder / "moves").glob("*.json")):
         # lamp-body's `moves::load` passes over dot-names (a Mac's `._x.json`).
-        if not path.name.startswith("."):
-            _move(path, path.relative_to(folder), report)
+        if path.name.startswith("."):
+            continue
+        where = path.relative_to(folder)
+        if path.stem in referenced:
+            _move(path, where, report)
+            continue
+        # A recorded move for `play`, not played by the skill's own rules: the
+        # lamp installs the skill and leaves a move it refuses out, and says
+        # so (`push_skill`'s answer, `moves.left_out`), so here it is a
+        # warning, never stricter than the lamp.
+        scratch = Report(folder)
+        _move(path, where, scratch)
+        for error in scratch.errors:
+            report.warnings.append(f"{error} (a recorded move for `play`: the lamp leaves it out and installs the skill all the same)")
     for path in sorted((folder / "sounds").glob("*")):
         where = path.relative_to(folder)
         if path.is_symlink():
@@ -337,6 +384,86 @@ def _permissions(rules: dict[str, Any], report: Report) -> None:
         )
 
 
+def is_service_grant(grant: object) -> bool:
+    """A linked service's grant: `<code>-read` or `<code>-write` for a catalog code."""
+    if not isinstance(grant, str):
+        return False
+    for suffix in ("-read", "-write"):
+        if grant.endswith(suffix):
+            return grant[: -len(suffix)] in SERVICE_CODES
+    return False
+
+
+def _task(folder: Path, rules: dict[str, Any], report: Report) -> bool:
+    """A skill's `do.task` and its `grants`, held as lamp-skills holds them
+    (lib.rs, task.rs): at most one task, alone in its `[[do]]` table, in an
+    installable skill; `grants` only beside one, each a grant a script may
+    hold, once; the task's words 1 to 500 bytes; its `run` a plain file in the
+    skill's own `scripts/`. True when the skill has a task step."""
+    steps = rules.get("do") if isinstance(rules.get("do"), list) else []
+    tasks = [step for step in steps if isinstance(step, dict) and "task" in step]
+    grants = rules.get("grants")
+    if len(tasks) > 1:
+        report.errors.append("skill.toml: do.task: a skill hands over one task, so it has one do.task step")
+    if tasks and rules.get("kind", "installable") != "installable":
+        report.errors.append(f'skill.toml: do.task: only an installable skill hands a task over, never kind = "{rules.get("kind")}"')
+    if grants is not None and not tasks:
+        report.errors.append("skill.toml: grants: what a do.task's script may reach, only beside one")
+    if isinstance(grants, list):
+        seen: list[str] = []
+        for grant in grants:
+            if grant == "skills":
+                report.errors.append('skill.toml: grants: "skills" is never a script\'s: it never puts skills on the lamp')
+            elif is_service_grant(grant):
+                if grant in seen:
+                    report.errors.append(f"skill.toml: grants: {grant!r} is listed twice")
+                else:
+                    report.warnings.append(f"skill.toml: grants: {grant!r} is a linked service's grant (a skill run's alone): a push from a computer is refused for it, only a Store or made skill carries one, and then only with LAMP_AGENT_SERVICES on")
+            elif grant not in TASK_GRANTS:
+                report.errors.append(f"skill.toml: grants: {str(grant)[:32]!r} is not a grant: one of {list(TASK_GRANTS)}")
+            elif grant in seen:
+                report.errors.append(f"skill.toml: grants: {grant!r} is listed twice")
+            seen.append(grant)
+    for step in tasks:
+        if set(step) != {"task"}:
+            report.errors.append("skill.toml: do.task is alone in its [[do]] table: the light, a cue or a say are steps of their own")
+        task = step.get("task")
+        if not isinstance(task, dict):
+            continue
+        words = task.get("task")
+        text = words.strip() if isinstance(words, str) else ""
+        if not text or len(text.encode()) > TASK_MOST_BYTES or any(ord(c) < 32 or 127 <= ord(c) < 160 for c in text):
+            report.errors.append(f"skill.toml: do.task: task is 1 to {TASK_MOST_BYTES} bytes of words, with no control characters")
+        run = task.get("run")
+        if isinstance(run, str):
+            _task_run(folder, run, report)
+    return bool(tasks)
+
+
+def _task_run(folder: Path, run: str, report: Report) -> None:
+    """`run_ok`: a plain file inside `scripts/`: relative, at most four parts,
+    none hidden or `..`, no backslash, and no link on the way."""
+    inside = f'skill.toml: do.task: run {run!r} is a file inside the skill\'s own {TASK_SCRIPTS}/, like "{TASK_SCRIPTS}/main.py"'
+    # As Rust's `Path::components`: empty and "." parts after the first collapse (`scripts//main.py` is
+    # `scripts/main.py`); a leading "./" or "/" never does.
+    raw = run.split("/")
+    parts = raw[:1] + [p for p in raw[1:] if p not in ("", ".")]
+    if run.startswith("/") or "\\" in run or not 2 <= len(parts) <= 4 or parts[0] != TASK_SCRIPTS or any(p == ".." or p.startswith(".") for p in parts):
+        report.errors.append(inside)
+        return
+    at = folder
+    for part in parts:
+        at = at / part
+        if at.is_symlink():
+            report.errors.append(f"skill.toml: do.task: run {run!r}: a link, never followed")
+            return
+        if not at.exists():
+            report.errors.append(f"skill.toml: do.task: run {run!r} is not in the skill's folder")
+            return
+    if not at.is_file():
+        report.errors.append(f"skill.toml: do.task: run {run!r} is not a plain file")
+
+
 def check(folder: str | Path, *, shape_required: bool = True) -> Report:
     """Check one skill folder; never raises for what's in it. With
     `shape_required=False` (a push), a missing `jsonschema` is a warning,
@@ -348,7 +475,8 @@ def check(folder: str | Path, *, shape_required: bool = True) -> Report:
         return report
     _skill_md(folder, report)
     rules = _skill_toml(folder, report, shape_required)
-    _files(folder, report)
+    task = _task(folder, rules, report) if isinstance(rules, dict) else False
+    _files(folder, report, _referenced_moves(rules), task)
     if isinstance(rules, dict):
         _permissions(rules, report)
     return report

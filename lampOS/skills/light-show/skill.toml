@@ -18,7 +18,7 @@ light = true
 
 [choice]
 name = "show"
-about = "The show they asked for: party (bright, quick), music (to play beside a song) or calm. Leave it out when they gave no hint."
+about = "None if they gave no hint."
 one_of = ["party", "music", "calm"]
 # Asked with no hint, a party.
 default = "party"

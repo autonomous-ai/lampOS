@@ -19,18 +19,24 @@ import asyncio
 import base64
 import collections
 import importlib.metadata
+import math
 import os
+import sys
 import socket
 import time
 import unicodedata
+import wave
 from pathlib import Path
 from typing import Any, Literal
 
-from lampos import Lamp, LampError, schema
+from lampos import Lamp, LampError, keys, schema
+from lampos.errors import NotPaired
 from lampos.client import SAY_MAX_BYTES
+from lampos.moves import POSES_STEP_MS, poses_to_frames
 from mcp.server.fastmcp import FastMCP, Image
 from mcp.server.fastmcp.exceptions import ToolError
 from pydantic import AnyUrl
+from .relink import Relink
 
 # The body's clips an agent is offered: the schema's `examples`, which leave
 # out `idle`, the lamp's own life, and `scanning`, a room sweep (CLAUDE.md
@@ -39,8 +45,12 @@ from pydantic import AnyUrl
 # A body lease for one look or move, never renewed: released at `done`, or
 # left to lapse if `done` doesn't come (Nine, #3504 13:27).
 ACTION_LEASE_MS = 10_000
-# The body actions lamp-control ends with a `done` after its `{"to": "body"}`.
-DONE_FOLLOWS = {"look"}
+# The body actions lamp-control ends with a `done` after its `{"to": "body"}`;
+# `move` too where hello's limits say `motion_done` (#4209).
+DONE_FOLLOWS = {"look", "joints"}
+# Waited for a motion's `done` at most: lamp-control tells one never begun
+# after 10 s and one with no end heard after 60 s, so this is past both.
+MOTION_WAIT_S = 75
 # The longest `lamp_follow_hand` follows, in one call.
 MOST_FOLLOW_S = 60
 # Said in place of a starting `lamp_follow_hand` when a stop comes meanwhile.
@@ -75,7 +85,13 @@ EVENT_NEEDS = {
     "name.heard": "hear",
     "sound.heard": "sound",
     "air.changed": "air",
+    "volume.changed": "speak",
+    "body.state": "body",
+    "lamp.said": "speech",
 }
+# The longest clip `lamp_play_audio` plays, in seconds: MCP cannot stream, so
+# the tool plays in real time and returns when done.
+PLAY_AUDIO_MAX_S = 60
 # Which `limits` kind each op counts against (docs/control.md, "Limits").
 LIMIT_KIND = {
     "gesture": "motion",
@@ -226,6 +242,22 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     # Nine's nine/mcp-follow).
     follow_now: list = []
 
+    async def ended_on(ended: asyncio.Future, gone: asyncio.Future | None, timeout: float):
+        """`ended`'s result, or `asyncio.TimeoutError` after `timeout`. With
+        `gone` (the connection the request was sent on, `Relink.gone`), a
+        connection that ends first ends the wait `closed`: its `done` can't
+        come on another connection (Second's P2 on #5830)."""
+        if gone is None:
+            return await asyncio.wait_for(asyncio.shield(ended), timeout)
+        waiting = asyncio.ensure_future(asyncio.shield(ended))
+        done, _ = await asyncio.wait({waiting, gone}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+        if waiting in done:
+            return waiting.result()
+        waiting.cancel()
+        if gone in done:
+            raise ToolError("closed: the connection to the lamp closed before this ended; lamp-mcp connects again by itself")
+        raise asyncio.TimeoutError
+
     def held() -> list[str]:
         now = clock()
         for lease in [lease for lease, lapses in leases.items() if lapses <= now]:
@@ -309,6 +341,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             nonlocal asked
             asked = id_
 
+        gone = getattr(lamp, "gone", None)
         lamp.on("lease", follow)
         lamp.on("done", follow)
         try:
@@ -319,14 +352,16 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if not ended.done():
                     ended.set_result(("done", "refused", None))
                 raise refused(error) from error
-            if sent.get("to") and op not in DONE_FOLLOWS:
+            motion_done = op in ("move", "play") and bool(lamp.limits.get("motion_done"))
+            if sent.get("to") and op not in DONE_FOLLOWS and not motion_done:
                 # Handed to a part (`{"to": "body"}`): no `done` follows, so
                 # the tool ends now and the lease lapses by itself (blue's
                 # P3 on #3813, lamp-control part 4, #3805). A `look`'s does
                 # follow, once the head is there (docs/control.md, "Looking").
                 return f"{op} taken by the {sent['to']}; its lease lapses within {ACTION_LEASE_MS // 1000} s"
             try:
-                what, how, why_ended = await asyncio.wait_for(asyncio.shield(ended), ACTION_LEASE_MS / 1000)
+                wait_s = MOTION_WAIT_S if motion_done else ACTION_LEASE_MS / 1000
+                what, how, why_ended = await ended_on(ended, gone, wait_s)
             except asyncio.TimeoutError:
                 # No `done` yet (the server sends it once actions reach the
                 # parts): the lease lapses by itself; it is never held open.
@@ -446,6 +481,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         @server.tool()
         async def lamp_express(feeling: str, strength: float = 0.5) -> str:
             """Show a feeling in the body and the light, as the lamp shows its own: glad, lively or low. `strength` 0 to 1: from 0.5 up the lamp's whole move, a smaller step of it below."""
+            await end_light_keep()  # it lights too: a light kept by lamp_light must not come back over it
             await act("express", feeling=feeling, strength=strength)
             return f"expressing {feeling}"
 
@@ -454,9 +490,21 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_gesture(name: Gesture) -> str:  # type: ignore[valid-type]
-            """One of the lamp's own gestures: nod, headshake, greeting, laugh, shy, a dance, …"""
-            await act("gesture", name=name)
-            return f"{name} taken"
+            """One of the lamp's own gestures: nod, headshake, greeting, laugh, shy, a dance, …
+            Where the lamp tells a motion's end (`motion_done`), it returns once the gesture has
+            ended: `finished`, or `dropped`/`cut_short` with the body's why."""
+            if not lamp.limits.get("motion_done"):
+                await act("gesture", name=name)
+                return f"{name} taken"
+            limits.take("gesture")
+            try:
+                done = await asyncio.wait_for(lamp.gesture(name, wait=True), MOTION_WAIT_S)
+            except LampError as error:
+                raise refused(error) from error
+            except asyncio.TimeoutError:
+                return f"{name} taken; no end heard within {MOTION_WAIT_S} s"
+            why = done.get("why")
+            return f"{name} {done.get('how')}" + (f": {why}" if why else "")
 
         @server.tool()
         async def lamp_look(
@@ -464,7 +512,10 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         ) -> str:
             """Turn the head: at the face in view, toward who said its name, ahead, or to `yaw`/`pitch`
             in degrees (right and up positive), within its reach. On a lamp today only `ahead` and
-            `yaw`/`pitch` are carried out, with lamp-control's `--lease-socket`."""
+            `yaw`/`pitch` are carried out, with lamp-control's `--lease-socket`; `name` is
+            refused, "not in this release" (the lamp has no sound direction), and
+            `face` turns once toward the face in view on the next build (customer
+            build 11091 and older refuse it) or ends `dropped`, "no face in view"."""
             if at is None:
                 target: Any = {"yaw": yaw or 0.0, "pitch": pitch or 0.0}
             else:
@@ -480,10 +531,26 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             return await with_body_lease("move", step_ms=step_ms, frames=frames)
 
         @server.tool()
-        async def lamp_play(name: str) -> str:
-            """Play a recorded move by its name (lowercase letters, digits, - and _). The body checks
-            it as any move. A lamp that doesn't route `play` yet says so, as the tool's error."""
-            return await with_body_lease("play", name=name)
+        async def lamp_move_poses(poses: list[dict[str, float]], hold_ms: int = 400) -> str:
+            """A move through a few poses, in degrees from the standing pose, eased there and
+            back: each pose names the joints it turns, `pitch` (up positive), `roll`, `yaw`
+            (right positive), `shoulder` and `elbow` (up positive), e.g. [{"pitch": 10},
+            {"yaw": -8}]; a joint left out stays put. Each pose is held `hold_ms` (0 to 10000).
+            At most pitch and roll 114.3°, yaw 114.3°, shoulder and elbow 87.9° at most before sending (what any lamp may take; the lamp's own reach is the body's and the door refuses past it with the reach in its words: pitch and roll 17.6°, yaw 22.0° (13.2° on 11091), shoulder and elbow 30.8° on a lamp as shipped, 90% of the hardware's range on a dev lamp, and the anti-tip rule still holds), and 10 s in all;
+            the body still holds each joint to its own bounds."""
+            try:
+                frames = poses_to_frames(poses, step_ms=POSES_STEP_MS, hold_ms=hold_ms)
+            except LampError as error:
+                raise ToolError(f"bad_request: {error.why}") from error
+            return await with_body_lease("move", step_ms=POSES_STEP_MS, frames=frames)
+
+        @server.tool()
+        async def lamp_play(name: str, skill: str | None = None) -> str:
+            """Play a move recorded in one of your pushed skills (its `moves/NAME.json`) by its name
+            (lowercase letters, digits, - and _), sent as a `move` of the same frames is: the body checks
+            it as any move. `skill` says which skill when two have the name (the lamp refuses an ambiguous
+            name, naming them). A lamp that doesn't route `play` yet says so, as the tool's error."""
+            return await with_body_lease("play", name=name, **({"skill": skill} if skill else {}))
 
         @server.tool()
         async def lamp_joints(
@@ -496,7 +563,8 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         ) -> str:
             """Aim the joints you name, in degrees (−180 to 180), reached within `within_ms`
             (0 or more; the body's caps pace each step): head `pitch` and `roll`, base `yaw`, `shoulder`
-            and `elbow`. At least one.
+            and `elbow`. At least one. `roll`, `shoulder` and `elbow` are taken only while the lamp
+            stands; otherwise the tool says the body dropped them, and why.
             The body bounds each step as it does every move. A lamp that doesn't route `joints` yet
             says so, as the tool's error."""
             targets = {
@@ -508,6 +576,29 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 raise ToolError("bad_request: lamp_joints needs at least one of pitch, roll, yaw, shoulder, elbow")
             return await with_body_lease("joints", named=True, targets=targets, within_ms=within_ms)
 
+    # The light `lamp_light(keep_for_s=...)` keeps on past one ask's 30 s: one task at most, asking the
+    # lamp again at half its hold limit until the time is up, another light, or `lamp_stop`.
+    light_keep: list[asyncio.Task] = []
+
+    async def end_light_keep() -> None:
+        for task in light_keep:
+            task.cancel()
+        light_keep.clear()
+
+    async def keep_light(colour: str, level: int, pattern: str | None, keep_s: float, hold_ms: int) -> None:
+        clock_now = asyncio.get_running_loop().time
+        deadline = clock_now() + keep_s
+        every = max(1.0, hold_ms / 2000)
+        while True:
+            await asyncio.sleep(min(every, max(0.0, deadline - clock_now())))
+            remaining = deadline - clock_now()
+            if remaining <= 0:
+                return
+            try:
+                await lamp.light(colour, level, max(1, min(int(remaining * 1000), hold_ms)), pattern)
+            except Exception:  # a refusal, or a closed connection: the hold is over, the next lamp_light says why
+                return
+
     if allowed("light"):
 
         @server.tool()
@@ -516,11 +607,25 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             level: int = 3,
             for_ms: int = 10_000,
             pattern: Literal[tuple(schema.patterns())] | None = None,  # type: ignore[valid-type]
+            keep_for_s: float | None = None,
         ) -> str:
-            """Light the ring for at most 30 s: one of its colours, `level` 1 to 5, steady or a pattern.
-            The person's own light comes back after; at night the lamp dims it."""
-            await act("light", colour=colour, level=level, for_ms=min(for_ms, 30_000), pattern=pattern)
-            return f"{colour} light for {min(for_ms, 30_000)} ms"
+            """Light the ring for `for_ms` milliseconds (30,000 at most, 10,000 by default): one of its
+            colours, `level` 1 to 5, steady or a pattern. The person's own light comes back after, or
+            at once with lamp_stop; at night the lamp dims it. To keep the light on longer than 30
+            seconds, give `keep_for_s` seconds (600 at most) instead of `for_ms`: this server asks the
+            lamp again until then, and another light or lamp_stop ends it sooner."""
+            await end_light_keep()
+            hold_ms = int(lamp.limits.get("hold_max_ms", 30_000))
+            if keep_for_s is None:
+                await act("light", colour=colour, level=level, for_ms=min(for_ms, 30_000), pattern=pattern)
+                return f"{colour} light for {min(for_ms, 30_000)} ms"
+            if not math.isfinite(keep_for_s):
+                raise ToolError("bad_request: keep_for_s is a number of seconds, 1 to 600")
+            keep_s = min(max(keep_for_s, 1.0), 600.0)
+            await act("light", colour=colour, level=level, for_ms=min(int(keep_s * 1000), hold_ms), pattern=pattern)
+            if keep_s * 1000 > hold_ms:
+                light_keep.append(asyncio.create_task(keep_light(colour, level, pattern, keep_s, hold_ms)))
+            return f"{colour} light kept for {keep_s:g} s"
 
         @server.tool()
         async def lamp_ring(
@@ -528,18 +633,22 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             rgb: str | None = None,
             brightness: int = 100,
             for_ms: int = 10_000,
+            fade_ms: int | None = None,
         ) -> dict:
-            """Light the ring in your own colours for at most 30 s: `pixels`, one "#rrggbb" per pixel from
+            """Light the ring in your own colours for `for_ms` milliseconds (30,000 at most, 10,000 by
+            default): `pixels`, one "#rrggbb" per pixel from
             pixel 0 around the ring (the lamp's count, `ring_pixels` in the answer), or `rgb`, one "#rrggbb"
-            for the whole ring; `brightness` 0 to 100. A turn's face, the privacy marks and the person's own
+            for the whole ring; `brightness` 0 to 100; `fade_ms` how slowly the ring comes into the light
+            (the lamp takes 1000 to 60000). A turn's face, the privacy marks and the person's own
             light stay over it; at night the lamp dims it."""
             if (pixels is None) == (rgb is None):
                 raise ToolError("bad_request: give pixels or rgb, one of them")
+            await end_light_keep()
             try:
                 if pixels is not None:
-                    await lamp.ring(pixels, for_ms=min(for_ms, 30_000), brightness=brightness)
+                    await lamp.ring(pixels, for_ms=min(for_ms, 30_000), brightness=brightness, fade_ms=fade_ms)
                 else:
-                    await lamp.light_rgb(rgb, for_ms=min(for_ms, 30_000), brightness=brightness)
+                    await lamp.light_rgb(rgb, for_ms=min(for_ms, 30_000), brightness=brightness, fade_ms=fade_ms)
             except LampError as error:
                 raise refused(error) from error
             return {"lit_ms": min(for_ms, 30_000), "ring_pixels": lamp.ring_pixels}
@@ -547,15 +656,49 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     if allowed("speak"):
 
         @server.tool()
-        async def lamp_say(text: str, rephrase: bool = False) -> str:
+        async def lamp_say(text: str, rephrase: bool = False, wait: bool = False) -> str:
             """Say a line in the lamp's own voice, at most 900 bytes of UTF-8 (the voice's own cap;
             about 900 Latin letters, fewer in other scripts), exactly as written, once the person isn't
             talking; `rephrase` lets the lamp say it in its own words instead, which also waits until the
             lamp isn't talking with someone, as before. It isn't said while the lamp is private, or in
-            quiet hours where this lamp has them set."""
+            quiet hours where this lamp has them set. Returns once the lamp has taken it; with `wait`,
+            once it has been said ("said") or not ("dropped: why"), 120 s at most."""
             words("text", text)
-            await act("say", text=text, rephrase=True if rephrase else None)
-            return "said"
+            limits.take("say")
+            ended: asyncio.Future = asyncio.get_running_loop().create_future()
+            asked: int | None = None
+
+            def note(id_: int) -> None:
+                nonlocal asked
+                asked = id_
+
+            def heard(event: dict) -> None:
+                if event.get("re") == asked and not ended.done():
+                    ended.set_result(event)
+
+            # The connection it's sent on: a wait ends `closed` when that one
+            # ends, never on another connection's done (#5830's relink).
+            gone = getattr(lamp, "gone", None)
+            lamp.on("done", heard)
+            try:
+                fields = {"text": text, **({"rephrase": True} if rephrase else {})}
+                try:
+                    await lamp.request("say", on_id=note, **fields)
+                except LampError as error:
+                    raise refused(error) from error
+                # Taken is not said: the voice says it once the person isn't
+                # talking, or drops it (private, quiet hours, a stop).
+                if not wait:
+                    return "taken: the lamp says it once the person isn't talking"
+                try:
+                    done = await ended_on(ended, gone, MOST_WAIT_S)
+                except asyncio.TimeoutError:
+                    return f"taken; not said within {MOST_WAIT_S} s"
+                if done.get("how") == "finished":
+                    return "said"
+                return f"{done.get('how')}" + (f": {done['why']}" if done.get("why") else "")
+            finally:
+                lamp.off("done", heard)
 
         @server.tool()
         async def lamp_sound(name: str) -> str:
@@ -618,6 +761,49 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             except LampError as error:
                 raise refused(error) from error
 
+    if allowed("notes"):
+        # This computer's own notes on the lamp (docs/control.md, "Notes"):
+        # small, kept across restarts, only this computer's, gone with a revoke.
+
+        @server.tool()
+        async def lamp_notes_set(key: str, value: Any) -> dict:
+            """Keep a note of this computer's own on the lamp under `key` (1 to 64 of letters, digits
+            and . _ : -): `value` is any JSON, at most 16384 bytes serialized. It replaces a note of the
+            same key and outlives this session and the lamp's restart; only this computer sees it, and
+            the owner letting this computer go deletes it. Each computer keeps up to 256 keys and 256 KiB.
+            Answers the key and the bytes the value took."""
+            try:
+                return await lamp.notes_set(key, value)
+            except LampError as error:
+                raise refused(error) from error
+
+        @server.tool()
+        async def lamp_notes_get(key: str) -> dict:
+            """One of this computer's own notes: `found` and, when it is, its `value`."""
+            try:
+                reply = await lamp.request("notes.get", key=key)
+            except LampError as error:
+                raise refused(error) from error
+            return {"found": True, "value": reply["value"]} if reply.get("found") else {"found": False}
+
+        @server.tool()
+        async def lamp_notes_delete(key: str) -> dict:
+            """Drop one of this computer's own notes: `deleted` says whether it was kept."""
+            try:
+                return {"deleted": await lamp.notes_delete(key)}
+            except LampError as error:
+                raise refused(error) from error
+
+        @server.tool()
+        async def lamp_notes_list(prefix: str = "") -> dict:
+            """This computer's own note keys that start with `prefix` (all when it is empty), sorted:
+            `keys` (each key and the bytes of its value), `count` listed, `total` kept, `bytes` they
+            take, and the most it may keep (`keys_max`, `bytes_max`)."""
+            try:
+                return await lamp.notes_list(prefix)
+            except LampError as error:
+                raise refused(error) from error
+
     if allowed("camera"):
 
         @server.tool()
@@ -626,6 +812,40 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
             the lamp is private or its camera is closed."""
             reply = await act("camera.snapshot")
             return Image(data=base64.b64decode(reply["jpeg"]), format="jpeg")
+
+    if allowed("speaker"):
+        # Needs the `speaker` grant (protocol.rs `Op::SpeakerStream` needs
+        # Grant::Speaker), never pre-ticked: the owner ticks it at pairing.
+
+        @server.tool()
+        async def lamp_play_audio(wav_path: str) -> str:
+            """Play the WAV file at `wav_path` on this computer through the lamp's speaker, in real time,
+            and return when it has played: 16-bit mono PCM at 16 kHz or 24 kHz, at most 60 s. It is
+            any sound, so it can sound like a person: the lamp shows its ring's mark while it plays,
+            never plays while the lamp is private or muted, and stops the moment the lamp or the
+            person speaks or a hand touches it (the tool's error says why). Only one stream plays on
+            the lamp: this one replaces another computer's."""
+            try:
+                with wave.open(str(Path(wav_path).expanduser()), "rb") as clip:
+                    rate, frames = clip.getframerate(), clip.getnframes()
+                    kind = (clip.getnchannels(), clip.getsampwidth(), clip.getcomptype())
+            except (OSError, EOFError, wave.Error) as error:
+                raise ToolError(f"bad_request: {wav_path} is not a WAV that can be read: {error}") from error
+            if kind != (1, 2, "NONE"):
+                raise ToolError("bad_request: a WAV of 16-bit mono PCM is needed")
+            if rate not in (16_000, 24_000):
+                raise ToolError(f"bad_request: {rate} Hz; the speaker takes 16000 or 24000")
+            if frames / rate > PLAY_AUDIO_MAX_S:
+                raise ToolError(f"bad_request: {frames / rate:.0f} s; at most {PLAY_AUDIO_MAX_S} s a call")
+            try:
+                async with lamp.speaker_stream(rate) as out:
+                    await out.play_wav(Path(wav_path).expanduser())
+                    ended = out.ended
+            except LampError as error:
+                raise refused(error) from error
+            if ended is not None:
+                raise ToolError(f"refused: the lamp ended the sound: {ended}")
+            return f"played {frames / rate:.1f} s"
 
     if allowed("skills"):
 
@@ -677,6 +897,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if event.get("re") == asked and not ended.done():
                     ended.set_result(event)
 
+            gone = getattr(lamp, "gone", None)
             lamp.on("done", heard)
             try:
                 try:
@@ -686,7 +907,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
                 if not wait:
                     return "turn started: the lamp answers the person's next line"
                 try:
-                    done = await asyncio.wait_for(asyncio.shield(ended), MOST_WAIT_S)
+                    done = await ended_on(ended, gone, MOST_WAIT_S)
                 except asyncio.TimeoutError:
                     return "turn started; not ended yet"
                 return f"turn {done.get('how')}" + (f": {done['why']}" if done.get("why") else "")
@@ -710,7 +931,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
         @server.tool()
         async def lamp_follow_hand(seconds: float = 10) -> dict:
-            """Turn the head after the hand the lamp sees, for up to `seconds` (60 at most), and say how it
+            """Turn the head after the hand the lamp sees, for up to `seconds` (a number of seconds, 60 at most), and say how it
             ended: the hand gone (none in view for 1 s), the time up, or the lamp taking its body back
             (someone touched or talked to it). Says how many times the lamp told where the hand was and where
             it last was, as shares of the picture: never a picture or whose hand. lamp_follow_stop, called
@@ -795,6 +1016,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     async def lamp_stop() -> str:
         """Stop everything this computer asked of the lamp, now, and let go of the body."""
         await end_follow()
+        await end_light_keep()
         await act("stop")
         for lease in held():
             leases.pop(lease, None)
@@ -863,9 +1085,12 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
         for event in streamed:
             try:
                 await lamp.on(event, heard_any)
-            except LampError:
-                # An event the lamp doesn't say yet is left out, not fatal.
-                lamp.off(event, heard_any)
+            except LampError as error:
+                # The lamp away (`closed`, a restart): kept, so it is made
+                # again on the next connection (Second's P2 on #5830). An
+                # event the lamp doesn't say yet is left out, not fatal.
+                if error.code != "closed":
+                    lamp.off(event, heard_any)
 
     @server.resource("lamp://events", mime_type="application/json")
     async def events_stream() -> dict:
@@ -877,7 +1102,7 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
     @server.tool()
     async def lamp_events(since: int = 0, wait_s: float = 0) -> dict:
         """The events the lamp said after `since` (a `seq`; 0 for all kept), newest last, and `latest`.
-        With `wait_s` (120 at most), waits that long for one if none is there yet. Every event the
+        With `wait_s` (seconds, 120 at most), waits that long for one if none is there yet. Every event the
         grants let this computer hear, but phrases (`lamp_wait_for` takes those): presence, hands,
         touch, the button, the lamp's state, sounds."""
         await start_stream()
@@ -916,8 +1141,13 @@ def build(lamp: Lamp, *, client: str | None = None, clock=time.monotonic) -> Fas
 
 
 async def serve(lamp_id: str | None, client: str | None) -> None:
-    async with await Lamp.connect(lamp_id) as lamp:
-        await build(lamp, client=client).run_stdio_async()
+    # Connected again by itself after the lamp restarts (every update), so an
+    # agent's tools keep working for as long as lamp-mcp runs (`relink.py`).
+    lamp = await Relink.connect(lamp_id)
+    try:
+        await build(lamp, client=client).run_stdio_async()  # type: ignore[arg-type]
+    finally:
+        await lamp.close()
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -925,16 +1155,39 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--lamp", help="the lamp's id, when this computer is paired with more than one")
     parser.add_argument("--client", help="how this computer is named in the lamp's leases and journal")
     parser.add_argument(
+        "--home",
+        metavar="PATH",
+        help="the folder `lamp pair` kept this computer's pairing in (LAMPOS_HOME). An MCP client often starts "
+        "lamp-mcp without your environment, so give it here",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="every frame to and from the lamp on stderr, secrets redacted (LAMPOS_LOG=debug)",
     )
     args = parser.parse_args(argv)
+    if args.home:
+        # Set before anything reads the keyring (the SDK reads it at each use).
+        os.environ["LAMPOS_HOME"] = args.home
     if args.verbose:
         # The SDK reads it at each frame; stderr, since stdout is the MCP stream.
         os.environ["LAMPOS_LOG"] = "debug"
     try:
         asyncio.run(serve(args.lamp, args.client))
+    except NotPaired as error:
+        # An MCP client strips the environment, so LAMPOS_HOME is often lost and the pairing not found, and the
+        # client shows only "Connection closed": one clear line on stderr (stdout is the MCP stream), exit code 2.
+        print(
+            f"lamp-mcp: {error.code}: {error}; looked in {keys.home()}: if the pairing is elsewhere, give "
+            "--home PATH (or set LAMPOS_HOME) in the MCP client's config",
+            file=sys.stderr,
+            flush=True,
+        )
+        raise SystemExit(2) from None
     except LampError as error:
         # Said on stderr: stdout is the MCP stream.
         raise SystemExit(f"lamp-mcp: {error}") from None
+
+
+if __name__ == "__main__":
+    main()

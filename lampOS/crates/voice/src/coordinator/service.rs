@@ -432,6 +432,7 @@ mod tests {
                             trace.onboarding_storage.as_ref().unwrap().client(),
                             definition.clone(),
                         );
+                        walk.uncounted_for_test();
                         walk.drain_storage_for_test(4_000_000);
                         assert_eq!(
                             walk.tick(4_000_000, 4_000_000, true, false, face, true),
@@ -477,6 +478,7 @@ mod tests {
                         trace.onboarding_storage.as_ref().unwrap().client(),
                         definition.clone(),
                     );
+                    walk.uncounted_for_test();
                     walk.drain_storage_for_test(4_000_000);
                     assert_eq!(
                         walk.tick(4_000_000, 4_000_000, true, false, face, true),
@@ -962,6 +964,124 @@ mod tests {
             .collect();
         assert_eq!(muted.len(), 1);
         assert_eq!(muted[0]["reason"], "privacy_unreadable");
+    }
+
+    /// A tester's lamp, 11 Nov: lamp-cloud's `ready` to the app-make
+    /// socket was refused 205 times over three hours while lamp-voice sat
+    /// in the privacy wait, the switch unreadable; the socket was bound
+    /// only by a run, after the wait. Bound before the first wait (as
+    /// `run_source` binds it), it answers through a closed switch, an
+    /// unreadable one and the run between them.
+    #[test]
+    fn the_app_make_socket_answers_through_a_closed_and_an_unreadable_switch() {
+        // `run_source` starts it after the say service and before the wait.
+        let source = include_str!("../coordinator.rs");
+        let started = source
+            .find("crate::app_make::start_from_environment(crate::say::Says::parked_asks())")
+            .expect("the app-make socket is started from the say service bound at start");
+        let says = source.find("crate::say::Says::start(notices.recordings())");
+        let waits = source.find("let supervised = service::supervise(");
+        assert!(
+            says.is_some_and(|says| says < started),
+            "after the say service"
+        );
+        assert!(
+            waits.is_some_and(|waits| started < waits),
+            "before the wait"
+        );
+
+        // Short enough for a socket's path.
+        let dir = PathBuf::from(format!("/tmp/am-wait-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("app-make").join("make.sock");
+        fn no_model() -> std::result::Result<crate::second_provider::net::Chat, String> {
+            Err("no model here".into())
+        }
+        let (asks, _asked) = crate::say::OwnAsks::for_test();
+        crate::app_make::serve(
+            &path,
+            None,
+            crate::app_make::On {
+                make: true,
+                written: false,
+            },
+            crate::made_skill::Keeping {
+                directory: dir.join("made"),
+                program: dir.join("no-pack"),
+                manage: dir.join("manage.sock"),
+                installed: dir.join("skills"),
+            },
+            Some(asks),
+            no_model,
+            dir.join("skills"),
+            |_| true,
+        )
+        .unwrap();
+        let ready = || {
+            let mut stream = std::os::unix::net::UnixStream::connect(&path)
+                .expect("the app-make socket listens");
+            writeln!(stream, r#"{{"ready": {{}}}}"#).unwrap();
+            let mut told = String::new();
+            io::BufRead::read_line(&mut io::BufReader::new(stream), &mut told).unwrap();
+            serde_json::from_str::<Value>(&told).unwrap()
+        };
+        let mut trace = SessionState::default();
+        let waits = Cell::new(0);
+        let active = Cell::new(0);
+        let answered = Cell::new(0);
+        supervise(
+            &mut trace,
+            &mut None,
+            &Termination::inactive(),
+            |_, _| {
+                waits.set(waits.get() + 1);
+                if waits.get() == 1 {
+                    // The switch closed: the wait holds, the socket answers.
+                    assert_eq!(ready(), json!({"ready": true}));
+                    answered.set(answered.get() + 1);
+                    return Ok(WaitOutcome::Allowed);
+                }
+                // The switch unreadable: read again, the socket answering
+                // between the reads.
+                let reads = Cell::new(0);
+                crate::service_privacy_controls::unreadable_retried(
+                    &Termination::inactive(),
+                    Duration::from_millis(1),
+                    || {
+                        reads.set(reads.get() + 1);
+                        assert_eq!(ready(), json!({"ready": true}));
+                        answered.set(answered.get() + 1);
+                        if reads.get() < 3 {
+                            Err(crate::service_privacy::unavailable(
+                                "Controls privacy freshness lost while waiting",
+                            ))
+                        } else {
+                            Ok(WaitOutcome::Allowed)
+                        }
+                    },
+                    |_| Ok(()),
+                )
+            },
+            |_, _| {
+                active.set(active.get() + 1);
+                assert_eq!(ready(), json!({"ready": true}));
+                answered.set(answered.get() + 1);
+                if active.get() == 1 {
+                    crate::service_privacy::finish(
+                        Err(crate::service_privacy::unavailable(
+                            "service privacy freshness lost before next observation",
+                        )),
+                        Ok(()),
+                    )
+                } else {
+                    Ok(())
+                }
+            },
+        )
+        .unwrap();
+        assert_eq!((waits.get(), active.get(), answered.get()), (2, 2, 6));
+        let _ = fs::remove_dir_all(&dir);
     }
 
     use crate::service_privacy_controls::tests::a_privacy_worker_ended;

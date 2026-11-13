@@ -1,7 +1,10 @@
 //! Durable task policy. A launch intent is committed before it can leave this
 //! module. Transcript observations and qualified speech receipts are separate.
 use crate::{
-    harness::{Closed, EngineKind, Launch, LaunchOutcome, Observation, Target, prompt_fits},
+    harness::{
+        Closed, EngineKind, JoinedOn, JoinedSession, Launch, LaunchOutcome, Observation, Target,
+        prompt_fits,
+    },
     protocol::{MAX_PAGE_SIZE, MAX_REPLY_BYTES, Request},
     store::{MAX_STATE_BYTES, Store},
 };
@@ -20,11 +23,32 @@ pub const MAX_ANSWER_BYTES: usize = 16_384;
 pub const MAX_ASK_BYTES: usize = 4096;
 pub const MAX_SPEECH_BYTES: usize = 1000;
 pub const CONFIRM_MS: u64 = 120_000;
+/// A `prepare` (or the app's default) naming an engine with no name: empty
+/// or blank (#6492). Any other name is Harness's to know.
+pub const ENGINE_UNKNOWN: &str = "engine_unknown";
+/// A `prepare` for the lamp naming an engine not among its engines now
+/// (#6492, [`crate::runtime::lamp_order`]): Harness doesn't report it
+/// installed on the lamp, it takes no task, its switch is off, or it is
+/// known missing there. Refused, never moved to another engine.
+pub const ENGINE_NOT_HERE: &str = "engine_not_here";
 pub const SPEECH_AGE_MS: u64 = 600_000;
 /// A close that failed is tried again this long after, at most
 /// [`CLOSE_TRIES`] times in all, each time after reading the agent again.
 pub const CLOSE_RETRY_MS: u64 = 60_000;
 pub const CLOSE_TRIES: u8 = 3;
+/// How long the lamp's own agent is left open with its answer kept but not
+/// yet told ([`closes_untold`], #6530): room for a follow-up, then closed.
+pub const UNTOLD_CLOSE_MS: u64 = 60_000;
+/// How long a task handed to the lamp's own OpenClaw may read idle with
+/// nothing asked, no answer and no tool used before it is taken as never
+/// begun (#6577, [`never_began`]): its `--message` never reached the TUI,
+/// as when the Gateway answered the look before `new` and then did not
+/// serve it. The slowest real first prompt seen, times two: on lamp-fc4b
+/// (12 Nov, Harness 0.6.16, signed out) three `new`s answered in 1.8 to
+/// 2.3 s had their first `ask` 65.1 s (the first after lamp-tasks
+/// started), 24.5 s and 18.5 s later. Harness 0.6.41's own reading on a
+/// lamp is still to come (#6577).
+pub const OPENCLAW_BEGIN_WITHIN_MS: u64 = 130_000;
 /// How often a task handed over is looked at on its own (unless `serve --no-watch`):
 /// every half minute for its first ten minutes, then every two, until the
 /// agent has finished or asks something, and for at most a day. After that
@@ -91,7 +115,15 @@ fn persistence_kept<P: Persistence>(persistence: &P) -> Option<String> {
 /// 5: a task's launch may name the session the person asked for (#5535,
 /// `serve --reply-named`). Only a state holding such a task is written as
 /// 5, by the same rule.
-const SCHEMA: u32 = 5;
+///
+/// 6: a task's dispatch may name another machine than its launch's, the
+/// one its named session was found on (`joined_on`, #5978): a build before
+/// would follow it on the wrong machine. Only a state holding such a task
+/// is written as 6, by the same rule.
+///
+/// 7: a target's engine may be `openclaw` (#6226). Only a state holding an
+/// OpenClaw task is written as 7, by the same rule.
+const SCHEMA: u32 = 7;
 /// The oldest `schema` this build reads and writes: a state with no Devin
 /// task.
 const OLDEST_SCHEMA: u32 = 1;
@@ -215,6 +247,16 @@ struct Dispatch {
     agent_id: Option<String>,
     creation_id: Option<String>,
     code: Option<String>,
+    /// The person's own session a named hand-over joined, as they would
+    /// know it ([`JoinedSession`]): listed with the task, so the voice says
+    /// which one took the work (the Reviewer-lead's P2 on #5784 at
+    /// 71bf964baa). Absent otherwise; a store without it reads as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    joined: Option<JoinedSession>,
+    /// The machine that session was found on, when not the launch's own
+    /// (#5978, [`JoinedOn`]): the task is followed and told there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    joined_on: Option<JoinedOn>,
 }
 impl Dispatch {
     fn prepared() -> Self {
@@ -226,8 +268,37 @@ impl Dispatch {
             agent_id: None,
             creation_id: None,
             code: None,
+            joined: None,
+            joined_on: None,
         }
     }
+}
+
+/// The machine a task is followed on: the one its named session was found
+/// on (#5978), else its launch's.
+fn machine_of(task: &Task) -> &str {
+    task.dispatch
+        .joined_on
+        .as_ref()
+        .map_or(&task.launch.target.machine_id, |on| &on.machine_id)
+}
+
+/// The engine a task is told as: its joined machine's target's (#5978),
+/// else its launch's.
+fn engine_of(task: &Task) -> EngineKind {
+    task.dispatch
+        .joined_on
+        .as_ref()
+        .map_or(task.launch.target.engine, |on| on.engine)
+}
+
+/// The alias a task is told by: its joined machine's target's (#5978),
+/// else the one it was prepared for.
+fn alias_of(task: &Task) -> &str {
+    task.dispatch
+        .joined_on
+        .as_ref()
+        .map_or(&task.target_alias, |on| &on.alias)
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -598,11 +669,65 @@ fn settled(value: &Observation) -> bool {
         _ => false,
     }
 }
+/// What `show` reads of an agent that has not begun: idle, nothing asked,
+/// no answer and no tool used.
+fn unbegun(value: &Observation) -> bool {
+    value.state == "idle"
+        && value.ask.is_none()
+        && value.answer.trim().is_empty()
+        && value.tools == 0
+}
+
+/// `observation` of `task` read at `now`, as a failure when the lamp's own
+/// OpenClaw has never begun it (#6577): handed over and accepted
+/// [`OPENCLAW_BEGIN_WITHIN_MS`] ago or more in this boot, and every read
+/// since, this one too, [`unbegun`]. It is then settled, told plainly that
+/// it stopped without finishing, never tried again or moved to another
+/// engine (the lead's rule), and its empty harness closed ([`close_due`]).
+/// Anything asked, answered or used, an earlier boot, the person's own
+/// session or another engine leaves it as it was read.
+fn never_began(task: &Task, observation: Observation, now: &Clock) -> Observation {
+    let waited = task.dispatch.finished.as_ref().is_some_and(|accepted| {
+        accepted.boot_id == now.boot_id
+            && now.monotonic_ms.saturating_sub(accepted.monotonic_ms) >= OPENCLAW_BEGIN_WITHIN_MS
+    });
+    if task.target_alias != crate::runtime::LAMP_TARGET
+        || task.launch.target.engine != EngineKind::Openclaw
+        || task.dispatch.state != DispatchState::Accepted
+        || task.dispatch.joined.is_some()
+        || task.dispatch.joined_on.is_some()
+        || !waited
+        || !unbegun(&observation)
+        || !task.observations.iter().all(|kept| unbegun(&kept.data))
+    {
+        return observation;
+    }
+    eprintln!(
+        "tasks: task {}: OpenClaw on the lamp still idle with nothing asked {} s after it was handed over: never begun, told as stopped and closed",
+        task.id,
+        OPENCLAW_BEGIN_WITHIN_MS / 1000
+    );
+    Observation {
+        state: "failed".into(),
+        ..observation
+    }
+}
+
+/// A never-begun task's kept reading ([`never_began`]): failed, with nothing
+/// asked, answered or used.
+fn never_began_kept(value: &Observation) -> bool {
+    value.state == "failed"
+        && value.ask.is_none()
+        && value.answer.trim().is_empty()
+        && value.tools == 0
+}
+
 /// Whether this lamp should close the harness it started for `task` now
 /// (#1390): a task this version made, whose newest answer was kept from an
 /// agent `idle` with an answer, and told: its claimed telling played, or
 /// is not known to have, or the voice told it in its own words
-/// ([`Request::Told`]). Harness's `ask` is what the agent was last asked,
+/// ([`Request::Told`]). On the lamp's own agent, told or not
+/// ([`closes_untold`], #6530). Harness's `ask` is what the agent was last asked,
 /// the lamp's own task text, so it says nothing here. One that waits for
 /// the person (`needs-input`) is left to them: Harness would refuse it
 /// anyway. The close itself first reads the agent again, and closes only if
@@ -635,13 +760,37 @@ fn close_due(task: &Task, now: &Clock) -> bool {
     // as its first kept answer. A newer one asked by the person at the
     // computer ("Now make it longer.") is theirs, kept and told or not.
     newest.data.ask == first.data.ask
-        && newest.data.state == "idle"
-        && settled(&newest.data)
-        && match &newest.speech {
-            // A playout under way is not told yet.
-            Some(speech) => speech.state != SpeechState::Claimed,
-            None => newest.told.is_some(),
-        }
+        && ((newest.data.state == "idle" && settled(&newest.data))
+            || (task.target_alias == crate::runtime::LAMP_TARGET && never_began_kept(&newest.data)))
+        && (closes_untold(task, now)
+            || match &newest.speech {
+                // A playout under way is not told yet.
+                Some(speech) => speech.state != SpeechState::Claimed,
+                None => newest.told.is_some(),
+            })
+}
+
+/// Whether `task`'s harness is closed though its answer is not told yet
+/// (#6530): one on the lamp's own agent ([`crate::runtime::LAMP_TARGET`],
+/// not joined on a computer) whose newest answer was kept at least
+/// [`UNTOLD_CLOSE_MS`] ago (or in an earlier boot). Told sooner, it is
+/// closed then, as any other. On 52e6 a Hermes chat stayed seven minutes
+/// after a ten-second turn whose news was cut short, so never told. The
+/// wait keeps the person's follow-up ("now add apples to that") joining
+/// the same session meanwhile (Twelve's read on #6536). The news is the
+/// kept answer's, told by the voice from the store, so the close cannot
+/// cut it. A computer's harness still waits for its telling: the person
+/// may be at that screen.
+fn closes_untold(task: &Task, now: &Clock) -> bool {
+    task.dispatch.joined_on.is_none()
+        && task.target_alias == crate::runtime::LAMP_TARGET
+        && task.observations.last().is_some_and(|newest| {
+            newest.observed.boot_id != now.boot_id
+                || now
+                    .monotonic_ms
+                    .saturating_sub(newest.observed.monotonic_ms)
+                    >= UNTOLD_CLOSE_MS
+        })
 }
 
 /// Whether a task is over, so that it may give way to a new one when the
@@ -689,13 +838,20 @@ fn task_label(store_id: &str, id: u64) -> String {
 
 impl State {
     /// The `schema` this state is written with: the lowest that reads every
-    /// task in it: 5 with a task whose launch names a session, 4 with a
+    /// task in it: 7 with an OpenClaw task, 6 with a task joined on another
+    /// machine, 5 with a task whose launch names a session, 4 with a
     /// Hermes task, 3 with a Devin Cloud one, 2 with a Devin one, else
     /// [`OLDEST_SCHEMA`].
     fn schema_needed(&self) -> u32 {
         self.tasks
             .iter()
             .map(|task| {
+                if task.launch.target.engine == EngineKind::Openclaw {
+                    return 7;
+                }
+                if task.dispatch.joined_on.is_some() {
+                    return 6;
+                }
                 if task.launch.session.is_some() {
                     return 5;
                 }
@@ -1133,12 +1289,63 @@ pub struct Engine<P: Persistence> {
     /// `serve --close-told` (#1390): only a task made while it is on is
     /// marked `closable`, so turning it on later closes no older task.
     close_told: bool,
+    /// `LAMP_HERMES_ON_LAMP` with the lamp looked at (#5978): while the
+    /// lamp has no Hermes target yet (Hermes still installing), the
+    /// targets answer says `"lamp":"installing"`.
+    hermes_on_lamp: bool,
+    /// The lamp's own engines, the default first, then the others in
+    /// Harness's order (#6492, [`crate::runtime::lamp_order`]): a `prepare`
+    /// naming an engine for the lamp runs on it only while it is here, and
+    /// the targets answer lists them. Empty without the lamp.
+    lamp_order: Vec<EngineKind>,
+    /// The lamp's default engine (#6492, [`crate::runtime::lamp_default`]),
+    /// while it is in [`Self::lamp_order`]: work for the lamp naming no
+    /// engine runs on it, and the targets answer says it. None: the
+    /// targets file's engine.
+    lamp_default: Option<EngineKind>,
 }
 impl<P: Persistence> Engine<P> {
+    /// The lamp's own engines now and its default (#6492), set by the part
+    /// before each request: the default is kept only while it is in the
+    /// order.
+    pub fn set_lamp_engines(&mut self, order: Vec<EngineKind>, default: Option<EngineKind>) {
+        self.lamp_default = default.filter(|engine| order.contains(engine));
+        self.lamp_order = order;
+    }
+
+    /// The engine the lamp's own target runs work naming none on (#6492):
+    /// the lamp's default, unless its machine is known not to have it,
+    /// else the targets file's.
+    fn lamp_engine(&self, alias: &str, target: &Target) -> EngineKind {
+        if alias != crate::runtime::LAMP_TARGET {
+            return target.engine;
+        }
+        self.lamp_default
+            .filter(|engine| {
+                !self
+                    .readiness
+                    .get(alias)
+                    .is_some_and(|known| known.missing(*engine))
+            })
+            .unwrap_or(target.engine)
+    }
+
+    /// Whether the lamp's own Hermes may become a target
+    /// (`LAMP_HERMES_ON_LAMP`, #5978).
+    pub fn hermes_on_lamp(&mut self, on: bool) {
+        self.hermes_on_lamp = on;
+    }
+
     /// Whether tasks made from now on are closed once told
     /// (`serve --close-told`).
     pub fn close_told(&mut self, on: bool) {
         self.close_told = on;
+    }
+
+    /// The targets hand-overs use now (#5978: the machines a named
+    /// session is looked for on, [`crate::harness::SessionMachines`]).
+    pub fn targets(&self) -> &BTreeMap<String, Target> {
+        &self.targets
     }
 
     pub fn open(
@@ -1305,6 +1512,9 @@ impl<P: Persistence> Engine<P> {
             failed: false,
             last_handover: None,
             close_told: false,
+            hermes_on_lamp: false,
+            lamp_order: Vec::new(),
+            lamp_default: None,
             kept_aside,
             set_aside,
             targets_newer: None,
@@ -1500,18 +1710,44 @@ impl<P: Persistence> Engine<P> {
             // `installed: false` only where its engine wasn't found on that
             // computer (#5199, `installed` null with `installable` true),
             // so the voice names only agents some computer has.
-            Request::Targets {} => Some(json!({"targets":self.targets.iter()
+            // `"lamp":"installing"` only with `LAMP_HERMES_ON_LAMP` on and
+            // no lamp Hermes target yet (#5978): the voice then says the
+            // lamp's own helper is still being installed.
+            Request::Targets {} => {
+                let mut told = json!({"targets":self.targets.iter()
                 .map(|(alias, target)| {
+                    // The lamp's own: the app's choice (#6492).
+                    let engine = self.lamp_engine(alias, target);
                     let mut told = match self.names.get(alias) {
-                        Some(name) => json!({"alias":alias,"engine":target.engine,"name":name}),
-                        None => json!({"alias":alias,"engine":target.engine}),
+                        Some(name) => json!({"alias":alias,"engine":engine,"name":name}),
+                        None => json!({"alias":alias,"engine":engine}),
                     };
-                    if self.readiness.get(alias).is_some_and(|known| known.missing(target.engine)) {
+                    // And every engine of the lamp's, the default first
+                    // (#6492), so the voice can name any of them.
+                    if alias == crate::runtime::LAMP_TARGET && !self.lamp_order.is_empty() {
+                        told["engines"] = self
+                            .lamp_order
+                            .iter()
+                            .map(|engine| engine.argument())
+                            .collect::<Vec<_>>()
+                            .into();
+                    }
+                    if self.readiness.get(alias).is_some_and(|known| known.missing(engine)) {
                         told["installed"] = false.into();
                     }
                     told
                 })
-                .collect::<Vec<_>>()})),
+                .collect::<Vec<_>>()});
+                if self.hermes_on_lamp
+                    && !self.targets.values().any(|target| {
+                        target.engine == EngineKind::Hermes
+                            && target.project == crate::runtime::LAMP_PROJECT
+                    })
+                {
+                    told["lamp"] = "installing".into();
+                }
+                Some(told)
+            }
             Request::List { after_id, limit } => {
                 if !(1..=MAX_PAGE_SIZE).contains(limit) {
                     return Err(err("bad_request", "Page size must be between 1 and 8."));
@@ -1552,6 +1788,22 @@ impl<P: Persistence> Engine<P> {
                 return Err(err(
                     "progress_off",
                     "Progress is not read; the service runs without --progress.",
+                ));
+            }
+            // A look at a named session is held by the service, on a lane
+            // of its own (#6274): one that reaches here is not looked at.
+            Request::Session { .. } => {
+                return Err(err(
+                    "unsupported",
+                    "Looks at a named session are held by the service.",
+                ));
+            }
+            // The index of the sessions the lamp started is the service's
+            // too (#6274).
+            Request::ForgetSessions {} => {
+                return Err(err(
+                    "unsupported",
+                    "The sessions the lamp started are kept by the service.",
                 ));
             }
             // The sign-in, too, is held by the service, and only with
@@ -1622,6 +1874,7 @@ impl<P: Persistence> Engine<P> {
                 text,
                 target,
                 session,
+                engine: named,
                 ..
             } => {
                 // Targets written for a newer build: nothing is handed over
@@ -1655,10 +1908,40 @@ impl<P: Persistence> Engine<P> {
                         "That preparation request ID was already used.",
                     ));
                 }
-                let target_value = self
+                let mut target_value = self
                     .targets
                     .get(target)
-                    .ok_or_else(|| err("target", "Choose a provisioned target alias."))?;
+                    .ok_or_else(|| err("target", "Choose a provisioned target alias."))?
+                    .clone();
+                // The lamp's own target (#6492): an engine named runs on
+                // exactly that one or is refused, never moved to the other;
+                // none named, the lamp's default. Another target ignores it.
+                let lamp = target == crate::runtime::LAMP_TARGET;
+                let named = named.as_deref().filter(|_| lamp);
+                if let Some(named) = named {
+                    if named.trim().is_empty() {
+                        return Err(err(ENGINE_UNKNOWN, "No engine was named."));
+                    }
+                    // Any name Harness gives an engine: one of the lamp's
+                    // now, or refused. None is the lamp's by name here.
+                    let engine = crate::runtime::engine_named(named)
+                        .filter(|engine| self.lamp_order.contains(engine))
+                        .filter(|engine| {
+                            !self
+                                .readiness
+                                .get(target)
+                                .is_some_and(|known| known.missing(*engine))
+                        })
+                        .ok_or_else(|| {
+                            err(
+                                ENGINE_NOT_HERE,
+                                "The engine named is not installed on this lamp, or is switched off.",
+                            )
+                        })?;
+                    target_value.engine = engine;
+                } else {
+                    target_value.engine = self.lamp_engine(target, &target_value);
+                }
                 // Known to fail on that computer (#5199): refused now, with
                 // why, rather than after the person's yes. A session the
                 // person named is already running there (#5535): its
@@ -1675,7 +1958,7 @@ impl<P: Persistence> Engine<P> {
                 let launch = Launch {
                     name: task_label(&next.store_id, id),
                     prompt: text.clone(),
-                    target: target_value.clone(),
+                    target: target_value,
                     session: session.clone(),
                 };
                 if launch
@@ -1944,6 +2227,15 @@ impl<P: Persistence> Engine<P> {
                 "The launch is not the current committed attempt.",
             ));
         }
+        // Found on another machine (#5978): a join, followed there.
+        let (outcome, joined_on) = match outcome {
+            LaunchOutcome::JoinedOn {
+                agent_id,
+                session,
+                on,
+            } => (LaunchOutcome::Joined { agent_id, session }, Some(on)),
+            outcome => (outcome, None),
+        };
         let mut next = self.state.clone();
         let at = next_audit(&mut next, now)?;
         let reused = match &outcome {
@@ -1956,7 +2248,7 @@ impl<P: Persistence> Engine<P> {
             // and not being closed, below. One the store still sees working
             // is the race where the router saw it idle: uncertain, since the
             // words were typed (the local leader's P2 on #4422).
-            LaunchOutcome::Joined { agent_id } => next
+            LaunchOutcome::Joined { agent_id, .. } => next
                 .tasks
                 .iter()
                 .any(|task| task.dispatch.agent_id.as_ref() == Some(agent_id) && !handed_on(task)),
@@ -1976,7 +2268,7 @@ impl<P: Persistence> Engine<P> {
         // A follow-up the router typed into a session an earlier, spent task
         // of the lamp's had: that task gives the session to this one, so the
         // store keeps one task a session and this one watches and tells it.
-        if let LaunchOutcome::Joined { agent_id: id } = &outcome {
+        if let LaunchOutcome::Joined { agent_id: id, .. } = &outcome {
             let before = next.tasks.len();
             next.tasks
                 .retain(|task| task.id == task_id || task.dispatch.agent_id.as_ref() != Some(id));
@@ -1995,9 +2287,14 @@ impl<P: Persistence> Engine<P> {
                 task.dispatch.agent_id = Some(id);
             }
             // The person's own session: told as any task's, never closed.
-            LaunchOutcome::Joined { agent_id: id } if agent_id(&id) => {
+            LaunchOutcome::Joined {
+                agent_id: id,
+                session,
+            } if agent_id(&id) => {
                 task.dispatch.state = DispatchState::Accepted;
                 task.dispatch.agent_id = Some(id);
+                task.dispatch.joined = session;
+                task.dispatch.joined_on = joined_on;
                 task.closable = false;
             }
             LaunchOutcome::Pending { creation_id: id } if creation_id(&id) => {
@@ -2179,7 +2476,7 @@ impl<P: Persistence> Engine<P> {
                 }
                 Some(Settled {
                     task_id: task.id,
-                    engine: task.launch.target.engine.bus_name(),
+                    engine: engine_of(task).bus_name(),
                     state: newest.data.state.clone(),
                     ago_ms,
                 })
@@ -2197,10 +2494,10 @@ impl<P: Persistence> Engine<P> {
                 let age = watched_age(task, now)?;
                 Some(Watched {
                     task_id: task.id,
-                    machine_id: task.launch.target.machine_id.clone(),
+                    machine_id: machine_of(task).to_owned(),
                     agent_id: task.dispatch.agent_id.clone()?,
                     // As the target file names it; the same words as `new`.
-                    engine: task.launch.target.engine.bus_name(),
+                    engine: engine_of(task).bus_name(),
                     accepted_ago_ms: age,
                 })
             })
@@ -2233,19 +2530,24 @@ impl<P: Persistence> Engine<P> {
                 // Told, from the store, so it holds across a restart: its
                 // telling played (a playout under way is not told yet), or
                 // the voice told it in its own words, or its harness was
-                // closed, which only follows a telling (#1390).
+                // closed, which follows a telling (#1390) except on the
+                // lamp's own agent, closed untold ([`closes_untold`]).
                 let told_at = newest.and_then(|seen| {
                     seen.speech
                         .as_ref()
                         .filter(|speech| speech.state != SpeechState::Claimed)
                         .map(|speech| speech.finished.as_ref().unwrap_or(&speech.claimed))
                         .or(seen.told.as_ref())
-                        .or(task.close.as_ref().map(|close| &close.attempted))
+                        .or(task
+                            .close
+                            .as_ref()
+                            .filter(|_| !closes_untold(task, now))
+                            .map(|close| &close.attempted))
                 });
                 Some(Recent {
                     task_id: task.id,
-                    engine: task.launch.target.engine.bus_name(),
-                    target: task.target_alias.clone(),
+                    engine: engine_of(task).bus_name(),
+                    target: alias_of(task).to_owned(),
                     watched,
                     settled: newest.map(|seen| seen.data.state.clone()),
                     settled_ago_ms,
@@ -2284,7 +2586,7 @@ impl<P: Persistence> Engine<P> {
         let told = &task.observations.last().expect("a told answer").data;
         let job = CloseJob {
             task_id: task.id,
-            machine_id: task.launch.target.machine_id.clone(),
+            machine_id: machine_of(task).to_owned(),
             agent_id: task.dispatch.agent_id.clone().expect("accepted task"),
             answer: told.answer.clone(),
             asked: told.ask.clone(),
@@ -2348,7 +2650,7 @@ impl<P: Persistence> Engine<P> {
         let job = ObservationJob {
             task_id: task.id,
             request_id: read.request_id,
-            machine_id: task.launch.target.machine_id.clone(),
+            machine_id: machine_of(task).to_owned(),
             agent_id: task.dispatch.agent_id.clone().expect("accepted task"),
         };
         self.save(next)?;
@@ -2367,6 +2669,7 @@ impl<P: Persistence> Engine<P> {
             return self.observation_failed(job, "invalid_reply", now);
         }
         let index = find(&self.state, job.task_id)?;
+        let observation = never_began(&self.state.tasks[index], observation, now);
         let observed_digest = digest(&observation);
         // The watch keeps only what the person would want to hear about:
         // an agent still at work is looked at again later, and an idle
@@ -2826,6 +3129,7 @@ mod tests {
             text: text.into(),
             target: "desk".into(),
             session: None,
+            engine: None,
         }
     }
     fn prepare(engine: &mut Engine<Memory>, at: u64) -> u64 {
@@ -3316,6 +3620,133 @@ mod tests {
         );
     }
 
+    /// #6577: a task handed to the lamp's own `engine`, accepted at `at`.
+    fn lamp_accepted(engine_kind: EngineKind, at: u64) -> (Engine<Memory>, u64) {
+        let targets = BTreeMap::from([(
+            crate::runtime::LAMP_TARGET.to_owned(),
+            Target {
+                machine_id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+                project: "lamp-project".into(),
+                engine: engine_kind,
+            },
+        )]);
+        let mut engine =
+            Engine::open(Memory::default(), targets, STORE, SESSION, &clock(0)).unwrap();
+        engine.close_told(true);
+        let request = Request::Prepare {
+            guard: guard(&engine, "prepare"),
+            text: "List five fruits that are good when you're sick.".into(),
+            target: crate::runtime::LAMP_TARGET.into(),
+            session: None,
+            engine: None,
+        };
+        let id = engine.handle(&request, &clock(at), false).unwrap()["id"]
+            .as_u64()
+            .unwrap();
+        engine
+            .handle(&confirmation(&engine, id), &clock(at), true)
+            .unwrap();
+        assert_eq!(
+            engine.begin_launch(&clock(at)).unwrap().unwrap().task_id,
+            id
+        );
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Created {
+                    agent_id: AGENT.into(),
+                },
+                &clock(at),
+            )
+            .unwrap();
+        (engine, id)
+    }
+
+    /// What `show` reads of a harness that has not begun its task.
+    fn not_begun() -> Observation {
+        Observation {
+            tools: 0,
+            ..data("")
+        }
+    }
+
+    /// The newest kept reading's state after a read of `seen` at `at`.
+    fn read_as(engine: &mut Engine<Memory>, id: u64, seen: Observation, at: u64) -> String {
+        let job = request_read(engine, id, at);
+        engine.finish_observation(&job, seen, &clock(at)).unwrap();
+        let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+        task.observations.last().unwrap().data.state.clone()
+    }
+
+    /// #6577: the lamp's OpenClaw still idle with nothing asked, answered
+    /// or used past the bound is a failure, told and then closed once with
+    /// the reading it really gave; before the bound it is as it was read.
+    #[test]
+    fn a_lamp_openclaw_task_never_begun_past_the_bound_is_failed_and_closed() {
+        let (mut engine, id) = lamp_accepted(EngineKind::Openclaw, 1_000);
+        assert_eq!(read_as(&mut engine, id, not_begun(), 31_000), "idle");
+        assert_eq!(
+            read_as(
+                &mut engine,
+                id,
+                not_begun(),
+                1_000 + OPENCLAW_BEGIN_WITHIN_MS - 1
+            ),
+            "idle"
+        );
+        let at = 1_000 + OPENCLAW_BEGIN_WITHIN_MS;
+        assert_eq!(read_as(&mut engine, id, not_begun(), at), "failed");
+        let task = &engine.state.tasks[find(&engine.state, id).unwrap()];
+        assert!(settled(&task.observations.last().unwrap().data));
+        // Not told yet: left open until the lamp's own untold bound.
+        assert!(engine.begin_close(&clock(at + 1)).unwrap().is_none());
+        let job = engine
+            .begin_close(&clock(at + UNTOLD_CLOSE_MS))
+            .unwrap()
+            .expect("the empty harness is closed");
+        assert_eq!(job.answer, "");
+        assert_eq!(job.asked, None);
+    }
+
+    /// #6577: a slow first prompt that shows up just before the bound, or a
+    /// tool used, is a task begun: never failed after it.
+    #[test]
+    fn a_slow_real_first_prompt_is_never_taken_as_never_begun() {
+        let (mut engine, id) = lamp_accepted(EngineKind::Openclaw, 0);
+        let asked = Observation {
+            ask: Some("List five fruits that are good when you're sick.".into()),
+            state: "working".into(),
+            ..not_begun()
+        };
+        assert_eq!(
+            read_as(&mut engine, id, asked, OPENCLAW_BEGIN_WITHIN_MS - 1),
+            "working"
+        );
+        assert_eq!(
+            read_as(&mut engine, id, not_begun(), OPENCLAW_BEGIN_WITHIN_MS + 1),
+            "idle"
+        );
+        let (mut engine, id) = lamp_accepted(EngineKind::Openclaw, 0);
+        let used = Observation {
+            tools: 1,
+            ..not_begun()
+        };
+        assert_eq!(
+            read_as(&mut engine, id, used, OPENCLAW_BEGIN_WITHIN_MS + 1),
+            "idle"
+        );
+    }
+
+    /// #6577: the lamp's Hermes never begun is as before, however long.
+    #[test]
+    fn hermes_never_begun_is_left_as_read() {
+        let (mut engine, id) = lamp_accepted(EngineKind::Hermes, 0);
+        assert_eq!(
+            read_as(&mut engine, id, not_begun(), 10 * OPENCLAW_BEGIN_WITHIN_MS),
+            "idle"
+        );
+    }
+
     /// A task read in `state`, as Harness's `show` gives it (its `ask` is
     /// the task's own text), and its telling played: (`at`, `at + 2`).
     fn told(engine: &mut Engine<Memory>, state: &str, at: u64) -> u64 {
@@ -3400,6 +3831,7 @@ mod tests {
                 id,
                 LaunchOutcome::Joined {
                     agent_id: AGENT.into(),
+                    session: None,
                 },
                 &clock(0),
             )
@@ -3438,6 +3870,114 @@ mod tests {
         assert!(engine.begin_close(&clock(10_000_000)).unwrap().is_none());
     }
 
+    /// The Reviewer-lead's P2 on #5784 at 71bf964baa: how the person knows
+    /// the session a named hand-over joined is kept on its dispatch, saved
+    /// and listed, for the voice to say at once; a join without one, and a
+    /// store from before it, keep none.
+    #[test]
+    fn a_joined_sessions_name_and_first_ask_are_kept_and_listed() {
+        let (mut engine, memory) = opened();
+        let id = queued(&mut engine, 0);
+        engine.begin_launch(&clock(0)).unwrap().unwrap();
+        let session = JoinedSession {
+            name: Some("Docs-Update".into()),
+            ask: Some("Update the setup page".into()),
+            resumed: None,
+        };
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: Some(session.clone()),
+                },
+                &clock(0),
+            )
+            .unwrap();
+        assert_eq!(engine.state.tasks[0].dispatch.joined, Some(session));
+        assert_eq!(
+            stored(&memory).tasks[0].dispatch,
+            engine.state.tasks[0].dispatch
+        );
+        let page = engine
+            .handle(
+                &Request::List {
+                    after_id: 0,
+                    limit: 8,
+                },
+                &clock(0),
+                false,
+            )
+            .unwrap();
+        assert_eq!(
+            page["items"][0]["dispatch"]["joined"],
+            json!({"name":"Docs-Update","ask":"Update the setup page"})
+        );
+        // None kept: not written, and read back as none.
+        let mut dispatch = serde_json::to_value(&engine.state.tasks[0].dispatch).unwrap();
+        dispatch.as_object_mut().unwrap().remove("joined");
+        let older: Dispatch = serde_json::from_value(dispatch).unwrap();
+        assert_eq!(older.joined, None);
+        assert!(!serde_json::to_string(&older).unwrap().contains("joined"));
+    }
+
+    /// #5978: a named session found on another machine than the launch's
+    /// (`JoinedOn`): the task is followed there, told as that machine's
+    /// target and engine, never closed, and stored as schema 6, which the
+    /// build before refuses rather than follow it on the wrong machine.
+    #[test]
+    fn a_session_joined_on_another_machine_is_followed_there() {
+        let (mut engine, memory) = opened();
+        let id = queued(&mut engine, 0);
+        engine.begin_launch(&clock(0)).unwrap().unwrap();
+        let on = JoinedOn {
+            alias: "laptop".into(),
+            machine_id: "f".repeat(32),
+            engine: EngineKind::Claude,
+        };
+        engine
+            .finish_launch(
+                id,
+                LaunchOutcome::JoinedOn {
+                    agent_id: AGENT.into(),
+                    session: None,
+                    on: on.clone(),
+                },
+                &clock(0),
+            )
+            .unwrap();
+        let task = &engine.state.tasks[0];
+        assert_eq!(task.dispatch.state, DispatchState::Accepted);
+        assert_eq!(task.dispatch.joined_on, Some(on));
+        assert!(!task.closable);
+        assert_eq!(stored(&memory).schema, 6);
+        let watched = engine.watched(&clock(0));
+        assert_eq!(watched[0].machine_id, "f".repeat(32));
+        assert_eq!(watched[0].engine, "claude");
+        let job = request_read(&mut engine, id, 1);
+        assert_eq!(job.machine_id, "f".repeat(32));
+        // Not joined elsewhere: the launch's own machine, schema as before.
+        let (mut plain, memory) = opened();
+        let id = queued(&mut plain, 0);
+        plain.begin_launch(&clock(0)).unwrap().unwrap();
+        plain
+            .finish_launch(
+                id,
+                LaunchOutcome::Joined {
+                    agent_id: AGENT.into(),
+                    session: None,
+                },
+                &clock(0),
+            )
+            .unwrap();
+        assert!(stored(&memory).schema < 6);
+        let job = request_read(&mut plain, id, 1);
+        assert_eq!(
+            job.machine_id,
+            plain.state.tasks[0].launch.target.machine_id
+        );
+    }
+
     /// A follow-up the router typed into a session an earlier task of the
     /// lamp's had (the local leader's P2 on #4422): that task gives the
     /// session over once it is spent, so the follow-up watches and tells
@@ -3453,6 +3993,7 @@ mod tests {
                     id,
                     LaunchOutcome::Joined {
                         agent_id: AGENT.into(),
+                        session: None,
                     },
                     &clock(at),
                 )
@@ -3680,6 +4221,85 @@ mod tests {
         assert_eq!(reply["told"], false);
         assert_eq!(engine.revision(), revision);
         assert_eq!(stored(&memory), before);
+    }
+
+    /// #6530: the lamp's own agent is closed a minute after its one turn is
+    /// done and kept, its news still untold (on 52e6 a telling cut short left a
+    /// Hermes chat open seven minutes). One still working, or idle with no
+    /// answer yet, is not; a computer's harness still waits for its telling;
+    /// and the news of the closed one is still to tell.
+    #[test]
+    fn the_lamps_own_agent_is_closed_once_done_its_news_untold() {
+        // Handed to the lamp's own agent: its alias, and the digest kept
+        // with it.
+        let lamp = |engine: &mut Engine<Memory>| {
+            let store_id = engine.state.store_id.clone();
+            let task = &mut engine.state.tasks[0];
+            task.target_alias = crate::runtime::LAMP_TARGET.into();
+            task.prepared_digest = digest(&(&store_id, task.id, &task.target_alias, &task.launch));
+        };
+        let keep = |engine: &mut Engine<Memory>, id, at, state: &str, answer: &str| {
+            let read = request_read(engine, id, at);
+            let mut seen = data(answer);
+            seen.state = state.into();
+            engine.finish_observation(&read, seen, &clock(at)).unwrap();
+        };
+
+        // Still working, then idle with nothing said yet: left open.
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        lamp(&mut engine);
+        keep(&mut engine, id, 10, "working", "");
+        assert!(engine.begin_close(&clock(11)).unwrap().is_none());
+        keep(&mut engine, id, 20, "idle", "");
+        assert!(engine.begin_close(&clock(21)).unwrap().is_none());
+
+        // Done in one turn: left open a minute for a follow-up, then
+        // closed, told or not.
+        keep(&mut engine, id, 30, "idle", "Done.");
+        assert!(engine.begin_close(&clock(31)).unwrap().is_none());
+        assert!(
+            engine
+                .begin_close(&clock(30 + UNTOLD_CLOSE_MS - 1))
+                .unwrap()
+                .is_none()
+        );
+        let job = engine
+            .begin_close(&clock(30 + UNTOLD_CLOSE_MS))
+            .unwrap()
+            .unwrap();
+        assert_eq!((job.task_id, job.agent_id.as_str()), (id, AGENT));
+        assert!(
+            engine.state.tasks[0]
+                .observations
+                .last()
+                .unwrap()
+                .told
+                .is_none()
+        );
+        engine
+            .finish_close(
+                &job,
+                Ok(crate::harness::Closed::Closed),
+                &clock(31 + UNTOLD_CLOSE_MS),
+            )
+            .unwrap();
+        // Its news is not taken as told by the close.
+        let recent = engine.recent(&clock(32 + UNTOLD_CLOSE_MS));
+        assert_eq!(recent.len(), 1);
+        assert_eq!(recent[0].settled.as_deref(), Some("idle"));
+        assert!(!recent[0].told);
+
+        // A computer's harness, done the same way, waits for its telling.
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        keep(&mut engine, id, 30, "idle", "Done.");
+        assert!(
+            engine
+                .begin_close(&clock(30 + 10 * UNTOLD_CLOSE_MS))
+                .unwrap()
+                .is_none()
+        );
     }
 
     /// One that waits for the person is left to them, however long; one the
@@ -4180,6 +4800,219 @@ mod tests {
         assert!(!reply.to_string().contains("lamp-tasks"));
         // A read: nothing is written.
         assert_eq!(engine.revision(), before);
+        assert!(reply.get("lamp").is_none(), "switch off: no lamp field");
+    }
+
+    /// #6492: the lamp's own target with both engines in its order and the
+    /// targets file saying OpenClaw.
+    fn lamp_engine_rig(order: Vec<EngineKind>, app: Option<EngineKind>) -> Engine<Memory> {
+        let targets = BTreeMap::from([
+            (
+                crate::runtime::LAMP_TARGET.to_owned(),
+                Target {
+                    machine_id: "cccccccccccccccccccccccccccccccc".into(),
+                    project: crate::runtime::LAMP_PROJECT.into(),
+                    engine: EngineKind::Openclaw,
+                },
+            ),
+            (
+                "desk".to_owned(),
+                Target {
+                    machine_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                    project: "review-project".into(),
+                    engine: EngineKind::Codex,
+                },
+            ),
+        ]);
+        let mut engine =
+            Engine::open(Memory::default(), targets, STORE, SESSION, &clock(0)).unwrap();
+        engine.set_lamp_engines(order, app);
+        engine
+    }
+
+    fn lamp_prepare(engine: &Engine<Memory>, target: &str, named: Option<&str>) -> Request {
+        Request::Prepare {
+            guard: guard(engine, "prepare"),
+            text: "Sort the photos from yesterday.".into(),
+            target: target.into(),
+            session: None,
+            engine: named.map(str::to_owned),
+        }
+    }
+
+    fn launched_engine(engine: &Engine<Memory>) -> EngineKind {
+        engine.state.tasks.last().unwrap().launch.target.engine
+    }
+
+    #[test]
+    fn a_named_engine_runs_the_lamps_work_on_it_even_when_not_first() {
+        use EngineKind::{Hermes, Openclaw};
+        let mut engine = lamp_engine_rig(vec![Openclaw, Hermes], None);
+        let request = lamp_prepare(&engine, "lamp", Some("hermes"));
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Hermes);
+    }
+
+    #[test]
+    fn a_named_engine_not_in_the_lamps_order_is_refused_never_moved() {
+        use EngineKind::Openclaw;
+        let mut engine = lamp_engine_rig(vec![Openclaw], None);
+        let before = engine.revision();
+        let request = lamp_prepare(&engine, "lamp", Some("hermes"));
+        let refused = engine.handle(&request, &clock(0), false).unwrap_err();
+        assert_eq!(refused.code, ENGINE_NOT_HERE);
+        assert!(engine.state.tasks.is_empty());
+        assert_eq!(engine.revision(), before);
+        // Any other name not among the lamp's engines (#6492): one Harness
+        // has but doesn't report here, or one it starts with no task.
+        for named in ["codex", "claude", "pi", "cursor"] {
+            let request = lamp_prepare(&engine, "lamp", Some(named));
+            let refused = engine.handle(&request, &clock(0), false).unwrap_err();
+            assert_eq!(refused.code, ENGINE_NOT_HERE, "{named}");
+        }
+        // No name at all.
+        for named in ["", "  "] {
+            let request = lamp_prepare(&engine, "lamp", Some(named));
+            let refused = engine.handle(&request, &clock(0), false).unwrap_err();
+            assert_eq!(refused.code, ENGINE_UNKNOWN, "{named:?}");
+        }
+        assert!(engine.state.tasks.is_empty());
+        assert_eq!(engine.revision(), before);
+        // No lamp engines known at all: refused too.
+        let mut none = lamp_engine_rig(Vec::new(), None);
+        let request = lamp_prepare(&none, "lamp", Some("openclaw"));
+        assert_eq!(
+            none.handle(&request, &clock(0), false).unwrap_err().code,
+            ENGINE_NOT_HERE
+        );
+    }
+
+    #[test]
+    fn no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it() {
+        use EngineKind::{Codex, Hermes, Openclaw};
+        // No app choice: the targets file's engine.
+        let mut engine = lamp_engine_rig(vec![Openclaw, Hermes], None);
+        let request = lamp_prepare(&engine, "lamp", None);
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Openclaw);
+        // The default is Hermes: work naming none runs on it, and the
+        // targets answer says it, with every engine of the lamp's.
+        let mut engine = lamp_engine_rig(vec![Hermes, Openclaw], Some(Hermes));
+        let request = lamp_prepare(&engine, "lamp", None);
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Hermes);
+        let told = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(
+            told["targets"].as_array().unwrap().contains(
+                &json!({"alias":"lamp","engine":"hermes","engines":["hermes","openclaw"]})
+            ),
+            "{told}"
+        );
+        // The app's choice not in the order: the file's.
+        let mut engine = lamp_engine_rig(vec![Openclaw], Some(Hermes));
+        let request = lamp_prepare(&engine, "lamp", None);
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Openclaw);
+        // Another target: an engine named is ignored, and lists no engines.
+        let mut engine = lamp_engine_rig(vec![Openclaw], None);
+        let request = lamp_prepare(&engine, "desk", Some("hermes"));
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Codex);
+        let told = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(
+            told["targets"]
+                .as_array()
+                .unwrap()
+                .contains(&json!({"alias":"desk","engine":"codex"})),
+            "{told}"
+        );
+        // No lamp engines: no `engines` on the lamp's entry.
+        let mut engine = lamp_engine_rig(Vec::new(), None);
+        let told = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(
+            told["targets"]
+                .as_array()
+                .unwrap()
+                .contains(&json!({"alias":"lamp","engine":"openclaw"})),
+            "{told}"
+        );
+    }
+
+    /// #6492: an engine Harness reports on the lamp that is neither Hermes
+    /// nor OpenClaw (Claude) can be named, and is the default when it is
+    /// first; the targets answer lists the lamp's engines in that order.
+    #[test]
+    fn a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default() {
+        use EngineKind::{Claude, Hermes, Openclaw};
+        let mut engine = lamp_engine_rig(vec![Hermes, Claude, Openclaw], None);
+        let request = lamp_prepare(&engine, "lamp", Some("claude"));
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Claude);
+        assert_eq!(
+            engine.state.tasks.last().unwrap().launch.target.project,
+            crate::runtime::LAMP_PROJECT
+        );
+        // Claude the default: work naming none runs on it.
+        let mut engine = lamp_engine_rig(vec![Claude, Hermes, Openclaw], Some(Claude));
+        let request = lamp_prepare(&engine, "lamp", None);
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), Claude);
+        let told = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(
+            told["targets"].as_array().unwrap().contains(&json!({
+                "alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]
+            })),
+            "{told}"
+        );
+    }
+
+    #[test]
+    fn the_targets_say_the_lamp_is_installing_only_with_the_switch_on_and_no_lamp_hermes() {
+        let office = Target {
+            machine_id: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".into(),
+            project: "lamp-tasks".into(),
+            engine: EngineKind::Claude,
+        };
+        let lamp = Target {
+            machine_id: "cccccccccccccccccccccccccccccccc".into(),
+            project: crate::runtime::LAMP_PROJECT.into(),
+            engine: EngineKind::Hermes,
+        };
+        let answer = |targets: BTreeMap<String, Target>, on: bool| {
+            let mut engine =
+                Engine::open(Memory::default(), targets, STORE, SESSION, &clock(0)).unwrap();
+            engine.hermes_on_lamp(on);
+            engine
+                .handle(&Request::Targets {}, &clock(0), false)
+                .unwrap()
+        };
+        let installing = answer(BTreeMap::new(), true);
+        assert_eq!(installing["lamp"], "installing");
+        assert_eq!(installing["targets"], json!([]));
+        let with_office = answer(
+            BTreeMap::from([("office".to_owned(), office.clone())]),
+            true,
+        );
+        assert_eq!(with_office["lamp"], "installing");
+        // Switch off: as before.
+        assert!(answer(BTreeMap::new(), false).get("lamp").is_none());
+        // Hermes installed on the lamp: as before.
+        let installed = answer(
+            BTreeMap::from([
+                ("office".to_owned(), office),
+                (crate::runtime::LAMP_TARGET.to_owned(), lamp),
+            ]),
+            true,
+        );
+        assert!(installed.get("lamp").is_none());
     }
 
     #[test]
@@ -4544,7 +5377,10 @@ mod tests {
         )
         .unwrap();
         let kept = engine.summary()["set_aside"].as_str().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-6-"), "{kept}");
+        assert!(
+            kept.starts_with(&format!("tasks.sqlite3.newer-{}-", SCHEMA + 1)),
+            "{kept}"
+        );
         drop(engine);
         let mut engine = Engine::open(
             memory.clone(),
@@ -4873,6 +5709,36 @@ mod tests {
         assert!(Engine::open(memory, hermes(), STORE, RESTART, &clock(2)).is_err());
     }
 
+    /// #6226: a store that holds an OpenClaw task is written as 7, which a
+    /// build before it sets aside; one that names OpenClaw under schema 6 is
+    /// refused. A store without one stays as low as its other tasks need.
+    #[test]
+    fn a_store_with_an_openclaw_task_is_written_as_schema_seven() {
+        let openclaw = || {
+            let mut staff = targets();
+            staff.get_mut("desk").unwrap().engine = EngineKind::Openclaw;
+            staff
+        };
+        let memory = Memory::default();
+        let mut engine =
+            Engine::open(memory.clone(), openclaw(), STORE, SESSION, &clock(0)).unwrap();
+        assert_eq!(written(&memory)["schema"], 1);
+        prepare(&mut engine, 0);
+        let stored = written(&memory);
+        assert_eq!(stored["schema"], 7);
+        assert_eq!(stored["tasks"][0]["launch"]["target"]["engine"], "openclaw");
+        drop(engine);
+        let engine = Engine::open(memory.clone(), openclaw(), STORE, RESTART, &clock(1))
+            .expect("a schema-7 store opens");
+        assert_eq!(engine.state.tasks.len(), 1);
+        drop(engine);
+        let mut wrong = written(&memory);
+        wrong["schema"] = json!(6);
+        let memory = Memory::default();
+        memory.0.borrow_mut().bytes = Some(serde_json::to_vec(&wrong).unwrap());
+        assert!(Engine::open(memory, openclaw(), STORE, RESTART, &clock(2)).is_err());
+    }
+
     /// #5535: a task whose launch names the session the person asked for
     /// is stored with it and written as 5, which a build before it sets
     /// aside; one that names a session under schema 4 is refused. A task
@@ -4925,7 +5791,7 @@ mod tests {
         accepted(&mut engine, 0);
         let mut newer: Value =
             serde_json::from_slice(memory.0.borrow().bytes.as_ref().unwrap()).unwrap();
-        newer["schema"] = json!(6);
+        newer["schema"] = json!(SCHEMA + 1);
         newer["tasks"][0]["dispatch"]["state"] = json!("a_state_from_later");
         let bytes = serde_json::to_vec(&newer).unwrap();
         let memory = Memory::default();
@@ -4939,7 +5805,10 @@ mod tests {
         )
         .expect("a newer store is set aside, not refused");
         let kept = engine.set_aside().unwrap().to_owned();
-        assert!(kept.starts_with("tasks.sqlite3.newer-6-"), "{kept}");
+        assert!(
+            kept.starts_with(&format!("tasks.sqlite3.newer-{}-", SCHEMA + 1)),
+            "{kept}"
+        );
         assert_eq!(
             memory.0.borrow().kept,
             [(kept, bytes)],
@@ -5930,6 +6799,7 @@ mod tests {
             EngineKind::Devin,
             EngineKind::DevinCloud,
             EngineKind::Hermes,
+            EngineKind::Openclaw,
         ];
         for value in engine {
             match value {
@@ -5938,7 +6808,8 @@ mod tests {
                 | EngineKind::Opencode
                 | EngineKind::Devin
                 | EngineKind::DevinCloud
-                | EngineKind::Hermes => {}
+                | EngineKind::Hermes
+                | EngineKind::Openclaw => {}
             }
         }
         let vocabulary = [
@@ -5952,10 +6823,10 @@ mod tests {
         assert_eq!(
             (SCHEMA, vocabulary.as_str()),
             (
-                5,
+                7,
                 "dispatch: prepared queued attempting accepted pending not_sent uncertain cancelled invalidated; \
                  read: requested attempting finished failed; speech: claimed spoken uncertain; \
-                 close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud hermes"
+                 close: attempting closed refused left failed; engine: codex claude opencode devin devin-cloud hermes openclaw"
             ),
             "a new stored value needs a `schema` bump (see SCHEMA): raise it, then write this line again"
         );

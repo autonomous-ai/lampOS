@@ -9,6 +9,12 @@ khác nhau, bản tiếng Anh đúng. Các thông điệp nằm trong
 `lamp-control` là phần sẽ làm việc đó, tắt cho đến khi chủ đèn bật quyền truy
 cập cho nhà phát triển trong ứng dụng.
 
+Khi `LAMP_CONTROL` không bật mà `LAMP_SKILL_TASKS=on`, `lamp-control` vẫn
+chạy nhưng không có cửa: không lắng nghe TCP, không TLS, không ghép đôi. Nó
+chỉ phục vụ phía chủ đèn (`--admin-socket`: lời đồng ý của voice, việc cấp
+token của lamp-tasks) và socket cho skill run. Cả hai đều tắt thì nó báo vậy
+và thoát với mã 0.
+
 ## Bốn quyết định
 
 1. **Nhà phát triển trước.** API trực tiếp, SDK Python và JavaScript và một
@@ -25,8 +31,14 @@ cập cho nhà phát triển trong ứng dụng.
 
 - **Sự kiện:** `person.arrived`, `person.left`, `person.stood_up`,
   `person.facing`, `phrase.heard` (chỉ cụm từ đã đăng ký khớp, **không bao
-  giờ** là lời đã nói), `name.heard`, `sound.heard`, `touch`, `button`,
+  giờ** là lời đã nói; so với chữ của bộ nhận dạng: chữ thường, bỏ dấu nháy,
+  từ viết liền hay tách đều khớp ("goodnight" / "good night"), và từ cuối
+  nghe được có thể thêm một "s" ("lamps" khớp "lamp"); lamp-control chỉ ghi
+  số đếm vào nhật ký, không ghi lời), `name.heard`, `sound.heard`, `touch`, `button`,
   `time`, `lamp.changed`.
+- **`touch`:** một cú chạm đầu (`tap`, nhả nhanh) từ `controls/touch` và một
+  cú vuốt đầu (`pet`, mỗi lần chạm một sự kiện, từ `controls/pet`) đến chương
+  trình của bạn; loại `hold` chưa được tạo ra.
 - **Hành động:** `express`, `gesture`, `look`, `move`, `play`, `joints`,
   `light`, `say`, `sound`, `stop`. `look`, `move`, `play` và `joints` cần một
   lease.
@@ -48,6 +60,22 @@ cập cho nhà phát triển trong ứng dụng.
   (HMAC trên mã ghim, khóa và nonce). Bằng chứng sai thì kết nối bị đóng, và
   mỗi giây chỉ một lần thử trên cả đèn. **Hello** trên mỗi kết nối, ký bằng
   khóa đó, một lần cho mỗi kết nối.
+
+## Token cho skill run
+
+Khi cấp token (`mint`, #6304, `task_yes::KeptYes`), `lamp-control` tự băm
+thư mục `/var/lib/lampOS/skills/<skill>`, hoặc, với tên không có ở đó, thư
+mục của skill được đẩy lên `/var/lib/lampOS/skills-dev/<skill>`
+(`task_yes::folder_of`). Chỉ cần có bất cứ thứ gì mang tên đó trong
+`skills/` (thư mục, tệp hay liên kết) là skill được đẩy lên không bao giờ
+thay chỗ nó; lamp-skills và lamp-tasks giữ cùng quy tắc đó. Một thư mục là
+liên kết thì không bao giờ được băm. Token chỉ nêu các quyền khi
+`task-yes.json` giữ lời đồng ý của chủ đèn cho đúng mã SHA-256 đó và các
+quyền đó. Không có lời đồng ý, hay thư mục đã đổi từ khi đồng ý, thì bị từ
+chối và không token nào được cấp. Lời đồng ý được giữ mà không có quyền nào
+(một skill có mã không dùng gì của đèn, như skill mã do #6307 tạo) vẫn là
+lời đồng ý: token của nó không nêu quyền nào (`"grants": []`), nên lần chạy
+chỉ `hello` được, mọi thao tác cần quyền đều bị từ chối `no_grant`.
 
 ## Ai thắng
 

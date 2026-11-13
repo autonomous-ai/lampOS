@@ -456,6 +456,12 @@ fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
         .ok()
         .flatten()
         .and_then(|bytes| serde_json::from_slice::<Progress>(&bytes).ok());
+    // A "no" or a redo first written here takes back the app's yes before
+    // the progress holding it is kept, so a crash between the two leaves
+    // no yes rather than one the owner just said no to. A take-back that
+    // fails fails the write before the progress keeps the "no", so the next
+    // write still sees it new and tries again (Jarvis's P2 on #5848).
+    take_back(paths, progress, before.as_ref())?;
     let next = path.with_extension("storage-next");
     let mut file = fs::OpenOptions::new()
         .create_new(true)
@@ -477,6 +483,55 @@ fn atomic_progress(paths: &Paths, progress: &Progress) -> io::Result<()> {
             .as_ref()
             .is_none_or(|before| kept_yes(before, step).is_none())
     })
+}
+
+/// The yes for each step in [`YES_STEPS`] removed, whoever gave it, when
+/// `progress` is the first write of a "no" (`skipped`) at the lamp or of a
+/// redo for that step: its count of them ([`Progress::yes_taken_back`]),
+/// its kept "no" or its redo time differs from the progress it replaces
+/// (`before`, none when unreadable; the count catches a second one in the
+/// same second, the times a file from a build without the count). The
+/// newest thing the walk heard wins whatever the clocks say (the first
+/// builder's P3 on #5567), and a start or a write that keeps the same "no"
+/// or redo leaves an app yes given after it. The consent folder is synced
+/// after a removal, so the take-back is on disk before the progress that
+/// keeps the "no". The first error is returned, after every step is tried.
+fn take_back(paths: &Paths, progress: &Progress, before: Option<&Progress>) -> io::Result<()> {
+    let no = |progress: &Progress, step: &str| {
+        progress
+            .steps
+            .get(step)
+            .filter(|kept| kept.outcome == super::Outcome::Skipped)
+            .map(|kept| kept.at_unix_s)
+    };
+    let redone = |progress: &Progress, step: &str| progress.yes_redone_at_unix_s.get(step).copied();
+    let count = |progress: &Progress, step: &str| progress.yes_taken_back.get(step).copied();
+    let mut first = Ok(());
+    for step in YES_STEPS {
+        let new_count = count(progress, step).is_some()
+            && before.is_none_or(|before| count(before, step) != count(progress, step));
+        let new_no = no(progress, step).is_some()
+            && before.is_none_or(|before| no(before, step) != no(progress, step));
+        let new_redo = redone(progress, step).is_some()
+            && before.is_none_or(|before| redone(before, step) != redone(progress, step));
+        if !(new_count || new_no || new_redo) {
+            continue;
+        }
+        let path = consent_path(paths, step);
+        let result = match fs::remove_file(&path) {
+            Ok(()) => path
+                .parent()
+                .ok_or_else(|| io::Error::other("a consent file has no folder"))
+                .and_then(fs::File::open)
+                .and_then(|folder| folder.sync_all()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e),
+        };
+        if first.is_ok() {
+            first = result;
+        }
+    }
+    first
 }
 
 /// [`consent`] for every step in [`YES_STEPS`], each handled before the
@@ -515,29 +570,14 @@ fn kept_yes(progress: &Progress, step: &str) -> Option<u64> {
         .map(|kept| kept.at_unix_s)
 }
 
-/// When the owner's yes for `step` from the app, if older, no longer
-/// stands: the step's last redo, or a "no" (`skipped`) at the lamp after it.
-fn app_yes_taken_back_at(progress: &Progress, step: &str) -> Option<u64> {
-    let redone = progress.yes_redone_at_unix_s.get(step).copied();
-    let no = progress
-        .steps
-        .get(step)
-        .filter(|kept| kept.outcome == super::Outcome::Skipped)
-        .map(|kept| kept.at_unix_s);
-    redone.max(no)
-}
-
 /// Whether the file at `path` is the owner's yes for `step` from the app
-/// (`"by":"app"`, written by `lamp-setup change`, #5500) that still stands
-/// against `progress`: given after the step's last redo and after any "no"
-/// at the lamp. With no time, it doesn't.
-fn app_yes_stands(path: &Path, progress: &Progress, step: &str) -> bool {
+/// (`"by":"app"`, written by `lamp-setup change`, #5500), which the voice's
+/// starts and writes keep. A "no" or a redo at the lamp takes it back when
+/// first written ([`take_back`]), never by comparing times. With no time,
+/// it doesn't stand.
+fn app_yes_stands(path: &Path, step: &str) -> bool {
     let kept = lamp_msgs::consent::read(path, step);
-    kept.yes
-        && kept.by_app()
-        && kept
-            .at_unix_s
-            .is_some_and(|at| app_yes_taken_back_at(progress, step).is_none_or(|taken| at > taken))
+    kept.yes && kept.by_app() && kept.at_unix_s.is_some()
 }
 
 /// A yes for another part (room sounds for lamp-ears, face expressions for
@@ -554,7 +594,7 @@ fn consent(paths: &Paths, progress: &Progress, step: &str, new: bool) -> io::Res
     use std::os::unix::fs::PermissionsExt;
     let path = &consent_path(paths, step);
     let Some(at) = kept_yes(progress, step) else {
-        if app_yes_stands(path, progress, step) {
+        if app_yes_stands(path, step) {
             return Ok(());
         }
         return match fs::remove_file(path) {
@@ -820,6 +860,7 @@ mod tests {
                         framing: None,
                         offered_at_unix_s: None,
                         later_offers: 0,
+                        ended_at_unix_ms: None,
                     },
                 );
             }
@@ -888,6 +929,7 @@ mod tests {
                     framing: None,
                     offered_at_unix_s: None,
                     later_offers: 0,
+                    ended_at_unix_ms: None,
                 },
             );
             progress
@@ -914,22 +956,18 @@ mod tests {
         .unwrap();
         execute(&paths, Operation::Initialize).unwrap();
         assert!(!face.exists());
-        // A "no" at the lamp before the app's yes leaves it; one after takes it.
+        // A "no" at the lamp written after the app's yes takes it; one
+        // given after the "no" stands.
         app(&face, "face_expressions", 100);
-        execute(
-            &paths,
-            Operation::Commit(with("face_expressions", Outcome::Skipped, 90), false),
-        )
-        .unwrap();
-        assert!(face.exists());
-        execute(
-            &paths,
-            Operation::Commit(with("face_expressions", Outcome::Skipped, 110), false),
-        )
-        .unwrap();
+        let no = with("face_expressions", Outcome::Skipped, 110);
+        execute(&paths, Operation::Commit(no.clone(), false)).unwrap();
         assert!(!face.exists());
-        // A redo of the step after the app's yes takes it, kept across the
-        // start that follows; one given after the redo stands.
+        app(&face, "face_expressions", 120);
+        execute(&paths, Operation::Initialize).unwrap();
+        execute(&paths, Operation::Commit(no, false)).unwrap();
+        assert!(face.exists());
+        // A redo of the step after the app's yes takes it; one given after
+        // the redo, even in its second, stands across starts and writes.
         let mut redone = Progress::default();
         redone
             .yes_redone_at_unix_s
@@ -937,9 +975,6 @@ mod tests {
         execute(&paths, Operation::Commit(redone.clone(), false)).unwrap();
         assert!(!paths.room_sounds.exists());
         app(&paths.room_sounds, "room_sounds", 120);
-        execute(&paths, Operation::Initialize).unwrap();
-        assert!(!paths.room_sounds.exists(), "the same second as the redo");
-        app(&paths.room_sounds, "room_sounds", 121);
         execute(&paths, Operation::Initialize).unwrap();
         execute(&paths, Operation::Commit(redone, false)).unwrap();
         assert!(paths.room_sounds.exists());
@@ -960,6 +995,193 @@ mod tests {
                 .as_deref(),
             Some("voice")
         );
+    }
+
+    /// A progress holding only `step`'s kept `outcome` at `at_unix_s`.
+    fn kept(step: &str, outcome: super::super::Outcome, at_unix_s: u64) -> Progress {
+        let mut progress = Progress::default();
+        progress.steps.insert(
+            step.into(),
+            super::super::Kept {
+                outcome,
+                at_unix_s,
+                framing: None,
+                offered_at_unix_s: None,
+                later_offers: 0,
+                ended_at_unix_ms: None,
+            },
+        );
+        progress
+    }
+
+    /// The first builder's P3 on #5567: a spoken "no", or a redo, is the
+    /// newest thing the walk heard, so the write that first keeps it takes
+    /// the app's yes back whatever the two clocks say, even one stamped
+    /// long after it (a lamp clock that stepped back).
+    #[test]
+    fn a_spoken_no_or_a_redo_takes_back_an_app_yes_whatever_the_clocks_say() {
+        use super::super::Outcome;
+        let files = Files::new();
+        let paths = files.paths();
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        let app = |path: &Path, step: &str, at| {
+            fs::write(path, lamp_msgs::consent::bytes(step, at, "app")).unwrap();
+        };
+        app(&face, "face_expressions", 1_000);
+        execute(
+            &paths,
+            Operation::Commit(kept("face_expressions", Outcome::Skipped, 90), false),
+        )
+        .unwrap();
+        assert!(!face.exists(), "a no stamped before the app's yes");
+        app(&paths.room_sounds, "room_sounds", 1_000);
+        let mut redone = Progress::default();
+        redone.yes_redone_at_unix_s.insert("room_sounds".into(), 50);
+        execute(&paths, Operation::Commit(redone, false)).unwrap();
+        assert!(
+            !paths.room_sounds.exists(),
+            "a redo stamped before the app's yes"
+        );
+    }
+
+    /// An app yes given after a "no" (or a redo) at setup was written
+    /// stands through every later start and write that keeps the same
+    /// "no", whatever its time says; only a new "no", a new redo, a forget
+    /// of everything (`remember.rs`) or the reset's plan takes it back.
+    #[test]
+    fn an_app_yes_after_a_setup_no_survives_restarts_whatever_the_clocks_say() {
+        use super::super::Outcome;
+        let files = Files::new();
+        let paths = files.paths();
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        let app = |path: &Path, step: &str, at| {
+            fs::write(path, lamp_msgs::consent::bytes(step, at, "app")).unwrap();
+        };
+        let no = kept("face_expressions", Outcome::Skipped, 500);
+        execute(&paths, Operation::Commit(no.clone(), false)).unwrap();
+        // Given after the "no", stamped before it and in its second.
+        for at in [100, 500] {
+            app(&face, "face_expressions", at);
+            for _ in 0..2 {
+                execute(&paths, Operation::Initialize).unwrap();
+                execute(&paths, Operation::Commit(no.clone(), false)).unwrap();
+            }
+            assert!(face.exists(), "an app yes at {at} after the no");
+        }
+        // A second "no" at the lamp takes it back.
+        execute(
+            &paths,
+            Operation::Commit(kept("face_expressions", Outcome::Skipped, 501), false),
+        )
+        .unwrap();
+        assert!(!face.exists());
+        // The same after a redo of the step.
+        let mut redone = Progress::default();
+        redone
+            .yes_redone_at_unix_s
+            .insert("room_sounds".into(), 500);
+        execute(&paths, Operation::Commit(redone.clone(), false)).unwrap();
+        app(&paths.room_sounds, "room_sounds", 400);
+        execute(&paths, Operation::Initialize).unwrap();
+        execute(&paths, Operation::Commit(redone.clone(), false)).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(paths.room_sounds.exists(), "an app yes after the redo");
+        // A later redo, even stamped earlier, takes it back.
+        redone
+            .yes_redone_at_unix_s
+            .insert("room_sounds".into(), 300);
+        execute(&paths, Operation::Commit(redone, false)).unwrap();
+        assert!(!paths.room_sounds.exists());
+    }
+
+    /// Jarvis's P2 on #5848: a "no" whose take-back fails (here the consent
+    /// folder read-only, EACCES) fails its write before the progress keeps
+    /// it, so the next write of it still sees a new "no" and retries the
+    /// take-back: the app's yes never outlives the owner's "no".
+    #[test]
+    fn a_failed_take_back_fails_the_write_and_the_next_write_retries_it() {
+        use super::super::Outcome;
+        use std::os::unix::fs::PermissionsExt;
+        let files = Files::new();
+        let mut paths = files.paths();
+        // The consent files live in a folder of their own on a lamp.
+        let folder = files.0.join("consent");
+        fs::create_dir(&folder).unwrap();
+        paths.room_sounds = folder.join("room-sounds.json");
+        let face = super::super::face_expressions_beside(&paths.room_sounds);
+        fs::write(
+            &face,
+            lamp_msgs::consent::bytes("face_expressions", 100, "app"),
+        )
+        .unwrap();
+        let mode = |mode| fs::set_permissions(&folder, fs::Permissions::from_mode(mode)).unwrap();
+        mode(0o500);
+        // Root writes into a read-only folder: nothing fails to show here.
+        if fs::write(folder.join("probe"), b"").is_ok() {
+            mode(0o700);
+            return;
+        }
+        let no = kept("face_expressions", Outcome::Skipped, 110);
+        let failed = execute(&paths, Operation::Commit(no.clone(), false));
+        mode(0o700);
+        assert!(failed.is_err(), "a take-back that fails fails the write");
+        assert!(face.exists());
+        // The same "no" written again, once the folder takes it.
+        execute(&paths, Operation::Commit(no.clone(), false)).unwrap();
+        execute(&paths, Operation::Initialize).unwrap();
+        assert!(
+            !lamp_msgs::consent::read(&face, "face_expressions").yes,
+            "the app's yes stands after the owner's no"
+        );
+        let kept_no = read_bounded(&paths.progress, MAX_PROGRESS)
+            .unwrap()
+            .map(|bytes| serde_json::from_slice::<Progress>(&bytes).unwrap());
+        assert_eq!(kept_no, Some(no));
+    }
+
+    /// Two redos of a step in the same second (or after the clock stepped
+    /// back) are each a new redo: each takes back an app yes given before
+    /// it, though both carry the same time.
+    #[test]
+    fn two_redos_in_one_second_each_take_back_the_app_yes() {
+        let files = Files::new();
+        let paths = files.paths();
+        let app = || {
+            fs::write(
+                &paths.room_sounds,
+                lamp_msgs::consent::bytes("room_sounds", 120, "app"),
+            )
+            .unwrap();
+        };
+        let mut redone = Progress::default();
+        redone.yes_redone("room_sounds");
+        let at = redone.yes_redone_at_unix_s["room_sounds"];
+        app();
+        execute(&paths, Operation::Commit(redone.clone(), false)).unwrap();
+        assert!(!paths.room_sounds.exists(), "the first redo");
+        // An app yes after it stands through the same redo written again.
+        app();
+        execute(&paths, Operation::Initialize).unwrap();
+        execute(&paths, Operation::Commit(redone.clone(), false)).unwrap();
+        assert!(paths.room_sounds.exists());
+        // A second redo, its time the same second as the first.
+        redone.yes_redone("room_sounds");
+        redone.yes_redone_at_unix_s.insert("room_sounds".into(), at);
+        execute(&paths, Operation::Commit(redone.clone(), false)).unwrap();
+        assert!(!paths.room_sounds.exists(), "the second redo in its second");
+        // The same for a second "no" kept with the first's time.
+        let mut no = kept("room_sounds", super::super::Outcome::Skipped, at);
+        no.yes_taken_back = redone.yes_taken_back.clone();
+        no.took_back("room_sounds");
+        app();
+        execute(&paths, Operation::Commit(no.clone(), false)).unwrap();
+        assert!(!paths.room_sounds.exists(), "the first no");
+        app();
+        execute(&paths, Operation::Commit(no.clone(), false)).unwrap();
+        assert!(paths.room_sounds.exists(), "the same no written again");
+        no.took_back("room_sounds");
+        execute(&paths, Operation::Commit(no, false)).unwrap();
+        assert!(!paths.room_sounds.exists(), "the second no in its second");
     }
 
     /// A room sounds file that fails to go (here a folder in its place)
@@ -1155,6 +1377,7 @@ mod tests {
                 framing: None,
                 offered_at_unix_s: None,
                 later_offers: 0,
+                ended_at_unix_ms: None,
             },
         );
         done.privacy_done_attempt = Some(lamp_turn_owner::BootId::new([7; 16]).unwrap());

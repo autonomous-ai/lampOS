@@ -1,0 +1,26 @@
+
+running 4 tests
+lamp-skills: the skills a person turned off kept in /tmp/tphIaNIA/state: []
+lamp-skills: skills from /tmp/tphIaNIA/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 715 ms later; cut, nothing settled within 6 s; the line was cut (the voice went from speaking to listening): nothing after it is made
+.lamp-skills: the skills a person turned off kept in /tmp/tpTWhnVP/state: []
+lamp-skills: skills from /tmp/tpTWhnVP/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["dance"]
+lamp-skills: dance Triggered: the model called dance with {}
+lamp-skills: dance Done: after the say: spoken from 0 ms after the call, the turn over 700 ms later; a cut with no words: the line was said again, then made; light warm: done; dim: done, dim: done; gesture dance_hype: told the body; light given back to on blue at 3: done
+.lamp-skills: the skills a person turned off kept in /tmp/tppGHzim/state: []
+lamp-skills: skills from /tmp/tppGHzim/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: skill:show: show short: light purple: done
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 719 ms later; a cut with no words: the line was said again, then made; show short: 3 frames shown; light given back to on blue at 3: done
+.lamp-skills: the skills a person turned off kept in /tmp/tpMBbaCI/state: []
+lamp-skills: skills from /tmp/tpMBbaCI/skills, the Policy's ask not asked: nothing is done, a skill's light set through the actions part and given back
+lamp-skills: loaded ["show"]
+lamp-skills: show Triggered: the model called light_show with {}
+lamp-skills: show Done: after the say: spoken from 0 ms after the call, the turn over 693 ms later; cut by words; the line was cut (the voice went from speaking to listening): nothing after it is made
+.
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 426 filtered out; finished in 6.69s
+

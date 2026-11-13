@@ -693,6 +693,146 @@ fn a_held_exchange_never_reaches_the_summary_or_the_talk_note() {
     );
 }
 
+/// Reviewer-two's HOLD on #5968 at `8c1cbd4268`: with the running summary
+/// off, memory's forget from the app still drops the write waiting for its
+/// send, through the worker's own reader (`memory_forgot_waiting`); a rules
+/// scope's forget, or another part's, leaves it.
+#[test]
+fn a_forget_from_the_app_drops_the_waiting_write_with_the_summary_off() {
+    let root = std::path::PathBuf::from(format!("/tmp/lvs-forgot-w-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+    let publisher = |source| {
+        bus.publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            source,
+        )
+        .unwrap()
+    };
+    let (mut memory, mut eyes) = (publisher("memory"), publisher("eyes"));
+    let told = |person: Option<&str>| lamp_msgs::MemoryForgot {
+        person: person.map(str::to_owned),
+    };
+    let waiting = || crate::services::Pending {
+        service: "gmail".to_owned(),
+        ..crate::services::Pending::new("id", 0, Instant::now(), "Send a mail.", "ann")
+    };
+    crate::services::pending_for_test(Some(waiting()));
+    eyes.publish_json(1, &told(None)).unwrap();
+    memory.publish_json(1, &told(Some("r-house"))).unwrap();
+    assert_eq!(memory_forgot_waiting(&mut forgot, 1_000_000), 0);
+    assert!(
+        crate::services::pending_for_test_is_some(),
+        "not the conversation's"
+    );
+    memory
+        .publish_json(2, &told(Some(&crate::remember::person_id("Tom"))))
+        .unwrap();
+    assert_eq!(memory_forgot_waiting(&mut forgot, 2_000_000), 1);
+    assert!(!crate::services::pending_for_test_is_some(), "dropped");
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// Jarvis's P3 on #6073: with the running summary off, memory's forget of
+/// a person from the app also drops the service records the voice holds
+/// of theirs (`LAMP_SERVICE_RECORDS`), mail text included, so nothing of
+/// them is told after it (`LAMP_SERVICE_RECORDS_TOLD`).
+#[test]
+fn a_forget_from_the_app_drops_the_held_service_records_with_the_summary_off() {
+    use crate::service_records as records;
+    let root = std::path::PathBuf::from(format!("/tmp/lvs-forgot-r-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+    let mut memory = bus
+        .publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            "memory",
+        )
+        .unwrap();
+    let person = crate::remember::person_id("Octavia records");
+    records::on_for_test(true);
+    records::read(
+        &person,
+        &serde_json::json!({"service":"gmail","what":"search","query":"party"}),
+        &serde_json::json!({"quoted":[]}),
+    );
+    let theirs = || records::held().iter().any(|record| record.person == person);
+    assert!(theirs(), "held");
+    memory
+        .publish_json(
+            1,
+            &lamp_msgs::MemoryForgot {
+                person: Some(person.clone()),
+            },
+        )
+        .unwrap();
+    memory_forgot_waiting(&mut forgot, 1_000_000);
+    assert!(!theirs(), "dropped");
+    records::on_for_test(false);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+/// With the running summary off, memory's forget of a person from the app
+/// also ends the role they asked the lamp to play (`LAMP_MEMORY_ROLE`) and
+/// drops the mail contacts planned for their waiting write
+/// (`LAMP_SERVICE_CONTACTS`), as [`memory_forgot_from`] does with it on.
+#[test]
+fn a_forget_from_the_app_ends_the_role_and_planned_contacts_with_the_summary_off() {
+    use crate::remember::role;
+    use crate::service_contacts as contacts;
+    let root = std::path::PathBuf::from(format!("/tmp/lvs-forgot-role-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).unwrap();
+    let bus = lamp_bus::Bus::new(&root).unwrap();
+    let mut forgot = crate::bus_out::ForgotIn::on(&bus).unwrap();
+    let mut memory = bus
+        .publisher_declared(
+            lamp_msgs::MemoryForgot::TOPIC,
+            &lamp_msgs::MemoryForgot::declaration(),
+            "memory",
+        )
+        .unwrap();
+    let person = crate::remember::person_id("Octavia role");
+    role::hold(&person, Some("Harry Potter".to_owned()));
+    assert_eq!(role::cached(&person).as_deref(), Some("Harry Potter"));
+    contacts::on_for_test(true);
+    crate::service_records::on_for_test(true);
+    contacts::plan(
+        Some(&person),
+        &serde_json::json!({
+            "service": "gmail",
+            "action": "send_mail",
+            "to": ["octavia@example.com"],
+            "text": "Hi Octavia, see you Sunday.",
+        }),
+        &[],
+        &[],
+        &mut serde_json::json!({"send_id": "s1", "read_back": "To Octavia."}),
+    );
+    let theirs = || contacts::planned().iter().any(|plan| plan.person == person);
+    assert!(theirs(), "planned");
+    memory
+        .publish_json(
+            1,
+            &lamp_msgs::MemoryForgot {
+                person: Some(person.clone()),
+            },
+        )
+        .unwrap();
+    memory_forgot_waiting(&mut forgot, 1_000_000);
+    assert_eq!(role::cached(&person), None, "the role ended");
+    assert!(!theirs(), "the planned contacts dropped");
+    contacts::on_for_test(false);
+    crate::service_records::on_for_test(false);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
 /// The reviewer-lead's P2 on #4479: memory's forget from the app
 /// (`memory/forgot`) reaches the conversation as a voice-tool forget does:
 /// a person's, the room's ("everyone") or every person's drops the thread,
@@ -822,7 +962,7 @@ fn a_forget_between_the_count_and_the_exchanges_keeps_no_note() {
     });
     assert!(!jobs.is_empty(), "the exchanges were due");
     for job in jobs {
-        summarize(job, &folding, summaries, || now);
+        summarize(job, &folding, summaries, || now, |_, _, _| {});
     }
     assert_eq!(told_from(summaries, Some("tom"), now, 64 * 1024), "");
     // With no forget, the same order keeps the note.
@@ -838,7 +978,223 @@ fn a_forget_between_the_count_and_the_exchanges_keeps_no_note() {
         );
     }
     for job in jobs_due(summaries, &thread, now, || {}) {
-        summarize(job, &folding, summaries, || now);
+        summarize(job, &folding, summaries, || now, |_, _, _| {});
     }
     assert!(told_from(summaries, Some("tom"), now, 64 * 1024).contains("said-1"));
+}
+
+/// Exchanges of `whose`, `from..=to`, each line numbered.
+fn numbered(thread: &mut Thread, from: u64, to: u64, whose: Option<&str>, at: Instant) {
+    for request in from..=to {
+        exchange(
+            thread,
+            request,
+            &format!("I said line {request:02}"),
+            &format!("Reply {request:02}."),
+            whose,
+            at,
+        );
+    }
+}
+
+/// What a turn of `whose` is told of the thread with the switch on: the
+/// note told and the thread's lines less those it holds.
+fn told_after_note(
+    summaries: &Mutex<Summaries>,
+    thread: &Mutex<Thread>,
+    whose: Option<&str>,
+    now: Instant,
+) -> (String, String) {
+    let (note, lineage) = told_with_lineage_from(summaries, whose, now, 64 * 1024);
+    let lines = thread
+        .lock()
+        .unwrap()
+        .recall_after_note(whose, now, 64 * 1024, lineage)
+        .unwrap_or_default();
+    (note, lines)
+}
+
+/// #6218 (`LAMP_HISTORY_AFTER_NOTE`): only a job whose note was kept folds
+/// its exchanges; a failed, empty, dropped or forgotten one folds none, and
+/// those stay told in full beside a note that does not hold them.
+#[test]
+fn only_a_kept_note_folds_its_exchanges() {
+    let tom = Some("tom");
+    let start = Instant::now();
+    // Kept: the first seven are held by the note and left out.
+    let summaries = own_summaries();
+    let thread = Mutex::new(Thread::new());
+    numbered(&mut thread.lock().unwrap(), 1, 11, tom, start);
+    let due = thread.lock().unwrap().summary_due(KEEP_VERBATIM, start);
+    assert_eq!(due[0].exchanges.len(), 7);
+    for due in due {
+        summarize_now_folding(
+            summaries,
+            &thread,
+            due.whose,
+            due.exchanges,
+            &folding,
+            start,
+        );
+    }
+    let (note, lines) = told_after_note(summaries, &thread, tom, start);
+    assert!(note.starts_with(HEADING), "{note}");
+    for request in 1..=7 {
+        assert!(!lines.contains(&format!("line {request:02}")), "{lines}");
+    }
+    for request in 8..=11 {
+        assert!(lines.contains(&format!("line {request:02}")), "{lines}");
+    }
+    // The next batch's job fails, gives nothing, is dropped, or a forget
+    // comes while the model answers: none of its exchanges is folded.
+    let failing = |_: &str| None;
+    let empty = |_: &str| Some(String::new());
+    for case in ["failed", "empty", "dropped"] {
+        let summaries = own_summaries();
+        let thread = Mutex::new(Thread::new());
+        numbered(&mut thread.lock().unwrap(), 1, 11, tom, start);
+        let due = thread.lock().unwrap().summary_due(KEEP_VERBATIM, start);
+        for due in due {
+            summarize_now_folding(
+                summaries,
+                &thread,
+                due.whose,
+                due.exchanges,
+                &folding,
+                start,
+            );
+        }
+        numbered(&mut thread.lock().unwrap(), 12, 18, tom, start);
+        let due = thread.lock().unwrap().summary_due(KEEP_VERBATIM, start);
+        assert_eq!(due.len(), 1, "{case}");
+        for due in due {
+            match case {
+                "failed" => summarize_now_folding(
+                    summaries,
+                    &thread,
+                    due.whose,
+                    due.exchanges,
+                    &failing,
+                    start,
+                ),
+                "empty" => summarize_now_folding(
+                    summaries,
+                    &thread,
+                    due.whose,
+                    due.exchanges,
+                    &empty,
+                    start,
+                ),
+                _ => {}
+            }
+        }
+        let (note, lines) = told_after_note(summaries, &thread, tom, start);
+        assert!(
+            note.contains("line 07"),
+            "{case}: the first note stays: {note}"
+        );
+        assert!(!note.contains("line 08"), "{case}: {note}");
+        assert!(!lines.contains("line 07"), "{case}: still held: {lines}");
+        for request in 8..=18 {
+            assert!(
+                lines.contains(&format!("line {request:02}")),
+                "{case}: {request} told in full: {lines}"
+            );
+        }
+    }
+    // A forget while the model answers: nothing kept, nothing folded.
+    let summaries = own_summaries();
+    let thread = Mutex::new(Thread::new());
+    numbered(&mut thread.lock().unwrap(), 1, 11, tom, start);
+    let forgetting = |input: &str| {
+        summaries.lock().unwrap().forget();
+        folding(input)
+    };
+    let due = thread.lock().unwrap().summary_due(KEEP_VERBATIM, start);
+    for due in due {
+        summarize_now_folding(
+            summaries,
+            &thread,
+            due.whose,
+            due.exchanges,
+            &forgetting,
+            start,
+        );
+    }
+    let (note, lines) = told_after_note(summaries, &thread, tom, start);
+    assert_eq!(note, "");
+    assert_eq!(lines.matches("You: ").count(), 11, "{lines}");
+}
+
+/// #6218: the exchanges a note held are told again once no note of that
+/// lineage is told: its conversation's end took it, it aged out, or it is
+/// too long for the room; a new note begun from nothing is another lineage
+/// and leaves them told. A note made from the one before keeps its lineage,
+/// so both batches are left out.
+#[test]
+fn folded_exchanges_come_back_when_their_note_is_not_told() {
+    let tom = Some("tom");
+    let start = Instant::now();
+    let summaries = own_summaries();
+    let thread = Mutex::new(Thread::new());
+    numbered(&mut thread.lock().unwrap(), 1, 11, tom, start);
+    let due = thread.lock().unwrap().summary_due(KEEP_VERBATIM, start);
+    for due in due {
+        summarize_now_folding(
+            summaries,
+            &thread,
+            due.whose,
+            due.exchanges,
+            &folding,
+            start,
+        );
+    }
+    // Too long for the room: no note told, every line told.
+    let (_, lineage) = told_with_lineage_from(summaries, tom, start, 8);
+    assert_eq!(lineage, None);
+    // The next batch, from the note before: the same lineage, both left out.
+    numbered(&mut thread.lock().unwrap(), 12, 18, tom, start);
+    let due = thread.lock().unwrap().summary_due(KEEP_VERBATIM, start);
+    for due in due {
+        summarize_now_folding(
+            summaries,
+            &thread,
+            due.whose,
+            due.exchanges,
+            &folding,
+            start,
+        );
+    }
+    let (note, lines) = told_after_note(summaries, &thread, tom, start);
+    assert!(note.contains("line 14"), "{note}");
+    assert_eq!(lines.matches("You: ").count(), 4, "{lines}");
+    // The note gone (its conversation's end drops it), then a note begun
+    // from nothing for a new batch: the earlier exchanges are told again.
+    summaries.lock().unwrap().notes.clear();
+    let (note, lines) = told_after_note(summaries, &thread, tom, start);
+    assert_eq!(note, "");
+    assert_eq!(lines.matches("You: ").count(), 12, "{lines}");
+    numbered(&mut thread.lock().unwrap(), 19, 25, tom, start);
+    let due = thread.lock().unwrap().summary_due(KEEP_VERBATIM, start);
+    for due in due {
+        summarize_now_folding(
+            summaries,
+            &thread,
+            due.whose,
+            due.exchanges,
+            &folding,
+            start,
+        );
+    }
+    let (note, lines) = told_after_note(summaries, &thread, tom, start);
+    assert!(note.contains("line 21"), "{note}");
+    assert!(!note.contains("line 07"), "a new lineage: {note}");
+    assert!(!lines.contains("line 21"), "{lines}");
+    assert!(lines.contains("line 25"), "{lines}");
+    // Aged out: no note told, every line in the thread told again.
+    let later = start + crate::thread::REMEMBERED_FOR + Duration::from_secs(1);
+    assert_eq!(
+        told_with_lineage_from(summaries, tom, later, 64 * 1024).1,
+        None
+    );
 }

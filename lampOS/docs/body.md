@@ -1277,6 +1277,16 @@ it a call changes nothing the body writes (test
   seen before or during it ends it, and the gaze has them. It takes the place
   of a shift at rest, never of another gesture.
 - It never searches: one glance, then it lets it go.
+- With `LAMP_NAME_WORDLESS_BAR=on` in its environment (#5385), only a
+  hearing at 0.99 or more is a call (`name_in::bar_from`). The body cannot
+  know whether words follow a hearing (the voice knows about 1.7 s later),
+  and on lamp-75c9 a hearing at 0.941 in the body's own move's sound, with
+  no words, turned and glanced. A real call under 0.99 still gets the
+  voice's own listening, which lifts the head from early in the line
+  (0.45 s into it on lamp-52e6, before the name is heard), so the first
+  thing seen is not later; only the glance with nobody in view, and the
+  two seconds a call adds while the voice rests, are left out. Off, as
+  before. Test: `with_the_wordless_bar_only_a_sure_hearing_is_a_call`.
 
 On lamp-52e6 on 2026-10-14, with calls published by hand and nobody in view
 ([verification](verification/look-at-name-lamp-52e6-20261014/)): standing,
@@ -1848,7 +1858,12 @@ What the body does with the request:
 - Its offsets are laid over whatever the mood and the eyes have the lamp
   doing, outside the filter that follows the mood, and leave the lamp where
   it was. They change by at most 24, 34, 26, 21 and 21 counts a step and
-  take no joint further than 220, 220, 170, 360 and 360 counts.
+  take no joint further than 220, 220, 250, 360 and 360 counts (the base's
+  250 is the lamp's own yaw reach at most: a move the check takes is played
+  whole; the base is never asked past home plus `--reach`'s yaw, or past where the look
+  alone has it, whatever is laid over the look: a sway over a turned look stops
+  at the reach, and the journal says `gesture's yaw cut to the reach`, once a
+  gesture; the way back toward home is never cut).
 - While one plays, and for half a second after, a joint of the head may be
   150 counts from its goal and read a load of 700, and the shoulder and
   elbow may be 260 from theirs. A quick move lags and reverses hard. If a
@@ -1938,9 +1953,47 @@ report counts. It is held to what the generator promises the clips:
   name order keeps it);
 - `step_ms` from 40 to 1000, and 1.5 to 10 s in all;
 - the first and the last frame nothing;
-- no joint farther than 200, 200, 150, 350 and 350 counts, nor asked to
-  go faster than 900, 1,300, 1,000, 800 and 800 counts a second (with a
-  count of rounding at each end of a step).
+- no joint farther than 200, 200, the lamp's own yaw reach (`--reach`'s
+  last figure, 250 counts, about 22 degrees, on lamp-75c9 and lamp-a63e; 150
+  without `--reach`; never past the 250 any lamp may be given), 350 and 350
+  counts, nor asked to go faster than 900, 1,300, 1,000, 800 and 800 counts a
+  second (with a count of rounding at each end of a step). A wider sway is
+  only slower: the speed and acceleration caps are the same. A move past the
+  reach is refused with it in the words (`farther than 250, this lamp's yaw
+  reach (--reach)`). The built-in clips keep to 150 and are unchanged.
+  A lamp started without `--reach` has a yaw reach of 40 (`Limits::FOLDED`) but its moves are admitted to 150, and only on such a lamp (`Limits::yaw_unset`) is the base held to no less than those 150 whatever is laid over the look (`gesture_yaw_reach`), so an accepted move of 150 is played whole, as before; a lamp started with a `--reach` keeps its yaw as configured, even under 150.
+  With `LAMP_BODY_APP_REACH=on` (the person, 14:04 on 10 Nov, for the dev lamps
+  75c9 and a63e until the hardware team signs the numbers) a move may instead
+  take each joint 90% of its hardware range from the pose, on each side
+  (`moves::Reach::of_hardware`, `body::app_reach_of`): the head's pitch, roll
+  and the base's yaw from the servos' own stored ranges, read at start (it
+  turns `LAMP_BODY_OWN_RANGES` on), the shoulder and the elbow from the arm's
+  window (the way between folded and stood up and `ARM_WINDOW_MARGIN` either
+  side). On 75c9 (yaw 820..3,268 from 2,015, roll 897..3,153 from 2,044, pitch
+  1,457..3,029 from 1,900) that is yaw 1,075 down and 1,127 up (-94 and +99
+  degrees), roll 1,032 and 998, pitch 398 up and 1,016 down. The head's pitch
+  floor then follows the servo's own lower limit less the margin (1,477 on
+  75c9), not the 1,670 tuned for lamp-4ace's head. The body judges the move
+  as it begins: one past that reach is dropped whole and said (`dropped: past
+  this lamp's reach`), never played cut short (with the switch on but the
+  servos' ranges unread, the reach is not known: a gesture past
+  `GESTURE_REACH` is dropped and said, `dropped: this lamp's reach is not
+  known`), and the door and the SDKs let a
+  move through up to the most any lamp may take (`moves::CEILING`). The
+  gesture's reach (`GESTURE_REACH`), the base's reach the look and a gesture
+  are held to together, the arm's ease reach and the head's roll in a
+  gesture (a lamp whose `--reach` roll is 1 does not tilt for a gesture, but
+  does for an app's move) follow it. A head or base joint whose servo stores the whole turn
+  (`0..=4095`, never calibrated) has no range to take 90% of: it keeps today's reach, and
+  its pitch floor is left alone. On such a lamp (lamp-sim's servos today) the switch lifts the door's pre-check but not the body's reach: a move past today's caps
+  is no longer refused `bad_request` at the door, it is taken and then dropped by the body (`done`
+  `dropped`, "past this lamp's reach"), which the SDK sees as a `done`, not an error. The head's pitch floor follows the servo's own limit
+  less a margin everywhere in the run, so with the switch on the lamp's own look and idle
+  may take the head that low too, not only an app's move. The lamp's own life (but for that
+  pitch floor), the anti-tip rule
+  (which refuses a shoulder alone past about 300 counts from the standing pose:
+  the arm's usable reach is the rule's, not 90%), the heat stop and every speed
+  and acceleration cap are as before.
 
 A file that breaks any of these, is not JSON of exactly these three fields
 or is longer than 256 KiB is refused, and its reason is said in the log.
@@ -2100,16 +2153,23 @@ The lamp programming protocol's server, `lamp-control`, keeps its own
 leases, clients and the 10-minute cap. The body knows one holder only.
 With `--lease-socket PATH` the body listens there for one stream at a time,
 and lets one in only if the kernel names it `lamp-control.service` run as
-`lampos`, or root (`lamp_ipc::caller`). A second, or anyone else, is
-answered `refused` with why and closed. Lines of JSON each way
+`lampos`, or root (`lamp_ipc::caller`); with `--lease-holder-uid N` (the
+virtual lamp's, where nothing runs under systemd; no product unit passes it),
+also any caller running as uid N, whatever its unit. The flag depends on the
+kernel naming the peer (Linux peer credentials): it cannot make an unidentified
+caller one, and it does not bypass the socket's filesystem permissions. "For
+the virtual lamp only" is a deployment rule (no product unit passes it), not
+something the body checks. A second, or anyone else, is answered `refused`
+with why and closed. Lines of JSON each way
 (`lamp_body::lease`):
 
 | Asked | Answered |
 |-------|----------|
-| `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held"}`, or `suspended` or `lost` as below |
+| `{"hold":{"for_ms":N}}`, N from 1 to 30000: taken or renewed | `{"lease":"held","tags":true}`, or `suspended` (also with `"tags":true`) or `lost` as below. `tags`: this body takes a `tag` on look and pose lines |
 | `{"let_go":true}` | `{"lease":"free"}` |
 | `{"look":{"yaw":Y,"pitch":P}}` (degrees, right and up positive, from the pose's own direction, as the gaze's look), `{"look":{"yaw":Y,"pitch":P,"from":"home"}}` (from where the head and base were found at start, as a computer's `joints` and `get` `body`: the body takes its pose's offset off, `body::aim_from_home`, and says `there` in the same frame), or `{"look":"ahead"}`, while held | once, later: `{"look":"there","yaw":…,"pitch":…,"clamped":…}`, or `{"look":"cut_short","why":…}`; at once while not held, or for another look: `{"look":"refused","why":…}` |
 | `{"pose":{"roll":R,"shoulder":S,"elbow":E}}` (degrees, one at least; as `get('body')` counts them), while held | once, later: `{"pose":"there","roll":…,"shoulder":…,"elbow":…,"clamped":…}`, or `{"pose":"cut_short","why":…}`; at once while not held, while the body takes no pose, or for another pose: `{"pose":"refused","why":…}` |
+| A look or pose line with `"tag":N` (N an unsigned 64-bit integer, lamp-control's; any other `tag`, such as a string, a negative or a fraction, refuses the line, and that refusal carries no tag) | every answer to that line carries the same `"tag":N`: its `there`, `cut_short` or `refused`, and the `cut_short` of a line a newer one replaced carries the replaced line's own `tag`. A line refused at once can overtake one still owed, so a holder pairs answers by `tag`, not by order. A line without `tag` is answered as before, with none |
 | `{"limp":true}` or `{"limp":false}`, while held | at once: `{"limp":"on"}` or `{"limp":"off"}`; `{"limp":"refused","why":…}` while not held; and unasked, once, `{"limp":"off","why":…}` when the hold ends |
 | anything else, or a line over 1024 bytes | `{"lease":"refused","why":...}` |
 
@@ -2142,8 +2202,8 @@ Tests: `a_held_lamp_looks_where_its_holder_asks_and_comes_back_when_let_go`,
 `the_lease_door_aims_its_holders_look_and_says_when_it_is_there`.
 
 **A holder's pose** (`lease::Posing`, the protocol's `joints` past yaw and
-pitch; no lamp-control code sends it yet, so `joints` still refuses roll,
-shoulder and elbow until that routing lands): the head's roll from the found home and the shoulder and the elbow
+pitch; lamp-control sends a `joints`' roll, shoulder and elbow as it,
+docs/control.md): the head's roll from the found home and the shoulder and the elbow
 from the folded arm, in degrees, each rising with counts, as `get('body')`
 says them. A joint not named keeps where it is. The body takes it only while
 held and standing still at its full height (a lamp given `--stand`) with no
@@ -2173,7 +2233,13 @@ stopped (its position still within a count) within 50 counts of it
 88 and 152). One stopped farther short is held by something: the pose stays
 owed and is cut short in time. `there` says the degrees the positions
 reached, sag and all, and `clamped` when the window or the reach cut the
-goal by more than half a degree. A pose not there in 6 s (`LONGEST_POSE`) is
+goal by more than half a degree, or when a joint stopped more than 2 degrees
+(`POSE_SHORT_WITHIN`) short of what was asked, measured from where it reached, for the joints the line named
+(an arm joint not named is not judged: a standing arm sags on its own weight; a
+roll whose goal still moves is not settled)
+(lamp-75c9: an elbow asked 43.0 degrees stood at 39.5 and was said unclamped
+before: a `there` that says reached while short is a silent failure).
+`a_pose_that_stopped_short_of_what_was_asked_says_clamped`. A pose not there in 6 s (`LONGEST_POSE`) is
 cut short, "something holds the arm". A conversation keeps it for when the lease is
 held again; any other end lets it go, back to the stand. Tests:
 `a_held_standing_lamp_takes_its_holders_pose_inside_the_arms_window`,
@@ -2365,6 +2431,7 @@ four rows, "Without it" is what `off` leaves.
 | `--arbitration on` | a gesture or a move may say who asks (`source`, `priority`), and one asked higher ends the one playing (see "Who may ask over whom") | as before: `source` and `priority` are ignored, and a gesture asked while another plays is dropped, except lamp-control's `replace`, which ends one at `skill` or lower (see "Gestures") | on or off |
 | `--caller-caps on` | who asks is the kernel's word: a gesture or a move is held to its unit's most, and the gaze socket takes sights from the eyes, skills or root only (see "Who asks, from the kernel") | as before: any process in group `lampos` may ask at any priority and send a sight | on or off |
 | `--lease-socket ABSOLUTE_PATH` | lamp-control may hold the body for up to 30 s at a time, renewed, while the lamp's own life stands back (see "Held by lamp-control") | no lease: nobody can ask the lamp's own life to stand back | a short absolute path |
+| `--lease-holder-uid N` | with `--lease-socket`: a caller running as user id N (above 0) may hold the body too, whatever its unit; for the virtual lamp only | only `lamp-control.service` as `lampos`, or root | a user id above 0, given once, and only with `--lease-socket` |
 | `--hold-from ABSOLUTE_FILE` | a test input, for tests on a lamp only: while the file's first word is `held`, the head's pitch is taken as held by a hand (see "Test input: --hold-from" under "Giving way to a hand") | off: only a joint that gave way is a hand. No product unit passes it | an absolute file; `held`, or anything else for no hand |
 | `--head-stall-load LOAD` | the head pitch's stall bound, this lamp's own (see "Giving way to a hand": a head that holds more than 100 to stand) | 100 | 100 to 230 |
 | `--stand-roll N` | the head's tilt reach once the lamp has stood up, where that is more than the roll of `--reach` | no more than folded | 200 |
@@ -3640,7 +3707,12 @@ half its bound and over its own resting load by a quarter of its bound (a
 press at 300 easing to 130 on a pitch bound 240, that read 25 before, is
 still a push), and it ends on the first step that is neither (the next
 `body/hand` after a release says it is gone). A hand that keeps the joint
-off, re-held where it is each second, stays a push until it lets go;
+off, re-held where it is each second, stays a push until it lets go, or
+until it has not moved 15 counts for 20 s (`HAND_STILL_STEPS`): its hold
+is then not renewed and it is let go, and a hand truly still on it gives
+way again. A joint moved and left there reads the same as one a hand holds
+still: lamp-06c1's head, its weight 130 over the 100 a moved joint is
+judged by, was said `pushed` until lamp-body was restarted (#5196);
 `since_us` is when that push began, on the body's
 own clock (0 when not pushed). A joint held at its rest that reads only its
 own weight and jitters a few counts is not a push, whichever lamp's

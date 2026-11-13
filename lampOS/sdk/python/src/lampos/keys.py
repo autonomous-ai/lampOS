@@ -15,9 +15,13 @@ import json
 import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+# `cryptography` is imported where a key is made, read or signed with, not here: `import lampos` no longer needs
+# it, and only pairing and keys use it. A skill's script on the lamp (`Lamp.local`) never pairs and holds no key,
+# so it needs `websockets` alone (#6507).
+if TYPE_CHECKING:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 
 def home() -> Path:
@@ -89,6 +93,9 @@ class Keyring:
 
     def key(self) -> Ed25519PrivateKey:
         """The computer's key, made on first use."""
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
         path = self.folder / "key"
         if path.exists():
             loaded = serialization.load_pem_private_key(path.read_bytes(), password=None)
@@ -107,6 +114,8 @@ class Keyring:
         return key
 
     def public(self) -> bytes:
+        from cryptography.hazmat.primitives import serialization
+
         return self.key().public_key().public_bytes(
             serialization.Encoding.Raw, serialization.PublicFormat.Raw
         )

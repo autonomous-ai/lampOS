@@ -9,8 +9,10 @@
 //! desk is often the largest (lamp-75c9's scripted sitting, 19 Oct). Pure
 //! arithmetic on the looks it is given: the bus is `bus_out`'s.
 use crate::faces;
+use crate::sitting::Sitting;
 use crate::who::{SAME_PERSON, likeness};
 use lamp_msgs::{Activity, RoomActivity, Side, StoodUp};
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 /// A face at least this share of the picture's height is at the desk:
@@ -66,6 +68,8 @@ const CHECK_EVERY_US: u64 = 2_000_000;
 /// 0.84 and grew to 1.30 (Nine). A head turned while sitting shrank to
 /// 0.84 at most, and leaning back sits at 0.68 or more (presence.md).
 const STOOD_WITHIN_US: u64 = 2_000_000;
+/// A gap under this does not end a sitting ([`RoomActivity::SITTING_GAP_S`]).
+const SITTING_GAP_US: u64 = RoomActivity::SITTING_GAP_S as u64 * 1_000_000;
 const STOOD_RISE: f32 = 0.5;
 const STOOD_AWAY: f32 = 0.6;
 
@@ -84,8 +88,9 @@ const LEFT_BY_LEFT: f32 = 0.35;
 const LEFT_BY_RIGHT: f32 = 0.65;
 
 /// One look's face, as shares of the picture's height, and how far down it
-/// looks.
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// looks. Kept across a short restart as the sitter's place and baseline
+/// (`sitting`): a box and a pitch, nobody's identity.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Look {
     pub height: f32,
     /// Across, in the same unit as `height`, so a distance is one measure.
@@ -398,6 +403,60 @@ impl Judge {
                 .min_by(|(_, a), (_, b)| a.from(&last).total_cmp(&b.from(&last))),
             None => near.max_by(|(_, a), (_, b)| a.height.total_cmp(&b.height)),
         }
+    }
+
+    /// What a restart keeps of the sitting going at `now_us` (`sitting`):
+    /// none without one, or once its gap has passed. Never a print or a yawn.
+    pub fn sitting(&self, now_us: u64) -> Option<Sitting> {
+        let last_face_us = self
+            .last_face
+            .filter(|last| now_us.saturating_sub(*last) <= SITTING_GAP_US)?;
+        Some(Sitting {
+            from_us: self.sitting_from?,
+            last_face_us,
+            sitter: self.sitter?,
+            baseline: self.baseline,
+            state: self.state,
+        })
+    }
+
+    /// The sitting the run before kept, at this run's first look at
+    /// `now_us`, before [`Judge::looked`] is given it: taken back only if
+    /// its sitter was last seen within the sitting's gap of this look and a
+    /// near face of it is at their place (or where they sat). The look is
+    /// then judged in that sitting, the restart's seconds a gap in it as a
+    /// look away of as long would be; otherwise nothing is taken and the
+    /// look begins as before. Whether it was taken back.
+    ///
+    /// Never while the sitter is told by face ([`Judge::with_prints`]): the
+    /// sitter's prints are never written, so after a restart no print could
+    /// tell them from someone else sitting down in their place, and by place
+    /// alone that person would be given their sitting.
+    pub fn take_back(&mut self, now_us: u64, kept: Sitting, faces: &[Look]) -> bool {
+        if self.prints.is_some()
+            || self.last_face.is_some()
+            || kept.from_us > kept.last_face_us
+            || kept.last_face_us > now_us
+            || now_us - kept.last_face_us > SITTING_GAP_US
+        {
+            return false;
+        }
+        self.sitting_from = Some(kept.from_us);
+        self.last_face = Some(kept.last_face_us);
+        self.sitter = Some(kept.sitter);
+        self.baseline = kept.baseline;
+        self.state = kept
+            .state
+            .filter(|(_, since)| (kept.from_us..=now_us).contains(since));
+        if self.sitter_in(now_us, faces).is_some() {
+            return true;
+        }
+        self.sitting_from = None;
+        self.last_face = None;
+        self.sitter = None;
+        self.baseline = None;
+        self.state = None;
+        false
     }
 
     /// The sitting is over, or the camera closed: the prints go.

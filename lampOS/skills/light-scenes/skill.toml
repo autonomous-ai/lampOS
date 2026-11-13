@@ -19,7 +19,7 @@ body = true
 
 [choice]
 name = "scene"
-about = "The scene they asked for: reading, focus, relax, movie, night or energise."
+about = "The one asked for."
 one_of = ["reading", "focus", "relax", "movie", "night", "energise"]
 
 # The model's line: the note is what it is told to say.

@@ -25,10 +25,36 @@ Environment=PATH=/usr/local/bin:/usr/bin:/bin
 # A home lamp keeps the Harness its build pinned: Harness's own self-update is held, and a newer
 # Harness comes only through a new pin in a build (#5229, #5379; docs/tasks.md).
 Environment=LAMP_HARNESS_HOLD_UPDATES=on
+# Work naming no machine goes to the lamp's own Hermes once Harness says it is installed (#5978,
+# docs/tasks.md); lamp-update installs it in a quiet window, on by default on a product lamp. It needs
+# --engines-from-machines above: that look is how the lamp's own machine is seen to have Hermes.
+Environment=LAMP_HERMES_ON_LAMP=on
+# A skill's task on the lamp's Hermes (#6306, docs/tasks.md): the hand-over socket and the model bridge bound,
+# each run with its one-run token from lamp-control and a network of only lo (lamp-update's line, the same name).
+Environment=LAMP_SKILL_TASKS=on
+# The lamp's agent's connectors (#6648, docs/services.md "The lamp's agent's connectors"): Hermes's config.yaml
+# gets mcp_servers.lamp-services at start, reaching a linked service only by a skill run's one-run token and grants;
+# a write waits for the owner's spoken yes. The same line in lamp-skills, lamp-skills-manage@, lamp-voice and
+# lamp-control. On in the product (owner, 13 Nov).
+Environment=LAMP_AGENT_SERVICES=on
+# The same for the lamp's own OpenClaw (#6226; no memory floor, every lamp has 6 GB): with both installed the
+# lamp's target is Hermes, the default again (#6498, the lead's decision); LAMP_LAMP_ENGINE=openclaw picks
+# OpenClaw, and either falls back to the other when it is not installed. Its Gateway runs always under
+# lamp-update's unit; lamp-tasks only waits for it to answer before a launch.
+Environment=LAMP_OPENCLAW_ON_LAMP=on
+# --reply-named (#5535) types the work into the session the person names (lamp-voice.service's LAMP_TASKS_REPLY_NAMED),
+# never a new one.
+# A follow-up for a session --close-told already closed (#5978): it is found by its last ask with `harness show`
+# and reopened with `harness resume`, then the work is typed in, never a new session.
+Environment=LAMP_TASKS_RESUME_CLOSED=on
 RuntimeDirectory=lampos-tasks
 RuntimeDirectoryMode=0700
 StateDirectory=lampos-tasks
 StateDirectoryMode=0700
+# lamp-control's state folder hidden (#6305): it keeps the owner's yes to a skill's task, which a part
+# running as lampos with no ProtectSystem=strict could otherwise write by hand. "-": the folder is
+# made at lamp-control's first start, and a part started before it is not refused.
+InaccessiblePaths=-/var/lib/lampos-control
 # --progress puts how each task goes on the bus (tasks/status), which the voice's news reads (#1156);
 # --push-wait holds Harness's own wait so a result is known within about 10 s of the agent ending (#560).
 # On lamp-75c9 (Ten, 2026-10-16): 8.3 to 10.2 s against 39 to 41 s without, about 1 point more of
@@ -41,7 +67,7 @@ StateDirectoryMode=0700
 # #5198, docs/tasks.md). The socket is lampos's, so any unit run as lampos can connect to it; lamp-tasks
 # reads each caller from the kernel (SO_PEERCRED and its cgroup) and closes any that is not
 # lamp-cloud.service run as lampos (#5379).
-ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --harness-as-person --set-up-later --targets-from-machines claude --folder-missing --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
+ExecStart=/opt/lampOS/tasks/current/lamp-tasks serve --enable --watch --progress --push-wait --close-told --reply-named --harness-as-person --set-up-later --targets-from-machines claude --engines-from-machines --folder-missing --sign-in-by-code --app-socket /run/lampos-tasks/app.sock --dir /var/lib/lampos-tasks/store --socket /run/lampos-tasks/request.sock --voice-socket /run/lampos-tasks/voice.sock --targets /var/lib/lampos-tasks/targets.json --harness /usr/local/bin/harness
 Restart=on-failure
 RestartSec=5s
 StandardInput=null
@@ -49,6 +75,17 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=lamp-tasks
 NoNewPrivileges=yes
+# Caps (#6306; crates/tasks/src/skill_task.rs: MEMORY_HIGH, CPU_QUOTA, TASKS_MAX; docs/tasks.md). A skill's run on the
+# lamp's Hermes is started by this part, so it stays in this cgroup beside Harness's `wait` and up to four `watch`es.
+# Sized for a skill task beside a spoken one: rest + 2 x delta x 1.5, rounded up. Measures: lamp-9adf, 12 Nov,
+# lamp-tasks.service cgroup (#6059), a real Hermes task: MemoryCurrent 632 MiB at rest, 1120 peak; TasksCurrent 91 at
+# rest, 126 peak (peaks sampled every 2 s, so a floor); CPU about 1.2 cores (an average over the run, an upper bound).
+# CPUQuota: 2 x 120% x 1.5 = 360%, leaving over 4 of the A733's 8 cores to the voice. MemoryHigh: past it the part is
+# throttled, never killed (no MemoryMax); with no swap on the lamp, every process here (serve included) stalls in reclaim
+# until the cgroup is back under it (inferred, not measured). TasksMax: past it a fork fails.
+MemoryHigh=2100M
+CPUQuota=360%
+TasksMax=512
 
 [Install]
 WantedBy=lampos.target

@@ -146,18 +146,27 @@ enum Extra {
         #[serde(default)]
         role: bool,
     },
-    /// `LAMP_MEMORY_ROLE`: a known person asked the lamp to play `name`
-    /// (`Days::role_set`).
+    /// Legacy unfenced role set, retained only for an explicit refusal.
     RoleSet {
         #[serde(default)]
         person: Who,
         name: String,
     },
-    /// `LAMP_MEMORY_ROLE`: a known person ended their role
-    /// (`Days::role_end`).
+    /// Legacy unfenced role end, retained only for an explicit refusal.
     RoleEnd {
         #[serde(default)]
         person: Who,
+    },
+    RoleSetSession {
+        person: Who,
+        session: String,
+        generation: u64,
+        name: String,
+    },
+    RoleEndSession {
+        person: Who,
+        session: String,
+        generation: u64,
     },
     SessionClose {
         #[serde(default)]
@@ -255,6 +264,32 @@ enum Extra {
         #[serde(default)]
         feelings: bool,
     },
+    /// Weekly chapters (B2): a known person's items of a week over, from
+    /// its Monday `week` (`Days::weekly_prepare`).
+    WeeklyPrepare {
+        #[serde(default)]
+        person: Who,
+        week: String,
+    },
+    /// Weekly chapters (B2): the model's one chapter, checked
+    /// (`Days::weekly_apply`).
+    WeeklyApply {
+        #[serde(default)]
+        person: Who,
+        job: String,
+        #[serde(default)]
+        proposal: Value,
+    },
+    /// Weekly chapters (B2): a known person's chapters of a span, for a
+    /// recall (`Days::chapters`).
+    Chapters {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        day_from: Option<String>,
+        #[serde(default)]
+        day_to: Option<String>,
+    },
     /// A forget a known person asked that may reach nothing kept (the
     /// voice's `forget {about}`): their exchanges of today said before it
     /// are not read by the night (`Days::forget_mark`, El's option 2 on
@@ -262,6 +297,89 @@ enum Extra {
     ForgetMark {
         #[serde(default)]
         person: Who,
+    },
+    /// The voice's `LAMP_SERVICE_RECORDS` (connector records, PR 1a): one
+    /// service record put, new or updated in place
+    /// (`Days::service_record_put`). A known person's only.
+    ServiceRecord {
+        #[serde(default)]
+        person: Who,
+        key: String,
+        service: String,
+        action: String,
+        status: String,
+        #[serde(default)]
+        reason: String,
+        #[serde(default)]
+        detail: Option<Value>,
+        #[serde(default)]
+        result_id: String,
+        asked_unix_ms: u64,
+        changed_unix_ms: u64,
+        #[serde(default)]
+        links: Vec<String>,
+        #[serde(default)]
+        replaced_by: String,
+    },
+    /// `LAMP_SERVICE_RECORDS`: a known person's records, the latest change
+    /// first (`Days::service_records`); with `about` (the voice's
+    /// `LAMP_SERVICE_RECORDS_TOLD`, a recall's words), those its words
+    /// match, the best first, whatever their age
+    /// (`Days::service_records_about`).
+    ServiceRecords {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        limit: Option<u64>,
+        #[serde(default)]
+        about: Option<String>,
+    },
+    /// `LAMP_SERVICE_RECORDS`: the records about a forget's key words
+    /// removed (`Days::service_records_forget`).
+    ServiceRecordsForget {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        about: Vec<Vec<String>>,
+        /// Every row of `person`, whatever `about` says.
+        #[serde(default)]
+        all: bool,
+    },
+    /// A forget about a thing's subjects: a known person's own exchanges
+    /// that have them forgotten (`Days::exchanges_forget`).
+    ExchangesForget {
+        #[serde(default)]
+        person: Who,
+        about: Vec<Vec<String>>,
+    },
+    /// The voice's `LAMP_SERVICE_CONTACTS` (connector records, PR 1c): a
+    /// known person's mail contact saved, new or replacing the address
+    /// kept for that name (`Days::service_contact_put`).
+    ServiceContact {
+        #[serde(default)]
+        person: Who,
+        name: String,
+        address: String,
+        at_unix_ms: u64,
+    },
+    /// `LAMP_SERVICE_CONTACTS`: a known person's contacts, or the one of
+    /// `name` (`Days::service_contacts`).
+    ServiceContacts {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        name: Option<String>,
+    },
+    /// `LAMP_SERVICE_CONTACTS`: the contacts about a forget's key words
+    /// removed (`Days::service_contacts_forget`).
+    ServiceContactsForget {
+        #[serde(default)]
+        person: Who,
+        #[serde(default)]
+        about: Vec<Vec<String>>,
+        /// Every row of `person`, whatever `about` says.
+        #[serde(default)]
+        all: bool,
     },
     /// #2176 (5a): the room's entries become someone known's (`Days::adopt`).
     Adopt {
@@ -852,11 +970,34 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             answer
         }
         Extra::RoleSet { person, name } => {
-            store.role_set(&one(person)?, &name)?;
-            json!({"ok":true})
+            let _ = (person, name);
+            return Err(Error::new(
+                "stale_session",
+                "role writes require an admitted session",
+            ));
         }
         Extra::RoleEnd { person } => {
-            json!({"ok":true,"ended":store.role_end(&one(person)?)?})
+            let _ = person;
+            return Err(Error::new(
+                "stale_session",
+                "role writes require an admitted session",
+            ));
+        }
+        Extra::RoleSetSession {
+            person,
+            session,
+            generation,
+            name,
+        } => {
+            store.role_set_session(&one(person)?, &session, generation, &name)?;
+            json!({"ok":true})
+        }
+        Extra::RoleEndSession {
+            person,
+            session,
+            generation,
+        } => {
+            json!({"ok":true,"ended":store.role_end_session(&one(person)?, &session, generation)?})
         }
         Extra::SessionClose { person, session } => {
             store.session_close(&one(person)?, &session)?;
@@ -992,9 +1133,124 @@ fn extra(store: &mut Days, request: Extra) -> Result<Value> {
             patterns,
             feelings,
         } => store.nightly_apply(&one(person)?, &job, &proposal, patterns, feelings)?,
+        Extra::WeeklyPrepare { person, week } => {
+            match store.weekly_prepare(&one(person)?, &week)? {
+                Some(input) => json!({"ok":true,"input":input}),
+                None => json!({"ok":true,"reason":"nothing"}),
+            }
+        }
+        Extra::WeeklyApply {
+            person,
+            job,
+            proposal,
+        } => store.weekly_apply(&one(person)?, &job, &proposal)?,
+        Extra::Chapters {
+            person,
+            day_from,
+            day_to,
+        } => {
+            let bad = || {
+                Error::new(
+                    "bad_day",
+                    "day_from and day_to are YYYY-MM-DD, oldest first, together",
+                )
+            };
+            let days = match (day_from, day_to) {
+                (None, None) => None,
+                (Some(from), Some(to)) => {
+                    let (first, last) = (
+                        Day::parse(&from).ok_or_else(bad)?,
+                        Day::parse(&to).ok_or_else(bad)?,
+                    );
+                    if first > last {
+                        return Err(bad());
+                    }
+                    Some((first.to_string(), last.to_string()))
+                }
+                _ => return Err(bad()),
+            };
+            json!({"ok":true,"chapters":store.chapters(&one(person)?, days)?})
+        }
         Extra::ForgetMark { person } => {
             store.forget_mark(&one(person)?)?;
             json!({"ok":true})
+        }
+        Extra::ServiceRecord {
+            person,
+            key,
+            service,
+            action,
+            status,
+            reason,
+            detail,
+            result_id,
+            asked_unix_ms,
+            changed_unix_ms,
+            links,
+            replaced_by,
+        } => {
+            let kept = store.service_record_put(
+                &one(person)?,
+                &crate::service_records::RecordIn {
+                    key,
+                    service,
+                    action,
+                    status,
+                    reason,
+                    detail,
+                    result_id,
+                    asked_unix_ms,
+                    changed_unix_ms,
+                    links,
+                    replaced_by,
+                },
+            )?;
+            json!({"ok":true,"status":kept})
+        }
+        Extra::ServiceRecords {
+            person,
+            limit,
+            about,
+        } => {
+            let limit = limit.unwrap_or(crate::service_records::LIST_MOST as u64) as usize;
+            let records = match about {
+                Some(about) => store.service_records_about(&one(person)?, &about, limit)?,
+                None => store.service_records(&one(person)?, limit)?,
+            };
+            json!({"ok":true,"records":records})
+        }
+        Extra::ServiceContact {
+            person,
+            name,
+            address,
+            at_unix_ms,
+        } => {
+            let kept = store.service_contact_put(&one(person)?, &name, &address, at_unix_ms)?;
+            json!({"ok":true,"kept":kept})
+        }
+        Extra::ServiceContacts { person, name } => {
+            json!({"ok":true,"contacts":store.service_contacts(&one(person)?, name.as_deref())?})
+        }
+        Extra::ServiceContactsForget { person, about, all } => {
+            let person = one(person)?;
+            if all {
+                json!({"ok":true,"removed":store.service_contacts_forget_all(&person)?})
+            } else {
+                let forgot = store.service_contacts_forget(&person, &about)?;
+                json!({"ok":true,"removed":forgot.removed,"records":forgot.records,"addresses":forgot.addresses})
+            }
+        }
+        Extra::ExchangesForget { person, about } => {
+            json!({"ok":true,"removed":store.exchanges_forget(&one(person)?, &about)?})
+        }
+        Extra::ServiceRecordsForget { person, about, all } => {
+            let person = one(person)?;
+            let removed = if all {
+                store.service_records_forget_all(&person)?
+            } else {
+                store.service_records_forget(&person, &about)?
+            };
+            json!({"ok":true,"removed":removed})
         }
         Extra::Adopt { person, to, ids } => {
             let to = one(Who::Id(to))?;
@@ -1035,9 +1291,21 @@ pub fn answer(store: &mut Days, line: &[u8], now: u64) -> protocol::Answer {
             "talk_notes",
             "nightly_prepare",
             "nightly_apply",
+            "weekly_prepare",
+            "weekly_apply",
+            "chapters",
             "forget_mark",
             "role_set",
             "role_end",
+            "role_set_session",
+            "role_end_session",
+            "service_record",
+            "service_records",
+            "service_records_forget",
+            "service_contact",
+            "service_contacts",
+            "service_contacts_forget",
+            "exchanges_forget",
         ];
         const OLD: &[&str] = &[
             "append",
@@ -1182,7 +1450,7 @@ mod tests {
     /// `LAMP_MEMORY_ROLE` (the memory owner's design, 6 Nov): a known
     /// person's role is kept across a reopen of the store, read with their
     /// `session_open` only when it asks for `role`, replaced by a new one,
-    /// ended by `role_end` and by `forget_all`, and never the room's or a
+    /// ended by `role_end_session` and by `forget_all`, and never the room's or a
     /// rules scope's. Without `role` a session open answers as before.
     #[test]
     fn a_role_is_kept_until_ended_and_read_only_with_the_session_open() {
@@ -1200,15 +1468,18 @@ mod tests {
             }
             send(store, request)
         };
-        assert_eq!(open(&mut store, olivia, "s1", true)["role"], Value::Null);
+        let first = open(&mut store, olivia, "s1", true);
+        assert_eq!(first["role"], Value::Null);
+        let og = first["snapshot"]["generation"].clone();
+        let tg = open(&mut store, tom, "s1", true)["snapshot"]["generation"].clone();
         let set = send(
             &mut store,
-            json!({"op":"role_set","person":olivia,"name":"Harry Potter"}),
+            json!({"op":"role_set_session","person":olivia,"session":"s1","generation":og,"name":"Harry Potter"}),
         );
         assert_eq!(set, json!({"ok":true}));
         let set = send(
             &mut store,
-            json!({"op":"role_set","person":tom,"name":"Ron"}),
+            json!({"op":"role_set_session","person":tom,"session":"s1","generation":tg,"name":"Ron"}),
         );
         assert_eq!(set, json!({"ok":true}));
         // Off: the open is as before, with no role in it.
@@ -1230,21 +1501,27 @@ mod tests {
         // A new one replaces theirs.
         send(
             &mut store,
-            json!({"op":"role_set","person":olivia,"name":"Hermione"}),
+            json!({"op":"role_set_session","person":olivia,"session":"s1","generation":og,"name":"Hermione"}),
         );
         assert_eq!(open(&mut store, olivia, "s4", true)["role"], "Hermione");
         // Ended: gone, and a second end says none was there.
-        let ended = send(&mut store, json!({"op":"role_end","person":olivia}));
+        let ended = send(
+            &mut store,
+            json!({"op":"role_end_session","person":olivia,"session":"s1","generation":og}),
+        );
         assert_eq!(ended, json!({"ok":true,"ended":true}));
         assert_eq!(open(&mut store, olivia, "s5", true)["role"], Value::Null);
-        let ended = send(&mut store, json!({"op":"role_end","person":olivia}));
+        let ended = send(
+            &mut store,
+            json!({"op":"role_end_session","person":olivia,"session":"s1","generation":og}),
+        );
         assert_eq!(ended, json!({"ok":true,"ended":false}));
         // Forget everything takes it too.
         send(&mut store, json!({"op":"forget_all","person":tom}));
         assert_eq!(open(&mut store, tom, "s6", true)["role"], Value::Null);
         // Never the room's, a rules scope's, nor an empty name.
         for person in [None, Some("r-0123456789abcdef")] {
-            let mut request = json!({"op":"role_set","name":"Harry"});
+            let mut request = json!({"op":"role_set_session","person":null,"session":"s1","generation":0,"name":"Harry"});
             if let Some(person) = person {
                 request["person"] = json!(person);
             }
@@ -1253,9 +1530,118 @@ mod tests {
         }
         let refused = send(
             &mut store,
-            json!({"op":"role_set","person":olivia,"name":" .. "}),
+            json!({"op":"role_set_session","person":olivia,"session":"s1","generation":og,"name":" .. "}),
         );
         assert_eq!(refused["error"], "empty", "{refused}");
+    }
+
+    #[test]
+    fn forgetting_an_empty_person_fences_a_reopened_session_name() {
+        let (_scratch, mut store) = Scratch::new("role-empty-forget");
+        let person = Person::new("p-0123456789abcdef").unwrap();
+        let old = store.session_open(&person, "reused", 1200).unwrap();
+        store.forget_person(&person).unwrap();
+        store.session_close(&person, "reused").unwrap();
+        let new = store.session_open(&person, "reused", 1200).unwrap();
+        assert_eq!(new.generation, old.generation + 1);
+        assert!(
+            store
+                .role_set_session(&person, "reused", old.generation, "Stale")
+                .is_err()
+        );
+        assert_eq!(store.role(&person).unwrap(), None);
+        store
+            .role_set_session(&person, "reused", new.generation, "Fresh")
+            .unwrap();
+        assert_eq!(store.role(&person).unwrap().as_deref(), Some("Fresh"));
+    }
+
+    #[test]
+    fn role_sessions_refuse_deleted_closed_wrong_and_legacy_writes() {
+        let (_scratch, mut store) = Scratch::new("role-session-fence");
+        let p = "p-0123456789abcdef";
+        let other = "p-fedcba9876543210";
+        let send = |store: &mut Days, request: Value| -> Value {
+            serde_json::from_str(&answer(store, request.to_string().as_bytes(), NOW).line).unwrap()
+        };
+        let open = |store: &mut Days, session: &str| -> Value {
+            send(
+                store,
+                json!({"op":"session_open","person":p,"session":session}),
+            )["snapshot"]["generation"]
+                .clone()
+        };
+        for (index, forget) in ["forget_person", "forget_all", "all"]
+            .into_iter()
+            .enumerate()
+        {
+            let session = format!("old-{index}");
+            let generation = open(&mut store, &session);
+            let set = json!({"op":"role_set_session","person":p,"session":session,"generation":generation,"name":"Harry"});
+            assert_eq!(send(&mut store, set.clone())["ok"], true);
+            let deletion = if forget == "all" {
+                json!({"op":"forget_all","person":null})
+            } else {
+                json!({"op":forget,"person":p})
+            };
+            assert_eq!(send(&mut store, deletion)["ok"], true);
+            let stale = send(&mut store, set);
+            assert_ne!(stale["ok"], true, "{forget}: {stale}");
+            let fresh = format!("fresh-{index}");
+            let current = open(&mut store, &fresh);
+            assert_eq!(
+                send(
+                    &mut store,
+                    json!({"op":"session_open","person":p,"session":fresh,"role":true})
+                )["role"],
+                Value::Null
+            );
+            assert_eq!(
+                send(
+                    &mut store,
+                    json!({"op":"role_set_session","person":p,"session":fresh,"generation":current,"name":"Sherlock"})
+                )["ok"],
+                true
+            );
+            assert_ne!(
+                send(
+                    &mut store,
+                    json!({"op":"role_end_session","person":p,"session":session,"generation":generation})
+                )["ok"],
+                true
+            );
+            assert_eq!(
+                send(
+                    &mut store,
+                    json!({"op":"session_open","person":p,"session":fresh,"role":true})
+                )["role"],
+                "Sherlock"
+            );
+        }
+        let generation = open(&mut store, "closing");
+        for request in [
+            json!({"op":"role_set_session","person":other,"session":"closing","generation":generation,"name":"Harry"}),
+            json!({"op":"role_set_session","person":p,"session":"closing","generation":u64::MAX,"name":"Harry"}),
+            json!({"op":"role_set_session","person":p,"session":"missing","generation":generation,"name":"Harry"}),
+            json!({"op":"role_set","person":p,"name":"Harry"}),
+            json!({"op":"role_end","person":p}),
+        ] {
+            assert_ne!(send(&mut store, request)["ok"], true);
+        }
+        assert_eq!(
+            send(
+                &mut store,
+                json!({"op":"session_close","person":p,"session":"closing"})
+            )["ok"],
+            true
+        );
+        assert_ne!(
+            send(
+                &mut store,
+                json!({"op":"role_set_session","person":p,"session":"closing","generation":generation,"name":"Harry"})
+            )["ok"],
+            true
+        );
     }
 
     #[test]

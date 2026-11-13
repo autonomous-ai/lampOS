@@ -308,7 +308,7 @@ impl ControlTurns {
                     turn.tell(Outcome::Dropped(why));
                     over = true;
                 }
-                Ok(Answer::Begun(_) | Answer::BegunTurn { .. })
+                Ok(Answer::Begun(_) | Answer::BegunTurn { .. } | Answer::Stream(_))
                 | Err(mpsc::TryRecvError::Empty) => {}
                 Err(mpsc::TryRecvError::Disconnected) => {
                     turn.tell(Outcome::Dropped("ended".into()));
