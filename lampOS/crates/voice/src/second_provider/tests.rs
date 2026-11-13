@@ -28,6 +28,7 @@ mod opens_further;
 mod pause_join;
 mod person_scope_seen;
 mod read_back_words;
+mod remove_words;
 mod remember_speaker;
 mod sent_write;
 mod short_done;
