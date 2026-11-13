@@ -2011,6 +2011,11 @@ struct Shared {
     /// The first setup save refused only for the read-back's yes, held for
     /// the person's next turn ([`HeldSave`]).
     held_save: Mutex<Option<HeldSave>>,
+    /// When the lamp last asked about a face added from a photo
+    /// ([`crate::photo_faces::is_ask`]), until its answer is called
+    /// (`photo_face_yes`, `photo_face_no`): a yes is held for it
+    /// ([`a_yes_held`]) within [`crate::photo_faces::ANSWER_WITHIN`].
+    photo_asked_at: Mutex<Option<Instant>>,
     /// The save a held one ran: its request, name and answer, so a model
     /// call after the yes never saves twice.
     saved_by_hold: Mutex<Option<(u64, String, Value, Instant)>>,
@@ -4623,6 +4628,7 @@ impl Engine {
                 speaking: None,
                 held_forget: Mutex::new(HeldForgets::default()),
                 held_save: Mutex::new(None),
+                photo_asked_at: Mutex::new(None),
                 saved_by_hold: Mutex::new(None),
                 face_kept_at: Mutex::new(None),
                 rename_yes: false,
@@ -13389,6 +13395,9 @@ fn lamp_awaits_answer(held: bool, messages: &[Message]) -> bool {
 
 /// Whether a yes of any kind is held for the person's next words: a keep or
 /// a forget ([`HeldForget`]), a setup face save ([`HeldSave`]), a face
+/// added from a photo asked about and not yet answered (`photo_asked_at`,
+/// within `photo_faces::ANSWER_WITHIN`: "Shall I remember you?" said, and
+/// the lamp said something else after it), a face
 /// rename held or asked ([`held_rename::waits`]), a skill's write or task
 /// yes (`skill_write_yes::awaited`, which `skill_task_yes` waits through),
 /// a made skill's clash waiting for their choice, an agent task read back
@@ -13405,6 +13414,11 @@ fn a_yes_held(shared: &Shared) -> bool {
         .lock()
         .is_ok_and(|hold| hold.held.is_some())
         || shared.held_save.lock().is_ok_and(|hold| hold.is_some())
+        || shared.photo_asked_at.lock().is_ok_and(|asked| {
+            asked.is_some_and(|at| {
+                now.saturating_duration_since(at) <= crate::photo_faces::ANSWER_WITHIN
+            })
+        })
         || held_rename::waits(shared)
         || crate::skill_write_yes::awaited(now)
         || crate::made_clash::awaited(now)
@@ -14883,6 +14897,14 @@ async fn answer(
     // One the walk says itself (#3769, lamp-52e6 30 Oct 08:22: the model
     // said its own small talk in place of the sentence prompt): its words,
     // and no chat at all.
+    // The photo face's ask (`photo_faces::turn`), the coordinator's: a yes
+    // is held for it from now ([`a_yes_held`]), known from the turn alone.
+    if written
+        && crate::photo_faces::is_ask(&said)
+        && let Ok(mut asked) = shared.photo_asked_at.lock()
+    {
+        *asked = Some(Instant::now());
+    }
     let own = written
         .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
         .flatten()
@@ -16758,6 +16780,14 @@ async fn answer(
             // holding answer (#1712; the peer read on #1986).
             if !calls.is_empty() {
                 called.store(true, Ordering::Relaxed);
+            }
+            // The photo face's answer called: no yes is held for it after.
+            if calls
+                .iter()
+                .any(|call| crate::photo_faces::is_tool(&call.name))
+                && let Ok(mut asked) = shared.photo_asked_at.lock()
+            {
+                *asked = None;
             }
             // A linked service called (lamp-9adf, 4 Nov 21:45: "Let me
             // look." then `service_read` for a calendar, and a picture of

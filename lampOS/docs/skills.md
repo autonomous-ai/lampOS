@@ -1241,13 +1241,20 @@ camera, so I can't take photos…" with `calls=none`.
 - **While the lamp waits for an answer, the model reads the line:** when
   the lamp's newest words asked something (`remarks::lamp_asked`), or a
   read-back, a confirm or a held yes of any kind waits (a keep or a
-  forget, a setup face save, a face rename, a skill's write or task yes, a
-  made skill's clash, an agent task waiting for `confirm_agent_task`, the
+  forget, a setup face save, a face rename, a face added from a photo
+  asked about and not yet answered (`photo_faces::is_ask`: the worker marks
+  the ask's written turn and holds its yes for
+  `photo_faces::ANSWER_WITHIN`, 120 s, until `photo_face_yes` or
+  `photo_face_no` is called, however much the lamp said after it), a
+  skill's write or task yes, a made skill's clash, an agent task waiting for `confirm_agent_task`, the
   voice's own mail send or a skill run's held write waiting for its
   send), no line is read for a skill by its name or its asks
   (`second_provider`'s `lamp_awaits_answer`). Round 1 is the model's, and
   it decides in context whether "Sounds good." or "Yes please." answers
-  the lamp or asks for a skill.
+  the lamp or asks for a skill. A Vietnamese yes ("Được.", "Ừ, làm đi.")
+  is held the same way. `remarks::lamp_asked` sees a Vietnamese question
+  only by its `?` ("Mình bắt đầu nhé?"); one written without it
+  ("Mình bắt đầu nhé.") is not taken as a question.
 - **The instructions:** the built-in one (`config::CHAT_INSTRUCTION`, and
   the camera one), which a product lamp runs (its provider setting names no
   `instruction_file`), says "never say you have no arms, legs, body or
@@ -1271,6 +1278,8 @@ camera, so I can't take photos…" with `calls=none`.
   `a_camera_question_is_not_an_ask`,
   `a_held_yes_leaves_yes_please_to_the_held_question`,
   `after_the_lamp_asks_a_yes_goes_to_the_model`,
+  `a_photo_faces_ask_holds_the_yes_after_another_lamp_line`,
+  `after_the_lamp_asks_a_vietnamese_yes_goes_to_the_model`,
   `an_agent_task_waiting_for_its_yes_leaves_the_line_to_it`,
   `a_skill_runs_held_write_leaves_send_it_to_it`,
   `the_voices_own_mail_waiting_leaves_go_for_it_to_it` and
