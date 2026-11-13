@@ -1080,10 +1080,12 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
    độc quyền) và `start` (0700, `gateway_run::start_text`): lệnh duy nhất
    lần chạy được chạy. `start` đọc `token` một lần rồi xóa (lần start thứ
    hai không còn token và thất bại), rồi chạy script của kỹ năng đúng như
-   nó là (`python3 <thư mục kỹ năng>/<script>`) với `LAMP_CONTROL_TOKEN`,
-   `LAMP_CONTROL_SOCKET` và `PYTHONPATH` chỉ trong môi trường của nó. Token
-   không bao giờ nằm trong lời của lượt, đối số, config hay phiên của
-   gateway.
+   nó là (`python3 <thư mục kỹ năng>/<script>`), được rào tách khỏi
+   gateway (xem "Hàng rào của gateway chặn và không chặn gì" bên dưới), chỉ
+   với `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH`, `PATH`
+   (`/usr/local/bin:/usr/bin:/bin`) và `HOME` (thư mục lần chạy) trong môi
+   trường của nó (`env -i`). Token không bao giờ nằm trong lời của lượt,
+   đối số, config hay phiên của gateway.
 2. Gateway phải trả lời trên `127.0.0.1:<port>` (`gateway::answers`), chờ
    tối đa 60 s (`gateway::READY_WITHIN`); nếu không, `run_failed` "the
    default agent's gateway did not answer ...", và không gửi lượt nào.
@@ -1161,23 +1163,47 @@ lamp-update).
   trên gateway chạy trong tiến trình của gateway, có mạng bình thường của
   đèn (unit của nó không có network namespace: provider model của nó ở
   `127.0.0.1:7741` và nó bind loopback). Model của lượt và gateway tới
-  được mọi thứ đèn tới được. Script của kỹ năng, do `start` chạy, cũng có
-  mạng đó. Không rào.
+  được mọi thứ đèn tới được. Script của kỹ năng được rào như `--net` của
+  Hermes: `start` chạy nó trong network namespace riêng chỉ có `lo` (để
+  tắt, không có cầu model: script không cần), nên nó chỉ tới được unix
+  socket của lamp-control, không gì khác, kể cả cổng loopback của gateway.
 - **File.** Cả hai chạy trong mount namespace chỉ cho thấy thư mục riêng
   của agent, thư mục làm việc, kỹ năng chỉ đọc và socket của lamp-control
   (`ALLOWED` của OpenClaw; ngoài ra `/run`, `/var/lib` và `/etc/lampOS`
   rỗng và chỉ đọc). Namespace của gateway được mọi lượt OpenClaw dùng
   chung: thư mục của lần chạy thấy được với một việc nói cho OpenClaw đang
-  chạy cùng lúc (nó 0700, nhưng cùng user `lampos`).
-- **Những gì một lần chạy trên gateway không chặn, nói thẳng.** Script mà
-  `start` chạy là tiến trình con của gateway: nó có môi trường của
-  gateway, toàn bộ mạng như trên, và cùng user `lampos` với mọi agent
-  OpenClaw khác trên đèn (`main` và các agent người dùng thêm). Các agent
-  đó cũng thấy socket của lamp-control và skills-dev khi công tắc bật, và
-  script đọc được `openclaw.json`, nơi giữ token admin của gateway. Chỉ
-  các kiểm tra token lần chạy của chính lamp-control là còn giữ. Vì vậy
-  `LAMP_SKILL_GATEWAY_RUNS` (switches.md) vẫn tắt cho tới khi script được
-  cô lập khỏi gateway hoặc first builder chấp nhận điều này bằng văn bản;
+  chạy cùng lúc (nó 0700, nhưng cùng user `lampos`). Script của kỹ năng
+  thấy ít hơn: `start` (`gateway_run::start_text`) đặt nó vào user, mount
+  và PID namespace riêng bên trong namespace của gateway, với `/tmp` mới
+  và một tmpfs 0700 rỗng phủ lên `/var/lib`, `/var/tmp` và `/dev/shm`
+  (`gateway_run::HIDDEN`) và lên project của các lần chạy, rồi chỉ cho
+  thấy lại thư mục của chính lần chạy và thư mục kỹ năng của nó. Vì vậy
+  state của OpenClaw (`openclaw.json`, nơi giữ token admin của gateway, và
+  `gateway-token` trong `/var/lib/lampos-openclaw`), thư mục của các lần
+  chạy khác và các kỹ năng khác không còn ở đó. `/run` là của gateway:
+  socket của lamp-control (`/run/lampos-control/control.sock`, bind riêng,
+  chỉ đọc) vẫn tới được, và SDK (`/usr/local/lib/lampos/sdk-python`) không
+  bị che. `/proc` riêng của nó chỉ liệt kê tiến trình của script, nên
+  không đọc được môi trường của gateway ở đó. Script chạy bằng chính id
+  của người gọi trong một user namespace lồng, nơi không mount nào trong
+  số này gỡ được.
+- **Môi trường.** Script chỉ nhận token của nó, socket của lamp-control,
+  `PYTHONPATH`, một `PATH` cố định và `HOME` (thư mục lần chạy): `env -i`,
+  không gì của gateway (không có token forwarder `LAMP_HERMES_TOKEN` hay
+  `OPENCLAW_STATE_DIR`). Token tới script qua một pipe, không bao giờ qua
+  đối số.
+- **Đóng khi lỗi.** Bất kỳ bước nào thất bại (các namespace, một mount,
+  một đường dẫn bị che nằm trong thư mục được cho thấy lại, việc chuyển
+  lại) kết thúc `start` với "the run's fence was not made (...): the
+  script was not run" trước khi script chạy; nó không bao giờ lùi về chạy
+  script không rào. Token đã bị xóa trong mọi trường hợp.
+- **Những gì một lần chạy trên gateway không chặn, nói thẳng.** Mọi agent
+  OpenClaw khác trên đèn (`main` và các agent người dùng thêm) chạy cùng
+  user `lampos` trong namespace của gateway: các agent đó cũng thấy socket
+  của lamp-control và skills-dev khi công tắc bật. Chỉ các kiểm tra token
+  lần chạy của chính lamp-control là còn giữ trước chúng. Vì vậy
+  `LAMP_SKILL_GATEWAY_RUNS` (switches.md) vẫn tắt cho tới khi hàng rào
+  được kiểm trên đèn hoặc first builder chấp nhận điều này bằng văn bản;
   khi tắt, lamp-update để wrapper và namespace của OpenClaw như trước
   đường chạy chung, và lamp-tasks từ chối lần chạy đó bằng lời.
 - **Exec.** Lần chạy của Hermes được chạy mọi lệnh trong namespace của nó
@@ -1188,7 +1214,8 @@ lamp-update).
   OpenClaw, thực thi trong tiến trình của gateway, không phải bởi kernel:
   một lỗi trong đó, hay một thay đổi ở OpenClaw sau này, sẽ mở nó ra.
   Script mà `start` chạy là của kỹ năng như chủ đã đồng ý; những gì script
-  đó chạy thì OpenClaw không rào.
+  đó chạy thì OpenClaw không rào, chỉ các namespace của `start` ở trên
+  rào.
 - **Phạm vi token.** Như nhau ở cả hai: một token cho mỗi lần chạy, cấp cho
   kỹ năng và quyền của lần chạy đó, kết thúc với lamp-control khi lần chạy
   kết thúc, chỉ đưa vào môi trường của script. Với Hermes, token nằm trong
@@ -1209,7 +1236,11 @@ lamp-update).
   của exec approvals, `gateway call agent` / `chat.abort` /
   `sessions.delete` và tham số của chúng là theo OpenClaw 2026.11.2 (gói
   của nó; `approvals get --gateway --json` đã đọc trên 2026.11.2 của c0a4,
-  không ghi gì); cả một lần chạy chưa thử trên đèn. Mỗi lúc chỉ một lần
+  không ghi gì); cả một lần chạy chưa thử trên đèn. Hàng rào của `start`
+  được kiểm trên máy tính với `unshare` và `mount` thay thế: việc user,
+  network, mount và PID namespace lồng được phép bên trong namespace của
+  gateway, và các mount cùng `--mount-proc` thành công ở đó, cần đèn để
+  chứng minh. Mỗi lúc chỉ một lần
   chạy (`skill_task` nhận một). Khóa `tools.exec.mode` của
   lamp-update được giữ như cũ. Chi phí dự kiến: không thêm tiến trình nào
   ngoài một lời gọi CLI (một lượt bắt đầu trong vài giây trên gateway đang
