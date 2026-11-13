@@ -1986,6 +1986,9 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 .ok()
                 .as_deref(),
         ),
+        energy: lamp_body::body::energy_switch(
+            std::env::var(lamp_body::body::ENERGY).ok().as_deref(),
+        ),
         // The app's reach reads the servos' own ranges, so it turns them on.
         own_ranges: lamp_body::body::own_ranges_from(
             std::env::var(lamp_body::body::OWN_RANGES).ok().as_deref(),

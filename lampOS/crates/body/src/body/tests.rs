@@ -18259,3 +18259,61 @@ fn an_energy_level_turns_faster_and_waits_for_the_lamp_to_settle() {
     assert_eq!(landed(&said_late), landed(&today));
     assert!(fastest(&said_late) <= 6);
 }
+
+/// `LAMP_BODY_ENERGY` (#6893): off, a step of the follower is the one it
+/// always was, to the bit; on, its acceleration changes by at most `JERK`
+/// times `acceleration` a second, and it still arrives and settles.
+#[test]
+fn the_follower_is_as_before_off_and_its_acceleration_slews_under_energy() {
+    let limits = Limits::folded_with(Tuning {
+        reach: [45, 15, 30, 40],
+        speed: 300,
+        servo_speed: 1_000,
+        servo_acceleration: 50,
+    })
+    .unwrap();
+    let step = TICK.as_secs_f32();
+    let (mut at, mut velocity, mut pulled) = (0.0f32, 0.0f32, 0.0f32);
+    for _ in 0..200 {
+        let gap = 40.0 - at;
+        let before = (velocity
+            + (FOLLOW * FOLLOW * gap - 2.0 * FOLLOW * velocity)
+                .clamp(-limits.acceleration, limits.acceleration)
+                * step)
+            .clamp(-limits.speed, limits.speed);
+        velocity = follow_step(gap, velocity, &mut pulled, &limits, step);
+        assert_eq!(velocity.to_bits(), before.to_bits());
+        assert_eq!(pulled, 0.0);
+        at += velocity * step;
+    }
+    let energy = Limits {
+        energy: true,
+        ..limits
+    };
+    let slew = JERK * energy.acceleration * step;
+    let (mut at, mut velocity, mut pulled) = (0.0f32, 0.0f32, 0.0f32);
+    let mut most = 0.0f32;
+    for tick in 0..400 {
+        // A goal 200 counts away, then back, then a small one.
+        let goal = match tick {
+            0..150 => 200.0,
+            150..300 => -50.0,
+            _ => -40.0,
+        };
+        let was = pulled;
+        velocity = follow_step(goal - at, velocity, &mut pulled, &energy, step);
+        assert!((pulled - was).abs() <= slew + 0.01, "tick {tick}");
+        assert!(velocity.abs() <= energy.speed);
+        at += velocity * step;
+        most = most.max(at);
+    }
+    assert!((at + 40.0).abs() < 1.0, "{at}");
+    assert!(most < 215.0, "{most}");
+    // Only the exact value turns it on, and the body's own limits leave it off.
+    assert!(energy_switch(Some("on")));
+    for value in [None, Some("1"), Some("ON"), Some("on "), Some("true")] {
+        assert!(!energy_switch(value));
+    }
+    assert!(!Limits::FOLDED.energy && limits.clip_ceiling().is_none());
+    assert_eq!(energy.clip_ceiling(), Some(1_000.0));
+}
