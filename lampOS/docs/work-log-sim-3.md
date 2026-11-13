@@ -3,6 +3,19 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 02:3x GMT+7: 888 sorted; the body-on-macOS CI step drafted
+
+- The first builder cleared #6666's sit-out and put #6966 first in the next
+  train (the lead asked the same).
+- Drafted `sim-3/mac-body` (pushed, no PR until #6965 merges): `sim-macos`
+  runs the whole lamp with the real body (up in 30 s, "lamp-body: it may
+  stand", still up 20 s on, no body restart) and no longer skips the two
+  speaker tests (#6933 is in); README's macOS line. The smoke script passed
+  against #6965's build here; every part ended within 3 s of lamp-sim's kill.
+  It replaces #6938 (no body off Linux), which closes then.
+- A safety check refused one command (a `bash -c` with `rm -rf` of a test
+  folder); nothing of it ran; redone with a script file and a fresh folder.
+
 ## 2026-11-14 02:1x GMT+7: #6965/#6966 to the train; 888's red was the flake
 
 - #6965 and #6966: the lead's READ-OKs beside mine; ten posted NEXT TRAIN.
