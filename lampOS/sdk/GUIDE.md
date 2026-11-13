@@ -102,15 +102,20 @@ The owner's steps in our app, today:
 
 ### Granting camera, microphone and notes today
 
-A pairing keeps the grants it was made with, and a re-pair replaces them: there is no
-way to add one to a paired computer. For each grant:
+A pairing starts with the grants its code was made with. The owner's side can change them
+later with no new code: `lamp-control grants CLIENT --grants LIST` at the lamp (as root, on
+the admin socket), or the app's `control.set_grants`, which the owner's tap makes. The list
+replaces the grants whole, so name every one the computer keeps. A list that names a linked service's grant is
+refused: those are a skill run's alone. A re-pair replaces them too. When the
+grants change the lamp closes the computer's connections, saying "grants changed by the
+owner", and the program reads the new ones at its next `hello`. For each grant:
 
 | grant | how a developer gets it | where it stops |
 |---|---|---|
 | `body`, `light`, `speak`, `look`, `hear`, `sound`, `skills`, `air`, `device` | the owner ticks it in the app (step 3) | nowhere |
-| `camera` | only a pairing code made on the lamp itself: its keeper, as root, runs `lamp-control code --grants body,camera` (the admin socket, `/run/lampos-control/admin.sock`, 0600; developer access on); then `lamp pair` as in step 5 | the app cannot make it; an owner without ssh cannot; the stream is local network only, with the ring's red dot, never while the lamp is private |
+| `camera` | a pairing code made on the lamp: its keeper, as root, runs `lamp-control code --grants body,camera` (the admin socket, `/run/lampos-control/admin.sock`, 0600; developer access on); then `lamp pair` as in step 5. For a computer already paired, `lamp-control grants CLIENT --grants body,camera` (the whole list) | whether the app offers it is the first builder's decision (below); the stream is local network only, with the ring's red dot, never while the lamp is private |
 | `microphone` | the same, with `microphone` in the list | the grant alone is not enough: the stream is off unless `lamp-control` runs `--microphone on` and the ears share their sound (`LAMP_BUS_AUDIO=on`), which the customer build does not: a stream ends "the microphone stream is off on this lamp (LAMP_CONTROL_MICROPHONE)" |
-| `speaker` | the same, with `speaker` in the list | the grant alone is not enough: the stream is off unless `lamp-control` runs `--speaker on` (`LAMP_CONTROL_SPEAKER`), which no unit sets; the pairing screen says it "can play any sound through the lamp's speaker, not only its own voice"; the app does not offer it |
+| `speaker` | the same, with `speaker` in the list | the grant alone is not enough: the stream is off unless `lamp-control` runs `--speaker on` (`LAMP_CONTROL_SPEAKER`), which no unit sets; the pairing screen says it "can play any sound through the lamp's speaker, not only the lamp's own voice, so it can sound like a person; never while the lamp is private"; the app does not offer it |
 | `notes` | the same (a code made on the lamp) | not on the app's screen either, per App Only's list of nine |
 
 Asking for one without it is refused `no_grant`: "not granted: camera (the app does not
@@ -474,8 +479,9 @@ with `Z` (`2026-10-27T08:40:01Z`): convert it to local time yourself. `welcome`,
 - `camera.ended`: `why` (the lamp turned private, the camera stayed closed, the ring did not
   show its mark). Grant `camera`. In today's build, lamp run pending.
 
-The grants, for reference: `body`, `light`, `speak`, `look`, `hear`, `sound`, `skills`, `air`,
-`device`, `camera`, `microphone`.
+The grants, for reference (the 14 of `control.schema.json`, `$defs.grant`): `body`, `light`,
+`speak`, `look`, `hear`, `sound`, `skills`, `air`, `device`, `camera`, `microphone`, `speaker`,
+`notes`, `speech`.
 
 ### MCP: the lamp as tools for an agent
 
