@@ -1672,7 +1672,23 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   the light. It runs only once you agree.", each grant in plain words. The
   yes is taken as a made skill's write yes is (`skill_write_yes`: the
   say-back heard whole and uncut first, a later heard line, the echo held,
-  the second route only). The voice reads the skill again through the
+  the second route only). A say-back not heard whole is said again before
+  any yes is taken (#6715): a "Yes." said over the read-back cuts it, a cut
+  answer is no say-back, and the yes is refused
+  (`skill_write_yes::NOT_SAID_WHOLE`) with the whole say-back handed back
+  to say word for word, and the same `approve_id`. So asking again gets it
+  said either way: a new `read_back` starts a new wait and hands the
+  say-back whole, and a `make_skill` the model calls at once with the
+  waiting `approve_id` is refused once more and handed the say-back too. A
+  yes over that repeat is refused again; only a yes after an answer that
+  held every word of the say-back, uncut, is taken. The journal says what
+  was kept: "a made skill's yes not taken: its say-back was not heard
+  whole (kept: r6 cut=true 28 words; first missing word in r6: 29 of 34)",
+  each answer kept by request, cut or not and its word count, then where
+  the one that holds the most first falls short (counts and places only,
+  never a word). Test:
+  `a_cut_task_read_back_is_said_again_whole_before_its_yes_is_taken`.
+  The voice reads the skill again through the
   manage helper and, only while its folder still hashes to that SHA-256
   and declares exactly those grants, asks lamp-control to record the yes
   (`{"task_yes_record": {"name", "sha256", "grants"}}` on

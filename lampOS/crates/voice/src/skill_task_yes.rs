@@ -1140,6 +1140,106 @@ mod tests {
         assert!(kept.writes.is_empty());
     }
 
+    /// #6715 (c0a4, 13 Nov, 12526): a task's read-back cut by a "Yes." said
+    /// over it is no say-back, and the yes is refused. The same ask again,
+    /// with the model calling `make_skill` at once with the waiting
+    /// `approve_id` (no read-back of its own), is refused too, and that
+    /// refusal hands the whole say-back to be said again word for word; a
+    /// yes over that repeat is still refused, and a yes after it was heard
+    /// whole is taken. Asked again by name (`read_back`) instead, the
+    /// say-back is handed over whole the same way, with a new wait.
+    #[test]
+    fn a_cut_task_read_back_is_said_again_whole_before_its_yes_is_taken() {
+        let now = Instant::now();
+        let read = |request| {
+            read_back(
+                "my photo booth skill",
+                asking(request),
+                nowhere(),
+                |_| Ok(Some(booth(false))),
+                now,
+            )
+            .unwrap()
+        };
+        // What the model is told to say, word for word.
+        let quoted = |told: &Value| {
+            told["next"]
+                .as_str()
+                .unwrap()
+                .split('"')
+                .nth(1)
+                .unwrap()
+                .to_owned()
+        };
+        let say_back = said(&booth(false));
+        let told = read(6);
+        let id = told[skill_write_yes::APPROVE_ID]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let whole = quoted(&told);
+        assert!(whole.contains(&say_back), "{whole}");
+        // All but its last ten words played, then cut by the "Yes." of
+        // request 7.
+        let words: Vec<&str> = whole.split_whitespace().collect();
+        skill_write_yes::lamp_said(6, &words[..words.len() - 10].join(" "));
+        skill_write_yes::lamp_cut(6);
+        assert!(!skill_write_yes::answer_awaited(7, now));
+        assert!(!skill_write_yes::approve_forced_now(now));
+        let refused = skill_write_yes::approve(&id, 7, true, true, now, |_| panic!("approved"));
+        assert_eq!(
+            refused["error"],
+            skill_write_yes::NOT_SAID_WHOLE,
+            "{refused}"
+        );
+        // The same ask again (request 9): the model calls make_skill at
+        // once with the waiting id, and is handed the whole say-back.
+        let again = skill_write_yes::approve(&id, 9, true, true, now, |_| panic!("approved"));
+        assert_eq!(again["error"], skill_write_yes::NOT_SAID_WHOLE, "{again}");
+        assert_eq!(quoted(&again), say_back, "{again}");
+        assert!(again["next"].as_str().unwrap().contains(&id), "{again}");
+        assert!(skill_write_yes::waits(&id));
+        // A "Yes." over that repeat: cut, so refused, and handed again.
+        let repeat: Vec<&str> = say_back.split_whitespace().collect();
+        skill_write_yes::lamp_said(9, &repeat[..repeat.len() / 2].join(" "));
+        skill_write_yes::lamp_cut(9);
+        let over = skill_write_yes::approve(&id, 10, true, true, now, |_| panic!("approved"));
+        assert_eq!(over["error"], skill_write_yes::NOT_SAID_WHOLE, "{over}");
+        assert_eq!(quoted(&over), say_back, "{over}");
+        // Said whole in request 10: the yes of request 11 is taken.
+        skill_write_yes::lamp_said(10, &quoted(&over));
+        assert!(skill_write_yes::answer_awaited(11, now));
+        assert!(skill_write_yes::approve_forced_now(now));
+        let mut kept = None;
+        let told = skill_write_yes::approve(&id, 11, true, true, now, |asks| {
+            kept = Some(asks.clone());
+            Ok(json!({"approved": 1}))
+        });
+        assert_eq!(told["approved"], true, "{told}");
+        assert_eq!(kept.unwrap().say_back, say_back);
+        // Asked again by name after a cut: a new wait, the say-back handed
+        // whole, and its yes taken once it is heard whole.
+        let told = read(20);
+        let first = told[skill_write_yes::APPROVE_ID]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        skill_write_yes::lamp_said(20, &words[..10].join(" "));
+        skill_write_yes::lamp_cut(20);
+        let told = read(22);
+        let id = told[skill_write_yes::APPROVE_ID]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_ne!(id, first);
+        assert!(!skill_write_yes::waits(&first));
+        assert_eq!(quoted(&told), whole);
+        skill_write_yes::lamp_said(22, &whole);
+        let told =
+            skill_write_yes::approve(&id, 23, true, true, now, |_| Ok(json!({"approved": 1})));
+        assert_eq!(told["approved"], true, "{told}");
+    }
+
     /// Agreed already for this folder, it is said and nothing is asked; a
     /// changed folder reads as not agreed (the helper's `approved` is for
     /// the SHA-256 now), so it is said back and asks again.
