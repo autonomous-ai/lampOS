@@ -11,8 +11,11 @@
 //! namespace script the gateway runs in, the agent id a skill's run is
 //! one turn of, and the argument lines of a turn, of its stop and of its
 //! end, each a template with `{name}`, `{agent}`, `{message}`, `{secs}` and
-//! `{ms}` in it. lamp-tasks knows no engine's commands: they are data
-//! lamp-update writes.
+//! `{ms}` in it; and the run's fence: the arguments that get the gateway's
+//! exec approvals as JSON (`fence-get`) and set them from stdin
+//! (`fence-set`), and the agent's own entry in them (`fence-entry`, JSON
+//! with `{start}` for the runs' start). lamp-tasks knows no engine's
+//! commands: they are data lamp-update writes.
 //!
 //! **A run** ([`GatewayRunner::run`]): the run's folder `skill-<run-id>`
 //! is made 0700 in lamp-tasks' Harness project (which the gateway's
@@ -22,8 +25,12 @@
 //! the token once, deletes it, and runs the skill's script with the token,
 //! lamp-control's socket and the SDK in its environment only. The token is
 //! never in the turn's words, its arguments or the gateway's state. The
-//! gateway must answer on its loopback port first; then the turn is sent
-//! through the agent's wrapper (the program), held to the run's deadline.
+//! gateway must answer on its loopback port first; then its fence is
+//! made sure of ([`GatewayRunner::ensure_fence`]: the approvals got, the
+//! agent's entry set when it is not there, got again to confirm it, each
+//! call bounded by [`AFTER_WITHIN`]), or the run is refused in words with
+//! no turn sent; then the turn is sent through the agent's wrapper (the
+//! program), held to the run's deadline.
 //! However it ends, the token is ended with lamp-control first, then the
 //! turn's process group is killed, the turn stopped and its session
 //! removed on the gateway (each bounded), then the run's folder removed.
@@ -50,7 +57,17 @@ pub const GATEWAY_MARK: &str = "# lampOS: a gateway agent: a skill's run is one 
 /// space.
 pub const DATA_PREFIX: &str = "#@";
 /// The keys of the gateway's data, each once.
-pub const KEYS: [&str; 6] = ["port", "ns", "agent", "turn", "stop", "end"];
+pub const KEYS: [&str; 9] = [
+    "port",
+    "ns",
+    "agent",
+    "turn",
+    "stop",
+    "end",
+    "fence-get",
+    "fence-set",
+    "fence-entry",
+];
 /// The run's token in its folder, read once by [`START_FILE`].
 pub const TOKEN_FILE: &str = "token";
 /// The one command a run on a gateway agent may run, in its folder.
@@ -79,6 +96,15 @@ pub struct GatewayAgent {
     pub stop: Vec<String>,
     /// The arguments that remove the run's session, a template.
     pub end: Vec<String>,
+    /// The arguments that print the gateway's exec approvals as JSON, a
+    /// template.
+    pub fence_get: Vec<String>,
+    /// The arguments that set the gateway's exec approvals from stdin, a
+    /// template.
+    pub fence_set: Vec<String>,
+    /// The agent's own entry in the approvals, JSON text with `{start}`
+    /// for the runs' start pattern.
+    pub fence_entry: String,
 }
 
 /// A plain word of data: letters, digits, `-`, `_`, `.`.
@@ -146,6 +172,12 @@ impl GatewayAgent {
         if !turn.iter().any(|word| word.contains("{message}")) {
             return Err("the gateway's turn never gives the run's words".into());
         }
+        let fence_entry = get("fence-entry")?.to_owned();
+        if !fence_entry.contains("{start}")
+            || !serde_json::from_str::<Value>(&fence_entry).is_ok_and(|entry| entry.is_object())
+        {
+            return Err("the gateway's fence-entry is not a JSON object with {start}".into());
+        }
         Ok(Self {
             port,
             ns,
@@ -153,7 +185,18 @@ impl GatewayAgent {
             turn,
             stop: args("stop")?,
             end: args("end")?,
+            fence_get: args("fence-get")?,
+            fence_set: args("fence-set")?,
+            fence_entry,
         })
+    }
+
+    /// [`Self::fence_entry`] for runs started by `start`.
+    pub fn entry(&self, start: &str) -> Result<Value, String> {
+        let start = serde_json::to_string(start).unwrap_or_default();
+        let start = start.trim_matches('"');
+        serde_json::from_str(&self.fence_entry.replace("{start}", start))
+            .map_err(|_| "the gateway's fence-entry is not JSON once filled".to_owned())
     }
 
     /// `template` for one run: `{name}` the run's session name
@@ -180,6 +223,43 @@ impl GatewayAgent {
             })
             .collect()
     }
+}
+
+/// The exec approvals `got` (the gateway's `fence-get` answer: the
+/// document itself, or it under `file` beside its hash) with `agents.<agent>`
+/// set to `entry`, every other key kept: `None` when it is so already,
+/// else the document to set (`fence-set`'s stdin). Any other shape is
+/// refused, never guessed at.
+pub fn set_entry(got: &str, agent: &str, entry: &Value) -> Result<Option<String>, String> {
+    let got: Value = serde_json::from_str(got.trim())
+        .map_err(|_| "the gateway's approvals are not JSON".to_owned())?;
+    let mut doc = match got.get("file") {
+        Some(file) if file.is_object() => file.clone(),
+        Some(_) => return Err("the gateway's approvals' `file` is not an object".into()),
+        None => got,
+    };
+    let root = doc
+        .as_object_mut()
+        .ok_or("the gateway's approvals are not an object")?;
+    if !root.contains_key("version") && !root.contains_key("agents") {
+        return Err("the gateway's approvals are not in a known shape".into());
+    }
+    let agents = root
+        .entry("agents")
+        .or_insert_with(|| Value::Object(Default::default()));
+    if agents.is_null() {
+        *agents = Value::Object(Default::default());
+    }
+    let agents = agents
+        .as_object_mut()
+        .ok_or("the gateway's approvals' `agents` is not an object")?;
+    if agents.get(agent) == Some(entry) {
+        return Ok(None);
+    }
+    agents.insert(agent.to_owned(), entry.clone());
+    Ok(Some(
+        serde_json::to_string_pretty(&doc).expect("a JSON value"),
+    ))
 }
 
 /// The run's start ([`START_FILE`]) for `folder`, running `script` with
@@ -279,7 +359,7 @@ impl Made<'_> {
             .runner
             .agent
             .fill(template, &self.name, "", AFTER_WITHIN);
-        match call(self.runner, &args, AFTER_WITHIN, None) {
+        match call(self.runner, &args, AFTER_WITHIN, None, None) {
             Ok(Turn::Done { code: 0, .. }) => {}
             Ok(Turn::Done { code, .. }) => {
                 eprintln!(
@@ -334,6 +414,7 @@ fn call(
     args: &[String],
     within: Duration,
     stop: Option<&AtomicBool>,
+    input: Option<&str>,
 ) -> Result<Turn, String> {
     use rustix::process::{Pid, Signal, WaitId, WaitIdOptions, kill_process_group, waitid};
     let mut child = Command::new(&runner.program)
@@ -341,13 +422,28 @@ fn call(
         .env_clear()
         .envs(runner.env.iter().map(|(name, value)| (name, value)))
         .current_dir("/")
-        .stdin(Stdio::null())
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .process_group(0)
         .spawn()
         .map_err(|error| format!("the default agent's gateway could not be asked: {error}"))?;
     let pid = Pid::from_child(&child);
+    // The input written by a thread of its own and its end closed, so a
+    // program that never reads it still ends at its bound.
+    let writer = child
+        .stdin
+        .take()
+        .zip(input.map(str::to_owned))
+        .map(|(mut into, text)| {
+            std::thread::spawn(move || {
+                let _ = into.write_all(text.as_bytes());
+            })
+        });
     let out = child.stdout.take();
     let reader = std::thread::spawn(move || {
         let mut said = String::new();
@@ -376,6 +472,9 @@ fn call(
     let _ = child.kill();
     let _ = child.wait();
     let said = reader.join().unwrap_or_default();
+    if let Some(writer) = writer {
+        let _ = writer.join();
+    }
     Ok(match status {
         Some(Some(code)) => Turn::Done { code, said },
         Some(None) => Turn::Done { code: -1, said },
@@ -397,6 +496,39 @@ fn answered(said: &str) -> Result<u64, String> {
 }
 
 impl GatewayRunner {
+    /// One fence call, bounded by [`AFTER_WITHIN`]: what it printed, when
+    /// it ended with status 0.
+    fn fence_call(&self, template: &[String], input: Option<&str>) -> Result<String, String> {
+        let args = self.agent.fill(template, "", "", AFTER_WITHIN);
+        match call(self, &args, AFTER_WITHIN, None, input)? {
+            Turn::Done { code: 0, said } => Ok(said),
+            Turn::Done { code, .. } => Err(format!(
+                "the gateway's approvals call ended with status {code}"
+            )),
+            Turn::Cut => Err(format!(
+                "the gateway's approvals call ran past {} s",
+                AFTER_WITHIN.as_secs()
+            )),
+        }
+    }
+
+    /// The agent's entry ([`GatewayAgent::entry`] for `start`) in the
+    /// gateway's exec approvals: got, set only when it is not there, and
+    /// got again to confirm it is.
+    pub fn ensure_fence(&self, start: &str) -> Result<(), String> {
+        let entry = self.agent.entry(start)?;
+        let got = self.fence_call(&self.agent.fence_get, None)?;
+        let Some(doc) = set_entry(&got, &self.agent.agent, &entry)? else {
+            return Ok(());
+        };
+        self.fence_call(&self.agent.fence_set, Some(&doc))?;
+        let again = self.fence_call(&self.agent.fence_get, None)?;
+        match set_entry(&again, &self.agent.agent, &entry)? {
+            None => Ok(()),
+            Some(_) => Err("the gateway's approvals do not hold the agent's entry once set".into()),
+        }
+    }
+
     /// The run, as the module says.
     pub fn run(&self, run: &SkillRun, end_token: &dyn Fn()) -> Result<u64, String> {
         // A fixed write (#6823) has no script: a gateway agent's run only
@@ -483,6 +615,15 @@ impl GatewayRunner {
                     .min(self.ready_within),
             );
         }
+        // The run's fence on the gateway, made sure of now (the gateway may
+        // have come up since lamp-tasks started): no turn without it.
+        let starts = self
+            .project
+            .join(format!("{RUN_FOLDER_PREFIX}*/{START_FILE}"));
+        self.ensure_fence(starts.to_str().ok_or("the project is not a plain path")?)
+            .map_err(|why| {
+                format!("the default agent's fence for a skill's run is not set ({why}), so nothing was started")
+            })?;
         let left = run.deadline.saturating_sub(began.elapsed());
         let args = self
             .agent
@@ -493,7 +634,7 @@ impl GatewayRunner {
             "[lamp-tasks] skill task {}: one turn on the default agent's warm gateway (127.0.0.1:{})",
             run.run, self.agent.port
         );
-        let turn = call(self, &args, left, self.stopping.as_deref())?;
+        let turn = call(self, &args, left, self.stopping.as_deref(), None)?;
         match turn {
             Turn::Done { code: 0, said } => answered(&said),
             Turn::Done { code, .. } => Err(format!(
@@ -607,8 +748,15 @@ mod tests {
         std::fs::write(
             &program,
             format!(
-                "#!/bin/sh\nprintf '%s\\n' \"$*\" >> {log}\ncase $3 in agent)\n{turn}\n;; esac\nexit 0\n",
-                log = log.display()
+                "#!/bin/sh\nprintf '%s\\n' \"$*\" >> {log}\n\
+                 case $1.$2 in\n\
+                 approvals.get) cat {fence} 2>/dev/null || printf '%s\\n' '{{\"version\":1,\"agents\":{{\"main\":{{}}}}}}'; exit 0;;\n\
+                 approvals.set) [ -e {refuse} ] && exit 1; cat > {fence}; exit 0;;\n\
+                 esac\n\
+                 case $3 in agent)\n{turn}\n;; esac\nexit 0\n",
+                log = log.display(),
+                fence = dir.path().join("fence").display(),
+                refuse = dir.path().join("refuse").display(),
             ),
         )
         .unwrap();
@@ -668,8 +816,23 @@ mod tests {
         (count, move || *inner.lock().unwrap() += 1)
     }
 
+    /// The gateway calls of a run, its fence's left out.
     fn calls(rig: &Rig) -> String {
-        std::fs::read_to_string(&rig.log).unwrap_or_default()
+        std::fs::read_to_string(&rig.log)
+            .unwrap_or_default()
+            .lines()
+            .filter(|line| !line.starts_with("approvals "))
+            .map(|line| format!("{line}\n"))
+            .collect()
+    }
+
+    fn fence_calls(rig: &Rig) -> Vec<String> {
+        std::fs::read_to_string(&rig.log)
+            .unwrap_or_default()
+            .lines()
+            .filter(|line| line.starts_with("approvals "))
+            .map(str::to_owned)
+            .collect()
     }
 
     fn nothing_left(rig: &Rig) {
@@ -755,6 +918,66 @@ mod tests {
         assert!(calls(&rig).is_empty(), "nothing sent, nothing to stop");
         assert!(*count.lock().unwrap() >= 1);
         nothing_left(&rig);
+    }
+
+    #[test]
+    fn the_fence_is_set_before_the_turn_and_only_once() {
+        let rig = rig(r#"{"status":"ok"}"#, false);
+        let (_, end) = ended();
+        let runner = runner(&rig);
+        assert_eq!(
+            runner.run(&skill_run(&rig, Duration::from_secs(20)), &end),
+            Ok(0)
+        );
+        let fence = fence_calls(&rig);
+        assert_eq!(fence.len(), 3, "get, set, get again: {fence:?}");
+        assert!(fence[1].starts_with("approvals set --gateway --stdin"));
+        let set: Value =
+            serde_json::from_str(&std::fs::read_to_string(rig.dir.path().join("fence")).unwrap())
+                .unwrap();
+        assert_eq!(set["agents"]["main"], serde_json::json!({}), "kept");
+        let ours = &set["agents"][crate::openclaw_config::SKILL_RUN_AGENT];
+        assert_eq!(
+            *ours,
+            crate::openclaw_config::skill_run_approvals(&format!(
+                "{}/skill-*/start",
+                rig.dir.path().join("project").display()
+            )),
+            "lamp-update's fence-entry is lamp-tasks' fence"
+        );
+        // A second run finds it set: one get, no set.
+        assert_eq!(
+            runner.run(&skill_run(&rig, Duration::from_secs(20)), &end),
+            Ok(0)
+        );
+        assert_eq!(fence_calls(&rig).len(), 4);
+    }
+
+    #[test]
+    fn a_run_whose_fence_cannot_be_set_is_refused_with_no_turn() {
+        let rig = rig(r#"{"status":"ok"}"#, false);
+        std::fs::write(rig.dir.path().join("refuse"), "").unwrap();
+        let (count, end) = ended();
+        let said = runner(&rig)
+            .run(&skill_run(&rig, Duration::from_secs(20)), &end)
+            .unwrap_err();
+        assert!(
+            said.contains("fence for a skill's run is not set"),
+            "{said}"
+        );
+        assert!(said.contains("nothing was started"), "{said}");
+        assert!(calls(&rig).is_empty(), "no turn: {}", calls(&rig));
+        assert!(!rig.seen.exists(), "the script never ran");
+        assert!(*count.lock().unwrap() >= 1);
+        nothing_left(&rig);
+        // An answer in no known shape is refused too.
+        std::fs::remove_file(rig.dir.path().join("refuse")).unwrap();
+        std::fs::write(rig.dir.path().join("fence"), "[1]").unwrap();
+        let said = runner(&rig)
+            .run(&skill_run(&rig, Duration::from_secs(20)), &end)
+            .unwrap_err();
+        assert!(said.contains("not an object"), "{said}");
+        assert!(calls(&rig).is_empty());
     }
 
     #[test]
