@@ -244,6 +244,94 @@ impl Agent {
     }
 }
 
+/// Whether a make of a skill that uses a linked service is the lamp's
+/// agent's (the owner's ask, 13 Nov): with `LAMP_AGENT_SERVICES` on and a
+/// made skill's code on, as the making model is then told to make such a
+/// skill as one `do.task` for the agent (`make_skill_local::agent_services`).
+pub fn services_through_agent() -> bool {
+    crate::made_skill::agent_services_here() && crate::made_skill::scripts_on()
+}
+
+/// Words that ask for a linked service whether or not it is linked, each
+/// as whole words in order, with the service's code: none of them is an
+/// everyday word for something the lamp sees or does itself.
+const SERVICE_WORDS: &[(&str, &[&str])] = &[
+    ("gmail", &["mail"]),
+    ("gmail", &["mails"]),
+    ("gmail", &["email"]),
+    ("gmail", &["emails"]),
+    ("gmail", &["emailed"]),
+    ("gmail", &["emailing"]),
+    ("gmail", &["inbox"]),
+    ("gmail", &["gmail"]),
+    ("google_calendar", &["calendar"]),
+    ("google_calendar", &["calendars"]),
+    ("google_calendar", &["meeting"]),
+    ("google_calendar", &["meetings"]),
+    ("google_calendar", &["appointment"]),
+    ("google_calendar", &["appointments"]),
+    ("google_drive", &["google", "drive"]),
+    ("google_drive", &["drive", "file"]),
+    ("google_drive", &["drive", "files"]),
+    ("google_drive", &["drive", "folder"]),
+    ("github", &["github"]),
+    ("github", &["pull", "request"]),
+    ("github", &["pull", "requests"]),
+];
+
+/// Words that ask for a linked service only when the lamp is told it is
+/// linked: a service's own name, or a word that is an everyday one too
+/// ("drive", "issue", "slack", "notion").
+const LINKED_WORDS: &[(&str, &[&str])] = &[
+    ("google_calendar", &["event"]),
+    ("google_calendar", &["events"]),
+    ("google_calendar", &["agenda"]),
+    ("google_drive", &["drive"]),
+    ("github", &["issue"]),
+    ("github", &["issues"]),
+    ("github", &["repo"]),
+    ("github", &["repository"]),
+    ("figma", &["figma"]),
+    ("linear", &["linear"]),
+    ("asana", &["asana"]),
+    ("ahrefs", &["ahrefs"]),
+    ("facebook", &["facebook"]),
+    ("slack", &["slack"]),
+    ("mondaydotcom", &["monday", "com"]),
+    ("hubspot", &["hubspot"]),
+    ("amplitude", &["amplitude"]),
+    ("notion", &["notion"]),
+];
+
+/// The code of the linked service `words` ask for, when they do: one of
+/// [`SERVICE_WORDS`], or one of [`LINKED_WORDS`] for a service `linked`
+/// (the codes `lamp-services` tells linked now, asked only when no word of
+/// the first list is there) names. Whole words only, in any case: "mail"
+/// in "voicemail" or "Monday" alone is none. None asks for none.
+pub fn service_asked(
+    words: &str,
+    linked: impl FnOnce() -> Option<Vec<String>>,
+) -> Option<&'static str> {
+    let words: Vec<String> = words
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let said = |phrase: &[&str]| {
+        words
+            .windows(phrase.len())
+            .any(|run| run.iter().zip(phrase).all(|(word, wanted)| word == wanted))
+    };
+    if let Some((code, _)) = SERVICE_WORDS.iter().find(|(_, phrase)| said(phrase)) {
+        return Some(code);
+    }
+    let linked = linked()?;
+    LINKED_WORDS
+        .iter()
+        .find(|(code, phrase)| linked.iter().any(|kept| kept == code) && said(phrase))
+        .map(|(code, _)| *code)
+}
+
 /// lamp-tasks' code only, never the run's words.
 fn code(answer: &Value) -> String {
     answer
@@ -441,6 +529,67 @@ pub(crate) mod tests {
             Err(NotWritten::Timeout)
         );
         assert!(began.elapsed() < Duration::from_secs(4));
+    }
+
+    /// The owner's ask, 13 Nov: a make naming mail, a calendar, Drive or
+    /// GitHub asks for a linked service, as whole words; a word that is an
+    /// everyday one too counts only for a service told linked; a make
+    /// naming none asks for none.
+    #[test]
+    fn a_linked_service_is_asked_for_in_whole_words() {
+        let none = || -> Option<Vec<String>> { None };
+        for (words, code) in [
+            ("when I leave my desk, email me that I'm out", "gmail"),
+            ("every morning at eight, read me my new mail", "gmail"),
+            ("tell me when my inbox has something new", "gmail"),
+            ("send an E-mail to Minh when I arrive", "gmail"),
+            (
+                "every evening, tell me tomorrow's calendar",
+                "google_calendar",
+            ),
+            (
+                "glow blue five minutes before each meeting",
+                "google_calendar",
+            ),
+            ("list what's new in my Google Drive at noon", "google_drive"),
+            ("say how many pull requests wait for me", "github"),
+            ("read my GitHub notifications at nine", "github"),
+        ] {
+            assert_eq!(service_asked(words, none), Some(code), "{words}");
+        }
+        for words in [
+            "make me a skill that dims the light at 10 pm",
+            "play my voicemail jingle when I arrive",
+            "nod when someone says emailer",
+            "every Monday at nine, glow green",
+            "when there's an issue with the air, say so",
+            "glow red when I drive home",
+        ] {
+            assert_eq!(service_asked(words, none), None, "{words}");
+        }
+        let linked = || Some(vec!["github".to_owned(), "slack".to_owned()]);
+        assert_eq!(
+            service_asked("say my new issues at nine", linked),
+            Some("github")
+        );
+        assert_eq!(
+            service_asked("read my Slack messages when I sit down", linked),
+            Some("slack")
+        );
+        assert_eq!(service_asked("what's on my drive at noon", linked), None);
+        assert_eq!(
+            service_asked("what's on my drive at noon", || Some(vec![
+                "google_drive".to_owned()
+            ])),
+            Some("google_drive")
+        );
+        // What is linked is asked only when no plain word is there.
+        assert_eq!(
+            service_asked("email me", || -> Option<Vec<String>> {
+                panic!("not asked")
+            }),
+            Some("gmail")
+        );
     }
 
     #[test]
