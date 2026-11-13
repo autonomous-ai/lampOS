@@ -25,5 +25,14 @@ nix = { version = "=0.29.0", default-features = false, features = ["signal", "us
 # The local day of the strain guard's daily peaks (#4501).
 lamp-local-time = { path = "../local-time" }
 
+[dev-dependencies]
+nix = { version = "=0.29.0", default-features = false, features = ["signal"] }
+
 [lints]
 workspace = true
+
+# `harness = false`: the test harness's own threads would take the signal
+# otherwise, so this program is its own `main`, run again as lamp-body is.
+[[test]]
+name = "stop_signals"
+harness = false
