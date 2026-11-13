@@ -12,6 +12,10 @@
 //! deepgram = "..."
 //! elevenlabs = "..."         # what speaks on the second route: an ElevenLabs key, or
 //! openai = "..."             # an OpenAI one (ElevenLabs when both are set)
+//! [local]                    # `--real-voice=local`: your own LLM, with the host's voice and STT
+//! llm = "..."                # the key the endpoint takes, as a bearer
+//! llm_url = "https://..."    # an OpenAI-compatible endpoint (`{llm_url}/chat/completions`)
+//! llm_model = "..."          # the model it is asked for
 //! ```
 //!
 //! The rules (the first builder, 12 Nov): the file is the user's own and mode
@@ -51,19 +55,22 @@ pub fn command(program: impl AsRef<std::ffi::OsStr>) -> std::process::Command {
 const FILE_UNDER_CONFIG: &str = "lampos/voice-keys.toml";
 /// One environment variable names another file.
 pub const FILE_ENVIRONMENT: &str = "LAMPOS_VOICE_KEYS_FILE";
-/// The file may not be larger than this (it holds four short lines).
+/// The file may not be larger than this (it holds nine short lines).
 const MOST_FILE_BYTES: u64 = 16 * 1024;
 /// A key may not be longer than this; lamp-voice reads at most 4098 bytes with its newline.
 const MOST_KEY_BYTES: usize = 4096;
 
 /// Every key: its table and name in the file, and the variable that overrides it.
-pub const KEYS: [(&str, &str, &str); 6] = [
+pub const KEYS: [(&str, &str, &str); 9] = [
     ("main", "gemini", "LAMPOS_VOICE_GEMINI_KEY"),
     ("own", "deepseek", "LAMPOS_VOICE_DEEPSEEK_KEY"),
     ("own", "deepseek_url", "LAMPOS_VOICE_DEEPSEEK_URL"),
     ("own", "deepgram", "LAMPOS_VOICE_DEEPGRAM_KEY"),
     ("own", "elevenlabs", "LAMPOS_VOICE_ELEVENLABS_KEY"),
     ("own", "openai", "LAMPOS_VOICE_OPENAI_KEY"),
+    ("local", "llm", "LAMPOS_VOICE_LOCAL_LLM_KEY"),
+    ("local", "llm_url", "LAMPOS_VOICE_LOCAL_LLM_URL"),
+    ("local", "llm_model", "LAMPOS_VOICE_LOCAL_LLM_MODEL"),
 ];
 
 /// Where a key came from.
@@ -164,11 +171,14 @@ pub struct Keys {
     pub deepgram: Option<Key>,
     pub elevenlabs: Option<Key>,
     pub openai: Option<Key>,
+    pub llm: Option<Key>,
+    pub llm_url: Option<Key>,
+    pub llm_model: Option<Key>,
 }
 
 impl Keys {
     /// Each key in [`KEYS`]' order, with its name.
-    pub fn each(&self) -> [(&'static str, &'static str, Option<&Key>); 6] {
+    pub fn each(&self) -> [(&'static str, &'static str, Option<&Key>); 9] {
         [
             (KEYS[0].0, KEYS[0].1, self.gemini.as_ref()),
             (KEYS[1].0, KEYS[1].1, self.deepseek.as_ref()),
@@ -176,6 +186,9 @@ impl Keys {
             (KEYS[3].0, KEYS[3].1, self.deepgram.as_ref()),
             (KEYS[4].0, KEYS[4].1, self.elevenlabs.as_ref()),
             (KEYS[5].0, KEYS[5].1, self.openai.as_ref()),
+            (KEYS[6].0, KEYS[6].1, self.llm.as_ref()),
+            (KEYS[7].0, KEYS[7].1, self.llm_url.as_ref()),
+            (KEYS[8].0, KEYS[8].1, self.llm_model.as_ref()),
         ]
     }
 }
@@ -292,7 +305,7 @@ fn read_bounded(reader: &mut dyn Read, path: &Path) -> Result<Vec<u8>, Refusal> 
     Ok(bytes)
 }
 
-/// The four keys out of the file's text. A refusal names the file, a line and a
+/// The keys out of the file's text. A refusal names the file, a line and a
 /// key's name, never any text of a value: the parser's own message quotes the
 /// line, so it is not used.
 fn parse(bytes: &[u8], path: &Path) -> Result<Vec<Option<String>>, Refusal> {
@@ -326,7 +339,7 @@ fn parse(bytes: &[u8], path: &Path) -> Result<Vec<Option<String>>, Refusal> {
         let known_group = KEYS.iter().any(|(g, _, _)| g == group);
         let Some(content) = content.as_table().filter(|_| known_group) else {
             return Err(Refusal(format!(
-                "{shown}: an unknown table{}: lamp-sim knows only [main] and [own]",
+                "{shown}: an unknown table{}: lamp-sim knows only [main], [own] and [local]",
                 line_with(group)
             )));
         };
@@ -431,6 +444,9 @@ pub fn load(
         deepgram: next(),
         elevenlabs: next(),
         openai: next(),
+        llm: next(),
+        llm_url: next(),
+        llm_model: next(),
     })
 }
 
@@ -471,7 +487,7 @@ mod tests {
     const DEEPSEEK: &str = "test-key-not-real-deepseek";
     const URL: &str = "https://test-not-real.invalid/v1";
     const DEEPGRAM: &str = "test-key-not-real-deepgram";
-    const FILE: &str = "[main]\ngemini = \"test-key-not-real-gemini\"\n[own]\ndeepseek = \"test-key-not-real-deepseek\"\ndeepseek_url = \"https://test-not-real.invalid/v1\"\ndeepgram = \"test-key-not-real-deepgram\"\nelevenlabs = \"test-key-not-real-eleven\"\nopenai = \"test-key-not-real-openai\"\n";
+    const FILE: &str = "[main]\ngemini = \"test-key-not-real-gemini\"\n[own]\ndeepseek = \"test-key-not-real-deepseek\"\ndeepseek_url = \"https://test-not-real.invalid/v1\"\ndeepgram = \"test-key-not-real-deepgram\"\nelevenlabs = \"test-key-not-real-eleven\"\nopenai = \"test-key-not-real-openai\"\n[local]\nllm = \"test-key-not-real-llm\"\nllm_url = \"https://test-not-real.invalid/v1\"\nllm_model = \"test-model\"\n";
 
     fn folder(name: &str) -> PathBuf {
         let dir = crate::test_root().join(format!("lsm-keys-{name}-{}", std::process::id()));
@@ -523,6 +539,9 @@ mod tests {
             keys.openai.as_ref().unwrap().expose(),
             "test-key-not-real-openai"
         );
+        assert_eq!(keys.llm.as_ref().unwrap().expose(), "test-key-not-real-llm");
+        assert_eq!(keys.llm_url.as_ref().unwrap().expose(), URL);
+        assert_eq!(keys.llm_model.as_ref().unwrap().expose(), "test-model");
         assert!(
             keys.each()
                 .iter()
@@ -777,7 +796,7 @@ mod tests {
             dir.join("nothing").to_str().unwrap(),
         )]));
         assert_eq!(code, 0);
-        assert_eq!(none.matches("not set").count(), 6, "{none}");
+        assert_eq!(none.matches("not set").count(), KEYS.len(), "{none}");
         let _ = fs::remove_dir_all(&dir);
     }
 

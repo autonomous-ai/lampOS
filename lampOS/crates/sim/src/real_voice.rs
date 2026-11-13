@@ -78,9 +78,14 @@ const PASSED_PREFIXES: [&str; 4] = ["LC_", "PULSE_", "PIPEWIRE_", "ALSA_"];
 /// `--real-voice=second`: the voice's SECOND route, the one a customer lamp runs, on the developer's own keys.
 pub const FLAG_SECOND: &str = "--real-voice=second";
 
-/// Whether `--real-voice` (the Live route) or `--real-voice=second` was given to `lamp-sim run`.
+/// `--real-voice=local`: the second route with the developer's own LLM endpoint, and speech and listening by the host
+/// (`lamp-sim speech` and `lamp-sim listen` on loopback, started by the run): macOS, where `speech` has the host's voice.
+pub const FLAG_LOCAL: &str = "--real-voice=local";
+
+/// Whether `--real-voice` (the Live route), `--real-voice=second` or `--real-voice=local` was given to `lamp-sim run`.
 pub fn wanted(args: &[String]) -> bool {
-    args.iter().any(|arg| arg == FLAG || arg == FLAG_SECOND)
+    args.iter()
+        .any(|arg| arg == FLAG || arg == FLAG_SECOND || arg == FLAG_LOCAL)
 }
 
 /// Whether it is the second route that was asked for.
@@ -88,11 +93,30 @@ pub fn second_wanted(args: &[String]) -> bool {
     args.iter().any(|arg| arg == FLAG_SECOND)
 }
 
+/// Whether it is the second route on the host's own speech and listening that was asked for.
+pub fn local_wanted(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == FLAG_LOCAL)
+}
+
 /// Why the voice cannot be started with these flags and this bin folder, said before anything starts.
 pub fn check(args: &[String], bin: &Path) -> Result<(), String> {
-    if !cfg!(target_os = "linux") {
+    if !cfg!(any(target_os = "linux", target_os = "macos")) {
+        return Err(format!("{FLAG} is for Linux and macOS only"));
+    }
+    check_on(args, bin, cfg!(target_os = "macos"))
+}
+
+/// [`check`] as on macOS (`macos`) or on Linux: `=local` needs the host's voice (`say` and AVSpeechSynthesizer, macOS
+/// only), the other routes lamp-voice's ALSA speaker (Linux only).
+fn check_on(args: &[String], bin: &Path, macos: bool) -> Result<(), String> {
+    if local_wanted(args) && !macos {
         return Err(format!(
-            "{FLAG} is for Linux only: lamp-voice's capture and speaker are ALSA, and macOS has no lamp-voice"
+            "{FLAG_LOCAL} is for macOS only: lamp-sim speech speaks in the host's voice there; on Linux use {FLAG_SECOND}"
+        ));
+    }
+    if !local_wanted(args) && macos {
+        return Err(format!(
+            "{FLAG} and {FLAG_SECOND} are for Linux only: lamp-voice's speaker is ALSA there; on macOS use {FLAG_LOCAL}"
         ));
     }
     if !args.iter().any(|arg| arg == "--microphone") {
@@ -514,6 +538,141 @@ fn product_second_path() -> String {
 /// copy of a key is in that one folder, which a [`KeyGuard`] removes on any failure here, and the run's own guard and
 /// the voice's watcher remove at the end.
 pub fn prepare_second(setup: &Setup, keys: &SecondKeys) -> io::Result<Launch> {
+    second_route(setup, keys.deepseek_url, |home| {
+        let deepseek = write_private(home, OWN_DEEPSEEK_KEY, keys.deepseek.expose())?;
+        if let Some(url) = keys.deepseek_url {
+            write_private(home, OWN_DEEPSEEK_URL, url.expose())?;
+        }
+        let deepgram = write_private(home, OWN_DEEPGRAM_KEY, keys.deepgram.expose())?;
+        let speech = write_private(home, "speech.key", keys.speech_key.expose())?;
+        // The route's required fields name key files; the chat is DeepSeek's (LAMP_SECOND_CHAT=deepseek) with the
+        // developer's own key over the relay's (LAMP_OWN_KEYS=on), so `llm_*` is DeepSeek's too and is never the company's.
+        let deepseek_base = keys
+            .deepseek_url
+            .map_or("https://api.deepseek.com", |url| url.expose().trim());
+        let second = serde_json::json!({
+            "llm_base_url": deepseek_base,
+            // One name for the model: lamp-voice's own default for `LAMP_SECOND_CHAT=deepseek` (the file requires a name; the chat
+            // asks this one). A test ties it to lamp-voice's `DEEPSEEK_MODEL`.
+            "llm_model": DEEPSEEK_MODEL,
+            "llm_credential_file": deepseek,
+            "deepgram_credential_file": deepgram,
+            "tts_provider": keys.speech.name(),
+            "tts_base_url": keys.speech.base_url(),
+            "tts_credential_file": speech,
+        });
+        let extra = vec![
+            ("LAMP_OWN_KEYS".to_owned(), "on".to_owned()),
+            ("LAMP_SECOND_CHAT".to_owned(), "deepseek".to_owned()),
+            (
+                "LAMP_SECOND_SPEECH".to_owned(),
+                keys.speech.name().to_owned(),
+            ),
+        ];
+        Ok((second, extra))
+    })
+}
+
+/// The developer's own LLM for `--real-voice=local`: an OpenAI-compatible endpoint, its key and the model asked.
+pub struct LocalKeys<'a> {
+    pub llm: &'a Key,
+    pub llm_url: &'a Key,
+    pub llm_model: &'a Key,
+}
+
+/// The local route's keys from what was found: all three of `[local]`, or why not (said before anything starts).
+pub fn local_keys(keys: &crate::keys::Keys) -> Result<LocalKeys<'_>, String> {
+    let (Some(llm), Some(llm_url), Some(llm_model)) = (&keys.llm, &keys.llm_url, &keys.llm_model)
+    else {
+        let missing: Vec<&str> = [
+            (keys.llm.is_none(), "local.llm"),
+            (keys.llm_url.is_none(), "local.llm_url"),
+            (keys.llm_model.is_none(), "local.llm_model"),
+        ]
+        .into_iter()
+        .filter_map(|(absent, name)| absent.then_some(name))
+        .collect();
+        return Err(format!(
+            "{FLAG_LOCAL} needs {} in ~/.config/lampos/voice-keys.toml (or the LAMPOS_VOICE_LOCAL_* variables); `lamp-sim voice-keys` says which are set",
+            missing.join(", ")
+        ));
+    };
+    if !service_url_ok(llm_url.expose().trim()) {
+        return Err(
+            "local.llm_url must be an https:// address with a host and no ? # or @ (your LLM key is sent there; lamp-voice takes no plain http for the chat)"
+                .to_owned(),
+        );
+    }
+    if !local_model_ok(llm_model.expose()) {
+        return Err(
+            "local.llm_model must be 1 to 128 printable characters with no space or quote"
+                .to_owned(),
+        );
+    }
+    Ok(LocalKeys {
+        llm,
+        llm_url,
+        llm_model,
+    })
+}
+
+/// A model name for an OpenAI-compatible endpoint: `gpt-4.1-mini`, `openai/gpt-4o`, `llama3.1:8b`; 1 to 128 printable
+/// ASCII characters, no space, quote or backslash.
+fn local_model_ok(model: &str) -> bool {
+    (1..=128).contains(&model.len())
+        && model
+            .bytes()
+            .all(|b| b.is_ascii_graphic() && !b"\"'\\".contains(&b))
+}
+
+/// The host's speech and listening, as the run started them: each one's loopback address and the file with its token
+/// (`lamp-sim speech` and `lamp-sim listen` write it 0600; lamp-voice reads it as the service's credential).
+pub struct LocalServices<'a> {
+    pub speech_url: &'a str,
+    pub speech_token: &'a Path,
+    pub listen_url: &'a str,
+    pub listen_token: &'a Path,
+}
+
+/// The second route (`LAMP_VOICE_ROUTE=second`) on the developer's own LLM and the host's speech and listening: the
+/// configured chat (no `LAMP_SECOND_CHAT`), so `{llm_url}/chat/completions` with the developer's key as a bearer;
+/// speech to text at the run's `lamp-sim listen` (the route's Deepgram protocol with no Deepgram key, so its
+/// `stt_base_url`); speech at the run's `lamp-sim speech` (`tts_provider` openai). Both are plain `http://127.0.0.1`,
+/// which lamp-voice takes only with `LAMP_VOICE_LOOPBACK_SERVICES=on`; the LLM stays https.
+pub fn prepare_local(
+    setup: &Setup,
+    keys: &LocalKeys,
+    services: &LocalServices,
+) -> io::Result<Launch> {
+    second_route(setup, Some(keys.llm_url), |home| {
+        let llm = write_private(home, "llm.key", keys.llm.expose())?;
+        let second = serde_json::json!({
+            "llm_base_url": keys.llm_url.expose().trim(),
+            "llm_model": keys.llm_model.expose(),
+            "llm_credential_file": llm,
+            "stt_base_url": services.listen_url,
+            "stt_credential_file": services.listen_token,
+            "tts_provider": "openai",
+            "tts_base_url": services.speech_url,
+            "tts_credential_file": services.speech_token,
+        });
+        let extra = vec![
+            ("LAMP_SECOND_SPEECH".to_owned(), "openai".to_owned()),
+            ("LAMP_VOICE_LOOPBACK_SERVICES".to_owned(), "on".to_owned()),
+        ];
+        Ok((second, extra))
+    })
+}
+
+/// What both second-route starts share: the paths made absolute and checked (never the product's file or folder), the
+/// address a key is sent to checked again, `DIR/voice` and the key's folder made, then `files` writes the route's keys
+/// into that folder and gives `second.json`'s content and the variables of its own; the Live route's placeholder
+/// `provider.json` and the language follow. A [`KeyGuard`] removes the key's folder on any failure here.
+fn second_route(
+    setup: &Setup,
+    sent_to: Option<&Key>,
+    files: impl FnOnce(&Path) -> io::Result<(serde_json::Value, Vec<(String, String)>)>,
+) -> io::Result<Launch> {
     let (dir_abs, bin_abs, bus_abs, home_abs) = absolute_paths(setup)?;
     let setup = &Setup {
         dir: &dir_abs,
@@ -543,13 +702,15 @@ pub fn prepare_second(setup: &Setup, keys: &SecondKeys) -> io::Result<Launch> {
             "the second route's configuration and credentials may not be the product's own",
         ));
     }
-    // And the address the key is sent to, again (second_keys said it first): before any key file is written.
-    if let Some(url) = keys.deepseek_url
+    // And the address the key is sent to, again (second_keys and local_keys said it first): before any key file is
+    // written.
+    if let Some(url) = sent_to
         && !service_url_ok(url.expose().trim())
     {
-        return Err(io::Error::other(
-            "own.deepseek_url must be an https:// address with a host and no ? # or @",
-        ));
+        return Err(io::Error::other(format!(
+            "{} must be an https:// address with a host and no ? # or @",
+            url.name()
+        )));
     }
     let voice = dir.join("voice");
     remove_key_home(&home.path);
@@ -557,28 +718,7 @@ pub fn prepare_second(setup: &Setup, keys: &SecondKeys) -> io::Result<Launch> {
     fs::DirBuilder::new().mode(0o700).create(&voice)?;
     fs::DirBuilder::new().mode(0o700).create(&home.path)?;
     let guard = KeyGuard::new(&home.path);
-    let deepseek = write_private(&home.path, OWN_DEEPSEEK_KEY, keys.deepseek.expose())?;
-    if let Some(url) = keys.deepseek_url {
-        write_private(&home.path, OWN_DEEPSEEK_URL, url.expose())?;
-    }
-    let deepgram = write_private(&home.path, OWN_DEEPGRAM_KEY, keys.deepgram.expose())?;
-    let speech = write_private(&home.path, "speech.key", keys.speech_key.expose())?;
-    // The route's required fields name key files; the chat is DeepSeek's (LAMP_SECOND_CHAT=deepseek) with the
-    // developer's own key over the relay's (LAMP_OWN_KEYS=on), so `llm_*` is DeepSeek's too and is never the company's.
-    let deepseek_base = keys
-        .deepseek_url
-        .map_or("https://api.deepseek.com", |url| url.expose().trim());
-    let second = serde_json::json!({
-        "llm_base_url": deepseek_base,
-        // One name for the model: lamp-voice's own default for `LAMP_SECOND_CHAT=deepseek` (the file requires a name; the chat
-        // asks this one). A test ties it to lamp-voice's `DEEPSEEK_MODEL`.
-        "llm_model": DEEPSEEK_MODEL,
-        "llm_credential_file": deepseek,
-        "deepgram_credential_file": deepgram,
-        "tts_provider": keys.speech.name(),
-        "tts_base_url": keys.speech.base_url(),
-        "tts_credential_file": speech,
-    });
+    let (second, own) = files(&home.path)?;
     let second = write_private(&home.path, "second.json", &second.to_string())?;
     // `serve`'s first argument: the Live route's file, which the second route still reads for the character. Its credential
     // is a file of its own holding a fixed word that is no key, never another service's key paired with Google's endpoint:
@@ -596,23 +736,18 @@ pub fn prepare_second(setup: &Setup, keys: &SecondKeys) -> io::Result<Launch> {
     let provider = write_private(&home.path, "provider.json", &provider.to_string())?;
     let language = write_private(&voice, "language", "en\n")?;
     guard.disarm();
-    let extra = vec![
+    let mut extra = vec![
         ("LAMP_VOICE_ROUTE".to_owned(), "second".to_owned()),
         (
             "LAMP_VOICE_SECOND_CONFIG".to_owned(),
             second.display().to_string(),
         ),
-        ("LAMP_OWN_KEYS".to_owned(), "on".to_owned()),
-        ("LAMP_SECOND_CHAT".to_owned(), "deepseek".to_owned()),
-        (
-            "LAMP_SECOND_SPEECH".to_owned(),
-            keys.speech.name().to_owned(),
-        ),
-        (
-            "CREDENTIALS_DIRECTORY".to_owned(),
-            home.path.display().to_string(),
-        ),
     ];
+    extra.extend(own);
+    extra.push((
+        "CREDENTIALS_DIRECTORY".to_owned(),
+        home.path.display().to_string(),
+    ));
     Ok(launch(setup, &provider, &language, extra))
 }
 
@@ -762,26 +897,49 @@ mod tests {
             "/d",
             "--real-voice=on"
         ])));
+        assert!(wanted(&args(&["lamp-sim", "run", "/d", FLAG_LOCAL])));
+        assert!(local_wanted(&args(&["lamp-sim", "run", "/d", FLAG_LOCAL])));
+        assert!(!local_wanted(&args(&[
+            "lamp-sim",
+            "run",
+            "/d",
+            FLAG_SECOND
+        ])));
         let bin = folder("bin");
-        if !cfg!(target_os = "linux") {
-            // Off Linux it is refused before anything else is looked at.
+        // On macOS the Live and second routes are refused before anything else is looked at (lamp-voice's speaker is
+        // ALSA), and on Linux the local one (the host's voice is macOS's).
+        for route in [FLAG, FLAG_SECOND] {
             let refused =
-                check(&args(&["run", "/d", "--real-voice", "--microphone"]), &bin).unwrap_err();
-            assert!(refused.contains("is for Linux only"), "{refused}");
-            let _ = fs::remove_dir_all(&bin);
-            return;
+                check_on(&args(&["run", "/d", route, "--microphone"]), &bin, true).unwrap_err();
+            assert!(
+                refused.contains("are for Linux only") && refused.contains(FLAG_LOCAL),
+                "{refused}"
+            );
         }
-        let without_mic = check(&args(&["run", "/d", "--real-voice"]), &bin).unwrap_err();
-        assert!(without_mic.contains("needs --microphone"), "{without_mic}");
-        let without_binary =
-            check(&args(&["run", "/d", "--real-voice", "--microphone"]), &bin).unwrap_err();
+        let refused = check_on(
+            &args(&["run", "/d", FLAG_LOCAL, "--microphone"]),
+            &bin,
+            false,
+        )
+        .unwrap_err();
         assert!(
-            without_binary.contains("needs lamp-voice")
-                && without_binary.contains("cargo build --release -p lamp-voice"),
-            "{without_binary}"
+            refused.contains("is for macOS only") && refused.contains(FLAG_SECOND),
+            "{refused}"
         );
-        fs::write(bin.join(PROGRAM), "#!/bin/sh\n").unwrap();
-        assert!(check(&args(&["run", "/d", "--real-voice", "--microphone"]), &bin).is_ok());
+        for (route, macos) in [(FLAG, false), (FLAG_SECOND, false), (FLAG_LOCAL, true)] {
+            let _ = fs::remove_file(bin.join(PROGRAM));
+            let without_mic = check_on(&args(&["run", "/d", route]), &bin, macos).unwrap_err();
+            assert!(without_mic.contains("needs --microphone"), "{without_mic}");
+            let without_binary =
+                check_on(&args(&["run", "/d", route, "--microphone"]), &bin, macos).unwrap_err();
+            assert!(
+                without_binary.contains("needs lamp-voice")
+                    && without_binary.contains("cargo build --release -p lamp-voice"),
+                "{without_binary}"
+            );
+            fs::write(bin.join(PROGRAM), "#!/bin/sh\n").unwrap();
+            assert!(check_on(&args(&["run", "/d", route, "--microphone"]), &bin, macos).is_ok());
+        }
         let _ = fs::remove_dir_all(&bin);
     }
 
@@ -1495,6 +1653,137 @@ mod tests {
         );
         assert!(!home.path.exists(), "every key's folder is gone");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    const LOCAL: [(&str, &str); 3] = [
+        ("LAMPOS_VOICE_LOCAL_LLM_KEY", "test-not-real-llm-key"),
+        (
+            "LAMPOS_VOICE_LOCAL_LLM_URL",
+            "https://llm.test-not-real.invalid/v1",
+        ),
+        ("LAMPOS_VOICE_LOCAL_LLM_MODEL", "openai/gpt-test:mini"),
+    ];
+
+    #[test]
+    fn the_local_route_needs_the_three_llm_values_and_an_https_endpoint() {
+        let why = local_keys(&keys_with(&LOCAL[..1])).err().unwrap();
+        assert!(why.contains("local.llm_url, local.llm_model"), "{why}");
+        assert!(!why.contains("local.llm,"), "{why}");
+        assert!(!why.contains(LOCAL[0].1), "no value in the words");
+        // The second route's keys are not the local route's.
+        assert!(local_keys(&keys_with(&OWN)).is_err());
+        let found = keys_with(&LOCAL);
+        let local = local_keys(&found).unwrap();
+        assert_eq!(local.llm_model.expose(), LOCAL[2].1);
+        // A plain http LLM is refused here, as lamp-voice refuses it (the loopback switch covers speech and listening
+        // only), and so is a model name that is no name.
+        for (url, model) in [
+            ("http://127.0.0.1:11434/v1", LOCAL[2].1),
+            ("https://user@llm.test-not-real.invalid/v1", LOCAL[2].1),
+            (LOCAL[1].1, "gpt 4"),
+            (LOCAL[1].1, "gpt\"4"),
+        ] {
+            let found = keys_with(&[
+                LOCAL[0],
+                ("LAMPOS_VOICE_LOCAL_LLM_URL", url),
+                ("LAMPOS_VOICE_LOCAL_LLM_MODEL", model),
+            ]);
+            let why = local_keys(&found).err().unwrap();
+            assert!(!why.contains(LOCAL[0].1), "{why}");
+        }
+        assert!(local_model_ok("gpt-4.1-mini") && local_model_ok("llama3.1:8b"));
+        assert!(!local_model_ok("") && !local_model_ok(&"m".repeat(129)));
+    }
+
+    #[test]
+    fn the_local_route_asks_the_developers_llm_and_the_hosts_speech_and_listening() {
+        let dir = folder("local");
+        let run = runtime("local-run");
+        let home = key_home(&dir, Some(run.as_os_str()));
+        let found = keys_with(&LOCAL);
+        let local = local_keys(&found).unwrap();
+        let speech_token = dir.join("local").join("speech.token");
+        let listen_token = dir.join("local").join("listen.token");
+        let services = LocalServices {
+            speech_url: "http://127.0.0.1:7732",
+            speech_token: &speech_token,
+            listen_url: "http://127.0.0.1:7733",
+            listen_token: &listen_token,
+        };
+        let launch = prepare_local(
+            &Setup {
+                dir: &dir,
+                bin: Path::new("/bin-dir"),
+                bus_root: Path::new("/lamp/bus"),
+                model: DEFAULT_MODEL,
+                speaker: "default",
+                unix_ms: 7,
+                home: &home,
+            },
+            &local,
+            &services,
+        )
+        .unwrap();
+        let mut names: Vec<String> = fs::read_dir(&home.path)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        assert_eq!(
+            names,
+            ["llm.key", "provider.json", "provider.key", "second.json"]
+        );
+        for name in &names {
+            assert_eq!(
+                fs::metadata(home.path.join(name)).unwrap().mode() & 0o777,
+                0o600,
+                "{name}"
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(home.path.join("llm.key")).unwrap(),
+            LOCAL[0].1
+        );
+        let second: serde_json::Value =
+            serde_json::from_slice(&fs::read(home.path.join("second.json")).unwrap()).unwrap();
+        assert_eq!(second["llm_base_url"], LOCAL[1].1);
+        assert_eq!(second["llm_model"], LOCAL[2].1);
+        assert_eq!(
+            second["llm_credential_file"],
+            home.path.join("llm.key").display().to_string()
+        );
+        // No Deepgram key: lamp-voice takes `stt_base_url` (its Deepgram protocol, `lamp-sim listen`'s), with the token.
+        assert!(second.get("deepgram_credential_file").is_none());
+        assert_eq!(second["stt_base_url"], "http://127.0.0.1:7733");
+        assert_eq!(
+            second["stt_credential_file"],
+            listen_token.display().to_string()
+        );
+        assert_eq!(second["tts_provider"], "openai");
+        assert_eq!(second["tts_base_url"], "http://127.0.0.1:7732");
+        assert_eq!(
+            second["tts_credential_file"],
+            speech_token.display().to_string()
+        );
+        let text = fs::read_to_string(home.path.join("second.json")).unwrap();
+        assert!(!text.contains(LOCAL[0].1), "second.json holds the key");
+        // The configured chat (no LAMP_SECOND_CHAT, no own keys), the configured voice, and plain loopback allowed.
+        let set: std::collections::HashMap<_, _> = launch.set.iter().cloned().collect();
+        assert_eq!(set["LAMP_VOICE_ROUTE"], "second");
+        assert_eq!(set["LAMP_SECOND_SPEECH"], "openai");
+        assert_eq!(set["LAMP_VOICE_LOOPBACK_SERVICES"], "on");
+        assert!(!set.contains_key("LAMP_SECOND_CHAT"));
+        assert!(!set.contains_key("LAMP_OWN_KEYS"));
+        assert_eq!(
+            set["CREDENTIALS_DIRECTORY"],
+            home.path.display().to_string()
+        );
+        let everything = format!("{:?} {:?}", launch.args, launch.set);
+        assert!(
+            !everything.contains(LOCAL[0].1),
+            "the key is in the argv or the environment"
+        );
+        let _ = (fs::remove_dir_all(&dir), fs::remove_dir_all(&run));
     }
 
     /// The DANGER TEST: lamp-voice WRITES the product's second.json (under /etc/lampOS/voice) when the second route is configured at exactly

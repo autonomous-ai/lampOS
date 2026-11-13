@@ -42,7 +42,7 @@ fn lamp_name(dir: &Path) -> String {
     format!("virtual-{:06x}", hash & 0xff_ffff)
 }
 
-const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] [--real-voice[=second] (the real lamp-voice: the Live route with your Gemini key, or =second its second route with your DeepSeek, Deepgram and ElevenLabs/OpenAI keys; needs --microphone)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim speech DIR [--listen 127.0.0.1:PORT] [--engine resident|say] [--language en-US] (a local OpenAI-compatible /audio/speech in the host's voice, pcm only, for the real voice's second route; its token in DIR/speech.token; on macOS the resident synthesizer unless --engine say) | lamp-sim listen DIR [--listen 127.0.0.1:PORT] [--whisper http://127.0.0.1:PORT] (a local speech-to-text socket in Deepgram's protocol, before your own whisper-server, for the real voice's second route; its token in DIR/listen.token) | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
+const USAGE: &str = "usage: lamp-sim people N DIR | hear TEXT DIR | hand DIR | sound music|laughter|door|footsteps DIR | touch tap|pet DIR | air KEY=VALUE... DIR (a person in front of the lamp, by hand) | lamp-sim run DIR [--bin-dir BIN] [--listen ADDR] [--camera|--camera=always [--camera-gain N] [--camera-warp=off]] [--microphone] [--controls (the real lamp-controls beside the lamp: controls/state, no slide)] [--real-voice[=second|=local] (the real lamp-voice: the Live route with your Gemini key, =second its second route with your DeepSeek, Deepgram and ElevenLabs/OpenAI keys, or =local (macOS) the second route with your own LLM endpoint and lamp-sim speech and listen started beside it [--whisper URL] [--speech-listen ADDR] [--stt-listen ADDR]; needs --microphone)] | lamp-sim code DIR [--grants a,b,...] (default: every grant) | lamp-sim servo DIR | lamp-sim speech DIR [--listen 127.0.0.1:PORT] [--engine resident|say] [--language en-US] (a local OpenAI-compatible /audio/speech in the host's voice, pcm only, for the real voice's second route; its token in DIR/speech.token; on macOS the resident synthesizer unless --engine say) | lamp-sim listen DIR [--listen 127.0.0.1:PORT] [--whisper http://127.0.0.1:PORT] (a local speech-to-text socket in Deepgram's protocol, before your own whisper-server, for the real voice's second route; its token in DIR/listen.token) | lamp-sim voice-keys (which of your voice keys are set, from the file or the environment; never a value)";
 
 fn option(args: &[String], name: &str) -> Option<String> {
     args.iter()
@@ -349,26 +349,34 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
     // `--real-voice`: the real lamp-voice on the Live route with the developer's Gemini key (real_voice.rs). Said
     // before anything starts when it cannot be; with no key, one line and the stand-in voice as always. The key
     // is read into its file here and dropped (zeroed) at once.
+    // `--real-voice=local`: the host's speech and listening, started before the voice and ended with the lamp.
+    let mut local_services: Vec<(&str, Child)> = Vec::new();
     let real_voice = if lamp_sim::real_voice::wanted(args) {
         lamp_sim::real_voice::check(args, &bin).map_err(std::io::Error::other)?;
         let environment = |name: &str| std::env::var_os(name);
         let file = lamp_sim::keys::path_from(&environment);
         let keys =
             lamp_sim::keys::load(&environment, file.as_deref()).map_err(std::io::Error::other)?;
-        // The Live route needs the Gemini key; the second route (`--real-voice=second`) needs the three own keys.
+        // The Live route needs the Gemini key; the second route (`--real-voice=second`) needs the three own keys, and
+        // the local one (`--real-voice=local`) the developer's LLM.
         let second = lamp_sim::real_voice::second_wanted(args);
         let second_keys = if second {
             Some(lamp_sim::real_voice::second_keys(&keys))
         } else {
             None
         };
-        let ready = match &second_keys {
-            Some(Ok(_)) => true,
-            Some(Err(line)) => {
+        let local_keys = if lamp_sim::real_voice::local_wanted(args) {
+            Some(lamp_sim::real_voice::local_keys(&keys))
+        } else {
+            None
+        };
+        let ready = match (&second_keys, &local_keys) {
+            (Some(Ok(_)), _) | (_, Some(Ok(_))) => true,
+            (Some(Err(line)), _) | (_, Some(Err(line))) => {
                 eprintln!("lamp-sim: {line}; using the stand-in voice");
                 false
             }
-            None => keys.gemini.is_some(),
+            (None, None) => keys.gemini.is_some(),
         };
         if ready {
             lamp_sim::controls::present(&bin).map_err(std::io::Error::other)?;
@@ -394,13 +402,20 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
                 unix_ms,
                 home: &home,
             };
-            Some(match (&second_keys, &keys.gemini) {
-                (Some(Ok(own)), _) => lamp_sim::real_voice::prepare_second(&setup, own)?,
-                (_, Some(key)) => lamp_sim::real_voice::prepare(&setup, key)?,
+            Some(match (&second_keys, &local_keys, &keys.gemini) {
+                (Some(Ok(own)), _, _) => lamp_sim::real_voice::prepare_second(&setup, own)?,
+                (_, Some(Ok(llm)), _) => {
+                    let started = start_local_services(dir, args)?;
+                    let launch =
+                        lamp_sim::real_voice::prepare_local(&setup, llm, &started.services())?;
+                    local_services = started.children;
+                    launch
+                }
+                (_, _, Some(key)) => lamp_sim::real_voice::prepare(&setup, key)?,
                 _ => unreachable!("ready means a key set for the route"),
             })
         } else {
-            if second_keys.is_none() {
+            if second_keys.is_none() && local_keys.is_none() {
                 eprintln!(
                     "lamp-sim: {}",
                     lamp_sim::real_voice::no_key_line(file.as_deref())
@@ -601,8 +616,15 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             let given = lamp_sim::real_voice::environment(launch, std::env::vars_os());
             let child =
                 lamp_sim::real_voice::watched_command(launch, std::process::id(), given).spawn()?;
+            let route = if lamp_sim::real_voice::local_wanted(args) {
+                "the second route on your LLM and the host's speech and listening"
+            } else if lamp_sim::real_voice::second_wanted(args) {
+                "the second route on your own keys"
+            } else {
+                "the Live route, not a customer lamp's"
+            };
             eprintln!(
-                "lamp-sim: real voice started (the Live route, not a customer lamp's; session {})",
+                "lamp-sim: real voice started ({route}; session {})",
                 launch.session.display()
             );
             Some(child)
@@ -654,6 +676,14 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             eprintln!("lamp-sim: lamp-control ended");
             ended = true;
         }
+        // A local service that ends is said once; the voice then hears or speaks nothing more, and the lamp stays up.
+        local_services.retain_mut(|(name, child)| match child.try_wait() {
+            Ok(Some(status)) => {
+                eprintln!("lamp-sim: lamp-sim {name} ended ({status}); the real voice cannot use it until the next run");
+                false
+            }
+            _ => true,
+        });
         if let Some(child) = voice.as_mut()
             && let Ok(Some(status)) = child.try_wait()
         {
@@ -678,6 +708,7 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             children.push(body);
             children.extend(controls);
             children.extend(voice);
+            children.extend(local_services.drain(..).map(|(_, child)| child));
             if let Some(launch) = &real_voice {
                 lamp_sim::real_voice::remove_key_home(&launch.key_home);
             }
@@ -802,6 +833,127 @@ fn why_in(text: &str) -> String {
         }
         (None, None) => "no exit report".to_owned(),
     }
+}
+
+/// The host's speech and listening for `--real-voice=local`, as started: each one's address and token file, and the
+/// processes (named) for the run to watch.
+struct LocalStarted {
+    speech_url: String,
+    listen_url: String,
+    speech_token: PathBuf,
+    listen_token: PathBuf,
+    children: Vec<(&'static str, Child)>,
+}
+
+impl LocalStarted {
+    fn services(&self) -> lamp_sim::real_voice::LocalServices<'_> {
+        lamp_sim::real_voice::LocalServices {
+            speech_url: &self.speech_url,
+            speech_token: &self.speech_token,
+            listen_url: &self.listen_url,
+            listen_token: &self.listen_token,
+        }
+    }
+}
+
+/// How long a local service may take to bind its address and write its token: `speech` starts a `say` or the
+/// resident synthesizer first, which takes about 0.4 s.
+const LOCAL_SERVICE_WAIT: Duration = Duration::from_secs(5);
+
+/// `lamp-sim speech` and `lamp-sim listen` in `DIR/local`, each under the watcher that ends it with the lamp, on
+/// `--speech-listen` and `--stt-listen` (127.0.0.1:7732 and :7733 unless given), `listen` before `--whisper`. Each is
+/// ready when its token file is whole: it writes the token after its socket is bound, so lamp-voice's first request
+/// then waits in the socket's queue, never on a refused connection. Said before the voice starts when an address is
+/// taken or a service does not come up; a service already started is stopped then.
+fn start_local_services(dir: &Path, args: &[String]) -> std::io::Result<LocalStarted> {
+    use std::os::unix::fs::DirBuilderExt;
+    let folder = dir.join("local");
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&folder)?;
+    let speech_at = option(args, "--speech-listen").unwrap_or_else(|| "127.0.0.1:7732".to_owned());
+    let listen_at = option(args, "--stt-listen").unwrap_or_else(|| "127.0.0.1:7733".to_owned());
+    let whisper = option(args, "--whisper").unwrap_or_else(|| "http://127.0.0.1:7734".to_owned());
+    for (flag, at) in [
+        ("--speech-listen", &speech_at),
+        ("--stt-listen", &listen_at),
+    ] {
+        let address: std::net::SocketAddr = at
+            .parse()
+            .map_err(|_| std::io::Error::other(format!("{flag} {at}: not an address")))?;
+        if !address.ip().is_loopback() {
+            return Err(std::io::Error::other(format!(
+                "{flag} {at}: the host's speech and listening are on loopback only"
+            )));
+        }
+        if let Err(error) = std::net::TcpListener::bind(address) {
+            return Err(std::io::Error::other(format!(
+                "cannot listen on {at}: {error} (pick another with {flag} 127.0.0.1:PORT)"
+            )));
+        }
+    }
+    let me = std::env::current_exe()?;
+    let speech_token = folder.join("speech.token");
+    let listen_token = folder.join("listen.token");
+    let _ = std::fs::remove_file(&speech_token);
+    let _ = std::fs::remove_file(&listen_token);
+    let folder_arg = folder.display().to_string();
+    let mut children: Vec<(&'static str, Child)> = Vec::new();
+    let mut start = |name: &'static str, rest: &[&str]| -> std::io::Result<()> {
+        let child = watched(me.clone())
+            .args([name, &folder_arg])
+            .args(rest)
+            .process_group(0)
+            .spawn()?;
+        children.push((name, child));
+        Ok(())
+    };
+    let started = start("speech", &["--listen", &speech_at])
+        .and_then(|()| start("listen", &["--listen", &listen_at, "--whisper", &whisper]));
+    let stop = |children: &mut Vec<(&'static str, Child)>| {
+        for (_, child) in children.iter_mut() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    };
+    if let Err(error) = started {
+        stop(&mut children);
+        return Err(error);
+    }
+    // A token is 32 hex digits and a line end (`new_token`).
+    let whole = |path: &Path| std::fs::metadata(path).is_ok_and(|info| info.len() == 33);
+    let since = std::time::Instant::now();
+    loop {
+        if whole(&speech_token) && whole(&listen_token) {
+            break;
+        }
+        if let Some(at) = children
+            .iter_mut()
+            .position(|(_, child)| matches!(child.try_wait(), Ok(Some(_))))
+        {
+            let name = children[at].0;
+            stop(&mut children);
+            return Err(std::io::Error::other(format!(
+                "lamp-sim {name} ended before it was ready (its line is above)"
+            )));
+        }
+        if since.elapsed() > LOCAL_SERVICE_WAIT {
+            stop(&mut children);
+            return Err(std::io::Error::other(format!(
+                "the host's speech and listening were not ready in {} s",
+                LOCAL_SERVICE_WAIT.as_secs()
+            )));
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    Ok(LocalStarted {
+        speech_url: format!("http://{speech_at}"),
+        listen_url: format!("http://{listen_at}"),
+        speech_token,
+        listen_token,
+        children,
+    })
 }
 
 /// A thread with a name, so that the lamp can say which one ended.
