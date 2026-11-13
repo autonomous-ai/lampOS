@@ -151,6 +151,16 @@ fn fixture(mode: &str) -> (Supervisor, Controller) {
         .unwrap();
     (supervisor, controller)
 }
+/// A "normal" child for a test that asserts a clean stop. The child is this
+/// test binary re-executed, so on a loaded host (a macOS runner running every
+/// test thread) it can take longer than the production 20 ms to acknowledge the
+/// inhibit: these tests wait 500 ms for it. The production bound is unchanged,
+/// and the timing-sample and expiry tests keep the real one.
+fn patient_fixture() -> (Supervisor, Controller) {
+    let (mut supervisor, controller) = fixture("normal");
+    supervisor.inhibit_deadline_us = 500_000;
+    (supervisor, controller)
+}
 fn until(s: &mut Supervisor, mut f: impl FnMut(&mut Supervisor) -> bool) {
     let deadline = Instant::now() + Duration::from_secs(2);
     while !f(s) {
@@ -347,7 +357,7 @@ fn qualification_rejects_wrong_supervisor_before_any_channel_dispatch() {
 }
 #[test]
 fn actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement() {
-    let (mut s, mut c) = fixture("normal");
+    let (mut s, mut c) = patient_fixture();
     ready(&mut s, &mut c);
     assert!(!s.reaped());
     assert!(
@@ -384,7 +394,7 @@ fn actual_child_uses_same_worker_loop_and_stop_reaps_before_clean_replacement() 
     );
     let old = s.worker;
     drop(s);
-    let (mut replacement, mut c) = fixture("normal");
+    let (mut replacement, mut c) = patient_fixture();
     assert_ne!(old, replacement.worker);
     ready(&mut replacement, &mut c);
     replacement.stop().unwrap();
@@ -923,7 +933,7 @@ fn dropping_reaped_predecessor_does_not_remove_active_successor_sockets() {
         let _ = s.poll();
         s.reaped()
     });
-    let (mut next, mut c) = fixture("normal");
+    let (mut next, mut c) = patient_fixture();
     ready(&mut next, &mut c);
     assert!(
         old.replacement_allowed(next.directory(), next.worker)
