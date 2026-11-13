@@ -1199,7 +1199,9 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   start_agent_task now to hand the work to Hermes; never do it yourself"),
   và journal ghi `request N: named agent, no start_agent_task: asked
   again`, rồi kết quả (`…: asked again: start_agent_task called`, `…: still
-  no call, said it wasn't done`, hoặc `…: called <tên>, not start_agent_task`).
+  no call: the heard words are handed over in code to <agent>, said back
+  for a yes`, `…: still no call, said it wasn't done` cho lời đọc lại không
+  nêu agent, hoặc `…: called <tên>, not start_agent_task`).
   Nếu vòng 1 chỉ gọi các công cụ riêng của đèn ("Hermes, look up the
   weather" được trả lời bằng `weather`: P1 của V2 trên 12587), không công
   cụ nào được chạy: mỗi lệnh gọi được trả lời là không chạy, lời không được
@@ -1223,17 +1225,32 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   nối). Câu mới bắt đầu trong cửa sổ sẽ kết thúc lượt này, journal ghi
   `…: a newer line began within the join window: not asked again`. Mỗi
   request chỉ một lần (`agent_tasks::AskedAgain`, giữ 8 request gần nhất):
-  lời của vòng 2 cũng bị giữ, chỉ nói khi có gọi hàm; nếu vẫn chỉ trả lời
-  bằng lời, lời đó không được nói mà đèn nói câu rõ ràng "Sorry, I didn't
-  do that. Could you ask me again?" (`action_claim::NOT_DONE_LINE`, theo
-  ngôn ngữ của chủ đèn). Request đã hỏi lại trước đó được nói kèm dòng
-  `…: asked again before, said as it came`; không bao giờ lặp. Vòng 1 có gọi bất kỳ hàm nào (`start_agent_task`,
+  lời của vòng 2 cũng bị giữ, chỉ nói khi có gọi hàm. Nếu vẫn chỉ trả lời
+  bằng lời (hoặc được hỏi lại sau một công cụ riêng và không gọi hàm nào),
+  lời đó không được nói và code tự giao việc (#6547 nguyên nhân 3, first
+  builder đồng ý): code gọi `start_agent_task` với nhiệm vụ là đúng lời
+  người nói đã nghe, không thêm gì khác, nên agent và nơi làm được đặt từ
+  chính lời đó như với lệnh gọi của model, và một máy tính được nêu khi
+  chưa ghép đôi vẫn bị từ chối như cũ (`NO_COMPUTER_PAIRED`, #6786). Lệnh
+  gọi này chỉ chuẩn bị: câu trả lời của nó đi vào vòng sau, vòng đó đọc
+  lại việc và hỏi có bắt đầu không; không gì bắt đầu trước tiếng yes của
+  người nói, và họ vẫn có thể huỷ. Câu không nêu agent nào (lần bắt đọc
+  lại bên dưới) mà vẫn chỉ trả lời bằng lời thì đèn nói câu rõ ràng "Sorry,
+  I didn't do that. Could you ask me again?" (`action_claim::NOT_DONE_LINE`,
+  theo ngôn ngữ của chủ đèn); vòng được hỏi lại mà tự gọi
+  `start_agent_task` thì code không tạo thêm lệnh nào. Request đã hỏi lại
+  trước đó được nói kèm dòng `…: asked again before, said as it came`;
+  không bao giờ lặp. Vòng 1 có gọi bất kỳ hàm nào (`start_agent_task`,
   `not_for_me`, một skill) thì như trước, lời của nó được nói khi hết vòng;
   câu không nêu agent nào thì không bị đụng tới và vẫn phát luồng như
   trước. Route Live không được bắt. Test:
   `second_provider::tests::agent_tasks_named`
   (`named_with_no_start_is_asked_again_once`,
-  `named_with_no_start_twice_says_it_was_not_done`,
+  `named_with_no_start_twice_is_handed_over_in_code_and_said_back`,
+  `named_answered_by_an_own_tool_then_nothing_is_handed_over_in_code`,
+  `a_computer_agent_named_with_none_paired_is_refused_as_before`,
+  `named_with_start_when_asked_again_makes_none_in_code`,
+  `not_named_no_start_twice_makes_none_in_code`,
   `named_with_start_is_untouched`,
   `not_named_and_a_question_about_an_agent_are_untouched`,
   `a_request_asked_again_before_is_not_asked_again`,

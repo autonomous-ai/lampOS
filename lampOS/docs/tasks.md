@@ -1977,7 +1977,9 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     work to Hermes; never do it yourself"), and the journal says
     `request N: named agent, no start_agent_task: asked again`, then what
     came of it (`…: asked again: start_agent_task called`, `…: still no
-    call, said it wasn't done`, or `…: called <names>, not start_agent_task`).
+    call: the heard words are handed over in code to <agent>, said back for
+    a yes`, `…: still no call, said it wasn't done` for a read-back with no
+    agent named, or `…: called <names>, not start_agent_task`).
     If round 1 calls only the lamp's own tools instead ("Hermes, look up the
     weather" answered with `weather`: V2's P1 on 12587), none of them runs:
     each is answered as not run, its words are not said, the turn is asked
@@ -2001,17 +2003,32 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     begun in the window ends the turn, journalled `…: a newer line began
     within the join window: not asked again`. Once a request
     (`agent_tasks::AskedAgain`, the last 8 requests kept): round 2's words
-    are held too, said beside a call; answered in words alone again, they
-    are not said and the plain line "Sorry, I didn't do that. Could you ask
-    me again?" (`action_claim::NOT_DONE_LINE`, in the owner's language) is
-    said instead. A request asked again before is said with `…: asked
-    again before, said as it came`; it never loops.
+    are held too, said beside a call. Answered in words alone again (or
+    asked again after an own tool and answered with no call), they are not
+    said and code hands the work over itself (#6547 cause 3, the first
+    builder's yes): it calls `start_agent_task` with the heard words as the
+    task and nothing else, so the agent and its place are set from those
+    words as for a model's call, and a computer named with none paired is
+    refused the same way (`NO_COMPUTER_PAIRED`, #6786). The call only
+    prepares: its answer goes to the next round, which says the task back
+    and asks whether to start it; nothing starts before the person's yes,
+    and they may cancel. A line naming no agent (the read-back catch below)
+    answered in words alone again says the plain line "Sorry, I didn't do
+    that. Could you ask me again?" (`action_claim::NOT_DONE_LINE`, in the
+    owner's language) instead; a round asked again that calls
+    `start_agent_task` itself has none made in code. A request asked again
+    before is said with `…: asked again before, said as it came`; it never
+    loops.
     A round 1 that calls anything (`start_agent_task`, `not_for_me`, a
     skill) goes on as before, its words said at the round's end; a line
     naming no agent is untouched and streams as before. The Live route is
     not caught. Tests: `second_provider::tests::agent_tasks_named`
     (`named_with_no_start_is_asked_again_once`,
-    `named_with_no_start_twice_says_it_was_not_done`,
+    `named_with_no_start_twice_is_handed_over_in_code_and_said_back`,
+    `named_answered_by_an_own_tool_then_nothing_is_handed_over_in_code`,
+    `a_computer_agent_named_with_none_paired_is_refused_as_before`,
+    `named_with_start_when_asked_again_makes_none_in_code`,
+    `not_named_no_start_twice_makes_none_in_code`,
     `named_with_start_is_untouched`,
     `not_named_and_a_question_about_an_agent_are_untouched`,
     `a_request_asked_again_before_is_not_asked_again`,
