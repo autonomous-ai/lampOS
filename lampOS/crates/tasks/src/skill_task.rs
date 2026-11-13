@@ -1744,6 +1744,15 @@ pub fn default_agent_takes_runs(
     Err(not_set_up(name, &why))
 }
 
+/// Whether `wrapper` (a wrapper's text) is a gateway agent's that
+/// lamp-update wrote, with whole, plain data: what
+/// [`default_agent_takes_runs`] hands to [`AgentRun::Gateway`], by the
+/// agent's own data, never its name.
+pub fn wrapper_is_gateway(wrapper: &str) -> bool {
+    lamp_updates(wrapper)
+        && crate::gateway_run::GatewayAgent::of(wrapper).is_some_and(|data| data.is_ok())
+}
+
 /// The words of every refusal of the lamp's default agent `name` for a
 /// skill's run, with `why`.
 fn not_set_up(name: &str, why: &str) -> String {

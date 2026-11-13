@@ -3026,6 +3026,31 @@ pub fn set_up_openclaw(state_dir: &Path, home: &Path, skills: bool) -> String {
     }
 }
 
+/// Whether the lamp's default agent `engine` is a gateway agent by its
+/// wrapper in `wrappers` ([`crate::skill_task::wrapper_is_gateway`]): the
+/// same data-driven check a run's hand-over makes, naming no engine. No
+/// default, or no wrapper there, is not.
+pub fn default_is_gateway_agent(engine: Option<EngineKind>, wrappers: &Path) -> bool {
+    engine
+        .and_then(|engine| std::fs::read_to_string(wrappers.join(engine.argument())).ok())
+        .is_some_and(|text| crate::skill_task::wrapper_is_gateway(&text))
+}
+
+/// At lamp-tasks' start: the fence ([`set_up_skill_run_fence`]) with
+/// `default_agent` (`LAMP_SKILL_DEFAULT_AGENT` on) and the lamp's default
+/// agent `engine` a gateway agent ([`default_is_gateway_agent`]), its
+/// journal line; else nothing is written and `None`.
+pub fn skill_run_fence_at_start(
+    default_agent: bool,
+    engine: Option<EngineKind>,
+    wrappers: &Path,
+    state_dir: &Path,
+    home: &Path,
+) -> Option<String> {
+    (default_agent && default_is_gateway_agent(engine, wrappers))
+        .then(|| set_up_skill_run_fence(state_dir, home))
+}
+
 /// The fence of a skill's run on OpenClaw's gateway
 /// ([`crate::openclaw_config::write_skill_run_fence`]): the fence agent in
 /// `state_dir`'s config, its workspace in lamp-tasks' Harness project
@@ -4339,14 +4364,19 @@ pub fn serve<C: Clock>(
             "{}",
             set_up_openclaw(Path::new(OPENCLAW_STATE_DIR), &side.home, skills)
         );
-        // #6685 step 4: with LAMP_SKILL_DEFAULT_AGENT on only, the fence a
-        // skill's run on OpenClaw's warm gateway is held to. Off, nothing
-        // here is written.
-        if std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on") {
-            eprintln!(
-                "{}",
-                set_up_skill_run_fence(Path::new(OPENCLAW_STATE_DIR), &side.home)
-            );
+        // #6685 step 4: with LAMP_SKILL_DEFAULT_AGENT on and the lamp's
+        // default agent a gateway agent (its wrapper's own data), the
+        // fence a skill's run on its warm gateway is held to. Otherwise
+        // (Hermes the default, say) nothing here is written; a default
+        // changed later is fenced at lamp-tasks' next start.
+        if let Some(line) = skill_run_fence_at_start(
+            std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on"),
+            lamp_default(side),
+            Path::new(crate::skill_task::AGENT_WRAPPERS),
+            Path::new(OPENCLAW_STATE_DIR),
+            &side.home,
+        ) {
+            eprintln!("{line}");
         }
     }
     let served = serve_with_adapter(config, clock, stop, move |session| {
@@ -4990,6 +5020,60 @@ fn with_sign_in(
 #[cfg(test)]
 mod tests {
     use super::code_handed;
+
+    /// #6882 P2-3: the fence is written at start only with the switch on
+    /// and the lamp's default agent a gateway agent by its wrapper's data;
+    /// a Hermes (per-run) default, no wrapper, or no default writes none.
+    #[test]
+    fn the_fence_is_written_only_for_a_gateway_default_agent() {
+        use super::{EngineKind, skill_run_fence_at_start};
+        let dir = tempfile::tempdir().unwrap();
+        let wrappers = dir.path().join("bin");
+        let state = dir.path().join("state");
+        let home = dir.path().join("home");
+        std::fs::create_dir_all(&wrappers).unwrap();
+        let openclaw_rs = include_str!("../../update/src/openclaw_install.rs");
+        let between = |from: &str| {
+            openclaw_rs
+                .split_once(from)
+                .and_then(|(_, rest)| rest.split_once("\"#;"))
+                .unwrap()
+                .0
+                .to_owned()
+        };
+        let own = between("pub const WRAPPER_TEXT: &str = r#\"");
+        let data = between("pub const GATEWAY_DATA: &str = r#\"");
+        let gateway = format!(
+            "#!/bin/sh\n{}{data}{}",
+            crate::gateway_run::GATEWAY_MARK,
+            own.strip_prefix("#!/bin/sh\n").unwrap()
+        );
+        std::fs::write(wrappers.join("openclaw"), &gateway).unwrap();
+        let hermes = format!(
+            "#!/bin/sh\n{}E=hermes\n{}",
+            crate::skill_task::ONE_PATH_MARK,
+            crate::skill_task::WRAPPER_RUN_LINES.concat()
+        );
+        std::fs::write(wrappers.join("hermes"), hermes).unwrap();
+        let config = state.join(crate::openclaw_config::CONFIG_FILE);
+        let at = |on, engine| skill_run_fence_at_start(on, engine, &wrappers, &state, &home);
+        for (on, engine) in [
+            (true, Some(EngineKind::Hermes)),
+            (true, Some(EngineKind::Claude)),
+            (true, None),
+            (false, Some(EngineKind::Openclaw)),
+        ] {
+            assert_eq!(at(on, engine), None, "{on} {engine:?}");
+            assert!(!config.exists(), "{on} {engine:?}");
+        }
+        let said = at(true, Some(EngineKind::Openclaw)).unwrap();
+        assert!(said.contains("written"), "{said}");
+        let text = std::fs::read_to_string(&config).unwrap();
+        assert!(
+            text.contains(crate::openclaw_config::SKILL_RUN_AGENT),
+            "{text}"
+        );
+    }
 
     /// #5488: `status` says Harness's sign-in once it was read, and nothing
     /// else changes.
