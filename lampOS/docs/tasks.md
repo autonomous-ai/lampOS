@@ -2896,6 +2896,31 @@ for each run, and is answered once the run ends
     (`Cli::close_now`) and is `run_failed` "the run was ended at its
     deadline, 840 s". `new` not started (`not_sent`, `uncertain`, or a
     `pending` creation) is `run_failed` too.
+  - **A run that never reached its agent** (#6835 gap 1). When the engine
+    exits before it is ready, Harness keeps the run's pane as a shell: the
+    same agent id, agent "Terminal", and `wait` reads it `idle` within
+    seconds. So once `wait` ends (and the session isn't `closed` or
+    `gone`), lamp-tasks asks `harness show --machine <lamp> <agent>
+    --json` (`Cli::shown_agent`); not asked again when a `stopped` end's own
+    `show` (#6432) already found the session bound, its agent started.
+    Agent "Terminal" means Harness never saw
+    the engine's process, not that the agent did nothing: the run is never
+    `{"ok":true}`. Its token is ended and its session closed, and it is
+    `run_failed` "the skill's task may not have run: Harness kept the run's
+    pane as a shell (agent Terminal, not hermes) …", said in words, "its
+    session was not closed" added when the close failed. It is never made
+    a second time, because a Hermes may have begun it (the first builder,
+    #6811), and a fixed write's is never `not_started`: its agent may have
+    begun (`SkillRun::started`). A `show` that names the engine, or isn't
+    answered, leaves the run judged by `wait`'s end as before. Tests:
+    `a_run_harness_kept_as_a_shell_never_started_and_is_not_said_done`,
+    `a_run_harness_kept_as_a_shell_is_run_failed_and_never_run_again`.
+  - **One journal line a run**: `[lamp-tasks] skill task <run-id>: ended,
+    Harness says <state>, after <n> s; its agent: started (Hermes)`, or
+    `never started (Harness shows a shell, agent Terminal)`, or `not known
+    (<why>)` (`show` not answered, the session gone, or the wait ended at
+    the deadline or the stop, said `Harness says none`). Test:
+    `a_runs_journal_line_says_its_end_its_time_and_whether_its_agent_started`.
   - **However it ends**, its guard first has lamp-control end the run's
     token (`{"end":{"run"}}`, once), then closes the session (`close
     --now`, once; not for one Harness says is `closed` or `gone`), removes
