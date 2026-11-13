@@ -3,6 +3,16 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 06:2x GMT+7: #6954 merged
+
+- Train 894 (#6993) merged as 7b4b4c35c6 with **#6954** (`lamp-sim speech`,
+  P4 step 1): the first voice piece on lamp-voice.
+- Rebased #6961 → a44727ef6e and #6971 → d40efd0154 onto it, own commits
+  only, range-diff all `=` (reads carry). lamp-sim tests pass in full, no
+  skips (#6975 in). NEXT TRAIN #6961 when its checks are green; #6971 waits on
+  ten's restate.
+- Heron confirmed #6991's STT P1 independently (also `[::1]` and Flux).
+
 ## 2026-11-14 06:0x GMT+7: #6988 READ-OK; #6991 (the loopback switch) HOLD
 
 - **#6988** (ten, docs): README hunk dropped, `simulator-lamp.md` only, at
