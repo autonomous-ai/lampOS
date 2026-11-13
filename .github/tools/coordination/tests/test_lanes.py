@@ -48,7 +48,7 @@ echo "$*" >> "$FAKE_DIR/calls.log"
 case "$*" in
   "pr diff"*) cat "$FAKE_DIR/files.txt" ;;
   *collaborators*) echo w1 ;;
-  *issues/4710/comments*|*issues/5385/comments*|*issues/6059/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; [ -f "$FAKE_DIR/queue-fail-$n" ] && exit 1; cat "$FAKE_DIR/queue-$n.json" 2>/dev/null; exit 0 ;;
+  *issues/4710/comments*|*issues/5385/comments*|*issues/6059/comments*|*issues/6809/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; [ -f "$FAKE_DIR/queue-fail-$n" ] && exit 1; cat "$FAKE_DIR/queue-$n.json" 2>/dev/null; exit 0 ;;
   *issues/*/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; cat "$FAKE_DIR/comments-$n.json" ;;
   *"--state all"*) echo 23 ;;
   *"--json headRefName --jq"*) cat "$FAKE_DIR/open.txt" 2>/dev/null ;;
