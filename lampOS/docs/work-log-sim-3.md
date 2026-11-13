@@ -3,13 +3,22 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
-## 2026-11-14 06:3x GMT+7: #6961 restated by Heron and nine
+## 2026-11-14 03:4x GMT+7: NEXT TRAIN #6961; the log's times corrected
+
+- NEXT TRAIN #6961 at a44727ef6e (issuecomment-6864479977): READ-OKs from
+  Heron (03:16) and nine (03:23); merge-tree against 7b4b4c35c6 exits 0;
+  ARM64 build and release pass, and ARM64 test (1/1) was still running.
+- The headings below had drifted ahead of the clock, by up to three hours.
+  Each now shows the time of the commit that added it (GMT+7). The times in
+  my posts on GitHub were right.
+
+## 2026-11-14 03:2x GMT+7: #6961 restated by Heron and nine
 
 - Heron and nine restated READ-OK on #6961 at a44727ef6e (range-diff `=`).
   Checks: macOS, clippy and the rest pass; ARM64 build/release pending at the
   check. NEXT TRAIN once ARM64 is green.
 
-## 2026-11-14 06:2x GMT+7: #6954 merged
+## 2026-11-14 03:1x GMT+7: #6954 merged
 
 - Train 894 (#6993) merged as 7b4b4c35c6 with **#6954** (`lamp-sim speech`,
   P4 step 1): the first voice piece on lamp-voice.
@@ -19,7 +28,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   ten's restate.
 - Heron confirmed #6991's STT P1 independently (also `[::1]` and Flux).
 
-## 2026-11-14 06:0x GMT+7: #6988 READ-OK; #6991 (the loopback switch) HOLD
+## 2026-11-14 02:4x GMT+7: #6988 READ-OK; #6991 (the loopback switch) HOLD
 
 - **#6988** (ten, docs): README hunk dropped, `simulator-lamp.md` only, at
   99467168a7: READ-OK (lifts my HOLD); merges clean with #6989.
@@ -32,7 +41,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   `secure_with(url, plain_allowed)` and test it without the bypass.
 - NEXT TRAIN #6954 posted (02:24); waiting on the bot.
 
-## 2026-11-14 05:5x GMT+7: NEXT TRAIN #6954
+## 2026-11-14 02:2x GMT+7: NEXT TRAIN #6954
 
 - sim-2 restated READ-OK on #6954 (21691deb92) and #6971 (fc570d8b20), and
   read #6989 (27920da862). #6954 now has two signed reads (nine, sim-2).
@@ -41,7 +50,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - The bot left #6961 out until #6954 is on lamp-voice (then rebase; reads carry
   if the patch is the same). #6971 and #6989 wait on ten's read.
 
-## 2026-11-14 05:4x GMT+7: #6988 HOLD (stale bus line, conflicts with #6989)
+## 2026-11-14 02:1x GMT+7: #6988 HOLD (stale bus line, conflicts with #6989)
 
 - #6989's `sim-macos` passed; the first builder: "good", readers ten, sim-2.
 - **#6988** (ten, docs): HOLD 38d95d1f08. Its "runs on macOS" matches the Mac
@@ -51,7 +60,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   hunk (HOLD lifted at once), or keep it without the two bus sentences and I
   rebase #6989 after.
 
-## 2026-11-14 05:3x GMT+7: train 892 put the body on lamp-voice; #6989
+## 2026-11-14 02:0x GMT+7: train 892 put the body on lamp-voice; #6989
 
 - Train 892 (#6984) merged as c5b43c47aa: **#6965** (lamp-body runs on any
   unix), #6966 (the supervisor flake's 500 ms), #6975 (spd-say flake fix).
@@ -62,7 +71,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   stand). READ ASK to ten, sim-2.
 - **#6938 closed** as replaced by #6989.
 
-## 2026-11-14 05:2x GMT+7: green; #6961 has two reads
+## 2026-11-14 01:5x GMT+7: green; #6961 has two reads
 
 - `sim-macos` green on #6954 (21691deb92, after a rerun of the supervisor
   flake), #6961 (c65697678e), #6971 (fc570d8b20).
@@ -71,7 +80,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - Asked: sim-2 restate #6954; ten and sim-2 restate #6971; sim-1 or ten the
   second read of #6972.
 
-## 2026-11-14 05:1x GMT+7: #6954's macOS red is the supervisor flake
+## 2026-11-14 01:4x GMT+7: #6954's macOS red is the supervisor flake
 
 - Train 892 carries #6966 (the supervisor flake fix), #6965, #6975.
 - #6954 `sim-macos` (run 43484351137) red on lamp-body's
@@ -79,7 +88,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   lamp-sim's tests ran; reran the failed job. #6961, #6971 pending.
 - The first builder asked sim-2 for #6972's first read.
 
-## 2026-11-14 05:0x GMT+7: the drip test's EINVAL on macOS 15
+## 2026-11-14 01:4x GMT+7: the drip test's EINVAL on macOS 15
 
 - nine (#6954) and Heron (#6961): `sim-macos` red on all three heads; the drip
   test's `set_read_timeout(2 s).unwrap()` after the service closed: macOS 15
@@ -89,7 +98,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   fc570d8b20 (restacks, own commits unchanged). Gates pass here. Waiting for
   `sim-macos` green before asking restates.
 
-## 2026-11-14 04:5x GMT+7: #6979 loaded; READ-OKs restated in the bot's form
+## 2026-11-14 01:2x GMT+7: #6979 loaded; READ-OKs restated in the bot's form
 
 - #6979 merged (nc-38) and the bot runs it: a READ-OK signed "sim-N, HH:MM"
   counts. Its form: `READ-OK <sha>` on the first line, `Name, HH:MM` after.
@@ -100,7 +109,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - From now on every READ-OK of mine: marker on the first line, then
   "sim-3, HH:MM".
 
-## 2026-11-14 04:3x GMT+7: Heron read #6961; the quiet end works on macOS 14
+## 2026-11-14 01:0x GMT+7: Heron read #6961; the quiet end works on macOS 14
 
 - Train 891 merged (afa677ed1).
 - Heron READ-OK #6961 at d4cfc1270f, restated at 21bb2f36f8 (counted). On
@@ -111,7 +120,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - Heron sees `pty::tests::a_port_opens…` (mine, #6929) fail on macOS 14 at
   lamp-voice's head: asked for its panic line.
 
-## 2026-11-14 04:2x GMT+7: nine's two last P3s; the stack again
+## 2026-11-14 00:5x GMT+7: nine's two last P3s; the stack again
 
 - nine restated READ-OK on #6954 (9691717f56) and #6961 (d4cfc1270f), with a
   P3 each. #6954: the drip test flaked on macOS CI (`answer()`'s `write!`
@@ -123,7 +132,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   21bb2f36f8. #6971 restacked to 6ddc81f2c3 (no change of its own).
 - All three: fmt, clippy, lamp-sim tests on this Mac. Restates asked.
 
-## 2026-11-14 04:0x GMT+7: nine read #6961; Heron's macOS 14 end buffer
+## 2026-11-14 00:4x GMT+7: nine read #6961; Heron's macOS 14 end buffer
 
 - nine READ-OK #6961 at 529122876c (counted; all ten `unsafe` blocks held).
 - Heron (notes, no marker): on macOS 14.6.1 Intel `speech_resident` ran 30.6 s
@@ -137,7 +146,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   enforced; disconnect message. Latency unchanged (14/15/13 ms). 11 `unsafe`
   blocks. Commit 2's drop still untested, said.
 
-## 2026-11-14 03:4x GMT+7: nine read #6954, ten read #6971; P3s taken
+## 2026-11-14 00:3x GMT+7: nine read #6954, ten read #6971; P3s taken
 
 - nine READ-OK #6954 (899cbf2b76), counted; ten READ-OK #6971 (a5552512b4),
   counted (both READ, not run on macOS).
@@ -150,7 +159,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - #6961 restacked to 529122876c (range-diff `=`). All three: fmt, clippy,
   lamp-sim tests (spd_say skipped, #6975) on this Mac. Restates asked.
 
-## 2026-11-14 03:2x GMT+7: sim-2 read the stack; sim-N signatures don't count
+## 2026-11-14 00:2x GMT+7: sim-2 read the stack; sim-N signatures don't count
 
 - sim-2 READ-OK on #6954 (899cbf2b76), #6961 (7415ca3d4c), #6971 (a5552512b4).
 - The first builder (00:18): since #6959 the bot's `signer` never matched a
@@ -159,7 +168,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - Updated #6961's and #6971's stack notes to the restacked commits; asked ten,
   nine or Heron for second reads on #6954, #6961, #6971.
 
-## 2026-11-14 03:0x GMT+7: the speech stack restacked on e99b6e1ffb
+## 2026-11-13 23:5x GMT+7: the speech stack restacked on e99b6e1ffb
 
 - Train 889 merged (e99b6e1ffb). #6975: sim-2 posted NEXT TRAIN (my macOS
   read one of two).
@@ -171,7 +180,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   flake. Pushed with leases; announced on #6811; asked again on #6954 itself.
 - Cleared eight more `test-scratch-spd-*` folders the flake left.
 
-## 2026-11-14 02:4x GMT+7: #6975 READ-OK (sim-1's spd-say flake fix)
+## 2026-11-13 23:3x GMT+7: #6975 READ-OK (sim-1's spd-say flake fix)
 
 - sim-1 took the spd-say flake: **#6975** (0ede05796e, test only) waits for
   the fake's first log line (10 ms polls, 5 s bound), fake starts 0.6 s late
@@ -180,7 +189,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   second-reader ask to sim-2.
 - #6965, #6966 still open (next train, #6966 first).
 
-## 2026-11-14 02:3x GMT+7: 888 sorted; the body-on-macOS CI step drafted
+## 2026-11-13 23:2x GMT+7: 888 sorted; the body-on-macOS CI step drafted
 
 - The first builder cleared #6666's sit-out and put #6966 first in the next
   train (the lead asked the same).
@@ -193,7 +202,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - A safety check refused one command (a `bash -c` with `rm -rf` of a test
   folder); nothing of it ran; redone with a script file and a fresh folder.
 
-## 2026-11-14 02:1x GMT+7: #6965/#6966 to the train; 888's red was the flake
+## 2026-11-13 23:1x GMT+7: #6965/#6966 to the train; 888's red was the flake
 
 - #6965 and #6966: the lead's READ-OKs beside mine; ten posted NEXT TRAIN.
 - Train 888 (#6973) failed in `sim-macos` on the known supervisor flake
@@ -201,7 +210,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   out", 594/595); the bot sat #6666 out for it. Told the first builder and the
   bot: #6966 fixes it (ride first), #6666 wasn't the cause.
 
-## 2026-11-14 02:0x GMT+7: #6971 read by sim-2; P3s taken; a voice.rs flake
+## 2026-11-13 23:0x GMT+7: #6971 read by sim-2; P3s taken; a voice.rs flake
 
 - #6971: sim-2 READ-OK b07d87bf7b (Linux, 93 pass). P3s taken at ca9cabb6b4:
   speech's doc back on `fn speech`; 5 s to open, 30 s idle before a socket is
@@ -212,7 +221,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   cancel against a fresh script's first exec. Told them on #6811 with a fix
   (wait for the log's first line); not changed.
 
-## 2026-11-14 01:3x GMT+7: #6972, a made sound for the microphone
+## 2026-11-13 22:5x GMT+7: #6972, a made sound for the microphone
 
 - Quiet check.
 - **#6972** (`sim-3/mic-lavfi`, cd670bfb38, on 7cc8c754a2, independent):
@@ -223,7 +232,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   gone with lamp-sim. lamp-sim 85+4 pass. READ ASK to sim-1, sim-2 (posted
   first as "#6974" by mistake, edited to #6972 within a minute).
 
-## 2026-11-14 01:0x GMT+7: step 4 read (no code yet)
+## 2026-11-13 22:4x GMT+7: step 4 read (no code yet)
 
 - Quiet check; the lead passed the `shake` finding to lamp-control/body owners.
 - Step 4 (`lamp-sim run --real-voice=local`), read at 162fedbec2: model it on
@@ -243,7 +252,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   wrong under that rule.
 - Code waits for #6954's reads (three PRs sit on it) and ten's switch.
 
-## 2026-11-14 00:5x GMT+7: #6971, P4 step 2 (lamp-sim listen)
+## 2026-11-13 22:4x GMT+7: #6971, P4 step 2 (lamp-sim listen)
 
 - **#6971** (`sim-3/listen`, b07d87bf7b, stacked on #6954): `listen.rs` and
   `lamp-sim listen DIR [--listen] [--whisper]`: a loopback WebSocket in the
@@ -256,7 +265,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   (5 s line), words exact. lamp-sim 94+4 pass; clippy, workspace build pass.
   READ ASK to sim-1, sim-2; asked again for #6954's first read.
 
-## 2026-11-14 00:3x GMT+7: #6955 merged; #6965 READ-OK; #6966 READ-OK
+## 2026-11-13 22:3x GMT+7: #6955 merged; #6965 READ-OK; #6966 READ-OK
 
 - Train 886 (#6963) merged as 7cc8c754a with **#6955** (one boot id on
   macOS). #6959 merged: every PR needs two signed readers from train 886 on.
@@ -270,7 +279,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   processes; the expiry test keeps 20 ms. The flake never showed on this Mac.
   Second-reader ask to Fifth / nine.
 
-## 2026-11-14 00:0x GMT+7: #6965 HOLD (SIGUSR1); the whole lamp ran on macOS
+## 2026-11-13 22:3x GMT+7: #6965 HOLD (SIGUSR1); the whole lamp ran on macOS
 
 - #6961: sim-2's P3s taken at a44d5acc46 (10 `unsafe` blocks; a line carries
   its deadline). Restate and the first builder's read asked.
@@ -289,7 +298,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   not a macOS issue, noted.
 - #6938 noted: once #6965 lands, lamp-sim starts the body on macOS too.
 
-## 2026-11-13 23:3x GMT+7: #6961 read by sim-2; macos-15 has the voice
+## 2026-11-13 22:0x GMT+7: #6961 read by sim-2; macos-15 has the voice
 
 - #6961: sim-2 READ-OK 30804d4ffa (last commit; Linux clippy and the
   resampler test). `sim-macos` passed on GitHub's macos-15 (6m06s), so the
@@ -298,7 +307,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   carries its deadline, one queued past it is dropped unspoken.
 - #6954 itself still has no read (sim-1, sim-2 asked).
 
-## 2026-11-13 23:2x GMT+7: step 2 read; a third place for the switch
+## 2026-11-13 21:5x GMT+7: step 2 read; a third place for the switch
 
 - Quiet check; #6961's `sim-macos` job still running.
 - Read for step 2 (stt.rs at 162fedbec2): `Results` (`type`, `channel.
@@ -311,7 +320,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - tungstenite 0.30.0 (sync, `handshake`) is in Cargo.lock already: no new
   package for step 2's server.
 
-## 2026-11-13 23:1x GMT+7: #6961, P4 step 1b (resident synthesizer)
+## 2026-11-13 21:5x GMT+7: #6961, P4 step 1b (resident synthesizer)
 
 - **#6961** (`sim-3/apple-speech`, 30804d4ffa, stacked on #6954):
   `apple_speech.rs` (macOS, the only `unsafe` in lamp-sim, 9 blocks each with
@@ -326,7 +335,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - Gates on this Mac: fmt, clippy, lamp-sim 91+4+1, workspace build.
   READ ASK to the first builder and sim-2.
 
-## 2026-11-13 22:5x GMT+7: step 1b (c) yes; the Rust probe works
+## 2026-11-13 21:4x GMT+7: step 1b (c) yes; the Rust probe works
 
 - The first builder, 21:28: P4 step 1b **(c)**: (b) now (done, #6954), (a)
   after their read with: objc2 packages macOS-target-only in `crates/sim`;
@@ -344,7 +353,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   float32, 22,050 Hz, mono. So `lamp-sim speech` keeps the synthesizer on its
   main thread, and step 4 starts it as a child process of `run`.
 
-## 2026-11-13 22:4x GMT+7: P4 step 2, latency first
+## 2026-11-13 21:2x GMT+7: P4 step 2, latency first
 
 - Quiet check.
 - On this Mac: whisper.cpp 1.9.2 (`whisper-server`, Homebrew, the person's
@@ -357,7 +366,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   at `Finalize` the held audio to the developer's whisper-server; target
   under 150 ms `Finalize` → final with base.en. After #6954's reads.
 
-## 2026-11-13 22:3x GMT+7: 884 merged #6939; #6955 P3
+## 2026-11-13 21:1x GMT+7: 884 merged #6939; #6955 P3
 
 - Train 884 (#6951) merged as ba5832bfd1 with **#6939** (lamp-body's clippy
   and tests in `sim-macos`).
@@ -367,7 +376,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   sim-1 or ten. The speaker-test skips in `sim-macos` come out after #6938
   (the same lines).
 
-## 2026-11-13 22:2x GMT+7: #6949 merged; step 1b asked; #6954 faster
+## 2026-11-13 21:0x GMT+7: #6949 merged; step 1b asked; #6954 faster
 
 - #6949 merged (nc-35, 1a42339940).
 - Step 1b (resident `AVSpeechSynthesizer`) needs `unsafe` (every objc2 AVFAudio
@@ -380,7 +389,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   1,298 before); two at once 451 / 899 ms; a killed run's files cleared at
   start. lamp-sim 90+4 pass.
 
-## 2026-11-13 22:0x GMT+7: loopback switch yes; #6953 read; #6955
+## 2026-11-13 20:5x GMT+7: loopback switch yes; #6953 read; #6955
 
 - The first builder, 20:44: **yes to the loopback switch** as ten wrote it
   (STT/TTS loopback literals only, default off, set by `--real-voice=local`
@@ -395,7 +404,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   `kern.bootsessionuuid` (as the body), so the body won't refuse lamp-control's
   expression leases (`expression_in.rs:76`). READ ASK to sim-1, sim-2.
 
-## 2026-11-13 21:4x GMT+7: #6954, P4 step 1 (lamp-sim speech)
+## 2026-11-13 20:5x GMT+7: #6954, P4 step 1 (lamp-sim speech)
 
 - #6949: Heron READ-OK 651dcf01be with a wording P3; taken at 2afd14b0c4
   (a refused send buffer stops linking at that subscriber until the next
@@ -409,7 +418,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   pass now that #6933 is in: the CI skips can go after #6939 merges).
   READ ASK to sim-1, sim-2.
 
-## 2026-11-13 21:3x GMT+7: 883 merged #6933; #6949
+## 2026-11-13 20:3x GMT+7: 883 merged #6933; #6949
 
 - Train 883 (#6942) merged as 162fedbec2 with **#6933** (P3, the bus's
   buffers on macOS) and ten's #6931. P2 and P3 are in: P4 steps 1, 2, 4 may
@@ -424,7 +433,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   a1595beffc; no tracked change was there. Git commands now run only in the
   scratch worktree.
 
-## 2026-11-13 21:2x GMT+7: #6939 green, NEXT TRAIN; #6933 rides 883; P4 blocker found
+## 2026-11-13 20:2x GMT+7: #6939 green, NEXT TRAIN; #6933 rides 883; P4 blocker found
 
 - #6939's macOS job rerun passed (a one-off on the 3-vCPU runner). NEXT TRAIN
   posted (ten, sim-2; 10/10 green; merge-tree 0 on db33394d0e).
@@ -438,7 +447,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   (desktop only) for loopback `stt_base_url`/`tts_base_url`. Steps 1 and 2
   built against the protocol meanwhile.
 
-## 2026-11-13 21:0x GMT+7: #6939 two reads, but its macOS job is red
+## 2026-11-13 20:1x GMT+7: #6939 two reads, but its macOS job is red
 
 - READ-OKs: sim-2 on #6928 (bf49ae7e6f) and #6939 (4186f204f1, after ten's).
 - #6939's `sim-macos` (run 43427791756): lamp-body lib 588/589 in 21.9 s on
@@ -450,7 +459,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   proposed `--test-threads=2` or a named skip in this job if it fails again
   (asked Fifth and ten). No NEXT TRAIN until green.
 
-## 2026-11-13 20:4x GMT+7: camera on macOS (test pattern)
+## 2026-11-13 20:0x GMT+7: camera on macOS (test pattern)
 
 - Quiet check. On this Mac, lamp-sim with #6938 and
   `LAMP_SIM_CAMERA=lavfi:testsrc2=size=320x180:rate=15 --camera` (ffmpeg
@@ -460,7 +469,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   AVFoundation webcam (it would capture the room); the README's "not tried"
   can say the test pattern works on macOS when next touched.
 
-## 2026-11-13 20:3x GMT+7: the role file is on lamp-voice
+## 2026-11-13 19:5x GMT+7: the role file is on lamp-voice
 
 - Train nc-33 (#6941) merged #6928 at its first head cafd2922e3: the role
   file is on lamp-voice 84fe6000c. #6928 stays open with only the cadence
@@ -469,7 +478,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - Train 883 cut by the first builder; my #6933, #6938, #6939 wait for
   their second reads.
 
-## 2026-11-13 20:2x GMT+7: train 882 merged #6929 and #6925
+## 2026-11-13 19:4x GMT+7: train 882 merged #6929 and #6925
 
 - Train 882 (#6937) merged as lamp-voice 9ea4104f33 with **#6929** (P2,
   lamp-sim's macOS side and the `sim-macos` job) and **#6925** (`ps`).
@@ -481,7 +490,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
 - Asked: sim-1 on #6938, sim-2 on #6939, sim-2 restate and the first
   builder on #6928, the first builder on #6933.
 
-## 2026-11-13 20:1x GMT+7: #6939, lamp-body in the macOS job
+## 2026-11-13 19:3x GMT+7: #6939, lamp-body in the macOS job
 
 - ten (on #6931) asked for lamp-body's clippy and tests on a Mac runner.
   lamp-body on macOS at d1915de028 (no #6931): clippy clean, tests
@@ -489,7 +498,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   stacked on #6929) adds both steps to `sim-macos`. READ ASK to ten, sim-2.
 - Train 882 still open at the check.
 
-## 2026-11-13 20:0x GMT+7: #6929 and #6925 in train 882; Heron reads #6933
+## 2026-11-13 19:2x GMT+7: #6929 and #6925 in train 882; Heron reads #6933
 
 - The first builder cut train 882 (#6937) at 19:09 with #6929 and #6925
   among others; not merged at this check. #6938 is rebased to its one
@@ -498,7 +507,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   his Mac). The first builder's read still asked.
 - READ ASK #6928 (role file) to sim-2 and the first builder.
 
-## 2026-11-13 19:5x GMT+7: resident synthesizer measured
+## 2026-11-13 19:1x GMT+7: resident synthesizer measured
 
 - A throwaway Swift probe (scratch, not committed) of
   `AVSpeechSynthesizer.write(_:toBufferCallback:)`, en-US, 5 runs: cold first
@@ -506,7 +515,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   22, 37 ms (`say`: 700, 839, 1,149 ms). Native rate is not 24 kHz:
   resample to `pcm_24000`. Posted on #6811.
 
-## 2026-11-13 19:4x GMT+7: P4 step 1, latency first
+## 2026-11-13 19:1x GMT+7: P4 step 1, latency first
 
 - Quiet check: nothing new for sim-3.
 - macOS `say -o … LEI16@24000`, 5 runs, medians: 2 words 700 ms (604 ms
@@ -518,7 +527,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   the fallback. Target under 250 ms request to first audio bytes. No code
   before P2 and P3 merge.
 
-## 2026-11-13 19:3x GMT+7: the first builder's yeses; #6931 read; #6933, #6938
+## 2026-11-13 19:1x GMT+7: the first builder's yeses; #6931 read; #6933, #6938
 
 - The first builder, 18:44 on #6811: no body on macOS, yes for now; sim-3-P3
   yes (the bus is the first builder's; readers the first builder and Heron);
@@ -538,7 +547,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   not return in 12 s from this agent's shell (sandbox audio, likely); to a
   file 685 ms. Not claimed; to check from a normal terminal.
 
-## 2026-11-13 19:2x GMT+7: quiet check; P4 step 2 sized
+## 2026-11-13 18:4x GMT+7: quiet check; P4 step 2 sized
 
 - No new comments for sim-3. #6929: Linux clippy, Linux `sim` and
   `sim-macos` pass; ARM64 pending.
@@ -548,7 +557,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   coordinator ends the line and sends `Finalize`, so recognition can run on
   the held utterance then. Latency to measure: `Finalize` to final.
 
-## 2026-11-13 19:1x GMT+7: sim-3-P4 (the person's proposal), asked
+## 2026-11-13 18:4x GMT+7: sim-3-P4 (the person's proposal), asked
 
 - **sim-3-P4** on #6811: a macOS voice for the virtual lamp where the
   developer configures only an LLM endpoint, on the real lamp-voice SECOND
@@ -560,7 +569,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   (4) `lamp-sim run --real-voice=local`. A voice brain only for the sim is
   avoided. No code until the first builder's word.
 
-## 2026-11-13 19:0x GMT+7: #6925 READ-OK from sim-2; P3 drafted
+## 2026-11-13 18:3x GMT+7: #6925 READ-OK from sim-2; P3 drafted
 
 - #6925: sim-2 READ-OK 11f1df07e5, run on Linux (procps-ng 4.0.4) 8/8
   twice. Its note: lampOS PR bodies carry no attribution; taken out of
@@ -574,7 +583,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   clippy -D warnings clean; lamp-sim's two speaker-stream tests pass with it.
   Not run: Linux.
 
-## 2026-11-13 18:5x GMT+7: P2 taken; #6928, #6929; sim-3-P3 asked
+## 2026-11-13 18:3x GMT+7: P2 taken; #6928, #6929; sim-3-P3 asked
 
 - The first builder, 18:15 on #6811: "sim-3: yes, welcome"; role file PR;
   first step sim-3-P2 as proposed; ten makes lamp-body's runtime
@@ -594,7 +603,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   `crates/bus` is and whether sim-3 may make it.
 - #6925: 10 checks pass, 1 pending; no reads yet.
 
-## 2026-11-13 18:4x GMT+7: macOS probe, the body is the one blocker
+## 2026-11-13 18:1x GMT+7: macOS probe, the body is the one blocker
 
 - #6925: Linux CI green so far (SDK JavaScript on Node 20.11 and 22 pass,
   so the `ps -A -o pid= -o ppid=` call works on procps too); ARM64 and
@@ -608,7 +617,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   `lamp-sim-conformance.sh` call `timeout`, which macOS lacks.
 - Not tried: AVFoundation camera and microphone, the JS tour.
 
-## 2026-11-13 18:3x GMT+7: #6925, and the macOS scope (sim-3-P2)
+## 2026-11-13 18:0x GMT+7: #6925, and the macOS scope (sim-3-P2)
 
 - The lead's answers (via the person): push own branches after gates;
   loop every 10 minutes with `since=` reads only (shared account);
@@ -630,7 +639,7 @@ is in [builders/sim-3.md](../builders/sim-3.md).
   for macOS and adds a macOS lamp-sim build to CI; ten makes the body's
   runtime portable. Waiting for the word; nothing in `crates/sim` before it.
 
-## 2026-11-13 18:1x GMT+7: first read, and sim-3-P1
+## 2026-11-13 18:0x GMT+7: first read, and sim-3-P1
 
 - READ-OK d2bca6363b on #6919 (sim-1, `startTwin`), run on macOS arm64:
   the PR's 7 test files 26/26 three times (with `lamp.glb` from LFS);
