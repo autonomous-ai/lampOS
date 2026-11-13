@@ -3,6 +3,16 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 05:4x GMT+7: #6988 HOLD (stale bus line, conflicts with #6989)
+
+- #6989's `sim-macos` passed; the first builder: "good", readers ten, sim-2.
+- **#6988** (ten, docs): HOLD 38d95d1f08. Its "runs on macOS" matches the Mac
+  (the nod). P2: the README line still says the bus refuses >2048 bytes and
+  the speaker tests are skipped "until sim-3-P3" (#6933 merged in 883). It
+  also conflicts with #6989's rewrite of that line. Offered: drop the README
+  hunk (HOLD lifted at once), or keep it without the two bus sentences and I
+  rebase #6989 after.
+
 ## 2026-11-14 05:3x GMT+7: train 892 put the body on lamp-voice; #6989
 
 - Train 892 (#6984) merged as c5b43c47aa: **#6965** (lamp-body runs on any
