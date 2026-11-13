@@ -972,7 +972,13 @@ của căn phòng (`remember::AGREED_FORGET_NOT_NOW`, P3 của Thirteen). Lời
 lời «có» của khuôn mặt khác, hay lời «có» không thấy miệng ngoài phòng riêng,
 không chạy gì. Lệnh quên trống, nhiều hoặc không điều nào khớp, hai khuôn mặt
 trong khung (câu không là của ai theo một khuôn mặt) và đường Live bị từ chối
-hoặc chạy như trước. Vậy TV nói «quên cái ô của tôi» chỉ được hỏi lại, không
+hoặc chạy như trước. Một lệnh quên trên câu một khuôn mặt mà đèn không hỏi lại được ghi
+vào journal kèm lý do («…names no one kept thing of theirs: not asked: two or
+more kept things match the words (2)», hoặc forget-all tắt, mô hình gọi một
+`source_id` trên câu không nêu chủ đề nào, liệt kê thất bại, liệt kê có thể bị
+cắt, không điều nào khớp; chỉ id và số lượng, không bao giờ là lời họ muốn
+quên; `remember::ForgetNotAsked`, hàng của Thirteen trên
+#5627). Vậy TV nói «quên cái ô của tôi» chỉ được hỏi lại, không
 bao giờ chạy.
 **Cũng không gì mang tính xoá bỏ, hay làm thay họ ngoài việc lưu và nhớ lại**
 (lần đọc riêng tư trên #5592): một `remember` sửa một điều đã giữ theo id

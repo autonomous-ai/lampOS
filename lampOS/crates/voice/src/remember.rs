@@ -4708,55 +4708,136 @@ pub enum ForgetWant {
     About(String),
 }
 
+/// Why [`one_face_forget_target`] asks nothing, and the forget is refused
+/// as before: said in the journal line that refuses it, so a lamp row can
+/// tell which one fired (Thirteen's row on #5627).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ForgetNotAsked {
+    /// The call is not a `forget`.
+    NotAForget,
+    /// `LAMP_MEMORY_FORGET_ALL` is off: no forget by id runs as one.
+    ForgetAllOff,
+    /// The model named a recalled `source_id`, and the heard line names no
+    /// subject to ask about.
+    SourceIdUnnamed(u64),
+    /// The model's own `about` is missing or not text.
+    AboutNotText,
+    /// The line names no one thing: how it was read ([`ForgetPick`]).
+    NothingNamed(&'static str),
+    /// No days memory, or one that takes no ids.
+    NoDaysMemory,
+    /// The kept listing failed, and how.
+    ListingFailed(&'static str),
+    /// The kept listing may be cut, so a second match may be missing.
+    ListingMayBeCut,
+    /// No kept thing of theirs matches.
+    NoMatch(ForgetWant),
+    /// More than one kept thing of theirs matches: how many.
+    SeveralMatch(ForgetWant, usize),
+    /// The days memory's context could not be read.
+    ContextUnreadable,
+}
+
+/// As the journal says it: ids and counts only, never `about`'s words
+/// ([`forget_args_logged`], the Reviewer-lead's P2 on #6841): the person
+/// asked to forget them.
+impl std::fmt::Display for ForgetNotAsked {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let want = |want: &ForgetWant| match want {
+            ForgetWant::Id(id) => format!("source_id {id}"),
+            ForgetWant::About(_) => "the words".to_owned(),
+        };
+        match self {
+            Self::NotAForget => f.write_str("not a forget"),
+            Self::ForgetAllOff => f.write_str("forget-all off"),
+            Self::SourceIdUnnamed(id) => write!(
+                f,
+                "the model named source_id {id} and the line names no subject"
+            ),
+            Self::AboutNotText => f.write_str("the model's about is not text"),
+            Self::NothingNamed(read) => write!(f, "the line names no one thing ({read})"),
+            Self::NoDaysMemory => f.write_str("no days memory taking ids"),
+            Self::ListingFailed(how) => write!(f, "listing failed: {how}"),
+            Self::ListingMayBeCut => f.write_str("listing may be cut"),
+            Self::NoMatch(about) => write!(f, "no kept thing matches {}", want(about)),
+            Self::SeveralMatch(about, count) => {
+                write!(f, "two or more kept things match {} ({count})", want(about))
+            }
+            Self::ContextUnreadable => f.write_str("the days memory's context is unreadable"),
+        }
+    }
+}
+
 /// The one kept thing of `person`'s that a named `forget` on a line theirs
 /// only by their face alone in view asks to remove, by its id, and the
 /// subject the lamp asks about, in the person's own words (the PM's cost
 /// ruling on #5627): the id recall gave, or what the heard line names
 /// ([`one_face_pick`]). Never the kept text: the speaker was not seen, so
 /// the question must not read out what was kept (the Reviewer-lead's P2 on
-/// #6673). `None`, and the forget is refused as before, for a bare or
+/// #6673). An error, and the forget is refused as before, for a bare or
 /// unclear forget, a keep-or-deny clause, no days memory, a listing that
-/// fails or may be cut, or anything but exactly one match. The id is
-/// marked shown in their scope, so the forget by id their yes runs is
-/// theirs to forget and never the last kept thing.
+/// fails or may be cut, or anything but exactly one match; it says which
+/// ([`ForgetNotAsked`]). The id is marked shown in their scope, so the
+/// forget by id their yes runs is theirs to forget and never the last kept
+/// thing.
 pub fn one_face_forget_target(
     call: &ToolCall,
     said: &str,
     person: &str,
     lease: &crate::memory_scope::ScopeLease,
-) -> Option<(u64, String)> {
+) -> Result<(u64, String), ForgetNotAsked> {
     // Their yes runs a forget by id, which only a memory taking ids runs
     // as one: anywhere else it would be the last kept thing.
-    if call.name != FORGET || !forget_all_on() {
-        return None;
+    if call.name != FORGET {
+        return Err(ForgetNotAsked::NotAForget);
+    }
+    if !forget_all_on() {
+        return Err(ForgetNotAsked::ForgetAllOff);
     }
     let (want, _) = forget_want(call, said)?;
     let client = DAYS
-        .get()?
-        .as_ref()
-        .filter(|client| client.forget_all.load(Ordering::Acquire))?;
+        .get()
+        .and_then(Option::as_ref)
+        .filter(|client| client.forget_all.load(Ordering::Acquire))
+        .ok_or(ForgetNotAsked::NoDaysMemory)?;
     let entries = client.kept_listing(person, &want, lease)?;
     let (id, subject) = one_face_pick(call, said, &entries)?;
-    let line = client.context.lock().ok()?.include(Some(person), &[id]);
+    let line = client
+        .context
+        .lock()
+        .map_err(|_| ForgetNotAsked::ContextUnreadable)?
+        .include(Some(person), &[id]);
     say(line);
-    Some((id, subject))
+    Ok((id, subject))
 }
 
 /// What a one-face named forget asks to remove, and the subject to ask
 /// about in the person's own words: the heard subject, the model's `about`
-/// when heard, or for an id recall gave the subject the line names. `None`
-/// when the line names nothing.
-fn forget_want(call: &ToolCall, said: &str) -> Option<(ForgetWant, String)> {
+/// when heard, or for an id recall gave the subject the line names. An
+/// error when the line names nothing.
+fn forget_want(call: &ToolCall, said: &str) -> Result<(ForgetWant, String), ForgetNotAsked> {
     match pick_forget(call, Some(said), &Recent::default()) {
         ForgetPick::AsCalled => match call.args.get("source_id").and_then(Value::as_u64) {
-            Some(id) => Some((ForgetWant::Id(id), named_subject(said)?)),
+            Some(id) => Ok((
+                ForgetWant::Id(id),
+                named_subject(said).ok_or(ForgetNotAsked::SourceIdUnnamed(id))?,
+            )),
             None => {
-                let about = call.args.get("about")?.as_str()?.trim().to_owned();
-                Some((ForgetWant::About(about.clone()), about))
+                let about = call
+                    .args
+                    .get("about")
+                    .and_then(Value::as_str)
+                    .ok_or(ForgetNotAsked::AboutNotText)?
+                    .trim()
+                    .to_owned();
+                Ok((ForgetWant::About(about.clone()), about))
             }
         },
-        ForgetPick::Named(subject) => Some((ForgetWant::About(subject.clone()), subject)),
-        _ => None,
+        ForgetPick::Named(subject) => Ok((ForgetWant::About(subject.clone()), subject)),
+        ForgetPick::Last => Err(ForgetNotAsked::NothingNamed("a bare forget")),
+        ForgetPick::Asked(_) => Err(ForgetNotAsked::NothingNamed("a forget of the follow-up")),
+        ForgetPick::Kept => Err(ForgetNotAsked::NothingNamed("a keep-or-deny clause")),
+        ForgetPick::Unclear => Err(ForgetNotAsked::NothingNamed("an unclear forget")),
     }
 }
 
@@ -4768,22 +4849,22 @@ pub fn one_face_pick(
     call: &ToolCall,
     said: &str,
     entries: &[(u64, String)],
-) -> Option<(u64, String)> {
+) -> Result<(u64, String), ForgetNotAsked> {
     let (want, subject) = forget_want(call, said)?;
     let (id, _) = one_kept_of(entries, &want)?;
-    Some((id, subject))
+    Ok((id, subject))
 }
 
 impl DaysClient {
-    /// `person`'s kept things, by id and text, for [`one_face_pick`]: `None`
-    /// for a failed listing, or one that may be cut when `want` matches by
-    /// what it is about.
+    /// `person`'s kept things, by id and text, for [`one_face_pick`]: an
+    /// error for a failed listing, or one that may be cut when `want`
+    /// matches by what it is about.
     fn kept_listing(
         &self,
         person: &str,
         want: &ForgetWant,
         lease: &crate::memory_scope::ScopeLease,
-    ) -> Option<Vec<(u64, String)>> {
+    ) -> Result<Vec<(u64, String)>, ForgetNotAsked> {
         let list = for_person(
             json!({"op":"kept","max_bytes":ABOUT_BYTES,"observations":true}),
             Some(person),
@@ -4794,37 +4875,50 @@ impl DaysClient {
             crate::tools::ASK_DEADLINE,
             Some(lease),
             ABOUT_ANSWER_BYTES,
-        )?;
-        let entries: Vec<(u64, String)> = answer["entries"]
-            .as_array()
-            .filter(|_| answer["ok"] == true)?
-            .iter()
-            .map(|entry| {
-                Some((
-                    entry["id"]
-                        .as_u64()
-                        .filter(|id| *id > 0 && *id <= i64::MAX as u64)?,
-                    entry["text"].as_str()?.to_owned(),
-                ))
-            })
-            .collect::<Option<_>>()?;
+        )
+        .ok_or(ForgetNotAsked::ListingFailed("no answer"))?;
+        let entries = kept_entries(&answer)?;
         // A listing that may be cut may miss a second match: by what it is
         // about, only a whole one picks.
         let listed: usize = entries.iter().map(|(_, text)| text.len()).sum();
         if matches!(want, ForgetWant::About(_))
             && listed.saturating_add(KEPT_TEXT_BYTES) > ABOUT_BYTES
         {
-            return None;
+            return Err(ForgetNotAsked::ListingMayBeCut);
         }
-        Some(entries)
+        Ok(entries)
     }
+}
+
+/// The entries (id, text) of a kept listing's `answer`, for
+/// [`DaysClient::kept_listing`]: an error for an answer not ok, or an entry
+/// without a valid id or text.
+fn kept_entries(answer: &Value) -> Result<Vec<(u64, String)>, ForgetNotAsked> {
+    answer["entries"]
+        .as_array()
+        .filter(|_| answer["ok"] == true)
+        .ok_or(ForgetNotAsked::ListingFailed("not ok"))?
+        .iter()
+        .map(|entry| {
+            Some((
+                entry["id"]
+                    .as_u64()
+                    .filter(|id| *id > 0 && *id <= i64::MAX as u64)?,
+                entry["text"].as_str()?.to_owned(),
+            ))
+        })
+        .collect::<Option<_>>()
+        .ok_or(ForgetNotAsked::ListingFailed("an entry without id or text"))
 }
 
 /// The one entry of `entries` (id, text) that `want` names: by id, or the
 /// one whose words have every word of one of its subjects, as a forget
-/// about matches ([`DaysClient::about_matching`]). `None` for none or more
-/// than one.
-pub fn one_kept_of(entries: &[(u64, String)], want: &ForgetWant) -> Option<(u64, String)> {
+/// about matches ([`DaysClient::about_matching`]). An error for none or
+/// more than one.
+pub fn one_kept_of(
+    entries: &[(u64, String)],
+    want: &ForgetWant,
+) -> Result<(u64, String), ForgetNotAsked> {
     let mut found = entries.iter().filter(|(id, text)| match want {
         ForgetWant::Id(want) => id == want,
         ForgetWant::About(about) => {
@@ -4837,8 +4931,16 @@ pub fn one_kept_of(entries: &[(u64, String)], want: &ForgetWant) -> Option<(u64,
             })
         }
     });
-    let one = found.next()?;
-    found.next().is_none().then(|| one.clone())
+    let one = found
+        .next()
+        .ok_or_else(|| ForgetNotAsked::NoMatch(want.clone()))?;
+    match found.next() {
+        None => Ok(one.clone()),
+        Some(_) => Err(ForgetNotAsked::SeveralMatch(
+            want.clone(),
+            2 + found.count(),
+        )),
+    }
 }
 
 #[cfg(test)]
@@ -4858,21 +4960,143 @@ mod one_kept_tests {
         let about = |about: &str| ForgetWant::About(about.to_owned());
         assert_eq!(
             one_kept_of(&kept, &about("umbrella")),
-            Some((3, "My umbrella is blue.".to_owned()))
+            Ok((3, "My umbrella is blue.".to_owned()))
         );
         assert_eq!(
             one_kept_of(&kept, &about("umbrellas")),
-            Some((3, "My umbrella is blue.".to_owned()))
+            Ok((3, "My umbrella is blue.".to_owned()))
         );
         assert_eq!(
             one_kept_of(&kept, &ForgetWant::Id(4)),
-            Some((4, "My bike lock code is 4512.".to_owned()))
+            Ok((4, "My bike lock code is 4512.".to_owned()))
         );
-        assert_eq!(one_kept_of(&kept, &about("scarf")), None, "none");
-        assert_eq!(one_kept_of(&kept, &ForgetWant::Id(9)), None, "not listed");
+        assert_eq!(
+            one_kept_of(&kept, &about("scarf")),
+            Err(ForgetNotAsked::NoMatch(about("scarf"))),
+            "none"
+        );
+        assert_eq!(
+            one_kept_of(&kept, &ForgetWant::Id(9)),
+            Err(ForgetNotAsked::NoMatch(ForgetWant::Id(9))),
+            "not listed"
+        );
         let mut two = kept.clone();
         two.push((6, "The umbrella in the car is red.".to_owned()));
-        assert_eq!(one_kept_of(&two, &about("umbrella")), None, "two: not one");
+        assert_eq!(
+            one_kept_of(&two, &about("umbrella")),
+            Err(ForgetNotAsked::SeveralMatch(about("umbrella"), 2)),
+            "two: not one"
+        );
+    }
+
+    /// Thirteen's row on #5627: each refusal says why in the journal, so a
+    /// lamp row can tell which one fired.
+    #[test]
+    fn a_one_face_forget_not_asked_says_why() {
+        let about = |about: &str| ForgetWant::About(about.to_owned());
+        for (why, said) in [
+            (ForgetNotAsked::NotAForget, "not a forget"),
+            (ForgetNotAsked::ForgetAllOff, "forget-all off"),
+            (
+                ForgetNotAsked::SourceIdUnnamed(7),
+                "the model named source_id 7 and the line names no subject",
+            ),
+            (
+                ForgetNotAsked::AboutNotText,
+                "the model's about is not text",
+            ),
+            (
+                ForgetNotAsked::NothingNamed("a bare forget"),
+                "the line names no one thing (a bare forget)",
+            ),
+            (ForgetNotAsked::NoDaysMemory, "no days memory taking ids"),
+            (
+                ForgetNotAsked::ListingFailed("no answer"),
+                "listing failed: no answer",
+            ),
+            (ForgetNotAsked::ListingMayBeCut, "listing may be cut"),
+            (
+                ForgetNotAsked::NoMatch(about("scarf")),
+                "no kept thing matches the words",
+            ),
+            (
+                ForgetNotAsked::NoMatch(ForgetWant::Id(9)),
+                "no kept thing matches source_id 9",
+            ),
+            (
+                ForgetNotAsked::SeveralMatch(about("umbrella"), 3),
+                "two or more kept things match the words (3)",
+            ),
+            (
+                ForgetNotAsked::SeveralMatch(ForgetWant::Id(9), 2),
+                "two or more kept things match source_id 9 (2)",
+            ),
+            (
+                ForgetNotAsked::ContextUnreadable,
+                "the days memory's context is unreadable",
+            ),
+        ] {
+            assert_eq!(why.to_string(), said);
+            assert!(
+                !said.contains("scarf") && !said.contains("umbrella"),
+                "{said}"
+            );
+        }
+    }
+
+    /// The listing's own failures say how: an answer not ok, or an entry
+    /// without an id or text, fails; a whole listing gives its entries.
+    #[test]
+    fn a_failed_kept_listing_says_how() {
+        let failed = |how| Err(ForgetNotAsked::ListingFailed(how));
+        assert_eq!(
+            kept_entries(&json!({"ok": false, "entries": []})),
+            failed("not ok")
+        );
+        assert_eq!(kept_entries(&json!({"ok": true})), failed("not ok"));
+        assert_eq!(
+            kept_entries(&json!({"ok": true, "entries": [{"id": 0, "text": "x"}]})),
+            failed("an entry without id or text")
+        );
+        assert_eq!(
+            kept_entries(&json!({"ok": true, "entries": [{"id": 3}]})),
+            failed("an entry without id or text")
+        );
+        assert_eq!(
+            kept_entries(&json!({"ok": true, "entries": [{"id": 3, "text": "x"}]})),
+            Ok(vec![(3, "x".to_owned())])
+        );
+    }
+
+    /// The pick says why it names nothing: a bare forget, or an id recall
+    /// gave on a line that names no subject; a match that is not one says
+    /// what it looked for.
+    #[test]
+    fn a_one_face_pick_says_why_it_names_nothing() {
+        let kept = vec![
+            (3, "My umbrella is blue.".to_owned()),
+            (6, "The umbrella in the car is red.".to_owned()),
+        ];
+        let forget = |args: Value| ToolCall {
+            id: String::new(),
+            name: FORGET.to_owned(),
+            args,
+        };
+        assert_eq!(
+            one_face_pick(&forget(json!({})), "Lamp, forget that.", &kept),
+            Err(ForgetNotAsked::NothingNamed("a bare forget"))
+        );
+        assert_eq!(
+            one_face_pick(
+                &forget(json!({"about": "umbrella"})),
+                "Lamp, forget my umbrella.",
+                &kept
+            ),
+            Err(ForgetNotAsked::SeveralMatch(
+                ForgetWant::About("umbrella".to_owned()),
+                2
+            ))
+        );
     }
 
     /// The Reviewer-lead's P2 on #6673: the speaker was not seen, so the

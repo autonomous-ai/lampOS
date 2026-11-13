@@ -12767,7 +12767,12 @@ struct HeldForget {
 /// id, and the subject to ask about in their words (never the kept text): the call, the line's words, the person and the line's
 /// lease ([`ask_once_forget`]).
 pub(crate) type ForgetTarget = Arc<
-    dyn Fn(&net::ToolCall, &str, &str, &crate::memory_scope::ScopeLease) -> Option<(u64, String)>
+    dyn Fn(
+            &net::ToolCall,
+            &str,
+            &str,
+            &crate::memory_scope::ScopeLease,
+        ) -> Result<(u64, String), crate::remember::ForgetNotAsked>
         + Send
         + Sync,
 >;
@@ -14041,11 +14046,12 @@ fn ask_once_forget(
             lease,
         ),
     };
-    let Some((id, subject)) = target else {
-        eprintln!(
-            "lamp-voice second: request {request}: a forget on a one-face line names no one kept thing of theirs: not asked (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
-        );
-        return None;
+    let (id, subject) = match target {
+        Ok(target) => target,
+        Err(why) => {
+            eprintln!("{}", one_face_forget_not_asked(request, &why));
+            return None;
+        }
     };
     let held = net::ToolCall {
         id: call.id.clone(),
@@ -14063,6 +14069,15 @@ fn ask_once_forget(
         Holding::OneWaits => Some(serde_json::json!({"error": crate::remember::ONE_FORGET_HELD})),
         Holding::Stale => None,
     }
+}
+
+/// The journal line for a forget on a one-face line [`ask_once_forget`]
+/// asks nothing about, saying why (Thirteen's row on #5627). Its words
+/// before the reason are the line's from before, so old greps still match.
+fn one_face_forget_not_asked(request: u64, why: &crate::remember::ForgetNotAsked) -> String {
+    format!(
+        "lamp-voice second: request {request}: a forget on a one-face line names no one kept thing of theirs: not asked: {why} (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+    )
 }
 
 /// The held turn `request` is over: its hold stands only if `answer`, the

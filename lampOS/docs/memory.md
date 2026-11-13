@@ -791,7 +791,12 @@ the model is told it is still kept; it never runs in the room's scope
 silence or 30 s passing keeps it; a yes from another face, or an unseen yes outside the private room,
 runs nothing. A bare forget, several or no matching kept things, two faces
 in view (the line is nobody's by one face) and the Live route are refused or
-run as before. A TV saying "forget my umbrella" is therefore asked, never run. **Nor
+run as before. A one-face forget it does not ask about is journaled with why
+("…names no one kept thing of theirs: not asked: two or more kept things
+match the words (2)", or forget-all off, the model named a `source_id` on a
+line that names no subject, listing failed, listing may be cut, no kept
+thing matches; ids and counts only, never the words they asked to
+forget; `remember::ForgetNotAsked`, Thirteen's row on #5627). A TV saying "forget my umbrella" is therefore asked, never run. **Nor
 anything destructive, or acting for them beyond saving and recall** (the
 privacy read on #5592): a `remember` that corrects a kept thing by id
 (`replaces`, `remember::corrects`) is refused like a forget, and without an
