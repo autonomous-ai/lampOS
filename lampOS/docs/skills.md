@@ -1209,28 +1209,31 @@ camera, so I can't take photos…" with `calls=none`.
   `dance`), is left out of the tools file and dropped by the voice; the
   names still run. Up to 8 words are matched, a name's or an ask's. The
   Live route is unchanged.
-- **An ask is never ordinary speech** (Thirteen's P1 and P2s and the
+- **An ask is checked by its shape** (Thirteen's P2s and the
   Reviewer-lead's P2 on #6842): `skill_named::ask_refused`, which the load
   check calls and the voice runs again as it matches, refuses a phrase
-  that is or holds a yes, a no or a consent's words ("yes please", "no
-  thanks", "never mind", "forget that", "remember that", "not now"), a
-  negation or a question word ("what time is it", "is there a camera"), a
+  with a negation or a question word ("not now", "what time is it"), a
   stop ("stop it", "stop the music"), the lamp's own words for what it
   does itself ("turn off the light", "good night", "remind me in ten
-  minutes", its light, sound, sleep, reminders and timers) or a phrase of
-  its first-round rules (`LAMP_MEMORY_KEEP_ASKED`, `LAMP_SCHEDULE_ASKED`,
-  `LAMP_REMINDERS_ASKED`, `LAMP_SKILL_ASKED`: "light show", "what
-  reminders do I have"), only words said around an ask ("hey lamp"), or
-  nothing of the skill's own beside them ("turn on the light", "play some
-  music"). A skill made at the lamp, by voice or from the app, never
-  carries `asks`: `made_skill::tidied` takes them out, and the cap refuses
-  one it can't (`made_skill::MADE_ASKS`).
-- **A held yes comes first:** while a yes of any kind waits for the
-  person's answer (a keep or a forget, a setup face save, a face rename, a
-  skill's write or task yes, a made skill's clash), or the line was taken
-  as one, no line is read for a skill by its name or its asks
-  (`second_provider`'s `a_yes_held`): "Yes, please." is the held
-  question's answer.
+  minutes") or a phrase of its first-round rules (`LAMP_MEMORY_KEEP_ASKED`,
+  `LAMP_SCHEDULE_ASKED`, `LAMP_REMINDERS_ASKED`, `LAMP_SKILL_ASKED`: "light
+  show", "remember that", "what reminders do I have"), only words said
+  around an ask ("hey lamp"), or nothing of the skill's own beside them
+  ("turn on the light", "play some music"). No word list judges whether a
+  phrase means yes (the owner's ruling on #6842): "yes please" loads. A
+  skill made at the lamp, by voice or from the app, never carries `asks`:
+  `made_skill::tidied` takes them out, and the cap refuses one it can't
+  (`made_skill::MADE_ASKS`).
+- **While the lamp waits for an answer, the model reads the line:** when
+  the lamp's newest words asked something (`remarks::lamp_asked`), or a
+  read-back, a confirm or a held yes of any kind waits (a keep or a
+  forget, a setup face save, a face rename, a skill's write or task yes, a
+  made skill's clash, an agent task waiting for `confirm_agent_task`, the
+  voice's own mail send or a skill run's held write waiting for its
+  send), no line is read for a skill by its name or its asks
+  (`second_provider`'s `lamp_awaits_answer`). Round 1 is the model's, and
+  it decides in context whether "Sounds good." or "Yes please." answers
+  the lamp or asks for a skill.
 - **The instructions:** the built-in one (`config::CHAT_INSTRUCTION`, and
   the camera one), which a product lamp runs (its provider setting names no
   `instruction_file`), says "never say you have no arms, legs, body or
@@ -1252,8 +1255,12 @@ camera, so I can't take photos…" with `calls=none`.
   `a_skills_own_ask_phrases_call_it_in_code` (Seventh's "take a photo" and
   "photo booth" from #6413, Sixth's two lines from #5749) and
   `a_camera_question_is_not_an_ask`,
-  `a_held_yes_leaves_yes_please_to_the_held_question` and
-  `ordinary_speech_given_as_asks_goes_to_the_model` (both reads' probe
+  `a_held_yes_leaves_yes_please_to_the_held_question`,
+  `after_the_lamp_asks_a_yes_goes_to_the_model`,
+  `an_agent_task_waiting_for_its_yes_leaves_the_line_to_it`,
+  `a_skill_runs_held_write_leaves_send_it_to_it`,
+  `the_voices_own_mail_waiting_leaves_go_for_it_to_it` and
+  `ordinary_speech_given_as_asks_goes_to_the_model` (the reads' probe
   lines); `skill_named::tests`'
   `an_ask_that_is_ordinary_speech_is_refused_and_runs_nothing`,
   `an_ask_holding_any_installed_skills_name_is_dropped` and

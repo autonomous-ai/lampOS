@@ -416,6 +416,14 @@ async fn a_skill_named_on_the_names_wait_runs_in_code() {
 /// Store's `relaxing-music` in its tools file and their `asks` beside them,
 /// as lamp-skills writes them from each `skill.toml`'s `asks` (#6772).
 fn asks_folder() -> std::path::PathBuf {
+    asks_folder_with(json!({
+        "photo_booth": ["take a photo", "take a picture"],
+        "play_relaxing_music": ["relaxing music", "play me something to relax"]
+    }))
+}
+
+/// [`asks_folder`]'s two skills with `asks` as their ask phrases.
+fn asks_folder_with(asks: Value) -> std::path::PathBuf {
     static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let base = if std::path::Path::new("/private/tmp").is_dir() {
         std::path::PathBuf::from("/private/tmp")
@@ -433,10 +441,7 @@ fn asks_folder() -> std::path::PathBuf {
             {"name": "photo_booth", "description": "Take a photo."},
             {"name": "play_relaxing_music", "description": "Play a quiet instrumental piece."}
         ],
-        "asks": {
-            "photo_booth": ["take a photo", "take a picture"],
-            "play_relaxing_music": ["relaxing music", "play me something to relax"]
-        }
+        "asks": asks
     });
     std::fs::write(dir.join(crate::tools::CATALOG_FILE), tools.to_string()).unwrap();
     dir
@@ -642,7 +647,6 @@ fn a_held_yes_leaves_yes_please_to_the_held_question() {
 fn ordinary_speech_given_as_asks_goes_to_the_model() {
     let lines = [
         "hey lamp",
-        "yes please",
         "no thanks",
         "not now",
         "what time is it",
@@ -680,7 +684,6 @@ fn ordinary_speech_given_as_asks_goes_to_the_model() {
     }));
     for heard in [
         "Hey lamp.",
-        "Yes, please.",
         "No thanks.",
         "not now",
         "Lamp, what time is it?",
@@ -702,4 +705,169 @@ fn ordinary_speech_given_as_asks_goes_to_the_model() {
         );
     }
     std::fs::remove_dir_all(dir).ok();
+}
+
+/// What a matcher that takes any line does on `heard` with `hold` set
+/// first on this test's thread: whether the booth ran in code.
+fn booth_runs_beside(heard: &str, hold: impl Fn()) -> bool {
+    hold();
+    let went = went_with(heard, vec![said("Okay.")], booth_told(), |engine| {
+        engine.calling_skills_named(Arc::new(|_: &str| {
+            Some(crate::skill_named::call(true, "photo_booth"))
+        }))
+    });
+    booth_runs(&went) > 0
+}
+
+/// Heron's P2 on #6842, 1: an agent task read back and waiting for
+/// `confirm_agent_task` (within `agent_tasks::CONFIRM_WITHIN`): "Sounds
+/// good." is the task's yes, never read for a skill. Prepared too long ago,
+/// or not at all, the matcher runs.
+#[test]
+fn an_agent_task_waiting_for_its_yes_leaves_the_line_to_it() {
+    let now = Instant::now();
+    assert!(!booth_runs_beside("Sounds good.", || {
+        crate::agent_tasks::awaits_yes_here(Some(now));
+    }));
+    if let Some(long_ago) = now.checked_sub(crate::agent_tasks::CONFIRM_WITHIN * 2) {
+        assert!(booth_runs_beside("Sounds good.", || {
+            crate::agent_tasks::awaits_yes_here(Some(long_ago));
+        }));
+    }
+    assert!(booth_runs_beside("Sounds good.", || {
+        crate::agent_tasks::awaits_yes_here(None);
+    }));
+}
+
+/// Heron's P2 on #6842, 2: a skill run's held write read back
+/// (`run_write_yes`, kept waiting by `services::wait_for_run_yes`): "Send
+/// it." is its yes, never read for a skill.
+#[test]
+fn a_skill_runs_held_write_leaves_send_it_to_it() {
+    assert!(!booth_runs_beside("Send it.", || {
+        crate::services::wait_for_run_yes(
+            0,
+            &crate::run_write_yes::RunWrite {
+                send_id: "ab12".into(),
+                service: "gmail".into(),
+                skill: "morning-mail".into(),
+                read_back: "an email to Kim: see you at nine".into(),
+                left: Duration::from_secs(100),
+            },
+            Instant::now(),
+        );
+    }));
+    crate::services::pending_for_test(None);
+    assert!(booth_runs_beside("Send it.", || {}));
+}
+
+/// Heron's P2 on #6842, 3: the voice's own prepared mail send (#6009),
+/// read back and waiting for its send: "Go for it." is its yes, never read
+/// for a skill.
+#[test]
+fn the_voices_own_mail_waiting_leaves_go_for_it_to_it() {
+    assert!(!booth_runs_beside("Go for it.", || {
+        crate::services::pending_for_test(Some(crate::services::Pending::new(
+            "cd34",
+            0,
+            Instant::now(),
+            "an email to Kim: see you at nine",
+            "the-owner",
+        )));
+    }));
+    crate::services::pending_for_test(None);
+    assert!(booth_runs_beside("Go for it.", || {}));
+}
+
+/// The owner's ruling on #6842: after the lamp asked something ("Shall I
+/// ask Claude Code to fix it?", its newest words in the turn's history, as
+/// the thread gives them), "Sounds good." and "Yes please." are the model's
+/// to read in context, even when a pushed skill's `asks` hold them: nothing
+/// runs in code and round 1 is the model's chat. After a line that asked
+/// nothing, or none, the same line runs the skill by its ask.
+#[tokio::test]
+async fn after_the_lamp_asks_a_yes_goes_to_the_model() {
+    for answer in ["Sounds good.", "Yes please."] {
+        for lamp in [
+            Some("Shall I ask Claude Code to fix it?"),
+            Some("Okay, I asked Claude Code to fix it."),
+            None,
+        ] {
+            let asked = lamp.is_some_and(crate::remarks::lamp_asked);
+            let dir = asks_folder_with(json!({
+                "photo_booth": ["take a photo", "sounds good", "yes please"]
+            }));
+            let reads = Arc::new(crate::skill_named::Heard::new(crate::tools::Settings {
+                skills: Some(dir.clone()),
+                use_skill: true,
+                ..Default::default()
+            }));
+            let script = Arc::new(Script {
+                heard: Mutex::new([Ok(answer.to_owned())].into()),
+                chats: Mutex::new([vec![text("Okay, on it."), Ok(ChatEvent::Done)]].into()),
+                ..Script::default()
+            });
+            let ran: Calls = Arc::default();
+            let seen = ran.clone();
+            let runner: ToolRunner = Arc::new(move |_, heard, name, args| {
+                seen.lock().unwrap().push((name, args, heard));
+                Box::pin(async { json!({"ok": true}) })
+            });
+            let history: Vec<Message> = lamp
+                .map(|lamp| {
+                    vec![
+                        Message::user("Can you get my repo fixed?"),
+                        Message::assistant(lamp),
+                    ]
+                })
+                .unwrap_or_default();
+            let mut engine = Engine::new(
+                script.clone(),
+                move || Told {
+                    text: "SYSTEM".into(),
+                    after: None,
+                    history: history.clone(),
+                },
+                runner,
+            )
+            .announcing(false)
+            .calling_skills_named(Arc::new(move |heard: &str| reads.heard(heard)));
+            engine.submit(start(1));
+            engine.submit(audio(1, 1));
+            engine.submit(end(1));
+            let heard = turn_within(&mut engine, Duration::from_secs(5)).await;
+            std::fs::remove_dir_all(&dir).ok();
+            assert_eq!(
+                heard.last().unwrap(),
+                "complete",
+                "{answer} {lamp:?}: {heard:?}"
+            );
+            let ran: Vec<(String, Value)> = ran
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|(name, args, _)| (name.clone(), args.clone()))
+                .collect();
+            let chats = script.asked.lock().unwrap().len();
+            if asked {
+                assert!(ran.is_empty(), "{answer}: nothing in code: {ran:?}");
+                assert_eq!(chats, 1, "{answer}: round 1 is the model's");
+                assert!(
+                    script.asked.lock().unwrap()[0].iter().all(|message| message
+                        .words()
+                        .is_none_or(|words| !words.contains("by its name"))),
+                    "{answer}: no skill was named"
+                );
+            } else {
+                assert_eq!(
+                    ran,
+                    [(
+                        crate::use_skill::NAME.to_owned(),
+                        json!({"skill": "photo_booth"})
+                    )],
+                    "{answer} {lamp:?}: run by its ask"
+                );
+            }
+        }
+    }
 }
