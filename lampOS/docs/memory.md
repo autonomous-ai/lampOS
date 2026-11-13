@@ -3806,7 +3806,8 @@ then use that person's scope:
   `known_faces::tests::with_the_record_switch_a_face_refusal_says_the_record_as_it_stands`
   and `known_faces::tests::each_face_refusal_has_a_reason_name_and_the_journal_says_only_it`.
   **A rename asked about is held for the yes** (`LAMP_NAMES_RENAME_YES=on`,
-  off unless set; only with `LAMP_NAMES=checked`; the second route;
+  off unless set, on in the product unit since #6859 after 9 of 9 on
+  lamp-52e6 on 9 Nov, #5485; only with `LAMP_NAMES=checked`; the second route;
   #5485). On lamp-29e7 on 6 Nov a known face B asked to be called A six
   times; each yes was refused by the yes word list, answered with no call,
   or answered with `remember` in place of `remember_my_face`, and the lamp
@@ -3822,8 +3823,8 @@ then use that person's scope:
   yes is taken from the known face alone in view when no other voice is
   heard, so a voice off camera could rename that face. It is kept because
   on lamp-a63e on 6 Nov the mouth read came back unread in 96% of looks at
-  a known face; the risk is accepted only while the switch is off, and is
-  to be confirmed before it is turned on. Carried lines stay refused. Any other turn drops it; a yes
+  a known face; the first builder accepted the risk for the switch-on
+  (#6594, #6859). Carried lines stay refused. Any other turn drops it; a yes
   dropped for another face is told so. While the rename has not run,
   each turn of its session by the asker (by the same test as the yes) is
   told the face is still B and nothing was renamed; a turn not proven
