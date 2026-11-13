@@ -865,9 +865,12 @@ may not need it.
 **The body's ask (#2938, `LAMP_BODY_ASK=on`, with `LAMP_SAY=on` and
 `LAMP_BUS=on`; off unless set).** A body that refuses to start for its pose
 lets go and says on `diagnostics` what it needs a person to do
-([body.md](body.md), `--refused-let-go`). The voice reads that diagnostic
-(`lamp_body::ask::asks`: the body's own error while starting or paused,
-never another part's, a stop or a warning) on a thread of its own
+([body.md](body.md), `--refused-let-go`); a body that runs but will not stand
+says what its owner can do in an `asks` fact on every report of that run
+(#6834, body.md's "does not stand, and says why"). The voice reads that
+diagnostic (`lamp_body::ask::asks`: the body's `asks` fact, or its own error
+while starting or paused; never another part's, a stop or any other
+warning) on a thread of its own
 (`body_ask`), and hands the line to its own say service as `text`, skill
 `body`, priority 8, not begun after a minute: the same queue and gates as a
 skill's say, so the voice's loop never waits for it, and checked as a

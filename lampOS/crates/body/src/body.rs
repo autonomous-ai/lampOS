@@ -31,6 +31,7 @@
 //!   nothing keeps pushing, then torque off on all five, and nothing after that.
 use crate::{
     Joint,
+    ask::{STAND_FAULT, STAND_NO_HOME, STAND_OFF_WAY, STAND_WARM},
     clips::{self, Clip},
     cog,
     gaze::{Gaze, Looking, Seen},
@@ -1366,6 +1367,10 @@ pub struct Glimpse {
     /// is found out of where it may start, and this is what it asks of a
     /// person, in words the voice can say. `None` on every other step.
     pub waiting: Option<&'static str>,
+    /// The run will not stand, and this is what its owner can do about it,
+    /// in words the voice can say (`crate::ask`, #6834). `None` while it
+    /// may stand.
+    pub stand_ask: Option<&'static str>,
     /// Where the head and base were found at start, pitch, roll, yaw: the
     /// frame a computer's degrees are counted from (`body/limits`). `None`
     /// before it is found.
@@ -1586,6 +1591,9 @@ pub struct BodyReport {
     pub standing: Option<Standing>,
     /// Why it would not stand, though it ran as a folded lamp.
     pub standing_refused: Option<String>,
+    /// The same, as its owner is asked (`Glimpse::stand_ask`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stand_ask: Option<&'static str>,
     /// With `Limits::own_ranges`, each joint's own stored limits as read at
     /// start, by `Joint::index` (#3558).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -4345,6 +4353,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         last: None,
         standing: None,
         standing_refused: None,
+        stand_ask: None,
         own_ranges: None,
         app_reach: None,
         torque_writes: 0,
@@ -4606,6 +4615,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     if standing.is_some() && home.is_none() {
         standing = None;
         report.standing_refused = Some("a lamp that stands needs a home".into());
+        report.stand_ask = Some(STAND_NO_HOME);
     }
 
     // Told to take hold: a joint found without torque, which would be a
@@ -4799,12 +4809,18 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             otherwise |= off > f32::from(Standing::FOUND_SLACK);
             if arm_profiles[index].0 != 1 {
                 otherwise = true;
-                why.get_or_insert(format!("{joint} torque is not on"));
+                why.get_or_insert((format!("{joint} torque is not on"), STAND_FAULT));
             } else if sample.status & !StatusFlags::OVERLOAD != 0 {
                 otherwise = true;
-                why.get_or_insert(format!("{joint} status is {:#04x}", sample.status));
+                why.get_or_insert((
+                    format!("{joint} status is {:#04x}", sample.status),
+                    STAND_FAULT,
+                ));
             } else if sample.temperature >= Standing::TEMPERATURE {
-                why.get_or_insert(format!("{joint} is at {} already", sample.temperature));
+                why.get_or_insert((
+                    format!("{joint} is at {} already", sample.temperature),
+                    STAND_WARM,
+                ));
                 warm.get_or_insert(Stop::Temperature {
                     joint: joint.id(),
                     temperature: sample.temperature,
@@ -4817,7 +4833,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 if limits.wake {
                     said.push_str("; waking does not lower an arm found off its way");
                 }
-                why.get_or_insert(said);
+                why.get_or_insert((said, STAND_OFF_WAY));
             }
         }
         // Up on its way and only too warm: left up and held it may heat on,
@@ -4827,9 +4843,10 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             why = None;
         }
         match why {
-            Some(why) => {
+            Some((why, ask)) => {
                 standing = None;
                 report.standing_refused = Some(why);
+                report.stand_ask = Some(ask);
                 // An arm that cannot be folded: refused as before.
                 if let Some(why) = refusal.take() {
                     report.stop = refused(why);
@@ -5037,6 +5054,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     "{joint} keeps status {:#04x}",
                     found[joint.index()].status
                 ));
+                report.stand_ask = Some(STAND_FAULT);
             }
         }
     }
@@ -7361,6 +7379,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             temperatures: COMMANDED.map(|joint| samples[joint.index()].temperature),
             eased: report.eased,
             stands: standing.is_some(),
+            stand_ask: report.stand_ask,
             stand,
             arm_goals: arm_written,
             arm_positions: ARM.map(|joint| samples[joint.index()].position),
@@ -8207,6 +8226,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                             "{} is {:.0} counts off the way between folded and stood up after it let go; an arm found off its way is not lowered",
                             ARM[index], off[index]
                         ));
+                        report.stand_ask = Some(STAND_OFF_WAY);
                     }
                     None => stand = if lift < 0.05 { 0.0 } else { unsmooth(lift) },
                 }

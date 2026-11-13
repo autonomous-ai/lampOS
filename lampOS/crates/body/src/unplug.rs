@@ -269,26 +269,26 @@ impl Adapter {
         let mut publisher = bus.publisher_declared(STATE_TOPIC, &State::declaration(), "body")?;
         let shared = Arc::new(Shared::default());
         let worker_shared = Arc::clone(&shared);
-        let worker = thread::Builder::new()
-            .name("body-unplug".into())
-            .spawn(move || {
-                let shared = worker_shared;
-                let mut preparation: Option<Preparation> = None;
-                loop {
-                    let stopping = shared.stopped.load(Ordering::SeqCst);
-                    shared.tick(
-                        &bus,
-                        &mut publisher,
-                        &mut preparation,
-                        stopping,
-                        lamp_ipc::monotonic_us,
-                    );
-                    if stopping {
-                        break;
-                    }
-                    thread::sleep(PERIOD);
+        // Made before lamp-body blocks SIGTERM for its signalfd: it never
+        // takes a signal, or systemd's stop ends the process here (#6834).
+        let worker = lamp_ipc::spawn_without_signals("body-unplug", move || {
+            let shared = worker_shared;
+            let mut preparation: Option<Preparation> = None;
+            loop {
+                let stopping = shared.stopped.load(Ordering::SeqCst);
+                shared.tick(
+                    &bus,
+                    &mut publisher,
+                    &mut preparation,
+                    stopping,
+                    lamp_ipc::monotonic_us,
+                );
+                if stopping {
+                    break;
                 }
-            })?;
+                thread::sleep(PERIOD);
+            }
+        })?;
         Ok(Some(Self {
             shared,
             worker: Some(worker),

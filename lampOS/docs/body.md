@@ -219,7 +219,14 @@ is not a reason to stop or to refuse: lamp-4ace's elbow has carried `0x20`
 since the head test of 2026-10-12. A change of that byte is.
 
 It also ends on SIGINT or SIGTERM, after easing back to its home (three
-seconds at most), and prints one JSON report either way.
+seconds at most), and prints one JSON report either way. Every thread it
+makes before `main` blocks the two for its signalfd is made with every
+signal blocked (`lamp_ipc::spawn_without_signals`: the log relay, and the
+unplug worker with `LAMP_UNPLUG=on`), or the kernel hands it the stop and
+its default ends the process at once, with no easing back and no report
+(#6834: a customer lamp restarted by systemd printed none;
+`tests/stop_signals.rs`). A body held at start by a kept unplug request
+(below) has not run, and ends on the stop without a report.
 
 ### Every arm goal inside its window
 
@@ -891,7 +898,22 @@ the shoulder (servo 2) and the elbow (servo 3):
 - It also does not stand, and says why, when it was given no home, when
   either joint has torque off, another flag, or is at 62 or warmer, or when
   the two are not found within 80 counts of one point on the way between
-  folded and stood up. Found part of the way up, on that way, it takes the
+  folded and stood up. Each of these also asks its owner, once, in words
+  the voice can say (#6834; before, the only why was in the exit report,
+  and a customer's lamp that never stood said nothing): every report of
+  the run carries the same `asks` fact, so the voice (`LAMP_BODY_ASK=on`)
+  says it once and again only when called by name, as a let-go body's ask
+  ([speaking-first.md](speaking-first.md)), and the journal's "it will not
+  stand this run" line says it too:
+  an arm off that way, "My arm isn't folded all the way down, so I won't
+  stand up. Please fold it down gently, then unplug me and plug me back
+  in."; torque off or a flag, "Something in my arm isn't right, so I won't
+  stand up. Please unplug me and plug me back in."; 62 or warmer, "My arm
+  is too warm to stand up. Once it has cooled, please unplug me and plug me
+  back in."; no home, "I don't know where my resting place is, so I won't
+  stand up. I need someone to set me up again."
+  (`a_run_that_will_not_stand_asks_the_owner_once_why`). The report's
+  `stand_ask` holds it. Found part of the way up, on that way, it takes the
   lamp as it is and stays up as if it had just been spoken to; but found
   up with only an arm at 62 or warmer (or over 100 on every first read),
   it folds down first, as when asked to stop, and is let go folded, on
@@ -2625,12 +2647,13 @@ The report is `ok` with no message, or a warning:
 | `warn` | `elbow is warming fast: from 42 to 50 within 5 min, and it is said warm at 55` | With the strain guard, a joint 8 °C warmer within 5 min while under 55 |
 | `warn` | `its arm sat down for a strain three times in half an hour: it rests folded and may rise again in N min` | Without the strain guard, during the long rest |
 | `warn` | `a joint met resistance and stopped pushing, 2 times in the last minute` | A commanded joint gave way within the last minute |
+| `warn` | `My arm isn't folded all the way down, so I won't stand up. …`, or another of the run's asks above | The run will not stand, and nothing above is said; the `asks` fact carries it on every report of the run, whatever the level (#6834) |
 | `warn` | `stopped, as it was asked to` | Its last word after SIGINT or SIGTERM |
 | `error` | `stopped: head_pitch was pushed against (load 260)`, and one such sentence for each other reason in "When it stops" | Its last word when it stopped itself or would not start |
 
 Its facts are the mood, how far it has stood up, the warmest joint and
 its reading, and how often a joint gave way in the last minute and since
-it started.
+it started, and, in a run that will not stand, `asks`.
 
 **Paused.** Whether or not it publishes, a body that can reach the bus
 reads `lamp/pause` at most once a second ([keeper.md](keeper.md), "Named
