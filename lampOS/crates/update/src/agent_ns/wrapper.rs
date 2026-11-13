@@ -197,6 +197,19 @@ pub const ONE_PATH_MARK: &str =
 /// engine's alone, never another agent's.
 pub const OWN_HOMES: [(&str, &str); 1] = [("hermes", hermes_install::PLACE)];
 
+/// The agents whose one run path data takes a voice make's own home
+/// (#6643 with #6685), each as `(engine, glob, lines)`: [`NS`] runs the
+/// lines for a `LAMP_NS_MAKE` ([`hermes_install::MAKE_ENV`], set only by
+/// the agent's own wrapper data) that matches the glob for that engine,
+/// and refuses any other non-empty one. Data, matched as `<engine>:<home>`
+/// like [`OWN_HOMES`]: Hermes's ([`hermes_install::MAKE_HOME_GLOB`],
+/// [`hermes_install::ONE_PATH_NS_MAKE_LINES`]), the only agent a make runs.
+pub const MAKE_HOMES: [(&str, &str, &str); 1] = [(
+    "hermes",
+    hermes_install::MAKE_HOME_GLOB,
+    hermes_install::ONE_PATH_NS_MAKE_LINES,
+)];
+
 /// One agent's data in its one run path wrapper ([`one_path_text`]): the
 /// only part of the wrapper that differs from one agent to another.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -506,6 +519,7 @@ pub fn ns_text(shown: Shown) -> String {
             text = text.replacen(from, to, 1);
         }
         text = text.replacen(ONE_PATH_HOME_ANCHOR, &one_path_home_check(), 1);
+        text = text.replacen(MAKE_HOME_ANCHOR, &one_path_make_home(), 1);
     }
     if text.contains(super::PATH_LINES) {
         text
@@ -537,6 +551,27 @@ pub const ONE_PATH_NS_EDITS: [(&str, &str); 3] = [
 /// The line of [`ns_text`] the home check ([`one_path_home_check`]) goes
 /// after, with [`Shown::one_path`]: the program's own check.
 const ONE_PATH_HOME_ANCHOR: &str = "[ -f \"$X\" ] || fail \"no program at $X\"\n";
+
+/// The lines of [`ns_text`] a make's home ([`one_path_make_home`]) goes
+/// between, with [`Shown::one_path`]: where Hermes's own script has its
+/// make lines ([`hermes_install::NS_HOME_LINE`]), its `HOME` set and its
+/// work folder shown. Only with lamp-update's `LAMP_SKILL_TASKS` on.
+const MAKE_HOME_ANCHOR: &str = "U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H\nunset LAMP_NS_HOME\n";
+
+/// [`MAKE_HOME_ANCHOR`] with a make's home between its lines: for a
+/// `LAMP_NS_MAKE` that is `<engine>:<glob>` of [`MAKE_HOMES`], that
+/// agent's lines; empty, nothing; `..` in it or anything else, it ends
+/// before the agent runs.
+pub fn one_path_make_home() -> String {
+    let arms: String = MAKE_HOMES
+        .iter()
+        .map(|(engine, glob, lines)| format!("{engine}:{glob})\n{lines}  ;;\n"))
+        .collect();
+    let (set, unset) = MAKE_HOME_ANCHOR.split_once('\n').unwrap_or_default();
+    format!(
+        "{set}\ncase $E:${{LAMP_NS_MAKE-}} in\n\"$E\":) ;;\n*..*) fail \"LAMP_NS_MAKE is not a make's home\" ;;\n{arms}*) fail \"LAMP_NS_MAKE is not a make's home for $E\" ;;\nesac\nunset LAMP_NS_MAKE\n{unset}"
+    )
+}
 
 /// [`ONE_PATH_HOME_ANCHOR`] and the home check after it: the home the
 /// wrapper names is [`HOMES`]`/<engine>` or the engine's own in
