@@ -66,6 +66,13 @@ pub const WATCH_CONFIRM_MS: u64 = 10_000;
 /// neither `show` nor Harness's own `wait` can tell (#1145 review). A
 /// different answer it ends with later is kept as a new observation.
 pub const WATCH_FOLLOW_MS: u64 = 600_000;
+/// How long an agent idle with its answer while background commands it
+/// started still run (#5689) is held as at work, from the first such read
+/// in this boot (`Task::background_since`). Past it the answer is kept
+/// and told as any idle one: a dev server, a `tail -f` or a `nohup` job
+/// left running must not hide it (Heron's P2 on #6997). The close still
+/// waits for them ([`CLOSE_RETRY_MS`]).
+pub const BACKGROUND_HOLD_MS: u64 = 600_000;
 /// How long the watch goes on, every [`WATCH_LATER_MS`], after it kept a
 /// question for the person (`needs-input`): they answer it at their
 /// computer, maybe much later, and what the agent then ends with is told
@@ -406,6 +413,11 @@ struct Task {
     /// Harness's own `wait` takes two looks at one turn for done.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     watch_idle: Option<String>,
+    /// The first read in a row that found the agent idle while background
+    /// commands it started still run (#5689): held as at work until
+    /// [`BACKGROUND_HOLD_MS`] past it. Any other read clears it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    background_since: Option<Clock>,
     /// Closing its harness once its result was told (#1390).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     close: Option<Close>,
@@ -686,6 +698,30 @@ fn unbegun(value: &Observation) -> bool {
 /// engine (the lead's rule), and its empty harness closed ([`close_due`]).
 /// Anything asked, answered or used, an earlier boot, the person's own
 /// session or another engine leaves it as it was read.
+/// An agent idle with its answer while background commands it started
+/// still run (#5689, [`crate::harness::BACKGROUND_STATE`]) is read as
+/// `working` for [`BACKGROUND_HOLD_MS`] from the first such read in a row
+/// in this boot, then as `idle`, so its answer is kept and told as any.
+/// With when that first read was ([`Task::background_since`]), none for
+/// any other read.
+fn background_held(
+    task: &Task,
+    mut observation: Observation,
+    now: &Clock,
+) -> (Observation, Option<Clock>) {
+    if observation.state != crate::harness::BACKGROUND_STATE {
+        return (observation, None);
+    }
+    let since = task
+        .background_since
+        .clone()
+        .filter(|since| since.boot_id == now.boot_id)
+        .unwrap_or_else(|| now.clone());
+    let held = now.monotonic_ms.saturating_sub(since.monotonic_ms) <= BACKGROUND_HOLD_MS;
+    observation.state = if held { "working" } else { "idle" }.into();
+    (observation, Some(since))
+}
+
 fn never_began(task: &Task, observation: Observation, now: &Clock) -> Observation {
     let waited = task.dispatch.finished.as_ref().is_some_and(|accepted| {
         accepted.boot_id == now.boot_id
@@ -776,6 +812,20 @@ fn close_due(task: &Task, now: &Clock) -> bool {
 pub(crate) fn background_code(code: &str) -> bool {
     code.strip_prefix("observe_") == Some(crate::harness::BACKGROUND_COMMANDS)
         || code == crate::harness::CLOSE_BACKGROUND_COMMANDS
+}
+
+/// Whether a close's result is a try not counted against [`CLOSE_TRIES`]
+/// (#5689): background commands still running, while the newest kept
+/// observation is in this boot and at most [`WATCH_AT_MOST_MS`] old.
+fn close_uncounted(task: &Task, result: &Result<Closed, String>, now: &Clock) -> bool {
+    matches!(result, Err(code) if background_code(code))
+        && task.observations.last().is_some_and(|newest| {
+            newest.observed.boot_id == now.boot_id
+                && now
+                    .monotonic_ms
+                    .saturating_sub(newest.observed.monotonic_ms)
+                    <= WATCH_AT_MOST_MS
+        })
 }
 
 /// Whether `task`'s harness is closed though its answer is not told yet
@@ -2002,6 +2052,7 @@ impl<P: Persistence> Engine<P> {
                     read: None,
                     observations: Vec::new(),
                     watch_idle: None,
+                    background_since: None,
                     close: None,
                     closable: self.close_told,
                 });
@@ -2604,6 +2655,18 @@ impl<P: Persistence> Engine<P> {
         Ok(Some(job))
     }
 
+    /// Whether [`Engine::finish_close`] would not count this try (#5689):
+    /// the journal line says so only then ([`close_uncounted`]).
+    pub fn close_uncounted(
+        &self,
+        job: &CloseJob,
+        result: &Result<Closed, String>,
+        now: &Clock,
+    ) -> bool {
+        find(&self.state, job.task_id)
+            .is_ok_and(|index| close_uncounted(&self.state.tasks[index], result, now))
+    }
+
     pub fn finish_close(
         &mut self,
         job: &CloseJob,
@@ -2629,16 +2692,9 @@ impl<P: Persistence> Engine<P> {
         // tried again every CLOSE_RETRY_MS, read first, never with `--now`,
         // until they end. Not past WATCH_AT_MOST_MS after the told answer
         // was kept, or after a restart: then it counts as any failure.
-        let background = matches!(&result, Err(code) if background_code(code));
-        let recent = task.observations.last().is_some_and(|newest| {
-            newest.observed.boot_id == now.boot_id
-                && now
-                    .monotonic_ms
-                    .saturating_sub(newest.observed.monotonic_ms)
-                    <= WATCH_AT_MOST_MS
-        });
+        let uncounted = close_uncounted(task, &result, now);
         let close = task.close.as_mut().expect("current close");
-        if background && recent {
+        if uncounted {
             close.tries = close.tries.saturating_sub(1);
         }
         (close.state, close.code) = match result {
@@ -2690,10 +2746,12 @@ impl<P: Persistence> Engine<P> {
     ) -> Result<(), Error> {
         self.clock(now)?;
         self.read_job(job)?;
+        let index = find(&self.state, job.task_id)?;
+        let (observation, background_since) =
+            background_held(&self.state.tasks[index], observation, now);
         if !valid_observation(&observation) || observation.agent_id != job.agent_id {
             return self.observation_failed(job, "invalid_reply", now);
         }
-        let index = find(&self.state, job.task_id)?;
         let observation = never_began(&self.state.tasks[index], observation, now);
         let observed_digest = digest(&observation);
         // The watch keeps only what the person would want to hear about:
@@ -2717,7 +2775,7 @@ impl<P: Persistence> Engine<P> {
             if !settled(&observation) || (idle && seen != Some(&observed_digest)) {
                 let watch_idle = idle.then(|| observed_digest.clone());
                 let failure = if idle { "idle_once" } else { "working" };
-                return self.watch_looked(job, watch_idle, failure, now);
+                return self.watch_looked(job, watch_idle, background_since, failure, now);
             }
         }
         let mut next = self.state.clone();
@@ -2750,6 +2808,7 @@ impl<P: Persistence> Engine<P> {
         };
         let task = &mut next.tasks[index];
         task.watch_idle = None;
+        task.background_since = background_since;
         let read = task.read.as_mut().expect("current read");
         read.state = ReadState::Finished;
         read.finished = Some(at.clone());
@@ -2767,8 +2826,10 @@ impl<P: Persistence> Engine<P> {
         self.clock(now)?;
         self.read_job(job)?;
         let index = find(&self.state, job.task_id)?;
-        let watch_idle = self.state.tasks[index].watch_idle.clone();
-        self.watch_looked(job, watch_idle, failure, now)
+        let task = &self.state.tasks[index];
+        let (watch_idle, background_since) =
+            (task.watch_idle.clone(), task.background_since.clone());
+        self.watch_looked(job, watch_idle, background_since, failure, now)
     }
 
     /// A read that ends without an observation kept, with what the watch
@@ -2777,6 +2838,7 @@ impl<P: Persistence> Engine<P> {
         &mut self,
         job: &ObservationJob,
         watch_idle: Option<String>,
+        background_since: Option<Clock>,
         failure: &str,
         now: &Clock,
     ) -> Result<(), Error> {
@@ -2785,6 +2847,7 @@ impl<P: Persistence> Engine<P> {
         let at = next_audit(&mut next, now)?;
         let task = &mut next.tasks[index];
         task.watch_idle = watch_idle;
+        task.background_since = background_since;
         let read = task.read.as_mut().expect("current read");
         read.state = ReadState::Failed;
         read.finished = Some(at.clone());
@@ -4432,7 +4495,7 @@ mod tests {
         if let Some(background) = background {
             reply["backgroundCommands"] = background;
         }
-        crate::harness::parse_observation(reply.to_string().as_bytes(), AGENT).unwrap()
+        crate::harness::parse_reading(reply.to_string().as_bytes(), AGENT).unwrap()
     }
 
     /// One pushed read of task `id` at `at` that finds `seen`.
@@ -4452,7 +4515,7 @@ mod tests {
         let (mut engine, _) = opened();
         let id = accepted(&mut engine, 0);
         let running = shown_idle(Some(serde_json::json!(2)));
-        assert_eq!(running.state, "working");
+        assert_eq!(running.state, crate::harness::BACKGROUND_STATE);
         assert!(!settled(&running));
         pushed_read(&mut engine, id, running, 10);
         assert!(engine.state.tasks[0].observations.is_empty());
@@ -4485,6 +4548,90 @@ mod tests {
             .finish_close(&job, Ok(Closed::Closed), &clock(36))
             .unwrap();
         assert!(engine.begin_close(&clock(10_000_000)).unwrap().is_none());
+    }
+
+    /// Heron's P2 on #6997: an agent that leaves a long-lived background
+    /// command (a dev server, `tail -f`) is held as at work only
+    /// BACKGROUND_HOLD_MS from the first such read; past it the idle answer
+    /// is kept as any, told once, and the close still waits
+    /// for the commands to end, never with `--now`.
+    #[test]
+    fn a_long_lived_background_command_holds_the_answer_only_a_while() {
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        let first = 10;
+        let mut at = first;
+        while at <= first + BACKGROUND_HOLD_MS {
+            pushed_read(&mut engine, id, shown_idle(Some(serde_json::json!(1))), at);
+            assert!(
+                engine.state.tasks[0].observations.is_empty(),
+                "held at {at}"
+            );
+            at += WATCH_FOLLOW_MS / 4;
+        }
+        // Past the bound, the idle answer is kept on that read (a pushed
+        // one keeps it at once), once, and the watch ends.
+        pushed_read(&mut engine, id, shown_idle(Some(serde_json::json!(1))), at);
+        assert!(!engine.push(id, &clock(at + 1)).unwrap());
+        let task = &engine.state.tasks[0];
+        assert_eq!(task.observations.len(), 1);
+        assert!(settled(&task.observations[0].data));
+        assert_eq!(task.observations[0].data.state, "idle");
+        assert_eq!(engine.settled_within(&clock(at + 3), u64::MAX).len(), 1);
+        let observation = task.observations[0].id;
+        engine
+            .handle(&claim(&engine, id, observation), &clock(at + 4), true)
+            .unwrap();
+        engine
+            .handle(
+                &acknowledgement(&engine, id, observation),
+                &clock(at + 5),
+                true,
+            )
+            .unwrap();
+        assert!(
+            engine
+                .handle(&claim(&engine, id, observation), &clock(at + 6), true)
+                .is_err(),
+            "told once"
+        );
+        // The close finds them still running: tried again, uncounted.
+        let job = engine.begin_close(&clock(at + 7)).unwrap().unwrap();
+        engine
+            .finish_close(
+                &job,
+                Err("observe_background_commands".into()),
+                &clock(at + 7),
+            )
+            .unwrap();
+        let job = engine
+            .begin_close(&clock(at + 7 + CLOSE_RETRY_MS))
+            .unwrap()
+            .unwrap();
+        assert_eq!(job.tries, 1);
+    }
+
+    /// #5689: a read that finds no background commands starts the hold
+    /// over: a later idle-with-background read is held again.
+    #[test]
+    fn the_background_hold_starts_over_after_any_other_read() {
+        let (mut engine, _) = opened();
+        let id = accepted(&mut engine, 0);
+        pushed_read(&mut engine, id, shown_idle(Some(serde_json::json!(1))), 10);
+        assert_eq!(engine.state.tasks[0].background_since, Some(clock(10)));
+        let mut working = shown_idle(None);
+        working.state = "working".into();
+        pushed_read(&mut engine, id, working, 20);
+        assert!(engine.state.tasks[0].background_since.is_none());
+        let later = 30 + BACKGROUND_HOLD_MS;
+        pushed_read(
+            &mut engine,
+            id,
+            shown_idle(Some(serde_json::json!(1))),
+            later,
+        );
+        assert!(engine.state.tasks[0].observations.is_empty());
+        assert_eq!(engine.state.tasks[0].background_since, Some(clock(later)));
     }
 
     /// #5689: `backgroundCommands` unknown (`null`: Codex, OpenClaw,
