@@ -3409,13 +3409,13 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
-### A made skill's fixed write on the lamp's Hermes (`LAMP_SKILL_WRITE_AGENT`, off)
+### A made skill's fixed write on the lamp's Hermes (`LAMP_SKILL_WRITE_AGENT`, on in the product)
 
 The owner's ruling (13 Nov): everything that touches a linked service runs
-through the lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`,
-on in no product unit) and `LAMP_AGENT_SERVICES=on` in lamp-tasks, the
-hand-over socket also takes a made skill's fixed write (`do.write`,
-docs/skills.md) as a run (`skill_task::WriteHandOver`, `answer_with`):
+through the lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`;
+on in the product's `lamp-skills`, `lamp-tasks`, `lamp-control` and `lamp-services` units, each once (the owner's ruling, 13 Nov)) and `LAMP_AGENT_SERVICES=on` in lamp-tasks, the
+hand-over socket also takes a made skill's fixed write (`do.write`, docs/skills.md)
+as a run (`skill_task::WriteHandOver`, `answer_with`):
 
 - **The line:** `{"op":"skill_write","skill","folder","grants","write"}`,
   every field needed and no other taken. `skill` and `folder` are checked

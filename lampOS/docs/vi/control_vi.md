@@ -78,7 +78,7 @@ lời đồng ý: token của nó không nêu quyền nào (`"grants": []`), nê
 chỉ `hello` được, mọi thao tác cần quyền đều bị từ chối `no_grant`.
 
 **Lượt chạy của một lệnh ghi cố định** (`LAMP_SKILL_WRITE_AGENT=on` trong
-lamp-control, đúng `on`, không bật trong unit sản phẩm nào; quyết định của
+lamp-control, đúng `on`, bật trong các unit lamp-control, lamp-skills, lamp-tasks và lamp-services của sản phẩm; quyết định của
 chủ đèn, 13/11): khi cấp token cho một skill không có lời đồng ý task nào mà
 bước `[[do]]` duy nhất là một lệnh ghi cố định
 (`lamp_skills::service_write::fixed_write_of`, đọc từ thư mục của nó), token

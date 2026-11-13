@@ -253,7 +253,7 @@ pub struct KeptYes {
 
 /// A made skill's fixed write run through the lamp's agent (the owner's
 /// ruling, 13 Nov): `on` only, here and in lamp-skills, lamp-tasks and
-/// lamp-services; on in no product unit.
+/// lamp-services; on in the product's four units.
 pub const WRITE_AGENT_ENVIRONMENT: &str = lamp_skills::service_write::AGENT_ENVIRONMENT;
 
 /// Whether [`WRITE_AGENT_ENVIRONMENT`] is on in this process.
