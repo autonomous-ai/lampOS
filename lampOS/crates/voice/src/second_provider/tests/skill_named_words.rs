@@ -411,3 +411,97 @@ async fn a_skill_named_on_the_names_wait_runs_in_code() {
         );
     }
 }
+
+/// A skills folder of the test's own, with the pushed `photo-booth` and the
+/// Store's `relaxing-music` in its tools file and their `asks` beside them,
+/// as lamp-skills writes them from each `skill.toml`'s `asks` (#6772).
+fn asks_folder() -> std::path::PathBuf {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let base = if std::path::Path::new("/private/tmp").is_dir() {
+        std::path::PathBuf::from("/private/tmp")
+    } else {
+        std::env::temp_dir()
+    };
+    let dir = base.join(format!(
+        "lvs-asks-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    let tools = json!({
+        "tools": [
+            {"name": "photo_booth", "description": "Take a photo."},
+            {"name": "play_relaxing_music", "description": "Play a quiet instrumental piece."}
+        ],
+        "asks": {
+            "photo_booth": ["take a photo", "take a picture"],
+            "play_relaxing_music": ["relaxing music", "play me something to relax"]
+        }
+    });
+    std::fs::write(dir.join(crate::tools::CATALOG_FILE), tools.to_string()).unwrap();
+    dir
+}
+
+/// `heard` asked as [`went`] asks it, with the heard words read over the
+/// skills of [`asks_folder`], their names and their ask phrases, as the
+/// voice reads them on the lamp (`skill_named::Heard`).
+fn went_asking(heard: &str, rounds: Vec<Vec<net::Result<ChatEvent>>>) -> Went {
+    let dir = asks_folder();
+    let reads = Arc::new(crate::skill_named::Heard::new(crate::tools::Settings {
+        skills: Some(dir.clone()),
+        use_skill: true,
+        ..Default::default()
+    }));
+    let went = went_with(heard, rounds, booth_told(), move |engine| {
+        engine.calling_skills_named(Arc::new(move |heard: &str| reads.heard(heard)))
+    });
+    std::fs::remove_dir_all(dir).ok();
+    went
+}
+
+/// The first builder's ruling on #6059 (13 Nov 10:15, and V2's ask at
+/// 12:5x): a skill's own ask phrases in skill.toml, matched whole and
+/// called in code. Seventh's two lines on #6413 (lamp-52e6, 12587) call
+/// the pushed `photo-booth`, and Sixth's two on #5749 (row-5749j) the
+/// `relaxing-music` skill, each as round 1, with no model call.
+#[test]
+fn a_skills_own_ask_phrases_call_it_in_code() {
+    for (heard, function) in [
+        ("take a photo", "photo_booth"),
+        ("photo booth", "photo_booth"),
+        (
+            "Hey Lamp, play me something to relax.",
+            "play_relaxing_music",
+        ),
+        (
+            "Lamp, can you play some relaxing music?",
+            "play_relaxing_music",
+        ),
+    ] {
+        let went = went_asking(heard, vec![said("Here you go.")]);
+        assert_eq!(
+            went.ran,
+            [(
+                crate::use_skill::NAME.to_owned(),
+                json!({ "skill": function })
+            )],
+            "{heard}"
+        );
+        assert_eq!(went.chats, 1, "{heard}: round 1 asks no chat");
+    }
+}
+
+/// A line that only asks about a camera is none of the skills' asks: the
+/// model is asked, and nothing runs in code.
+#[test]
+fn a_camera_question_is_not_an_ask() {
+    for heard in [
+        "is there a camera?",
+        "don't take a photo",
+        "Take a photo, wait.",
+    ] {
+        let went = went_asking(heard, vec![said("Yes, I have one.")]);
+        assert!(went.ran.is_empty(), "{heard}: {:?}", went.ran);
+        assert_eq!(went.chats, 1, "{heard}");
+    }
+}
