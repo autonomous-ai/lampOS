@@ -2247,14 +2247,25 @@ sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
 - **lamp-tasks** checks the line as a task's (its skill, its folder, the one
   grant matching the write's service, at most 8 KiB of content) and runs it
   as a task (`skill_task::WriteHandOver`): a token minted by lamp-control and
-  held to that one grant, and Hermes told to call `service_write` once with
-  exactly that content, quoted as data.
+  held to that one grant, and Hermes told, with the skill's name and the
+  run's id, to call `service_write` once naming only the write's service
+  and action (`{"service":"gmail-app","action":"send_mail"}`). **Never its
+  content** (the Reviewer-lead's P2 on #6824 and #6879): the words are the
+  agent's argv (`harness new --task`, or `hermes chat -q` without Harness,
+  readable in `/proc/<pid>/cmdline`) and Harness's transcript, so no
+  recipient, subject or text is ever in them. `SkillRun`'s `Debug` prints
+  the words' length only.
 - **lamp-control** mints a skill with no task yes whose only `[[do]]` step
   is a fixed write (`service_write::fixed_write_of`) its one `-write` grant
   (`task_yes::KeptYes::fixed_write_grant`) and marks the run a fixed
-  write's; its `service.write` comes here with the run's id
-  (`fixed_write_run`). No yes is read there: the owner's yes to the write is
-  this program's.
+  write's, holding that write as the skill's file has it for the run's life
+  (`runs::FixedWrite`, whose `Debug` never shows it). Its `service.write`
+  comes here with the run's id (`fixed_write_run`). A call naming no content
+  of its own (no field, or only fields equal to the held write's, such as
+  its `action`: `FixedWrite::covers`) is given the held write by the run's
+  token, so the agent never sees it; a call naming any other content goes
+  as asked and is refused here, as below. No yes is read there: the owner's
+  yes to the write is this program's.
 - **Here**, a call carrying `fixed_write_run` goes only through the same
   `skill_write` as `lamp-skills`' call (`serve::Services::run_fixed_write`):
   the owner's kept yes matched on that exact content (a run that changes a
@@ -2288,9 +2299,11 @@ Set it alike in lamp-skills, lamp-tasks, lamp-control and lamp-services.
 Tests: `a_fixed_write_is_handed_to_lamp_tasks_with_its_one_grant`,
 `a_write_the_agent_couldnt_take_is_sent_straight_once`,
 `no_straight_send_once_the_agents_run_began`,
-`a_fixed_write_runs_on_its_one_grant_with_its_exact_content`,
+`a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
+`a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`,
 `a_fixed_writes_run_is_minted_its_one_write_grant`,
 `a_fixed_writes_run_names_its_run_to_lamp_services`,
+`a_fixed_writes_contentless_call_is_given_the_skills_write`,
 `a_fixed_writes_run_sends_the_approved_content_once_within_the_bounds`.
 
 ## A skill's run on the lamp's Hermes (#6432, `LAMP_SKILL_TASKS`, on in the product)

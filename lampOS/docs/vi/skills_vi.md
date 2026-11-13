@@ -972,7 +972,12 @@ sau:
    lượt chạy của kỹ năng với một quyền duy nhất, `<code>-write`, và đúng nội
    dung của nó (`service_write::hand`); tác tử gửi nó qua `service_write`, và
    `lamp-services` giữ nó theo cùng lời đồng ý, liên kết, giới hạn và nhật ký
-   đã gửi, một lần mỗi lượt chạy. Journal ghi lượt chạy ra sao ("handed to
+   đã gửi, một lần mỗi lượt chạy. Lời nhắc của tác tử chỉ nêu dịch vụ và
+   action của lệnh ghi, không bao giờ có nội dung (không người nhận, tiêu đề
+   hay nội dung nào trong argv của nó hay transcript của Harness):
+   lamp-control đưa cho lệnh gọi của nó lệnh ghi của kỹ năng theo token của
+   lượt chạy ([tasks_vi.md](tasks_vi.md), "Lệnh ghi cố định của một kỹ năng
+   tự tạo trên Hermes của đèn"). Journal ghi lượt chạy ra sao ("handed to
    the lamp's agent: its run ended, task N"). Khi tác tử không nhận được nó
    (không biết thư mục, không có `--tasks-socket`, không tới được lamp-tasks,
    hoặc bị từ chối trước khi tác tử bắt đầu, trong đó có Harness đã đăng

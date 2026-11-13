@@ -258,6 +258,14 @@ impl KeptYes {
     /// the owner's yes to that write is lamp-services', kept in root's store
     /// and matched there on its exact content at the send, once a run.
     fn fixed_write_grant(&self, skill: &str) -> Option<Grant> {
+        let write = self.fixed_write_step(skill)?;
+        crate::protocol::ServiceGrant::of(&write.service, crate::protocol::Access::Write)
+            .map(Grant::Service)
+    }
+
+    /// `skill`'s fixed write, read from its folder ([`folder_of`]), with
+    /// [`KeptYes::write_agent`] and no task yes kept for it.
+    fn fixed_write_step(&self, skill: &str) -> Option<lamp_skills::service_write::WriteStep> {
         if !self.write_agent
             || !name_ok(skill)
             || yeses(&self.state).iter().any(|yes| yes.name == skill)
@@ -268,9 +276,7 @@ impl KeptYes {
         if !std::fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir()) {
             return None;
         }
-        let write = lamp_skills::service_write::fixed_write_of(&folder)?;
-        crate::protocol::ServiceGrant::of(&write.service, crate::protocol::Access::Write)
-            .map(Grant::Service)
+        lamp_skills::service_write::fixed_write_of(&folder)
     }
 }
 
@@ -309,8 +315,13 @@ impl crate::runs::SkillYes for KeptYes {
             .collect()
     }
 
-    fn fixed_write(&self, skill: &str) -> bool {
-        self.on && self.fixed_write_grant(skill).is_some()
+    /// The write the run's `service.write` is given
+    /// ([`crate::runs::FixedWrite`]): the skill's own, as its file has it.
+    fn fixed_write(&self, skill: &str) -> Option<crate::runs::FixedWrite> {
+        if !self.on || self.fixed_write_grant(skill).is_none() {
+            return None;
+        }
+        crate::runs::FixedWrite::of(self.fixed_write_step(skill)?.content())
     }
 }
 
@@ -753,16 +764,25 @@ mod tests {
             kept(true, true).grants("arrive-mail").unwrap(),
             BTreeSet::from([gmail_write])
         );
-        assert!(kept(true, true).fixed_write("arrive-mail"));
+        let held = kept(true, true).fixed_write("arrive-mail").unwrap();
+        assert_eq!(held.service(), "gmail-app");
+        assert_eq!(
+            held.args(),
+            *json!({"action": "send_mail", "to": ["boss@work.test"], "subject": "In",
+                    "text": "I'm at my desk."})
+            .as_object()
+            .unwrap()
+        );
+        assert_eq!(format!("{held:?}"), "FixedWrite(..)");
         // Off, or the skills' tasks off: nothing, as before.
         assert_eq!(kept(true, false).grants("arrive-mail").unwrap_err(), NO_YES);
-        assert!(!kept(true, false).fixed_write("arrive-mail"));
+        assert!(kept(true, false).fixed_write("arrive-mail").is_none());
         assert_eq!(kept(false, true).grants("arrive-mail").unwrap_err(), OFF);
-        assert!(!kept(false, true).fixed_write("arrive-mail"));
+        assert!(kept(false, true).fixed_write("arrive-mail").is_none());
         // A task's skill is never a fixed write's: its own yes, as before.
         task_skill(&skills, "photo-booth", r#"["camera"]"#);
         assert_eq!(kept(true, true).grants("photo-booth").unwrap_err(), NO_YES);
-        assert!(!kept(true, true).fixed_write("photo-booth"));
+        assert!(kept(true, true).fixed_write("photo-booth").is_none());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
