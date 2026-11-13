@@ -273,8 +273,12 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `/usr/local/lib/lampos/hermes-run-env.sh` của lamp-update vào
   `terminal.shell_init_files` của Hermes, sau ba file mặc định
   `~/.profile`, `~/.bash_profile`, `~/.bashrc` khi nó tạo danh sách, trừ khi
-  `terminal.auto_source_bashrc` tắt; danh sách người dùng tự đặt được giữ
-  nguyên; terminal của Hermes source file đó trước snapshot đăng nhập, và
+  `terminal.auto_source_bashrc` tắt theo cách Hermes đọc (`false`, `no`,
+  `off`, `null` hoặc `0`; `'false'` có ngoặc là bật); danh sách rỗng
+  (`shell_init_files:` trống, `null`, `[]`) cũng nhận ba file mặc định;
+  danh sách người dùng tự đặt được giữ nguyên; một `terminal:` không gộp
+  được (flow style, anchor) được để nguyên và ghi journal, phần còn lại
+  vẫn được gộp; terminal của Hermes source file đó trước snapshot đăng nhập, và
   file chỉ đặt SDK lên đầu `PYTHONPATH` khi có `LAMP_CONTROL_SOCKET`, tức
   chỉ trong lần chạy kỹ năng), quy tắc chạy
   script đúng như nó là, không bao giờ sửa, chép hay viết lại file của kỹ

@@ -530,31 +530,75 @@ fn child_value(parts: &[Part], top: &str, child: &str) -> Result<Option<String>,
         .map(|(index, _)| inline_value(&part.lines[*index]).to_owned()))
 }
 
-/// [`RUN_ENV`] in `terminal.shell_init_files`. Making the list, Hermes's
+/// Whether `top.child` lists anything, as Hermes reads it
+/// (`cfg.get(child) or []`): a block with an item under it, or an inline
+/// value that is not empty or unset. A bare `child:` (YAML's null), `[]`,
+/// `{}`, `null` or `~` lists nothing, so Hermes's defaults apply.
+fn lists_any(parts: &[Part], top: &str, child: &str) -> Result<bool, Refused> {
+    let Some(part) = parts.iter().find(|part| part.key.as_deref() == Some(top)) else {
+        return Ok(false);
+    };
+    if !inline_value(&part.lines[0]).is_empty() {
+        return Ok(false);
+    }
+    let (_, starts) = children(part, top)?;
+    let Some(position) = starts.iter().position(|(_, key)| key == child) else {
+        return Ok(false);
+    };
+    let (begin, end) = child_span(part, &starts, position);
+    let value = inline_value(&part.lines[begin]);
+    if value.is_empty() {
+        return Ok(part.lines[begin + 1..end]
+            .iter()
+            .any(|line| !is_blank_or_comment(line)));
+    }
+    Ok(!is_unset(value))
+}
+
+/// Whether Hermes sources its defaults: `terminal.auto_source_bashrc`
+/// read as Python's `bool()` of what PyYAML gives. Missing, true. Unquoted,
+/// YAML 1.1's false spellings (`false`, `no`, `off`, any case), a null
+/// (bare, `null`, `~`) or `0` are false. Quoted, any text but the empty one
+/// is true (`bool("false")` is `True`).
+fn sources_defaults(value: Option<&str>) -> bool {
+    let Some(value) = value else {
+        return true;
+    };
+    let value = value.trim();
+    for quote in ['"', '\''] {
+        if let Some((inner, _)) = value
+            .strip_prefix(quote)
+            .and_then(|rest| rest.split_once(quote))
+        {
+            return !inner.is_empty();
+        }
+    }
+    let bare = value.split(" #").next().unwrap_or_default().trim();
+    !["", "false", "no", "off", "null", "~", "0"]
+        .iter()
+        .any(|off| bare.eq_ignore_ascii_case(off))
+}
+
+/// [`RUN_ENV`] in `terminal.shell_init_files`. Making the list (none
+/// there, or one listing nothing, [`lists_any`]), Hermes's
 /// [`SHELL_DEFAULTS`] go in first, as Hermes would have sourced them, unless
-/// `terminal.auto_source_bashrc` is off (YAML 1.1's `false`, `no`, `off`);
-/// a list already there is kept as it is, [`RUN_ENV`] added last.
+/// it would not have ([`sources_defaults`]); a list already there is kept
+/// as it is, [`RUN_ENV`] added last. Worked on a copy: a list it can't add
+/// to leaves every line as it was.
 fn add_shell_init(parts: &mut Vec<Part>) -> Result<(), Refused> {
     const TOP: &str = "terminal";
     const CHILD: &str = "shell_init_files";
-    let listed = child_value(parts, TOP, CHILD)?.is_some_and(|value| !is_unset(&value));
-    let auto = child_value(parts, TOP, "auto_source_bashrc")?.is_none_or(|value| {
-        let bare = value
-            .split(" #")
-            .next()
-            .unwrap_or_default()
-            .trim()
-            .trim_matches(['"', '\'']);
-        !["false", "no", "off"]
-            .iter()
-            .any(|off| bare.eq_ignore_ascii_case(off))
-    });
+    let listed = lists_any(parts, TOP, CHILD)?;
+    let auto = sources_defaults(child_value(parts, TOP, "auto_source_bashrc")?.as_deref());
+    let mut merged = parts.clone();
     if !listed && auto {
         for file in SHELL_DEFAULTS {
-            add_to_list(parts, TOP, CHILD, file)?;
+            add_to_list(&mut merged, TOP, CHILD, file)?;
         }
     }
-    add_to_list(parts, TOP, CHILD, RUN_ENV)
+    add_to_list(&mut merged, TOP, CHILD, RUN_ENV)?;
+    *parts = merged;
+    Ok(())
 }
 
 fn quoted(value: &str) -> String {
@@ -612,7 +656,13 @@ pub fn merge_config_for(text: &str, port: u16, agent_services: bool) -> Result<S
         Some(&one("mode", APPROVALS)),
     )?;
     add_to_list(&mut parts, "skills", "external_dirs", SKILLS_DIR)?;
-    add_shell_init(&mut parts)?;
+    // A `terminal:` it can't merge (flow style, an anchor) keeps the rest:
+    // only the SDK's path for a skill's run is left out, and said.
+    if let Err(Refused(why)) = add_shell_init(&mut parts) {
+        eprintln!(
+            "[lamp-tasks] Hermes's terminal.shell_init_files not set (a skill's run won't have the SDK on its path): {why}"
+        );
+    }
     merge_mcp_servers(&mut parts, agent_services)?;
     let mut out = String::new();
     for part in &parts {
@@ -1450,7 +1500,7 @@ skills:
             [format!("- {RUN_ENV}/")],
             "there already"
         );
-        for off in ["false", "False", "no", "off", "'false'", "false # mine"] {
+        for off in ["false", "False", "no", "off", "null", "false # mine"] {
             let text = format!("terminal:\n  auto_source_bashrc: {off}\n");
             let merged = merge_config(&text, 7741).unwrap();
             assert_eq!(init_files(&merged), [format!("- \"{RUN_ENV}\"")], "{off}");
@@ -1458,13 +1508,69 @@ skills:
     }
 
     #[test]
-    fn a_terminal_it_cannot_merge_is_refused_and_left() {
+    fn a_terminal_it_cannot_merge_keeps_every_other_lamp_line() {
         for text in [
             "terminal: local\n",
+            "terminal: {backend: local}\n",
+            "terminal: &t\n  backend: local\n",
             "terminal:\n  shell_init_files: {a: b}\n",
             "terminal:\n  shell_init_files:\n  - [a]\n",
         ] {
-            assert!(merge_config(text, 7741).is_err(), "{text:?}");
+            let merged = merge_config(text, 7741).unwrap();
+            // The lamp's provider and skills folder are still written; the
+            // terminal block is left as it was.
+            assert!(merged.contains("provider: \"custom:lamp\""), "{merged}");
+            assert!(merged.contains(SKILLS_DIR), "{merged}");
+            assert!(merged.starts_with(text), "{text:?}: {merged}");
+            assert!(!merged.contains(RUN_ENV), "{text:?}");
         }
+    }
+
+    /// The Reviewer-lead's P3s on #6759: a bare `shell_init_files:` (null)
+    /// lists nothing, so the defaults go in; `auto_source_bashrc` is read
+    /// as Hermes's `bool()` reads PyYAML's value.
+    #[test]
+    fn a_null_list_gets_the_defaults_and_auto_source_bashrc_reads_as_hermes_does() {
+        let made = [
+            SHELL_DEFAULTS[0],
+            SHELL_DEFAULTS[1],
+            SHELL_DEFAULTS[2],
+            RUN_ENV,
+        ]
+        .map(|path| format!("- \"{path}\""));
+        for text in [
+            "terminal:\n  shell_init_files:\n",
+            "terminal:\n  shell_init_files:\n  # none yet\n  backend: local\n",
+            "terminal:\n  shell_init_files: null\n",
+            "terminal:\n  shell_init_files: ~\n",
+        ] {
+            let merged = merge_config(text, 7741).unwrap();
+            assert_eq!(init_files(&merged), made, "{text:?}: {merged}");
+            assert_eq!(merge_config(&merged, 7741).unwrap(), merged);
+        }
+        assert!(sources_defaults(None));
+        for on in ["true", "yes", "On", "'false'", "\"no\"", "1", "'x' # c"] {
+            assert!(sources_defaults(Some(on)), "{on}");
+        }
+        for off in [
+            "false",
+            "False",
+            "NO",
+            "off",
+            "null",
+            "~",
+            "",
+            "0",
+            "false # mine",
+            "''",
+        ] {
+            assert!(!sources_defaults(Some(off)), "{off}");
+        }
+        let quoted = merge_config("terminal:\n  auto_source_bashrc: 'false'\n", 7741).unwrap();
+        assert_eq!(
+            init_files(&quoted),
+            made,
+            "a quoted false is true to Hermes"
+        );
     }
 }
