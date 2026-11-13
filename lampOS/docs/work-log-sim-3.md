@@ -3,6 +3,14 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 02:1x GMT+7: #6965/#6966 to the train; 888's red was the flake
+
+- #6965 and #6966: the lead's READ-OKs beside mine; ten posted NEXT TRAIN.
+- Train 888 (#6973) failed in `sim-macos` on the known supervisor flake
+  (`actual_child_uses_same_worker_loop…`, "motor inhibit acknowledgement timed
+  out", 594/595); the bot sat #6666 out for it. Told the first builder and the
+  bot: #6966 fixes it (ride first), #6666 wasn't the cause.
+
 ## 2026-11-14 02:0x GMT+7: #6971 read by sim-2; P3s taken; a voice.rs flake
 
 - #6971: sim-2 READ-OK b07d87bf7b (Linux, 93 pass). P3s taken at ca9cabb6b4:
