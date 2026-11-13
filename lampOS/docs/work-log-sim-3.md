@@ -3,6 +3,15 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 02:4x GMT+7: #6975 READ-OK (sim-1's spd-say flake fix)
+
+- sim-1 took the spd-say flake: **#6975** (0ede05796e, test only) waits for
+  the fake's first log line (10 ms polls, 5 s bound), fake starts 0.6 s late
+  on purpose. On this Mac: that test alone 20/20 (3/15 failed before); lib
+  suite 3/3 (~5.3 s); clippy clean; no scratch folder left. READ-OK posted,
+  second-reader ask to sim-2.
+- #6965, #6966 still open (next train, #6966 first).
+
 ## 2026-11-14 02:3x GMT+7: 888 sorted; the body-on-macOS CI step drafted
 
 - The first builder cleared #6666's sit-out and put #6966 first in the next
