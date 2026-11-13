@@ -12,7 +12,7 @@ computer, never on a lamp. Node 20.11 or later.
 **On a customer lamp today (stable 11450, promoted 10 Nov, lamp-voice `135bc417d4`):** lamp-control is on every lamp,
 and answers once the owner turns on developer access in the app. Five gaps,
 and what to do ([more](../README.md#on-a-customer-lamp-today)):
-- **Play and a look at a face:** `play` is refused, "not routed yet: waits for client packages", and so is `look` at `'face'` or `'name'`, "not in this release". Send a recorded move as `move`; look at `'ahead'` or an angle.
+- **Play and a look at a face:** `play` of a pushed skill's recorded move works from build 12171 (on 11913 and before it is refused, "not routed yet: waits for client packages"). `look` at `'face'` is taken but refused "no face in view" when the eyes show none, or "this lamp's gaze is not measured, so it cannot look at a face"; `look` at `'name'` is refused, "not in this release: look at who said the lamp's name (the lamp has no sound direction)". Look at `'ahead'` or an angle, or send your own frames as `move`.
 - **A motion's end:** `{ wait: true }` on `gesture`, `move` and `express` resolves when the lamp takes the motion, not when it ends (the next build ends it at the body's `done`).
 - **Limp and pose:** the body's limp and hold-a-pose can't be reached from a computer.
 - **No mDNS:** `lamp find` finds nothing. Pair with `--host lamp-xxxx.local` (the lamp's host name) or its IP address; the address is kept for later connects.
