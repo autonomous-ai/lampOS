@@ -237,7 +237,10 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   `{"end":{"run"}}` khi lần chạy kết thúc. lamp-control tự đọc lời đồng ý
   của chủ đèn và nêu các quyền; lần chạy nào có quyền được cấp không khớp
   đúng các quyền dòng giao việc xin thì bị từ chối `no_token` và token bị
-  kết thúc, nên lần chạy không bao giờ nhận quyền mà kỹ năng không xin. Lời
+  kết thúc, nên lần chạy không bao giờ nhận quyền mà kỹ năng không xin. Dòng
+  giao việc không xin quyền nào và lời đồng ý được giữ không có quyền nào thì
+  khớp: token không nêu quyền nào, và lần chạy chạy mà không dùng gì của
+  đèn. Lời
   từ chối của chính lamp-control (chưa có đồng ý, tắt chạy kỹ năng, không
   liên lạc được trong 5 s) là thông điệp `no_token`. Lần chạy nhận token qua
   `LAMP_CONTROL_TOKEN`,

@@ -2613,7 +2613,8 @@ for each run, and is answered once the run ends
   ended at once too, since its token may be live. lamp-control reads the owner's yes itself and names its grants; a
   run whose minted grants are not exactly the ones its line asks is refused
   `no_token` and its token ended, so a run never gets grants its skill did
-  not ask. lamp-control's own refusal (no yes, skill runs off, not
+  not ask. A line that asks no grant and a yes kept with none match: its
+  token names none, and the run goes with nothing of the lamp's. lamp-control's own refusal (no yes, skill runs off, not
   reachable within 5 s) is the `no_token` message. The run is given the
   token as `LAMP_CONTROL_TOKEN`, beside
   `LAMP_CONTROL_SOCKET=/run/lampos-control/control.sock`, and nothing else
