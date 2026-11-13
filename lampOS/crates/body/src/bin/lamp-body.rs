@@ -950,7 +950,7 @@ impl Minutely {
 /// Whether the body can't be moved by a holder now, for its lease: let go
 /// (torque off after a slump), or let go and waiting for a hand to set its
 /// pose right (`--refused-let-go`, the reviewer-lead's P3 on #3820).
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 fn slumped_now(glimpse: &lamp_body::body::Glimpse) -> bool {
     glimpse.limp || glimpse.waiting.is_some()
 }
@@ -1489,7 +1489,7 @@ fn main() -> std::process::ExitCode {
     // Its log lines never block it or end it, and its last ones reach the
     // journal (`lamp_ipc::log_relay`).
     let _log = lamp_ipc::log_relay::guard();
-    #[cfg(target_os = "linux")]
+    #[cfg(unix)]
     if std::env::args_os()
         .nth(1)
         .is_some_and(|first| first == "exit-report")
@@ -1522,7 +1522,7 @@ fn main() -> std::process::ExitCode {
 /// whole journal) as plain lines on stdout. Exits 0 when the newest was
 /// read, 1 when there is none, 3 when the newest could not be read (the
 /// previous one follows, labelled) and 4 when stdin cannot be read.
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 fn exit_report() -> std::process::ExitCode {
     let mut text = String::new();
     if let Err(error) = std::io::Read::read_to_string(&mut std::io::stdin(), &mut text) {
@@ -1556,7 +1556,7 @@ fn step_said(notify: &lamp_keeper::Notify, ready: &std::cell::Cell<bool>) {
     notify.alive();
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(unix))]
 fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let _ = (arguments.unit_id, arguments.mood_socket, arguments.home);
     let _ = (
@@ -1587,18 +1587,24 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         arguments.arbitration,
         arguments.caller_caps,
     );
-    Err("the body requires Linux; no device was opened".into())
+    Err("the body requires a unix system; no device was opened".into())
 }
 
-#[cfg(target_os = "linux")]
+/// The body's run on any unix system.
+///
+/// On macOS the port is lamp-sim's pty slave, and what a Mac was seen to do
+/// there (sim-3, macOS 26.5, #6931): a 1 Mbaud `tcsetattr` reads back 1 Mbaud and
+/// `flock` on the slave works, but `TIOCEXCL` is accepted and NOT enforced (a
+/// second `open` by the same user succeeds), so on macOS the lock-file `flock`
+/// is the only guard against a second writer. Termios is refused on a pty's
+/// master (ENOTTY) and a slave goes back to cooked when its last fd closes, so
+/// the raw mode and the baud this sets on open are what make the port raw.
+#[cfg(unix)]
 fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
+    use lamp_body::stop_signal::StopSignal;
     use lamp_body::{
         body::{Limits, Stop, Tuning},
         linux::{InspectionConfig, run_body},
-    };
-    use nix::sys::{
-        signal::{SigSet, Signal},
-        signalfd::{SfdFlags, SignalFd},
     };
     use std::{io::Write, os::unix::net::UnixDatagram};
 
@@ -1624,12 +1630,6 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             true
         })?
     };
-    struct SignalMask(SigSet);
-    impl Drop for SignalMask {
-        fn drop(&mut self) {
-            let _ = self.0.thread_set_mask();
-        }
-    }
     let config = InspectionConfig::new(
         arguments.device,
         arguments.unit_id,
@@ -1728,13 +1728,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         );
     }
     let test_held = std::cell::Cell::new(false);
-    let old_mask = SigSet::thread_get_mask()?;
-    let mut mask = SigSet::empty();
-    mask.add(Signal::SIGINT);
-    mask.add(Signal::SIGTERM);
-    mask.thread_block()?;
-    let restore = SignalMask(old_mask);
-    let signal_fd = SignalFd::with_flags(&mask, SfdFlags::SFD_CLOEXEC | SfdFlags::SFD_NONBLOCK)?;
+    let signal = StopSignal::new()?;
     let mut cancelled = false;
     // A gesture asked for on the same socket, and at what priority, until
     // the body takes it; and who asked for the last one, for the journal.
@@ -2653,10 +2647,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
         || unplug.as_ref().is_some_and(|unplug| unplug.latched()),
         || {
             if !cancelled {
-                cancelled = signal_fd
-                    .read_signal()
-                    .map_err(|error| std::io::Error::from_raw_os_error(error as i32))?
-                    .is_some();
+                cancelled = signal.requested()?;
                 if cancelled {
                     // It eases back from here.
                     notify.stopping();
@@ -2721,7 +2712,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     serde_json::to_writer(&mut output, &result)?;
     writeln!(output)?;
     output.flush()?;
-    restore.0.thread_set_mask()?;
+    signal.restore()?;
     Ok(result.port.preparation_error.is_none()
         && result.port.cleanup.errors.is_empty()
         && result.body.is_some_and(|body| body.stop == Stop::Cancelled))
