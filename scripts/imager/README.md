@@ -138,7 +138,7 @@ make sd-card-flash-raw DEVICE_TYPE=lamp-v2 DISK=N
 | `LAMPOS_UPDATE_KEY` | **(required)** | The update key's public half, used by the host to authenticate the bootstrap manifest before execution, then baked as `/etc/lampOS/update/key.pub`. `install` and every later update verify with it again |
 | `LAMPOS_CHANNEL_DIR` | *(unset)* | A channel folder (`lampos-manifest.json` signed by that key, and the build's files, `files_url` `file:///var/tmp/lampos-channel/`), read at build and not left on the image. Unset: the build is read from `LAMPOS_CHANNEL_URL` |
 | `LAMPOS_MODELS_DIR` | *(unset)* | The models release's files (`gh release download models-2026-10-16 -R autonomous-ai/lampOS -D <dir>`). `install` fetches each model in `lampOS/deploy/product/models.json` itself; one it cannot (that release is still a draft, so its public links answer 404) is placed from here by the same size and SHA-256 checks, and a second `install` records it. Without it, a model install could not fetch fails the build |
-| `LAMPOS_CHANNEL_URL` | `https://github.com/autonomous-ai/lampOS/releases/download/lampos-lamp-voice/` | The product channel, the one `lamp-update.service` follows on the lamp |
+| `LAMPOS_CHANNEL_URL` | `https://cdn.autonomous.ai/lampos/stable/` | The product channel, the one `lamp-update.service` follows on the lamp: the stable build's CDN mirror (#6256) |
 | `VARIANT` | `standard` | Which of `lampOS/deploy/image/shipped.json`'s variants (`standard`, `pro`, `pro-xvf3800`, `pro-respeaker-lite`) |
 | `OUT_IMG_SIZE` | `8G` | The raw image; resize-once fills the card at first boot |
 | `AP_BAND`, `COUNTRY_CODE`, `COMPRESS` | as V1 | as V1 |
