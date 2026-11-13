@@ -32,6 +32,7 @@ lamp-skills`, which runs every skill's cases).
 | `quiet-at-night` | One spell from 23:00, over by 01:00 | Pass: nothing: the chance kept through the quiet hours is spent when the spell ends |
 | `waits-out-the-night` | Stuffy (1,400) from 23:00 to 10:00, then down to 700 | Pass: nothing in the night; `sleepy` and a dim once at 08:00, the quiet's end, with the chance that came at 23:10 kept; the dim ends at 10:09.5 |
 | `quiet-on-a-short-rise` | From 10:00, up to 1,300 and back: 8 minutes above 1,200 | Pass: nothing |
+| `stuffy-through-unknown-readings` | From 14:00, stuffy (2,230 to 2,290) from the first reading, every 5 s, with `co2_ppm` null (`feel` unknown) for 90 s in every 4 minutes, 40 minutes | Pass: `sleepy`, a dim and the line once, at 600 s; nothing again while it stays stuffy. The unknown readings are passed over (#6592): before, each 90 s ended the spell past its 1-minute gap and nothing was done or said, as on lamp-52e6 on 12295. Written by a script in `lamp-bus record`'s format, the air part's own message shape (source `air`) |
 
 The `sleepy` look has no case: whether the whole 9.2 s clip reads as a
 drowsy lamp, not a gesture on cue, is for the lamp check to judge (still

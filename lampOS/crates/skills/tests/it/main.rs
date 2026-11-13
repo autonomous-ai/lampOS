@@ -17,6 +17,7 @@ mod shared;
 mod skills;
 mod stands_in;
 mod store;
+mod stuffy_unknown;
 mod welcome_stuck;
 
 /// The daily journal at `path`, opened as the next process would. A test

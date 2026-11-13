@@ -2288,6 +2288,21 @@ enum Test {
 }
 
 impl Test {
+    /// Whether `value` says a level test's field is not known: the field
+    /// there and `null`, as the air part sends a CO2 its sensor does not
+    /// know yet (`crates/air/src/lib.rs`'s `reading`). Such a message says
+    /// nothing of the level, so a trigger passes it over (#6592). A field
+    /// left out is not this: `lamp/health` leaves `quiet_ms` out at 0.
+    fn unknown_in(&self, value: &Value) -> bool {
+        match self {
+            Self::Above(field, _) | Self::Below(field, _) => field
+                .split('.')
+                .try_fold(value, |value, name| value.get(name))
+                .is_some_and(Value::is_null),
+            _ => false,
+        }
+    }
+
     fn holds(&self, value: &Value) -> bool {
         match self {
             Self::NoFaces => serde_json::from_value::<Faces>(value.clone())
@@ -5953,6 +5968,11 @@ struct Watch {
     /// message of its topic must hold, or the hold is dropped, whatever its
     /// `gap`.
     restored: bool,
+    /// Since when its topic's messages have not known the trigger's field
+    /// (a sensor's `null`, #6592), which they are passed over for: a run
+    /// held until the trigger ends ends once that lasts as long as a
+    /// silence would end it ([`Engine::tick`]).
+    unknown_us: Option<u64>,
 }
 
 /// Whether a trigger's hold is kept across a short restart ([`holds`]): a
@@ -7210,7 +7230,9 @@ impl Engine {
                 let Some((_, at_us, lifespan_us)) = self.latest.get(&trigger.topic) else {
                     continue;
                 };
-                let silent_us = now_us.saturating_sub(*at_us);
+                // Messages that do not know its field, passed over, are no
+                // more than silence (#6592): counted from the first of them.
+                let silent_us = now_us.saturating_sub(watch.unknown_us.unwrap_or(*at_us));
                 let silent = silent_us >= lifespan_us.unwrap_or(SILENT_ENDS_US);
                 let outside = out_of_window(trigger, moment.as_ref());
                 if watch.open && (silent || outside.is_some()) {
@@ -8114,6 +8136,16 @@ impl Engine {
                     continue;
                 }
                 let started = *watch.started_us.get_or_insert(now_us);
+                // A level the message does not know (`co2_ppm: null` while
+                // the air sensor does not know it, #6592) is passed over, as
+                // a rise's reading is: it neither ends the spell nor counts
+                // toward its `for` or the rearm line. Taken as not holding,
+                // a minute of them ends the spell past its gap and begins
+                // its 10 minutes again in silence (lamp-52e6, #6592).
+                if trigger.when != When::Changes && trigger.test.unknown_in(&value) {
+                    watch.unknown_us.get_or_insert(now_us);
+                    continue;
+                }
                 // A rise compares the field's readings: a message without
                 // one (the sensor not knowing it yet) is passed over, as if
                 // it never came, and breaks nothing (#1684).
@@ -8123,10 +8155,12 @@ impl Engine {
                         .as_f64()
                         .filter(|got| got.is_finite())
                     else {
+                        watch.unknown_us.get_or_insert(now_us);
                         continue;
                     };
                     rose = watch.readings.rose(reading, now_us, rise);
                 }
+                watch.unknown_us = None;
                 if let Some(line) = &trigger.rearm_line {
                     if !line.test.holds(&value) {
                         watch.past_line_us = None;
@@ -8602,6 +8636,24 @@ impl Engine {
                     if waited < trigger.wait_us {
                         watch.spent = false;
                         watch.disarmed = false;
+                        // A chance kept waiting says so, once a hold: a
+                        // matured spell waiting out a talk left no line for
+                        // up to its whole `wait` (#6592).
+                        let (latest, holding) = (&self.latest, &self.holding);
+                        dropped(
+                            &mut self.dropped,
+                            watch,
+                            &skill.name,
+                            "wait",
+                            now_us,
+                            || {
+                                format!(
+                                    "its while did not hold: kept up to {} s for it (held by {})",
+                                    trigger.wait_us / 1_000_000,
+                                    Self::held_back(latest, holding, skill, now_us)
+                                )
+                            },
+                        );
                     } else if once && (trigger.once_per_day || trigger.wait_us > 0) {
                         if trigger.once_per_day
                             && let (Some(name), Some(day)) = (
