@@ -1,6 +1,6 @@
 #!/bin/zsh
 # asks-for-me.sh [SINCE_LOCAL_HH:MM] (30 Oct 11:0x, first builder): every comment on the Queue (#3997, then lib.sh's
-# COORD_QUEUE_ISSUES: #4710, #5385, #6059) and the lead's channel (#1711) since SINCE that names the first builder and isn't
+# COORD_QUEUE_ISSUES: #4710, #5385, #6059, #6809, #6811) and the lead's channel (#1711) since SINCE that names the first builder and isn't
 # mine, IN FULL, none dropped. Fourteen asked three times (08:42, 09:40, 10:5x) for two closes that my tail-cut scans
 # never showed.
 # 3 Nov 09:2x: with no SINCE it starts 5 min before its own last run ($LAMP_COORD_STATE/asks-last), so ticks can't leave gaps:
