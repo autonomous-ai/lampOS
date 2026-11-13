@@ -840,7 +840,7 @@ fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
 }
 
 /// The voice's own functions and the executive's.
-fn core_tools(settings: &Settings) -> Vec<Tool> {
+pub(crate) fn core_tools(settings: &Settings) -> Vec<Tool> {
     core_tools_within(settings, lamp_gemini::MAX_TOOLS)
 }
 

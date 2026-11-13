@@ -110,7 +110,7 @@ impl Said {
 /// What agrees to what the lamp said back, a word or words in a row:
 /// "Yes.", "That's right.", "Of course.", "Go ahead.", "Uh-huh.", and the
 /// Vietnamese "Vâng.", "Dạ.", "Đúng rồi." (the reviewer on #1057).
-const AGREE: &[&[&str]] = &[
+pub(crate) const AGREE: &[&[&str]] = &[
     &["yes"],
     &["yeah"],
     &["yep"],
@@ -140,7 +140,7 @@ const AGREE: &[&[&str]] = &[
 /// Words that take a turn's agreement back, anywhere in it: "No, it's…",
 /// "Yeah, no, it's Kim.", "Of course not.", "Dạ không." (Ten and the
 /// reviewer on #1208: a correction mostly comes right after the yes word).
-const DISAGREE: &[&str] = &[
+pub(crate) const DISAGREE: &[&str] = &[
     "no", "nope", "not", "wrong", "don't", "dont", "isn't", "isnt", "nah", "không", "chưa", "sai",
 ];
 /// Yeses that hold a word that would take one back: "Sure, no problem!",
