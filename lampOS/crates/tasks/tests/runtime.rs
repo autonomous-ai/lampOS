@@ -2057,15 +2057,15 @@ fn targets_from_machines_are_written_and_used_while_signed_in() {
     );
 }
 
-/// A service with `--targets-from-machines claude` and, as asked,
-/// `--engines-from-machines` (#5199): the lamp and one computer, `Office
-/// iMac`, running; a look every 20 ms, the machines' every 100.
 /// How long a test waits for the engine reads to come round again: a
 /// bound, not a delay, so a quick machine passes in a second or two. Five
 /// seconds failed twice on a loaded ARM64 PR runner (#6912's runs, 14 Nov),
 /// where the same head passes in about 2.3 s on a Mac.
 const LOOKED_AGAIN_WITHIN: Duration = Duration::from_secs(20);
 
+/// A service with `--targets-from-machines claude` and, as asked,
+/// `--engines-from-machines` (#5199): the lamp and one computer, `Office
+/// iMac`, running; a look every 20 ms, the machines' every 100.
 fn engines_running(engines: bool) -> (Running, std::path::PathBuf) {
     let mut s = Running::unstarted(false, false, false, false);
     let path = s.root.path().join("targets.json");
