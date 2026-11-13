@@ -1571,13 +1571,14 @@ cả hai người viết.
   DeepSeek: có giữ không, phần nói lại và thời gian. Người dùng của agent có
   thuộc nhóm `lamp-agents` trên đèn hay không.
 
-### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, tắt)
+### Kỹ năng tự tạo được nới lỏng (`LAMP_MADE_SKILL_LOOSE=on`, bật trong sản phẩm)
 
 Kỹ năng tạo tại đây, bằng giọng nói hay trong ứng dụng, là của chính người
 dùng, nên với `LAMP_MADE_SKILL_LOOSE=on` các kiểm tra của nó được nới lỏng
 (yêu cầu của chủ sở hữu trên Queue, #6059, 11/11; người xây dựng đầu tiên
 đồng ý ở đó lúc 22:44, với hai điều chỉnh: `[rest]` được giữ, và việc gửi,
-camera và micro luôn được nêu đúng tên). Tắt nếu không đặt, và không có trong unit sản phẩm nào.
+camera và micro luôn được nêu đúng tên). Tắt nếu không đặt; bật trong `lamp-voice.service`, `lamp-skills.service`
+và `lamp-skills-manage@.service` của sản phẩm, mỗi unit một lần.
 `lamp-voice` đọc nó (và chuyển đúng `on` cho worker `provider` và `second`,
 nơi tạo kỹ năng), và trình quản lý của `lamp-skills` đọc nó qua
 `made_skill::capped` khi bật một kỹ năng tự tạo. Hãy đặt nó giống nhau trong
