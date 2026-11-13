@@ -265,6 +265,11 @@ struct FakeSystemd {
     /// Explicit manager facts, independent of the filesystem classifier.
     setup_properties: Option<String>,
     remove_setup_marker_on_query: bool,
+    /// After setup's next restart, its next `systemctl show` finds it ended
+    /// by itself with this `Result`, and the marker written when the bool
+    /// says so: setup finishing inside the watch (#6820).
+    setup_ends_in_watch: Option<(&'static str, bool)>,
+    setup_ends_armed: bool,
     /// `systemctl show` fails from the first restart on.
     unreachable_after_restart: bool,
     unreachable: bool,
@@ -386,6 +391,25 @@ impl Systemd for FakeSystemd {
             self.failing -= 1;
             return Err("systemctl did not answer within 5 s".into());
         }
+        if self.setup_ends_armed && units.iter().any(|unit| unit == "lamp-setup.service") {
+            self.setup_ends_armed = false;
+            let (result, marker) = self.setup_ends_in_watch.take().unwrap();
+            if marker {
+                let done = self.root.join("var/lib/lampos-setup/done");
+                fs::create_dir_all(done.parent().unwrap()).unwrap();
+                fs::write(done, "done\n").unwrap();
+            }
+            self.units.insert(
+                "lamp-setup.service".into(),
+                Running {
+                    active: "inactive".into(),
+                    sub: "dead".into(),
+                    result: result.into(),
+                    condition: "yes".into(),
+                    ..Running::default()
+                },
+            );
+        }
         Ok(units
             .iter()
             .map(|unit| {
@@ -430,6 +454,7 @@ impl Systemd for FakeSystemd {
         self.unreachable |= self.unreachable_after_restart;
         self.failing += std::mem::take(&mut self.failing_after_restart);
         self.start(unit);
+        self.setup_ends_armed |= unit == "lamp-setup.service" && self.setup_ends_in_watch.is_some();
         Ok(())
     }
 
@@ -664,6 +689,8 @@ impl Lamp {
             held_at_restart: Vec::new(),
             setup_properties: None,
             remove_setup_marker_on_query: false,
+            setup_ends_in_watch: None,
+            setup_ends_armed: false,
             unreachable_after_restart: false,
             unreachable: false,
             failing_after_restart: 0,
