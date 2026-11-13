@@ -200,4 +200,15 @@ def asks_beyond(folder: str | Path, grants: list[str]) -> tuple[str, str] | None
     for key, grant in PERMISSION_GRANTS.items():
         if permissions.get(key) and grant not in grants:
             return "no_grant", f"[permissions] {key} needs the {grant} grant, which this computer doesn't hold"
+    from .skillcheck import is_service_grant
+
+    # A `do.task`'s script reaches only what this computer holds too; a picture is held off for the owner's yes
+    # on the lamp, never refused here (lamp-skills `beyond`).
+    for grant in rules.get("grants", []) if isinstance(rules.get("grants"), list) else []:
+        # A linked service's grant is a skill run's alone: a paired computer is never given one, so the lamp refuses a
+        # push that names one, switch or not (package.rs, #6432), in its words.
+        if is_service_grant(grant):
+            return "no_grant", f"not installed: it asks {grant}, a linked service's grant (a skill run's alone), which this computer was not granted"
+        if isinstance(grant, str) and grant != "camera" and grant not in grants:
+            return "no_grant", f"grants {grant}: a task's script needs the {grant} grant, which this computer doesn't hold"
     return None

@@ -1590,6 +1590,23 @@ test('a package whose moves fail the check still installs and the answer names t
   });
 });
 
+test('a skill whose task hands a script to the lamp packs with its scripts/ folder and is pushed', async () => {
+  // lamp-75c9, 13 Nov (stable 12587): the lamp took this shape from a raw skill.push; the JS push never checked a folder, so it goes.
+  const { pack } = await import('../src/push.js');
+  await withLamp({ grants: ['light', 'skills'] }, async (lamp) => {
+    const rules = 'format = 2\nversion = "1.0.0"\ngrants = ["light"]\ntool = "blue_task"\n\n[permissions]\nlight = true\n\n'
+      + '[[do]]\ntask = { task = "Breathe the light blue for a few seconds", run = "scripts/main.py" }\n';
+    const dir = skillFolder('blue-task', rules);
+    mkdirSync(join(dir, 'scripts'), { recursive: true });
+    writeFileSync(join(dir, 'scripts', 'main.py'), "print('x')\n");
+    const pkg = pack(dir);
+    assert.equal(pkg.name, 'blue-task');
+    const skill = await lamp.pushSkill(dir);
+    assert.equal(skill.name, 'blue-task');
+    assert.deepEqual((await lamp.skills()).map((listed) => listed.name), ['blue-task']);
+  });
+});
+
 test('a waiting play ends at the answer or the done as a move does', async () => {
   // `play` is sent as a `move`: the answer on a lamp that does not say
   // `motionDone`, the body's `done` (told by the test) on one that does.
