@@ -1579,10 +1579,14 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   kết thúc, hoặc khi không có hook nghe để biết lúc nó bắt đầu, được xét như
   mọi câu khác.
 - **Một cái "có" trả về rỗng** (#6840). Nếu chữ cuối cùng của speech to
-  text cho một câu như vậy trả về rỗng nhưng trên đường đi nó có một câu
-  "có" hay "không" trơn, các chữ đó được tính là đã nói khi lệnh ghi còn chờ
-  (`second_provider::answer_on_the_way`, docs/not-speech.md); mọi chữ khác
-  trên đường đi bị bỏ và được đếm trong journal. Trên lamp-9adf ngày 13/11
+  text cho một câu như vậy trả về rỗng nhưng các chữ trên đường đi của nó,
+  mọi kết quả của câu gộp lại chứ không chỉ đoạn cuối, là một câu "có" hay
+  "không" trơn, các chữ đó được tính là đã nói khi lệnh ghi còn chờ
+  (`second_provider::answer_on_the_way`, docs/not-speech.md): "Wait, not
+  that one." rồi "Okay." không phải câu trả lời. Mọi chữ khác trên đường đi
+  bị bỏ và được đếm trong journal. Với một câu bắt đầu khi đèn im, các chữ
+  đó chỉ được đọc khi bật `LAMP_SECOND_UNFINISHED_WAIT`; tắt thì không gì
+  thay đổi. Trên lamp-9adf ngày 13/11
   câu "Yes." của chủ đèn cho một lần dời lịch trả về 0 chữ và lệnh ghi bị
   bỏ ở câu kế tiếp.
 - **Không lời nhắc, không câu huỷ của đèn.** Lời nhắc riêng của đèn "Say
