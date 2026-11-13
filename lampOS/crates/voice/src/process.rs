@@ -1185,6 +1185,10 @@ fn worker_command(
             role,
             var(crate::skill_named::ENVIRONMENT).as_deref(),
         ))
+        .envs(make_skill_asked_worker_environment(
+            role,
+            var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -1959,6 +1963,17 @@ fn skill_named_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (role == "second" && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::skill_named::ENVIRONMENT, "on"))
+}
+
+// A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
+// #6835), passed the same narrow way: the exact `on`, to the second route,
+// whose chat can be made to call a function.
+fn make_skill_asked_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::tools::make_skill_asked::ENVIRONMENT, "on"))
 }
 
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
@@ -3090,6 +3105,13 @@ mod tests {
                         "LAMP_SKILL_NAMED",
                         ["second"].as_slice(),
                     ),
+                    // A plain ask to make a skill calls make_skill: the
+                    // second route alone (#6835).
+                    (
+                        make_skill_asked_worker_environment,
+                        "LAMP_MAKE_SKILL_ASKED",
+                        ["second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -3395,6 +3417,7 @@ mod tests {
                     crate::tools::reminders_asked::ENVIRONMENT,
                     crate::tools::skill_asked::ENVIRONMENT,
                     crate::skill_named::ENVIRONMENT,
+                    crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
@@ -3687,6 +3710,7 @@ mod tests {
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
+                    "LAMP_MAKE_SKILL_ASKED=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_DONT_KNOW_RECALLS=on",
                     "LAMP_MEMORY_DOUBT_UNDOES=on",

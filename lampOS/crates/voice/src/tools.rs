@@ -53,6 +53,9 @@ pub mod reminders_asked;
 #[path = "tools/skill_asked.rs"]
 pub mod skill_asked;
 
+#[path = "tools/make_skill_asked.rs"]
+pub mod make_skill_asked;
+
 #[path = "tools/schedule_whose.rs"]
 pub mod schedule_whose;
 

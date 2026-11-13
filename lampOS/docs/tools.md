@@ -380,6 +380,14 @@ and none of the skills' own (`crate::use_skill`):
   code as round 1, through the round's call path (the Policy's hold, a
   look its answer asks for), and the model words the result; see
   [skills.md](skills.md#a-skill-asked-for-by-its-name-runs-in-code-6772).
+- **A plain ask to make a skill** (`LAMP_MAKE_SKILL_ASKED=on`, the second
+  route, off; #6835): a line whose sentence opens with "make (me) a (new)
+  skill" or the like and says what it does has its first chat round sent
+  with `tool_choice` naming `make_skill`, when `make_skill` is declared
+  (`tools::make_skill_asked`; docs/skills.md, "A plain ask to make one
+  calls it"). Host tests: `a_plain_ask_to_make_a_skill_is_told_apart`,
+  `the_force_names_make_skill_for_an_ask_and_nothing_else`,
+  `the_played_make_sends_a_tool_choice_for_make_skill_when_declared`.
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
