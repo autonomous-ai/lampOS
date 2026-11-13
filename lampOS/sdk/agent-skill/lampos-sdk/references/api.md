@@ -50,7 +50,7 @@ pairing keeps it for later connects.
 | `phrase.heard` (hear) | `phrase`: one of yours | a line the lamp heard holds your phrase; register up to 16 with `phrases` |
 | `name.heard` (hear) | none | someone says the lamp's name |
 | `sound.heard` (sound) | `class` (`music`, `laughter`, `door`, `footsteps`), `score` | a class's score rises past 0.5 |
-| `touch` | `kind`: `tap` or `pet` | a tap or a pet |
+| `touch` | `kind`: `tap` or `pet` | a tap (shown from 11372) or a pet (not shown on a lamp yet) |
 | `button` | `press`: `long_press` | the button is held |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` | one of them changes |
 | `volume.changed` (speak) | `level` (0–100 of what the lamp allows), `muted` | the speaker's volume changes, whoever changed it: the person by voice or in the app, or a computer |
@@ -89,8 +89,8 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 |---|---|---|---|---|
 | a feeling (move and light) | `await lamp.express("glad", 0.5)` (`glad`, `lively`, `low`) | `lamp.express('glad', 0.5)` | `lamp_express(feeling, strength)` | body and light |
 | a gesture | `await lamp.gesture("nod", wait=False)` | `lamp.gesture('nod', { wait })` | `lamp_gesture(name)` | body |
-| look (`name` refused; `face` is taken by lamp-control but a customer lamp's body drops it, "gaze is not measured"; refused "not in this release" on 11091 and older) | `await lamp.look("ahead")`, `look(yaw=20, pitch=5)`, `look("hand")` | `lamp.look('ahead')`, `lamp.look({ yaw, pitch })` | `lamp_look(at, yaw, pitch)` | body, a body lease |
-| follow a hand | `async with lamp.follow_hand() as following:` | `lamp.withHand(async (following) => …)`, `lamp.followHand().start()` | `lamp_follow_hand(seconds)`, `lamp_follow_stop()` | body and look |
+| look (`name` refused; `hand`: the lamp doesn't track hands yet, the GUIDE's Follow a hand row; `face` is taken by lamp-control but a customer lamp's body drops it, "gaze is not measured"; refused "not in this release" on 11091 and older) | `await lamp.look("ahead")`, `look(yaw=20, pitch=5)` | `lamp.look('ahead')`, `lamp.look({ yaw, pitch })` | `lamp_look(at, yaw, pitch)` | body, a body lease |
+| follow a hand (in development: the lamp doesn't track hands yet; lamp-body refuses a hold that says `follow`) | `async with lamp.follow_hand() as following:` | `lamp.withHand(async (following) => …)`, `lamp.followHand().start()` | `lamp_follow_hand(seconds)`, `lamp_follow_stop()` | body and look |
 | a move of your own | `await lamp.move(frames, step_ms)` | `lamp.move(frames, stepMs)` | `lamp_move(step_ms, frames)` | body, a body lease |
 | a move through poses in degrees, eased | `await lamp.move_poses([{"pitch": 10}, {"yaw": -8}])` | `lamp.movePoses([{ pitch: 10 }, { yaw: -8 }])` | `lamp_move_poses(poses)` | body, a body lease |
 | a recorded move (refused on every lamp today) | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
