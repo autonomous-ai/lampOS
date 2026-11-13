@@ -2316,6 +2316,74 @@ toàn bộ):
 - Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh
   bạ, nên mô hình tạo kỹ năng xin địa chỉ.
 
+### Qua tác tử của đèn (`LAMP_SKILL_WRITE_AGENT`, tắt)
+
+Quyết định của chủ đèn (13/11, trong cuộc trò chuyện này; việc do first
+builder mở, hỏi trên Queue #6809): mọi thứ chạm vào một dịch vụ đã liên kết
+đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`,
+không bật trong unit sản phẩm nào) và `LAMP_AGENT_SERVICES=on`, lệnh ghi cố
+định của một kỹ năng tự tạo được gửi bởi một lượt chạy của kỹ năng trên
+Hermes của đèn, không phải bởi `lamp-skills`:
+
+- **lamp-skills** không bao giờ gọi chương trình này cho lệnh ghi đó. Nó
+  trao lệnh ghi cho lamp-tasks qua socket của `do.task` dưới dạng
+  `{"op":"skill_write","skill","folder","grants":["<code>-write"],"write":<đúng nội dung>}`
+  (`service_write::hand`), một quyền duy nhất, `-write` của dịch vụ đó
+  (`skill_writes::run_grant`, `gmail-app` là `gmail`).
+- **lamp-tasks** kiểm tra dòng như của một task (kỹ năng, thư mục, một quyền
+  khớp với dịch vụ của lệnh ghi, nội dung tối đa 8 KiB) và chạy nó như một
+  task (`skill_task::WriteHandOver`): token do lamp-control cấp, giữ đúng một
+  quyền đó, và Hermes được bảo gọi `service_write` một lần với đúng nội
+  dung đó, trích dẫn như dữ liệu.
+- **lamp-control** cấp cho một kỹ năng không có lời đồng ý task nào mà bước
+  `[[do]]` duy nhất là một lệnh ghi cố định
+  (`service_write::fixed_write_of`) một quyền `-write` của nó
+  (`task_yes::KeptYes::fixed_write_grant`) và đánh dấu lượt chạy là của một
+  lệnh ghi cố định; `service.write` của lượt đó tới đây kèm id của lượt chạy
+  (`fixed_write_run`). Ở đó không đọc lời đồng ý nào: lời đồng ý của chủ cho
+  lệnh ghi là của chương trình này.
+- **Ở đây**, một lệnh gọi mang `fixed_write_run` chỉ đi qua cùng
+  `skill_write` như lệnh gọi của `lamp-skills`
+  (`serve::Services::run_fixed_write`): lời đồng ý đã giữ của chủ khớp đúng
+  nội dung đó (lượt chạy đổi một trường nào bị từ chối "not sent: this write
+  is not the one the owner said yes to", không bao giờ bị giữ chờ lời đồng ý
+  nói ra), liên kết lúc đồng ý, giới hạn trong ngày (10 mỗi kỹ năng, 30 cho
+  tất cả) và nhật ký đã gửi, và **một lần mỗi lượt chạy**: lần thử thứ hai,
+  dù gửi gì, cũng bị từ chối ("not sent: a skill's fixed write is sent once
+  a run …"). Tác tử được báo "Sent, as the owner said yes to it." Mọi lệnh
+  gọi khác của lượt đó bị từ chối, và khi công tắc tắt ở đây thì lệnh gọi
+  như vậy bị từ chối và không gì được gửi.
+- **Gửi thẳng vẫn là đường dự phòng** (quyết định của first builder trên
+  #6823: không đèn nào mất một lần gửi nó có hôm nay). Khi tác tử không nhận
+  được lệnh ghi, `lamp-skills` gửi thẳng tới chương trình này như khi công
+  tắc tắt, với mọi bước kiểm ở trên, và ghi một dòng journal: "the lamp's
+  agent couldn't take its write (…), so it goes straight to lamp-services".
+  Tức là: không biết thư mục hay không có `--tasks-socket`, không kết nối
+  được lamp-tasks, hoặc lamp-tasks từ chối trước khi tác tử bắt đầu (`off`,
+  `bad_request`, `too_long`, `no_token`, `busy`, hoặc `not_started`: Harness
+  đã đăng xuất hoặc chưa cài, không có target Hermes, một lần launch Harness
+  chưa hề gửi; `service_write::NOT_TAKEN`). **Không bao giờ gửi hai lần:**
+  một khi lượt chạy có thể đã bắt đầu (`run_failed`, câu trả lời bị mất hay
+  không đọc được) thì không thử gì thêm, và một lượt chạy đã kết thúc là kết
+  quả của nó, kể cả khi lần gửi bị chương trình này từ chối vì nội dung hay
+  vì giới hạn.
+- **Tắt** (mặc định), lệnh ghi đi như trên, giống hệt từng byte như trước.
+  Nó vẫn tắt cho tới khi một hàng kiểm tra trên 9adf cho thấy gửi lúc về tới,
+  nội dung đổi bị từ chối, lần gửi thứ 11 bị từ chối và đường dự phòng khi
+  Harness đã đăng xuất; một đèn không có Harness dùng đường dự phòng cho mọi
+  lệnh ghi cho tới khi lượt chạy đi được mà không cần Harness (PR 3 của
+  #6685).
+
+Đặt nó như nhau trong lamp-skills, lamp-tasks, lamp-control và
+lamp-services. Test:
+`a_fixed_write_is_handed_to_lamp_tasks_with_its_one_grant`,
+`a_write_the_agent_couldnt_take_is_sent_straight_once`,
+`no_straight_send_once_the_agents_run_began`,
+`a_fixed_write_runs_on_its_one_grant_with_its_exact_content`,
+`a_fixed_writes_run_is_minted_its_one_write_grant`,
+`a_fixed_writes_run_names_its_run_to_lamp_services`,
+`a_fixed_writes_run_sends_the_approved_content_once_within_the_bounds`.
+
 ## Lượt chạy của một kỹ năng trên Hermes của đèn (#6432, `LAMP_SKILL_TASKS`, bật trong sản phẩm)
 
 Một kỹ năng dùng một dịch vụ đã liên kết được Hermes của đèn chạy với dịch
@@ -2531,6 +2599,10 @@ qua một socket mở.
   (`run_write_yes`, "Your <skill> skill wants to send: …") và chờ lời đồng ý
   nói rõ của chủ (cơ chế chờ của #6558); chỉ khi đó chương trình này mới gửi,
   tính vào giới hạn của kỹ năng (3 lần một ngày mỗi kỹ năng, 10 cho tất cả).
+  Lệnh ghi cố định của một kỹ năng tự tạo chạy qua tác tử
+  (`LAMP_SKILL_WRITE_AGENT`, tắt) là lệnh ghi duy nhất được gửi theo lệnh gọi
+  của một lượt chạy, và chỉ như lời đồng ý đã giữ của chủ, một lần ("Một kỹ
+  năng tự tạo ghi vào dịch vụ", "Qua tác tử của đèn").
 - **Nhật ký** từ máy chủ chỉ ghi độ dài của lời từ chối; các phần nó gọi ghi
   dịch vụ và `what` hay `action`, không bao giờ ghi nội dung, địa chỉ hay
   tiêu đề.

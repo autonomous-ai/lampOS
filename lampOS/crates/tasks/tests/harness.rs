@@ -6649,6 +6649,7 @@ fn skill_run(deadline: Duration) -> SkillRun {
             (skill_task::TOKEN_ENV, RUN_SECRET.into()),
         ],
         deadline,
+        started: Default::default(),
     }
 }
 
@@ -6684,10 +6685,10 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
     // The token is ended before `close --now` (V2's order on #6510).
     let ended_at = std::cell::Cell::new(None);
     let end_token = || ended_at.set(Some(rig.calls().len()));
-    assert_eq!(
-        runner.run(&skill_run(Duration::from_secs(20)), &end_token),
-        Ok(0)
-    );
+    let run = skill_run(Duration::from_secs(20));
+    assert_eq!(runner.run(&run, &end_token), Ok(0));
+    // Asked of Harness: begun, so a fixed write's is never sent straight (#6823).
+    assert!(run.started.load(std::sync::atomic::Ordering::Acquire));
     assert_eq!(
         ended_at.get(),
         Some(3),
@@ -7186,10 +7187,11 @@ fn a_skill_run_that_fails_leaves_nothing() {
 #[test]
 fn a_skill_run_is_refused_with_no_harness_or_an_old_wrapper() {
     let refused = |runner: HarnessRunner, rig: &Rig, words: &str| {
-        let why = runner
-            .run(&skill_run(Duration::from_secs(20)), &|| {})
-            .unwrap_err();
+        let run = skill_run(Duration::from_secs(20));
+        let why = runner.run(&run, &|| {}).unwrap_err();
         assert!(why.contains(words), "{why}");
+        // Never begun: a fixed write's is `not_started`, sent straight (#6823).
+        assert!(!run.started.load(std::sync::atomic::Ordering::Acquire));
         assert!(
             rig.calls().iter().all(|call| call["args"][0] == "auth"),
             "nothing asked but the sign-in"

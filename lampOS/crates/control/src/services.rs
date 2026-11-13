@@ -63,6 +63,16 @@ impl Services {
         .to_string()
     }
 
+    /// `line` for a run minted for a skill's fixed write
+    /// (`LAMP_SKILL_WRITE_AGENT`): with its run's id beside it
+    /// (`lamp_services::skill_writes::FIXED_WRITE_RUN`), so lamp-services
+    /// sends it only as the owner's kept yes has it, once a run.
+    pub fn fixed_write(line: &str, run: &str) -> String {
+        let mut value: Value = serde_json::from_str(line).unwrap_or_default();
+        value["fixed_write_run"] = json!(run);
+        value.to_string()
+    }
+
     /// Sends `line` and waits for its answer, off the door's lock: the
     /// reply's `result`, or lamp-services' refusal in its own words.
     pub fn call(&self, line: &str) -> Result<Value, Error> {
@@ -109,6 +119,13 @@ mod tests {
         let write: Value =
             serde_json::from_str(&Services::line("s", true, "github", &Map::new())).unwrap();
         assert_eq!(write["name"], "service_write");
+        // A fixed write's run (LAMP_SKILL_WRITE_AGENT): its run's id beside
+        // it, and nothing else changed.
+        let line = Services::line("arrive-mail", true, "gmail", &args);
+        let fixed: Value = serde_json::from_str(&Services::fixed_write(&line, "task-1")).unwrap();
+        let mut expected: Value = serde_json::from_str(&line).unwrap();
+        expected["fixed_write_run"] = json!("task-1");
+        assert_eq!(fixed, expected);
     }
 
     #[test]

@@ -1410,10 +1410,15 @@ fn serve(
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
                     .collect();
                 *runner.made.borrow_mut() = made_here(&skills, dir);
-                // A pushed skill's folder is the developer folder's.
+                // A pushed skill's folder is the developer folder's. A fixed
+                // write's too, when it runs through the lamp's agent.
+                let writes_handed = lamp_skills::service_write::agent();
                 runner.tasks.borrow_mut().of = skills
                     .iter()
-                    .filter(|skill| skill.task_step().is_some())
+                    .filter(|skill| {
+                        skill.task_step().is_some()
+                            || (writes_handed && skill.write_step().is_some())
+                    })
                     .filter_map(|skill| {
                         let folder = lamp_skills::task::folder_of(
                             dir,
@@ -2644,9 +2649,16 @@ fn start(
     if let [Call::ServiceWrite(write)] = calls.as_slice() {
         let write = (**write).clone();
         let (sockets, finished) = (runner.sockets_for(&skill), runner.finished.clone());
+        // Through the lamp's agent (LAMP_SKILL_WRITE_AGENT): its folder and
+        // lamp-tasks' socket, as a do.task's.
+        let agent = lamp_skills::service_write::agent().then(|| {
+            let tasks = runner.tasks.borrow();
+            let folder = tasks.of.get(&skill).map(|(folder, _)| folder.clone());
+            (folder, tasks.socket.clone())
+        });
         let _ = made.send(());
         std::thread::spawn(move || {
-            let why = write_service(&skill, &write, &sockets);
+            let why = write_service(&skill, &write, &sockets, agent);
             let _ = finished.send(SkillEvent {
                 skill,
                 stage: SkillStage::Done,
@@ -5383,11 +5395,15 @@ fn hand_over(socket: &Path, line: &str) -> Result<String, String> {
 /// sends it only as the owner said yes to it. The journal's words: the
 /// outcome only, never a recipient or a text. A refusal that says its link
 /// is gone or another's stops the skill's writes until this program starts
-/// again.
+/// again. With `agent` (`LAMP_SKILL_WRITE_AGENT`, its folder and
+/// lamp-tasks' socket), it is handed to the lamp's agent instead, and sent
+/// straight only when the agent couldn't take it
+/// ([`lamp_skills::service_write::hand`], #6823).
 fn write_service(
     skill: &str,
     write: &lamp_skills::service_write::WriteStep,
     sockets: &Sockets,
+    agent: Option<(Option<PathBuf>, Option<PathBuf>)>,
 ) -> String {
     use lamp_skills::service_write;
     if !service_write::on() {
@@ -5402,6 +5418,47 @@ fn write_service(
     {
         return why;
     }
+    // Through the lamp's agent, or straight when it couldn't take it.
+    if let Some((folder, socket)) = agent {
+        return service_write::hand(
+            skill,
+            write,
+            folder.as_deref(),
+            socket.as_deref(),
+            hand_write_over,
+            || send_write(skill, write),
+            |line| eprintln!("lamp-skills: skill:{skill}: {line}"),
+        );
+    }
+    send_write(skill, write)
+}
+
+/// One fixed write's line to lamp-tasks at `socket`, and its answer, read
+/// when the run ends ([`lamp_skills::service_write::agent_answered`]). Not
+/// connected, nothing was taken; a line written and no answer read, the
+/// run may have begun.
+fn hand_write_over(socket: &Path, line: &str) -> Result<String, lamp_skills::service_write::Unrun> {
+    use lamp_skills::service_write::Unrun;
+    let stream = UnixStream::connect(socket)
+        .map_err(|error| Unrun::NotTaken(format!("lamp-tasks couldn't be reached: {error}")))?;
+    let exchange = || -> io::Result<String> {
+        stream.set_write_timeout(Some(Duration::from_secs(5)))?;
+        stream.set_read_timeout(Some(lamp_skills::task::RUN_MOST))?;
+        (&stream).write_all(format!("{line}\n").as_bytes())?;
+        let mut answer = String::new();
+        BufReader::new((&stream).take(8_192)).read_line(&mut answer)?;
+        Ok(answer)
+    };
+    let answer = exchange()
+        .map_err(|error| Unrun::Unknown(format!("lamp-tasks' answer never came: {error}")))?;
+    lamp_skills::service_write::agent_answered(&answer)
+}
+
+/// `skill`'s fixed write sent straight on `lamp-services`' tools socket
+/// (#6066), which sends it only as the owner said yes to it; a refusal
+/// that says its link is gone or another's stops its writes.
+fn send_write(skill: &str, write: &lamp_skills::service_write::WriteStep) -> String {
+    use lamp_skills::service_write;
     let services = std::env::var_os(SERVICES_SOCKET_ENVIRONMENT)
         .map_or_else(|| PathBuf::from(SERVICES_SOCKET), PathBuf::from);
     let asked = || -> io::Result<serde_json::Value> {

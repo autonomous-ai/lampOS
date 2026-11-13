@@ -612,6 +612,7 @@ fn serve(arguments: &[String], admin: PathBuf) -> Result<(), String> {
                         state: state.clone(),
                         skills: PathBuf::from(lamp_control::task_yes::SKILLS),
                         on: lamp_control::task_yes::on(),
+                        write_agent: lamp_control::task_yes::write_agent_on(),
                     }));
                     tokio::spawn(server::serve_run(listener, uid, user, shared.clone()));
                 }

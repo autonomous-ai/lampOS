@@ -633,6 +633,39 @@ trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ l�
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
 
+### Lệnh ghi cố định của một kỹ năng tự tạo trên Hermes của đèn (`LAMP_SKILL_WRITE_AGENT`, tắt)
+
+Quyết định của chủ đèn (13/11): mọi thứ chạm vào một dịch vụ đã liên kết
+đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`,
+không bật trong unit sản phẩm nào) và `LAMP_AGENT_SERVICES=on` trong
+lamp-tasks, socket trao việc cũng nhận lệnh ghi cố định của một kỹ năng tự
+tạo (`do.write`, docs/skills.md) như một lượt chạy
+(`skill_task::WriteHandOver`, `answer_with`):
+
+- **Dòng:** `{"op":"skill_write","skill","folder","grants","write"}`, cần
+  mọi trường và không nhận trường nào khác. `skill` và `folder` được kiểm
+  như của một task; `grants` đúng một quyền, `-write` của chính dịch vụ của
+  lệnh ghi (`gmail-app` và `figma-api` là `gmail` và `figma`); `write` là
+  một object có `service` và `action`, tối đa 8 KiB dạng JSON. Mọi thứ khác
+  là `bad_request`, và không xin token nào.
+- **Lượt chạy** là của một task (`run_on_token`, cùng việc cấp token, kiểm
+  quyền, kết thúc và runner): lamp-control cấp token cho đúng một quyền đó
+  (docs/control.md), và Hermes được bảo gọi `service_write` của
+  `lamp-services` một lần với đúng nội dung đó, trích dẫn như dữ liệu, không
+  gọi lại dù nó trả lời gì. lamp-services chỉ gửi như lời đồng ý đã giữ của
+  chủ, một lần mỗi lượt chạy (docs/services.md, "Through the lamp's agent").
+- **Tắt** (một trong hai công tắc), dòng `skill_write` bị từ chối như
+  trước: `bad_request`, "not a skill's task line".
+- **Chưa bắt đầu** (#6823): lượt chạy của một lệnh ghi cố định thất bại
+  trước khi tác tử có thể đã bắt đầu (`SkillRun::started`, do runner đặt khi
+  nó nhờ Harness launch, trừ khi Harness chưa hề gửi, hoặc khi Hermes đã
+  được spawn: không có Harness, không có target, wrapper cũ) bị từ chối
+  `not_started` (`skill_task::NOT_STARTED`) bằng lời của runner, nên
+  lamp-skills tự gửi thẳng lệnh ghi; lượt thất bại sau đó là `run_failed`,
+  không biết lần gửi ra sao, và lamp-skills không thử gì thêm. Lượt chạy của
+  một task vẫn là `run_failed` trong cả hai trường hợp, như trước. Test:
+  `a_fixed_write_runs_on_its_one_grant_with_its_exact_content`.
+
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
 Trước đây giọng nói không nói được Harness của đèn đã đăng nhập chưa, hay giao
