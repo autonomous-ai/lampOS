@@ -737,22 +737,21 @@ A program can play sound of its own through the lamp's speaker, not only the lam
 - **Never while private.** Both calls are refused while the privacy switch is on, or while the voice's privacy signal stops. A stream ends at once when the lamp turns private.
 - **Local only.** The camera is never given beyond the lamp's own network, even with remote access on.
 - **The person sees it.** While a stream runs, the ring shows a small steady red dot, and a snapshot blinks it. A picture goes only while the ring says it drew the dot.
-- **The fast stream is coming.** Every frame at 640x480 or 1280x720, up to 25 a second, is built, but no product unit turns it on yet. **Today a stream is about 2 frames a second of the 320-across frame** (asked for 5, it gave 2).
+- **The fast stream is on in the product.** Every frame at 640x480 or 1280x720, up to 25 a second, is built, and the product's `lamp-eyes.service` sets `LAMP_EYES_FAST_STREAM=on` (`deploy/product/lamp-eyes.service`); a lamp whose unit is not that one still gives about 2 frames a second of the 320-across frame (asked for 5, it gave 2). What reaches an SDK is in the row "The faster camera stream" near the end of the Plan and status table.
 
 **Refusals, in the lamp's words:**
 - `refused: the camera is closed`
 - `refused: the frame was being written; ask again`
 - `private` ("the lamp is private")
 - `no_grant`
-- `refused: local network only: the camera and the microphone are never given beyond the lamp's own network`
+- `refused: local network only: the camera, the microphone and the speaker are never given beyond the lamp's own network`
 
 **Example:** `examples/camera.py` (Python) and `examples/camera.js` (JavaScript) save a snapshot and
 the last frame of a 3 s stream; without the `camera` grant they print the refusal and exit 1.
 
 ### Touch and the button
 
-The head senses a `tap`, a `pet` and a `hold`; the button a `press` and a
-`long_press`. Both come as events with no grant (`touch`, `button`); a tap reaches a
+The head senses a `tap` and a `pet`, and the button a `long_press`: those are what lamp-control sends (`crates/control/src/watch.rs`). `hold` (touch) and a short `press` (button) are in the schema but nothing sends them yet. Both come as events with no grant (`touch`, `button`); a tap reaches a
 program from build 11372 (#5981; shown on lamp-75c9, 10 Nov 14:18); a `pet` is not shown on a lamp yet. Example: `examples/touch.py` answers a tap with a light and a pet with a feeling.
 
 ```python
@@ -765,7 +764,7 @@ await lamp.on("touch", lambda event: print(event["kind"], event.get("where")))
 You don't need this to use the SDKs; it's for anyone writing their own client or reading a debug log (`LAMPOS_LOG=debug` in either SDK prints every frame, `->` sent and `<-` received).
 
 - **Where:** `wss://<lamp>.local:7731/v1`, WebSocket over TLS 1.3. Nothing listens until the owner turns developer access on in the app. Only the lamp's own network may connect.
-- **Finding the lamp:** mDNS `_lampos._tcp`, TXT `id`, `name`, `v=1` and `fp` (the first 16 hex characters of the SHA-256 of the lamp's certificate). The certificate is the lamp's own, self-signed; the client pins its full SHA-256 at pairing (the pin the app shows).
+- **Finding the lamp:** planned, nothing on the lamp announces it yet: mDNS `_lampos._tcp`, TXT `id`, `name`, `v=1` and `fp` (the first 16 hex characters of the SHA-256 of the lamp's certificate). The certificate is the lamp's own, self-signed; the client pins its full SHA-256 at pairing (the pin the app shows).
 - **Frames:** UTF-8 JSON, one message per text frame.
   - The lamp's first frame on each connection is a `welcome` with a nonce, which pairing's proof and hello's signature cover, and the lamp's `id`, `name`, `v` and the owner's `language` (`en`, `vi`, `ja`, `zh` or `ko`, read from the lamp's setup at each connection; a lamp from before this sends none).
   - **Request:** `{"id": 7, "op": "...", ...}`; `id` is the client's whole number.
