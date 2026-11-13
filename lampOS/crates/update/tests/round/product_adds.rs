@@ -633,3 +633,79 @@ fn lamp_control_off_by_both_switches_or_failed_is_not_started() {
     assert_eq!(lamp.round(), Outcome::UpToDate(2));
     assert_eq!(control_starts(&lamp), 0, "{:?}", lamp.calls());
 }
+
+/// A unit of lamp-update's own that a build adds (the region's, #6386)
+/// starts through `update/current`, which the lamp has and no part owns:
+/// it is added beside lamp-update's own folder, and the link is left as it
+/// is. Refused, every later build was refused on a lamp that took the
+/// region's build through a round (lamp-52e6, 12635 to 12661).
+#[test]
+fn a_unit_of_lamp_updates_own_added_by_a_build_starts_through_its_current_link_and_switches() {
+    let mut lamp = product_lamp();
+    let region =
+        "[Service]\nType=oneshot\nExecStart=/opt/lampOS/update/current/lamp-update region\n"
+            .to_string();
+    let mut units = all();
+    units.push(("lamp-region.service", region.clone()));
+    let binaries = binaries("eyes 1", "mood 1");
+    let mut binaries: Vec<(&str, &str)> = binaries
+        .iter()
+        .map(|(name, text)| (*name, text.as_str()))
+        .collect();
+    binaries.push(("lamp-update", "update 1"));
+    publish(&mut lamp, manifest::ADDS_UPDATER, &binaries, &units);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    assert_eq!(lamp.read("/etc/systemd/system/lamp-region.service"), region);
+    assert_eq!(
+        link(&lamp, "/opt/lampOS/update/current"),
+        Some(sha("update 1"))
+    );
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.contains("no unit of this lamp starts through it")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// Put back, a build that added a unit of lamp-update's own takes the unit
+/// away and leaves lamp-update's folder and link exactly as they were.
+#[test]
+fn a_build_put_back_takes_away_a_unit_of_lamp_updates_own_and_leaves_its_folder() {
+    let mut lamp = product_lamp();
+    let before = lamp.lamp_files();
+    let region =
+        "[Service]\nType=oneshot\nExecStart=/opt/lampOS/update/current/lamp-update region\n"
+            .to_string();
+    let mut units = all();
+    units.push(("lamp-region.service", region));
+    let binaries = binaries("eyes 2 which crashes", "mood 1");
+    let mut binaries: Vec<(&str, &str)> = binaries
+        .iter()
+        .map(|(name, text)| (*name, text.as_str()))
+        .collect();
+    binaries.push(("lamp-update", "update 1"));
+    publish(&mut lamp, manifest::ADDS_UPDATER, &binaries, &units);
+    assert!(
+        matches!(
+            lamp.round(),
+            Outcome::RolledBack {
+                sequence: 2,
+                after: Ok(()),
+                ..
+            }
+        ),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.lamp_files(), before);
+    assert_eq!(
+        lamp.read(&format!(
+            "/opt/lampOS/update/{}/lamp-update",
+            sha("update 1")
+        )),
+        "update 1"
+    );
+}

@@ -4294,6 +4294,24 @@ fn add_units(
         let (folder, make, link) = match (installed_part, added_part) {
             (Some(part), _) => (part.program.folder(), None, None),
             (None, Some(other)) => (other.new_folder.clone(), None, None),
+            // A unit of lamp-update's own (the region's, #6386) starts
+            // through `update/current`, which no part owns: lamp-update's own
+            // unit does, and no round moves that link. It is added beside
+            // the folder that unit starts from, the link left as it is.
+            (None, None) if builds == own::FOLDER => {
+                let own = fs::read_to_string(config.on(&config.units).join(OWN_UNIT))
+                    .ok()
+                    .and_then(|text| {
+                        unit::program(&text).or_else(|| unit::linked_program(&text, &config.root))
+                    })
+                    .filter(|program| program.builds == own::FOLDER);
+                let Some(own) = own else {
+                    return Err(format!(
+                        "{name} starts through {link_path}, and {OWN_UNIT} does not"
+                    ));
+                };
+                (own.folder(), None, None)
+            }
             (None, None) => {
                 if fs::symlink_metadata(config.on(&link_path)).is_ok() {
                     return Err(format!(
