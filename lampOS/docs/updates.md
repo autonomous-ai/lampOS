@@ -2220,7 +2220,13 @@ for at least level 8 (9 since second-P1, above), so an updater of level 7 climbs
   added, and that is said. `lamp-update install` makes them.
 
 A service of a part already installed here is added beside it, through the
-same link. A part new to the lamp is installed afresh in the folder of its
+same link. A unit of lamp-update's own that starts through `update/current`
+(the region's, `lamp-region.service`, #6386) is added beside the folder
+lamp-update's own unit starts from, and that link is left as it is: no round
+moves it. Before this, such a unit was refused (`update/current is there,
+and no unit of this lamp starts through it`), so a lamp that took the
+region's build through a round refused every later build. A part new to the
+lamp is installed afresh in the folder of its
 binary's SHA-256, as a switch installs a build, and its `current` link is
 made to name it. A part's template, socket or timer is added when its part
 is here or added with it. Each is enabled only if `install` enables it
