@@ -632,7 +632,8 @@ pub fn line_in_echo_tail(request: u64) {
     kept::pending(|pending| echo_tail_in(pending, request));
 }
 
-/// The line of `request` heard no words, or its answer only declined so
+/// The line of `request` heard no words, however it is asked (as the name,
+/// "Lamp.", when a call was heard in it), or its answer only declined so
 /// the words it cut short are answered in its place (`second_provider`,
 /// `LAMP_CUT_ASK_ANSWERED`): the lamp's words in it answer no new request
 /// of the person's, so they never make it the read-back's one answer
@@ -877,6 +878,17 @@ pub fn answer_awaited(words: &str) -> bool {
                 .as_ref()
                 .is_some_and(|kept| kept.began_clear && answers_the_read_back(kept, Instant::now()))
         })
+}
+
+/// Whether a write waits now for the reply its uncut read-back asked for
+/// ([`answers_the_read_back`]), wherever the line began: a call heard with
+/// no words then is not answered as the name (`second_provider`, #6363).
+pub fn awaits_an_answer() -> bool {
+    kept::pending(|pending| {
+        pending
+            .as_ref()
+            .is_some_and(|kept| answers_the_read_back(kept, Instant::now()))
+    })
 }
 
 /// Whether a line now is the reply the waiting write `kept` asked for
