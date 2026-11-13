@@ -1647,11 +1647,13 @@ handed over once it is; the state file never naming the skill
 or holding its words, 0600), and
 `online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`.
 
-### Run by the lamp's agent (`LAMP_UPLOAD_TO_AGENT`, off)
+### Run by the lamp's agent (`LAMP_UPLOAD_TO_AGENT`, on in the product)
 
 The owner's ask (12 Nov): a `SKILL.md` uploaded from the app runs through
-the lamp's agent, as V1's did; the first builder's yes at 19:44, behind
-two switches, both off and set in no unit. With `LAMP_UPLOAD_TO_AGENT=on`
+the lamp's agent, as V1's did; the first builder's yes at 19:44. On in the
+product since 13 Nov (the owner's ruling: the upload flow goes via the
+agent), set in `lamp-cloud`, `lamp-voice`, `lamp-skills` and
+`lamp-skills-manage@`; `LAMP_TASK_NET` stays off. With `LAMP_UPLOAD_TO_AGENT=on`
 in `lamp-cloud`'s unit (`upload::AGENT_ENVIRONMENT`, `Uploads::to_agent`),
 a bare `SKILL.md` may be up to 64 KiB (`MOST_AGENT_BYTES`; past it,
 `failure` with "its SKILL.md is longer than 64 KiB") and goes to
