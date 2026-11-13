@@ -3330,7 +3330,7 @@ pub fn serve(
             .is_ok_and(|value| value == "on")
         {
             eprintln!(
-                "lamp-voice second: a carried line is read and kept as that person's, a keep written at once; no forget, correction, rule or yes runs on it, never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
+                "lamp-voice second: a carried line is read and kept as that person's, a keep written at once; no forget, correction or rule runs on it, and no yes but to a face rename held for them (LAMP_NAMES_RENAME_YES), never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
             );
             engine = engine.reading_carried(true);
         }
