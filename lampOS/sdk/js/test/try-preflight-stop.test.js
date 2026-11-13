@@ -1,5 +1,6 @@
 // The pre-flight's stops and retries on a real-mode page: a Ctrl-C part-way, say's missing event, turn_end pressed again, --only.
-// (Split from try-preflight.test.js; see test/preflight-page.js.)
+// (Split from try-preflight.test.js; see test/preflight-page.js. The Ctrl-C at a question and the page going away are in
+// try-preflight-close.test.js.)
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
