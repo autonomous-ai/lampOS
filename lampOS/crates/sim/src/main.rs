@@ -148,7 +148,9 @@ fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
         .parse()
         .map_err(|_| std::io::Error::other(format!("--listen {listen}: not an address")))?;
     let listener = lamp_sim::speech::bind(address)?;
-    let (token, file) = new_token(dir, "speech.token")?;
+    // The token is written when the engine is ready (a reader waits for it): a stale one goes first.
+    let file = dir.join("speech.token");
+    let _ = std::fs::remove_file(&file);
     let folder = dir.join("speech");
     std::fs::DirBuilder::new()
         .recursive(true)
@@ -186,9 +188,23 @@ fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
     if engine == "resident" {
         let language = option(args, "--language").unwrap_or_else(|| "en-US".to_owned());
         let (resident, lines) = lamp_sim::apple_speech::resident();
+        let dir = dir.to_path_buf();
         let server = std::thread::Builder::new()
             .name("speech-http".to_owned())
             .spawn(move || {
+                // The synthesizer's first line costs about 1.5 s (it loads the voice), every later one about 50 ms
+                // (macOS 26, first byte over HTTP): paid here, on one line rendered to nobody, before the token says
+                // the service is ready, not on the lamp's first answer.
+                let warm = std::time::Instant::now();
+                let warmed = lamp_sim::speech::Engine::speak(&resident, "Ready.", &mut |_| Ok(()));
+                eprintln!(
+                    "lamp-sim speech: the voice is warm after {} ms{}",
+                    warm.elapsed().as_millis(),
+                    warmed
+                        .err()
+                        .map_or_else(String::new, |error| format!(" ({error})"))
+                );
+                let (token, _) = new_token(&dir, "speech.token")?;
                 lamp_sim::speech::serve(listener, token, std::sync::Arc::new(resident))
             })?;
         lamp_sim::apple_speech::serve_on_main_thread(lines, &language)?;
@@ -196,11 +212,9 @@ fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
             .join()
             .unwrap_or_else(|_| Err(std::io::Error::other("the speech service ended")));
     }
-    lamp_sim::speech::serve(
-        listener,
-        token,
-        std::sync::Arc::new(lamp_sim::speech::Say::new(folder)),
-    )
+    let say = lamp_sim::speech::Say::new(folder);
+    let (token, _) = new_token(dir, "speech.token")?;
+    lamp_sim::speech::serve(listener, token, std::sync::Arc::new(say))
 }
 
 /// `people N DIR`, `hear TEXT DIR`, `hand DIR`, `air KEY=VALUE... DIR`: what a

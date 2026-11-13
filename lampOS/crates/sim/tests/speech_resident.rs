@@ -37,15 +37,26 @@ fn start() -> (Service, String) {
         .spawn()
         .unwrap();
     let mut line = String::new();
-    BufReader::new(child.stderr.take().unwrap())
-        .read_line(&mut line)
-        .unwrap();
+    let mut said = BufReader::new(child.stderr.take().unwrap());
+    said.read_line(&mut line).unwrap();
+    // The rest of what it says is read and let go: a closed pipe would make its next line (the warm voice's) fail.
+    std::thread::spawn(move || std::io::copy(&mut said, &mut std::io::sink()));
     let address = line
         .split("http://")
         .nth(1)
         .and_then(|rest| rest.split_whitespace().next())
         .unwrap_or_else(|| panic!("no address in {line:?}"))
         .to_owned();
+    // Ready when the token is whole (32 hex digits and a line end): written once the voice is warm.
+    let token = folder.join("speech.token");
+    let since = Instant::now();
+    while std::fs::metadata(&token).map_or(true, |info| info.len() != 33) {
+        assert!(
+            since.elapsed() < Duration::from_secs(10),
+            "no token in 10 s"
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
     (Service { child, folder }, address)
 }
 
@@ -87,10 +98,16 @@ fn the_resident_synthesizer_speaks_a_line_with_the_token_as_24_khz_pcm() {
     let (service, address) = start();
     let token = std::fs::read_to_string(service.folder.join("speech.token")).unwrap();
     let token = token.trim();
-    // The first line after start loads the voice.
+    // The voice was loaded before the token was written: the first line is as quick as any (1.6 s without that).
+    let asked = Instant::now();
     let (status, pcm) = ask(&address, token, "Hello.");
+    let took = asked.elapsed();
     assert_eq!(status, 200);
     assert!(!pcm.is_empty());
+    assert!(
+        took < Duration::from_secs(1),
+        "the first line took {took:?}"
+    );
     // A warm line: "Hi there." is about 0.6 s, so well over 0.2 s and under
     // 3 s of 24 kHz S16LE, whole; and whole well within a second here (about
     // 30 ms measured; the bound is for a loaded runner).
