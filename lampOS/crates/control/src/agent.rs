@@ -74,6 +74,40 @@ mod tests {
     const PASSWD: &str = "root:x:0:0:root:/root:/bin/bash\nlampos:x:994:994::/var/lib/lampos:/usr/sbin/nologin\nagent:x:1001:1001::/home/agent:/bin/bash\n";
     const GROUPS: &str = "root:x:0:\nlampos:x:994:\nlamp-agents:x:995:lampos,agent\n";
 
+    /// A stale socket file after the owner's switch is turned off (the lead's run on lamp-75c9, 13 Nov): lamp-control cannot
+    /// remove it at its next start (`ProtectSystem=strict`; the folder is writable only through the switch's drop-in, which
+    /// the off removes), so the unit's stop does, as root, for the socket's own path and nothing else.
+    #[test]
+    fn the_units_stop_removes_the_socket_file_the_switch_made() {
+        let unit = include_str!("../../../deploy/product/lamp-control.service");
+        assert!(
+            unit.contains(&format!("\nExecStopPost=-+/usr/bin/rm -f {SOCKET}\n")),
+            "the unit's stop removes {SOCKET}"
+        );
+        // The folder is not in the unit's own writable paths: that is why lamp-control cannot do it itself.
+        let folder = std::path::Path::new(SOCKET)
+            .parent()
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(
+            !unit
+                .lines()
+                .any(|line| line.starts_with("ReadWritePaths=") && line.contains(folder)),
+            "{folder} is writable only through the switch's drop-in"
+        );
+        // Only the one file: no glob, no folder.
+        let stops: Vec<_> = unit
+            .lines()
+            .filter(|l| l.starts_with("ExecStopPost="))
+            .collect();
+        assert_eq!(stops.len(), 1, "{stops:?}");
+        assert!(
+            !stops[0].contains('*') && !stops[0].contains(" -r"),
+            "{stops:?}"
+        );
+    }
+
     #[test]
     fn a_user_and_a_group_are_read_by_their_exact_name() {
         assert_eq!(uid_of("agent", PASSWD), Some(1001));
