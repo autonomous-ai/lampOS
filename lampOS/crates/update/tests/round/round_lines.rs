@@ -137,4 +137,42 @@ fn a_failure_that_repeats_the_same_lines_keeps_them_once() {
         .filter(|entry| entry["round"] == true && entry["event"] == "failed")
         .count();
     assert_eq!(ends, 3, "each round's end is written");
+    // A failure that says something else is kept again: a newer build's round
+    // installs its own files, so its lines differ from the last kept ones (the
+    // compare is exact), and they are kept. The round after it says less (the
+    // files are in), which differs again, and is kept; the one after that
+    // repeats it, and is not.
+    lamp.publish(
+        3,
+        &[
+            ("lamp-voice", "voice 3"),
+            ("lamp-turn-end", "turn-end 3"),
+            ("lamp-body", "body 1"),
+            ("lamp-controls", "controls 1"),
+        ],
+        &[("lamp-voice.service", &second)],
+    );
+    let failed_kept = |lamp: &Lamp| {
+        kept_lines(lamp)
+            .into_iter()
+            .filter(|(event, _)| event == "failed")
+            .collect::<Vec<_>>()
+    };
+    assert!(matches!(lamp.round(), Outcome::Failed(_)));
+    let after_new_build = failed_kept(&lamp);
+    assert_eq!(after_new_build.len(), 3, "the changed lines are kept again");
+    assert_ne!(after_new_build[1].1, after_new_build[2].1);
+    assert!(matches!(lamp.round(), Outcome::Failed(_)));
+    assert_eq!(
+        failed_kept(&lamp).len(),
+        4,
+        "the shorter lines differ again"
+    );
+    assert!(matches!(lamp.round(), Outcome::Failed(_)));
+    assert_eq!(failed_kept(&lamp).len(), 4, "a repeat is said, not kept");
+    let ends = log(&lamp)
+        .iter()
+        .filter(|entry| entry["round"] == true && entry["event"] == "failed")
+        .count();
+    assert_eq!(ends, 6, "each round's end is written");
 }
