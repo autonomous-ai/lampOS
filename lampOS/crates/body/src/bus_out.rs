@@ -327,6 +327,10 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
                 if resisted == 1 { "" } else { "s" }
             ),
         )
+    } else if let Some(ask) = glimpse.stand_ask {
+        // A run that will not stand is not well, and says why in words
+        // its owner can act on (#6834).
+        (Level::Warn, ask.to_owned())
     } else {
         (Level::Ok, String::new())
     };
@@ -351,6 +355,8 @@ pub fn health(glimpse: &Glimpse, resisted: u32) -> Diagnostic {
         // Each joint's own, for lamp-control's `body.state`, after the
         // facts above so that none of theirs moves.
         .chain(warmth.map(|(joint, reading)| fact(&format!("temperature_{joint}"), reading)))
+        // Whatever else it says, so the ask is one ask for the whole run.
+        .chain(glimpse.stand_ask.map(|ask| fact(crate::ask::ASKS, ask)))
         .collect(),
     }
 }
@@ -1077,6 +1083,7 @@ mod tests {
             seated: None,
             home: None,
             waiting: None,
+            stand_ask: None,
         }
     }
 

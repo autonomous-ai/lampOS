@@ -2366,14 +2366,15 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
             said = Some((glimpse.mood, glimpse.step, glimpse.goals, glimpse.arm_goals));
             if asked_to_stand && !told_whether_it_stands {
                 told_whether_it_stands = true;
-                eprintln!(
-                    "lamp-body: {}",
-                    if glimpse.stands {
-                        "it may stand"
-                    } else {
-                        "it will not stand this run; the report at its end says why"
-                    }
-                );
+                match (glimpse.stands, glimpse.stand_ask) {
+                    (true, _) => eprintln!("lamp-body: it may stand"),
+                    (false, Some(ask)) => eprintln!(
+                        "lamp-body: it will not stand this run, and asks: {ask} (the report at its end says why)"
+                    ),
+                    (false, None) => eprintln!(
+                        "lamp-body: it will not stand this run; the report at its end says why"
+                    ),
+                }
             }
             if glimpse.stands {
                 eprintln!(
