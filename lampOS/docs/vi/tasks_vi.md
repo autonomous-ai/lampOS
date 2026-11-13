@@ -1055,10 +1055,14 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
   `/usr/local/lib/lampos/openclaw-ns`), `agent` (agent rào,
   `lamp-skill-run`), và `turn`, `stop`, `end`: các đối số, sau wrapper,
   của một lượt, của lệnh dừng và lệnh kết thúc nó, dạng mẫu (`{name}`,
-  `{agent}`, `{message}`, `{secs}`, `{ms}`). lamp-tasks không biết lệnh của
-  engine nào: đó là dữ liệu của lamp-update. Mỗi khóa đúng một lần, cổng
-  là một cổng, đường dẫn và tên đều trơn, và lượt phải có `{message}`;
-  nếu không, lần chạy bị từ chối bằng lời ("is a gateway agent's, but
+  `{agent}`, `{message}`, `{secs}`, `{ms}`); và hàng rào của lần chạy
+  trong exec approvals của gateway: `fence-get` (`approvals get --gateway
+  --json --timeout <ms>`), `fence-set` (`approvals set --gateway --stdin
+  --timeout <ms>`) và `fence-entry` (mục của agent rào, JSON có
+  `{start}`). lamp-tasks không biết lệnh của engine nào: đó là dữ liệu của
+  lamp-update. Mỗi khóa đúng một lần, cổng là một cổng, đường dẫn và tên
+  đều trơn, lượt phải có `{message}` và `fence-entry` phải là một object
+  JSON có `{start}`; nếu không, lần chạy bị từ chối bằng lời ("is a gateway agent's, but
   ..."). Namespace của gateway phải cho thấy socket của lamp-control
   (`AGENT_NS_TASKS_LINE`): nếu không, bị từ chối, nêu
   `LAMP_SKILL_DEFAULT_AGENT` hoặc `LAMP_SKILL_TASKS` của lamp-update. Không
@@ -1083,7 +1087,23 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
 2. Gateway phải trả lời trên `127.0.0.1:<port>` (`gateway::answers`), chờ
    tối đa 60 s (`gateway::READY_WITHIN`); nếu không, `run_failed` "the
    default agent's gateway did not answer ...", và không gửi lượt nào.
-3. Một lượt, qua wrapper (wrapper vào các namespace của gateway đang chạy,
+3. **Đảm bảo hàng rào** (`GatewayRunner::ensure_fence`), ngay trước mỗi
+   lượt, vì gateway có thể lên sau khi lamp-tasks khởi động: `fence-get`
+   qua wrapper; câu trả lời phải là tài liệu approvals (có `version` hoặc
+   `agents`), hoặc nó nằm dưới `file` cạnh hash; mọi dạng khác bị từ chối,
+   không bao giờ đoán (`gateway_run::set_entry`). Khi
+   `agents.lamp-skill-run` chưa đúng là mục của hàng rào, cả tài liệu (giữ
+   mọi khóa khác) được đưa vào `fence-set` qua stdin, và `fence-get` lần
+   nữa phải thấy nó. Mỗi lệnh tối đa 10 s (`AFTER_WITHIN`) và đọc tối đa
+   256 KiB. Lỗi bất kỳ là `run_failed` "the default agent's fence for a
+   skill's run is not set (...), so nothing was started": không gửi lượt
+   nào và script không bao giờ chạy. Việc ghi hàng rào
+   (`exec.approvals.get`/`set`, như `sessions.delete` ở bước 5) cần quyền
+   `operator.admin`, mà CLI loopback của đèn với token chung của gateway có
+   (ghép đôi cục bộ tự được duyệt,
+   `gateway.nodes.pairing.autoApproveLocal`, mặc định bật); nếu ghi lỗi,
+   lần chạy bị từ chối như trên.
+4. Một lượt, qua wrapper (wrapper vào các namespace của gateway đang chạy,
    `nsenter`): `openclaw gateway call agent --expect-final --json
    --timeout <ms> --params {"agentId":"lamp-skill-run",
    "sessionKey":"agent:lamp-skill-run:skill-<run-id>","message":<lời>,
@@ -1094,7 +1114,7 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
    bảo chạy `start` một lần và không gì khác, task được trích như dữ liệu.
    Tiến trình ở trong process group riêng, môi trường chỉ còn `PATH`, câu
    trả lời được đọc tối đa 256 KiB.
-4. **Kết thúc.** Lần chạy bị giữ tới hạn của nó (14 phút, đời của token;
+5. **Kết thúc.** Lần chạy bị giữ tới hạn của nó (14 phút, đời của token;
    gateway cũng được báo đúng hạn đó qua `timeout` của lượt, nên chính nó
    cũng kết thúc lượt). Thoát 0 với `status` `ok` của gateway (hoặc không
    có) là `{"ok":true,"id":0}`; `status` khác hay mã thoát khác là
@@ -1108,21 +1128,31 @@ theo agent mặc định của đèn *là gì*, không bao giờ theo tên của
 
 **Hàng rào lamp-tasks ghi** (`openclaw_config::write_skill_run_fence`,
 lúc lamp-tasks khởi động, chỉ khi `LAMP_SKILL_DEFAULT_AGENT=on`, với quyền
-`lampos`, user của OpenClaw; tắt thì không ghi gì): trong `openclaw.json`
-của OpenClaw, `agents.list` có agent rào `lamp-skill-run` (khi chưa có danh
-sách thì tạo với `main` của chính OpenClaw đứng đầu và là `default`, để
-việc nói của người dùng giữ agent của chúng; danh sách có sẵn được giữ):
-workspace riêng `/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs`
-(0700), sandbox tắt, `tools.allow: ["exec"]` (không có công cụ đọc, ghi,
-sửa, web, trình duyệt, process hay phiên), không nâng quyền, và exec chạy
-trên host của gateway theo danh sách cho phép, không hỏi, không có safe
-binary nào (`host: gateway`, `security: allowlist`, `ask: off`,
-`safeBins: []`). Trong exec approvals của OpenClaw
-(`/var/lib/lampos-openclaw/.openclaw/exec-approvals.json`), cùng agent đó
-có `security: allowlist`, `ask: off`, `askFallback: deny`,
+`lampos`, user của OpenClaw; tắt thì không ghi gì), cho OpenClaw 2026.11.2:
+trong `openclaw.json` của OpenClaw, `agents.entries` có agent rào
+`lamp-skill-run` (theo khóa, không có `id` và `default`): workspace riêng
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/gateway-skill-runs` (0700),
+sandbox tắt, `tools.allow: ["exec"]` (không có công cụ đọc, ghi, sửa, web,
+trình duyệt, process hay phiên), không nâng quyền, và exec chạy trên host
+của gateway theo danh sách cho phép, không có safe binary nào
+(`host: gateway`, `mode: allowlist`, `safeBins: []`; không bao giờ để
+`mode` cùng `security`/`ask` cũ, schema của OpenClaw từ chối). Khi có agent
+thứ hai, `agents.ownership: explicit` và
+`agents.defaults.systemAgent.agentId: main` được đặt, mỗi khóa chỉ khi
+chưa có, để việc nói của người dùng giữ agent của chúng. `agents.list` cũ
+(không hợp lệ trên 2026.11.2) bị từ chối, "Refused: ... legacy
+`agents.list` ...", và file giữ nguyên. Mọi khóa khác được giữ; file đã
+đúng thì không ghi lại.
+
+**Exec approvals của nó không phải là file**: OpenClaw giữ chúng trong kho
+riêng của gateway, và một `exec-approvals.json` cũ trong state của nó sẽ
+chặn chúng, nên lamp-tasks không ghi file nào. Chúng được đặt qua gateway
+trước mỗi lượt (bước 3 ở trên): `agents.lamp-skill-run` có
+`security: allowlist`, `ask: off`, `askFallback: deny`,
 `autoAllowSkills: false` và một mục cho phép duy nhất:
-`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`. Mọi khóa khác
-của hai file được giữ; file đã đúng thì không ghi lại.
+`/var/lib/lampos-tasks/harnesses/lamp-tasks/skill-*/start`
+(`openclaw_config::skill_run_approvals`, giống `fence-entry` của
+lamp-update).
 
 ### Hàng rào của gateway chặn và không chặn gì, so với `--net` của Hermes
 
