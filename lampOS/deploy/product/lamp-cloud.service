@@ -40,10 +40,13 @@ Environment=LAMP_CLOUD_KNOWN_FILE=/run/lampos-eyes/known
 # the person's name and the rename, through root's `lamp-setup change` helper (#2851: the hello used the
 # new name, a reminder came at the new zone's time); the skills page, its list 0.8 to 1.0 s after the
 # tap, removing and turning off through `lamp-skills-manage` (#1890); and the update page, reading
-# lamp-update's own status, never starting one (#2194). Not LAMP_SETTINGS_WIFI yet: a new network from the
-# app is the one change that can take the lamp off the network the app reaches it on, so it waits with
-# the other broker-held changes for the broker connection's TLS (LAMP_CLOUD_TLS, docs/cloud.md).
+# lamp-update's own status, never starting one (#2194).
 Environment=LAMP_SETTINGS_CHANGE=on
+# The Wi-Fi from the app (#1959; its fall-back 3/3 on lamp-0c89, 22 Oct, #2852) goes on only with the broker
+# connection's TLS (LAMP_CLOUD_TLS, #6031, docs/cloud.md), since a Wi-Fi password goes over that link: the two
+# together for #6854. The backend hands a lamp whose ping says mqtt_tls the TLS broker port (Backend2, #6854).
+Environment=LAMP_SETTINGS_WIFI=on
+Environment=LAMP_CLOUD_TLS=on
 Environment=LAMP_SKILLS_PAGE=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills page and report list the skills with
 # their [present] values, as lamp-skills runs them (Comfort break on). The same line in lamp-skills.service and lamp-skills-manage@.service.
