@@ -3,6 +3,16 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 20:4x GMT+7: camera on macOS (test pattern)
+
+- Quiet check. On this Mac, lamp-sim with #6938 and
+  `LAMP_SIM_CAMERA=lavfi:testsrc2=size=320x180:rate=15 --camera` (ffmpeg
+  9.0.2), Python SDK paired with `camera, light`: three `camera_snapshot()`
+  JPEGs (8,796 / 9,218 / 9,902 bytes, `ffd8ff`) in 84, 204 and 281 ms;
+  lamp-control: `camera.snapshot: ok, to the eyes' newest frame`. Not the
+  AVFoundation webcam (it would capture the room); the README's "not tried"
+  can say the test pattern works on macOS when next touched.
+
 ## 2026-11-13 20:3x GMT+7: the role file is on lamp-voice
 
 - Train nc-33 (#6941) merged #6928 at its first head cafd2922e3: the role
