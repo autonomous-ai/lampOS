@@ -860,6 +860,7 @@ impl Publisher {
             }
             let socket = UnixDatagram::unbound().and_then(|socket| {
                 socket.set_nonblocking(true)?;
+                crate::room::to_send(&socket)?;
                 Ok(socket)
             });
             match socket {
