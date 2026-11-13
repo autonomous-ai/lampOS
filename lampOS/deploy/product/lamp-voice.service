@@ -208,9 +208,11 @@ Environment=LAMP_SAID_AS_HEARD=on
 # Known gap, accepted: the lamp's own echo can commit as a cut-in with 0 words and be asked (7 of 15 stories on
 # lamp-06c1, 3 Nov, #4938); a later echo fix from duplex makes those asks fewer.
 Environment=LAMP_CUT_IN_WORDLESS_ASKS=on
-# LAMP_CUT_IN_WORDLESS_RESUMES (a busy room's cut goes on from the sentence it cut) is off for the candidate
-# (the PM, 6 Nov): its lamp check on lamp-06c1 came back FAIL, partial, with the busy room and the second and third
-# cuts never reached (#5430). It comes back on once that path passes on a lamp.
+# Such a cut in a busy room says "Anyway," and goes on from the sentence it cut; another within a minute says
+# "Oops, cut off again. Anyway," and goes on; a third says why and pauses (#5430). On again by the memory owner's
+# call, 6 Nov: the quiet-room path played on lamp-06c1 was a FAIL (2 of 5 fixed lines cut 40 ms in by the
+# cough's own tail, then quiet; fixed by #5511, such a tail says the line again); the busy-room path not yet reached.
+Environment=LAMP_CUT_IN_WORDLESS_RESUMES=on
 Environment=LAMP_SECOND_SAID_ONCE=on
 # A light, volume or timer turn answered at once with the acting part's own result, a single ask ending there, in
 # English only (#2135, #4700): on lamp-4ace on 31 Oct (d06603109f) off and on alternating, timers and reminders 2.06-2.20 s
