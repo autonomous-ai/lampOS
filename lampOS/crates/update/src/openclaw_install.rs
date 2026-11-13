@@ -336,8 +336,13 @@ fi
 /// `shown.skills`, lamp-skills' socket folder is shown read-only too; with
 /// `shown.tasks`, lamp-control's socket alone, read-only (no round asks
 /// for it: OpenClaw takes no skill's run yet, #6685); neither, as before.
+/// A voice make's home lines ([`hermes_install::NS_HOME_LINE`]) are
+/// Hermes's alone: a make runs Hermes only, so they are taken out.
 pub fn ns_text(shown: Shown) -> String {
     let mut text = hermes_install::ns_text(shown.skills, shown.tasks);
+    if shown.tasks {
+        text = text.replacen(hermes_install::NS_HOME_LINE, "", 1);
+    }
     for (from, to) in ENGINE_EDITS {
         text = text.replace(from, to);
     }
