@@ -1142,7 +1142,7 @@ running. The test uses a folder of Desk tutor's shape.
 ### A skill asked for by its name runs in code (#6772)
 
 With `LAMP_SKILL_NAMED=on` (off unless set to `on` exactly; passed to the
-second route alone, and on in no product unit), a spoken line on the
+second route alone; on in the product's `lamp-voice.service`, once), a spoken line on the
 second route that plainly asks for an installed skill by its name has that
 skill's function **called in code as round 1**; the model only words the
 answer, in round 2. On lamp-52e6 at 12587 (Seventh's photo-booth row on

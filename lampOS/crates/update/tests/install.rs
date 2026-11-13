@@ -2211,6 +2211,29 @@ fn the_product_never_says_an_action_no_call_made() {
     );
 }
 
+/// A line that is only an installed skill's name said plainly ("photo
+/// booth", "run photo booth") calls that skill in code as round 1
+/// (`LAMP_SKILL_NAMED`, #6772, #6782): on lamp-52e6 at 12587 (13 Nov)
+/// "photo booth" was answered "I don't have a camera" over the photo-booth
+/// skill it was offered, with no call. On in lamp-voice alone, once, whose
+/// second route's worker reads it, and named by no other product unit.
+#[test]
+fn the_product_runs_a_skill_named_plainly() {
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_SKILL_NAMED=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_SKILL_NAMED"))
+            .count();
+        assert_eq!(on, usize::from(*unit == "lamp-voice.service"), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+}
+
 /// A thing the person already keeps, said again, is that kept thing, not a
 /// second one (`LAMP_MEMORY_REMEMBER_ONCE`, #2176): on lamp-06c1 on 28 Oct
 /// the product unit, without it, kept "the meeting room is called orange"

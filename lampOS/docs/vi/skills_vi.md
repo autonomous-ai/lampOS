@@ -2104,7 +2104,7 @@ Bảng đầy đủ các khóa `[[while]]` ở [skills.md](../skills.md).
 ## Kỹ năng được gọi theo tên thì chạy trong code (#6772)
 
 Với `LAMP_SKILL_NAMED=on` (tắt trừ khi đặt đúng `on`; chỉ chuyển cho
-tuyến thứ hai, và không bật trong unit sản phẩm nào), một câu nói trên
+tuyến thứ hai; bật trong `lamp-voice.service` của sản phẩm, một lần), một câu nói trên
 tuyến thứ hai chỉ đơn giản xin một kỹ năng đã cài theo tên của nó thì hàm
 của kỹ năng đó **được gọi trong code làm vòng 1**; model chỉ nói lời trả
 lời, ở vòng 2. Trên lamp-52e6 ở 12587 (hàng photo-booth của Seventh trên
