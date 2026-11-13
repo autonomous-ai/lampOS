@@ -872,7 +872,7 @@ on macOS a non-blocking `flock` on a lock nobody held was turned down now and
 then while the `it` binary's other tests were busy with files (#1569). Not run
 on a lamp.
 
-## The Wi-Fi changed after setup (#1959, built, off unless set)
+## The Wi-Fi changed after setup (#1959, off unless set; on in the product with LAMP_CLOUD_TLS, #6854)
 
 The person gives the lamp a new Wi-Fi from the app (`wifi.set`, `cloud.md`),
 without a reset. Off unless `lamp-cloud` has `LAMP_SETTINGS_WIFI=on` beside
