@@ -764,3 +764,32 @@ Ready for lamp-voice: no (a read and a lamp result; no code)
     - P2: keep's "the new one wins" isn't enforced yet.
     - P2: replace removes a skill with no echo guard, and the echo hold is off while a clash waits.
 - **17:4x** My person left. I go on alone: reads and the watcher. ssh, lamp sound, switches and installs wait for them.
+
+## 2026-11-13 — Queue #6059, my person here from 10:1x
+
+- **Morning reads, 08:0x–10:0x** (the earlier session, posted on #6059 at 08:4x and 09:5x):
+  - **READ-OK:**
+    - #6755 `f02c4a2627`.
+    - #6759 `2d05648b0d`.
+    - #6762 `7934f8fc65`.
+    - #6766 `71890322e7`.
+    - #6764 `4e7c38bb97`.
+    - #6773 `f2d0e1733f`.
+    - #6767 `14bbd342ea`: my P2 lifted.
+  - **Restated:** #6639 `c5691fd13f`; #6410 `5d630e9739`, then `2a147b460f`.
+  - **#6768:** HOLD `8095eb3c07`. P2: the guide's `lamp-skills pack` runs in an `env_clear` make with every `LAMP_*` off, so it refuses steps the voice's check accepts.
+- **10:1x** New session. The watcher is re-armed every 10 min. My person asked for parallel subagents when several PRs only need a read.
+- **10:4x #6788:** HOLD `293eb80f76` (6843083024).
+  - P2: with Hermes as the target but no make run (no socket, `no_namespace`, `not_held_off`) or lamp-tasks `busy`, an app make loses DeepSeek's repairs. `skills.md` and the body say "as before".
+  - The product unit already has `LAMP_MAKE_SKILL_AGENT=on`, so it's live at merge.
+  - Probe: `stub(Some("old"))` and `stub(Some("no_namespace"))` give `served=1 state=not_kept`.
+  - The first builder agreed at 10:44, and Fourteen is fixing it with #6768's HOLD.
+  - Gates: fmt, clippy, and 112 tests (`app_make`, `make_skill_agent`, `make_skill_local`) pass.
+- **11:0x #6786:** READ-OK `b66492cb6f` (6843338868), read by a subagent and checked by me.
+  - The Reviewer-lead's P1 is fixed by `is_task_tool`, and the join wait is in.
+  - P3s: there's no STATUS named-agent test, and no test for the newer-line branch.
+  - Gates: 1516 tests pass, and two mutations are caught.
+- **11:2x #6803:** READ-OK `662e12f1e8` (6843528979).
+  - When Harness is signed out, a skill's task refusal says so.
+  - Gates: lamp-tasks `skill_task` 40/0 and `skill_run` 7/0. A mutation on the `NotSent` wrap is caught.
+- **Lesson:** a "behaves as now" claim about a fallback needs a test with the fallback's own stub (`old`). Reading `engine.is_none()` alone showed the repairs were skipped, but only the probe showed it on the app path.
