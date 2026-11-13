@@ -1669,7 +1669,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the namespace leaves `/usr` as it is, so a run reads it and cannot change
      it). The folder holding anything but exactly this build's files counts
      as Hermes missing, so a newer build has it written again; a skill's run
-     has it on `PYTHONPATH` (`docs/tasks.md`). No fetch at run time. No unit, no
+     has it on `PYTHONPATH` (`docs/tasks.md`). Hermes's own launcher replaces
+     the `PYTHONPATH` it is started with, so the same one-shot also writes
+     `/usr/local/lib/lampos/hermes-run-env.sh` (root's, 0644, never run),
+     which lamp-tasks lists in Hermes's `terminal.shell_init_files`: Hermes's
+     terminal sources it before its login snapshot, and it puts the SDK first
+     on `PYTHONPATH` only when `LAMP_CONTROL_SOCKET` is set, which only a
+     skill run's start sets (#6684). The file missing or changed counts as
+     Hermes missing too, and the switch off takes it out with the wrapper.
+     No fetch at run time. No unit, no
      service, no gateway, nothing at boot: Harness starts `hermes` in a
      pane only when a task is sent to it.
    - **In a namespace that shows Hermes only its own folders.** Hermes
