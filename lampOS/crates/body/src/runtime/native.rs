@@ -9,14 +9,11 @@ use super::{
 use crate::{
     control::{self, Clock, MotionId, Placement, Tick},
     linux::{InspectionConfig, motion::LinuxMotor},
+    stop_signal::StopSignal,
     units::NormalizedPosition,
 };
 use lamp_turn_owner::{
     BootId, BoundaryGuard, Error as AuthorityError, OutputPermit, Permission, Snapshot,
-};
-use nix::sys::{
-    signal::{SigSet, Signal},
-    signalfd::{SfdFlags, SignalFd},
 };
 use std::{io, time::Duration};
 
@@ -94,41 +91,26 @@ impl<C: Clock> Backend for LinuxMotor<C> {
         }
     }
 }
-struct Signals {
-    old: SigSet,
-    fd: SignalFd,
-}
-impl Signals {
-    fn new() -> io::Result<Self> {
-        let old = SigSet::thread_get_mask()?;
-        let mut mask = SigSet::empty();
-        mask.add(Signal::SIGTERM);
-        mask.add(Signal::SIGINT);
-        mask.thread_block()?;
-        match SignalFd::with_flags(&mask, SfdFlags::SFD_CLOEXEC | SfdFlags::SFD_NONBLOCK) {
-            Ok(fd) => Ok(Self { old, fd }),
-            Err(e) => {
-                let _ = old.thread_set_mask();
-                Err(e.into())
-            }
-        }
-    }
-}
-impl Drop for Signals {
-    fn drop(&mut self) {
-        let _ = self.old.thread_set_mask();
-    }
-}
 struct NativeLink {
     channels: Channels,
-    signals: Signals,
+    signals: StopSignal,
+    /// Without PR_SET_PDEATHSIG (Linux only) the parent's death is noticed
+    /// here, once a control poll: the parent pid changes when it is gone.
+    #[cfg(not(target_os = "linux"))]
+    parent_pid: u32,
 }
 impl Link for NativeLink {
     fn control(
         &mut self,
         now: &mut dyn FnMut() -> io::Result<lamp_turn_owner::MonoTime>,
     ) -> io::Result<Option<Control>> {
-        if self.signals.fd.read_signal()?.is_some() {
+        if self.signals.requested()? {
+            return Ok(Some(Control::Stop {}));
+        }
+        #[cfg(not(target_os = "linux"))]
+        if rustix::process::getppid().map(|p| p.as_raw_nonzero().get() as u32)
+            != Some(self.parent_pid)
+        {
             return Ok(Some(Control::Stop {}));
         }
         self.channels.control(now)
@@ -159,6 +141,7 @@ pub fn run(
             "motor parent identity changed before startup",
         ));
     }
+    #[cfg(target_os = "linux")]
     rustix::process::set_parent_process_death_signal(Some(rustix::process::Signal::KILL))?;
     if rustix::process::getppid().map(|p| p.as_raw_nonzero().get() as u32) != Some(parent_pid) {
         return Err(io::Error::other(
@@ -169,7 +152,9 @@ pub fn run(
     let clock = SystemClock;
     let started = clock.now();
     let mut link = NativeLink {
-        signals: Signals::new()?,
+        signals: StopSignal::new()?,
+        #[cfg(not(target_os = "linux"))]
+        parent_pid,
         channels: {
             while !channels.connect_step()? {
                 if clock.now().as_micros().saturating_sub(started.as_micros()) >= 3_000_000 {

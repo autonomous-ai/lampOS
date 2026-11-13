@@ -36,6 +36,8 @@ pub mod pause_in;
 pub mod peaks;
 pub mod sleep_in;
 pub mod stand_in;
+#[cfg(unix)]
+pub mod stop_signal;
 
 pub mod calibration;
 pub mod clips;
