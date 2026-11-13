@@ -709,8 +709,9 @@ sau:
      cũ, từng chữ.
    - **Một yêu cầu rõ ràng để tạo kỹ năng sẽ gọi hàm**
      (`LAMP_MAKE_SKILL_ASKED=on`, `tools::make_skill_asked`, route thứ
-     hai, tắt và không có trong unit sản phẩm nào; #6835 gap 3): trên
-     lamp-52e6 ngày 13/11 (build 12635, đã có lời của #6755 trong mô tả),
+     hai, bật trong unit sản phẩm, chỉ nơi `LAMP_MAKE_SKILL` bật; #6835
+     gap 3): trên lamp-52e6 ngày 13/11 (build 12635, đã có lời của #6755
+     trong mô tả),
      cùng yêu cầu đó vẫn bị trả lời "I can't read my own processor
      temperature, so I can't make that happen on my own. A skill can,
      though… Want me to make one?" và không có lời gọi nào. Khi bật công

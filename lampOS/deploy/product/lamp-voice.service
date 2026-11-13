@@ -495,6 +495,9 @@ Environment=LAMP_SKILL_ASKED=on
 # code as round 1, for a non-core skill that takes no choice or yes-or-no (#6772, #6782, docs/skills.md; lamp-52e6
 # at 12587, 13 Nov: "photo booth" got "I don't have a camera" over the skill it was offered); the second route alone.
 Environment=LAMP_SKILL_NAMED=on
+# And a line that plainly asks the lamp to make a skill, saying what it does, calls make_skill (lamp-52e6, 13 Nov,
+# build 12635: a make of a skill that checks the processor temperature was answered "I can't" with no call, #6835).
+Environment=LAMP_MAKE_SKILL_ASKED=on
 # A line is a known person's only when their own face was seen speaking it, else the room's (#3437, reviewer-three's
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.
