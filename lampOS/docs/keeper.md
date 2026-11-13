@@ -84,7 +84,7 @@ together):
 | 1 | memory, actions, controls | The voice reads what is kept before its first session and calls the actions for its functions. It starts after Controls, so at a shutdown it stops before Controls (#3697) |
 | 2 | voice | The lamp's reason to be: listening as early as it can. The ring is the voice's own, so "the light" comes with it |
 | 3 | body, name, policy | The body's mood comes from the voice; name and policy read and write the voice's topics |
-| 4 | eyes, Expression | The eyes send each look to the body's gaze socket; Expression's requests go to the body and the ring's owner |
+| 4 | seen, then eyes and Expression | `lamp-seen` (#6543) starts before the eyes: it keeps the frame link's boots the eyes read at their start (seen.md, "The product unit"). The eyes send each look to the body's gaze socket; Expression's requests go to the body and the ring's owner |
 
 Health is ordered against none of them: it starts and stops with the
 target, at no fixed point in either order.

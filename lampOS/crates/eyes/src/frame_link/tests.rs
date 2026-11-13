@@ -562,6 +562,19 @@ fn the_boots_come_from_the_file_lamp_seen_keeps() {
 }
 
 #[test]
+fn no_folder_for_the_boots_file_is_no_link() {
+    // An update round restarts the eyes before a newly added lamp-seen has
+    // made /run/lampos-seen: no folder is no file, so the eyes start
+    // without a link (main.rs's `None` arm), not exit.
+    let dir = Dir::new();
+    let socket = dir.socket();
+    let file = dir.0.join("lampos-seen").join("frame-link.env");
+    assert_eq!(boots_from(&file, &socket).unwrap(), None);
+    let deeper = dir.0.join("no").join("such").join("frame-link.env");
+    assert_eq!(boots_from(&deeper, &socket).unwrap(), None);
+}
+
+#[test]
 fn a_boots_file_not_as_lamp_seen_keeps_it_is_refused() {
     let socket = PathBuf::from("/run/lampos-eyes-frames/camera.frames");
     let good = boots_text(&socket);

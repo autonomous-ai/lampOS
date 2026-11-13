@@ -144,7 +144,7 @@ the plan's paths (`reset::forget_agents`, #6343, below), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
 16:13), the person's own keys (`/etc/lampOS/voice/own`, `LAMP_OWN_KEYS`), the
 name (`/etc/lampOS/person/name`), the owner's place from the app
-(`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the owner's chosen voice and character words from the app (`/etc/lampOS/setup/voice` and `/etc/lampOS/setup/character`, #5394), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), lamp-control's certificate and paired computers (`/var/lib/lampos-control`) and the owner's developer setting, its drop-in (`/etc/systemd/system/lamp-control.service.d/developer.conf`, `control.set`), and the owner's local agent switch, its drop-in (`/etc/systemd/system/lamp-control.service.d/agent.conf`, `control.set_agent`), the owner's dev monitor, lamp-peek's drop-in (`/etc/systemd/system/lamp-peek.service.d/monitor.conf`, `monitor.set`, #5883), the person's linked services' tokens (`/var/lib/lampos-services`, `lamp-services`' store, Queue #4710), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
+(`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the owner's chosen voice and character words from the app (`/etc/lampOS/setup/voice` and `/etc/lampOS/setup/character`, #5394), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), lamp-control's certificate and paired computers (`/var/lib/lampos-control`) and the owner's developer setting, its drop-in (`/etc/systemd/system/lamp-control.service.d/developer.conf`, `control.set`), and the owner's local agent switch, its drop-in (`/etc/systemd/system/lamp-control.service.d/agent.conf`, `control.set_agent`), the owner's dev monitor, lamp-peek's drop-in (`/etc/systemd/system/lamp-peek.service.d/monitor.conf`, `monitor.set`, #5883), lamp-seen's record of the opt-in said back (`/var/lib/lampos-seen`, #6543), the person's linked services' tokens (`/var/lib/lampos-services`, `lamp-services`' store, Queue #4710), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
 the setup marker. Kept: the
 software, its releases, the update key, the touch calibration and other
 per-lamp facts (the servos' daily load and temperature peaks in
@@ -155,7 +155,8 @@ checkpoint and transient handoff files share its root-owned 0700 directory.
 The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,
 0640 root:lampos so lamp-ears can read it, and the face expressions yes
 (`LAMP_FACE_EXPRESSIONS_ASK`) is `/var/lib/lampOS/consent/face-expressions.json`
-beside it; both reset plans wipe both files.
+beside it, and lamp-seen's opt-in (#6543, seen.md) is `seen-activity.json` there
+too; both reset plans wipe all three files.
 The product unit names that canonical file and turns `LAMP_ONBOARDING` on.
 Both reset plans wipe the entire directory's contents, including pending writes,
 temporary files and mailbox descendants, retaining the empty private container.
@@ -333,9 +334,11 @@ lamp-setup reset-now`). That unit, in this order:
    emptied by being memory, `reset::VOLATILE`: every folder a part keeps in
    `/run` past its stop, the tmpfiles' `/run/lampos-bus` (the bus's latest
    messages, which can say a person's name or words),
-   `/run/lampos-photos` and `/run/lampos-eyes-kept` (the eyes' sitting kept
-   across a restart, eyes.md), and the voice's and the records' own folders
-   (`RuntimeDirectoryPreserve=yes`: the thread's set-aside words, the room).
+   `/run/lampos-photos`, `/run/lampos-eyes-kept` (the eyes' sitting kept
+   across a restart, eyes.md) and `/run/lampos-eyes-frames` (the frame
+   link's socket for lamp-seen), and the voice's, the records' and
+   lamp-seen's own folders (`RuntimeDirectoryPreserve=yes`: the thread's
+   set-aside words, the room, the frame link's boots).
    Every other part's `RuntimeDirectory=` goes as its unit stops. If they
    can't be emptied it reboots instead. Then, best effort, it forgets what
    else a reboot dropped from memory (`reset::FORGET`): `wpa_cli -i wlan0
