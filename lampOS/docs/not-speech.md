@@ -595,14 +595,22 @@ one is chosen) and kept in the thread as the lamp's:
   the next line. For a line begun in the clear whose final is empty, while a
   read-back awaits its answer (a services write's,
   `services::answer_awaited`, or a skill's yes,
-  `skill_write_yes::answer_awaited`), words on the way that are a plain yes
-  or no (`services::plain_yes`, `services::plain_no`) are taken as said
-  (`second_provider::answer_on_the_way`; the journal: "its final words came
+  `skill_write_yes::answer_awaited`), the line's words on the way are taken
+  as said when, all together, they are a plain yes or no
+  (`services::plain_yes`, `services::plain_no`;
+  `second_provider::answer_on_the_way`; the journal: "its final words came
   back empty; its N words on the way answer a waiting read-back: taken as
-  said (#6840)"). Any other words on the way, or with no answer awaited, are
-  thrown away as before, and the journal counts them: "its final words came
-  back empty; its N words on the way are thrown away (#6840)". The cut-in's
-  stop path over the lamp's voice is unchanged.
+  said (#6840)"). Speech to text sends each result's own words, one segment
+  at a time, so the line's words are every result's in order, an interim
+  that only grows the one before standing in its place
+  (`second_provider::add_line_words`), never the last segment alone: "Wait,
+  not that one." then "Okay." is no answer (Heron's P2 on #6992). Any other
+  words on the way, or with no answer awaited, are thrown away as before,
+  and the journal counts all the line's words: "its final words came back
+  empty; its N words on the way are thrown away (#6840)". For a line in the
+  clear, the words on the way are read only with
+  `LAMP_SECOND_UNFINISHED_WAIT` on; without it, nothing changes. The
+  cut-in's stop path over the lamp's voice is unchanged.
 - **Known gaps** (#4938): the lamp's own echo can still cut its answer with
   no words. A playback gap admitted the story's tail in the clear, or a loud
   word of its own made a yield commit (06c1, 3 Nov 02:13 and 02:24); with
