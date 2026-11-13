@@ -3941,8 +3941,12 @@ used only to say it.
   watch goes on looking every 2 minutes for 10 (`WATCH_FOLLOW_MS`).
   From Harness 0.6.52 (openharness#4229) `show` says it: an idle agent
   carries `backgroundCommands`, and one idle with more than zero still
-  running is read as `working` (#5689), so it is never kept, listed
-  settled, told or closed until none runs; its news is told then, once.
+  running is read as `working` (#5689), so it is not kept, listed settled
+  or told until none runs, for up to 10 minutes from the first such read
+  in a row in this boot (`BACKGROUND_HOLD_MS`); its news is told then,
+  once. Past that it is read as `idle` and kept and told as any, so a dev
+  server or a `tail -f` left running doesn't hide the answer; the close
+  still waits for the commands to end (below), never with `--now`.
   `null` (Codex, OpenClaw, Windows: Harness can't tell) or no field at all
   (Harness before 0.6.52) is read as before. The same
   answer is only seen again; a different one, confirmed the same way, is
