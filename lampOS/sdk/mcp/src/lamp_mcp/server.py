@@ -85,6 +85,9 @@ EVENT_NEEDS = {
     "name.heard": "hear",
     "sound.heard": "sound",
     "air.changed": "air",
+    "volume.changed": "speak",
+    "body.state": "body",
+    "lamp.said": "speech",
 }
 # The longest clip `lamp_play_audio` plays, in seconds: MCP cannot stream, so
 # the tool plays in real time and returns when done.

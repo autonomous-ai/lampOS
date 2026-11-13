@@ -499,7 +499,7 @@ grant it needs. With every grant: 27 tools. With `light` alone: 6
 
 | Area | MCP tools | Grant |
 |---|---|---|
-| State and events | `lamp_state`, `lamp_events`, `lamp_wait_for` | none for the lamp's own state; each event's own grant (`person.*` and `hand`: look; `phrase.heard`, `name.heard`: hear; `sound.heard`: sound; `air.changed`: air) |
+| State and events | `lamp_state`, `lamp_events`, `lamp_wait_for` | none for the lamp's own state; each event's own grant (`person.*` and `hand`: look; `phrase.heard`, `name.heard`: hear; `sound.heard`: sound; `air.changed`: air; `volume.changed`: speak; `body.state`: body; `lamp.said`: speech) |
 | Body | `lamp_gesture`, `lamp_look`, `lamp_joints`, `lamp_move`, `lamp_play` | body (a `look` at a face also needs look) |
 | Body and light | `lamp_express` | body and light |
 | Follow a hand | `lamp_follow_hand`, `lamp_follow_stop` | body and look |

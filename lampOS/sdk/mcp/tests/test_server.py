@@ -593,6 +593,35 @@ def test_lamp_events_never_hears_what_the_grants_dont_allow(tmp_path):
     run(go())
 
 
+def test_the_three_events_lamp_control_gives_a_grant_are_asked_for_only_with_it(tmp_path):
+    """`EVENT_NEEDS` lacked `body.state` (body), `volume.changed` (speak) and `lamp.said` (speech) while lamp-control's
+    `EventKind::needs` has them, so the server asked for all three whatever the pairing held, and `lamp_wait_for` let them
+    through to the lamp (the GUIDE audit, 13 Nov)."""
+    three = {"body.state", "volume.changed", "lamp.said"}
+
+    async def go():
+        async with connected(tmp_path, grants=("light",)) as (fake, _, session):
+            await session.call_tool("lamp_events", {})
+            await until(lambda: any(fake.subscribed.values()))
+            heard = {e for s in fake.subscribed.values() for e in s}
+            assert "touch" in heard and not heard & three, heard & three
+            for event in sorted(three):
+                refused = await session.call_tool("lamp_wait_for", {"events": [event], "timeout_s": 1})
+                assert refused.isError and "no_grant" in text(refused), (event, text(refused))
+            assert not any(r["op"] == "subscribe" and set(r["events"]) & three for r in fake.requests)
+        async with connected(tmp_path / "all", grants=("body", "speak", "speech")) as (fake, _, session):
+            await session.call_tool("lamp_events", {})
+            await until(lambda: three <= {e for s in fake.subscribed.values() for e in s})
+        # One grant of the three gives that event and no other.
+        async with connected(tmp_path / "speak", grants=("speak",)) as (fake, _, session):
+            await session.call_tool("lamp_events", {})
+            await until(lambda: any(fake.subscribed.values()))
+            heard = {e for s in fake.subscribed.values() for e in s}
+            assert "volume.changed" in heard and not heard & {"body.state", "lamp.said"}, heard
+
+    run(go())
+
+
 def test_a_client_subscribed_to_the_events_is_told_of_each(tmp_path):
     from mcp import types
 
