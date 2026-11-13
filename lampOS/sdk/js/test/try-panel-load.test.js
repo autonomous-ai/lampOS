@@ -6,7 +6,7 @@ import { test } from 'node:test';
 
 const html = readFileSync(new URL('../examples/twin/index.html', import.meta.url), 'utf8');
 const source = /\/\/ <panel-load>\n([\s\S]*?)\/\/ <\/panel-load>/.exec(html)?.[1];
-const { loadPanel, retrying } = new Function(`${source}\nreturn { loadPanel, retrying };`)();
+const { loadPanel, retrying, fetched, refusedText } = new Function(`${source}\nreturn { loadPanel, retrying, fetched, refusedText };`)();
 
 const run = (probes, loads, tries) => {
   const said = [];
@@ -88,6 +88,41 @@ test('the model and the lamp are fetched through retrying: a lost first request 
   const said = [];
   await assert.rejects(retrying(async () => { throw new TypeError('Failed to fetch'); }, { wait: async () => {}, said: () => said.push('line') }), /Failed to fetch/);
   assert.deepEqual(said, ['line'], 'a plain line, once, and the error is not swallowed');
-  assert.match(html, /retrying\(\(n\) => fetch\(withToken\('\/model\.json'\)/);
+  assert.match(html, /retrying\(\(n\) => fetched\(withToken\('\/model\.json'\)/);
   assert.match(html, /retrying\(\(n\) => new GLTFLoader\(\)\.loadAsync\(withToken\('\/lamp\.glb'\)/);
+});
+
+test('a 403 on the model (a wrong token) is not tried again, and is said as a refusal with the way out', async () => {
+  let tries = 0;
+  const said = [];
+  const refusedFetch = async () => ({ ok: false, status: 403 });
+  const globalFetch = globalThis.fetch;
+  globalThis.fetch = refusedFetch;
+  try {
+    await assert.rejects(retrying(async () => { tries += 1; return fetched('/model.json?t=x', (r) => r.json()); }, { wait: async () => {}, said: (error) => said.push(error) }), /403/);
+  } finally { globalThis.fetch = globalFetch; }
+  assert.equal(tries, 1, 'one request');
+  assert.equal(said.length, 1);
+  assert.match(refusedText(said[0]), /403.*link the terminal printed/);
+});
+
+test('the lamp model (a loader error that names the 403) is also a refusal, and any other failure is not', () => {
+  assert.match(refusedText(new Error('fetch for "http://x/lamp.glb" responded with 403: Forbidden')), /403/);
+  assert.equal(refusedText(new TypeError('Failed to fetch')), undefined);
+  assert.equal(refusedText(Object.assign(new Error('the server answered 500'), { status: 500 })), undefined);
+});
+
+test('a fetch answered 500 throws with its status; one answered 200 gives its body', async () => {
+  const globalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => ({ ok: false, status: 500 });
+    await assert.rejects(fetched('/x', (r) => r), (error) => error.status === 500);
+    globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => ({ a: 1 }) });
+    assert.deepEqual(await fetched('/x', (r) => r.json()), { a: 1 });
+  } finally { globalThis.fetch = globalFetch; }
+});
+
+test('loadPanel names its answer `answer`, not the page\'s status element', () => {
+  assert.doesNotMatch(source, /let status\b/);
+  assert.match(source, /let answer\b/);
 });
