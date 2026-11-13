@@ -2846,7 +2846,16 @@ for each run, and is answered once the run ends
     fails the check is refused in words, journaled: "the lamp's default
     agent (<engine>) isn't set up for a skill's run yet (<why>), so nothing
     was started", with nothing made or asked, and no other agent runs it
-    instead. A wrapper lamp-update wrote (its mark, `WRAPPER_MARK`, in the
+    instead. One exception, so the switch is safe whatever order a lamp's
+    units and its updater change in (#6914, #6898): when the default is the
+    lamp's Hermes and its wrapper is lamp-update's but not yet its one run
+    path's (an older updater's round), the run goes the switch-off way,
+    through the lamp's Hermes as before, journaled "run through the lamp's
+    Hermes as with LAMP_SKILL_DEFAULT_AGENT off until lamp-update rewrites
+    its wrapper" (`skill_task::hermes_waits_for_its_round`). That way's own
+    check still holds: a wrapper that doesn't find a run by its folder is
+    refused as with the switch off. Any other default is still refused.
+    A wrapper lamp-update wrote (its mark, `WRAPPER_MARK`, in the
     first 512 bytes) without the run lines is said as an agent with no
     fenced run path for a skill's run yet, whatever lamp-update's switch,
     with no engine named in the check. An agent whose wrapper is a

@@ -439,7 +439,16 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     qua được kiểm tra bị từ chối bằng lời, có ghi nhật ký: "the lamp's
     default agent (<engine>) isn't set up for a skill's run yet (<lý do>),
     so nothing was started", không tạo hay hỏi gì, và không agent nào khác
-    chạy thay. Một wrapper do lamp-update ghi (có dấu `WRAPPER_MARK` trong
+    chạy thay. Một ngoại lệ, để công tắc an toàn dù unit của đèn và bộ cập
+    nhật đổi theo thứ tự nào (#6914, #6898): khi mặc định là Hermes của đèn
+    và wrapper của nó là của lamp-update nhưng chưa phải của đường chạy
+    chung (vòng của một bộ cập nhật cũ hơn), lần chạy đi theo đường khi tắt
+    công tắc, qua Hermes của đèn như trước, có ghi nhật ký "run through the
+    lamp's Hermes as with LAMP_SKILL_DEFAULT_AGENT off until lamp-update
+    rewrites its wrapper" (`skill_task::hermes_waits_for_its_round`). Kiểm
+    tra riêng của đường đó vẫn giữ: wrapper không tìm lần chạy theo thư mục
+    thì bị từ chối như khi tắt công tắc. Mặc định khác vẫn bị từ chối.
+    Một wrapper do lamp-update ghi (có dấu `WRAPPER_MARK` trong
     512 byte đầu) mà không có các dòng nhận lần chạy được báo là agent chưa
     có đường chạy đã rào cho lần chạy kỹ năng, bất kể công tắc của
     lamp-update, và phép kiểm tra không gọi tên engine nào. Một agent có
