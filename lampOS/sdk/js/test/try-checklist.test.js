@@ -97,10 +97,9 @@ test('the export is JSON and a markdown table of the rows and marks, and holds n
 
 test('the served page asks for the checklist with its token, and the table names the lamp and the mode', async (t) => {
   const { mkdtempSync, rmSync, writeFileSync, chmodSync } = await import('node:fs');
-  const { spawn } = await import('node:child_process');
+  const { startTwin } = await import('./twin-start.js');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
-  const { createServer } = await import('node:net');
   const server = new URL('../examples/twin/server.js', import.meta.url).pathname;
   const folder = mkdtempSync(join(tmpdir(), 'try-checklist-'));
   t.after(() => rmSync(folder, { recursive: true, force: true }));
@@ -109,14 +108,7 @@ test('the served page asks for the checklist with its token, and the table names
   chmodSync(stub, 0o755);
   const glb = join(folder, 'lamp.glb');
   writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
-  const port = await new Promise((resolve) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port: p } = s.address(); s.close(() => resolve(p)); }); });
-  const child = spawn(process.execPath, [server, '--fake', '--port', String(port), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub], { stdio: ['ignore', 'pipe', 'inherit'] });
-  t.after(() => child.kill('SIGTERM'));
-  const token = await new Promise((resolve, reject) => {
-    let text = '';
-    child.stdout.on('data', (chunk) => { text += chunk; const found = /\?t=(\S+)/.exec(text); if (found) resolve(found[1]); });
-    child.on('close', (code) => reject(new Error(`the server ended (${code})`)));
-  });
+  const { port, token } = await startTwin(t, server, (port) => ['--fake', '--port', String(port), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub]);
   const base = `http://127.0.0.1:${port}`;
   assert.equal((await fetch(`${base}/checklist.js`)).status, 403, 'not without the token');
   assert.equal((await fetch(`${base}/checklist.js?t=${token}`)).status, 200);
