@@ -1663,8 +1663,7 @@ With the switch:
     Still to do in the reader's PR: a live name wins over an alias, and a
     rename away from the owner's typed name is guarded with #5519's.
   - **A rename's yes by its guards** (`LAMP_NAMES_RENAME_YES=on`, off
-    unless set, on in the product unit since #6859 after 9 of 9 on
-    lamp-52e6 on 9 Nov, #5485; only with `LAMP_NAMES=checked`; the second route; #5485).
+    unless set; only with `LAMP_NAMES=checked`; the second route; #5485).
     On lamp-29e7 on 6 Nov a known face B asked to be called A, and every
     yes was refused: "Yes. Please forget the name B, and this is my face,
     the face of A." held words outside the list, and "Okay. Can you repeat
@@ -1700,8 +1699,8 @@ With the switch:
     other voice is heard, so a voice off camera could rename that face.
     It is kept because on lamp-a63e on 6 Nov the mouth read came back
     unread in 96% of looks at a known face, so "seen saying it" alone
-    would almost never pass. The first builder accepted the risk for the
-    switch-on (#6594, #6859). It runs through the same runner as a
+    would almost never pass. The risk is accepted only while the switch
+    is off, and is to be confirmed before it is turned on. It runs through the same runner as a
     model call, so every name and owner check still applies, and the
     model is told the result. Any other turn drops it: a no, another name,
     another face seen saying the yes (told), a carried line, another
@@ -1874,8 +1873,7 @@ With the switch:
   first. A forced save, like the model's, checks the name and that one
   face is in view, but not that the face is the speaker's.
 - **On the second route, a known face giving another name asks first**
-  (`LAMP_NAMES_RENAME_ASKED=on`, off unless set, #5485; on in the product
-  unit since #6859, after 9 of 9 on lamp-52e6 on 9 Nov). Without it, "Call
+  (`LAMP_NAMES_RENAME_ASKED=on`, off by default, #5485). Without it, "Call
   me Tove." from a face known as Kess called nothing, since the ask above
   needs "remember" said too. With the switch, names checked, the eyes'
   who socket and the bus, a line that gives a name (`gives_a_name`) not
