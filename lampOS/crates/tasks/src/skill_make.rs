@@ -304,10 +304,19 @@ fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
 /// memories and sessions, from the run ([`WRAPPER_HOME_LINE`],
 /// [`NS_HOME_LINE`]). Removed however the run ends.
 pub(crate) fn fresh_home(work: &Path) -> std::io::Result<MadeFolder> {
+    fresh_home_for(work, false)
+}
+
+/// [`fresh_home`], its config with the lamp's agent's connectors
+/// (`mcp_servers.lamp-services`, [`crate::hermes_config::mcp_entry`]) when
+/// `services`: an agent skill's run granted a linked service
+/// (`crate::skill_task`, `LAMP_AGENT_SERVICES` on in lamp-tasks), which
+/// reaches it only through lamp-control under the run's one-run token.
+pub(crate) fn fresh_home_for(work: &Path, services: bool) -> std::io::Result<MadeFolder> {
     let made = fresh_folder(work, FOLDER_HEAD)?;
     let home = folder_in(&made.fd, HOME_FOLDER)?;
     let hermes = folder_in(&home, HERMES_FOLDER)?;
-    file_in(&hermes, CONFIG_FILE, &make_config()?)?;
+    file_in(&hermes, CONFIG_FILE, &make_config(services)?)?;
     for (name, target) in RUNTIME_LINKS {
         rustix::fs::symlinkat(target, &hermes, name)?;
     }
@@ -328,11 +337,13 @@ fn fresh_folder(work: &Path, head: &str) -> std::io::Result<MadeFolder> {
 }
 
 /// A make's fresh config: the lamp's provider ([`crate::hermes_config::merge_config`],
-/// its key a variable's name only) and [`MAKE_CONFIG`], each its own
-/// top-level block (the provider config has none of them).
-fn make_config() -> std::io::Result<String> {
-    let mut config = crate::hermes_config::merge_config("", crate::runtime::HERMES_FORWARDER_PORT)
-        .map_err(|_| std::io::Error::other("the provider config was not made"))?;
+/// its key a variable's name only), the lamp's agent's connectors only when
+/// `services`, and [`MAKE_CONFIG`], each its own top-level block (the
+/// provider config has none of them).
+fn make_config(services: bool) -> std::io::Result<String> {
+    let mut config =
+        crate::hermes_config::merge_config_for("", crate::runtime::HERMES_FORWARDER_PORT, services)
+            .map_err(|_| std::io::Error::other("the provider config was not made"))?;
     for (key, value) in MAKE_CONFIG {
         let (block, name) = key.split_once('.').unwrap_or(("", key));
         config.push_str(&format!("{block}:\n  {name}: {value}\n"));
