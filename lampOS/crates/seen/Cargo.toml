@@ -45,6 +45,10 @@ reqwest = { version = "0.13", default-features = false, features = ["rustls-no-p
 # (MIT OR Apache-2.0) AND IJG), so the lock gains no package.
 zune-jpeg = "=0.4.21"
 jpeg-encoder = "=0.7.1"
+# Posture's request (#6543 phase 3): one WebSocket per frame, synchronous,
+# on a thread of its own, with tungstenite itself (already built under
+# tokio-tungstenite above), so no new package.
+tungstenite = { version = "=0.30.0", default-features = false, features = ["handshake"] }
 
 [lints]
 workspace = true

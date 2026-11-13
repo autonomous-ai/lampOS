@@ -4,26 +4,29 @@
 //! 2); else each copy is dropped. The sitting's timers go out on
 //! `humans/doing`, and each new sighting on `humans/doing_seen`. The opt-in
 //! is said back once when it turns on and once when it turns off, and a
-//! forget turns it off; the kept yes is only read, never written.
+//! forget turns it off; the kept yes is only read, never written. With
+//! `LAMP_SEEN_POSTURE=on` and the account too, one frame every 30 s goes to
+//! the pose model and `humans/posture` is said while someone sits (phase 3).
 //! Off unless `LAMP_SEEN_ACTIVITY=on`: off, it idles until stopped and
 //! touches nothing (no bus, no file, no socket).
 use lamp_bus::{Bus, Publisher, Subscriber};
-use lamp_camera::frames::FrameMeta;
 use lamp_camera::frames::{FrameClient, Role};
 use lamp_msgs::{
-    Diagnostic, DoingSeen, ExpressionState, Faces, HumanDoing, HumanFamiliar, Level, MemoryForgot,
-    MicrophonePrivacy, RoomActivity, RoomPresence, StoodUp,
+    Diagnostic, DoingSeen, ExpressionState, Faces, HumanDoing, HumanFamiliar, HumanPosture, Level,
+    MemoryForgot, MicrophonePrivacy, RoomActivity, RoomPresence, StoodUp,
 };
 use lamp_seen::{
     BUS_NAME, ENVIRONMENT, HEALTH_NAME,
     activity::{self, Activity},
     burst::{Outcome, Pace},
     endpoint::Endpoint,
-    frames::{self, Discard, Sink, Taker},
+    frames::{self, Sink, Taker},
     gate,
     mark::{BusRing, Marked},
     opt_in,
     opt_in::Reader as _,
+    outlet::Outlet,
+    pose::{self, Pose},
     said_back::{self, SaidBack, SayService},
     sitting::Sitting,
     switched_on,
@@ -40,7 +43,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32 [--account ABSOLUTE_PATH --key ABSOLUTE_PATH [--public-key-file ABSOLUTE_PATH]]] [--run-for-ms N]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, humans/familiar, expression/state,\nmemory/forgot, room/activity, room/stood_up) and the owner's opt-in (seen-activity.json in\n--opt-in-folder, default /var/lib/lampOS/consent, read again every 2 s and never written),\nsays on diagnostics whether a frame may be asked for, and says the sitting's timers on humans/doing every 30 s\nwhile one remembered face sits at the desk. With --frames-socket it is the camera frame\nlink's perception consumer: a frame asked for only while the gate is open and once the ring\nsaid it drew its mark (light/mark, light/mark_drawn). With --account (setup's\nbackend.json) and --key (the account key) too, one burst of 8 frames a minute goes to the\nperception service's activity socket, encrypted, on a socket closed after each burst, and\nwhat was seen goes on humans/doing and humans/doing_seen (#6543 phase 2); without them each\ncopy is dropped at once. No frame is asked for before the on line for the kept yes has\nbegun. The opt-in is said back once each way, on and off (a forget included; an on line not\nbegun is withdrawn), through the voice's say service\n(--say-socket, LAMP_SAY_SOCKET or /run/lampos-say/say.sock), and what was said back is\nkept in --state-folder (default /var/lib/lampos-seen). memory/forgot turns the opt-in off\nuntil the voice removes the kept yes or a later yes is given.";
+const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32 [--account ABSOLUTE_PATH --key ABSOLUTE_PATH [--public-key-file ABSOLUTE_PATH]]] [--run-for-ms N]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, humans/familiar, expression/state,\nmemory/forgot, room/activity, room/stood_up) and the owner's opt-in (seen-activity.json in\n--opt-in-folder, default /var/lib/lampOS/consent, read again every 2 s and never written),\nsays on diagnostics whether a frame may be asked for, and says the sitting's timers on humans/doing every 30 s\nwhile one remembered face sits at the desk. With --frames-socket it is the camera frame\nlink's perception consumer: a frame asked for only while the gate is open and once the ring\nsaid it drew its mark (light/mark, light/mark_drawn). With --account (setup's\nbackend.json) and --key (the account key) too, one burst of 8 frames a minute goes to the\nperception service's activity socket, encrypted, on a socket closed after each burst, and\nwhat was seen goes on humans/doing and humans/doing_seen (#6543 phase 2); without them each\ncopy is dropped at once. No frame is asked for before the on line for the kept yes has\nbegun. The opt-in is said back once each way, on and off (a forget included; an on line not\nbegun is withdrawn), through the voice's say service\n(--say-socket, LAMP_SAY_SOCKET or /run/lampos-say/say.sock), and what was said back is\nkept in --state-folder (default /var/lib/lampos-seen). memory/forgot turns the opt-in off\nuntil the voice removes the kept yes or a later yes is given. With LAMP_SEEN_POSTURE=on and the account too, one frame every 30 s goes,\nencrypted, to the pose model on a socket closed after it, and humans/posture is said every\n30 s while someone sits (#6543 phase 3).";
 
 /// One step of the loop.
 const TICK: Duration = Duration::from_millis(100);
@@ -286,46 +289,18 @@ fn said_word(said: opt_in::Said) -> &'static str {
     }
 }
 
-/// Where the frames go: activity's bursts, or nowhere.
-enum Outlet {
-    Discard(Discard),
-    Activity(Box<Activity>),
-}
-
-impl Sink for Outlet {
-    fn ready(&mut self, now_us: u64) -> bool {
-        match self {
-            Outlet::Discard(sink) => sink.ready(now_us),
-            Outlet::Activity(sink) => sink.ready(now_us),
-        }
-    }
-    fn frame(&mut self, now_us: u64, meta: &FrameMeta, jpeg: &[u8]) {
-        match self {
-            Outlet::Discard(sink) => sink.frame(now_us, meta, jpeg),
-            Outlet::Activity(sink) => sink.frame(now_us, meta, jpeg),
-        }
-    }
-    fn stopped(&mut self) {
-        match self {
-            Outlet::Discard(sink) => sink.stopped(),
-            Outlet::Activity(sink) => sink.stopped(),
-        }
-    }
-}
-
 type Frames = (Taker<FrameClient>, Marked<BusRing, Outlet>);
 
 fn health(publisher: &mut Publisher, gate: Result<(), gate::Closed>, frames: Option<&Frames>) {
-    let activity = frames.and_then(|(_, marked)| match marked.inner() {
-        Outlet::Activity(activity) => Some(activity),
-        Outlet::Discard(_) => None,
-    });
-    let warn = activity.is_some_and(|activity| activity.retreat().warn());
+    let activity = frames.and_then(|(_, marked)| marked.inner().activity.as_deref());
+    let posture = frames.and_then(|(_, marked)| marked.inner().pose.as_deref());
+    let warn = activity.is_some_and(|activity| activity.retreat().warn())
+        || posture.is_some_and(|pose| pose.warn());
     let mut diagnostic = Diagnostic::new(
         if warn { Level::Warn } else { Level::Ok },
         HEALTH_NAME,
         if warn {
-            "the perception service is busy or unreachable: activity's bursts are held back"
+            "the perception service is busy or unreachable: its frames are held back"
         } else {
             ""
         },
@@ -356,6 +331,25 @@ fn health(publisher: &mut Publisher, gate: Result<(), gate::Closed>, frames: Opt
                 )
         }
     };
+    if let Some(pose) = posture {
+        let counts = pose.counts();
+        let now = monotonic_us();
+        diagnostic = diagnostic
+            .with("pose", pose.state(now))
+            .with("pose_sent", counts.sent)
+            .with("pose_answered", counts.answered)
+            .with("pose_no_body", counts.no_body)
+            .with("pose_busy", counts.busy)
+            .with("pose_failed", counts.failed)
+            .with("pose_cancelled", counts.cancelled)
+            .with("pose_samples", pose.samples())
+            .with("pose_wrong_frame", counts.wrong_frame)
+            .with(
+                "pose_last_failure",
+                pose.last_failure()
+                    .map_or("none", |failure| failure.as_str()),
+            );
+    }
     diagnostic = match frames {
         None => diagnostic.with("frames", "no frame socket"),
         Some((taker, marked)) => {
@@ -390,32 +384,50 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     let mut read_at: Option<Instant> = None;
     let mut latch = opt_in::OptIn::default();
     let mut readings = Readings::default();
-    let mut said_back = SaidBack::default();
     let mut mouth = SayService::new(config.say_socket.clone());
-    // Activity's bursts, given the account; else the copies are dropped.
-    let outlet = match config.account.as_ref() {
-        None => Outlet::Discard(Discard),
-        Some((account, key, public_key)) => {
-            let endpoint =
-                Endpoint::from_files(account, key).and_then(|endpoint| match public_key {
-                    Some(pem) => endpoint.with_public_key_file(pem),
-                    None => Ok(endpoint),
-                });
-            match endpoint {
-                Ok(endpoint) => {
-                    eprintln!("lamp-seen: activity's bursts go to {}", endpoint.socket_url);
-                    Outlet::Activity(Box::new(Activity::new(endpoint, Pace::default())))
+    // Activity's bursts, given the account, and posture's samples with its
+    // switch too; else the copies are dropped.
+    let mut outlet = Outlet::default();
+    if let Some((account, key, public_key)) = config.account.as_ref() {
+        let endpoint = Endpoint::from_files(account, key).and_then(|endpoint| match public_key {
+            Some(pem) => endpoint.with_public_key_file(pem),
+            None => Ok(endpoint),
+        });
+        match endpoint {
+            Ok(endpoint) => {
+                eprintln!("lamp-seen: activity's bursts go to {}", endpoint.socket_url);
+                if switched_on(std::env::var(pose::ENVIRONMENT).ok().as_deref()) {
+                    match pose::client::Client::for_endpoint(&endpoint) {
+                        Ok(client) => {
+                            eprintln!(
+                                "lamp-seen: posture's frames go to {}",
+                                client.address().pose_url()
+                            );
+                            outlet.pose = Some(Box::new(Pose::new(client)));
+                        }
+                        Err(error) => eprintln!("lamp-seen: no posture sent: {error}"),
+                    }
                 }
-                Err(error) => {
-                    eprintln!("lamp-seen: no activity sent: {error}");
-                    Outlet::Discard(Discard)
-                }
+                outlet.activity = Some(Box::new(Activity::new(endpoint, Pace::default())));
             }
+            Err(error) => eprintln!("lamp-seen: no activity or posture sent: {error}"),
         }
+    }
+    // With posture sending, the on line owed names it, and posture sends
+    // nothing until that line has begun for the kept yes.
+    let mut said_back = SaidBack::with_posture(outlet.pose.is_some());
+    let mut posture_out = match outlet.pose {
+        Some(_) => Some(bus.publisher_declared(
+            HumanPosture::TOPIC,
+            &HumanPosture::declaration(),
+            BUS_NAME,
+        )?),
+        None => None,
     };
-    let every_us = match outlet {
-        Outlet::Activity(_) => activity::SPACING_US,
-        Outlet::Discard(_) => frames::EVERY_US,
+    let every_us = if outlet.activity.is_some() {
+        activity::SPACING_US
+    } else {
+        frames::EVERY_US
     };
     // No frame without the ring's mark: no mark asked for, no frames.
     let mut frames: Option<Frames> = match config.frames.as_ref() {
@@ -509,7 +521,17 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             sitting = Some(Sitting::new(inputs.arrived_us(now)));
         }
         if let Some((taker, marked)) = frames.as_mut() {
-            if let Outlet::Activity(activity) = marked.inner_mut()
+            // Posture's own gate: closed `not_said_yet` until a line naming
+            // posture was said for this yes, whatever activity's says.
+            let posture_gate = pose::gate(gate, said_back.said_posture(&kept, &record));
+            if let (Some(pose), Some(posture_out)) =
+                (marked.inner_mut().pose.as_mut(), posture_out.as_mut())
+                && let Some(posture) = pose.step(now, posture_gate, came.stood_up)
+                && let Err(error) = posture_out.publish_json(now, &posture)
+            {
+                eprintln!("lamp-seen: humans/posture could not be said: {error}");
+            }
+            if let Some(activity) = marked.inner_mut().activity.as_mut()
                 && let Some(finished) = activity.poll(now)
             {
                 match finished.outcome {

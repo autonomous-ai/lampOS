@@ -29,6 +29,13 @@
 //! - The gate opens no earlier than the on line for the kept yes has begun
 //!   ([`SaidBack::said_on`]), so the ring's camera mark never comes before
 //!   the lamp said it would look. With no say service it never opens.
+//! - **Posture's line.** With `LAMP_SEEN_POSTURE` on
+//!   ([`SaidBack::with_posture`]), the on line owed is [`POSTURE_ON_LINE`],
+//!   which names posture too, and the record keeps that it did. A yes whose
+//!   plain [`ON_LINE`] was said before posture was switched on is owed the
+//!   posture line once. Posture sends no frame until it has begun for the
+//!   kept yes ([`SaidBack::said_posture`]); activity needs either line. A
+//!   forget then a new yes owes it again, as any new yes does.
 use crate::opt_in::{Said, Store};
 use lamp_msgs::consent::Kept;
 use std::io::{BufRead, BufReader, Write};
@@ -41,6 +48,10 @@ use std::time::Duration;
 /// Said word for word when the opt-in turns on (the first builder's
 /// wording on #6543).
 pub const ON_LINE: &str = "I'll look now and then to see if you're eating, drinking or slouching. I keep none of the pictures.";
+/// Said instead of [`ON_LINE`] when posture is switched on
+/// (`LAMP_SEEN_POSTURE`): the same line with posture named. Awaiting the
+/// PM's wording (docs/seen.md); this constant is the one place to change it.
+pub const POSTURE_ON_LINE: &str = "I'll look now and then to see if you're eating, drinking or slouching, and now and then how you're sitting, so I can remind you to sit back. I keep none of the pictures.";
 /// Said word for word when the opt-in turns off, a forget's included.
 pub const OFF_LINE: &str = "Okay, I've stopped looking at the desk.";
 /// The say service's `skill`: logged and traced only.
@@ -59,7 +70,8 @@ pub const CANCEL_LINE: &str = r#"{"cancel":true}"#;
 /// The line that says `said`.
 pub fn line(said: Said) -> &'static str {
     match said {
-        Said::On { .. } => ON_LINE,
+        Said::On { posture: false, .. } => ON_LINE,
+        Said::On { posture: true, .. } => POSTURE_ON_LINE,
         Said::Off => OFF_LINE,
     }
 }
@@ -113,9 +125,20 @@ pub struct SaidBack {
     retry: Option<(Said, u64)>,
     /// The ask out was withdrawn.
     withdrawn: bool,
+    /// Posture is switched on: the on line owed names it.
+    posture: bool,
 }
 
 impl SaidBack {
+    /// With posture switched on or not: on, the on line owed is
+    /// [`POSTURE_ON_LINE`].
+    pub fn with_posture(posture: bool) -> Self {
+        Self {
+            posture,
+            ..Self::default()
+        }
+    }
+
     /// One step at `now_us`: `opted_in` as the gate takes it, `kept` as the
     /// store read it.
     pub fn step(
@@ -174,12 +197,20 @@ impl SaidBack {
         self.said_here.or_else(|| store.said())
     }
 
-    /// The line owed now, if any: on for a kept yes not said back, off
-    /// only after an on line was said.
+    /// The line owed now, if any: on for a kept yes not said back (with
+    /// posture on, not said back naming posture), off only after an on
+    /// line was said.
     fn owed(&self, opted_in: bool, kept: &Kept, store: &impl Store) -> Option<Said> {
         let last = self.last(store);
         if opted_in {
-            (!last.is_some_and(|last| last.is_on_for(kept))).then(|| Said::on_for(kept))
+            let said = last.is_some_and(|last| {
+                if self.posture {
+                    last.names_posture_for(kept)
+                } else {
+                    last.is_on_for(kept)
+                }
+            });
+            (!said).then(|| Said::on_for(kept, self.posture))
         } else {
             matches!(last, Some(Said::On { .. })).then_some(Said::Off)
         }
@@ -189,6 +220,13 @@ impl SaidBack {
     /// an earlier one): the gate asks for no frame before it.
     pub fn said_on(&self, kept: &Kept, store: &impl Store) -> bool {
         self.last(store).is_some_and(|last| last.is_on_for(kept))
+    }
+
+    /// Whether an on line naming posture has begun for `kept`: posture
+    /// sends no frame before it.
+    pub fn said_posture(&self, kept: &Kept, store: &impl Store) -> bool {
+        self.last(store)
+            .is_some_and(|last| last.names_posture_for(kept))
     }
 }
 
@@ -387,7 +425,101 @@ mod tests {
     fn on(at: u64) -> Said {
         Said::On {
             for_at_unix_s: Some(at),
+            posture: false,
         }
+    }
+
+    fn on_posture(at: u64) -> Said {
+        Said::On {
+            for_at_unix_s: Some(at),
+            posture: true,
+        }
+    }
+
+    #[test]
+    fn posture_on_with_only_the_plain_line_said_owes_the_posture_line_once() {
+        let store = Memory::default();
+        let mut voice = Voice::default();
+        // The plain line said while posture was off.
+        say(
+            &mut SaidBack::default(),
+            true,
+            &yes(7),
+            &store,
+            &mut voice,
+            0,
+            on(7),
+        );
+        assert_eq!(voice.asked, [ON_LINE]);
+        // Posture switched on (a restart with LAMP_SEEN_POSTURE=on).
+        let mut back = SaidBack::with_posture(true);
+        assert!(back.said_on(&yes(7), &store), "activity's gate stays open");
+        assert!(!back.said_posture(&yes(7), &store), "no posture frame yet");
+        say(
+            &mut back,
+            true,
+            &yes(7),
+            &store,
+            &mut voice,
+            10,
+            on_posture(7),
+        );
+        assert_eq!(voice.asked, [ON_LINE, POSTURE_ON_LINE]);
+        assert!(back.said_posture(&yes(7), &store));
+        assert_eq!(*store.said.borrow(), Some(on_posture(7)), "kept");
+        // Said once: not again, here or after a restart.
+        assert_eq!(back.step(true, &yes(7), &store, &mut voice, 20), Step::Idle);
+        assert_eq!(
+            SaidBack::with_posture(true).step(true, &yes(7), &store, &mut voice, 21),
+            Step::Idle
+        );
+        // Posture switched off again: the posture line still covers it.
+        assert_eq!(
+            SaidBack::default().step(true, &yes(7), &store, &mut voice, 22),
+            Step::Idle
+        );
+        assert_eq!(voice.asked.len(), 2);
+    }
+
+    #[test]
+    fn a_forget_then_a_new_yes_needs_the_posture_line_again() {
+        let store = Memory::default();
+        let mut voice = Voice::default();
+        let mut back = SaidBack::with_posture(true);
+        say(
+            &mut back,
+            true,
+            &yes(7),
+            &store,
+            &mut voice,
+            0,
+            on_posture(7),
+        );
+        assert!(back.said_posture(&yes(7), &store));
+        // The forget: off, said back.
+        say(
+            &mut back,
+            false,
+            &Kept::default(),
+            &store,
+            &mut voice,
+            10,
+            Said::Off,
+        );
+        assert!(!back.said_posture(&yes(7), &store));
+        // A new yes: no posture frame until its posture line began.
+        assert!(!back.said_posture(&yes(30), &store));
+        say(
+            &mut back,
+            true,
+            &yes(30),
+            &store,
+            &mut voice,
+            20,
+            on_posture(30),
+        );
+        assert!(back.said_posture(&yes(30), &store));
+        assert_eq!(voice.asked, [POSTURE_ON_LINE, OFF_LINE, POSTURE_ON_LINE]);
     }
 
     /// One step that asks for `said` and has it begun.
@@ -742,6 +874,8 @@ mod tests {
     fn the_ask_and_its_answers() {
         assert_eq!(line(Said::Off), OFF_LINE);
         assert_eq!(line(on(1)), ON_LINE);
+        assert_eq!(line(on_posture(1)), POSTURE_ON_LINE);
+        assert!(POSTURE_ON_LINE.len() <= 900);
         assert!(OFF_LINE.len() <= 900);
         let ask: serde_json::Value = serde_json::from_str(ask_line(ON_LINE).trim()).unwrap();
         assert_eq!(ask["skill"], SKILL);

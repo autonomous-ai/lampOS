@@ -42,7 +42,7 @@ fn private() -> RsaPrivateKey {
 
 /// The server's answer to one frame.
 #[derive(Clone, Debug)]
-enum Reply {
+pub(crate) enum Reply {
     Labels(Vec<(&'static str, f64)>),
     Busy,
     Error,
@@ -51,7 +51,7 @@ enum Reply {
 
 /// What the server does with each connection, in turn; the last repeats.
 #[derive(Clone, Debug)]
-enum Script {
+pub(crate) enum Script {
     /// Upgrade, and answer the frames in turn (the last answer repeats).
     Answer(Vec<Reply>),
     /// Refuse the upgrade with this status.
@@ -60,24 +60,24 @@ enum Script {
 
 /// What the server saw.
 #[derive(Default)]
-struct Seen {
+pub(crate) struct Seen {
     connections: usize,
     api_keys: Vec<String>,
     /// Each connection's plaintexts after the key exchange, in order.
     plain: Vec<Vec<Value>>,
     /// The frames' JPEGs, over all connections.
-    frames: Vec<Vec<u8>>,
+    pub(crate) frames: Vec<Vec<u8>>,
     /// Connections that ended.
     closed: usize,
 }
 
-struct Mock {
+pub(crate) struct Mock {
     addr: SocketAddr,
     seen: Arc<Mutex<Seen>>,
 }
 
 impl Mock {
-    fn start(scripts: Vec<Script>) -> Self {
+    pub(crate) fn start(scripts: Vec<Script>) -> Self {
         let seen = Arc::new(Mutex::new(Seen::default()));
         let (addr_tx, addr_rx) = std::sync::mpsc::channel();
         let shared = seen.clone();
@@ -103,18 +103,18 @@ impl Mock {
         }
     }
 
-    fn endpoint(&self) -> Endpoint {
+    pub(crate) fn endpoint(&self) -> Endpoint {
         let mut endpoint = Endpoint::new(&format!("http://{}", self.addr), "test-key").unwrap();
         endpoint.public_key = Some(public_key_from_pem(PUBLIC).unwrap());
         endpoint
     }
 
-    fn seen<T>(&self, read: impl FnOnce(&Seen) -> T) -> T {
+    pub(crate) fn seen<T>(&self, read: impl FnOnce(&Seen) -> T) -> T {
         read(&self.seen.lock().unwrap())
     }
 
     /// Wait until `ready` holds of what the server saw.
-    fn wait(&self, what: &str, ready: impl Fn(&Seen) -> bool) {
+    pub(crate) fn wait(&self, what: &str, ready: impl Fn(&Seen) -> bool) {
         let until = Instant::now() + Duration::from_secs(10);
         while !self.seen(&ready) {
             assert!(Instant::now() < until, "the server never saw: {what}");
@@ -225,7 +225,7 @@ async fn serve(stream: tokio::net::TcpStream, script: Script, seen: Arc<Mutex<Se
     seen.lock().unwrap().closed += 1;
 }
 
-fn pace() -> Pace {
+pub(crate) fn pace() -> Pace {
     Pace {
         gap: Duration::from_millis(5),
         connect_within: Duration::from_secs(2),
