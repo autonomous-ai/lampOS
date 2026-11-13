@@ -5521,11 +5521,11 @@ mod tests {
         assert!(WRAPPER_HOME_LINE.contains(&format!("{MAKE_WORK}/{FOLDER_HEAD}*/home)")));
         assert!(WRAPPER_HOME_LINE.contains("export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\""));
         for cover in [
-            "mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\"",
-            "mount --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\"",
+            "mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\"",
+            "mount -n --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\"",
             "ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"",
-            "mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\"",
-            "mkdir \"$F\" && mount --move \"$X/f\" \"$F\"",
+            "mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\"",
+            "mkdir \"$F\" && mount -n --move \"$X/f\" \"$F\"",
             "HOME=$LAMP_NS_HOME",
         ] {
             assert!(NS_HOME_LINE.contains(cover), "{cover}");
