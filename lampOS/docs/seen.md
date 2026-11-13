@@ -11,8 +11,10 @@ It is one process with one owner. It asks the camera for a frame only when
 the rules below allow, sends it encrypted, and puts **labels** on the bus.
 No frame and no voice ever reaches a skill, the bus or the model.
 
-It is off behind `LAMP_SEEN_ACTIVITY` ([switches.md](switches.md)). Phase 1
-and 1b, described here, make no server call, so **no frame leaves the
+It is off behind `LAMP_SEEN_ACTIVITY` ([switches.md](switches.md)), and
+has no product unit yet. Phase 1 and 1b make no server call. Phase 2
+(activity, below) sends frames only when the launcher also gives it the
+account (`--account`, `--key`); without them, **no frame leaves the
 lamp**.
 
 ## Phase 0: the rules
@@ -77,7 +79,8 @@ lamp also says once when the opt-in is turned off.
     its partial frame, the request in flight, the grant and the copy (wiped).
 
   Each copy goes to a `Sink`, the one place a frame would go to the server.
-  In phase 1 that is `Discard`, and the copy is wiped right after. The sink
+  Without the account it is `Discard`, and the copy is wiped right after;
+  with it, activity's sink ([phase 2](#phase-2-activity)). The sink
   is asked before each request (`Sink::ready`) and told when sending stops
   (`Sink::stopped`), which is where the ring's mark holds (below).
 
@@ -209,8 +212,10 @@ lamp also says once when the opt-in is turned off.
 - **The server is full** (`backoff.rs`). On a 503, sending pauses for
   `Retry-After`, as V1's `retry_after_s` sets it: the header's seconds,
   held to 2–30 s, 5 s when the header is missing or a date, and ±20 %
-  jitter. While paused nothing is published, so the skills keep their own
-  clock and presence rules.
+  jitter. While paused no frame is sent, but `humans/doing` keeps going
+  out on the clock (phase 2), so the skills run on their own clock and
+  presence rules. Activity's socket never gets a 503: its bursts have
+  their own retreat (phase 2).
 - **V1's wire** (`wire.rs`), as types only. The activity session
   (`/ws/hal/api/dl/action-analysis/ws`, task `action`) sends a `config`,
   then `heartbeat`s and `frame`s, and gets back `detected_classes`. The pose
@@ -218,16 +223,163 @@ lamp also says once when the opt-in is turned off.
   `pose_2d`, `pose_3d` and `ergo`. It also has V1's label groups (drink,
   eat, break and the rest).
 - **Health.** Once a second it says on `diagnostics` (part `seen`, so on
-  `lamp/health`) whether the gate is open or why not, its frame counts, and
-  its marks: asked, not drawn in time, blinks that ended with no frame
-  inside them, and frames dropped with no mark drawn for them or captured
-  outside the blink.
+  `lamp/health`) whether the gate is open or why not, its frame counts
+  (`requested`, `handed`, `grant_changed`, `lost`), and its marks: asked,
+  not drawn in time, blinks that ended with no frame inside them, and
+  frames dropped with no mark drawn for them or captured outside the
+  blink. With activity on, also its bursts (below), and `warn` while they
+  retreat.
 
-### What phase 1 and 1b do not do
+## Phase 2: activity
 
-- No server call and no socket to it: no frame, label or key leaves the
-  lamp.
-- No label topic is published.
+With `--frames-socket` and the account (`--account`, setup's
+`backend.json`; `--key`, the account key; both as a unit's
+`LoadCredential=` gives them), the frames' sink is activity's
+(`activity.rs`) instead of `Discard`. It still sits inside the ring's mark
+and behind the gate, so a frame reaches it only while the gate is clear
+(the on line for the kept yes begun included: `not_said_yet` closes it)
+**and** the ring said it drew the mark for that frame. Any gate close,
+that one too, aborts a burst under way.
+
+- **One burst a minute** (`activity::EVERY_US`), of **8 frames**
+  (`activity::FRAMES`, the server's clip). The sink wants a frame
+  (`Sink::ready`) only while a burst is due or under way with frames left,
+  so between bursts no frame is asked for and the ring is not asked for its
+  mark (`Marked` asks the sink inside first). The taker asks for the
+  frames 1.2 s apart (`activity::SPACING_US`), and the burst sends them at
+  least 1.1 s apart (`burst::Pace::gap`): the server buffers a frame into
+  its clip only a second or more after the last.
+- **Each burst is its own socket** (`burst.rs`), on a thread of its own so
+  the gate, the frames and the bus never wait on the network:
+  1. the server's public key, fetched once with `X-API-Key` from
+     `<base>/crypto/public-key` (V1's `fetch_public_key`) and kept, unless
+     `--public-key-file` gives it; fetched again after a refused key
+     exchange;
+  2. a new WebSocket to `<base>/ws/hal/api/dl/action-analysis/ws`
+     (`wss` for `https`), with `X-API-Key`;
+  3. the key exchange, then V1's config: the 30 labels of V1's
+     `white_list.txt` in its order plus one class beyond V1's list,
+     "eating chips" after "eating carrots" (`wire::WHITELIST`, 31
+     labels), threshold 0.3, person detection on, its least area 0.25.
+     "eating chips" is the nearest Kinetics class to a snack, added after
+     the 13 Nov lamp run gave no eating label for one; it is in the `eat`
+     group. The whitelist reaches only this session: the server builds each
+     session's class mask from the list that session sent
+     (`core/perception/action/session.py`, `_post_config_update`), and V1
+     lamps send their own 30 at each session's start, so they are
+     unaffected. The server keeps **one** config object for every session
+     (`perception.py`, `create_session`) and reads its threshold live, so
+     the threshold and the person fields stay V1's: another value there
+     would change V1 lamps' results. The config's answer is read and not
+     checked, as V1 does;
+  4. each frame, `{"type":"frame","task":"action","frame_b64":…}`,
+     encrypted, and its answer read before the next;
+  5. the socket closed. The server's session, with the frames it buffered
+     for the clip, ends with it, so **nothing is kept between bursts**.
+
+  No heartbeat is sent: a burst lasts about ten seconds, and V1's heartbeat
+  came once a minute. Every wait is bounded: 15 s for the connection, the
+  public key and each answer (V1's `DL_WS_RECV_TIMEOUT_S`), and 10 s for
+  the camera's next frame, after which the burst ends with what it has.
+- **The address** is V1's (`endpoint.rs`, `v1_base`): the account's
+  `llm_base_url` with trailing `/` trimmed, ending in exactly one `/v1`,
+  added when missing and never doubled. V1 lamps hold
+  `…/api/v1/ai/v1`; setup's `backend.json` holds `…/api/v1/ai/`, and
+  without the `/v1` the relay answers 404 "route not found". `<base>`
+  above is that `/v1` base, and `Endpoint::socket` gives any other V1
+  path on it. A relay probe on 12 Nov got 101 on both WebSocket upgrades
+  (action-analysis and pose-estimation) on the `/v1` base, and 521 on the
+  public key (the origin down). The key goes only to
+  `https://campaign-api.autonomous.ai`, or to this machine (`127.0.0.1`,
+  `localhost`, `[::1]`, for the simulator and the tests); any other base
+  is refused and nothing is sent.
+- **The frames** are sent at 320×240 (`scale.rs`), whatever size the
+  camera serves: only the camera's own JPEG (`MJPG`, not a derived copy)
+  of at least 320×240 (`activity::LEAST_SIZE`) is taken. A larger one is
+  decoded (`zune-jpeg`), scaled down by area until one side meets
+  320×240's and the other is no smaller (4:3 becomes 320×240 exactly,
+  1280×720 becomes 427×240), and encoded again at quality 80
+  (`jpeg-encoder`); 320×240 goes as it came. Anything smaller, not MJPG,
+  derived, or a JPEG that does not decode at its meta's size is dropped
+  and counted (`wrong_frame`). Before this, a lamp whose eyes ran
+  `--full-look 1280x960` had every frame dropped (lamp-06c1, 13 Nov: 106
+  `wrong_frame`, no burst sent). The server takes any size: its person
+  detector letterboxes the frame to its own input, and the action model
+  scales the person's crop to 224×224 (`preprocess_single_frame`). V1
+  sent 640×480 from its own camera; whether 320×240 reads drinks and
+  meals as well is not measured; the lamp rows before the switch goes on
+  should say. The scaling runs in the frame's call, before a burst opens
+  for it: on a development Mac, in release, a 1280×960 frame (274 KB, more detail
+  than the lamp's ~88 KB) takes 26 ms at the median and a 640×480 one 9 ms
+  (`scale::tests::scale_time`); a lamp's A55 cores, three to five times
+  slower, would take about 80–130 ms for 1280×960, eight times a minute.
+  Not measured on a lamp yet.
+- **Copies are wiped.** Each frame's copy for a burst is wiped when its
+  message is made, or with the burst if it was never sent; its Base64 and
+  the message's plaintext are wiped too, and only ciphertext reaches the
+  socket. A scaled copy is made inside the copy itself: the decoded and
+  the scaled pixels are wiped before it is handed on, and the encoder
+  writes into room reserved for the whole result, so no outgrown buffer
+  is left behind. The decoder's and encoder's own working rows are inside
+  those crates and are freed unwiped. The frames' own buffer is wiped as in phase 1.
+- **Busy.** The server answers a busy frame `{"error":"busy"}` and never a
+  503 on this socket. The burst is then dropped at once, with no retry
+  inside it, and the next comes in its turn.
+- **The retreat** (`backoff::Retreat`). After 3 busy bursts in a row, or
+  any burst that failed (no public key, no connection, the upgrade refused,
+  such as a 5xx, a refused key exchange, a server error, no answer in
+  time), the next burst waits 60 s, doubling each time to 10 min, with
+  ±20 % jitter. Meanwhile `diagnostics` says `warn` (so `lamp/health`
+  does), with the last failure, until a burst is answered.
+- **The gate closes mid-burst** (or the link is lost, the grant changes,
+  the process stops: `Sink::stopped`): the burst is aborted at once,
+  whatever it waits on, its socket closed, its frames wiped and its answers
+  dropped.
+- **What was seen** (`sitting.rs`). A burst's answers are read as drinking,
+  eating or a break (V1's `drink`, `eat` and `break` groups), never as the
+  raw label. A false "drank" silences sip-of-water for 90 minutes, so a
+  kind counts only when one answer is at least 0.5 sure of it, or at least
+  2 of the burst's last 4 answers have it at all (the server sends only
+  what clears 0.3).
+- **The sitting and its timers.** A sitting begins when one remembered face
+  is at the desk (the gate's presence and stranger lines, whatever the
+  opt-in, its said-back line, the privacy or sleep say), from `room/activity`'s `sitting_s`
+  when it said one lately, else from now. It ends on `room/stood_up`, and
+  when the gate's lines say nobody or a stranger. Its timers count from the
+  desk arrival until something is seen, and from the last sighting after.
+- **Published**, on the topics `lamp_msgs` declares (`doing.rs`):
+  - `humans/doing` (`HumanDoing`): `drank_s_ago`, `ate_s_ago`,
+    `break_s_ago` (always present), `last` and `confidence`, every 30 s
+    while a sitting lasts, and at once after a burst that saw something.
+    It goes out whether or not frames do (the opt-in off, the server busy,
+    the slide shut, no account given), so a skill's `[[while]] above` on a
+    timer runs on the clock as it would without this part;
+  - `humans/doing_seen` (`DoingSeen`): once for each kind newly seen, not
+    seen in the burst before.
+- **Health**: with activity on, `diagnostics` also says `sends: activity`,
+  its bursts (`bursts`, `answered`, `busy`, `failed`, `aborted`),
+  `frames_sent`, `frames_wiped`, `wrong_frame` and `last_failure`.
+
+The crates are the ones the other lampOS clients use, pinned as
+`lamp-gemini` and `lamp-voice` pin them: `tokio-tungstenite` 0.30.0,
+`rustls` 0.23 with the ring provider and the webpki roots, `reqwest` 0.13
+with no provider of its own, so no OpenSSL; the lock gains no package
+([reuse-decisions.md](reuse-decisions.md)).
+
+Its tests run a local WebSocket server that speaks V1's side, the key
+exchange with the test key's private half included, and answers each
+frame with labels, `busy`, an error, or nothing: a full burst on V1's
+wire and its socket closed after, a gate close mid-burst, an abort that
+doesn't wait for a silent server, busy bursts and the retreat, a refused
+upgrade, a server error and no server, the copies wiped, and the frame
+sizes taken.
+
+### What phases 1 to 2 do not do
+
+- Without `--account` and `--key`, no server call and no socket to it: no
+  frame, label or key leaves the lamp. `humans/doing` still goes out, from
+  the clock.
+- Posture (phase 3) is not built: `humans/posture` is not published.
 - No product unit, and no package. The binary is listed under `development`
   in `deploy/package-binaries.json`. The product's frame link has no
   `perception` consumer yet: `lamp-eyes` owns the camera, and the voice's
@@ -243,15 +395,19 @@ lamp also says once when the opt-in is turned off.
 
 | Item | What | When |
 |---|---|---|
-| Giving the yes | The voice's spoken yes writing `seen-activity.json`, the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`, removal on every forget, and the file in lamp-setup's reset list beside the other two (Fourteen's design on #6543) | before phase 2 |
-| The state folder | `lamp-seen`'s unit with `StateDirectory=lampos-seen`, in the `lampos` group so it may read the consent folder | phase 2, with the unit |
-| The say service for `lamp-seen` | Its unit in `LAMP_SAY_GROUP`, so it may reach the say socket. Without it the on line is never said and the gate never opens | phase 2, with the unit |
-| The frame source | A `perception` consumer of the product's camera: joining the eyes' camera and the frame link, or a link from the eyes | phase 2 |
-| A known face on the bus | `lamp-eyes --visits` in the product, or another marker the gate can read | phase 2 |
-| Labels | `humans/doing` (latest, `lamp_msgs/HumanDoing` v1, every 30 s, lasting 90 s: `{drank_s_ago?, ate_s_ago?, break_s_ago?, last, confidence}`, reset on `room/stood_up`), `humans/doing_seen` (an event for each result), `humans/posture` (latest, `lamp_msgs/HumanPosture` v1: `{window_s, bad_share, region}`). Types and declarations in msgs.md and bus.md | phase 2 (activity), phase 3 (posture) |
-| Skills | They read the labels with the existing `[[while]]` on a topic's field (for example `topic = "humans/doing"`, `field = "drank_s_ago"`); no new skill key | phase 2 |
-| A product unit and a package | Its unit, `lamp/health`'s expected parts, the units list | phase 2 |
+| Giving the yes | The voice's spoken yes writing `seen-activity.json`, the key in `lamp_msgs::consent::FILES` and `lamp-cloud`'s `consent.set`, removal on every forget, and the file in lamp-setup's reset list beside the other two (Fourteen's design on #6543) | before the switch goes on |
+| The state folder | `lamp-seen`'s unit with `StateDirectory=lampos-seen`, in the `lampos` group so it may read the consent folder | with the product unit |
+| The say service for `lamp-seen` | Its unit in `LAMP_SAY_GROUP`, so it may reach the say socket. Without it the on line is never said and the gate never opens | with the product unit |
+| The frame source | A `perception` consumer of the product's camera: `lamp-eyes`' frame link (#6645), given to `lamp-seen` by its launcher | with the product unit |
+| A known face on the bus | `lamp-eyes --visits` in the product, or another marker the gate can read | before the switch goes on |
+| Posture's label | `humans/posture` (latest, `lamp_msgs/HumanPosture` v1: `{window_s, bad_share, region}`), declared; activity's `humans/doing` and `humans/doing_seen` are published (phase 2, above) | phase 3 |
+| The frame size | Every frame is sent at 320×240, scaled down from the eyes' link at any larger size (`--full-look` included). Measure the labels at 320×240 on a lamp against V1's 640×480 before the switch goes on | before the switch goes on |
+| `humans/doing` when lamp-seen stops | A topic that has run out holds a skill's `[[while]]` closed until lamp-skills restarts (`unknown = "holds"` covers only a topic never said). lamp-seen under the keeper, or a skills change, before a skill reads it | before a skill reads it |
+| Skills | They read the labels with the existing `[[while]]` on a topic's field (for example `topic = "humans/doing"`, `field = "drank_s_ago"`); no new skill key | after the `humans/doing` row above |
+| A product unit and a package | Its unit, `lamp/health`'s expected parts, the units list | before the switch goes on |
 
-V1 faults not to port: activity's per-face mode sent double events, and its
-heartbeat waited with no timeout (`motion.py:208`). Phase 2 bounds every
-answer, the heartbeat's too, at V1's 15 s (`wire::ANSWER_WITHIN_S`).
+V1 faults not ported: activity's per-face mode sent double events (one
+burst here, for the one remembered face), its heartbeat waited with no
+timeout (`motion.py:208`; no heartbeat here, and every answer is bounded at
+V1's 15 s, `wire::ANSWER_WITHIN_S`), and it reconnected every 2 s with no
+backoff (here, the retreat).

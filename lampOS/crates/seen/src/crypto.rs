@@ -160,7 +160,9 @@ impl Session {
         Self::new(server, &mut rand_core::OsRng)
     }
 
-    fn with_key(
+    /// A session with the given key: the server's side in tests, which
+    /// opens the key exchange and then speaks under the same key.
+    pub(crate) fn with_key(
         key: &[u8; KEY_BYTES],
         server: &RsaPublicKey,
         rng: &mut (impl RngCore + CryptoRng),

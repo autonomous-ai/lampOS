@@ -4,10 +4,12 @@
 //! header's seconds, held between 2 and 30 s, a missing or date-form header
 //! taken as 5 s, then jittered by ±20 %.
 //!
-//! While paused, nothing is sent and nothing is published: no label goes
-//! out, so the skills go on by their own clock and presence rules, as they
-//! do with this part off. A pure state machine: the caller passes the time
-//! and the jitter, so tests need no clock and no randomness.
+//! While paused, nothing is sent. The HTTP routes (posture, later) pause
+//! on it; activity's WebSocket never gets a 503, so its bursts have their
+//! own [`Retreat`]. While either holds, `humans/doing` still goes out with
+//! the sitting's timers, so the skills go on by their own clock. Pure
+//! state machines: the caller passes the time and the jitter, so tests
+//! need no clock and no randomness.
 
 /// The pause when the header is missing or not a number of seconds.
 pub const DEFAULT_S: f64 = 5.0;
@@ -89,6 +91,96 @@ impl Backoff {
     }
 }
 
+/// Activity's bursts (#6543 phase 2) on a WebSocket, where the server
+/// never sends a 503 or `Retry-After` (a busy frame gets `{"error":"busy"}`
+/// and the socket stays open): after [`BUSY_RUN`] busy bursts in a row, or
+/// any burst that failed (no connection, an HTTP refusal such as a 5xx, a
+/// refused key exchange, a server error, no answer in time), the next burst
+/// waits [`RETREAT_LEAST_S`], doubling each time to [`RETREAT_MOST_S`],
+/// with ±20 % jitter, and the part says `warn` on `lamp/health` until a
+/// burst is answered.
+pub const BUSY_RUN: u32 = 3;
+/// The first wait after a run of busy bursts or a failure.
+pub const RETREAT_LEAST_S: u64 = 60;
+/// The longest.
+pub const RETREAT_MOST_S: u64 = 600;
+
+/// How one burst ended, as the retreat takes it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ended {
+    /// Answered for every frame sent.
+    Answered,
+    /// The server said busy: the burst dropped.
+    Busy,
+    /// No connection, refused, or no answer in time.
+    Failed,
+}
+
+/// Whether bursts are held back after busy runs and failures.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Retreat {
+    busy_in_a_row: u32,
+    /// Waits taken since the last answer: the next one doubles.
+    steps: u32,
+    until_us: Option<u64>,
+}
+
+impl Retreat {
+    /// The wait for the `step`th retreat in a row (1 the first), before
+    /// jitter, in seconds.
+    pub fn wait_s(step: u32) -> u64 {
+        let doubled = RETREAT_LEAST_S.saturating_mul(1u64 << step.saturating_sub(1).min(16));
+        doubled.min(RETREAT_MOST_S)
+    }
+
+    /// Take a burst's end at `now_us`, with a jitter draw from 0 to 1.
+    pub fn take(&mut self, ended: Ended, now_us: u64, jitter: f64) {
+        let retreat = match ended {
+            Ended::Answered => {
+                *self = Self::default();
+                return;
+            }
+            Ended::Busy => {
+                self.busy_in_a_row = self.busy_in_a_row.saturating_add(1);
+                self.busy_in_a_row >= BUSY_RUN
+            }
+            Ended::Failed => true,
+        };
+        if retreat {
+            self.steps = self.steps.saturating_add(1);
+            let jitter = if jitter.is_nan() {
+                0.5
+            } else {
+                jitter.clamp(0.0, 1.0)
+            };
+            let factor = 1.0 - JITTER + 2.0 * JITTER * jitter;
+            let wait = (Self::wait_s(self.steps) as f64 * factor * 1_000_000.0).round() as u64;
+            self.until_us = Some(now_us.saturating_add(wait));
+        }
+    }
+
+    /// Whether a burst may begin at `now_us`.
+    pub fn may_start(&self, now_us: u64) -> bool {
+        self.until_us.is_none_or(|until| now_us >= until)
+    }
+
+    /// When the wait ends, if one was set; it stays set (for
+    /// `diagnostics`) until a burst is answered.
+    pub fn until_us(&self) -> Option<u64> {
+        self.until_us
+    }
+
+    /// Whether to say `warn` on `lamp/health`: retreating, until a burst is
+    /// answered.
+    pub fn warn(&self) -> bool {
+        self.steps > 0
+    }
+
+    pub fn busy_in_a_row(&self) -> u32 {
+        self.busy_in_a_row
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,5 +252,43 @@ mod tests {
             1.0,
         );
         assert!(!backoff.may_send(u64::MAX - 1));
+    }
+
+    #[test]
+    fn busy_bursts_retreat_after_three_and_failures_at_once() {
+        let mut retreat = Retreat::default();
+        retreat.take(Ended::Busy, 0, 0.5);
+        retreat.take(Ended::Busy, 60 * S, 0.5);
+        assert!(!retreat.warn(), "two busy bursts: no retreat yet");
+        assert!(retreat.may_start(60 * S));
+        retreat.take(Ended::Busy, 120 * S, 0.5);
+        assert!(retreat.warn());
+        assert!(!retreat.may_start(180 * S - 1));
+        assert!(retreat.may_start(180 * S));
+        // Busy again: the wait doubles.
+        retreat.take(Ended::Busy, 180 * S, 0.5);
+        assert_eq!(retreat.until_us(), Some(300 * S));
+        // An answer ends it.
+        retreat.take(Ended::Answered, 300 * S, 0.5);
+        assert!(!retreat.warn());
+        assert!(retreat.may_start(300 * S));
+        assert_eq!(retreat.busy_in_a_row(), 0);
+        // A failure retreats at once, jittered ±20 %.
+        retreat.take(Ended::Failed, 0, 0.0);
+        assert_eq!(retreat.until_us(), Some(48 * S));
+        retreat.take(Ended::Failed, 0, 1.0);
+        assert_eq!(retreat.until_us(), Some(144 * S));
+    }
+
+    #[test]
+    fn the_retreat_doubles_from_a_minute_to_ten() {
+        let waits: Vec<u64> = (1..=7).map(Retreat::wait_s).collect();
+        assert_eq!(waits, [60, 120, 240, 480, 600, 600, 600]);
+        assert_eq!(Retreat::wait_s(u32::MAX), 600);
+        let mut retreat = Retreat::default();
+        for _ in 0..100 {
+            retreat.take(Ended::Failed, u64::MAX - 1, 1.0);
+        }
+        assert!(!retreat.may_start(u64::MAX - 1));
     }
 }

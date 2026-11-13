@@ -1,24 +1,31 @@
 //! `lamp-seen serve`: the "no frames" gate on the bus and, given a frame
-//! socket, the camera's frame client behind the ring's mark; each copy
-//! dropped (#6543 phase 1 and 1b, no server call). The opt-in is said back
-//! once when it turns on and once when it turns off, and a forget turns it
-//! off; the kept yes is only read, never written. Off unless
-//! `LAMP_SEEN_ACTIVITY=on`: off, it idles until stopped and touches nothing
-//! (no bus, no file, no socket).
+//! socket, the camera's frame client behind the ring's mark (#6543). Given
+//! the account too, activity's bursts go to the perception service (phase
+//! 2); else each copy is dropped. The sitting's timers go out on
+//! `humans/doing`, and each new sighting on `humans/doing_seen`. The opt-in
+//! is said back once when it turns on and once when it turns off, and a
+//! forget turns it off; the kept yes is only read, never written.
+//! Off unless `LAMP_SEEN_ACTIVITY=on`: off, it idles until stopped and
+//! touches nothing (no bus, no file, no socket).
 use lamp_bus::{Bus, Publisher, Subscriber};
+use lamp_camera::frames::FrameMeta;
 use lamp_camera::frames::{FrameClient, Role};
 use lamp_msgs::{
-    Diagnostic, ExpressionState, Faces, HumanFamiliar, Level, MemoryForgot, MicrophonePrivacy,
-    RoomPresence,
+    Diagnostic, DoingSeen, ExpressionState, Faces, HumanDoing, HumanFamiliar, Level, MemoryForgot,
+    MicrophonePrivacy, RoomActivity, RoomPresence, StoodUp,
 };
 use lamp_seen::{
     BUS_NAME, ENVIRONMENT, HEALTH_NAME,
-    frames::{Discard, Sink as _, Taker},
+    activity::{self, Activity},
+    burst::{Outcome, Pace},
+    endpoint::Endpoint,
+    frames::{self, Discard, Sink, Taker},
     gate,
     mark::{BusRing, Marked},
     opt_in,
     opt_in::Reader as _,
     said_back::{self, SaidBack, SayService},
+    sitting::Sitting,
     switched_on,
     watch::Readings,
 };
@@ -33,7 +40,7 @@ use std::{
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
-const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32] [--run-for-ms N]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, humans/familiar, expression/state,\nmemory/forgot) and the owner's opt-in (seen-activity.json in --opt-in-folder, default\n/var/lib/lampOS/consent, read again every 2 s and never written), and says on diagnostics whether a frame may be asked\nfor. With --frames-socket it is the camera frame link's perception consumer: one frame\nasked for at a time, only while the gate is open and once the ring said it drew its mark\n(light/mark, light/mark_drawn), copied and dropped at once, and none\nbefore the on line for the kept yes has begun. The opt-in is said back once\neach way, on and off (a forget included; an on line not begun is withdrawn), through the voice's say service (--say-socket, LAMP_SAY_SOCKET or\n/run/lampos-say/say.sock), and what was said back is kept in --state-folder (default\n/var/lib/lampos-seen). memory/forgot turns the opt-in off until the voice removes the kept\nyes or a later yes is given. No frame leaves the\nlamp (#6543 phase 1).";
+const USAGE: &str = "usage: lamp-seen serve [--bus-root ABSOLUTE_PATH] [--opt-in-folder ABSOLUTE_PATH] [--state-folder ABSOLUTE_PATH] [--say-socket ABSOLUTE_PATH] [--frames-socket ABSOLUTE_PATH --own-boot HEX32 --controller-boot HEX32 [--account ABSOLUTE_PATH --key ABSOLUTE_PATH [--public-key-file ABSOLUTE_PATH]]] [--run-for-ms N]\n\nOff unless LAMP_SEEN_ACTIVITY=on: off, it idles and touches nothing. On, it reads the bus\n(voice/privacy, room/presence, humans/faces/tracked, humans/familiar, expression/state,\nmemory/forgot, room/activity, room/stood_up) and the owner's opt-in (seen-activity.json in\n--opt-in-folder, default /var/lib/lampOS/consent, read again every 2 s and never written),\nsays on diagnostics whether a frame may be asked for, and says the sitting's timers on humans/doing every 30 s\nwhile one remembered face sits at the desk. With --frames-socket it is the camera frame\nlink's perception consumer: a frame asked for only while the gate is open and once the ring\nsaid it drew its mark (light/mark, light/mark_drawn). With --account (setup's\nbackend.json) and --key (the account key) too, one burst of 8 frames a minute goes to the\nperception service's activity socket, encrypted, on a socket closed after each burst, and\nwhat was seen goes on humans/doing and humans/doing_seen (#6543 phase 2); without them each\ncopy is dropped at once. No frame is asked for before the on line for the kept yes has\nbegun. The opt-in is said back once each way, on and off (a forget included; an on line not\nbegun is withdrawn), through the voice's say service\n(--say-socket, LAMP_SAY_SOCKET or /run/lampos-say/say.sock), and what was said back is\nkept in --state-folder (default /var/lib/lampos-seen). memory/forgot turns the opt-in off\nuntil the voice removes the kept yes or a later yes is given.";
 
 /// One step of the loop.
 const TICK: Duration = Duration::from_millis(100);
@@ -48,6 +55,9 @@ struct Config {
     state_folder: PathBuf,
     say_socket: PathBuf,
     frames: Option<(PathBuf, BootId, BootId)>,
+    /// Setup's `backend.json`, the account key, and the server's public
+    /// key if given ahead.
+    account: Option<(PathBuf, PathBuf, Option<PathBuf>)>,
     run_for: Option<Duration>,
 }
 
@@ -82,6 +92,7 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Config, String> {
     let mut say_socket = std::env::var_os("LAMP_SAY_SOCKET")
         .map_or_else(|| PathBuf::from(SayService::DEFAULT_SOCKET), PathBuf::from);
     let (mut socket, mut own, mut controller, mut run_for) = (None, None, None, None);
+    let (mut account, mut key, mut public_key) = (None, None, None);
     let mut seen = std::collections::BTreeSet::new();
     while let Some(flag) = args.next() {
         if !seen.insert(flag.clone()) {
@@ -95,6 +106,9 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Config, String> {
             "--frames-socket" => socket = Some(absolute(args.next(), &flag)?),
             "--own-boot" => own = Some(boot(args.next(), &flag)?),
             "--controller-boot" => controller = Some(boot(args.next(), &flag)?),
+            "--account" => account = Some(absolute(args.next(), &flag)?),
+            "--key" => key = Some(absolute(args.next(), &flag)?),
+            "--public-key-file" => public_key = Some(absolute(args.next(), &flag)?),
             "--run-for-ms" => {
                 let ms: u64 = args
                     .next()
@@ -111,12 +125,21 @@ fn parse(mut args: impl Iterator<Item = String>) -> Result<Config, String> {
         (Some(socket), Some(own), Some(controller)) => Some((socket, own, controller)),
         _ => return Err("--frames-socket needs --own-boot and --controller-boot".into()),
     };
+    let account = match (account, key, public_key) {
+        (None, None, None) => None,
+        (Some(_), Some(_), _) if frames.is_none() => {
+            return Err("--account needs --frames-socket: nothing to send".into());
+        }
+        (Some(account), Some(key), public_key) => Some((account, key, public_key)),
+        _ => return Err("--account and --key go together".into()),
+    };
     Ok(Config {
         bus_root,
         opt_in_folder,
         state_folder,
         say_socket,
         frames,
+        account,
         run_for,
     })
 }
@@ -178,6 +201,17 @@ struct Inputs {
     familiar: Subscriber,
     expression: Subscriber,
     forgot: Subscriber,
+    activity: Subscriber,
+    stood_up: Subscriber,
+    /// `room/activity`'s sitting length and when it was read.
+    sitting_s: Option<(u32, u64)>,
+}
+
+/// What came in one step besides the gate's readings.
+#[derive(Default)]
+struct Came {
+    forgot: bool,
+    stood_up: bool,
 }
 
 impl Inputs {
@@ -190,11 +224,26 @@ impl Inputs {
             familiar: typed(HumanFamiliar::TOPIC, HumanFamiliar::TYPE)?,
             expression: typed(ExpressionState::TOPIC, ExpressionState::TYPE)?,
             forgot: typed(MemoryForgot::TOPIC, MemoryForgot::TYPE)?,
+            activity: typed(RoomActivity::TOPIC, RoomActivity::TYPE)?,
+            stood_up: typed(StoodUp::TOPIC, StoodUp::TYPE)?,
+            sitting_s: None,
         })
     }
 
-    /// Read what came into `readings`; true when a forget came.
-    fn read(&mut self, readings: &mut Readings) -> bool {
+    /// When this sitting began, as `room/activity` counts it (a gap under
+    /// two minutes forgiven), if it said so lately; else `now_us`.
+    fn arrived_us(&self, now_us: u64) -> u64 {
+        let fresh = RoomActivity::LASTS.as_micros() as u64;
+        match self.sitting_s {
+            Some((sitting_s, at)) if now_us.saturating_sub(at) <= fresh => {
+                now_us.saturating_sub(u64::from(sitting_s).saturating_mul(1_000_000))
+            }
+            _ => now_us,
+        }
+    }
+
+    /// Read what came into `readings`.
+    fn read(&mut self, readings: &mut Readings) -> Came {
         let now = monotonic_us();
         if let Some(lease) = newest::<MicrophonePrivacy>(&mut self.privacy) {
             readings.privacy(&lease, now);
@@ -211,7 +260,13 @@ impl Inputs {
         if let Some(state) = newest::<ExpressionState>(&mut self.expression) {
             readings.expression(&state, now);
         }
-        forgot(&mut self.forgot)
+        if let Some(activity) = newest::<RoomActivity>(&mut self.activity) {
+            self.sitting_s = Some((activity.sitting_s, now));
+        }
+        Came {
+            forgot: forgot(&mut self.forgot),
+            stood_up: newest::<StoodUp>(&mut self.stood_up).is_some(),
+        }
     }
 }
 
@@ -231,15 +286,76 @@ fn said_word(said: opt_in::Said) -> &'static str {
     }
 }
 
-type Frames = (Taker<FrameClient>, Marked<BusRing, Discard>);
+/// Where the frames go: activity's bursts, or nowhere.
+enum Outlet {
+    Discard(Discard),
+    Activity(Box<Activity>),
+}
+
+impl Sink for Outlet {
+    fn ready(&mut self, now_us: u64) -> bool {
+        match self {
+            Outlet::Discard(sink) => sink.ready(now_us),
+            Outlet::Activity(sink) => sink.ready(now_us),
+        }
+    }
+    fn frame(&mut self, now_us: u64, meta: &FrameMeta, jpeg: &[u8]) {
+        match self {
+            Outlet::Discard(sink) => sink.frame(now_us, meta, jpeg),
+            Outlet::Activity(sink) => sink.frame(now_us, meta, jpeg),
+        }
+    }
+    fn stopped(&mut self) {
+        match self {
+            Outlet::Discard(sink) => sink.stopped(),
+            Outlet::Activity(sink) => sink.stopped(),
+        }
+    }
+}
+
+type Frames = (Taker<FrameClient>, Marked<BusRing, Outlet>);
 
 fn health(publisher: &mut Publisher, gate: Result<(), gate::Closed>, frames: Option<&Frames>) {
-    let mut diagnostic = Diagnostic::new(Level::Ok, HEALTH_NAME, "")
-        .with(
-            "gate",
-            gate.map_or_else(|closed| closed.as_str(), |()| "open"),
-        )
-        .with("sends", "none (phase 1)");
+    let activity = frames.and_then(|(_, marked)| match marked.inner() {
+        Outlet::Activity(activity) => Some(activity),
+        Outlet::Discard(_) => None,
+    });
+    let warn = activity.is_some_and(|activity| activity.retreat().warn());
+    let mut diagnostic = Diagnostic::new(
+        if warn { Level::Warn } else { Level::Ok },
+        HEALTH_NAME,
+        if warn {
+            "the perception service is busy or unreachable: activity's bursts are held back"
+        } else {
+            ""
+        },
+    )
+    .with(
+        "gate",
+        gate.map_or_else(|closed| closed.as_str(), |()| "open"),
+    );
+    diagnostic = match activity {
+        None => diagnostic.with("sends", "none"),
+        Some(activity) => {
+            let counts = activity.counts();
+            diagnostic
+                .with("sends", "activity")
+                .with("bursts", counts.bursts)
+                .with("answered", counts.answered)
+                .with("busy", counts.busy)
+                .with("failed", counts.failed)
+                .with("aborted", counts.aborted)
+                .with("frames_sent", counts.frames)
+                .with("frames_wiped", activity.wiped())
+                .with("wrong_frame", counts.wrong_frame)
+                .with(
+                    "last_failure",
+                    activity
+                        .last_failure()
+                        .map_or("none", |failure| failure.as_str()),
+                )
+        }
+    };
     diagnostic = match frames {
         None => diagnostic.with("frames", "no frame socket"),
         Some((taker, marked)) => {
@@ -247,7 +363,7 @@ fn health(publisher: &mut Publisher, gate: Result<(), gate::Closed>, frames: Opt
             let marks = marked.counts();
             diagnostic
                 .with("requested", counts.requested)
-                .with("dropped_unsent", counts.handed)
+                .with("handed", counts.handed)
                 .with("grant_changed", counts.grant_changed)
                 .with("lost", counts.lost)
                 .with("marks_asked", marks.asked)
@@ -264,6 +380,10 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     let mut inputs = Inputs::subscribe(&bus)?;
     let mut diagnostics =
         bus.publisher_declared(Diagnostic::TOPIC, &Diagnostic::declaration(), BUS_NAME)?;
+    let mut doing_out =
+        bus.publisher_declared(HumanDoing::TOPIC, &HumanDoing::declaration(), BUS_NAME)?;
+    let mut seen_out =
+        bus.publisher_declared(DoingSeen::TOPIC, &DoingSeen::declaration(), BUS_NAME)?;
     let opt_in_file = opt_in::File::in_folder(&config.opt_in_folder);
     let record = opt_in::Record::in_folder(&config.state_folder);
     let mut kept = lamp_msgs::consent::Kept::default();
@@ -272,26 +392,57 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
     let mut readings = Readings::default();
     let mut said_back = SaidBack::default();
     let mut mouth = SayService::new(config.say_socket.clone());
+    // Activity's bursts, given the account; else the copies are dropped.
+    let outlet = match config.account.as_ref() {
+        None => Outlet::Discard(Discard),
+        Some((account, key, public_key)) => {
+            let endpoint =
+                Endpoint::from_files(account, key).and_then(|endpoint| match public_key {
+                    Some(pem) => endpoint.with_public_key_file(pem),
+                    None => Ok(endpoint),
+                });
+            match endpoint {
+                Ok(endpoint) => {
+                    eprintln!("lamp-seen: activity's bursts go to {}", endpoint.socket_url);
+                    Outlet::Activity(Box::new(Activity::new(endpoint, Pace::default())))
+                }
+                Err(error) => {
+                    eprintln!("lamp-seen: no activity sent: {error}");
+                    Outlet::Discard(Discard)
+                }
+            }
+        }
+    };
+    let every_us = match outlet {
+        Outlet::Activity(_) => activity::SPACING_US,
+        Outlet::Discard(_) => frames::EVERY_US,
+    };
     // No frame without the ring's mark: no mark asked for, no frames.
     let mut frames: Option<Frames> = match config.frames.as_ref() {
         None => None,
         Some((socket, own, controller)) => Some((
-            Taker::new(FrameClient::new(
-                socket,
-                Role::Perception,
-                *own,
-                *controller,
-                lamp_camera::MAX_FRAME_BYTES,
-            )),
-            Marked::new(BusRing::on(&bus, boot_clock_id())?, Discard),
+            Taker::with_every(
+                FrameClient::new(
+                    socket,
+                    Role::Perception,
+                    *own,
+                    *controller,
+                    lamp_camera::MAX_FRAME_BYTES,
+                ),
+                every_us,
+            ),
+            Marked::new(BusRing::on(&bus, boot_clock_id())?, outlet),
         )),
     };
+    let mut sitting: Option<Sitting> = None;
+    let mut doing_said: Option<Instant> = None;
     let started = Instant::now();
     let mut said_at: Option<Instant> = None;
     let mut last_gate = None;
     while !stop.load(Ordering::Relaxed) && config.run_for.is_none_or(|run| started.elapsed() < run)
     {
-        if inputs.read(&mut readings) {
+        let came = inputs.read(&mut readings);
+        if came.forgot {
             latch.forgot(unix_s());
             eprintln!(
                 "lamp-seen: a forget came: the opt-in is off until its kept yes is removed or given again"
@@ -338,8 +489,58 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             );
             last_gate = Some(gate);
         }
+        // The sitting: begun when one remembered face is at the desk
+        // (whatever the opt-in, its said-back line, the privacy or sleep
+        // say), ended on room/stood_up and when nobody or a stranger is
+        // there. Frames still go only under `gate`, said-back included.
+        let desk = gate::may_request(&gate::Inputs {
+            opted_in: true,
+            said_on: true,
+            privacy_open: Some(true),
+            asleep: Some(false),
+            ..readings.inputs(opted_in, said_on, now)
+        });
+        if (came.stood_up || matches!(desk, Err(gate::Closed::Nobody | gate::Closed::Stranger)))
+            && sitting.take().is_some()
+        {
+            doing_said = None;
+        }
+        if desk.is_ok() && sitting.is_none() {
+            sitting = Some(Sitting::new(inputs.arrived_us(now)));
+        }
         if let Some((taker, marked)) = frames.as_mut() {
+            if let Outlet::Activity(activity) = marked.inner_mut()
+                && let Some(finished) = activity.poll(now)
+            {
+                match finished.outcome {
+                    Outcome::Answered => {}
+                    Outcome::Busy => eprintln!("lamp-seen: the server is busy: the burst dropped"),
+                    Outcome::Failed(failure) => {
+                        eprintln!("lamp-seen: a burst failed ({})", failure.as_str())
+                    }
+                }
+                if let Some(sitting) = sitting.as_mut() {
+                    for newly in sitting.saw(&finished.seen, now) {
+                        if newly.check().is_ok() {
+                            let _ = seen_out.publish_json(now, &newly);
+                        }
+                    }
+                    if !finished.seen.is_empty() {
+                        // Said at once, not at the next 30 s.
+                        doing_said = None;
+                    }
+                }
+            }
             taker.step(gate, now, marked);
+        }
+        if let Some(sitting) = sitting.as_ref()
+            && doing_said.is_none_or(|at| at.elapsed() >= HumanDoing::EVERY)
+        {
+            let doing = sitting.doing(now);
+            if doing.check().is_ok() {
+                let _ = doing_out.publish_json(now, &doing);
+            }
+            doing_said = Some(Instant::now());
         }
         if said_at.is_none_or(|at| at.elapsed() >= HEALTH_EVERY) {
             health(&mut diagnostics, gate, frames.as_ref());
@@ -415,7 +616,34 @@ mod tests {
         )))
         .unwrap();
         assert!(config.frames.is_some());
+        assert!(config.account.is_none());
         assert_eq!(config.run_for, Some(Duration::from_millis(5)));
+        let config = parse(args(&format!(
+            "serve --frames-socket /run/x/camera.frames --own-boot {hex} --controller-boot {hex} --account /run/c/account --key /run/c/key"
+        )))
+        .unwrap();
+        assert_eq!(
+            config.account,
+            Some((
+                PathBuf::from("/run/c/account"),
+                PathBuf::from("/run/c/key"),
+                None
+            ))
+        );
+        for bad in [
+            "serve --account /a --key /k".to_owned(),
+            format!(
+                "serve --frames-socket /x --own-boot {hex} --controller-boot {hex} --account /a"
+            ),
+            format!(
+                "serve --frames-socket /x --own-boot {hex} --controller-boot {hex} --account /a --key k"
+            ),
+            format!(
+                "serve --frames-socket /x --own-boot {hex} --controller-boot {hex} --public-key-file /p"
+            ),
+        ] {
+            assert!(parse(args(&bad)).is_err(), "{bad}");
+        }
         for bad in [
             "",
             "run",
