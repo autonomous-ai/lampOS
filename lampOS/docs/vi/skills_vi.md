@@ -2602,7 +2602,29 @@ vụ lần chạy (#6432, #6306). Chi tiết đầy đủ ở
   ở lần kích hoạt sau; mỗi lần hỏi đã nói đều có việc chờ riêng. Việc chờ là
   của read-back, đủ mọi cổng: nói trọn trước, một câu nghe được sau đó, giữ
   tiếng vọng, `YES_WITHIN`, `approve_id` được ghi chú ở các câu nghe sau, và
-  chỉ cái "có" của chủ đèn. Mỗi lúc chỉ một việc chờ, như mọi read-back: việc
+  chỉ cái "có" của chủ đèn. Câu của người ngay sau đó bị buộc vòng 1 gọi
+  `make_skill` (`tool_choice`, `skill_write_yes::approve_force`, khi
+  `make_skill` được khai báo và công tắc bật, trước mọi lực buộc khác), mà
+  form `approve_id` của nó nhận thêm `answer`: `yes`, `no` hoặc `unclear` (bỏ trống: `yes` với
+  thao tác ghi hay code của kỹ năng tự tạo, như trước; `unclear` với task
+  của kỹ năng, để một lời gọi bị ép mà không có câu trả lời không bao giờ
+  giữ một lời đồng ý). Code quyết định khi nào; mô hình quyết định cái gì
+  (#6835 khoảng trống 2, phương án (b) của first builder trên #6811; trên
+  lamp-52e6 ngày 13/11, sau một `use_skill` mô hình tự bắt đầu, mô hình trả
+  lời câu "Yes." của chủ đèn bằng "Want me to go ahead with that?" và không
+  gọi gì). Lực buộc chỉ giữ khi việc chờ của một tác vụ (không bao giờ là
+  write hay code của kỹ năng tự tạo) còn trong `YES_WITHIN` và câu trả lời
+  mới nhất của đèn được giữ cho nó chứa trọn câu đọc lại, không bị cắt: nên
+  chỉ cho đúng một vòng đó, không bao giờ sau câu đọc lại bị cắt hay thiếu,
+  không trong chính lượt đọc lại, không khi không có gì chờ. `yes` đi qua
+  việc duyệt với mọi cổng ở trên; `no` không giữ gì, kết thúc việc chờ và
+  đèn nói nó vẫn tắt (`skill_write_yes::DECLINED_NEXT`); `unclear` không
+  giữ gì và đèn hỏi lại một lần (`UNCLEAR_NEXT`), và `unclear` lần hai kết
+  thúc việc chờ như một `no` (`skill_write_yes::answered`). Journal: "the
+  line after a skill's task said back whole: its first round must call
+  make_skill", rồi các dòng của việc duyệt, hoặc "the answer to NAME's
+  say-back was no: nothing kept, it stays off" / "… was unclear: nothing
+  kept, asked once more". Mỗi lúc chỉ một việc chờ, như mọi read-back: việc
   chờ mới hơn thay thế nó. Route Live không bao giờ bắt đầu nó. Khi có
   "có", lamp-control ghi đúng SHA-256 thư mục và các grant đó, và tác vụ
   chạy ở lần kích hoạt kế tiếp. Mô hình được bảo chỉ nói đúng điều đó, không

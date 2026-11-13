@@ -689,6 +689,13 @@ fn parameters_with(writes: bool, tasks: bool, code: bool) -> Value {
             "type": "string",
             "description": "Only when a skill you just made or read back waits for the person's yes and they then agree, in any words: its approve_id, given alone with no request."
         });
+        // What the person answered (#6835 gap 2): a call made in code's
+        // turn may be a no or unclear, never only a yes.
+        parameters["properties"][crate::skill_write_yes::ANSWER] = json!({
+            "type": "string",
+            "enum": crate::skill_write_yes::ANSWERS,
+            "description": "With approve_id only: what the person's words answered the say-back, in any words: yes when they agree, no when they decline or wait, unclear when you can't tell. Left out: yes for a made skill's writes or code, unclear for a skill's task."
+        });
         parameters["required"] = json!([]);
     }
     if writes || tasks {
@@ -2632,6 +2639,14 @@ pub fn answer(
     // The person's yes to a made skill's writes (#6066): the waiting
     // skill's, in a later heard line, approved by the voice itself.
     if let Some(id) = call.args[crate::skill_write_yes::APPROVE_ID].as_str() {
+        // A no, or an unclear answer (#6835 gap 2): nothing is kept.
+        if let Some(told) = crate::skill_write_yes::answered(
+            id,
+            request,
+            call.args[crate::skill_write_yes::ANSWER].as_str(),
+        ) {
+            return told;
+        }
         // Every made skill's wait: only the owner's yes (#6307, #6558).
         if let Some(refused) = not_owners_yes_refused(id, || {
             crate::services::owners_yes_now(request, heard, lease)
