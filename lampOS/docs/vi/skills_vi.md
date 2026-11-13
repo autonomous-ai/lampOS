@@ -934,7 +934,24 @@ sau:
    lời từ chối khác hay một lần gửi. Ngày của trigger một lần mỗi ngày vẫn
    được giữ là đã nhận. Journal ghi `SKILL sent nothing: its group's hour,
    cooldown, day's count and rest are given back`. Test:
-   `a_write_waiting_for_the_owners_yes_spends_nothing`. Journal chỉ giữ kết
+   `a_write_waiting_for_the_owners_yes_spends_nothing`. **Qua tác tử của
+   đèn** (`LAMP_SKILL_WRITE_AGENT=on` cùng `LAMP_AGENT_SERVICES=on`, tắt,
+   không bật trong unit sản phẩm nào; quyết định của chủ đèn, 13/11):
+   `lamp-skills` không bao giờ gọi `lamp-services` cho lệnh ghi đó, mà trao
+   nó cho lamp-tasks qua socket của `do.task` (`--tasks-socket`) như một
+   lượt chạy của kỹ năng với một quyền duy nhất, `<code>-write`, và đúng nội
+   dung của nó (`service_write::hand`); tác tử gửi nó qua `service_write`, và
+   `lamp-services` giữ nó theo cùng lời đồng ý, liên kết, giới hạn và nhật ký
+   đã gửi, một lần mỗi lượt chạy. Journal ghi lượt chạy ra sao ("handed to
+   the lamp's agent: its run ended, task N"). Khi tác tử không nhận được nó
+   (không biết thư mục, không có `--tasks-socket`, không tới được lamp-tasks,
+   hoặc bị từ chối trước khi tác tử bắt đầu, trong đó có Harness đã đăng
+   xuất hay không có Hermes: `service_write::NOT_TAKEN`), nó được gửi thẳng
+   như trên, kèm một dòng journal nói lý do (quyết định của first builder
+   trên #6823); một khi lượt chạy có thể đã bắt đầu thì không bao giờ
+   (`service_write::hand`: không bao giờ gửi hai lần). Một lệnh ghi gửi qua
+   tác tử mà đang chờ lời đồng ý chỉ được báo cho tác tử, nên phần đã tiêu
+   khi bắt đầu không được trả lại. Tắt thì nó đi như trên. Journal chỉ giữ kết
    quả, không bao giờ có người nhận hay nội dung
    ([services_vi.md](services_vi.md), "Một kỹ năng tự tạo ghi vào dịch
    vụ").

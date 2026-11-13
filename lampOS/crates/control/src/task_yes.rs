@@ -234,6 +234,44 @@ pub struct KeptYes {
     pub state: std::path::PathBuf,
     pub skills: std::path::PathBuf,
     pub on: bool,
+    /// `LAMP_SKILL_WRITE_AGENT=on` ([`WRITE_AGENT_ENVIRONMENT`]): a skill
+    /// with no yes here whose only step is a fixed write
+    /// (`lamp_skills::service_write::fixed_write_of`) is minted its one
+    /// grant, its service's `-write` ([`KeptYes::fixed_write_grant`]).
+    pub write_agent: bool,
+}
+
+/// A made skill's fixed write run through the lamp's agent (the owner's
+/// ruling, 13 Nov): `on` only, here and in lamp-skills, lamp-tasks and
+/// lamp-services; on in no product unit.
+pub const WRITE_AGENT_ENVIRONMENT: &str = lamp_skills::service_write::AGENT_ENVIRONMENT;
+
+/// Whether [`WRITE_AGENT_ENVIRONMENT`] is on in this process.
+pub fn write_agent_on() -> bool {
+    std::env::var(WRITE_AGENT_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+impl KeptYes {
+    /// The one grant of `skill`'s fixed write's run, with
+    /// [`KeptYes::write_agent`] and no task yes kept for it: its service's
+    /// `-write`, read from its folder ([`folder_of`]). No yes is read here:
+    /// the owner's yes to that write is lamp-services', kept in root's store
+    /// and matched there on its exact content at the send, once a run.
+    fn fixed_write_grant(&self, skill: &str) -> Option<Grant> {
+        if !self.write_agent
+            || !name_ok(skill)
+            || yeses(&self.state).iter().any(|yes| yes.name == skill)
+        {
+            return None;
+        }
+        let folder = folder_of(&self.skills, skill);
+        if !std::fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir()) {
+            return None;
+        }
+        let write = lamp_skills::service_write::fixed_write_of(&folder)?;
+        crate::protocol::ServiceGrant::of(&write.service, crate::protocol::Access::Write)
+            .map(Grant::Service)
+    }
 }
 
 impl crate::runs::SkillYes for KeptYes {
@@ -245,7 +283,10 @@ impl crate::runs::SkillYes for KeptYes {
             return Err(format!("{skill:?} is not a skill's name"));
         }
         if !yeses(&self.state).iter().any(|yes| yes.name == skill) {
-            return Err(NO_YES.into());
+            return match self.fixed_write_grant(skill) {
+                Some(grant) => Ok(BTreeSet::from([grant])),
+                None => Err(NO_YES.into()),
+            };
         }
         let folder = folder_of(&self.skills, skill);
         if !std::fs::symlink_metadata(&folder).is_ok_and(|meta| meta.is_dir()) {
@@ -266,6 +307,10 @@ impl crate::runs::SkillYes for KeptYes {
                     .map_err(|_| format!("grants: {grant:?} is not a grant"))
             })
             .collect()
+    }
+
+    fn fixed_write(&self, skill: &str) -> bool {
+        self.on && self.fixed_write_grant(skill).is_some()
     }
 }
 
@@ -609,6 +654,7 @@ mod tests {
             state: state.clone(),
             skills: skills.clone(),
             on: true,
+            write_agent: false,
         };
         assert_eq!(kept.grants("photo-booth").unwrap_err(), NO_YES);
         let sha256 = lamp_skills::task::folder_sha256(&booth).unwrap();
@@ -635,6 +681,7 @@ mod tests {
             state: state.clone(),
             skills: skills.clone(),
             on: false,
+            write_agent: false,
         };
         assert_eq!(off.grants("photo-booth").unwrap_err(), OFF);
         // A yes for fewer grants than the folder declares names none of them.
@@ -668,6 +715,57 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// LAMP_SKILL_WRITE_AGENT (the owner's ruling, 13 Nov): a skill whose
+    /// only step is a fixed write, with no task yes here, is minted its one
+    /// grant, its service's `-write`, and marked a fixed write's; off, or
+    /// for a skill with any other step, nothing.
+    #[test]
+    fn a_fixed_writes_run_is_minted_its_one_write_grant() {
+        use crate::runs::SkillYes as _;
+        let dir = folder("fixed");
+        let state = dir.join("state");
+        let skills = dir.join("skills");
+        std::fs::create_dir_all(&state).unwrap();
+        let arrive = skills.join("arrive-mail");
+        std::fs::create_dir_all(&arrive).unwrap();
+        std::fs::write(
+            arrive.join("SKILL.md"),
+            "---\nname: arrive-mail\ndescription: Mails my boss.\n---\n",
+        )
+        .unwrap();
+        std::fs::write(
+            arrive.join("skill.toml"),
+            "version = \"1.0.0\"\n[permissions]\nservices = { gmail-app = \"write\" }\n\
+             [[do]]\nwrite = { service = \"gmail-app\", action = \"send_mail\", \
+             to = [\"boss@work.test\"], subject = \"In\", text = \"I'm at my desk.\" }\n",
+        )
+        .unwrap();
+        let kept = |on: bool, write_agent: bool| KeptYes {
+            state: state.clone(),
+            skills: skills.clone(),
+            on,
+            write_agent,
+        };
+        let gmail_write = Grant::Service(
+            crate::protocol::ServiceGrant::of("gmail", crate::protocol::Access::Write).unwrap(),
+        );
+        assert_eq!(
+            kept(true, true).grants("arrive-mail").unwrap(),
+            BTreeSet::from([gmail_write])
+        );
+        assert!(kept(true, true).fixed_write("arrive-mail"));
+        // Off, or the skills' tasks off: nothing, as before.
+        assert_eq!(kept(true, false).grants("arrive-mail").unwrap_err(), NO_YES);
+        assert!(!kept(true, false).fixed_write("arrive-mail"));
+        assert_eq!(kept(false, true).grants("arrive-mail").unwrap_err(), OFF);
+        assert!(!kept(false, true).fixed_write("arrive-mail"));
+        // A task's skill is never a fixed write's: its own yes, as before.
+        task_skill(&skills, "photo-booth", r#"["camera"]"#);
+        assert_eq!(kept(true, true).grants("photo-booth").unwrap_err(), NO_YES);
+        assert!(!kept(true, true).fixed_write("photo-booth"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     /// A skill the owner's computer pushed (`skills-dev/<name>`, beside the
     /// lamp's skills): minted from the yes for its folder as lamp-control
     /// hashes it there, with the same checks. A changed script asks again,
@@ -688,6 +786,7 @@ mod tests {
             state: state.clone(),
             skills: skills.clone(),
             on: true,
+            write_agent: false,
         };
         assert_eq!(folder_of(&skills, "photo-booth"), booth);
         assert_eq!(kept.grants("photo-booth").unwrap_err(), NO_YES);

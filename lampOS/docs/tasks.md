@@ -3031,6 +3031,38 @@ engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
 
+### A made skill's fixed write on the lamp's Hermes (`LAMP_SKILL_WRITE_AGENT`, off)
+
+The owner's ruling (13 Nov): everything that touches a linked service runs
+through the lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`,
+on in no product unit) and `LAMP_AGENT_SERVICES=on` in lamp-tasks, the
+hand-over socket also takes a made skill's fixed write (`do.write`, docs/skills.md)
+as a run (`skill_task::WriteHandOver`, `answer_with`):
+
+- **The line:** `{"op":"skill_write","skill","folder","grants","write"}`,
+  every field needed and no other taken. `skill` and `folder` are checked
+  as a task's; `grants` is exactly one, the write's own service's `-write`
+  (`gmail-app` and `figma-api` as `gmail` and `figma`); `write` is an
+  object with a `service` and an `action`, at most 8 KiB as JSON. Anything
+  else is `bad_request`, and no token is asked for.
+- **The run** is a task's (`run_on_token`, the same mint, grant check, end
+  and runner): lamp-control mints its token for that one grant (docs/control.md),
+  and Hermes is told to call `lamp-services`' `service_write` once with
+  exactly that content, quoted as data, never again whatever it answers.
+  lamp-services sends it only as the owner's kept yes has it, once a run
+  (docs/services.md, "Through the lamp's agent").
+- **Off** (either switch), a `skill_write` line is refused as before:
+  `bad_request`, "not a skill's task line".
+- **Not started** (#6823): a fixed write's run that fails before its agent
+  may have begun (`SkillRun::started`, set by the runner as it asks
+  Harness to launch, unless Harness never sent it, or once Hermes is
+  spawned: no Harness, no target, an old wrapper) is refused `not_started`
+  (`skill_task::NOT_STARTED`) in the runner's words, so lamp-skills sends
+  the write straight itself; one that fails after is `run_failed`, its
+  send's outcome unknown, and lamp-skills tries nothing more. A task's run
+  is `run_failed` either way, as before. Test:
+  `a_fixed_write_runs_on_its_one_grant_with_its_exact_content`.
+
 ## Devin (#1854)
 
 `devin` is Devin's own terminal program on the person's computer, which

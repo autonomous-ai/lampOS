@@ -2223,6 +2223,68 @@ whole):
 - A contact named without an address: the lamp keeps no contact book, so
   the making model asks for the address.
 
+### Through the lamp's agent (`LAMP_SKILL_WRITE_AGENT`, off)
+
+The owner's ruling (13 Nov, here in chat; the first builder's task asked on
+Queue #6809): everything that touches a linked service runs through the
+lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`, on in no
+product unit), and `LAMP_AGENT_SERVICES=on`, a made skill's fixed write is
+sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
+
+- **lamp-skills** never calls this program for it. It hands the write to
+  lamp-tasks on the `do.task` socket as
+  `{"op":"skill_write","skill","folder","grants":["<code>-write"],"write":<the exact content>}`
+  (`service_write::hand`), one grant, its service's `-write`
+  (`skill_writes::run_grant`, `gmail-app` as `gmail`).
+- **lamp-tasks** checks the line as a task's (its skill, its folder, the one
+  grant matching the write's service, at most 8 KiB of content) and runs it
+  as a task (`skill_task::WriteHandOver`): a token minted by lamp-control and
+  held to that one grant, and Hermes told to call `service_write` once with
+  exactly that content, quoted as data.
+- **lamp-control** mints a skill with no task yes whose only `[[do]]` step
+  is a fixed write (`service_write::fixed_write_of`) its one `-write` grant
+  (`task_yes::KeptYes::fixed_write_grant`) and marks the run a fixed
+  write's; its `service.write` comes here with the run's id
+  (`fixed_write_run`). No yes is read there: the owner's yes to the write is
+  this program's.
+- **Here**, a call carrying `fixed_write_run` goes only through the same
+  `skill_write` as `lamp-skills`' call (`serve::Services::run_fixed_write`):
+  the owner's kept yes matched on that exact content (a run that changes a
+  field is refused "not sent: this write is not the one the owner said yes
+  to", never held for a spoken yes), the link it was said under, the day's
+  bounds (10 a skill, 30 in all) and the sent-log, and **once a run**: a
+  second try, whatever it sends, is refused ("not sent: a skill's fixed
+  write is sent once a run …"). The agent is told "Sent, as the owner said
+  yes to it." Any other call of that run is refused, and with the switch
+  off here such a call is refused and nothing is sent.
+- **The direct send stays the fallback** (the first builder's ruling on
+  #6823: no lamp loses a send it has today). When the agent couldn't take
+  the write, `lamp-skills` sends it straight to this program as with the
+  switch off, with every check above, and journals one line: "the lamp's
+  agent couldn't take its write (…), so it goes straight to lamp-services".
+  That is: no folder or no `--tasks-socket`, lamp-tasks not connected, or
+  lamp-tasks refusing it before its agent began (`off`, `bad_request`,
+  `too_long`, `no_token`, `busy`, or `not_started`: Harness signed out or
+  not set up, no Hermes target, a launch Harness never sent;
+  `service_write::NOT_TAKEN`). **Never two sends:** once the run may have
+  begun (`run_failed`, its answer lost or unreadable) nothing more is
+  tried, and a run that ended is its outcome, its send refused here for
+  its content or a cap among it.
+- **Off** (the default), the write goes as above, byte for byte as before.
+  It stays off until a 9adf row shows a send on arrival, a changed content
+  refused, the 11th send refused and the fallback with Harness signed out;
+  a lamp with no Harness falls back on every write until a run can go
+  without Harness (#6685's PR 3).
+
+Set it alike in lamp-skills, lamp-tasks, lamp-control and lamp-services.
+Tests: `a_fixed_write_is_handed_to_lamp_tasks_with_its_one_grant`,
+`a_write_the_agent_couldnt_take_is_sent_straight_once`,
+`no_straight_send_once_the_agents_run_began`,
+`a_fixed_write_runs_on_its_one_grant_with_its_exact_content`,
+`a_fixed_writes_run_is_minted_its_one_write_grant`,
+`a_fixed_writes_run_names_its_run_to_lamp_services`,
+`a_fixed_writes_run_sends_the_approved_content_once_within_the_bounds`.
+
 ## A skill's run on the lamp's Hermes (#6432, `LAMP_SKILL_TASKS`, on in the product)
 
 A skill that uses a linked service is run by the lamp's Hermes with that
@@ -2430,7 +2492,10 @@ never through an open socket.
   owner's yes: nothing is sent". The voice reads the held write back
   (`run_write_yes`, "Your <skill> skill wants to send: …") and waits for the
   owner's plain spoken yes (#6558's wait); only then does this program send
-  it, counted in the skills' bounds (3 a day a skill, 10 across them).
+  it, counted in the skills' bounds (3 a day a skill, 10 across them). A
+  made skill's fixed write run through the agent (`LAMP_SKILL_WRITE_AGENT`,
+  off) is the one write sent on a run's call, and only as the owner's kept
+  yes has it, once ("A made skill's write", "Through the lamp's agent").
 - **The journal** gets a refusal's length only from the server; the parts it
   calls journal the service and the `what` or `action`, never the text, an
   address or a subject.
