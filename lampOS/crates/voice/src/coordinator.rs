@@ -1532,10 +1532,16 @@ impl Reply {
             && self.settled(speaker_pending)
             && self.notice.retired();
         // A reminder that played through gaps and counts as said
-        // (#5258) is spoken on the same proof.
+        // (#5258) is spoken on the same proof. Any other model's say that
+        // played to its end through gaps is spoken too: every word of it
+        // played, nobody took the turn over it and the mic was allowed
+        // (#6749 D: a skill task's ask said whole was answered `dropped`
+        // for its gaps, so lamp-skills counted it unsaid and asked again
+        // 10 min later). Only a cut, a failed answer or no audio drops it.
         let played_whole = sound
             || self.heard_whole(speaker_pending, snapshot)
-            || self.said_through_gaps(speaker_pending, snapshot);
+            || self.said_through_gaps(speaker_pending, snapshot)
+            || self.reminder.is_none() && self.heard_through(speaker_pending, snapshot);
         // complete_reminder runs first. Read its resulting settlement, not the
         // pre-completion eligibility that successful completion consumes.
         let reminder_complete = self

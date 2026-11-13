@@ -7155,7 +7155,9 @@ fn to_the_end(said_ago: Option<Duration>, ended_ago: Option<Duration>) -> Option
 /// goes on only by the thread's window or the person's call
 /// (`thread_or_call`), and then only [`BUSY_GOING_ON_FOR`] from the end of
 /// the lamp's last words (`said_ago`) or [`CALL_CARRIES_FOR`] from the
-/// call (`called_ago`). The quiet room's [`AFTER_THE_LAMPS_WORDS`]
+/// call (`called_ago`); or, while a skill's yes is awaited after its
+/// say-back (`yes_going_on`, #6749 C), the thread's 45 s from that
+/// answer's end as played. The quiet room's [`AFTER_THE_LAMPS_WORDS`]
 /// ([`going_on_from`]) never counts there: after an answer of 30 s or more
 /// it let office talk out in the 15 s after the words (the first builder's
 /// agent on #2032, 03:09). When none is going on, the journal says why,
@@ -7167,14 +7169,15 @@ fn went_on_told(
     said_ago: Option<Duration>,
     called_ago: Option<Duration>,
     left_alone: Option<usize>,
-    thread_or_call: bool,
+    (thread_or_call, yes_going_on): (bool, bool),
     ran_for: Duration,
 ) -> Signs {
     let busy = signs.room == crate::room_told::Room::Busy;
     if busy {
-        signs.going_on &= thread_or_call
-            && (said_ago.is_some_and(|ago| ago <= BUSY_GOING_ON_FOR)
-                || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR));
+        signs.going_on &= yes_going_on
+            || thread_or_call
+                && (said_ago.is_some_and(|ago| ago <= BUSY_GOING_ON_FOR)
+                    || called_ago.is_some_and(|ago| ago <= CALL_CARRIES_FOR));
     }
     if !signs.going_on {
         let ago = |ago: Option<Duration>, what: &str| {
@@ -9943,6 +9946,22 @@ impl Heeding {
         };
         let said_going_on = said_going_on
             || at_start(held_ago).is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
+        // A skill's yes awaited after its say-back said whole (#6749 C): the
+        // thread's window counts from the end of that answer as played, not
+        // from its start, in a busy room too, and the line answers the
+        // lamp's own ask. A long read-back and a repair used up the 45 s
+        // from the answer's start, and the "Yes." 8 s after its end was
+        // held (9adf, 13 Nov).
+        let yes_awaited = crate::skill_write_yes::answer_awaited(request, now);
+        let yes_going_on =
+            yes_awaited && at_start(said_ago).is_some_and(|ago| ago <= crate::thread::GOING_ON_FOR);
+        if yes_going_on && !said_going_on {
+            eprintln!(
+                "lamp-voice second: request {request}: a skill's yes is awaited: the conversation goes on {} s from the end of its say-back as played (#6749)",
+                crate::thread::GOING_ON_FOR.as_secs()
+            );
+        }
+        let said_going_on = said_going_on || yes_going_on;
         let going_on = going_on_from(said_going_on, at_start(said_ago), at_start(called_ago));
         // `LAMP_NAME_OR_FOLLOW_UP`: whether the line is a follow-up begun
         // while the lamp's words played or soon after them, or its call,
@@ -9958,7 +9977,7 @@ impl Heeding {
         let mut signs = Signs {
             room: crate::room_told::Room::Unknown,
             going_on,
-            lamp_asked,
+            lamp_asked: lamp_asked || yes_awaited,
             turned: None,
             names: Vec::new(),
             near: self
@@ -10042,7 +10061,7 @@ impl Heeding {
             // Oct, follow-ups begun about 7 s after their asks, as the
             // answers played, went unanswered.
             if switch && signs.room == crate::room_told::Room::Busy {
-                signs.going_on = goes || carry;
+                signs.going_on = goes || carry || yes_going_on && !talked_past;
                 if carry && !goes {
                     // Its start decides, as a follow-up's does: a line begun
                     // in the window may be judged after it.
@@ -10078,7 +10097,7 @@ impl Heeding {
                 said_ago,
                 called_ago,
                 left_alone,
-                thread_or_call,
+                (thread_or_call, yes_going_on),
                 line_ran,
             )
         };
@@ -13883,6 +13902,112 @@ mod tests {
         *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
     }
 
+    /// #6749 C, 9adf on 13 Nov: a code make's 477-char read-back and a
+    /// repair, its answer begun 56 s before the "Yes.", its words ended 8 s
+    /// before it, in a busy room: the thread's 45 s from the answer's start
+    /// had passed, the call too, so the yes was held ("no conversation going
+    /// on … where it goes on 15 s", then "a busy room"). While the skill's
+    /// yes is awaited after its say-back said whole, the window counts from
+    /// the end of those words, and the "Yes." answers the lamp's own ask: it
+    /// is let out, by the route's own windows and with
+    /// `LAMP_NAME_OR_FOLLOW_UP` alike. Without the wait, or past the 45 s
+    /// from the words' end, or with the say-back cut, it is held as before.
+    #[test]
+    fn a_yes_after_a_long_read_back_counts_from_its_end_in_a_busy_room() {
+        let _one = crate::provider_worker::tests::one_thread();
+        let _clock = clock_with_history();
+        let s = Duration::from_secs;
+        let say_back = "it reads the processor's temperature every minute and sets the light \
+             to red above sixty degrees, blue below forty and white between them, using the \
+             light and the system's sensors, from code of its own that the lamp checked, said \
+             back to you now in full so you know exactly what it does before it runs any of it \
+             at all, and it keeps running only while you have it on, until you turn it off or \
+             ask me to remove it, which you can do at any time by asking me in a few words.";
+        assert!(say_back.len() > 400, "a long read-back");
+        // `wait`: none, said whole, or said cut. `follow_up`: the switch.
+        let judged = |wait: Option<bool>, ended_ago: u64, follow_up: bool| {
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            {
+                let mut told = crate::room_told::room().lock().unwrap();
+                for other in 901..=903 {
+                    told.unanswered(other, monotonic_us());
+                }
+                assert_eq!(told.at(monotonic_us()), crate::room_told::Room::Busy);
+            }
+            let asked = Instant::now() - s(60);
+            let answered = Instant::now() - s(56);
+            if let Some(cut) = wait {
+                crate::skill_write_yes::wait_for_yes(
+                    crate::skill_write_yes::Asks {
+                        skill: "temperature-light".into(),
+                        sha256: "ab".repeat(32),
+                        writes: Vec::new(),
+                        say_back: say_back.into(),
+                        grants: Some(vec!["light".into()]),
+                        code: true,
+                    },
+                    1,
+                    answered,
+                );
+                if cut {
+                    crate::skill_write_yes::lamp_cut(1);
+                }
+            }
+            let mut thread = crate::thread::Thread::new();
+            thread.person(
+                "Make a skill that checks the processor temperature.",
+                true,
+                asked,
+            );
+            thread.lamp(
+                1,
+                &format!("I made temperature light: {say_back}"),
+                answered,
+            );
+            *crate::thread::THREAD.lock().unwrap() = thread;
+            let mut heeding = Heeding::new(true, true, None, None);
+            heeding.as_the_only_voice(false, true, false);
+            if follow_up {
+                heeding.needing_name_or_follow_up();
+            }
+            heeding.called_at = Some(asked);
+            let now_us = monotonic_us();
+            heeding.lamp_did(crate::second_provider::Did::Said(
+                1,
+                now_us - ended_ago * 1_000_000,
+            ));
+            let held = heeding.heed(2, (now_us - 600_000, now_us), "Yes.", None);
+            *crate::room_told::room().lock().unwrap() = crate::room_told::RoomTold::new();
+            *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+            crate::skill_write_yes::clear_for_test();
+            held
+        };
+        for follow_up in [false, true] {
+            assert_eq!(
+                judged(Some(false), 8, follow_up),
+                None,
+                "{follow_up}: the yes 8 s after the say-back's end is let out"
+            );
+            assert_eq!(
+                judged(Some(false), 30, follow_up),
+                None,
+                "{follow_up}: 30 s after its end, inside the 45 s"
+            );
+            assert!(
+                judged(None, 8, follow_up).is_some(),
+                "{follow_up}: no yes awaited: held as before"
+            );
+            assert!(
+                judged(Some(true), 8, follow_up).is_some(),
+                "{follow_up}: the say-back cut: held as before"
+            );
+            assert!(
+                judged(Some(false), 50, follow_up).is_some(),
+                "{follow_up}: past 45 s from its end: held"
+            );
+        }
+    }
+
     /// The turn's own call carries no conversation past the close: a call
     /// let out at or before it is not `called_ago`; one after it is.
     #[test]
@@ -13993,8 +14118,30 @@ mod tests {
             continues_from: None,
             soft_lead_us: 0,
         };
-        assert!(went_on_told(5, busy(), said_ago, None, None, true, Duration::ZERO).going_on);
-        assert!(!went_on_told(5, busy(), Some(s(18)), None, None, true, Duration::ZERO).going_on);
+        assert!(
+            went_on_told(
+                5,
+                busy(),
+                said_ago,
+                None,
+                None,
+                (true, false),
+                Duration::ZERO
+            )
+            .going_on
+        );
+        assert!(
+            !went_on_told(
+                5,
+                busy(),
+                Some(s(18)),
+                None,
+                None,
+                (true, false),
+                Duration::ZERO
+            )
+            .going_on
+        );
         // No words in the thread: none, whatever was played.
         assert_eq!(to_the_end(None, Some(s(1))), None);
         assert_eq!(to_the_end(Some(s(30)), None), Some(s(30)));
@@ -14040,7 +14187,7 @@ mod tests {
                 Some(s(said)),
                 called.map(s),
                 None,
-                true,
+                (true, false),
                 Duration::ZERO,
             )
             .going_on
@@ -14064,7 +14211,7 @@ mod tests {
                 Some(s(10)),
                 None,
                 None,
-                false,
+                (false, false),
                 Duration::ZERO,
             )
             .going_on
@@ -17833,7 +17980,7 @@ mod tests {
             Some(Duration::from_secs(5)),
             None,
             None,
-            true,
+            (true, false),
             Duration::ZERO,
         );
         assert!(window.going_on, "inside the busy room's 15 s");
