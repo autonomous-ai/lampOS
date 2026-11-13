@@ -788,7 +788,15 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   nói, lượt được hỏi lại một lần với cùng ghi chú, và journal ghi `request
   N: named agent, called <tên> not start_agent_task: none run, asked again`
   (`agent_tasks_named::named_answered_by_an_own_tool_runs_none_and_is_asked_again_once`;
-  khi không nêu agent nào, công cụ riêng chạy như trước). Chỉ hỏi lại khi cửa sổ nối câu (`JOIN_WITHIN`, 3 s tính từ lúc bắt đầu
+  khi không nêu agent nào, công cụ riêng chạy như trước). Các công cụ việc
+  của agent (`confirm_agent_task`, `check_agent_task`, `tasks_now`, đọc trạng
+  thái) không phải công cụ riêng: "Hermes, go ahead and run it" được trả lời
+  bằng `confirm_agent_task` thì chạy như đã gọi, không hỏi lại (P1 của
+  Reviewer-lead trên #6786,
+  `agent_tasks_named::an_agent_task_tool_with_the_agent_named_runs_as_called`).
+  Lần bắt này cũng chờ hết cửa sổ nối câu bên dưới; câu mới bắt đầu trong đó
+  được journal ghi `…: a newer line began within the join window: none run,
+  not asked again`. Chỉ hỏi lại khi cửa sổ nối câu (`JOIN_WITHIN`, 3 s tính từ lúc bắt đầu
   trả lời, khoảng cuối câu nói) đã qua mà không có câu mới nào bắt đầu:
   nửa sau của một lời nhờ có ngắt nghỉ, bắt đầu trong cửa sổ đó, được nối
   vào nửa đầu (`LAMP_JOIN_CUT_WORDS`), và nửa đầu không bao giờ bị hỏi lại
