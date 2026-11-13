@@ -2,13 +2,18 @@
 // still clean up, a moving row waits for the page's yes, the keyring is try.js's alone. (Split from try-real.test.js; see
 // test/try-real-helper.js.)
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { FakeLamp } from '../src/testing.js';
 import { run, raw } from './try-real-helper.js';
+
+// The first child of `pid`, by one `ps` call both BSD (macOS) and GNU procps take: `ps --ppid` is procps only, and on macOS
+// it exits 1 with `illegal option -- -`.
+const childOf = (pid) => Number(execFileSync('ps', ['-A', '-o', 'pid=', '-o', 'ppid=']).toString().trim().split('\n')
+  .map((line) => line.trim().split(/\s+/).map(Number)).find(([, parent]) => parent === pid)?.[0]);
 
 const tryJs = new URL('../examples/twin/try.js', import.meta.url).pathname;
 
@@ -110,7 +115,6 @@ test('this run\'s scratch notes and clip come off the lamp when the real run end
 
 // What a terminal does: Ctrl-C reaches try.js AND (if it shared the group) the twin; then try.js asks the twin to end.
 test('a Ctrl-C that reaches both processes still takes this run\'s notes and clip off the lamp, and the exit is 0', async (t) => {
-  const { execFileSync } = await import('node:child_process');
   const fake = await FakeLamp.start({ grants: ['notes', 'speak'] });
   const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
   t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
@@ -128,7 +132,7 @@ test('a Ctrl-C that reaches both processes still takes this run\'s notes and cli
   assert.equal(fake.notes.get(client).size, 1);
   assert.equal(fake.clips.get(client).size, 1);
   // The twin is try.js's child, in a group of its own: a terminal's signal does not reach it, but send it anyway.
-  const twin = Number(execFileSync('ps', ['--ppid', String(real.child.pid), '-o', 'pid=']).toString().trim().split('\n')[0]);
+  const twin = childOf(real.child.pid);
   assert.ok(twin > 0, 'the twin is a child of try.js');
   assert.notEqual(Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(twin)]).toString().trim()), Number(execFileSync('ps', ['-o', 'pgid=', '-p', String(real.child.pid)]).toString().trim()), 'the twin has its own process group');
   process.kill(twin, 'SIGINT');
@@ -139,7 +143,6 @@ test('a Ctrl-C that reaches both processes still takes this run\'s notes and cli
 });
 
 test('if try.js dies without a word the twin cleans up and ends by itself', async (t) => {
-  const { execFileSync } = await import('node:child_process');
   const fake = await FakeLamp.start({ grants: ['notes'] });
   const home = mkdtempSync(join(tmpdir(), 'try-real-home-'));
   t.after(async () => { await fake.stop(); rmSync(home, { recursive: true, force: true }); });
@@ -153,7 +156,7 @@ test('if try.js dies without a word the twin cleans up and ends by itself', asyn
   for (let i = 0; i < 80 && !results.length; i += 1) await new Promise((r) => setTimeout(r, 50));
   socket.close();
   const [client] = [...fake.notes.keys()];
-  const twin = Number(execFileSync('ps', ['--ppid', String(real.child.pid), '-o', 'pid=']).toString().trim().split('\n')[0]);
+  const twin = childOf(real.child.pid);
   real.child.kill('SIGKILL');
   await real.ended;
   for (let i = 0; i < 100 && fake.notes.get(client).size > 0; i += 1) await new Promise((r) => setTimeout(r, 100));
