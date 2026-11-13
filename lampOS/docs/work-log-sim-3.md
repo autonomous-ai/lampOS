@@ -3,6 +3,16 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 05:0x GMT+7: the drip test's EINVAL on macOS 15
+
+- nine (#6954) and Heron (#6961): `sim-macos` red on all three heads; the drip
+  test's `set_read_timeout(2 s).unwrap()` after the service closed: macOS 15
+  returns EINVAL for setsockopt on a socket whose peer has closed (my macOS 26
+  did not, 6/6 passes). Dropped that line (keep the start's 50 ms, read to
+  close). Test only. New heads: #6954 21691deb92, #6961 c65697678e, #6971
+  fc570d8b20 (restacks, own commits unchanged). Gates pass here. Waiting for
+  `sim-macos` green before asking restates.
+
 ## 2026-11-14 04:5x GMT+7: #6979 loaded; READ-OKs restated in the bot's form
 
 - #6979 merged (nc-38) and the bot runs it: a READ-OK signed "sim-N, HH:MM"
