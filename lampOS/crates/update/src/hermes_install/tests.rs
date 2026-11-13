@@ -3488,8 +3488,17 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
         touch \"$H/.hermes/hermes-agent/x\" 2>/dev/null && echo WROTE-CHECKOUT\n\
         touch \"$H/.hermes/tools/x\" 2>/dev/null && echo WROTE-TOOLS\n\
         touch answer.md && touch \"$HOME/.hermes/memory.md\" && echo ANSWERED\n";
+    // On the lamp, Hermes's home and the work folder are mounts by now
+    // (moved from the staging); here they are made so, for `ro` to find.
+    let b = base.display();
+    let lines = make_lines(&base, checks).replacen(
+        &format!("W={b}/w\n"),
+        &format!("W={b}/w\nmount --bind {b}/h {b}/h && mount --bind {b}/w {b}/w || exit 1\n"),
+        1,
+    );
+    assert!(lines.contains("mount --bind"));
     let script = base.join("make-lines");
-    fs::write(&script, make_lines(&base, checks)).unwrap();
+    fs::write(&script, lines).unwrap();
     let out = std::process::Command::new("unshare")
         .args([
             "--map-root-user",
