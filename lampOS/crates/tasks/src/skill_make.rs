@@ -208,8 +208,14 @@ pub const CONFIG_FILE: &str = "config.yaml";
 /// recorded environment only under `<HERMES_HOME>/installs/<key>/environments`
 /// once resolved, and a link resolves to the lasting path the record
 /// names. lamp-update's namespace script ([`NS_HOME_LINE`]) shows both
-/// targets read-only, so nothing in them can be changed, and nothing else
-/// of the lasting home: never its memory, sessions or state.
+/// targets read-only, so nothing in them can be changed but what Hermes
+/// writes at every start, bound back read-write: each
+/// `installs/<key>/.install.lock` (`runtime_lock`) and each lease-managed
+/// generation's `installs/<key>/environments/<gen>/.leases`
+/// (`lease_directory`), and `installs/<key>/pm-runtime/.prepare.lock`
+/// (`pm/runtime.py` `prepare_runtime`) with its generations' `.leases`;
+/// and nothing else of the lasting home: never its
+/// memory, sessions or state.
 pub const RUNTIME_LINKS: [(&str, &str); 2] = [
     ("installs", "/var/lib/lampos-hermes/.hermes/installs"),
     ("tools", "/var/lib/lampos-hermes/.hermes/tools"),
@@ -239,7 +245,7 @@ pub const NS: &str = "/usr/local/lib/lampos/hermes-ns";
 /// held equal to it by a test): its mark, checked before every make, held or not.
 pub const WRAPPER_HOME_LINE: &str = "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n";
 /// The namespace script's line for it (`lamp_update::hermes_install::NS_HOME_LINE`).
-pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" || fail \"no make staging\"\n  mount --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount --bind \"$H/.hermes/tools\" \"$X/t\" || fail \"no Hermes tools\"\n  mount --bind \"$H/.hermes/installs\" \"$X/i\" || fail \"no Hermes installs\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount --move \"$X/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  mkdir \"$H/.hermes/installs\" && mount --move \"$X/i\" \"$H/.hermes/installs\" && ro \"$H/.hermes/installs\" || fail \"Hermes installs not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X\n";
+pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" || fail \"no make staging\"\n  mount -n --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount -n --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount -n --bind \"$H/.hermes/tools\" \"$X/t\" || fail \"no Hermes tools\"\n  mount -n --bind \"$H/.hermes/installs\" \"$X/i\" || fail \"no Hermes installs\"\n  k=\n  for p in \"$H/.hermes/installs\"/*/.install.lock; do\n    [ -f \"$p\" ] && [ ! -L \"$p\" ] || continue\n    mount -n --bind \"$p\" \"$X/i/${p#\"$H/.hermes/installs/\"}\" || fail \"Hermes install lock not shown\"\n    k=1\n  done\n  [ -n \"$k\" ] || fail \"no Hermes install lock: the lasting Hermes has not run\"\n  for p in \"$H/.hermes/installs\"/*/pm-runtime; do\n    [ -d \"$p\" ] || continue\n    [ -f \"$p/.prepare.lock\" ] && [ ! -L \"$p/.prepare.lock\" ] && mount -n --bind \"$p/.prepare.lock\" \"$X/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\" || fail \"Hermes runtime lock not shown\"\n  done\n  for p in \"$H/.hermes/installs\"/*/environments/*/.lease-managed \"$H/.hermes/installs\"/*/pm-runtime/generations/*/.lease-managed; do\n    [ -f \"$p\" ] || continue\n    g=${p%/.lease-managed}\n    { [ -d \"$g/.leases\" ] || mkdir \"$g/.leases\"; } && [ ! -L \"$g/.leases\" ] && mount -n --bind \"$g/.leases\" \"$X/i/${g#\"$H/.hermes/installs/\"}/.leases\" || fail \"Hermes leases not shown\"\n  done\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount -n --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount -n --move \"$X/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  mkdir \"$H/.hermes/installs\" && mount -n --move \"$X/i\" \"$H/.hermes/installs\" && ro \"$H/.hermes/installs\" || fail \"Hermes installs not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount -n --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X k p g\n";
 /// Said when Hermes's wrapper or namespace script has no make-home line.
 pub const NO_NAMESPACE: &str = "the lamp's Hermes can't be given a make's own home yet (its wrapper or namespace script has no make-home line: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
 
@@ -660,16 +666,28 @@ impl MakeHandOvers {
             write_answer(stream, &json!({"ok": true, "started": true}));
         });
         drop(place);
-        // The outcome's code only: never the rules or the answer.
-        match answered["ok"].as_bool() {
-            Some(true) => eprintln!("[lamp-tasks] skill make: the run ended with an answer"),
-            _ => eprintln!(
-                "[lamp-tasks] skill make: refused {}",
-                answered["error"].as_str().unwrap_or("?")
-            ),
-        }
+        eprintln!("{}", journal_line(&answered));
         write_answer(stream, &answered);
     }
+}
+
+/// The journal's line for a make's outcome: its code and, refused, the
+/// refusal's reason in one line. Every reason is a fixed form (a path or
+/// an exit status at most), never the rules or the answer.
+fn journal_line(answered: &Value) -> String {
+    if answered["ok"].as_bool() == Some(true) {
+        return "[lamp-tasks] skill make: the run ended with an answer".into();
+    }
+    let why: String = answered["message"]
+        .as_str()
+        .unwrap_or("?")
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    format!(
+        "[lamp-tasks] skill make: refused {}: {why}",
+        answered["error"].as_str().unwrap_or("?")
+    )
 }
 
 /// One of [`MOST_CONNECTIONS`] held while its thread lives.
@@ -1128,6 +1146,85 @@ mod tests {
         assert!(script.contains("L=/run/lampos-control/control.sock"));
         assert!(!script.contains("admin.sock"));
         assert!(script.contains("@NONE"));
+    }
+
+    /// Hermes 0.22.2 writes under `installs` at every start
+    /// (`hermes_cli/runtime_state.py`): `runtime_lock` opens
+    /// `<key>/.install.lock` `O_CREAT|O_RDWR`, and `lease_directory`
+    /// creates and flocks a lease in `<key>/environments/<gen>/.leases`;
+    /// its PM runtime (`pm/runtime.py` `prepare_runtime`) opens
+    /// `<key>/pm-runtime/.prepare.lock` `a+b` and leases
+    /// `<key>/pm-runtime/generations/<gen>/.leases`.
+    /// The make's namespace binds exactly those back read-write, from the
+    /// lasting home before it is hidden, onto the shown `installs` before
+    /// its read-only remount; no lock at all ends it before Hermes runs.
+    #[test]
+    fn a_make_may_write_hermess_install_lock_and_leases_only() {
+        let shown = NS_HOME_LINE.find("mount -n --move \"$X/i\"").unwrap();
+        let hidden = NS_HOME_LINE.find("none \"$H/.hermes\"").unwrap();
+        for bind in [
+            "mount -n --bind \"$p\" \"$X/i/${p#\"$H/.hermes/installs/\"}\"",
+            "mount -n --bind \"$p/.prepare.lock\" \"$X/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\"",
+            "mount -n --bind \"$g/.leases\" \"$X/i/${g#\"$H/.hermes/installs/\"}/.leases\"",
+        ] {
+            let at = NS_HOME_LINE.find(bind).expect(bind);
+            assert!(at < hidden && at < shown, "{bind}");
+        }
+        assert!(NS_HOME_LINE.contains("\"$H/.hermes/installs\"/*/.install.lock"));
+        assert!(NS_HOME_LINE.contains(
+            "\"$H/.hermes/installs\"/*/environments/*/.lease-managed \"$H/.hermes/installs\"/*/pm-runtime/generations/*/.lease-managed"
+        ));
+        assert!(NS_HOME_LINE.contains("\"$H/.hermes/installs\"/*/pm-runtime; do"));
+        assert!(NS_HOME_LINE.contains(
+            "[ -n \"$k\" ] || fail \"no Hermes install lock: the lasting Hermes has not run\""
+        ));
+        // Nothing else of `installs`, nor `tools`, is bound back.
+        assert_eq!(NS_HOME_LINE.matches("mount -n --bind").count(), 7);
+        for kept in [
+            "facts.json",
+            "publication.json",
+            "selected.json",
+            "venv",
+            "tools\"/",
+        ] {
+            assert!(!NS_HOME_LINE.contains(kept), "{kept}");
+        }
+        assert!(NS_HOME_LINE.contains("ro \"$H/.hermes/installs\""));
+        assert!(NS_HOME_LINE.contains("ro \"$H/.hermes/tools\""));
+    }
+
+    /// The make's lines run after `/run` is read-only, where util-linux
+    /// cannot write its utab: a `--move` without `-n` failed there on a
+    /// lamp ("Hermes checkout not shown"). Every mount the lines make is
+    /// `mount -n` (the `ro` helper's remounts passed there as they are).
+    #[test]
+    fn every_mount_a_makes_lines_make_skips_the_utab() {
+        assert_eq!(NS_HOME_LINE.matches("mount -n --move").count(), 4);
+        assert_eq!(
+            NS_HOME_LINE.matches("mount ").count(),
+            NS_HOME_LINE.matches("mount -n ").count()
+        );
+    }
+
+    /// A refused make is journalled with its code and its reason, in one
+    /// line; an answered one with no words of it.
+    #[test]
+    fn a_refused_make_is_journalled_with_its_reason() {
+        assert_eq!(
+            journal_line(&refusal(
+                "run_failed",
+                "the lamp's Hermes ended with status 1"
+            )),
+            "[lamp-tasks] skill make: refused run_failed: the lamp's Hermes ended with status 1"
+        );
+        assert_eq!(
+            journal_line(&refusal("no_answer", "a\nb")),
+            "[lamp-tasks] skill make: refused no_answer: a b"
+        );
+        assert_eq!(
+            journal_line(&json!({"ok": true, "answer": "THE ANSWER"})),
+            "[lamp-tasks] skill make: the run ended with an answer"
+        );
     }
 
     /// The first builder's 19:14 ruling: by default a make's run keeps the
