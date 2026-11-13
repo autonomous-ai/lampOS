@@ -34,7 +34,9 @@ A packaged skill adds `lamp-skill.json`, with `format: 1`, the skill's
 `crates/skills/src/package.rs`): the Store's, or for a package its author
 shares, the author's own, carrying their public key (`lamp-skills pack
 --key-file KEY --author`; skills.md, "A shared package"). A folder with a `run.py`, or any script,
-is refused: script skills are a later format.
+is refused: script skills are a later format, except the `scripts/` of a skill whose `[[do]]` has a
+`task = { task, run }` (format 2, with its top-level `grants`; skills.md, "A skill's task"): `lamp
+skill check` holds that as the lamp does, and a push may carry it.
 
 **`SKILL.md`** starts with front matter between two `---` lines. Two keys
 are read and both are required:

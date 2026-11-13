@@ -22,6 +22,13 @@
         "type": "string"
       }
     },
+    "grants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "What a do.task's script may reach through lamp-control: names of its grants, each once, never skills. Only beside a do.task; the lamp checks the names (docs/skills.md, 'A skill's task')."
+    },
     "kind": {
       "enum": [
         "core",
@@ -1553,6 +1560,25 @@
               }
             }
           ]
+        },
+        "task": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "task",
+            "run"
+          ],
+          "properties": {
+            "task": {
+              "type": "string",
+              "description": "The task's words, 1 to 500 bytes, no control characters."
+            },
+            "run": {
+              "type": "string",
+              "description": "The script, a plain file inside the skill's own scripts/ (at most four parts, none hidden)."
+            }
+          },
+          "description": "A task handed to the lamp's agent, alone in its [[do]] table, one a skill, in an installable skill (do.task, docs/skills.md)."
         }
       }
     },
