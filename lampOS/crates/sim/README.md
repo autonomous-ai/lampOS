@@ -136,9 +136,13 @@ characters. Each line says on stderr its characters, when its first bytes went
 and how much sound it made.
 
 The engine is macOS's `say`, one process a line, rendered whole before the
-first byte: measured on macOS 26 (arm64) through this service, 5 requests each,
-medians, first bytes after 715 ms for "Hi there.", 887 ms for 8 words and
-1,298 ms for 20. Off macOS there is no engine yet: a request is answered 503 with the reason (`say` is not found). A
+first byte; each `say` is started before its line comes (it waits on its
+stdin), so a line pays only its rendering, not the ~0.4 s start. Measured on
+macOS 26 (arm64) through this service, 5 requests each a second apart,
+medians, first bytes after 371 ms for "Hi there.", 517 ms for 8 words and
+828 ms for 20 (715, 887 and 1,298 ms with a `say` started with the line); a
+second line at the same moment starts its own and takes about 0.9 s. A killed
+run's leftover files are cleared at the next start. Off macOS there is no engine yet: a request is answered 503 with the reason (`say` is not found). A
 resident synthesizer that streams as it speaks is the next step.
 
 The real lamp-voice cannot use it yet: its service URLs must be https and it
