@@ -3,6 +3,28 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 05:5x GMT+7: lamp-voice's Linux-gate map, for step 3
+
+- The first builder (05:43): yes to a read-only map of lamp-voice's Linux
+  gates; ten plans step 3 from it, after the ship's lamp work. #7002 (ten's
+  playback seam) also needs a played row on lamp-75c9 before it rides.
+- **Posted the map** (issuecomment-6866998744), at 1b1b7d08df, with
+  file:line:
+  1. **Build off Linux:** `serve`, `directed`, the capture and speaker
+     workers, and `audio_workers` with its ALSA arms cfg'd inside.
+     lamp-audio's `pcm` module is `cfg(linux)` (`audio/src/lib.rs:23`), so
+     #7002's `PlaybackPcm` and a `BusPcm` won't build on macOS unless the
+     trait moves outside the gate.
+  2. **Runtime stop:** `refuse_legacy_owners` runs `/usr/bin/systemctl` at
+     every serve start.
+  3. **Hardware that `serve` always starts:** the ring (SPI, `--continuous`)
+     and the privacy worker (GPIO, unless the bus route).
+  4. **Already portable:** about 15 gates with non-Linux branches.
+  5. **Test-only:** about 20.
+  - Not traced: how `serve` takes a failed ring worker; the privacy
+    worker's argv under `no-slide`.
+- My header said 06:0x at 05:56; edited to 05:5x.
+
 ## 2026-11-14 05:4x GMT+7: #7000 two reads, NEXT TRAIN
 
 - **#7000** at bb5d491284: READ-OKs from sim-2 (05:34, Linux, dash) and
