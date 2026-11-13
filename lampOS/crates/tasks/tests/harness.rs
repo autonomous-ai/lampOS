@@ -12,7 +12,7 @@ use lamp_tasks::runtime::{
 };
 use lamp_tasks::session_index;
 use lamp_tasks::skill_task::{
-    self, HarnessRunner, Runner, SkillHarness, SkillHarnessSlot, SkillRun,
+    self, HarnessHere, HarnessRunner, NoHarness, Runner, SkillHarness, SkillHarnessSlot, SkillRun,
 };
 use serde_json::{Value, json};
 use std::{
@@ -6630,6 +6630,7 @@ fn skill_runner_with(
         retry: Duration::from_millis(20),
         stopping: std::sync::OnceLock::new(),
         default_agent: false,
+        no_harness: Default::default(),
         wrappers: None,
         agent_ns: None,
         login: None,
@@ -6975,6 +6976,72 @@ fn a_skill_run_goes_to_the_default_agent_by_the_one_path() {
     );
     off.default_agent = false;
     assert_eq!(engine_of(off, &rig), "hermes");
+}
+
+/// #6685 PR 3: with the switch on and Harness read signed in (or offline,
+/// or not read yet), a skill's run still goes through Harness, `harness
+/// new <default>`, even though the default agent's wrapper takes a run
+/// with no Harness; read signed out, lamp-tasks starts the wrapper itself
+/// and Harness is asked nothing.
+#[test]
+fn signed_in_a_skill_run_still_goes_through_harness() {
+    let ns = ns_with_runs();
+    for (here, through) in [
+        (HarnessHere::SignedIn, true),
+        (HarnessHere::Unknown, true),
+        (HarnessHere::SignedOut, false),
+    ] {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, "stopped");
+        let runner = one_path_runner(
+            &rig,
+            EngineKind::Hermes,
+            &[("hermes", ONE_PATH_HERMES)],
+            Some(&ns),
+        );
+        let ran = rig.root.path().join("ran");
+        let bin = runner.wrappers.clone().unwrap();
+        if !through {
+            // lamp-update's wrapper, which only says it ran here: started by
+            // lamp-tasks itself.
+            let text = ONE_PATH_HERMES.replacen(
+                skill_task::ONE_PATH_MARK,
+                &format!(
+                    "{}touch {}\nexit 0\n",
+                    skill_task::ONE_PATH_MARK,
+                    ran.display()
+                ),
+                1,
+            );
+            let wrapper = bin.join("hermes");
+            fs::write(&wrapper, text).unwrap();
+            fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let _ = runner.no_harness.set(NoHarness {
+            here: Box::new(move || here),
+            default_engine: Box::new(|| Some(EngineKind::Hermes)),
+            home: rig.root.path().to_owned(),
+        });
+        let said = runner.run(&skill_run(Duration::from_secs(20)), &|| {});
+        let calls = rig.calls();
+        if through {
+            assert_eq!(said, Ok(0), "{here:?}");
+            let new = calls
+                .iter()
+                .find(|call| call["args"][0] == "new")
+                .expect("a new");
+            assert_eq!(new["args"][1], "hermes");
+            assert!(!ran.exists());
+        } else {
+            assert_eq!(said, Ok(0), "{here:?}");
+            assert!(
+                calls.is_empty(),
+                "{here:?}: Harness asked nothing: {calls:?}"
+            );
+            assert!(ran.exists(), "the wrapper started by lamp-tasks");
+        }
+        nothing_left(&rig);
+    }
 }
 
 /// #6685: with the switch on, a default agent that can't take a run by the
