@@ -124,6 +124,11 @@ fn speech(dir: &Path, args: &[String]) -> std::io::Result<()> {
         .recursive(true)
         .mode(0o700)
         .create(&folder)?;
+    // A killed run leaves its ready say's file behind: the folder is this
+    // service's own, so what is in it at start is stale.
+    for entry in std::fs::read_dir(&folder)?.flatten() {
+        let _ = std::fs::remove_file(entry.path());
+    }
     eprintln!(
         "lamp-sim speech: on http://{} (POST /audio/speech, pcm), token in {}",
         listener.local_addr()?,
