@@ -1507,7 +1507,7 @@ grant"; dịch vụ chưa liên kết bị lamp-services từ chối lúc gọi.
 từ máy tính không bao giờ mang quyền này. Tắt, quyền dịch vụ là "not a
 grant" như trước.
 
-### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, bật trong sản phẩm, đề xuất trên #6059)
+### Giao cho agent của đèn khi DeepSeek thất bại (`LAMP_MAKE_SKILL_AGENT=on`, tắt lại trong sản phẩm từ 13/11 cho đến khi lần thử make trên đèn đạt, đề xuất trên #6059)
 
 Đề xuất trên #6059 (chủ sở hữu đồng ý, 11/11), first builder đã đồng ý
 (Queue #6059, 11/11 22:44 +07). Khi bật công tắc, một lần tạo bằng giọng
