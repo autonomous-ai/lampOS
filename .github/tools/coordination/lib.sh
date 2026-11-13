@@ -42,9 +42,9 @@ coord_pr_comments() {
 }
 
 # The Queue's issues, oldest first: #4710 hit GitHub's 2,500-comment limit on 5 Nov and the Queue went on in #5385,
-# which hit it on 10 Nov; the Queue goes on in #6059.
+# which hit it on 10 Nov, and #6059, which hit it on 13 Nov; the Queue goes on in #6811.
 # The one place their numbers live: every one is read, so a HOLD on an older one still counts; the bot posts on the last.
-COORD_QUEUE_ISSUES=(4710 5385 6059)
+COORD_QUEUE_ISSUES=(4710 5385 6059 6811)
 COORD_QUEUE_POST=${COORD_QUEUE_ISSUES[-1]}
 
 # coord_queue OUT: the comments of the last 3 days on every Queue issue, where Queue HOLDs are posted, as one list of
