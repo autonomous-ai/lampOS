@@ -3,6 +3,17 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 04:3x GMT+7: Heron read #6961; the quiet end works on macOS 14
+
+- Train 891 merged (afa677ed1).
+- Heron READ-OK #6961 at d4cfc1270f, restated at 21bb2f36f8 (counted). On
+  Heron's macOS 14.6.1 Intel: `speech_resident` passes in 3.98 s (30.6 s and a
+  fail before): the quiet end works there.
+- Heron's P3 (a mid-line stall over 300 ms cuts a line silently): a log line
+  when the quiet end is used, as a follow-up after the stack rides.
+- Heron sees `pty::tests::a_port_opens…` (mine, #6929) fail on macOS 14 at
+  lamp-voice's head: asked for its panic line.
+
 ## 2026-11-14 04:2x GMT+7: nine's two last P3s; the stack again
 
 - nine restated READ-OK on #6954 (9691717f56) and #6961 (d4cfc1270f), with a
