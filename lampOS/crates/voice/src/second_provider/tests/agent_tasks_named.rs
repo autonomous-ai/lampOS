@@ -11,7 +11,10 @@
 //! too. Either is asked again only once the join window
 //! ([`super::JOIN_WITHIN`]) has passed with no newer line begun, so a paused
 //! ask is joined, never handed over half said; asked again and answered in
-//! words once more, the plain line that it wasn't done is said.
+//! words once more, the plain line that it wasn't done is said, unless an
+//! agent was named: then code calls `start_agent_task` itself with the
+//! heard words, and the prepared task is said back for a yes (#6547
+//! cause 3).
 use super::*;
 
 /// The lamp's engines and the computer's staff in these tests.
@@ -32,6 +35,8 @@ struct Went {
     asked: usize,
     /// The calls run, by name.
     ran: Vec<String>,
+    /// The calls' arguments, as run.
+    args: Vec<Value>,
     /// Whether a round was asked with the named-agent note.
     told: bool,
     /// The journal's named lines.
@@ -49,12 +54,36 @@ fn went(
     later: Vec<Vec<net::Result<ChatEvent>>>,
     asked_before: bool,
 ) -> Went {
+    went_answered(heard, first, later, asked_before, json!({"ok": true}))
+}
+
+/// [`went`] with every call answered `answer`.
+fn went_answered(
+    heard: &str,
+    first: Vec<net::Result<ChatEvent>>,
+    later: Vec<Vec<net::Result<ChatEvent>>>,
+    asked_before: bool,
+    answer: Value,
+) -> Went {
     let script = Arc::new(Script {
         heard: Mutex::new([Ok(heard.to_owned())].into()),
         chats: Mutex::new(std::iter::once(first).chain(later).collect()),
         ..Script::default()
     });
-    let (engine, calls, _) = scripted(script.clone());
+    let calls: Calls = Arc::default();
+    let seen = calls.clone();
+    let tools: ToolRunner = Arc::new(move |_, heard, name, args| {
+        seen.lock().unwrap().push((name, args, heard));
+        let answer = answer.clone();
+        Box::pin(async move { answer })
+    });
+    let at = Instant::now();
+    let engine = Engine::with_clock(
+        script.clone(),
+        Arc::new(|| "SYSTEM".to_owned().into()),
+        tools,
+        Arc::new(move || at),
+    );
     let journal: Arc<Mutex<Vec<String>>> = Arc::default();
     let mut engine = engine
         .announcing(false)
@@ -88,18 +117,15 @@ fn went(
         .flatten()
         .filter_map(|message| message.content.as_ref().and_then(Value::as_str))
         .any(|content| notes.iter().any(|note| note == content));
+    let ran = calls.lock().unwrap().clone();
     Went {
         said: labels
             .into_iter()
             .filter(|label| label.starts_with("said:"))
             .collect(),
         asked: asked.len(),
-        ran: calls
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|(name, ..)| name.clone())
-            .collect(),
+        ran: ran.iter().map(|(name, ..)| name.clone()).collect(),
+        args: ran.iter().map(|(_, args, _)| args.clone()).collect(),
         told,
         journal: journal.lock().unwrap().clone(),
         took,
@@ -154,30 +180,162 @@ fn named_with_no_start_is_asked_again_once() {
     );
 }
 
-/// Asked again and answered in words once more (#6547 C): those words are
-/// not said, the plain line that it wasn't done is, never a third round,
-/// and the journal says no call came.
+/// The journal's line for a hand-over made in code (#6547 cause 3).
+fn handed_in_code(agent: &str) -> String {
+    format!(
+        "{ASKED_AGAIN}: still no call: the heard words are handed over in code to {agent}, said back for a yes"
+    )
+}
+
+/// The poem read back from the prepared task.
+const POEM_READ_BACK: &str =
+    "I'll have Hermes on the lamp write a poem about tea in a file. Shall I start it?";
+
+/// #6547 cause 3: Hermes named for the work, round 1 and the round asked
+/// again both answered in words with no call. Neither is said; code calls
+/// `start_agent_task` itself with the heard words as the task, so the work
+/// is prepared as a model's call would be, nothing dispatched, and the
+/// prepared task's read-back is said for the person's yes or cancel. No
+/// "I didn't do that", and the journal says it was handed over in code.
 #[test]
-fn named_with_no_start_twice_says_it_was_not_done() {
+fn named_with_no_start_twice_is_handed_over_in_code_and_said_back() {
+    const HEARD: &str = "Have Hermes write a poem about tea in a file.";
+    assert_eq!(named(HEARD).as_deref(), Some("Hermes"));
     let went = went(
-        "Hermes, look up the weather.",
-        saying("It is sunny today."),
-        vec![saying("It is still sunny.")],
+        HEARD,
+        saying("Sure, here is a poem about tea."),
+        vec![
+            saying("Tea leaves dance in the cup."),
+            saying(POEM_READ_BACK),
+        ],
         false,
     );
     assert_eq!(
         went.said,
-        said(&[crate::action_claim::NOT_DONE_LINE]),
+        [
+            "said:I'll have Hermes on the lamp write a poem about tea in a file.",
+            "said: Shall I start it?",
+        ],
         "{went:?}"
     );
-    assert_eq!((went.asked, went.ran.len()), (2, 0), "{went:?}");
-    assert!(went.told);
+    // Prepared only: never `confirm_agent_task`, so nothing starts before
+    // the person's yes.
+    assert_eq!(went.ran, [crate::agent_tasks::START.to_owned()], "{went:?}");
+    assert_eq!(went.args, [json!({"task": HEARD})], "{went:?}");
+    assert_eq!(went.asked, 3, "{went:?}");
+    assert!(went.told, "{went:?}");
+    assert_eq!(
+        went.journal,
+        [ASKED_AGAIN.to_owned(), handed_in_code("Hermes")],
+        "{went:?}"
+    );
+}
+
+/// #6547 cause 3's control: Hermes named and round 1 answered with the
+/// lamp's own tool (none run), then the round asked again with nothing:
+/// handed over in code the same way.
+#[test]
+fn named_answered_by_an_own_tool_then_nothing_is_handed_over_in_code() {
+    const HEARD: &str = "Hermes, look up the weather in Hanoi.";
+    let went = went(
+        HEARD,
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![call(
+                "w0",
+                "weather",
+                json!({"place": "Hanoi"}),
+            )])),
+            Ok(ChatEvent::Done),
+        ],
+        vec![
+            saying("It is sunny in Hanoi."),
+            saying("Hermes will look it up. Shall I start it?"),
+        ],
+        false,
+    );
+    assert_eq!(went.ran, [crate::agent_tasks::START.to_owned()], "{went:?}");
+    assert_eq!(went.args, [json!({"task": HEARD})], "{went:?}");
+    assert_eq!(
+        went.journal.last(),
+        Some(&handed_in_code("Hermes")),
+        "{went:?}"
+    );
+}
+
+/// #6547 cause 3's control: a computer agent named with none paired. The
+/// code-made call carries the heard words only, so the tasks part refuses
+/// it from those words as it refuses a model's (#6786): nothing prepared,
+/// and the refusal is what the next round says.
+#[test]
+fn a_computer_agent_named_with_none_paired_is_refused_as_before() {
+    const HEARD: &str = "Ask Claude Code to write a poem about tea in a file.";
+    const REFUSED_SAID: &str = "No computer is paired with the lamp.";
+    assert_eq!(named(HEARD).as_deref(), Some("Claude Code"));
+    let went = went_answered(
+        HEARD,
+        saying("Sure, here is a poem about tea."),
+        vec![saying("Tea leaves dance in the cup."), saying(REFUSED_SAID)],
+        false,
+        json!({"error": crate::agent_tasks::NO_COMPUTER_PAIRED}),
+    );
+    assert_eq!(went.said, said(&[REFUSED_SAID]), "{went:?}");
+    assert_eq!(went.ran, [crate::agent_tasks::START.to_owned()], "{went:?}");
+    // No place or who of the code's own: the tasks part reads them from
+    // the heard words, as for the model's call.
+    assert_eq!(went.args, [json!({"task": HEARD})], "{went:?}");
+    assert_eq!(went.journal.last(), Some(&handed_in_code("Claude Code")));
+}
+
+/// #6547 cause 3's control: the round asked again calls
+/// `start_agent_task` itself: only the model's call runs, with the
+/// model's task, and none is made in code.
+#[test]
+fn named_with_start_when_asked_again_makes_none_in_code() {
+    let went = went(
+        "Have Hermes write a poem about tea in a file.",
+        saying("Sure, here is a poem about tea."),
+        vec![starting(), saying("Hermes is on it.")],
+        false,
+    );
+    assert_eq!(went.ran, [crate::agent_tasks::START.to_owned()], "{went:?}");
+    assert_eq!(
+        went.args,
+        [json!({"task": "Look up the weather"})],
+        "{went:?}"
+    );
     assert_eq!(
         went.journal,
         [
             ASKED_AGAIN.to_owned(),
-            format!("{ASKED_AGAIN}: still no call, said it wasn't done"),
+            format!("{ASKED_AGAIN}: start_agent_task called"),
         ]
+    );
+}
+
+/// #6547 cause 3's control: no agent named, a read-back twice with no
+/// call: nothing is made in code; the plain line that it wasn't done is
+/// said, as before.
+#[test]
+fn not_named_no_start_twice_makes_none_in_code() {
+    let went = went(
+        "Write a poem about tea in a file.",
+        saying(READ_BACK),
+        vec![saying(READ_BACK)],
+        false,
+    );
+    assert!(went.ran.is_empty(), "{went:?}");
+    assert_eq!(
+        went.said
+            .last()
+            .map(|line| line.trim_start_matches("said:").trim()),
+        Some(crate::action_claim::NOT_DONE_LINE),
+        "{went:?}"
+    );
+    assert_eq!(
+        went.journal.last(),
+        Some(&format!(
+            "{READ_BACK_AGAIN}: still no call, said it wasn't done"
+        ))
     );
 }
 
