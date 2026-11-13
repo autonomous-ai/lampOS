@@ -41,6 +41,13 @@
 //! through its whole check, and one it refuses goes back with the check's
 //! words at most [`GUIDED_MOST_REPAIRS`] more times, within the agent's
 //! [`MAKE_WITHIN`]. Off, the line is today's, byte for byte.
+//!
+//! With the guide, the line also carries this worker's values of the
+//! switches `lamp-skills` reads as it packs a skill ([`CHECK_SWITCHES`],
+//! `"switches"`, Heron's P2 on #6768): lamp-tasks starts the make with a
+//! cleared environment, so without them the guide's check would refuse a
+//! `write` step or a `do.task`'s service grant the voice's own check
+//! accepts, and Hermes would take the asked-for step out.
 use crate::agent_tasks;
 use serde_json::{Value, json};
 use std::{
@@ -182,6 +189,36 @@ pub fn waiting_due(request: u64) -> bool {
 /// Whether the guide's switch is on ([`GUIDE_ENVIRONMENT`]).
 pub fn guide_on() -> bool {
     on_with(std::env::var(GUIDE_ENVIRONMENT).ok().as_deref())
+}
+
+/// The switches `lamp-skills pack` reads as it loads a skill, so that change
+/// what it refuses: a `do.task`'s linked service grants and a `write` step
+/// or permission (`lamp_tasks::skill_make::CHECK_SWITCHES`, the only names
+/// lamp-tasks takes). The voice's check runs with this worker's own
+/// environment, which has each as `on` exactly or not at all
+/// (`process::agent_services_worker_environment`,
+/// `skill_writes_worker_environment`).
+pub const CHECK_SWITCHES: [&str; 2] = [
+    crate::made_skill::AGENT_SERVICES_ENVIRONMENT,
+    crate::made_skill::WRITES_ENVIRONMENT,
+];
+
+/// The line's `"switches"`: each of [`CHECK_SWITCHES`] `"on"` when `var`
+/// gives it as `on` exactly, else `"off"`.
+pub fn check_switches_with(var: impl Fn(&str) -> Option<String>) -> Value {
+    CHECK_SWITCHES
+        .iter()
+        .map(|name| {
+            let on = on_with(var(name).as_deref());
+            ((*name).to_owned(), json!(if on { "on" } else { "off" }))
+        })
+        .collect::<serde_json::Map<_, _>>()
+        .into()
+}
+
+/// [`check_switches_with`] this process's environment.
+pub fn check_switches() -> Value {
+    check_switches_with(|name| std::env::var(name).ok())
 }
 
 /// The tasks part's folder, as the second route's worker was given it
@@ -326,9 +363,11 @@ impl Agent {
             "within_ms": self.within.as_millis() as u64,
         });
         // The guide asked for only with its switch: off, the line is
-        // today's, its three keys alone.
+        // today's, its three keys alone. With it, the check's switches as
+        // this worker has them, so the guide's check is the voice's.
         if self.guide {
             line["guide"] = json!(true);
+            line["switches"] = check_switches();
         }
         stream
             .set_write_timeout(Some(SEND_WITHIN))
@@ -818,9 +857,10 @@ pub(crate) mod tests {
         );
         assert_eq!(
             makes[1].as_object().unwrap().keys().collect::<Vec<_>>(),
-            ["guide", "op", "rules", "within_ms"]
+            ["guide", "op", "rules", "switches", "within_ms"]
         );
         assert_eq!(makes[1]["guide"], true);
+        assert_eq!(makes[1]["switches"], check_switches());
         assert_eq!(makes[0]["rules"], makes[1]["rules"]);
         assert_eq!(
             tasks.agent().most_repairs(),
@@ -830,6 +870,48 @@ pub(crate) mod tests {
         // Within lamp-tasks' most and the agent's part.
         const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= 120) };
         const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= MAKE_WITHIN.as_secs()) };
+    }
+
+    /// Heron's P2 on #6768: the guided line's switches are this worker's
+    /// values of exactly lamp-tasks' list, `on` only for an exact `on`.
+    #[test]
+    fn the_checks_switches_are_lamp_tasks_list_with_this_workers_values() {
+        assert_eq!(CHECK_SWITCHES, lamp_tasks::skill_make::CHECK_SWITCHES);
+        let given = |on: &'static [&'static str], value: &'static str| {
+            move |name: &str| on.contains(&name).then(|| value.to_owned())
+        };
+        assert_eq!(
+            check_switches_with(given(&[], "on")),
+            json!({"LAMP_AGENT_SERVICES": "off", "LAMP_SKILL_WRITES": "off"})
+        );
+        assert_eq!(
+            check_switches_with(given(&["LAMP_SKILL_WRITES"], "on")),
+            json!({"LAMP_AGENT_SERVICES": "off", "LAMP_SKILL_WRITES": "on"})
+        );
+        assert_eq!(
+            check_switches_with(given(&CHECK_SWITCHES, "on")),
+            json!({"LAMP_AGENT_SERVICES": "on", "LAMP_SKILL_WRITES": "on"})
+        );
+        for not_on in ["1", "true", "ON", "on ", ""] {
+            assert_eq!(
+                check_switches_with(given(&CHECK_SWITCHES, not_on)),
+                json!({"LAMP_AGENT_SERVICES": "off", "LAMP_SKILL_WRITES": "off"}),
+                "{not_on:?}"
+            );
+        }
+        // What lamp-tasks takes, whole.
+        let line = json!({
+            "op": "skill_make", "rules": "R", "within_ms": 2_000, "guide": true,
+            "switches": check_switches_with(given(&CHECK_SWITCHES, "on")),
+        });
+        let make = lamp_tasks::skill_make::MakeLine::parse(line.to_string().as_bytes()).unwrap();
+        assert_eq!(
+            make.switches.unwrap().env(),
+            [
+                ("LAMP_AGENT_SERVICES", "on".to_owned()),
+                ("LAMP_SKILL_WRITES", "on".to_owned())
+            ]
+        );
     }
 
     #[test]
