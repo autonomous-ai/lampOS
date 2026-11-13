@@ -48,6 +48,7 @@ starts, and, if the body still ends at start, prints its reason (the last line o
 | `--microphone` | the host microphone (ffmpeg) feeds `mic1/audio`; it stays open for the lamp's life, so a macOS microphone indicator stays on; a computer still hears it only through `microphone.stream` and the ring's mark |
 | `--controls` | starts the real `lamp-controls` beside the lamp (it must be in `--bin-dir` with the others: `cargo build --release -p lamp-controls`): it publishes `controls/state` on the lamp's bus, as a real voice's privacy route waits for, on this boot's clock. It runs as on a lamp with no slide (`LAMP_PRIVACY_CONTROLS=no-slide`, no pins file): it reads no pin, reports its input as missing and says `no_privacy_slide` on every state (about 50 a second); no button, touch or slide is simulated. Off unless given; it stops with the lamp, and the lamp ends if it ends |
 | `--real-voice` | starts the real `lamp-voice` on its LIVE route with your own Gemini key (see "Your own voice keys"); `--real-voice=second` starts it on its SECOND route (the one a customer lamp runs) with your own DeepSeek, Deepgram and ElevenLabs-or-OpenAI keys; needs `--microphone` (the voice hears the host's microphone on the lamp's bus), `lamp-voice` in `--bin-dir` (`cargo build --release -p lamp-voice`), and a Linux with systemd (`/usr/bin/systemctl` must exist: lamp-voice's start asks it whether the legacy services are idle and refuses without it, so not a container or NixOS) and ALSA. lamp-voice starts its workers with an empty environment, so its speaker worker has no `XDG_RUNTIME_DIR`: on a desktop with PipeWire or PulseAudio the `default` ALSA device may not find the sound server and the voice is silent or its speaker faults. `LAMP_SIM_VOICE_SPEAKER=hw:CARD,DEV` (or `plughw:CARD,DEV`) names a device that needs no sound server; the default is unchanged. **`--real-voice` is the voice's Live route, not the route a customer lamp runs (every product lamp answers through its second route); `--real-voice=second` is that route.** It turns `--controls` on. With no key: one line (`no voice key: set main.gemini in ... (or LAMPOS_VOICE_GEMINI_KEY); using the stand-in voice`) and the stand-in as always. lamp-voice takes its credential only from a file, so lamp-sim keeps ONE private copy of the key for the run, in `$XDG_RUNTIME_DIR/lamp-sim-voice-<lamp>-<hash>/gemini.key` (memory-backed storage; folder 0700, file 0600) beside the `provider.json` that names it, and removes it when the voice or lamp-sim ends (a stale one from a killed run goes at the next start); without a private `XDG_RUNTIME_DIR` the copy is on disk in `DIR/voice/keep` until lamp-sim ends, and lamp-sim says so in one line. The key is never in an argument, the environment lamp-voice is given or any output; lamp-voice gets only a short list of lamp-sim's variables (the login's basics, the locale, the sound-session names, and the proxy and CA names `HTTPS_PROXY`, `HTTP_PROXY`, `ALL_PROXY`, `NO_PROXY` in both cases and `SSL_CERT_FILE`, `SSL_CERT_DIR`; a proxy URL may carry a password, so it goes to lamp-voice only and is never printed) and none of the others. A killed lamp-sim: its watcher removes the key's copy within about a second; the copy stays only if the watcher is killed too (then until the next start of the same lamp, or, in memory-backed storage, until you log out). The model defaults to the product's name (`gemini-3.8-live`), which may differ on Google's own API: `LAMPOS_VOICE_GEMINI_MODEL` names another, and the first real run settles it. With the real voice, a person's talk is answered by it, but the SDK's `lamp.say` and the volume ops still go to lamp-sim's stand-ins (lamp-control's `say` and `volume` ops need a socket, and the real voice's own say socket is `LAMP_SAY`, which a desktop leaves unset), so `lamp.say` is spoken by the host's speech program, not by the real voice. The session folder `DIR/voice/session-N` holds the voice's own events (transcripts of what was said) until the next `--real-voice` start removes it, or the lamp's folder does. If the voice ends, lamp-sim says so and the lamp stays up. Not yet run with a real key; wear headphones for a first run (the speakers feed the microphone) |
+| `--real-voice=local` | macOS: the real `lamp-voice` on its SECOND route with your own LLM endpoint (`[local]` in the keys file, below) and the host's voice and listening: lamp-sim starts `lamp-sim speech` and `lamp-sim listen` beside it (`--speech-listen`, `--stt-listen`, `--whisper`; see "Your own LLM with the host's voice"). Needs `--microphone`, `lamp-voice` in `--bin-dir` and your own `whisper-server` |
 
 `LAMP_SIM_SERVO_RANGES` sets the angle limits the simulated servos store (what `lamp-body` reads with `LAMP_BODY_OWN_RANGES` or `LAMP_BODY_APP_REACH`): unset or `full`, 0..4095 on all five, as before (the body then keeps its own caps); `75c9`, lamp-75c9's read on 10 Nov (yaw 820-3268, roll 897-3153, pitch 1457-3029; shoulder and elbow stay 0..4095, their reach comes from the arm's window, and no other number is invented); or a list such as `yaw=820-3268,pitch=1457-3029` (joints `yaw`, `shoulder`, `elbow`, `roll`, `pitch`). A bad value stops lamp-sim at start.
 
@@ -106,7 +107,7 @@ Each lamp folder has its own lamp name, `virtual-` and six hex digits of the fol
 
 ## Your own voice keys
 
-`lamp-sim voice-keys` says which of a developer's voice keys are set and from where, and never says a key. `lamp-sim run DIR --real-voice` reads the Gemini key from the same place, and `--real-voice=second` reads `own.deepseek` (and `own.deepseek_url`), `own.deepgram` and `own.elevenlabs` or `own.openai` (the one that speaks; ElevenLabs when both are set). The second route talks to DeepSeek, Deepgram and ElevenLabs/OpenAI at their own addresses, never the company's relay, and ALL THREE are billed to you (every spoken turn: text, listening and speech); when both speech keys are set, ElevenLabs speaks; `own.deepseek_url` must be https://. Wear headphones for a first run (the speakers feed the microphone); lamp-sim never names the product's `second.json`. The keys come from `~/.config/lampos/voice-keys.toml` (`$XDG_CONFIG_HOME` honoured; `LAMPOS_VOICE_KEYS_FILE` names another file), or from environment variables, which win over the file. An empty value is no key: an empty environment variable is as if it were not set, so the file's value is used; an empty value in the file is no key either. A missing file is no keys, not an error. A key given by a variable stays in lamp-sim's own environment and reaches no process lamp-sim starts (every one is made with `keys::command`, which drops every `LAMPOS_VOICE_*` name, and a test refuses a bare `Command::new`); the voice is given only a short list of names (`PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_*`, `TZ`, `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `PULSE_*`, `PIPEWIRE_*`, `ALSA_*`) and what lamp-sim sets for it, none of your other variables; if a real lamp-voice needs another name, the first real run will say so.
+`lamp-sim voice-keys` says which of a developer's voice keys are set and from where, and never says a key. `lamp-sim run DIR --real-voice` reads the Gemini key from the same place, and `--real-voice=second` reads `own.deepseek` (and `own.deepseek_url`), `own.deepgram` and `own.elevenlabs` or `own.openai` (the one that speaks; ElevenLabs when both are set). `--real-voice=local` reads `local.llm`, `local.llm_url` (https) and `local.llm_model`, and nothing else costs money. The second route talks to DeepSeek, Deepgram and ElevenLabs/OpenAI at their own addresses, never the company's relay, and ALL THREE are billed to you (every spoken turn: text, listening and speech); when both speech keys are set, ElevenLabs speaks; `own.deepseek_url` must be https://. Wear headphones for a first run (the speakers feed the microphone); lamp-sim never names the product's `second.json`. The keys come from `~/.config/lampos/voice-keys.toml` (`$XDG_CONFIG_HOME` honoured; `LAMPOS_VOICE_KEYS_FILE` names another file), or from environment variables, which win over the file. An empty value is no key: an empty environment variable is as if it were not set, so the file's value is used; an empty value in the file is no key either. A missing file is no keys, not an error. A key given by a variable stays in lamp-sim's own environment and reaches no process lamp-sim starts (every one is made with `keys::command`, which drops every `LAMPOS_VOICE_*` name, and a test refuses a bare `Command::new`); the voice is given only a short list of names (`PATH`, `HOME`, `USER`, `LOGNAME`, `LANG`, `LC_*`, `TZ`, `XDG_RUNTIME_DIR`, `DBUS_SESSION_BUS_ADDRESS`, `PULSE_*`, `PIPEWIRE_*`, `ALSA_*`) and what lamp-sim sets for it, none of your other variables; if a real lamp-voice needs another name, the first real run will say so.
 
 ```toml
 [main]
@@ -115,6 +116,10 @@ gemini = "..."          # a Google (Gemini) API key: LAMPOS_VOICE_GEMINI_KEY
 deepseek = "..."        # LAMPOS_VOICE_DEEPSEEK_KEY
 deepseek_url = "https://..."   # optional, LAMPOS_VOICE_DEEPSEEK_URL
 deepgram = "..."        # LAMPOS_VOICE_DEEPGRAM_KEY
+[local]                 # --real-voice=local: your own LLM, with the host's voice and listening
+llm = "..."             # the endpoint's key, sent as a bearer: LAMPOS_VOICE_LOCAL_LLM_KEY
+llm_url = "https://..." # an OpenAI-compatible endpoint, {llm_url}/chat/completions: LAMPOS_VOICE_LOCAL_LLM_URL
+llm_model = "..."       # the model it is asked for: LAMPOS_VOICE_LOCAL_LLM_MODEL
 ```
 
 The file must be a regular file you own, mode 0600 (or 0400), and not a symbolic link, as lamp-voice demands of its own credential files; otherwise `voice-keys` stops with the refusal and the `chmod 600` line that fixes it (exit 2). A name lamp-sim does not know is refused by its line only (a key pasted where a name belongs would otherwise be echoed), and a known key that is not quoted text by its name and line; a value is never shown. A key is never written, logged or put in a lamp's folder, and its type prints only its name, where it came from and its length.
@@ -142,7 +147,11 @@ HTTP side runs on another thread), writing each line to buffers made into
 24 kHz S16LE as they come (from its 22,050 Hz, linear). Measured on macOS 26
 (arm64) through this service, 5 requests each a second apart, medians, first
 bytes after 19 ms for "Hi there.", 13 ms for 8 words and 18 ms for 20 (the
-whole line after 29, 32 and 61 ms); the first line after start about 290 ms;
+whole line after 29, 32 and 61 ms). The first line a synthesizer speaks loads
+its voice (about 290 ms alone; 1.5 to 1.7 s in a debug build while a lamp
+was starting), so the
+service speaks one line to nobody before it writes its token: the token is its
+"ready", and the first real line starts in about 50 ms (53 ms measured, 3 runs);
 whisper.cpp (`base.en`) wrote back a 15-word line's output word for word. A
 line ends at the synthesizer's empty end buffer, or 300 ms after its last
 buffer if that never comes (it did not on macOS 14, Heron's read on #6961);
@@ -160,9 +169,9 @@ medians, first bytes after 371 ms for "Hi there.", 517 ms for 8 words and
 second line at the same moment starts its own and takes about 0.9 s. A killed
 run's leftover files are cleared at the next start. Off macOS there is no engine yet: a request is answered 503 with the reason (`say` is not found).
 
-The real lamp-voice cannot use it yet: its service URLs must be https and it
-trusts only its built-in roots. A loopback switch for it is ten's step 3, and
-`lamp-sim run --real-voice=local` (step 4) will start this service with it.
+The real lamp-voice reaches it with `LAMP_VOICE_LOOPBACK_SERVICES=on`, which
+lets the route's speech and listening addresses be plain `http://127.0.0.1` or
+`[::1]`; `lamp-sim run --real-voice=local` starts this service and sets it.
 
 ## A local speech-to-text socket (`lamp-sim listen`)
 
@@ -193,9 +202,49 @@ speaking the route's protocol, 6 runs each: `Finalize` to the final `Results`
 45 ms for a 1.2 s line and 72 ms for a 5 s one, both words exact (the clips
 were made with `say`, not a person through a microphone).
 
-As with `lamp-sim speech`, the real lamp-voice reaches it only with ten's
-loopback switch (step 3), and `lamp-sim run --real-voice=local` (step 4)
-starts both.
+lamp-voice's own client, from a real `second.json` with the loopback switch
+on, streamed a 2.5 s line into it at real pace: the words came back exact,
+101 ms after the line ended (#6991's read). `lamp-sim run --real-voice=local`
+starts it.
+
+## Your own LLM with the host's voice (`--real-voice=local`)
+
+```sh
+whisper-server -m ggml-base.en.bin --host 127.0.0.1 --port 7734    # your own whisper.cpp
+lamp-sim run ~/.lampsim/b --microphone --real-voice=local          # [local] set in voice-keys.toml
+```
+
+macOS only (sim-3-P4 step 4). The real lamp-voice on its SECOND route, the one
+a customer lamp runs, where you configure only the LLM:
+
+- **Thinking:** your endpoint, an OpenAI-compatible
+  `{llm_url}/chat/completions` asked for `llm_model` with `llm` as a bearer
+  (the route's configured chat: no `LAMP_SECOND_CHAT`). It must be https;
+  lamp-voice takes no plain http for the chat, so a model on this computer
+  needs an https front.
+- **Listening:** `lamp-sim listen` on `--stt-listen` (127.0.0.1:7733), before
+  your `whisper-server` at `--whisper` (http://127.0.0.1:7734).
+- **Speaking:** `lamp-sim speech` on `--speech-listen` (127.0.0.1:7732), the
+  resident synthesizer.
+- **The speaker:** the voice is given `--speaker-device bus:speaker1` and
+  publishes what it plays on the bus (`speaker1/play`, 24 kHz mono S16LE), and
+  lamp-sim plays it with the host's player (`paplay`, `aplay`, else `ffplay`;
+  `LAMP_SIM_SPEAKER=silent` counts it only), one line per spoken run with its
+  milliseconds and any dropped or missing blocks (`bus_speaker.rs`).
+
+lamp-sim starts `speech` and `listen` in `DIR/local`, each under the watcher
+that ends it with the lamp, and starts the voice when both tokens are written
+(a service writes its token once its socket is bound and, for `speech`, its
+voice is warm). An address already taken, or a service not ready in 5 s, is
+said before the voice starts. `second.json` (in the key's folder, with your
+LLM key, as for `--real-voice=second`) names the two loopback addresses and
+their token files, and the voice is started with
+`LAMP_VOICE_LOOPBACK_SERVICES=on`. Only your LLM costs money.
+
+Not yet run with the real lamp-voice: its speaker half of `bus:speaker1` is
+ten's (step 3). Run on macOS 26 with a stand-in in its place: the services come
+up, the voice's files and environment are as above, and the services end with
+the lamp.
 
 ## Known gaps
 
