@@ -1,5 +1,5 @@
 //! An uploaded skill's keys, given in the owner's app
-//! (`LAMP_SKILL_SECRETS`, off unless `on`, set in no unit; the first
+//! (`LAMP_SKILL_SECRETS`, off unless `on`, on in the product; the first
 //! builder's ruling, 12 Nov 19:44 on #6059). Three kinds, over the lamp's
 //! own account channel as `skills.upload` and `skills.list`, each answered
 //! inline:
