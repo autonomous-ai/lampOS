@@ -546,8 +546,8 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
   và một token bị Google từ chối được báo lần đầu ở một lần gửi.
 - **Đọc:** không có. Một `service_read` của `gmail-app`, đã liên kết hay
   chưa, đều trả lời "This Gmail link, made with Google sign-in, can only send
-  mail. To read mail, link Gmail with an app password in the app: Skills,
-  then Connectors.", trừ khi `gmail` được liên kết bằng mật khẩu ứng dụng
+  mail. To read mail, link Gmail with an app password in the app: open this lamp,
+  then Settings, then Linked accounts.", trừ khi `gmail` được liên kết bằng mật khẩu ứng dụng
   (xem dưới). Danh sách đọc của nó rỗng, nên không route đọc nào được gọi
   với token của nó.
 - **Ghi:** `send_mail`, được đọc lại và gửi như của `gmail`, khi có câu
@@ -1184,7 +1184,7 @@ scope được so nguyên vẹn); nếu không, và khi liên kết không ghi s
 (đặt trước khi scope được lưu, hoặc đặt tay), lệnh gọi đầu tiên bị từ chối
 trước mọi phần đọc lại, không giữ hay gọi gì: `writes::DRIVE_NO_WRITE_SCOPE`,
 "This Google Drive link can't make files. To let the lamp make one, link
-Google Drive again in the app: Skills, then Connectors." Không có scope thì
+Google Drive again in the app: open this lamp, then Settings, then Linked accounts." Không có scope thì
 bị từ chối vì liên kết đó có thể chỉ đọc, và người dùng sẽ đọc cả tệp chỉ để
 nghe một lỗi; liên kết lại qua app sẽ ghi các scope.
 
@@ -1214,8 +1214,8 @@ phép gì, như phần tạo tệp của Google Drive (#5825) từ chối một 
 trần; kiểm tra đó sẽ gọi cùng hàm này khi #5825 vào. Chỉ liên kết của Google
 ghi scope theo dạng này, nên không dịch vụ nào khác có trong bảng.
 Không có scope nào trong số đó thì lệnh gọi thất bại với "<Service> is linked
-without permission to <what>: link it again in the app (Skills, then
-Connectors) and allow it." (`serve::NO_PERMISSION`, sau dấu hai chấm),
+without permission to <what>: link it again in the app (open this lamp, then
+Settings, then Linked accounts) and allow it." (`serve::NO_PERMISSION`, sau dấu hai chấm),
 `<what>` là "send mail", "add calendar events", "change calendar events"
 hoặc "delete calendar events": không gì được giữ, không
 gì được gọi. Một mật khẩu ứng dụng, một khoá cá nhân (`pat`) hoặc một liên kết
@@ -1813,7 +1813,7 @@ kỹ năng tự tạo. Khi bật, xem
 phần "Một kỹ năng tự tạo đọc dịch vụ".
 
 Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
-to this lamp yet. It can be linked in the app: Skills, then Connectors."
+to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts."
 (`serve::NOT_LINKED`), để đèn nói chỗ liên kết, không chỉ nói là chưa có.
 
 `service` của một lệnh gọi đến một dịch vụ theo đúng mã của nó (mỗi mã Gmail
@@ -1826,7 +1826,7 @@ trắng và `-` được đọc là `_` ("Google Drive", "GMAIL", "google calend
 
 Một lệnh gọi nêu một dịch vụ mà đèn không có connector (không mã hay tên nào
 trong catalogue khớp) thất bại với "The lamp can't link <name> yet. The services it can
-link are in the app: Skills, then Connectors." (`serve::CANT_LINK`, sau câu
+link are in the app: open this lamp, then Settings, then Linked accounts." (`serve::CANT_LINK`, sau câu
 đầu). `<name>` là tên lệnh gọi đưa ra, chỉ được nói khi nó tối đa 40 ký tự,
 toàn chữ cái, chữ số, khoảng trắng, `-` hoặc `_`; mọi tên khác, hoặc không có
 tên, được nói là "that service". Mô tả của `services_connected` nêu các dịch
@@ -2005,7 +2005,7 @@ cùng `--state-dir` của nó; tắt, [switches.md](../switches.md)). Một lầ
 bị từ chối vì dịch vụ chưa liên kết (`NOT_LINKED`; không bao giờ "couldn't
 be reached" hay một lời từ chối khác) được nói một lần, như lời chính xác qua
 socket nói sau khi cổng được xét lại: "Gmail isn't linked to this lamp yet.
-It can be linked in the app: Skills, then Connectors." Tên kỹ năng được giữ
+It can be linked in the app: open this lamp, then Settings, then Linked accounts." Tên kỹ năng được giữ
 trong `link-noted` của thư mục trạng thái, nên không lần đọc sau và không lần
 khởi động lại nào nói lại; một lần đọc thành công bỏ nó ra, nên một liên kết
 mất về sau được báo thêm một lần. Dòng "not read" của journal thêm "told
@@ -2060,8 +2060,8 @@ hỏi như trước, và:
 - tạo bằng giọng nói, câu trả lời của việc tạo có `needs_link`
   (`[{"code", "name"}]`), và sau câu báo đã bật, mô hình được dặn nói với
   người dùng, bằng lời của nó và bằng ngôn ngữ của cuộc trò chuyện, rằng kỹ
-  năng sẽ chạy khi Gmail được liên kết trong ứng dụng, ở Skills, rồi
-  Connectors (`made_skill::needs_link_ask`; chủ đèn, 10/11, "đồng bộ luôn":
+  năng sẽ chạy khi Gmail được liên kết trong ứng dụng: mở đèn này, rồi
+  Settings, rồi Linked accounts (`made_skill::needs_link_ask`; chủ đèn, 10/11, "đồng bộ luôn":
   không bao giờ là một câu tiếng Anh cố định nói nguyên văn);
 - tạo từ ứng dụng, lời yêu cầu giữ nó, và `skills.made` báo nó là
   `needs_link: [{"code": "gmail", "name": "Gmail"}]`, `[]` khi không thiếu

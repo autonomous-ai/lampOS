@@ -144,7 +144,7 @@ pub const DRIVE_WRITE_SCOPES: &[&str] = &[
 /// file, or records none: refused at the first call, before any read-back
 /// or "send", so the person hears to link again rather than "not sent"
 /// after the whole file.
-pub const DRIVE_NO_WRITE_SCOPE: &str = "This Google Drive link can't make files. To let the lamp make one, link Google Drive again in the app: Skills, then Connectors.";
+pub const DRIVE_NO_WRITE_SCOPE: &str = "This Google Drive link can't make files. To let the lamp make one, link Google Drive again in the app: open this lamp, then Settings, then Linked accounts.";
 /// The most rows a new Google Sheet is made with.
 pub const ROWS_MOST: usize = 50;
 /// The most columns in each of its rows.
