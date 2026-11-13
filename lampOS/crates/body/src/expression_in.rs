@@ -122,6 +122,27 @@ impl Requests {
     }
 }
 
+/// This machine's boot identity: the Linux boot id, or on macOS the boot
+/// session uuid (`kern.bootsessionuuid`), which changes at every boot too.
+fn boot_identity() -> io::Result<String> {
+    #[cfg(target_os = "linux")]
+    {
+        std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let out = std::process::Command::new("/usr/sbin/sysctl")
+            .args(["-n", "kern.bootsessionuuid"])
+            .output()?;
+        let text = String::from_utf8(out.stdout)
+            .map_err(|_| io::Error::other("the boot session id is not text"))?;
+        if !out.status.success() || text.trim().is_empty() || text.len() > 128 {
+            return Err(io::Error::other("the boot session id is unavailable"));
+        }
+        Ok(text)
+    }
+}
+
 /// The body's end of `expression/body`.
 pub struct ExpressionIn {
     requests: Requests,
@@ -138,7 +159,7 @@ impl ExpressionIn {
             return None;
         }
         let made = Bus::from_environment().and_then(|bus| {
-            let clock_id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+            let clock_id = boot_identity()?;
             Self::on(&bus, clock_id.trim())
         });
         match made {
