@@ -383,13 +383,13 @@ owner's yes named its grant: `<code>-read` or `<code>-write` (such as `gmail-rea
 | `lamp.volume(to=...)`, `lamp.volume(step="up")`, `lamp.volume(mute=True)` | `lamp.volume({ to })`, `lamp.volume({ step: 'up' })`, `lamp.volume({ mute: true })` | `lamp_volume(to, step, mute)` | Op `volume`: sets the speaker's volume, the person's own (the same as by voice or in the app) | `speak` | exactly one of `to` 0–100, `step` `up` or `down`, `mute` true or false | `{level, muted}`; a `volume.changed` event follows | `bad_request` "one of to, step or mute"; `bad_request` "to: from 0 to 100"; `refused` "the speaker's volume: …" | works today (9 Nov 2026): `to` answered in 62 ms, a `step` down in 115 ms (20 to 10), and `to` put it back, on a test lamp on the customer build |
 | `lamp.device()` | `lamp.device()` | `lamp_state(["device"])` | The lamp's own computer: processor load, memory, disk, temperatures (state `device`, 4.2) | `device` | — | `{known, cpu_load, memory_used, disk_free, uptime_s, temperature_c}` | `no_grant` "not granted: device" | works today (10 Nov 2026, lamp-75c9 with the lamp-control of build 11450): `get` of `device` answered `known: true` with `cpu_load`, `memory_used`, `disk_free`, `uptime_s` and `temperature_c` (eight zones, 75 to 82 °C) |
 | `lamp.air()`; `lamp.on("air.changed", ...)` | `lamp.air()`; `lamp.on('air.changed', ...)` | `lamp_state(["air"])`; `lamp_events` | The air at the sensor (state `air`, 4.2), and each change past a step | `air` | `air.changed` at most once every 5 s | as 4.2 | `no_grant` "not granted: air" | in today's build, lamp run pending: lamp-75c9 cannot show it (10 Nov 2026, on 11450's lamp-control `get` of `air` answered `known: false` and no `air.changed` came: its base has no air reading); it needs a lamp with the air sensor |
-| `lamp.stop()` | `lamp.stop()` | `lamp_stop()` | Op `stop`: ends what this computer asked for, now: its light, its says still waiting, its camera stream and a hand-follow (the SDKs and lamp-mcp also let go of the follow's lease) | — | doesn't lift a `listen.set` mute | ok | — | in today's build, lamp run pending |
+| `lamp.stop()` | `lamp.stop()` | `lamp_stop()` | Op `stop`: ends what this computer asked for, now: its light, its says still waiting or playing, its camera, microphone and speaker streams and a hand-follow (the SDKs and lamp-mcp also let go of the follow's lease) | — | doesn't lift a `listen.set` mute | ok | — | in today's build, lamp run pending |
 
 ### Errors
 
 Every refusal is `{"code": "…", "why": "…"}`, with `retry_ms` on `rate` (and on stable
 10824's motion `busy`). What to do is the SDKs' own text (`WHAT_TO_DO` in Python,
-`errors.js` in JavaScript, `err.what_to_do` on each error).
+`errors.js` in JavaScript): `err.what_to_do` on each Python error, `err.whatToDo` on each JavaScript one.
 
 | Code | What to do |
 |---|---|
@@ -401,7 +401,7 @@ Every refusal is `{"code": "…", "why": "…"}`, with `retry_ms` on `rate` (and
 | `busy` | Someone else holds the part (the owner's app, another computer) or your own earlier lease does: try later, or let go of yours first. |
 | `refused` | The part's own check said no, in its words in `why` (out of reach, under a pattern's least level, not routed on this lamp yet). Change the request: the same one is refused again. |
 | `quiet_hours` | It's the lamp's quiet hours (`limits.quiet_hours`, off unless this lamp sets them): `say`, `sound` and `turn.start` wait until they end. A light is still fine. |
-| `private` | The person set the lamp private: it neither sees nor hears for computers. Wait for `lamp.changed` with `private` false. (Today only the camera ops answer it.) |
+| `private` | The person set the lamp private: it neither sees nor hears for computers. Wait for `lamp.changed` with `private` false. (Today the camera ops, and the microphone and speaker streams, answer it.) |
 | `paused` | The person paused the lamp. Wait for `lamp.changed` with `paused` false. |
 | `asleep` | The lamp is asleep. Wait for `lamp.changed` with `asleep` false. |
 | `rate` | Too many of one kind too fast: wait `retry_ms` and send it again. With the rates off (the default), only refused actions and phrase changes are bounded. |
@@ -954,9 +954,10 @@ This guide is part of the SDK. It is kept true the same way the code is:
 - **A pull request that adds or changes an SDK op, event, grant, refusal,
   limit or status updates this guide in the same pull request.** That rule is
   in [AGENTS.md](../AGENTS.md) for every builder.
-- **A test checks it:** every op, event and grant name in
+- **A test checks it:** every op, event, state, grant and error code name in
   [docs/control.schema.json](../docs/control.schema.json) must appear in this
-  guide, so the SDK tests fail when the guide falls behind the protocol.
+  guide (`sdk/python/tests/test_guide.py`), so the SDK tests fail when the guide
+  falls behind the protocol.
 - **Each status row carries the date it was last verified.** A status changes
   only with a run behind it: "works today" needs a run on a lamp running the
   customer build, said with the date.
