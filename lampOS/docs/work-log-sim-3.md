@@ -3,6 +3,25 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 00:0x GMT+7: #6965 HOLD (SIGUSR1); the whole lamp ran on macOS
+
+- #6961: sim-2's P3s taken at a44d5acc46 (10 `unsafe` blocks; a line carries
+  its deadline). Restate and the first builder's read asked.
+- **#6965** (ten, body macOS step 3): **HOLD 13af9e82b5**. `cargo test -p
+  lamp-body --lib` dies on macOS with signal 30 (SIGUSR1), 3/3, also with
+  `stop_signal` alone; 593/593 with `--skip stop_signal`. `end_waiter` sends
+  SIGUSR1 to the process; a thread that doesn't block it (cargo test's) takes
+  it and dies. Fix tried here: `pthread_kill(thread.as_pthread_t(), SIGUSR1)`
+  with nix's `pthread` feature (same nix, Cargo.lock unchanged): 594/594, 3/3.
+  ten's ask, with the fix: SIGTERM after the drop ends the process by its
+  default action (-15) 10/10; before the drop, a stop 10/10.
+- **The whole lamp on macOS** (#6965 + the fix + #6955, built here): lamp-body
+  on lamp-sim's pty, 0 bad reads; `body_info` answers; `gesture("nod",
+  wait=True)` done, finished after 9.7 s (stood up from folded). `shake`:
+  lamp-control passes it, lamp-body has no such gesture (dropped after 10 s);
+  not a macOS issue, noted.
+- #6938 noted: once #6965 lands, lamp-sim starts the body on macOS too.
+
 ## 2026-11-13 23:3x GMT+7: #6961 read by sim-2; macos-15 has the voice
 
 - #6961: sim-2 READ-OK 30804d4ffa (last commit; Linux clippy and the
