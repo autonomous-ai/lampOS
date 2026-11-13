@@ -558,10 +558,11 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 42 of the lamp's own
+unit sets it: a product lamp's chat request offers 45 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 24 with these two among them (and `set_role` and `end_role`
-since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov), the actions part's
+voice's own 27 with these two among them (and `set_role` and `end_role`
+since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov, and `go_to_sleep`
+since `LAMP_SLEEP_ASKED` is on in the product, #6853), the actions part's
 17 and `use_skill`, which reaches Dance's `dance` and Pose's `set_pose`
 (#4135, #2826), Light show's `light_show` (#5745), and Light scenes'
 `light_scene` and Point the light's `point_light` (#5744). At the bound a core skill's function is never the one cut (the
