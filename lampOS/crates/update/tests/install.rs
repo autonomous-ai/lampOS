@@ -1930,6 +1930,41 @@ fn the_product_lets_a_made_skill_read_a_linked_service() {
     }
 }
 
+/// A made skill loosened (#6059): `LAMP_MADE_SKILL_LOOSE=on` alike in the
+/// three units that read it, `lamp-voice` (makes the skill, both routes),
+/// `lamp-skills` and its manage helper (a made say's cooldown at least a
+/// minute as it is put on, `made_skill::capped`), each once, and no other
+/// product unit names it: with it on in the voice alone, a made say under
+/// an hour apart would be refused at install.
+#[test]
+fn the_product_loosens_a_made_skill_alike_in_its_three_units() {
+    let owners = [
+        "lamp-voice.service",
+        "lamp-skills.service",
+        "lamp-skills-manage@.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_MADE_SKILL_LOOSE=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_MADE_SKILL_LOOSE"))
+            .count();
+        let owner = owners.contains(unit);
+        assert_eq!(on, usize::from(owner), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+}
+
 /// A made skill's write goes out after its owner's yes in the product
 /// (#6066, #6142): the owner's ask on 11 Nov, so the testers can try it.
 /// `LAMP_SKILL_WRITES=on` in the four units that read it, `lamp-services`

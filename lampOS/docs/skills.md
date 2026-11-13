@@ -4355,14 +4355,15 @@ the same code for both writers.
   ([tasks.md](tasks.md)); and the three mail makes refused on lamp-9adf
   made by the agent, straight, with `LAMP_AGENT_SERVICES` on.
 
-##### A made skill loosened (`LAMP_MADE_SKILL_LOOSE=on`, off)
+##### A made skill loosened (`LAMP_MADE_SKILL_LOOSE=on`, on in the product)
 
 A skill made here, by voice or in the app, is the person's own, so with
 `LAMP_MADE_SKILL_LOOSE=on` its checks loosen (the owner's ask on the Queue,
 #6059, 11 Nov; the first builder's yes there at 22:44, with two
 adjustments: `[rest]` stays, and a send, the camera and the microphone are
 always named exactly). Off unless
-set, and in no product unit. `lamp-voice` reads it (and gives the exact `on`
+set; on in the product's `lamp-voice.service`, `lamp-skills.service` and
+`lamp-skills-manage@.service`, each once. `lamp-voice` reads it (and gives the exact `on`
 to its `provider` and `second` workers, which make the skill), and
 `lamp-skills`' manage helper reads it through `made_skill::capped` as
 it puts a made skill on. Set it alike in `lamp-voice` and in the
