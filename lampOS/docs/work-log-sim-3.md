@@ -3,6 +3,20 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 21:4x GMT+7: #6954, P4 step 1 (lamp-sim speech)
+
+- #6949: Heron READ-OK 651dcf01be with a wording P3; taken at 2afd14b0c4
+  (a refused send buffer stops linking at that subscriber until the next
+  look). Restate and the first builder's read asked.
+- **#6954** (`sim-3/speech`, ab3b8d8693): `speech.rs` + `lamp-sim speech DIR
+  [--listen]`, a loopback OpenAI-compatible `/audio/speech` (pcm 24 kHz,
+  chunked) with macOS `say`, only for the run's bearer token (0600), bounded;
+  503 with the reason when the engine fails before any sound. Through the
+  service, 5 runs, medians: first bytes 715 / 887 / 1,298 ms (2 / 8 / 20
+  words). lamp-sim tests 90+4 pass on this Mac (the two speaker-stream tests
+  pass now that #6933 is in: the CI skips can go after #6939 merges).
+  READ ASK to sim-1, sim-2.
+
 ## 2026-11-13 21:3x GMT+7: 883 merged #6933; #6949
 
 - Train 883 (#6942) merged as 162fedbec2 with **#6933** (P3, the bus's
