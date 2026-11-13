@@ -19,8 +19,8 @@ against lamp-06c1.
   With `LAMP_CLOUD_TLS=on` the connection is TLS (1.2 and 1.3, the webpki
   roots, as the backend's ping already is), on the account's port, which is
   then the broker's TLS port; if TLS cannot be set up it does not connect,
-  never falling back to a plain connection. Off unless set; on in the
-  product with `LAMP_SETTINGS_WIFI` (#6854), once its lamp row passed.
+  never falling back to a plain connection. Off unless set, until the
+  backend's broker is shown taking it on a lamp.
   The keepalive is 60 s (V1 asks 65,535 s, which never notices a dead link).
   One connection, TCP to CONNACK, may take 10 s (`wss::CONNECT`).
   **Over WSS when TCP keeps failing (#6256, F9).** After 3 failed
@@ -2850,9 +2850,8 @@ app that asks anyway is told `developer access is off on this lamp`.
   the code is shown, checks the pin outside the broker; it does not protect
   the pairing code itself. Only the lamp's own account channel may ask
   (`online::commanded`), and that channel is plain too. Broker TLS
-  (`LAMP_CLOUD_TLS`, on in the product since #6854) closes the rest. On a lamp
-  without it this is an accepted risk, and the pairing is never described as
-  end to end.
+  (`LAMP_CLOUD_TLS`) closes the rest. Until it is on this is an accepted risk,
+  and the pairing is never described as end to end.
 
 ## The dev monitor (#5883, `monitor.set`, `monitor.get`, `monitor.link`)
 
