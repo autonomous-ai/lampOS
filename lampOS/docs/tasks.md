@@ -3601,9 +3601,12 @@ default agent is, never by its name (`skill_task::AgentRun`):
    `gateway_run::start_text`): the one command the run may run. `start`
    reads `token` once and deletes it (a second start has none and fails),
    and runs the skill's script as it is (`python3 <skill
-   folder>/<script>`) with `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET` and
-   `PYTHONPATH` in its environment only. The token is never in the turn's
-   words, its arguments, the gateway's config or its session.
+   folder>/<script>`) fenced apart from the gateway (see "What the
+   gateway's fence does and doesn't stop" below), with only
+   `LAMP_CONTROL_TOKEN`, `LAMP_CONTROL_SOCKET`, `PYTHONPATH`, `PATH`
+   (`/usr/local/bin:/usr/bin:/bin`) and `HOME` (the run's folder) in its
+   environment (`env -i`). The token is never in the turn's words, its
+   arguments, the gateway's config or its session.
 2. The gateway must answer on `127.0.0.1:<port>` (`gateway::answers`),
    waited for at most 60 s (`gateway::READY_WITHIN`); else `run_failed`
    "the default agent's gateway did not answer ...", and no turn is sent.
@@ -3680,26 +3683,51 @@ before each run's turn (step 3 above): `agents.lamp-skill-run` gets
   the gateway runs in the gateway's process, which has the lamp's normal
   network (its unit has no network namespace: its model provider is at
   `127.0.0.1:7741` and it binds loopback). The turn's model and the
-  gateway can reach anything the lamp can. The skill's script, started
-  by `start`, has the same network. Not fenced.
+  gateway can reach anything the lamp can. The skill's script is fenced
+  like Hermes's `--net`: `start` runs it in a network namespace of its own
+  with only `lo` (left down, and no model bridge: the script has no use
+  for one), so it reaches lamp-control's unix socket and nothing else, not
+  even the gateway's loopback port.
 - **Filesystem.** Both run in a mount namespace that shows only the
   agent's own folder, the work folder, the skills read-only and
   lamp-control's socket (OpenClaw's `ALLOWED`; `/run`, `/var/lib` and
   `/etc/lampOS` empty and read-only otherwise). The gateway's namespace is
   shared by every OpenClaw turn: the run's folder is visible to a spoken
   OpenClaw task running at the same time (it is 0700, but the same
-  `lampos` user).
-- **What a gateway run does not stop, plainly.** The script `start` runs
-  is a child of the gateway: it has the gateway's environment, the full
-  network above, and the same `lampos` user as every other OpenClaw agent
-  on the lamp (`main` and any the person added). Those agents see
-  lamp-control's socket and skills-dev too while the switch is on, and
-  the script can read `openclaw.json`, which holds the gateway's admin
-  token. Only lamp-control's own checks of the run's token hold. So
-  `LAMP_SKILL_GATEWAY_RUNS` (switches.md) stays off until the script is
-  sandboxed apart from the gateway or the first builder accepts this in
-  writing; off, lamp-update leaves OpenClaw's wrapper and namespace as
-  before the one run path, and lamp-tasks refuses such a run in words.
+  `lampos` user). The skill's script sees less: `start`
+  (`gateway_run::start_text`) puts it in a user, mount and PID namespace
+  of its own inside the gateway's, with a fresh `/tmp` and an empty 0700
+  tmpfs over `/var/lib`, `/var/tmp` and `/dev/shm` (`gateway_run::HIDDEN`)
+  and over the runs' project, then shows again only the run's own folder
+  and its skill's folder. So OpenClaw's state (`openclaw.json`, which
+  holds the gateway's admin token, and `gateway-token` under
+  `/var/lib/lampos-openclaw`), the other runs' folders and the other
+  skills are not there. `/run` is the gateway's: lamp-control's socket
+  (`/run/lampos-control/control.sock`, bound alone, read-only) stays
+  reachable, and the SDK (`/usr/local/lib/lampos/sdk-python`) is not
+  hidden. Its own `/proc` lists only the script's processes, so the
+  gateway's environment cannot be read there. The script runs as the
+  caller's own ids in a nested user namespace, where none of these mounts
+  can be undone.
+- **Environment.** The script gets only its token, lamp-control's socket,
+  `PYTHONPATH`, a fixed `PATH` and `HOME` (the run's folder): `env -i`,
+  nothing of the gateway's (not its forwarder token `LAMP_HERMES_TOKEN`
+  nor `OPENCLAW_STATE_DIR`). The token reaches the script through a pipe,
+  never an argument.
+- **Fail closed.** Any step that fails (the namespaces, a mount, a hidden
+  path inside a folder shown again, the move back) ends `start` with
+  "the run's fence was not made (...): the script was not run" before the
+  script runs; it never falls back to running the script unfenced. The
+  token is deleted either way.
+- **What a gateway run does not stop, plainly.** Every other OpenClaw
+  agent on the lamp (`main` and any the person added) runs as the same
+  `lampos` user in the gateway's namespace: those agents see
+  lamp-control's socket and skills-dev too while the switch is on. Only
+  lamp-control's own checks of the run's token hold against them. So
+  `LAMP_SKILL_GATEWAY_RUNS` (switches.md) stays off until the fence is
+  checked on a lamp or the first builder accepts this in writing; off,
+  lamp-update leaves OpenClaw's wrapper and namespace as before the one
+  run path, and lamp-tasks refuses such a run in words.
 - **Exec.** Hermes's run may run any command in its namespace (its
   hardline list holds, approvals are off). The fence agent's only tool is
   `exec`, and its allow-list matches resolved binary paths: only a run's
@@ -3707,7 +3735,8 @@ before each run's turn (step 3 above): `agents.lamp-skill-run` gets
   This is OpenClaw's policy, enforced in the gateway's own process, not by
   the kernel: a bug in it, or a change in a later OpenClaw, opens it.
   The script `start` runs is the skill's as the owner said yes to; what
-  that script runs is not fenced by OpenClaw.
+  that script runs is not fenced by OpenClaw, only by `start`'s
+  namespaces above.
 - **Token scope.** The same in both: one token per run, minted for that
   run's skill and grants, ended with lamp-control when the run ends,
   given only in the script's environment. With Hermes the token is in the
@@ -3729,7 +3758,10 @@ before each run's turn (step 3 above): `agents.lamp-skill-run` gets
   `sessions.delete` and their parameters are as OpenClaw 2026.11.2 has
   them (its package; `approvals get --gateway --json` read on c0a4's
   2026.11.2, nothing written); a whole run is not yet tried on a lamp.
-  Runs are one at a time (`skill_task` takes one). lamp-update's
+  `start`'s fence is checked on a computer with `unshare` and `mount`
+  stood in for: that nested user, network, mount and PID namespaces are
+  allowed inside the gateway's, and that the mounts and `--mount-proc`
+  succeed there, is for a lamp to show. Runs are one at a time (`skill_task` takes one). lamp-update's
   `tools.exec.mode` key is kept as it was. Expected cost: no new process
   beyond one CLI call (a turn starts in seconds on a warm gateway, not the
   ~53 s to a ready per-run gateway, and adds the turn's own memory to the
