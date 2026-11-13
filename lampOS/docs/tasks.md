@@ -1759,9 +1759,13 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
       `PYTHONPATH` only in a skill run (`LAMP_CONTROL_SOCKET` set). A list
       there replaces Hermes's defaults, so when the merge makes the list it
       puts `~/.profile`, `~/.bash_profile` and `~/.bashrc` first, as Hermes
-      would have sourced them, unless `terminal.auto_source_bashrc` is off.
-      A list a person made is kept as it is, the lamp's file added last.
-      Anything it can't merge refuses the whole merge, as above.
+      would have sourced them, unless `terminal.auto_source_bashrc` is off
+      as Hermes reads it (`false`, `no`, `off`, `null` or `0`; a quoted
+      `'false'` is on). An empty list (a bare `shell_init_files:`, `null`,
+      `[]`) gets the defaults too. A list a person made is kept as it is,
+      the lamp's file added last. A `terminal:` it can't merge (flow style,
+      an anchor) is left as it is and journaled; the rest of the merge
+      still goes in.
     - **The guidance.** Each time the part keeps the lamp as a target, it
       writes `AGENTS.md` in the lamp's work folder
       (`~/harnesses/lamp-tasks/lamp`), which Hermes reads from its working
