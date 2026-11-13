@@ -3,6 +3,20 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-13 21:2x GMT+7: #6939 green, NEXT TRAIN; #6933 rides 883; P4 blocker found
+
+- #6939's macOS job rerun passed (a one-off on the 3-vCPU runner). NEXT TRAIN
+  posted (ten, sim-2; 10/10 green; merge-tree 0 on db33394d0e).
+- #6933 rode train 883; the first builder's READ-OK for the record, P3: say
+  in docs/bus.md that a macOS socket that can't raise its buffer fails at
+  creation. Follow-up after 883 merges.
+- #6928's cadence fix merged (nc-34, db33394d0e).
+- **P4 blocker**: lamp-voice is https-only (`net.rs` `https_only`, `checked_url`)
+  and trusts only `webpki-roots`, so no local http or local-CA service is
+  reachable. Proposed for ten's step 3: `LAMP_VOICE_LOOPBACK_SERVICES=on`
+  (desktop only) for loopback `stt_base_url`/`tts_base_url`. Steps 1 and 2
+  built against the protocol meanwhile.
+
 ## 2026-11-13 21:0x GMT+7: #6939 two reads, but its macOS job is red
 
 - READ-OKs: sim-2 on #6928 (bf49ae7e6f) and #6939 (4186f204f1, after ten's).
