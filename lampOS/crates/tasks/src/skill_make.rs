@@ -14,10 +14,13 @@
 //!
 //! Each make has a fresh home of its own, `make-<run id>/home`, 0700, as
 //! `HOME` and `HERMES_HOME`: empty but for the provider config (its key
-//! named by its variable, never a key), never Hermes's memory, sessions or
-//! state; it goes with the make. lamp-update's namespace script hides
+//! named by its variable, never a key) and two links to Hermes's prepared
+//! runtime ([`RUNTIME_LINKS`]), so a make never prepares dependencies of
+//! its own; never Hermes's memory, sessions or state. It goes with the
+//! make. lamp-update's namespace script hides
 //! Hermes's lasting home from a make (an empty read-only tmpfs over it,
-//! only the checkout and its Python tools shown again, read-only) and the rest of the work
+//! only the checkout, its Python tools and its dependency record shown
+//! again, read-only) and the rest of the work
 //! folder's `lamp` (only the make's folder shown, read-write), and leaves
 //! Hermes's folder and the work folder read-only.
 //!
@@ -182,12 +185,29 @@ pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
 /// make.
 pub const HOME_FOLDER: &str = "home";
 /// Hermes's own folder in it, `HERMES_HOME`, holding only its provider
-/// config ([`CONFIG_FILE`]).
+/// config ([`CONFIG_FILE`]) and the links of [`RUNTIME_LINKS`].
 pub const HERMES_FOLDER: &str = ".hermes";
 /// The provider config copied in: the lamp's provider, its key a
 /// variable's name only (`key_env`, [`crate::hermes_config::TOKEN_ENV`]),
 /// never a key, memory, sessions or state.
 pub const CONFIG_FILE: &str = "config.yaml";
+/// Hermes's prepared runtime, each a link in a make's `HERMES_HOME` to
+/// the lasting home's own (#6643, lamp-c0a4): `installs`, its dependency
+/// record (`installs/<key>/facts.json`) and environments, and `tools`, its
+/// uv, Python and package manager. Hermes 0.22.2 keeps dependency state
+/// per data root (`pm/environments.py`, `<HERMES_HOME>/installs/<key>`);
+/// with none in a fresh home it syncs one first ("preparing dependencies
+/// for this data root"), which a make's run cannot finish, so it ended
+/// `run_failed` in under a second. Links, not binds: Hermes takes a
+/// recorded environment only under `<HERMES_HOME>/installs/<key>/environments`
+/// once resolved, and a link resolves to the lasting path the record
+/// names. lamp-update's namespace script ([`NS_HOME_LINE`]) shows both
+/// targets read-only, so nothing in them can be changed, and nothing else
+/// of the lasting home: never its memory, sessions or state.
+pub const RUNTIME_LINKS: [(&str, &str); 2] = [
+    ("installs", "/var/lib/lampos-hermes/.hermes/installs"),
+    ("tools", "/var/lib/lampos-hermes/.hermes/tools"),
+];
 /// lamp-update's four Hermes settings (`lamp_update::hermes_install::CONFIG`,
 /// a test holds them equal), written into each make's fresh config too:
 /// no update checks of its own over the kept network, no language servers,
@@ -213,7 +233,7 @@ pub const NS: &str = "/usr/local/lib/lampos/hermes-ns";
 /// held equal to it by a test): its mark, checked before every make, held or not.
 pub const WRAPPER_HOME_LINE: &str = "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n";
 /// The namespace script's line for it (`lamp_update::hermes_install::NS_HOME_LINE`).
-pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" \"$X/t\" || fail \"no make staging\"\n  mount --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount --bind \"$H/.hermes/tools\" \"$X/t\" || fail \"no Hermes tools\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount --move \"$X/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X/t\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X\n";
+pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" || fail \"no make staging\"\n  mount --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount --bind \"$H/.hermes/tools\" \"$X/t\" || fail \"no Hermes tools\"\n  mount --bind \"$H/.hermes/installs\" \"$X/i\" || fail \"no Hermes installs\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount --move \"$X/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  mkdir \"$H/.hermes/installs\" && mount --move \"$X/i\" \"$H/.hermes/installs\" && ro \"$H/.hermes/installs\" || fail \"Hermes installs not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X\n";
 /// Said when Hermes's wrapper or namespace script has no make-home line.
 pub const NO_NAMESPACE: &str = "the lamp's Hermes can't be given a make's own home yet (its wrapper or namespace script has no make-home line: lamp-update's LAMP_SKILL_TASKS is off or its round hasn't run), so nothing was started";
 
@@ -258,7 +278,8 @@ fn file_in(at: &rustix::fd::OwnedFd, name: &str, text: &str) -> std::io::Result<
 }
 
 /// The make's folder in `work` with its rules, and its fresh home with
-/// only the provider config: each folder 0700 and each file 0600, made
+/// only the provider config and the runtime links ([`RUNTIME_LINKS`]):
+/// each folder 0700 and each file 0600, made
 /// before a byte is written, each part opened from the one above, never
 /// through a link.
 fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
@@ -274,6 +295,9 @@ fn put(work: &Path, rules: &str) -> std::io::Result<MadeFolder> {
     let home = folder_in(&made.fd, HOME_FOLDER)?;
     let hermes = folder_in(&home, HERMES_FOLDER)?;
     file_in(&hermes, CONFIG_FILE, &make_config()?)?;
+    for (name, target) in RUNTIME_LINKS {
+        rustix::fs::symlinkat(target, &hermes, name)?;
+    }
     Ok(made)
 }
 
