@@ -497,7 +497,7 @@ ends, so a result is known within seconds rather than at the watch's next
 look: ["Watching"](#the-lamp-as-chief-of-staff-watching-and-telling-2026-10-15)
 below. It reads with the watch, so it refuses to go with `--no-watch`.
 
-`--push-watch` (off unless set; #5230) holds one Harness `watch --json` on
+`--push-watch` (off unless set, on in the product unit since #6858; #5230) holds one Harness `watch --json` on
 each task the watch looks at, at most four, and reads a task as soon as
 its agent settles: ["Following by watch"](#following-by-watch-serve---push-watch-5230)
 below. It reads with the watch, so it refuses to go with `--no-watch`.
