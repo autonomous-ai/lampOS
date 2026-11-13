@@ -122,8 +122,14 @@ pub enum PostureRegion {
 
 /// How the person has sat over the current window: its length so far, the
 /// share of its samples read as bad, and the region that was most often
-/// bad. `window_s` is always said, 0 at the window's start, so a skill's
-/// `[[while]] above` on it is never blocked by a missing field.
+/// bad. `window_s` is always in a value said, 0 at the window's start, so a
+/// skill's `[[while]] above` on it is never blocked by a missing field.
+///
+/// Not said while the window holds no sample (frames not going out: the
+/// opt-in off, the slide shut, the server busy, no body found, a privacy or
+/// sleep wipe), so the topic runs out and a skill holding on it with
+/// `unknown = "holds_stale"` runs as it did. A `bad_share` of 0 is said only
+/// over samples, never for none.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct HumanPosture {
     /// How long the window has run, in whole seconds, at most an hour.
@@ -137,7 +143,8 @@ impl HumanPosture {
     pub const TYPE: &str = "lamp_msgs/HumanPosture";
     pub const VERSION: u32 = 1;
     pub const TOPIC: &str = "humans/posture";
-    /// Said every 30 s while someone sits at the desk.
+    /// Said every 30 s while someone sits at the desk and the window holds
+    /// a sample.
     pub const EVERY: Duration = Duration::from_secs(30);
     /// A value means nothing this long after it was said.
     pub const LASTS: Duration = Duration::from_secs(90);

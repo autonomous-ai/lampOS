@@ -208,8 +208,9 @@ impl Activity {
 }
 
 /// Whether `meta` is the camera's own JPEG, of at least 320×240 (a larger
-/// one is scaled down to it before it is sent, [`crate::scale`]).
-fn sendable(meta: &FrameMeta) -> bool {
+/// one is scaled down to it before it is sent, [`crate::scale`]): posture
+/// takes the same frames only ([`crate::pose`]).
+pub(crate) fn sendable(meta: &FrameMeta) -> bool {
     meta.width >= LEAST_SIZE.0
         && meta.height >= LEAST_SIZE.1
         && meta.width <= crate::scale::MOST_SIDE
@@ -264,4 +265,4 @@ impl Sink for Activity {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

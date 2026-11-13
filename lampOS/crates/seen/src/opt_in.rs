@@ -44,7 +44,8 @@ pub const READ_EVERY: Duration = Duration::from_secs(2);
 pub const STATE_FOLDER: &str = "/var/lib/lampos-seen";
 
 /// The said-back record's file in the state folder: on, with the yes's
-/// `at_unix_s` (`null` for a yes with no time), or off.
+/// `at_unix_s` (`null` for a yes with no time) and whether the line said
+/// named posture, or off.
 pub const SAID_FILE: &str = "said-back.json";
 
 /// Where the opt-in is kept.
@@ -58,23 +59,36 @@ pub trait Reader {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Said {
     /// That it is on, for the kept yes with this `at_unix_s` (`None` for a
-    /// yes with no time).
-    On { for_at_unix_s: Option<u64> },
+    /// yes with no time), and whether the line said named posture
+    /// ([`crate::said_back::POSTURE_ON_LINE`]): posture sends no frame for
+    /// a yes whose line did not name it.
+    On {
+        for_at_unix_s: Option<u64>,
+        posture: bool,
+    },
     /// That it is off.
     Off,
 }
 
 impl Said {
-    /// The on said back for `kept`.
-    pub fn on_for(kept: &Kept) -> Self {
+    /// The on said back for `kept`, naming posture or not.
+    pub fn on_for(kept: &Kept, posture: bool) -> Self {
         Self::On {
             for_at_unix_s: kept.at_unix_s,
+            posture,
         }
     }
 
-    /// Whether this is the on said back for `kept`.
+    /// Whether this is the on said back for `kept`, whichever line it was.
     pub fn is_on_for(&self, kept: &Kept) -> bool {
-        kept.yes && *self == Self::on_for(kept)
+        kept.yes
+            && matches!(self, Self::On { for_at_unix_s, .. } if *for_at_unix_s == kept.at_unix_s)
+    }
+
+    /// Whether this is the on said back for `kept` with the line that named
+    /// posture.
+    pub fn names_posture_for(&self, kept: &Kept) -> bool {
+        self.is_on_for(kept) && matches!(self, Self::On { posture: true, .. })
     }
 }
 
@@ -141,12 +155,23 @@ impl Record {
     }
 }
 
-/// The said-back file's bytes: `{"version":1,"said":"on","for_at_unix_s":N|null}`
-/// or `{"version":1,"said":"off"}`.
+/// The said-back file's bytes: `{"version":1,"said":"on","for_at_unix_s":N|null}`,
+/// with `"posture":true` when the line named posture, or
+/// `{"version":1,"said":"off"}`. A record with no `posture` (one kept
+/// before posture) is a line that did not name it.
 pub fn said_bytes(said: Said) -> Vec<u8> {
     let value = match said {
-        Said::On { for_at_unix_s } => {
+        Said::On {
+            for_at_unix_s,
+            posture: false,
+        } => {
             json!({"version": 1, "said": "on", "for_at_unix_s": for_at_unix_s})
+        }
+        Said::On {
+            for_at_unix_s,
+            posture: true,
+        } => {
+            json!({"version": 1, "said": "on", "for_at_unix_s": for_at_unix_s, "posture": true})
         }
         Said::Off => json!({"version": 1, "said": "off"}),
     };
@@ -166,14 +191,18 @@ impl Store for Record {
         let Value::Object(value) = serde_json::from_str::<Value>(&text).ok()? else {
             return None;
         };
+        // Only `true` names posture: anything else is the plain line.
+        let posture = value.get("posture").and_then(Value::as_bool) == Some(true);
         match value.get("said")?.as_str()? {
             "off" => Some(Said::Off),
             "on" => match value.get("for_at_unix_s")? {
                 Value::Null => Some(Said::On {
                     for_at_unix_s: None,
+                    posture,
                 }),
                 at => at.as_u64().map(|at| Said::On {
                     for_at_unix_s: Some(at),
+                    posture,
                 }),
             },
             _ => None,
@@ -335,9 +364,15 @@ mod tests {
         for said in [
             Said::On {
                 for_at_unix_s: Some(7),
+                posture: false,
             },
             Said::On {
                 for_at_unix_s: None,
+                posture: false,
+            },
+            Said::On {
+                for_at_unix_s: Some(7),
+                posture: true,
             },
             Said::Off,
         ] {
@@ -360,10 +395,32 @@ mod tests {
             by: None,
             at_unix_s: at,
         };
+        // A record kept before posture: the plain line.
+        std::fs::write(
+            &record.path,
+            r#"{"version":1,"said":"on","for_at_unix_s":7}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            record.said(),
+            Some(Said::On {
+                for_at_unix_s: Some(7),
+                posture: false
+            })
+        );
         let said = Said::On {
             for_at_unix_s: Some(7),
+            posture: false,
         };
         assert!(said.is_on_for(&yes(Some(7))));
+        assert!(!said.names_posture_for(&yes(Some(7))), "the plain line");
+        let posture = Said::On {
+            for_at_unix_s: Some(7),
+            posture: true,
+        };
+        assert!(posture.is_on_for(&yes(Some(7))));
+        assert!(posture.names_posture_for(&yes(Some(7))));
+        assert!(!posture.names_posture_for(&yes(Some(8))), "another yes");
         assert!(!said.is_on_for(&yes(Some(8))), "another yes");
         assert!(!said.is_on_for(&yes(None)));
         assert!(!said.is_on_for(&Kept::default()), "no yes");
@@ -379,6 +436,7 @@ mod tests {
         record
             .set_said(Said::On {
                 for_at_unix_s: Some(7),
+                posture: false,
             })
             .unwrap();
         assert!(!OptIn::default().on(&file.read()));
