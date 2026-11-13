@@ -1502,10 +1502,14 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   over its voice, within 1.5 s (`own_echo::TAIL_US`) of its words' end, or
   with no hearing hook to say when it began is judged as any other line.
 - **A yes that came back empty** (#6840). If speech to text's final words
-  for such a line come back empty but it had a plain yes or no on the way,
-  those words are taken as said while the write waits
-  (`second_provider::answer_on_the_way`, docs/not-speech.md); any other
-  words on the way are thrown away and counted in the journal. On lamp-9adf
+  for such a line come back empty but its words on the way, all of the
+  line's results together and not its last segment alone, are a plain yes
+  or no, those words are taken as said while the write waits
+  (`second_provider::answer_on_the_way`, docs/not-speech.md): "Wait, not
+  that one." then "Okay." is no answer. Any other words on the way are
+  thrown away and counted in the journal. Those words are read for a line
+  in the clear only with `LAMP_SECOND_UNFINISHED_WAIT` on; without it,
+  nothing changes. On lamp-9adf
   on 13 Nov the owner's "Yes." to a calendar move came back as 0 words and
   the write was dropped at the next line.
 - **No nudge, no lamp-said cancel.** The lamp's own "Say 'send it' to send

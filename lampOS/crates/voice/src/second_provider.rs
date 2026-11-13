@@ -8170,6 +8170,14 @@ async fn spoken(
     // none empty: a cut-in whose final words come back empty may still have
     // had some on the way ([`words_on_the_way`]).
     let mut interim: Option<String> = None;
+    // Every result's words for this line, in order, a result that only
+    // grows the one before it standing in its place ([`add_line_words`]):
+    // speech to text sends each result's own words, one segment at a time,
+    // so a line whose finals all come back empty is judged on all of them,
+    // never its last segment alone ([`answer_on_the_way`], Heron's P2 on
+    // #6992). Like `interim`, only while `words_said` is taken: for a line in
+    // the clear, with `LAMP_SECOND_UNFINISHED_WAIT` alone.
+    let mut line_words: Vec<String> = Vec::new();
     let mut enrollment_audio = None;
     let mut enrollment_audio_valid = true;
     loop {
@@ -8177,6 +8185,7 @@ async fn spoken(
             Some(words) = next_said(&mut words_said) => {
                 if !words.trim().is_empty() {
                     interim = Some(words.clone());
+                    add_line_words(&mut line_words, &words);
                 }
                 if shared.unfinished_words {
                     let unfinished = crate::unfinished_words::trailing(&words);
@@ -8285,10 +8294,14 @@ async fn spoken(
     // And the words that came while the final ones were asked for.
     while let Some(words) = words_said.as_mut().and_then(|said| said.try_recv().ok()) {
         if !words.trim().is_empty() {
+            add_line_words(&mut line_words, &words);
             interim = Some(words);
         }
     }
     let interim = interim
+        .map(|words| crate::unfinished_words::without_fillers(&words))
+        .filter(|words| !words.trim().is_empty());
+    let line_words = Some(line_words.join(" "))
         .map(|words| crate::unfinished_words::without_fillers(&words))
         .filter(|words| !words.trim().is_empty());
     // The coordinator's call, its words back after the next line began
@@ -8397,14 +8410,19 @@ async fn spoken(
     // to text had a plain yes or no on the way, while a read-back awaits its
     // answer (#6840, lamp-9adf on 13 Nov: the owner's "Yes." to a calendar
     // move came back as 0 words, opened nothing, and the waiting write was
-    // dropped at the next line). Only then; any other words on the way are
-    // thrown away as before, and the journal counts them.
+    // dropped at the next line). Only then, and only when the whole line's
+    // words on the way (`line_words`, every result's, not the last segment's
+    // alone: "Wait, not that one." then "Okay." is no yes) are the plain yes
+    // or no; any other words on the way are thrown away as before, and the
+    // journal counts them all. Those words exist for a line in the clear only
+    // with `LAMP_SECOND_UNFINISHED_WAIT` (`words_said` above); without it,
+    // nothing changes.
     let text = if on_the_way.is_none() && text.trim().is_empty() {
-        let awaited = interim.as_deref().is_some_and(|words| {
+        let awaited = line_words.as_deref().is_some_and(|words| {
             crate::services::answer_awaited(words)
                 || crate::skill_write_yes::answer_awaited(request, Instant::now())
         });
-        match answer_on_the_way(&text, interim.clone(), awaited) {
+        match answer_on_the_way(&text, line_words.clone(), awaited) {
             Some(words) => {
                 eprintln!(
                     "lamp-voice second: request {request}: its final words came back empty; its {} words on the way answer a waiting read-back: taken as said (#6840)",
@@ -8413,7 +8431,7 @@ async fn spoken(
                 words
             }
             None => {
-                if let Some(words) = interim.as_deref() {
+                if let Some(words) = line_words.as_deref() {
                     eprintln!(
                         "lamp-voice second: request {request}: its final words came back empty; its {} words on the way are thrown away (#6840)",
                         words.split_whitespace().count()
@@ -12104,16 +12122,41 @@ fn words_on_the_way(text: &str, interim: Option<String>, over: bool) -> Option<S
 /// The words speech to text had on the way for a line in the clear whose
 /// final words (`text`) came back empty, while a read-back awaits its
 /// answer (`awaited`: a services write's, [`crate::services::answer_awaited`],
-/// or a skill's yes, [`crate::skill_write_yes::answer_awaited`]): `interim`,
-/// only when it is a plain yes or no ([`crate::services::plain_yes`],
+/// or a skill's yes, [`crate::skill_write_yes::answer_awaited`]): `line`,
+/// the whole line's words on the way ([`add_line_words`]), only when all of
+/// them are a plain yes or no ([`crate::services::plain_yes`],
 /// [`crate::services::plain_no`]). None otherwise, so nothing changes with
-/// no answer awaited (#6840).
-fn answer_on_the_way(text: &str, interim: Option<String>, awaited: bool) -> Option<String> {
-    interim.filter(|words| {
+/// no answer awaited (#6840), and other words anywhere in the line keep it
+/// from being an answer (Heron's P2 on #6992).
+fn answer_on_the_way(text: &str, line: Option<String>, awaited: bool) -> Option<String> {
+    line.filter(|words| {
         awaited
             && text.trim().is_empty()
             && (crate::services::plain_yes(words) || crate::services::plain_no(words))
     })
+}
+
+/// Adds one result's `words` to the line's (`line`), in order. A result
+/// whose words begin with all of the last one's (an interim growing, or its
+/// final) stands in its place, so a segment is kept once; any other result
+/// is its own segment, added after. A revision that changes earlier words
+/// is kept beside them: more words, never fewer, so never more of an answer
+/// than was said (#6840, Heron's P2 on #6992).
+fn add_line_words(line: &mut Vec<String>, words: &str) {
+    if words.trim().is_empty() {
+        return;
+    }
+    let grows = line.last().is_some_and(|last| {
+        let last = plain_words(last);
+        let words = plain_words(words);
+        let last: Vec<&str> = last.split_whitespace().collect();
+        let words: Vec<&str> = words.split_whitespace().collect();
+        words.starts_with(&last)
+    });
+    if grows {
+        line.pop();
+    }
+    line.push(words.to_owned());
 }
 
 /// The next of a listener's early words; never, once there are none.

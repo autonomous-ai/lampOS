@@ -14419,6 +14419,86 @@ fn an_empty_final_with_a_yes_on_the_way_answers_an_awaited_read_back() {
     assert_eq!(super::words_on_the_way("", on("Yes."), false), None);
 }
 
+/// Heron's P2 on #6992: speech to text sends each result's own words, one
+/// segment at a time, so the line's words on the way are all its results',
+/// an interim that only grows the one before standing in its place. "Wait,
+/// not that one." then "Okay." is no answer, though "Okay." alone is a
+/// plain yes; "Yes." then "please." is the yes "Yes. please.".
+#[test]
+fn an_empty_finals_answer_on_the_way_is_judged_on_all_the_lines_words() {
+    let line = |results: &[&str]| {
+        let mut line = Vec::new();
+        for words in results {
+            super::add_line_words(&mut line, words);
+        }
+        Some(line.join(" ")).filter(|words| !words.is_empty())
+    };
+    // Each segment once: interims growing to their final stand in place.
+    assert_eq!(
+        line(&["Wait", "Wait, not", "Wait, not that one.", "Okay", "Okay."]).as_deref(),
+        Some("Wait, not that one. Okay.")
+    );
+    assert_eq!(
+        line(&["No", "No, don't", "No, don't send it."]).as_deref(),
+        Some("No, don't send it.")
+    );
+    assert_eq!(line(&["", " "]), None);
+    // Two segments, the last a plain yes: no answer.
+    let two = line(&["Wait, not that one.", "Okay."]);
+    assert_eq!(super::answer_on_the_way("", two, true), None);
+    // Two segments, both yes: the line's yes.
+    let both = line(&["Yes.", "please."]);
+    assert_eq!(
+        super::answer_on_the_way("", both, true).as_deref(),
+        Some("Yes. please.")
+    );
+    // One segment growing to its final: as said.
+    assert_eq!(
+        super::answer_on_the_way("", line(&["Yes", "Yes."]), true).as_deref(),
+        Some("Yes.")
+    );
+}
+
+/// The same through `spoken` (`LAMP_SECOND_UNFINISHED_WAIT` on, a write
+/// waiting for its read-back's answer, the line's final words empty): the
+/// line's words on the way, not its last segment, are judged. "Yes." alone
+/// is taken as said and the chat asked; "Wait, not that one." then "Okay."
+/// is thrown away, nothing asked.
+#[tokio::test]
+async fn an_empty_final_takes_the_whole_lines_words_on_the_way_not_its_last_segment() {
+    async fn run(on_the_way: &[&str]) -> (Vec<String>, usize) {
+        crate::services::pending_for_test(Some(crate::services::Pending {
+            began_clear: true,
+            service: "gmail".to_owned(),
+            ..crate::services::Pending::new("id", 0, Instant::now(), "Send a mail.", "ann")
+        }));
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(String::new())].into()),
+            said: Mutex::new([on_the_way.iter().map(|w| (*w).to_owned()).collect()].into()),
+            chats: Mutex::new([vec![text("Sent."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (built, _, _) = scripted(script.clone());
+        let mut engine = built.telling_unfinished_words(true);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().len();
+        crate::services::pending_for_test(None);
+        (out, asked)
+    }
+    let (out, asked) = run(&["Yes", "Yes."]).await;
+    assert!(out.contains(&"heard:Yes.".to_owned()), "{out:?}");
+    assert_eq!(asked, 1, "{out:?}");
+    let (out, asked) = run(&["Wait, not that one.", "Okay."]).await;
+    assert!(
+        !out.iter().any(|label| label.starts_with("heard:Okay")),
+        "{out:?}"
+    );
+    assert_eq!(asked, 0, "{out:?}");
+}
+
 /// #1712, item 4 (`LAMP_FOLLOWS_ON`): a line begun soon after the lamp's
 /// words finished is told it may follow on from them, as the Live route
 /// tells it; not when its End marks a sound, nor when it was judged in a
