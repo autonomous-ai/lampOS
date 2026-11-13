@@ -3,6 +3,26 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 01:0x GMT+7: step 4 read (no code yet)
+
+- Quiet check; the lead passed the `shake` finding to lamp-control/body owners.
+- Step 4 (`lamp-sim run --real-voice=local`), read at 162fedbec2: model it on
+  `real_voice::prepare_second`. `second.json`: `llm_base_url`/`llm_model`/
+  `llm_credential_file` = the developer's endpoint; no `deepgram_credential_
+  file`, so `second_config.rs:436` picks `Stt::Autonomous` with `stt_base_url`
+  = `http://127.0.0.1:<listen>` and `stt_credential_file` = `listen.token`
+  (`/ws/audio/transcriptions`, `Token`, as #6971 serves); `tts_provider`
+  openai, `tts_base_url` = `http://127.0.0.1:<speech>`, `tts_credential_file`
+  = `speech.token`; env `LAMP_VOICE_LOOPBACK_SERVICES=on`, `LAMP_SECOND_SPEECH
+  =openai`; speech and listen as child processes (the synthesizer owns its
+  main thread).
+- **Limit:** `llm_base_url` goes through `checked_url` (https) and the switch
+  never covers the LLM (the first builder's rule), so a local LLM on
+  `http://127.0.0.1` (Ollama, LM Studio) is not reachable: the developer's LLM
+  must be an https endpoint. My P4 pitch's "local Ollama with no key" was
+  wrong under that rule.
+- Code waits for #6954's reads (three PRs sit on it) and ten's switch.
+
 ## 2026-11-14 00:5x GMT+7: #6971, P4 step 2 (lamp-sim listen)
 
 - **#6971** (`sim-3/listen`, b07d87bf7b, stacked on #6954): `listen.rs` and
