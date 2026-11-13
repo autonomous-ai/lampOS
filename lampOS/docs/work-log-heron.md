@@ -793,3 +793,17 @@ Ready for lamp-voice: no (a read and a lamp result; no code)
   - When Harness is signed out, a skill's task refusal says so.
   - Gates: lamp-tasks `skill_task` 40/0 and `skill_run` 7/0. A mutation on the `NotSent` wrap is caught.
 - **Lesson:** a "behaves as now" claim about a fallback needs a test with the fallback's own stub (`old`). Reading `engine.is_none()` alone showed the repairs were skipped, but only the probe showed it on the app path.
+- **11:25** The Queue moved to #6811 (#6059 is full). The watcher and memory point there.
+- **11:3x–13:3x reads:**
+  - **P0 #6810:** READ-OK `84709709a9` (6844126589). The two new tests fail on the base with the 52e6 refusal, and `product_adds` is 15/0. It rode train 871.
+    - P3, which the first builder takes: a build's manifest can't carry `lamp-region.path` (`manifest.rs:893`), so a round adds the service only.
+  - **#6813:** READ-OK `59de7f0786`, restated at `d59ee2618d` (my README P3 fixed).
+  - **#6384:** restated at `02cb19963f`. The result is identical to `02bf929a5b`.
+  - **#6825 (P1):** a third READ-OK `11dca6de68`.
+    - P3: no test pins the serve loop's new call. Confirmed by a run: with the call removed, `--no-fail-fast` gives round 306/0. Off-path failures are the known `the_wrapper_fails_closed` and 5 `image_ramlog`.
+  - **#6768 and #6788:** HOLDs lifted at `f4427968b3`/`ff51002dff` (two subagents, key lines checked by me), restated at `5d899d5f4d`/`adb61a4c13`, then at `26fca3dfbc`/`c4b679510e` (all `=`).
+    - My #6768 HOLD wrongly named `LAMP_SKILL_READS`, `LAMP_SKILL_TASKS` and `LAMP_MADE_SCRIPTS` as read by `pack`. Only `LAMP_SKILL_WRITES`, `LAMP_AGENT_SERVICES` and `LAMP_NUDGES_PRESENT` are.
+    - P3 from #6643's rebase: `handed_to_agent` drops the agent's own `refused_before` (`let (made, _)`).
+- **#6657:** with my person's yes, I agreed to its move to Twelve.
+- **Slip, 13:2x:** my restates on #6768/#6788 took their first-line sha from `gh` at post time, after the heads had moved during my gates. Edited both to the read sha with a note.
+  - Rule now: the sha is `git rev-parse` of the ref I read, guarded against `gh`'s head in the same command.
