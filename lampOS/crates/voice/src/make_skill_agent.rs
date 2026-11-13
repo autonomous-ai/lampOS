@@ -252,6 +252,11 @@ pub struct Agent {
     /// Whether each make asks for the lamp's skill-creator guide
     /// ([`GUIDE_ENVIRONMENT`]).
     pub guide: bool,
+    /// Whether DeepSeek gets its repairs when the agent doesn't take the
+    /// make (no make run, `busy`, or no first answer): the app's MAKE IT,
+    /// with no turn waiting ([`Agent::for_app`], Heron's P2 on #6788); a
+    /// voice make's one answer stands, as before.
+    pub repairs_if_untaken: bool,
 }
 
 /// Why the agent gave no answer to take.
@@ -324,7 +329,12 @@ impl Agent {
         if !tasks.is_absolute() {
             return None;
         }
-        Some(Self::made_with(tasks, None, on_with(guide)))
+        // No turn waits on the app's make: DeepSeek keeps its repairs when
+        // the agent doesn't take it.
+        Some(Self {
+            repairs_if_untaken: true,
+            ..Self::made_with(tasks, None, on_with(guide))
+        })
     }
 
     /// One make's agent through the tasks part at `tasks`, its waiting line
@@ -341,6 +351,7 @@ impl Agent {
             },
             make_within: MAKE_WITHIN,
             guide,
+            repairs_if_untaken: false,
         }
     }
 
@@ -608,6 +619,7 @@ pub(crate) mod tests {
                 within: Duration::from_millis(1_500),
                 make_within: Duration::from_secs(10),
                 guide: false,
+                repairs_if_untaken: false,
             }
         }
 
@@ -974,6 +986,7 @@ pub(crate) mod tests {
         assert_eq!(agent.tasks, PathBuf::from("/run/lampos-tasks"));
         assert_eq!(agent.say, None);
         assert!(!agent.guide);
+        assert!(agent.repairs_if_untaken);
         assert_eq!(agent.within, WRITE_WITHIN);
         assert_eq!(agent.make_within, MAKE_WITHIN);
         let guided = Agent::for_app_with(Some("on"), Some("on"), tasks).unwrap();
