@@ -228,6 +228,8 @@ Environment=LAMP_ACTION_CLAIM_CHECKED=on
 # The owner's line is told which services are linked in the app, so "what can you do with my calendar?"
 # is answered from it, not as the app's job (#5523).
 Environment=LAMP_SERVICES_TOLD=on
+# A claim in the model's own words ("I've kept the light on until ten.") with no call is held too (#5215, GO-159).
+Environment=LAMP_ACTION_CLAIM_WORDED=on
 Environment=LAMP_NOT_FOR_ME_WORDS=on
 Environment=LAMP_BUSY_ENDS_SOONER=on
 # Talk over the lamp's own line (a say, a reminder, news) in a busy room is let go and the line goes on; its name,
