@@ -1,5 +1,6 @@
 //! A bare `SKILL.md` added from a file, run by the lamp's agent
-//! (`LAMP_UPLOAD_TO_AGENT`, off unless `on`, set in no unit; the owner's
+//! (`LAMP_UPLOAD_TO_AGENT`, off unless `on`, on in the product's lamp-cloud,
+//! lamp-voice, lamp-skills and lamp-skills-manage@ units since 13 Nov; the owner's
 //! ask, 12 Nov: a skill uploaded from the app runs through the lamp's
 //! Hermes, as V1's did). With it off, a bare `SKILL.md` is a written skill
 //! as before ([`crate::upload_skill::written`], at most 900 bytes).

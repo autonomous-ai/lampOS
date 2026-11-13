@@ -2406,11 +2406,13 @@ Kiểm thử: `upload_skill::tests`, `upload::tests`,
 `online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`
 và `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
 
-### Chạy bởi agent của đèn (`LAMP_UPLOAD_TO_AGENT=on`, tắt)
+### Chạy bởi agent của đèn (`LAMP_UPLOAD_TO_AGENT=on`, bật trong sản phẩm)
 
 Yêu cầu của chủ (12/11): một `SKILL.md` tải lên từ app chạy qua agent của
-đèn, như V1; người xây dựng đầu tiên đồng ý lúc 19:44, cả hai công tắc tắt
-và không đặt trong unit nào. Khi bật (trong `lamp-voice`, `lamp-cloud`,
+đèn, như V1; người xây dựng đầu tiên đồng ý lúc 19:44. Bật trong sản phẩm từ
+13/11 (phán quyết của chủ: luồng tải lên đi qua agent), đặt trong
+`lamp-voice`, `lamp-cloud`, `lamp-skills` và `lamp-skills-manage@`;
+`LAMP_TASK_NET` vẫn tắt, nên tệp cần tới internet vẫn bị từ chối. Khi bật (trong `lamp-voice`, `lamp-cloud`,
 `lamp-skills` và manage helper), một `SKILL.md` trần tối đa 64 KiB thành một
 kỹ năng agent thay vì kỹ năng viết (tắt: như trước, ghi chú tối đa 900 byte):
 tệp được giữ nguyên là `scripts/SKILL.md`; kỹ năng là một công cụ giọng nói

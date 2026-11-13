@@ -4944,11 +4944,14 @@ say service, kept and then `on`) and, with the
 real `lamp-skills`,
 `made::a_skill_added_from_a_file_is_checked_and_never_takes_a_place`.
 
-##### Run by the lamp's agent (`LAMP_UPLOAD_TO_AGENT=on`, off)
+##### Run by the lamp's agent (`LAMP_UPLOAD_TO_AGENT=on`, on in the product)
 
 The owner's ask (12 Nov: a `SKILL.md` uploaded from the app runs through
-the lamp's agent, as V1's did); the first builder's yes at 19:44, both
-switches off and set in no unit. `lamp_voice::upload_agent`. With
+the lamp's agent, as V1's did); the first builder's yes at 19:44. On in
+the product since 13 Nov (the owner's ruling: the upload flow goes via the
+agent), set in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
+`lamp-skills-manage@`; `LAMP_TASK_NET` stays off, so a file that reaches
+the internet is still refused. `lamp_voice::upload_agent`. With
 `LAMP_UPLOAD_TO_AGENT=on` in `lamp-voice`, `lamp-cloud`, `lamp-skills` and
 its manage helper, a bare `SKILL.md` of at most 64 KiB becomes an agent
 skill instead of a written one (off: a written skill, its note at most 900

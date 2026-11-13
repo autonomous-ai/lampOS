@@ -2239,6 +2239,76 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
     }
 }
 
+/// An uploaded `SKILL.md` runs through the lamp's agent (the owner's ruling,
+/// 13 Nov: the upload flow goes via the agent): `LAMP_UPLOAD_TO_AGENT` on,
+/// once, in the four units whose part reads it (lamp-cloud's upload,
+/// lamp-voice's keep, lamp-skills' load and its manage helper's install),
+/// each beside what it needs, and in no other; `LAMP_TASK_NET` stays off,
+/// in no unit.
+#[test]
+fn the_product_runs_an_uploaded_skill_through_the_lamps_agent() {
+    let readers: [(&str, &[&str]); 4] = [
+        ("lamp-cloud.service", &["Environment=LAMP_SKILL_UPLOAD=on"]),
+        (
+            "lamp-voice.service",
+            &[
+                "Environment=LAMP_SKILL_UPLOAD=on",
+                "Environment=LAMP_SKILL_TASKS=on",
+                "Environment=LAMP_AGENT_SERVICES=on",
+            ],
+        ),
+        (
+            "lamp-skills.service",
+            &[
+                "Environment=LAMP_SKILL_TASKS=on",
+                "Environment=LAMP_AGENT_SERVICES=on",
+            ],
+        ),
+        (
+            "lamp-skills-manage@.service",
+            &[
+                "Environment=LAMP_SKILL_TASKS=on",
+                "Environment=LAMP_AGENT_SERVICES=on",
+            ],
+        ),
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let needs = readers
+            .iter()
+            .find(|(name, _)| name == unit)
+            .map(|(_, needs)| *needs);
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_UPLOAD_TO_AGENT"))
+                .count(),
+            usize::from(needs.is_some()),
+            "{unit}"
+        );
+        assert!(
+            !service.iter().any(|line| line.contains("LAMP_TASK_NET")),
+            "{unit} sets LAMP_TASK_NET"
+        );
+        let Some(needs) = needs else {
+            continue;
+        };
+        for line in ["Environment=LAMP_UPLOAD_TO_AGENT=on"].iter().chain(needs) {
+            assert_eq!(
+                service.iter().filter(|set| **set == *line).count(),
+                1,
+                "{unit} lacks {line}"
+            );
+        }
+    }
+    for (unit, _) in readers {
+        assert!(
+            install::PRODUCT.iter().any(|(name, _)| *name == unit),
+            "{unit} is not a product unit"
+        );
+    }
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story), and a cut-in with no words gets its
 /// question (the memory owner's call, 4 Nov; the lamp's own echo can still
