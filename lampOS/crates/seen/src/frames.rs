@@ -32,8 +32,8 @@ use zeroize::Zeroize;
 /// The newest frame asked for may be at most this old when the camera
 /// copies it.
 pub const MAX_AGE_US: u32 = 500_000;
-/// One frame asked for at most this often (phase 2 sets each sense's own
-/// rate: activity's clips, posture's one in 30 s).
+/// One frame asked for at most this often, unless a taker is made with
+/// its own rate ([`Taker::with_every`]: activity's bursts).
 pub const EVERY_US: u64 = 5_000_000;
 
 /// The camera's end, as this part uses it: [`FrameClient`] in the product,
@@ -140,16 +140,25 @@ pub struct Taker<S> {
     jpeg: Vec<u8>,
     grant: Option<CameraGrant>,
     next_request_us: u64,
+    every_us: u64,
     counts: Counts,
 }
 
 impl<S: Source> Taker<S> {
     pub fn new(source: S) -> Self {
+        Self::with_every(source, EVERY_US)
+    }
+
+    /// One frame asked for at most every `every_us` (activity's burst
+    /// spacing, `crate::activity::SPACING_US`); the sink's
+    /// [`Sink::ready`] says when a frame is wanted at all.
+    pub fn with_every(source: S, every_us: u64) -> Self {
         Self {
             source,
             jpeg: Vec::new(),
             grant: None,
             next_request_us: 0,
+            every_us,
             counts: Counts::default(),
         }
     }
@@ -212,7 +221,7 @@ impl<S: Source> Taker<S> {
             self.grant = Some(meta.grant);
             sink.frame(now_us, &meta, &self.jpeg);
             self.jpeg.zeroize();
-            self.next_request_us = now_us.saturating_add(EVERY_US);
+            self.next_request_us = now_us.saturating_add(self.every_us);
             self.counts.handed = self.counts.handed.saturating_add(1);
             return Ok(Step::Handed);
         }

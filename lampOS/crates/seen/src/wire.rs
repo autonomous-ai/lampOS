@@ -43,6 +43,58 @@ pub const HEARTBEAT_EVERY_S: u64 = 60;
 /// (`motion.py:208`); a port bounds it too.
 pub const ANSWER_WITHIN_S: u64 = 15;
 
+/// V1's activity whitelist, line for line and in its order
+/// (`processors/resources/white_list.txt` on `main`), plus one class beyond
+/// V1's list: "eating chips", after "eating carrots", the nearest Kinetics
+/// class to a snack, added after the 13 Nov lamp run gave no eating label
+/// for one. The list reaches only this session: the server
+/// (`core/perception/action/session.py`, `_post_config_update`) builds each
+/// session's class mask from the whitelist that session sent, and a V1
+/// lamp sends its own at its session's start, so V1 lamps keep their 30.
+/// The config object itself is shared (`perception.py`, `create_session`)
+/// and the threshold is read from it live, so the other values stay V1's.
+pub const WHITELIST: [&str; 31] = [
+    "drinking",
+    "drinking beer",
+    "drinking shots",
+    "tasting beer",
+    "celebrating",
+    "clapping",
+    "applauding",
+    "stretching arm",
+    "stretching leg",
+    "tasting food",
+    "dining",
+    "eating burger",
+    "eating cake",
+    "eating carrots",
+    "eating chips",
+    "eating doughnuts",
+    "eating hotdog",
+    "eating ice cream",
+    "eating spaghetti",
+    "eating watermelon",
+    "using computer",
+    "writing",
+    "texting",
+    "reading book",
+    "reading newspaper",
+    "drawing",
+    "playing controller",
+    "laughing",
+    "crying",
+    "yawning",
+    "singing",
+];
+
+/// Activity's config as V1 sends it: the whitelist (V1's and one more
+/// class) and V1's defaults.
+pub fn v1_action_config() -> Sent {
+    Sent::action_config(Some(
+        WHITELIST.iter().map(|label| (*label).to_owned()).collect(),
+    ))
+}
+
 /// What the lamp sends, after the key exchange, before encryption.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -150,8 +202,8 @@ pub fn group(label: &str) -> Option<&'static str> {
         "stretching arm" | "stretching leg" => "break",
         "celebrating" | "clapping" | "applauding" => "celebrate",
         "tasting food" | "dining" | "eating burger" | "eating cake" | "eating carrots"
-        | "eating doughnuts" | "eating hotdog" | "eating ice cream" | "eating spaghetti"
-        | "eating watermelon" => "eat",
+        | "eating chips" | "eating doughnuts" | "eating hotdog" | "eating ice cream"
+        | "eating spaghetti" | "eating watermelon" => "eat",
         "using computer" | "writing" | "texting" | "reading book" | "reading newspaper"
         | "reading" | "drawing" | "playing controller" => "sedentary",
         "yawning" => "tired",
@@ -229,9 +281,26 @@ mod tests {
         assert_eq!(group("tasting beer"), Some("drink"));
         assert_eq!(group("eating burger"), Some("eat"));
         assert_eq!(group("dining"), Some("eat"));
+        // The one class beyond V1's list.
+        assert_eq!(group("eating chips"), Some("eat"));
         assert_eq!(group("stretching leg"), Some("break"));
         assert_eq!(group("yawning"), Some("tired"));
         assert_eq!(group("reading"), Some("sedentary"));
         assert_eq!(group("juggling"), None);
+        // Every whitelisted label is one V1 grouped.
+        assert!(WHITELIST.iter().all(|label| group(label).is_some()));
+    }
+
+    #[test]
+    fn the_config_is_v1s_exactly() {
+        let config = serde_json::to_value(v1_action_config()).unwrap();
+        assert_eq!(config["whitelist"].as_array().unwrap().len(), 31);
+        assert_eq!(config["whitelist"][0], "drinking");
+        assert_eq!(config["whitelist"][13], "eating carrots");
+        assert_eq!(config["whitelist"][14], "eating chips");
+        assert_eq!(config["whitelist"][30], "singing");
+        assert_eq!(config["threshold"], 0.3);
+        assert_eq!(config["person_detection_enabled"], true);
+        assert_eq!(config["person_min_area_ratio"], 0.25);
     }
 }

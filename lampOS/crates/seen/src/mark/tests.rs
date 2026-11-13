@@ -289,3 +289,23 @@ fn on_the_bus() {
     assert_eq!(ring.drawn_at(), Some(45 * MS));
     let _ = std::fs::remove_dir_all(root);
 }
+
+/// A sink that wants no frame now.
+struct Resting;
+
+impl Sink for Resting {
+    fn ready(&mut self, _: u64) -> bool {
+        false
+    }
+    fn frame(&mut self, _: u64, _: &FrameMeta, _: &[u8]) {}
+}
+
+#[test]
+fn no_mark_is_asked_while_the_sink_wants_no_frame() {
+    let mut marked = Marked::new(FakeRing::default(), Resting);
+    for now in [0, WAIT_US, 10 * WAIT_US] {
+        assert!(!marked.ready(now));
+    }
+    assert!(marked.ring_mut().asks.is_empty(), "the ring never blinks");
+    assert_eq!(marked.counts().asked, 0);
+}

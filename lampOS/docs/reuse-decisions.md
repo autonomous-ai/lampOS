@@ -2367,3 +2367,11 @@ V1's bytes exactly), round trips through the same test key, and on
 crate sent. Memory: one session key and one cipher per connection; no
 buffer grows with use. Platform: pure Rust, no C; built and tested on the
 Mac, the ARM64 build is the pull request's ARM64 run.
+
+Activity's bursts (phase 2) add no package: `lamp-seen` takes the socket and
+TLS crates the other clients already pin, `tokio` =1.53.1,
+`tokio-tungstenite` =0.30.0 (`connect`, `handshake`,
+`rustls-tls-webpki-roots`, as `lamp-gemini`), `futures-util` =0.3.34,
+`rustls` 0.23 with the ring provider given to each client explicitly,
+`webpki-roots` 1, and `reqwest` 0.13 with `rustls-no-provider` for the
+public key's one GET. No OpenSSL; the lock gains no package.

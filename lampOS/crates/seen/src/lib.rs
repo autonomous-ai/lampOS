@@ -2,7 +2,9 @@
 //! and drink), from the cloud perception service, on the owner's opt-in
 //! (#6543, docs/seen.md).
 //!
-//! Phase 1 is the lamp's side without the server: no frame leaves the lamp.
+//! Phase 1 is the lamp's side without the server. Phase 2 sends activity's
+//! frames, in bursts, behind the gate and the ring's mark, and puts what
+//! was seen on the bus (`humans/doing`, `humans/doing_seen`).
 //!
 //! - [`gate`]: the "no frames" gate, a pure function of what the bus says
 //!   and the opt-in. No frame is even asked for unless it is open.
@@ -12,8 +14,15 @@
 //!   (`lamp_camera::frames`), following its rules: one request at a time,
 //!   copy before anything else, the frame's grant kept and checked, and
 //!   everything dropped on a privacy close. Each copy goes to a
-//!   [`frames::Sink`], the one place a frame would go to the server; in
-//!   phase 1 that is [`frames::Discard`].
+//!   [`frames::Sink`], the one place a frame would go to the server:
+//!   [`activity::Activity`] when an account is given, else
+//!   [`frames::Discard`].
+//! - [`activity`]: one 8-frame burst a minute, each on its own socket
+//!   ([`burst`]) to [`endpoint`], closed after; busy and failures retreat.
+//! - [`scale`]: the camera's frame scaled down to 320×240 and encoded
+//!   again before it is sent, whatever size the camera serves.
+//! - [`sitting`]: a burst's labels read as drinking, eating or a break,
+//!   and the sitting's timers for `humans/doing`.
 //! - [`mark`]: the ring's mark before any frame: a [`frames::Sink`] that
 //!   asks the ring for it and takes no frame until the ring said it drew
 //!   it (fails closed).
@@ -21,16 +30,22 @@
 //!   say service, when it is turned on and when it is turned off.
 //! - [`crypto`]: V1's encryption, byte for byte: a session AES-256-GCM key
 //!   sent under the server's RSA key (OAEP, SHA-256). No plaintext path.
-//! - [`backoff`]: the server's 503 and `Retry-After`, as V1 paused on it.
+//! - [`backoff`]: the server's 503 and `Retry-After`, as V1 paused on it,
+//!   and activity's retreat after busy bursts and failures.
 //! - [`wire`]: V1's WebSocket messages for activity and pose, as types.
 //! - [`watch`]: the bus readings the gate is built from.
+pub mod activity;
 pub mod backoff;
+pub mod burst;
 pub mod crypto;
+pub mod endpoint;
 pub mod frames;
 pub mod gate;
 pub mod mark;
 pub mod opt_in;
 pub mod said_back;
+pub mod scale;
+pub mod sitting;
 pub mod watch;
 pub mod wire;
 

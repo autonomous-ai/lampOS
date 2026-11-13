@@ -2440,18 +2440,26 @@ version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
+ "futures-util",
+ "jpeg-encoder",
  "lamp-bus",
  "lamp-camera",
  "lamp-msgs",
  "lamp-turn-owner",
  "rand_core 0.6.4",
+ "reqwest",
  "rsa",
  "rustix",
+ "rustls",
  "serde",
  "serde_json",
  "sha2",
  "signal-hook",
+ "tokio",
+ "tokio-tungstenite",
+ "webpki-roots 1.0.9",
  "zeroize",
+ "zune-jpeg",
 ]
 
 [[package]]
