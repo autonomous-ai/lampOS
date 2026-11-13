@@ -351,20 +351,8 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
         eprintln!("lamp-sim: no lamp-skills beside lamp-sim: skill.push is off");
     }
     // The ring, before lamp-control asks it anything.
-    // One boot id for the ring and lamp-control (macOS has no /proc).
-    let clock_id = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")
-        .map(|id| id.trim().to_owned())
-        .ok()
-        .filter(|id| !id.is_empty())
-        .unwrap_or_else(|| {
-            format!(
-                "lamp-sim-{}-{}",
-                std::process::id(),
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map_or(0, |d| d.as_nanos())
-            )
-        });
+    // One boot id for the ring, lamp-control and lamp-body (lib.rs `boot_id`).
+    let clock_id = lamp_sim::boot_id();
     let boot_id = clock_id.clone();
     let mut ring = Ring::on(&bus)?;
     let mut people = People::on(&bus, dir)?;
