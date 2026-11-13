@@ -172,6 +172,7 @@ pub fn make_run(folder: &Path, within: Duration) -> SkillRun {
             (HOME_ENV, shown(&home)),
         ],
         deadline: within,
+        started: Default::default(),
         start_in: Some(folder.to_path_buf()),
     }
 }
