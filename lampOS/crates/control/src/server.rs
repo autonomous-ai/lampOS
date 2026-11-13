@@ -204,6 +204,10 @@ pub struct Shared {
     /// Whether computers beyond the lamp's own network may connect
     /// (`--remote on`): off unless given.
     remote: std::sync::atomic::AtomicBool,
+    /// Whether the door listens on the network: false while lamp-control serves only the owner's side
+    /// and skill runs (`LAMP_CONTROL` not on, #6059). What `{"clients": true}` says as `listening`, so
+    /// the app does not show "On" for a socket with no door behind it (#5299, the App Only E2E).
+    listening: std::sync::atomic::AtomicBool,
     /// Why the lamp ended a connection (a revoke, a change of grants), by connection:
     /// said in the close frame, so the computer's SDK can log why it was cut off.
     close_reasons: Mutex<HashMap<u64, &'static str>>,
@@ -343,6 +347,7 @@ impl Shared {
             task_yes: Mutex::new(None),
             changes: Mutex::new(None),
             remote: std::sync::atomic::AtomicBool::new(false),
+            listening: std::sync::atomic::AtomicBool::new(false),
             close_reasons: Mutex::new(HashMap::new()),
             features: Mutex::new(Features::default()),
         })
@@ -353,6 +358,11 @@ impl Shared {
     /// on`), never to the camera or the microphone.
     pub fn set_remote(&self, remote: bool) {
         self.remote.store(remote, Ordering::Relaxed);
+    }
+
+    /// That the door listens on the network (said once at start, when it is bound).
+    pub fn set_listening(&self, listening: bool) {
+        self.listening.store(listening, Ordering::Relaxed);
     }
 
     /// What streams this lamp can serve now, for the app's grants screen.
@@ -562,6 +572,7 @@ impl Shared {
                 task_yes: Mutex::new(None),
                 changes: Mutex::new(None),
                 remote: std::sync::atomic::AtomicBool::new(false),
+                listening: std::sync::atomic::AtomicBool::new(false),
                 close_reasons: Mutex::new(HashMap::new()),
                 features: Mutex::new(Features::default()),
             }
@@ -1622,7 +1633,10 @@ async fn connection<S>(
 ///   false` with an `error` when the file couldn't take it yet;
 /// - `{"clients": true}` → `{"clients": [{id, name, grants, paired_at,
 ///   paired_at_unix_ms}]}`, `paired_at` in Unix seconds as the file keeps it
-///   (for older readers) and `paired_at_unix_ms` the same in milliseconds.
+///   (for older readers) and `paired_at_unix_ms` the same in milliseconds; and
+///   `listening`, whether the door listens on the network (false when lamp-control
+///   serves only the owner's side and skill runs), so the admin socket's being
+///   there is not read as the door's being open;
 ///
 /// [`CODE_FOR_US`]: crate::pairing::CODE_FOR_US
 pub async fn admin(listener: UnixListener, shared: Arc<Shared>) {
@@ -1836,7 +1850,11 @@ fn admin_answer(shared: &Shared, line: &str, from_the_voice: bool) -> Value {
             .collect();
         // The words for every grant this build knows, once: the app shows them for
         // a grant it has no label of its own for.
-        return json!({"clients": clients, "shown": Grant::shown_all()});
+        return json!({
+            "clients": clients,
+            "shown": Grant::shown_all(),
+            "listening": shared.listening.load(Ordering::Relaxed),
+        });
     }
     json!({"error": "ask for code, set_grants, cancel_code, take_back, revoke, clients, task_yes_record, task_yes_check or task_yes_forget"})
 }
