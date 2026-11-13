@@ -1428,7 +1428,7 @@ pub fn needs_link(uses: &Uses, linked: impl FnOnce() -> Option<Vec<String>>) -> 
 /// in its own words and the conversation's language, never a fixed
 /// English sentence the lamp says as it is (the owner, 10 Nov: "đồng bộ
 /// luôn", as the `cannot:` reason is the model's own): that the skill
-/// starts once they are linked in the app, under Skills, then Connectors.
+/// starts once they are linked in the app: open this lamp, then Settings, then Linked accounts.
 /// The services themselves go with it as `needs_link`. None with none.
 pub fn needs_link_ask(needs: &[Value]) -> Option<String> {
     let names: Vec<&str> = needs
@@ -1444,8 +1444,8 @@ pub fn needs_link_ask(needs: &[Value]) -> Option<String> {
     );
     Some(format!(
         "Then tell the person, in your own words and in the language of the conversation, \
-         that the skill will start once {names} {are} linked in the app, under Skills, then \
-         Connectors (needs_link)."
+         that the skill will start once {names} {are} linked in the app: open this lamp, then \
+         Settings, then Linked accounts (needs_link)."
     ))
 }
 
@@ -11393,8 +11393,8 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(
             ask.contains("in your own words and in the language of the conversation")
                 && ask.contains(
-                    "the skill will start once Gmail is linked in the app, under \
-                                 Skills, then Connectors"
+                    "the skill will start once Gmail is linked in the app: open \
+                                 this lamp, then Settings, then Linked accounts"
                 ),
             "{ask}"
         );

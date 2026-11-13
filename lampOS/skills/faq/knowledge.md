@@ -31,7 +31,7 @@ Say "Hey Lamp", then ask in your own words. I can:
 On my own I say hello when you come back (`welcome-back`), give short nudges after a long sitting, droop a little when the air is stuffy (`stuffy-air`), and sleep at night (`night-sleep`).
 
 ## connectors
-You link your accounts in the Autonomous app: Skills, then Connectors. The services there are Gmail, Google Calendar and Drive, Figma, GitHub, Linear, Asana, a Facebook Page, Slack, monday.com, HubSpot, Amplitude and Notion. Ahrefs can't be linked in the app yet. Spotify and other music services aren't among them yet.
+You link your accounts in the Autonomous app: open this lamp, then Settings, then Linked accounts. The services there are Gmail, Google Calendar and Drive, Figma, GitHub, Linear, Asana, a Facebook Page, Slack, monday.com, HubSpot, Amplitude and Notion. Ahrefs can't be linked in the app yet. Spotify and other music services aren't among them yet.
 <!-- LAMP_SERVICES: on in the product -->
 Once one is linked, just ask me out loud, like "what's on my calendar today?". I read things to you; before I send an email or make anything, I read it back and ask, and do it only if you say yes.
 <!-- LAMP_SERVICES_WRITE: on in the product -->

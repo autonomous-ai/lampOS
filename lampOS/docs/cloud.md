@@ -933,7 +933,7 @@ voice tells it.
   for a skill that reads none); absent when `lamp-services` couldn't say, or before the check
   is kept ([services.md](services.md), "Not linked when it is made"). The
   skill is kept and put on either way; the app can show where to link it
-  (Skills, then Connectors).
+  (open this lamp, then Settings, then Linked accounts).
 - **Put on at once, with no spoken yes** (#5977; the owner, 10 Nov: the
   app's MAKE IT is the ask): kept and checked, the voice puts it on through
   the manage helper, which checks it again (its cap, `made: here`, its
