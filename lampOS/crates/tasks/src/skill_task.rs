@@ -937,6 +937,11 @@ pub const RUN_FOLDER_PREFIX: &str = "skill-";
 /// How long a failed `harness wait` is let rest before it is asked again,
 /// until the run's deadline.
 pub const WAIT_RETRY: Duration = Duration::from_secs(1);
+/// How long an agent Harness says `stopped` with no session bound is
+/// looked past, for the live one in the run's folder, before the run ends
+/// as lost (#6432); and how often in that time it is looked for.
+pub const LOST_START_LOOK: Duration = Duration::from_secs(5);
+const LOST_START_EVERY: Duration = Duration::from_millis(500);
 
 /// The Harness a skill's run is started through, as lamp-tasks has set it
 /// up for spoken tasks (`runtime::serve`): its settings with routing,
@@ -1357,6 +1362,9 @@ pub type SkillHarnessSlot = std::sync::Arc<std::sync::OnceLock<SkillHarness>>;
 /// - **Its end:** `harness wait --any` on the one agent, asked again until
 ///   it ends or the run's deadline ([`SkillRun::deadline`]) cancels it.
 ///   At the deadline, `harness close --now` ([`crate::harness::Cli::close_now`]).
+///   A `stopped` with no session bound is not its end ([`after_stop`],
+///   #6432): the live agent in the run's folder is waited on instead, or,
+///   with none within [`LOST_START_LOOK`], the run is an error.
 ///   However it ends, its guard closes the session (`close --now`),
 ///   removes the folder and the token file, and the caller ends the token
 ///   with lamp-control ([`answer`]). Nothing the run printed is kept by
@@ -1383,6 +1391,9 @@ pub struct HarnessRunner {
     pub held_by: Option<PathBuf>,
     /// How long a failed `wait` rests before it is asked again.
     pub retry: Duration,
+    /// How long a `stopped` with no session bound is looked past
+    /// ([`LOST_START_LOOK`] on a lamp, #6432).
+    pub lost_look: Duration,
     /// [`DEFAULT_AGENT_SWITCH`] on: a run goes to the lamp's default agent
     /// by the one run path, or is refused ([`default_agent_takes_runs`]).
     pub default_agent: bool,
@@ -1420,6 +1431,7 @@ impl HarnessRunner {
             harness,
             held_by: Some(PathBuf::from(HERMES)),
             retry: WAIT_RETRY,
+            lost_look: LOST_START_LOOK,
             default_agent: std::env::var(DEFAULT_AGENT_SWITCH).is_ok_and(|value| value == "on"),
             wrappers: Some(PathBuf::from(AGENT_WRAPPERS)),
             agent_ns: Some(PathBuf::from(AGENT_NS)),
@@ -1486,6 +1498,67 @@ fn ended_as(state: &str, agent: &str) -> Result<u64, String> {
         )),
         "failed" => Err(format!("{agent} failed (Harness says failed)")),
         other => Err(format!("the run ended as Harness says {other}")),
+    }
+}
+
+/// Whether Harness's `show` of an agent read a turn of its session: with
+/// none bound (no session id, no transcript) it has no ask, no answer and
+/// no tools.
+fn session_bound(seen: &crate::harness::Observation) -> bool {
+    seen.ask.is_some() || !seen.answer.trim().is_empty() || seen.tools > 0
+}
+
+/// What an agent Harness says `stopped` comes to ([`after_stop`]).
+enum AfterStop {
+    /// It had a session: the run's end.
+    Bound,
+    /// None bound, and this agent, a new one, is live in the run's folder.
+    Moved(String),
+    /// None bound, and none live in the run's folder within the look.
+    Lost,
+    Cancelled,
+}
+
+/// #6432: Harness at times binds a run to the `hermes` wrapper's pid just
+/// before it `exec`s into the namespace, says it `stopped` about 2.5 s
+/// later, and lists the real Hermes, still loading, as another agent in
+/// the same pane and folder. So a `stopped` is the run's end only once
+/// `show` finds a session; until then, `ps` is looked at for a live agent
+/// in the run's own folder, not one already waited on (`seen`), every
+/// [`LOST_START_EVERY`] for `look`. Nothing is started.
+fn after_stop(
+    cli: &crate::harness::Cli,
+    machine: &str,
+    agent: &str,
+    folder: &str,
+    seen: &[String],
+    look: Duration,
+    cancel: &std::sync::atomic::AtomicBool,
+) -> AfterStop {
+    let until = std::time::Instant::now() + look;
+    loop {
+        if cancel.load(Ordering::Acquire) {
+            return AfterStop::Cancelled;
+        }
+        if cli
+            .observe(machine, agent)
+            .is_ok_and(|seen| session_bound(&seen))
+        {
+            return AfterStop::Bound;
+        }
+        if let Ok(live) = cli.live_in(machine, folder)
+            && let Some(live) = live.into_iter().find(|id| !seen.contains(id))
+        {
+            return AfterStop::Moved(live);
+        }
+        let now = std::time::Instant::now();
+        if now >= until {
+            return AfterStop::Lost;
+        }
+        let next = (now + LOST_START_EVERY).min(until);
+        while std::time::Instant::now() < next && !cancel.load(Ordering::Acquire) {
+            std::thread::sleep(RUN_TICK);
+        }
     }
 }
 
@@ -1626,7 +1699,8 @@ impl Runner for HarnessRunner {
         };
         started.agent = Some(launched.clone());
         drop(token);
-        let agents = [launched];
+        let mut agents = vec![launched];
+        let mut seen = agents.clone();
         let cancel = AtomicBool::new(false);
         let deadline = run.deadline.saturating_sub(began.elapsed());
         let stopping = self.stopping.get().cloned();
@@ -1666,8 +1740,39 @@ impl Runner for HarnessRunner {
                 match cli.wait(&lamp.machine_id, &agents, cancel) {
                     // None: Harness's own hold passed with no end, asked again.
                     Ok(ended) => {
-                        if let Some(ended) = ended.into_iter().next() {
-                            break Some(ended.state);
+                        let Some(ended) = ended.into_iter().next() else {
+                            continue;
+                        };
+                        if ended.state != "stopped" {
+                            break Some(Ok(ended.state));
+                        }
+                        let folder = &launch.target.project;
+                        match after_stop(
+                            &cli,
+                            &lamp.machine_id,
+                            &ended.agent_id,
+                            folder,
+                            &seen,
+                            self.lost_look,
+                            cancel,
+                        ) {
+                            AfterStop::Bound => break Some(Ok(ended.state)),
+                            // Waited on in its place, and closed by the guard.
+                            AfterStop::Moved(live) => {
+                                eprintln!(
+                                    "[lamp-tasks] skill task {}: Harness said {agent} stopped before it had a session; waiting on the live one in the run's folder",
+                                    run.run
+                                );
+                                seen.push(live.clone());
+                                started.agent = Some(live.clone());
+                                agents = vec![live];
+                            }
+                            AfterStop::Lost => {
+                                let why = format!("Harness lost {agent} as it started");
+                                eprintln!("[lamp-tasks] skill task {}: {why}", run.run);
+                                break Some(Err(why));
+                            }
+                            AfterStop::Cancelled => break None,
                         }
                     }
                     Err(code) if code == "cancelled" => break None,
@@ -1684,13 +1789,14 @@ impl Runner for HarnessRunner {
             ended
         });
         match ended {
-            Some(state) => {
+            Some(Ok(state)) => {
                 // Already closed or gone: nothing left for the guard to close.
                 if matches!(state.as_str(), "closed" | "gone") {
                     started.agent = None;
                 }
                 ended_as(&state, agent)
             }
+            Some(Err(why)) => Err(why),
             None => {
                 started.close();
                 if began.elapsed() >= run.deadline {

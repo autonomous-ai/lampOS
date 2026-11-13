@@ -2793,7 +2793,18 @@ for each run, and is answered once the run ends
     `WAIT_RETRY`) until it ends or the deadline (14 minutes, the token's
     life) cancels it. Ended `idle`, `stopped`, `closed` or `gone` is
     `{"ok":true,"id":0}`; `failed`, or `needs-input` (no one answers a
-    skill's run), is `run_failed`. At the deadline the run is closed with
+    skill's run), is `run_failed`. A `stopped` counts only once `harness
+    show` finds a session (an ask, an answer or a tool; #6432): Harness at
+    times holds the `hermes` wrapper's pid just before it `exec`s into the
+    namespace, says it `stopped` about 2.5 s later, and lists the real
+    Hermes, still loading, as another agent in the run's folder. With no
+    session, lamp-tasks looks at `harness ps` every 0.5 s for up to 5 s
+    (`LOST_START_LOOK`) for an agent live in the run's own folder, and
+    waits on that one instead, its end being the run's (the guard closes
+    it). None found is `run_failed` "Harness lost the lamp's Hermes as it
+    started", said in the journal too. No second Hermes is started. The
+    re-bind belongs in Harness; this is the lamp's side. Tests:
+    `a_skill_run_whose_agent_stopped_before_a_session_*`. At the deadline the run is closed with
     `harness close --machine <lamp> <agent> --now --json`
     (`Cli::close_now`) and is `run_failed` "the run was ended at its
     deadline, 840 s". `new` not started (`not_sent`, `uncertain`, or a

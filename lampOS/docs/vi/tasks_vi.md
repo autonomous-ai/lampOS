@@ -388,7 +388,19 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     `WAIT_RETRY`) cho tới khi nó kết thúc hoặc hạn chót (14 phút, đời của
     token) huỷ nó. Kết thúc `idle`, `stopped`, `closed` hay `gone` là
     `{"ok":true,"id":0}`; `failed`, hay `needs-input` (không ai trả lời lần
-    chạy của kỹ năng), là `run_failed`. Ở hạn chót, lần chạy bị đóng bằng
+    chạy của kỹ năng), là `run_failed`. Một `stopped` chỉ được tính khi
+    `harness show` thấy một phiên (một câu hỏi, một câu trả lời hay một
+    công cụ; #6432): đôi khi Harness giữ pid của wrapper `hermes` ngay
+    trước khi nó `exec` vào namespace, báo `stopped` khoảng 2,5 s sau, và
+    liệt kê Hermes thật, còn đang nạp, thành một agent khác trong thư mục
+    của lần chạy. Khi chưa có phiên, lamp-tasks xem `harness ps` mỗi 0,5 s,
+    tối đa 5 s (`LOST_START_LOOK`), tìm một agent còn sống trong chính thư
+    mục của lần chạy, và chờ agent đó thay vào, kết thúc của nó là kết thúc
+    của lần chạy (guard đóng nó). Không thấy agent nào là `run_failed`
+    "Harness lost the lamp's Hermes as it started", cũng ghi trong nhật ký.
+    Không khởi động Hermes thứ hai. Việc gắn lại thuộc về Harness; đây là
+    phía đèn. Test: `a_skill_run_whose_agent_stopped_before_a_session_*`.
+    Ở hạn chót, lần chạy bị đóng bằng
     `harness close --machine <lamp> <agent> --now --json`
     (`Cli::close_now`) và là `run_failed` "the run was ended at its
     deadline, 840 s". `new` không khởi động được (`not_sent`, `uncertain`,

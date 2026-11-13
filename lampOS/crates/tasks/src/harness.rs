@@ -2858,6 +2858,32 @@ impl Cli {
         parse_ps_names(&reply.stdout).map_err(str::to_string)
     }
 
+    /// The agents live in `folder` on one machine, from one `ps` (#6432: a
+    /// skill run's real Hermes, which Harness may list apart from the
+    /// agent it gave the run). A read only.
+    pub fn live_in(&self, machine: &str, folder: &str) -> Result<Vec<String>, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run_bounded(
+                &[
+                    "ps".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+                PS_STDOUT_LIMIT,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("status_failed".into());
+        }
+        parse_ps_live_in(&reply.stdout, folder).map_err(str::to_string)
+    }
+
     /// Whether Harness is signed in to the person's account (`harness auth
     /// status --json`, `serve --set-up-later`). A read only: it signs
     /// nothing in or out.
@@ -5589,6 +5615,37 @@ pub fn parse_ps_names(bytes: &[u8]) -> Result<Vec<PsSession>, &'static str> {
                 folder: row["folder"].as_str().map(str::to_owned),
             })
         })
+        .collect())
+}
+
+/// `harness ps --json`'s agent ids working in `folder` and not ended
+/// (`stopped`, `failed`, `closed`, `gone`, or no state), the reply bounded
+/// as [`parse_ps`]'s ([`Cli::live_in`], #6432).
+pub fn parse_ps_live_in(bytes: &[u8], folder: &str) -> Result<Vec<String>, &'static str> {
+    if bytes.len() > PS_STDOUT_LIMIT {
+        return Err("status_invalid_reply");
+    }
+    let reply: Value = serde_json::from_slice(bytes).map_err(|_| "status_invalid_reply")?;
+    let rows = reply["harnesses"]
+        .as_array()
+        .ok_or("status_invalid_reply")?;
+    if rows.len() > MOST_LISTED {
+        return Err("status_invalid_reply");
+    }
+    let folder = folder.trim_end_matches('/');
+    Ok(rows
+        .iter()
+        .filter(|row| {
+            row["folder"]
+                .as_str()
+                .is_some_and(|at| at.trim_end_matches('/') == folder)
+                && !matches!(
+                    row["state"].as_str(),
+                    None | Some("stopped" | "failed" | "closed" | "gone")
+                )
+        })
+        .filter_map(|row| row["id"].as_str().filter(|id| agent_id(id)))
+        .map(str::to_owned)
         .collect())
 }
 
