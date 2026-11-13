@@ -29,6 +29,18 @@
 //! can't hold it off when held, or a wrapper or namespace script with no
 //! make-home line, `no_namespace`), the make is not handed over and DeepSeek's
 //! failure stands ([`NotWritten::NoMakeRun`]).
+//!
+//! With [`GUIDE_ENVIRONMENT`] `on` too (`LAMP_MAKE_AGENT_GUIDE`, off unless
+//! set; the owner's ask, 13 Nov: the agent makes a skill as V1's
+//! `skill-creator` did), each make's line asks lamp-tasks for the lamp's
+//! skill-creator guide (`"guide":true`, `lamp_tasks::skill_make::GUIDE`):
+//! Hermes takes the intent from the person's words, drafts the skill,
+//! checks it with the lamp's own check (`lamp-skills pack`, the voice's
+//! own) and fixes it before it answers, each answer given
+//! [`GUIDED_WRITE_WITHIN`] for that. The voice still puts every answer
+//! through its whole check, and one it refuses goes back with the check's
+//! words at most [`GUIDED_MOST_REPAIRS`] more times, within the agent's
+//! [`MAKE_WITHIN`]. Off, the line is today's, byte for byte.
 use crate::agent_tasks;
 use serde_json::{Value, json};
 use std::{
@@ -48,6 +60,16 @@ pub const WRITE_WITHIN: Duration = Duration::from_secs(45);
 /// repair is begun only while one more answer ([`WRITE_WITHIN`]) still
 /// ends within it.
 pub const MAKE_WITHIN: Duration = Duration::from_secs(120);
+/// The guide's switch: `on`, and nothing else; off unless set.
+pub const GUIDE_ENVIRONMENT: &str = "LAMP_MAKE_AGENT_GUIDE";
+/// With the guide, the longest one of the agent's answers is waited for: a
+/// draft, its check and up to two fixes in one run, within lamp-tasks'
+/// most (`lamp_tasks::skill_make::MOST_WITHIN`, 120 s) and the agent's
+/// [`MAKE_WITHIN`].
+pub const GUIDED_WRITE_WITHIN: Duration = Duration::from_secs(90);
+/// With the guide, the most times an answer the voice's check refused goes
+/// back to the agent with the check's words.
+pub const GUIDED_MOST_REPAIRS: usize = 2;
 /// lamp-tasks' make socket in its folder (`lamp_tasks::skill_make::MAKE_SOCKET`).
 pub const MAKE_SOCKET_NAME: &str = "skill-make.sock";
 /// What the lamp says, through the say service, as the agent begins, so
@@ -80,6 +102,11 @@ fn on_with(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// Whether the guide's switch is on ([`GUIDE_ENVIRONMENT`]).
+pub fn guide_on() -> bool {
+    on_with(std::env::var(GUIDE_ENVIRONMENT).ok().as_deref())
+}
+
 /// The tasks part's folder, as the second route's worker was given it
 /// (`--tasks-dir`).
 static TASKS: OnceLock<PathBuf> = OnceLock::new();
@@ -100,6 +127,9 @@ pub struct Agent {
     pub within: Duration,
     /// [`MAKE_WITHIN`], or a test's own.
     pub make_within: Duration,
+    /// Whether each make asks for the lamp's skill-creator guide
+    /// ([`GUIDE_ENVIRONMENT`]).
+    pub guide: bool,
 }
 
 /// Why the agent gave no answer to take.
@@ -136,12 +166,29 @@ impl Agent {
             return None;
         }
         let tasks = TASKS.get()?.clone();
+        let guide = guide_on();
         Some(Self {
             tasks,
             say: Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
-            within: WRITE_WITHIN,
+            within: if guide {
+                GUIDED_WRITE_WITHIN
+            } else {
+                WRITE_WITHIN
+            },
             make_within: MAKE_WITHIN,
+            guide,
         })
+    }
+
+    /// The most times an answer the voice's check refused goes back to the
+    /// agent: [`GUIDED_MOST_REPAIRS`] with the guide, else
+    /// `make_skill_local::MOST_REPAIRS`, as before.
+    pub fn most_repairs(&self) -> usize {
+        if self.guide {
+            GUIDED_MOST_REPAIRS
+        } else {
+            crate::make_skill_local::MOST_REPAIRS
+        }
     }
 
     /// Who the lamp's agent is, as the person calls it ("Hermes",
@@ -191,11 +238,16 @@ impl Agent {
             .map_err(|_| NotWritten::NoMakeRun)?;
         // lamp-tasks ends the run at `within`; its answer comes just after.
         let grace = (self.within / 2).min(Duration::from_secs(5));
-        let line = json!({
+        let mut line = json!({
             "op": "skill_make",
             "rules": format!("{system}\n\n{brief}\n"),
             "within_ms": self.within.as_millis() as u64,
         });
+        // The guide asked for only with its switch: off, the line is
+        // today's, its three keys alone.
+        if self.guide {
+            line["guide"] = json!(true);
+        }
         stream
             .set_write_timeout(Some(SEND_WITHIN))
             .and_then(|()| stream.set_read_timeout(Some(self.within + grace)))
@@ -384,6 +436,15 @@ pub(crate) mod tests {
                 say: None,
                 within: Duration::from_millis(1_500),
                 make_within: Duration::from_secs(10),
+                guide: false,
+            }
+        }
+
+        /// [`StubTasks::agent`], each make asking for the guide.
+        pub(crate) fn guided(&self) -> Agent {
+            Agent {
+                guide: true,
+                ..self.agent()
             }
         }
 
@@ -590,6 +651,39 @@ pub(crate) mod tests {
             }),
             Some("gmail")
         );
+    }
+
+    /// `LAMP_MAKE_AGENT_GUIDE`: with it each make's line asks lamp-tasks
+    /// for the guide, the rules the same; without it the line is today's,
+    /// its three keys alone (above).
+    #[test]
+    fn the_guide_is_asked_for_only_with_its_switch() {
+        let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("A".into())));
+        assert_eq!(tasks.agent().write("S", "B", false).unwrap(), "A");
+        assert_eq!(tasks.guided().write("S", "B", false).unwrap(), "A");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let makes: Vec<&Value> = sent
+            .iter()
+            .filter(|line| line["op"] == "skill_make")
+            .collect();
+        assert_eq!(
+            makes[0].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["op", "rules", "within_ms"]
+        );
+        assert_eq!(
+            makes[1].as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["guide", "op", "rules", "within_ms"]
+        );
+        assert_eq!(makes[1]["guide"], true);
+        assert_eq!(makes[0]["rules"], makes[1]["rules"]);
+        assert_eq!(
+            tasks.agent().most_repairs(),
+            crate::make_skill_local::MOST_REPAIRS
+        );
+        assert_eq!(tasks.guided().most_repairs(), GUIDED_MOST_REPAIRS);
+        // Within lamp-tasks' most and the agent's part.
+        const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= 120) };
+        const { assert!(GUIDED_WRITE_WITHIN.as_secs() <= MAKE_WITHIN.as_secs()) };
     }
 
     #[test]

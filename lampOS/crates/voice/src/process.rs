@@ -2238,6 +2238,8 @@ fn second_route_worker_environment(
         crate::made_skill::ENVIRONMENT,
         // A make it didn't make handed to the lamp's agent (#6059's proposal).
         crate::make_skill_agent::ENVIRONMENT,
+        // With the lamp's skill-creator guide given to that agent (13 Nov).
+        crate::make_skill_agent::GUIDE_ENVIRONMENT,
         crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
         // A remark about the lamp held in a busy room (#4175).
         crate::remark_about_it::ENVIRONMENT,
@@ -2527,6 +2529,7 @@ mod tests {
             crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT,
             crate::made_skill::ENVIRONMENT,
             crate::make_skill_agent::ENVIRONMENT,
+            crate::make_skill_agent::GUIDE_ENVIRONMENT,
             crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT,
             crate::remark_about_it::ENVIRONMENT,
             crate::opens_further::ENVIRONMENT,
@@ -3517,6 +3520,7 @@ mod tests {
                     || name == crate::untied_going_on::CALLER_SPEAKING_ENVIRONMENT
                     || name == crate::made_skill::ENVIRONMENT
                     || name == crate::make_skill_agent::ENVIRONMENT
+                    || name == crate::make_skill_agent::GUIDE_ENVIRONMENT
                     || name == crate::second_provider::BUSY_CALLED_STRICT_ENVIRONMENT
                     || name == crate::remark_about_it::ENVIRONMENT
                     || name == crate::opens_further::ENVIRONMENT
@@ -3685,6 +3689,7 @@ mod tests {
                     "LAMP_LANGUAGE_FILE=/etc/lampOS/setup/language",
                     "LAMP_LEDGER_REFENCE=on",
                     "LAMP_LIGHT_TOLD=on",
+                    "LAMP_MAKE_AGENT_GUIDE=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
                     "LAMP_MEMORY_DAYS=on",
