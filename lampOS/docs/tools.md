@@ -320,7 +320,8 @@ and none of the skills' own (`crate::use_skill`):
   is several calls in one turn, each look told to call again with the next
   place (`a_search_skill_through_use_skill_is_not_told_it_already_ran`,
   #5505). The function's description says: the call runs the skill, and it
-  is not called again for the same ask unless its answer says to.
+  is not called again in this turn for the same ask unless its answer says
+  to; a new ask in a later line is a call of its own (#7076).
   - **Told instead, never dropped** (the reviewer on #1696):
     - a skill that isn't installed ("There is no skill named juggle. Your
       skills are …");

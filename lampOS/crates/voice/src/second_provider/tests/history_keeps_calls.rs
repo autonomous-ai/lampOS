@@ -174,10 +174,10 @@ fn a_light_call_is_handed_on_with_its_arguments() {
 }
 
 /// Any other function's call made with arguments, neither the light's,
-/// the volume's nor the Schedule's, is never handed on: a keep's are the
-/// person's own words, never told again as a call, and told bare they
-/// would teach calling it bare (Fourteen's P3 on #5018). The step beside
-/// it is.
+/// the volume's, the Schedule's nor a skill's through `use_skill` with only
+/// its own fields, is never handed on: a keep's are the person's own words,
+/// never told again as a call, and told bare they would teach calling it
+/// bare (Fourteen's P3 on #5018). The step beside it is.
 #[test]
 fn another_call_with_arguments_is_not_handed_on() {
     let rounds = vec![
@@ -200,6 +200,60 @@ fn another_call_with_arguments_is_not_handed_on() {
         ),
         [(1, "light_dimmer".to_owned(), json!({}))]
     );
+}
+
+/// #7076, lamp-52e6 on 14 Nov: a second "Lamp, I'm unplugging you now."
+/// 8 s after a prepare-unplug run was answered in words, `calls=none`: the
+/// earlier asks were told as words alone. A skill's call through
+/// `use_skill` is handed on with its skill, choice and flag only, told that
+/// it ran then and that a new ask needs its own call; one with any other
+/// field, or no skill, is not.
+#[test]
+fn a_skill_call_is_handed_on_and_told_a_new_ask_needs_its_own_call() {
+    let rounds = vec![
+        vec![
+            Ok(ChatEvent::ToolCalls(vec![
+                call("c0", "use_skill", json!({"skill": "prepare-unplug"})),
+                call(
+                    "c1",
+                    "use_skill",
+                    json!({"skill": "dance", "choice": "calm", "flag": true}),
+                ),
+            ])),
+            Ok(ChatEvent::Done),
+        ],
+        saying("Done."),
+    ];
+    assert_eq!(
+        handed_on_told(true, "Lamp, I'm unplugging you now.", rounds),
+        [
+            (
+                1,
+                "use_skill".to_owned(),
+                json!({"skill": "prepare-unplug"}),
+                Some(SKILL_RAN_EARLIER)
+            ),
+            (
+                1,
+                "use_skill".to_owned(),
+                json!({"skill": "dance", "choice": "calm", "flag": true}),
+                Some(SKILL_RAN_EARLIER)
+            ),
+        ]
+    );
+    assert_eq!(kept_args("use_skill", &json!({"choice": "calm"})), None);
+    assert_eq!(
+        kept_args("use_skill", &json!({"skill": "tea", "ask": "five"})),
+        None
+    );
+    assert_eq!(
+        kept_args(
+            "use_skill",
+            &json!({"skill": "x".repeat(crate::thread::KEPT_ARGS_BYTES)})
+        ),
+        None
+    );
+    assert!(SKILL_RAN_EARLIER.starts_with('(') && SKILL_RAN_EARLIER.ends_with(')'));
 }
 
 /// lamp-52e6 at 9928 (4 Nov 09:30): "set a timer for one minute" called
