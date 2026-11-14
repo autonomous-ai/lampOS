@@ -149,8 +149,7 @@ const PARTS: &[&str] = &[
     "lamp-peek",
     "lamp-policy",
     "lamp-records",
-    // PARKED (#6386): its units are in deploy/product/parked; re-enable when China is scheduled and stable's lamp-update carries #6810.
-    // "lamp-region",
+    "lamp-region",
     "lamp-schedule",
     "lamp-seen",
     "lamp-selftest",
