@@ -1356,6 +1356,60 @@ fn the_unplug_skills_exact_line_answers_the_conversation_it_is_in() {
     assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
 }
 
+/// #7060 (case B on lamp-52e6: "unplug", the fold, the ask, "No."): the
+/// "No." was still the voice model's turn in flight, queued but not yet
+/// played, when the skill's stay line came. The line answers the
+/// conversation, not that turn: it waits until the lamp has nothing on its
+/// way to the speaker and nobody is heard, then plays. Taken at once, it
+/// opened a sound turn that never played and was dropped as "the voice has
+/// gone".
+#[test]
+fn the_unplug_skills_exact_line_waits_for_a_turn_still_on_its_way() {
+    let mut owner = resting_owner();
+    let (mut reply, mut trace) = (None, SessionState::default());
+    let admission = InputAdmission::default();
+    let (mut says, answered) = crate::say::Says::words_for_test(
+        "prepare-unplug",
+        crate::say::Words::ExactSound {
+            samples: vec![400; 480],
+            text: Some(crate::language::UNPLUG_STAY.to_owned()),
+        },
+        8,
+    );
+    let rest = sound_now(&mut owner, &reply, &admission, &says);
+    let queued = crate::say::SoundNow {
+        conversing: true,
+        speaking: true,
+        playing: false,
+        ..rest
+    };
+    assert!(
+        !take_exact(&mut says, &queued, &mut owner, &mut reply, &mut trace),
+        "it waits for the turn still on its way"
+    );
+    assert!(answered.try_recv().is_err(), "still waiting");
+    let heard = crate::say::SoundNow {
+        conversing: true,
+        listening: true,
+        ..rest
+    };
+    assert!(
+        !take_exact(&mut says, &heard, &mut owner, &mut reply, &mut trace),
+        "it waits while someone is heard"
+    );
+    assert!(answered.try_recv().is_err(), "still waiting");
+    let done = crate::say::SoundNow {
+        conversing: true,
+        speaking: false,
+        listening: false,
+        ..rest
+    };
+    assert!(take_exact(
+        &mut says, &done, &mut owner, &mut reply, &mut trace
+    ));
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+}
+
 /// An exact line asked while the lamp is muted is refused at once, with
 /// why, and nothing plays.
 #[test]
