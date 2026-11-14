@@ -7149,9 +7149,10 @@ async fn a_known_person_speaking_is_told_how_they_seem_and_no_one_else_is() {
 }
 
 /// #6543 (`LAMP_SECOND_DOING`): a spoken request from a known person in view
-/// is told what they were last seen doing; one in the room's scope (two
-/// faces, none known) is not, and is never asked of the note. Without the
-/// switch no note is ever asked.
+/// is told what they were last seen doing; a written turn, a line held only
+/// by the face's gap (no face to read) and one in the room's scope (two
+/// faces, none known) are not, and are never asked of the note (Heron's P3
+/// on #6661). Without the switch no note is ever asked.
 #[tokio::test]
 async fn a_known_person_speaking_is_told_what_they_were_seen_doing_and_no_one_else_is() {
     use crate::memory_scope::{FaceCache, GAP, ScopeLease};
@@ -7164,13 +7165,16 @@ async fn a_known_person_speaking_is_told_what_they_were_seen_doing_and_no_one_el
                 [
                     Ok("Should I have a coffee?".to_owned()),
                     Ok("And now?".to_owned()),
+                    Ok("And then?".to_owned()),
                 ]
                 .into(),
             ),
             chats: Mutex::new(
                 [
                     vec![text("Maybe later."), Ok(ChatEvent::Done)],
+                    vec![text("Hello."), Ok(ChatEvent::Done)],
                     vec![text("Still here."), Ok(ChatEvent::Done)],
+                    vec![text("Yes."), Ok(ChatEvent::Done)],
                 ]
                 .into(),
             ),
@@ -7206,15 +7210,25 @@ async fn a_known_person_speaking_is_told_what_they_were_seen_doing_and_no_one_el
         engine.submit(end(1));
         assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
         engine.memory_answered(1, Instant::now());
+        engine.submit(written(2, "Say hello."));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
+        // No face in view, just after the answer: the person held only by
+        // the gap, whose face can't be read.
+        cache.replace_seen(cache.begin_refresh(), None, Some(0));
+        engine.submit(start(3));
+        assert!(engine.memory_lease().unwrap().scope().unwrap().held());
+        engine.submit(audio(3, 1));
+        engine.submit(end(3));
+        assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
         // Two faces, none known: the room's scope.
         cache.replace_seen(cache.begin_refresh(), None, Some(2));
-        engine.submit(start(2));
+        engine.submit(start(4));
         assert_eq!(
             engine.memory_lease().unwrap().scope().unwrap().person(),
             None
         );
-        engine.submit(audio(2, 1));
-        engine.submit(end(2));
+        engine.submit(audio(4, 1));
+        engine.submit(end(4));
         assert_eq!(turn(&mut engine).await.last().unwrap(), "complete");
         let told = |messages: &Vec<Message>| {
             messages.iter().any(|message| {
@@ -7227,9 +7241,11 @@ async fn a_known_person_speaking_is_told_what_they_were_seen_doing_and_no_one_el
             })
         };
         let asked = script.asked.lock().unwrap();
-        assert_eq!(asked.len(), 2);
+        assert_eq!(asked.len(), 4);
         assert_eq!(told(&asked[0]), switched_on, "{:?}", asked[0]);
-        assert!(!told(&asked[1]), "{:?}", asked[1]);
+        for untold in &asked[1..] {
+            assert!(!told(untold), "{untold:?}");
+        }
         if switched_on {
             assert_eq!(*asked_for.lock().unwrap(), [1], "the known person's only");
             assert!(heard_for.lock().unwrap().contains(&1));
