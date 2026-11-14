@@ -310,12 +310,11 @@ fn fail(host: &mut impl Host, previous: Option<&[u8]>, reason: Reason) -> Joined
     Joined::Failed { reason }
 }
 
-/// V1's `cloudProbeTimeout`: the name, the connection and the TLS handshake,
-/// all of it, so a dead network still fails fast inside the 60 s join.
-// PARKED (#6386): 5 s for a slow first lookup or a far server from China (#6256);
-// re-enable when China is scheduled and stable's lamp-update carries #6810:
-// pub const REACH_TIMEOUT: Duration = Duration::from_secs(5);
-pub const REACH_TIMEOUT: Duration = Duration::from_secs(3);
+/// The name, the connection and the TLS handshake, all of it, so a dead
+/// network still fails inside the 60 s join. V1's `cloudProbeTimeout` was
+/// 3 s; 5 s lets a slow first lookup or a far server (about 450 ms a round
+/// trip from China) pass (#6256).
+pub const REACH_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Pinged in turn before the TLS check, each for at most 2 s: AliDNS first,
 /// which answers in China, then Google's, which answers almost everywhere
@@ -694,9 +693,7 @@ impl ImageHost {
             station_script: "/usr/local/bin/device-sta-mode".into(),
             hotspot_script: "/usr/local/bin/device-ap-mode".into(),
             interface: "wlan0".into(),
-            // PARKED (#6386): the product's relay, not Gemini (#6256); re-enable when China is scheduled and stable's lamp-update carries #6810:
-            // reach: Reach::new(DEFAULT_REACH, REACH_TIMEOUT),
-            reach: Reach::new("generativelanguage.googleapis.com:443", REACH_TIMEOUT),
+            reach: Reach::new(DEFAULT_REACH, REACH_TIMEOUT),
             started: std::time::Instant::now(),
             since_unix: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -854,41 +851,32 @@ impl Host for ImageHost {
     }
 
     fn internet(&mut self) -> bool {
-        // PARKED (#6386): AliDNS, then Google, then TLS to the backend, each passing
-        // check said (#6256); re-enable when China is scheduled and stable's lamp-update carries #6810:
-        // let began = Instant::now();
-        // let ping = |target: &str| {
-        //     std::process::Command::new("ping")
-        //         .args(["-c", "1", "-W", "2", target])
-        //         .stdout(std::process::Stdio::null())
-        //         .stderr(std::process::Stdio::null())
-        //         .status()
-        //         .is_ok_and(|status| status.success())
-        // };
-        // let passed = PING_TARGETS
-        //     .iter()
-        //     .find(|target| ping(target))
-        //     .map(|target| format!("ping {target}"))
-        //     .or_else(|| {
-        //         self.reach
-        //             .check()
-        //             .then(|| format!("TLS {}", self.reach.address))
-        //     });
-        // // Which check passed and when, for a network that blocks some (#6256).
-        // if let Some(passed) = &passed {
-        //     eprintln!(
-        //         "lamp-setup: the internet answered: {passed} in {} ms",
-        //         began.elapsed().as_millis()
-        //     );
-        // }
-        // passed.is_some()
-        let ping = std::process::Command::new("ping")
-            .args(["-c", "1", "-W", "2", "8.8.8.8"])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-            .is_ok_and(|status| status.success());
-        ping || self.reach.check()
+        let began = Instant::now();
+        let ping = |target: &str| {
+            std::process::Command::new("ping")
+                .args(["-c", "1", "-W", "2", target])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status()
+                .is_ok_and(|status| status.success())
+        };
+        let passed = PING_TARGETS
+            .iter()
+            .find(|target| ping(target))
+            .map(|target| format!("ping {target}"))
+            .or_else(|| {
+                self.reach
+                    .check()
+                    .then(|| format!("TLS {}", self.reach.address))
+            });
+        // Which check passed and when, for a network that blocks some (#6256).
+        if let Some(passed) = &passed {
+            eprintln!(
+                "lamp-setup: the internet answered: {passed} in {} ms",
+                began.elapsed().as_millis()
+            );
+        }
+        passed.is_some()
     }
 
     fn current_ssid(&mut self) -> Option<String> {
