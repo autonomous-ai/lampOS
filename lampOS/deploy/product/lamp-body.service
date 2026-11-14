@@ -46,7 +46,7 @@ Environment=LAMP_BODY_STRAIN_GUARD=on
 # (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
 Environment=LAMP_UNPLUG=on
 EnvironmentFile=/etc/lampOS/body/lamp.env
-# --speed 300, Tuning::SPEED_CAP (24 Oct): Expression's offsets, the mood poses and gaze moves reach the head at this
+# --speed 300 (24 Oct; energy level 1, Tuning::SPEED_CAP is 800 for LAMP_BODY_ENERGY levels): Expression's offsets, the mood poses and gaze moves reach the head at this
 # rate, with the software acceleration six times it (720 -> 1800 counts/s^2); leans keep their 1.5 s and the arm's stand
 # and fold follow --stand-seconds. Measured on lamp-4ace through one spoken answer each, body/joint_states read 10 times
 # a second: at 120, 2 head swings of 2 degrees or more (its posture only); at 300, 6 of 3 to 7 degrees (the nods).

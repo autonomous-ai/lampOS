@@ -20,6 +20,7 @@ pub mod ask;
 pub mod body;
 #[cfg(any(unix, test))]
 pub mod bus_out;
+pub mod energy_in;
 #[cfg(any(unix, test))]
 pub mod exit_report;
 #[cfg(any(unix, test))]
@@ -44,6 +45,7 @@ pub mod clips;
 pub mod cog;
 pub mod command;
 pub mod control;
+pub mod energy;
 pub mod first_stand;
 pub mod gaze;
 pub mod gesture;
