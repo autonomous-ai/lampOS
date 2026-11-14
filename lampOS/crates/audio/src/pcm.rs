@@ -212,8 +212,42 @@ impl Speaker {
             pcm.sw_params(&software)?;
             format
         };
-        Ok(Self {
-            pcm: Box::new(pcm),
+        Ok(Self::from_parts(Box::new(pcm), format, boot, clock_mode))
+    }
+
+    /// A speaker that plays into `pcm` rather than into an ALSA device (a software queue: see
+    /// [`crate::soft_pcm`]), in the same modes as [`Speaker::open`] and [`Speaker::open_clock`].
+    /// `format` must be one the speaker accepts of ALSA: the rendering rate, a period of at most a
+    /// block, a buffer of at most four blocks and, with `clock_mode`, at least two.
+    pub fn with_pcm(
+        pcm: Box<dyn PlaybackPcm>,
+        format: PcmFormat,
+        boot: BootId,
+        clock_mode: bool,
+    ) -> Result<Self> {
+        if format.rate != RENDER_RATE
+            || format.period_frames <= 0
+            || format.period_frames > RENDER_SAMPLES as i64
+            || format.buffer_frames <= 0
+            || format.buffer_frames > (RENDER_SAMPLES * 4) as i64
+            || (clock_mode && format.buffer_frames < (RENDER_SAMPLES * 2) as i64)
+        {
+            return Err(io::Error::other(format!(
+                "the playback queue cannot meet the bounded speaker format: {format:?}"
+            ))
+            .into());
+        }
+        Ok(Self::from_parts(pcm, format, boot, clock_mode))
+    }
+
+    fn from_parts(
+        pcm: Box<dyn PlaybackPcm>,
+        format: PcmFormat,
+        boot: BootId,
+        clock_mode: bool,
+    ) -> Self {
+        Self {
+            pcm,
             format,
             guard: BoundaryGuard::new(boot, now()),
             pending: PlaybackOwnership::new(),
@@ -230,7 +264,7 @@ impl Speaker {
             post_write_check_at: None,
             #[cfg(test)]
             avail_errno: None,
-        })
+        }
     }
 
     pub fn format(&self) -> PcmFormat {
@@ -1260,5 +1294,85 @@ mod underrun_tests {
         let error = underrun(&mut speaker, rustix::io::Errno::PIPE);
         assert!(error.downcast_ref::<Underrun>().is_none(), "{error}");
         assert!(speaker.zero_authority().is_err(), "the guard is closed");
+    }
+}
+
+#[cfg(test)]
+mod soft_queue_tests {
+    use super::*;
+    use crate::soft_pcm::{self, SoftPcm};
+    use lamp_turn_owner::{AdmissionState, CaptureState, Controller, Permission};
+    use std::sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    };
+
+    /// The seam in use: a speaker over a software queue primes, starts its clock and sees the queue
+    /// drain by the clock, with every frame it was given told to the sink. Nothing here is ALSA.
+    #[test]
+    fn a_speaker_plays_into_a_software_queue_as_into_alsa() {
+        let clock = Arc::new(AtomicU64::new(5_000_000));
+        let told = Arc::new(Mutex::new(0usize));
+        let (read, count) = (clock.clone(), told.clone());
+        let pcm = SoftPcm::with_clock(
+            move || read.load(Ordering::SeqCst),
+            move |frames| *count.lock().unwrap() += frames.len(),
+        );
+        let boot = BootId::new([122; 16]).unwrap();
+        let mut speaker = Speaker::with_pcm(Box::new(pcm), soft_pcm::FORMAT, boot, true).unwrap();
+        assert_eq!(speaker.format().buffer_frames, soft_pcm::DEPTH_FRAMES);
+        let mut controller = Controller::new(boot, now());
+        controller
+            .set_microphone_permission(now(), Permission::Allowed)
+            .unwrap();
+        let until = now().checked_add(500_000).unwrap();
+        controller
+            .set_capture(now(), CaptureState::RetainingUntil(until))
+            .unwrap();
+        controller
+            .set_admission(now(), AdmissionState::OpenUntil(until))
+            .unwrap();
+        speaker
+            .install(controller.snapshot(now()).unwrap())
+            .unwrap();
+        let token = speaker.zero_authority().unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        speaker.try_write_silence(token, 240).unwrap();
+        assert_eq!(*told.lock().unwrap(), 480);
+        // Not started: the clock has not begun, so nothing has drained, however long it waits.
+        clock.fetch_add(1_000_000, Ordering::SeqCst);
+        speaker.maintain().unwrap();
+        assert!(speaker.pending.has_pending());
+        speaker.start_clock(token).unwrap();
+        // 480 frames at 24 kHz are 20 ms; after that the speaker sees an empty queue.
+        clock.fetch_add(20_000, Ordering::SeqCst);
+        speaker.maintain().unwrap();
+        assert!(!speaker.pending.has_pending());
+    }
+
+    /// A format the speaker would not take of ALSA is not taken of a queue either.
+    #[test]
+    fn a_queue_of_a_format_the_speaker_refuses_is_refused() {
+        let boot = BootId::new([123; 16]).unwrap();
+        for format in [
+            PcmFormat {
+                rate: 16_000,
+                ..soft_pcm::FORMAT
+            },
+            PcmFormat {
+                buffer_frames: (RENDER_SAMPLES * 5) as i64,
+                ..soft_pcm::FORMAT
+            },
+            PcmFormat {
+                buffer_frames: RENDER_SAMPLES as i64,
+                ..soft_pcm::FORMAT
+            },
+        ] {
+            let pcm = SoftPcm::with_clock(|| 0, |_| {});
+            assert!(
+                Speaker::with_pcm(Box::new(pcm), format, boot, true).is_err(),
+                "{format:?}"
+            );
+        }
     }
 }

@@ -212,6 +212,16 @@ impl Audio {
     /// holds that computer's open stream. A block is 10 to 100 ms long, not
     /// the microphone's fixed 20 ms.
     pub const SPEAKER_TOPIC: &str = "speaker/audio";
+    /// The sound the VOICE plays, put on the bus instead of into a sound card
+    /// (`lamp-voice --speaker-device bus:speaker1`, for a developer's computer
+    /// beside lamp-sim): the voice publishes it and a simulator plays it. The
+    /// reverse of [`Audio::SPEAKER_TOPIC`], which carries a computer's sound
+    /// into the voice. The same header and `json+pcm` payload, 24 kHz mono
+    /// S16LE ([`Audio::SPEAKER_SAMPLE_RATE`]), one block per write the voice's
+    /// speaker queue takes (up to 10 ms, a shorter one when the queue had room
+    /// for only part), the sequence rising by one a block. The voice writes at
+    /// the pace its queue drains, in real time; the bus has no back-pressure.
+    pub const PLAY_TOPIC: &str = "speaker1/play";
     /// The speaker path's sample rate, in hertz: the only one on
     /// [`Audio::SPEAKER_TOPIC`].
     pub const SPEAKER_SAMPLE_RATE: u32 = 24_000;
@@ -2367,7 +2377,10 @@ pub fn sleep_audio_topics() -> Vec<(&'static str, Declaration)> {
 /// separate from the original seventeen: lamp-control publishes it and the
 /// voice reads it only while it holds that computer's open stream.
 pub fn speaker_audio_topics() -> Vec<(&'static str, Declaration)> {
-    vec![(Audio::SPEAKER_TOPIC, Audio::speaker_declaration())]
+    vec![
+        (Audio::SPEAKER_TOPIC, Audio::speaker_declaration()),
+        (Audio::PLAY_TOPIC, Audio::speaker_declaration()),
+    ]
 }
 
 /// Semantic room sound is separate from the original topics and level/onset.
@@ -3595,6 +3608,29 @@ mod tests {
                 .iter()
                 .any(|(name, _)| *name == Audio::SLEEP_TOPIC)
         );
+    }
+
+    /// `speaker1/play`: the voice's own sound put on the bus for a simulator, a
+    /// microphone's block the other way round, declared as the speaker's
+    /// stream, and not one of the original topics nor `speaker/audio`.
+    #[test]
+    fn the_play_topic_is_the_voices_sound_to_a_simulator() {
+        let declared = declaration_of(Audio::PLAY_TOPIC).unwrap();
+        assert_eq!(
+            (
+                declared.type_name.as_str(),
+                declared.kind,
+                declared.period_ms
+            ),
+            (Audio::TYPE, Kind::Event, Some(100))
+        );
+        assert_ne!(Audio::PLAY_TOPIC, Audio::SPEAKER_TOPIC);
+        assert!(
+            !first_topics()
+                .iter()
+                .any(|(name, _)| *name == Audio::PLAY_TOPIC)
+        );
+        assert!(!Audio::TOPICS.contains(&Audio::PLAY_TOPIC));
     }
 
     /// `speaker/audio`: a computer's sound to the speaker, the microphone's
