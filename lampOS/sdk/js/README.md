@@ -244,7 +244,7 @@ await lamp.closed();
   | `touch` | `kind` (`tap`, `pet`, `hold`), `where` | none |
   | `button` | `press` (`press`, `long_press`) | none |
   | `time` | your schedule | none |
-  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep`, `lease`, and `quiet_hours` (planned: not produced yet; on a lamp that sets quiet hours, off by default, the door refuses `say` and `sound` in them, or while the lamp's local time isn't known, with the error `quiet_hours`) | none |
+  | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false; a lease change is a `lease` event) | none |
   | `volume.changed` | `level` (0–100), `muted`: the speaker's volume changed, whoever changed it (the person by voice or in the app, or a computer) | `speak` |
   | `lamp.said` | `text`, `by`, `source`, `cut`: a line the lamp said out loud (its fixed phrases, a computer's own say back to it, a reply said to the owner); never what a person says | `speech` |
   | `body.state` | `joints` (`pitch`, `roll`, `yaw`, `shoulder`, `elbow`: each `deg`, `counts`, `goal_deg`, `load`, `moving`, `temp_c`) and `lamp` (`light`, `talking`, `private`), at most 25 a second (12.5 today) | `body` |
@@ -452,7 +452,7 @@ subscribe.
 | `sound.heard` | `class`: `music`, `laughter`, `door` or `footsteps`. `score`: 0.5–1, 2 places | `{"ev":"sound.heard","class":"door","score":0.72}` | a class's score rises past 0.5 (again only after it falls under). Never speech | `sound` |
 | `touch` | `kind`: `tap` (two or more taps are one tap) or `pet`. The schema also has `hold` and `where`, not sent yet | `{"ev":"touch","kind":"pet"}` | a tap or a pet on the lamp | none |
 | `button` | `press`: `long_press`. The schema also has `press`, not sent yet | `{"ev":"button","press":"long_press"}` | the button is held | none |
-| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false). `quiet_hours` is planned, not sent yet | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
+| `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` (each true or false) | `{"ev":"lamp.changed","lamp_state":{"talking":true,"paused":false,"private":false,"asleep":false}}` | any of the four changes | none |
 | `volume.changed` | `level`: 0–100 of what the lamp allows. `muted`: true at 0 | `{"ev":"volume.changed","level":30,"muted":false}` | the volume changes, whoever changed it: the person by voice or in the app, or a computer | `speak` |
 | `lamp.said` | `text`: what the lamp said, as written. `by`: `lamp` or `computer`. `source`: `reply`, `exact` or `cached`. `cut`: true when it was cut short | `{"ev":"lamp.said","text":"Going to sleep now.","by":"lamp","source":"cached"}` | the lamp says a line out loud (its fixed phrases, a computer's own say back to it alone, a reply only when said to the owner); never what a person says | `speech` |
 | `time` | your schedule | | accepted in a subscription, not produced yet | none |
