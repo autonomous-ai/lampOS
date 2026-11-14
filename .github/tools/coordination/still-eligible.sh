@@ -33,6 +33,7 @@ for p in "$@"; do
   sw=$(coord_switch_on $head) || { echo "#$p: its diff can't be read for a switch turned on"; exit 1; }
   so=(); [[ $sw == on ]] && so=(--switch-on)
   rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf $so --pr $p $heads < $tmp/c)
+  # 14 Nov 15:40 (the lead): "row-incomplete <parts>" (a row without the lamp, the build or the journal lines) is no row.
   [[ $rw == row || $rw == no-row-needed ]] || { echo "#$p: no lamp row (rows.py: ${rw:-failed})"; exit 1; }
 done
 exit 0
