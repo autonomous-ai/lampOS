@@ -6208,7 +6208,9 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
 - **What a known person was last seen doing (`LAMP_SECOND_DOING=on`,
   #6543):** off. With `LAMP_BUS=on`, `humans/doing` is read every 2 s
   (`worker::doing_task`, `crate::doing_told`), a value fresh within the
-  message's 90 s (`HumanDoing::LASTS`), with `last` not `none` and a
+  message's 90 s (`HumanDoing::LASTS`) and not expired as the bus has it
+  (a stamp from another boot or ahead of now never counts, even with the
+  wall clock stepped back), with `last` not `none` and a
   `confidence` of 0.5 or over (`SURE_FROM`: a drink told that wasn't
   costs more than one missed), and only while exactly one face is in view
   (`humans/faces`), since with two it may be the other's. Only the last
@@ -6224,7 +6226,10 @@ stands), and eyes that can't be reached at all name nobody, as before. Without a
   seem (`Engine::noting_what_they_did`, `worker::doing_noting`); not in a
   busy room, never a written turn. Spent once an answer given it begins to
   be heard, and each sighting is told once (a sighting is its kind and the
-  time it was seen, within 60 s). Nothing of it is kept past the note. The
+  time it was seen, within 60 s). Each request keeps the sighting it was
+  given (up to 4 in flight), so an answer heard spends only that one: a
+  newer sighting given to a request still in flight is still told.
+  Nothing of it is kept past the note. The
   journal, at that first audio: `request N is told what the person was
   last seen doing`.
 - **An answer may leave a soft door** (`LAMP_OPENS_FURTHER=on`, #5194;

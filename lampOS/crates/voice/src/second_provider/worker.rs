@@ -2164,24 +2164,38 @@ async fn doing_task(bus: lamp_bus::Bus, doing: Arc<Mutex<crate::doing_told::Doin
     every.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     loop {
         every.tick().await;
-        let fresh_ms = lamp_msgs::HumanDoing::LASTS.as_millis() as u64;
         let now_ms = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |since| since.as_millis() as u64);
-        let read = bus
-            .latest(lamp_msgs::HumanDoing::TOPIC)
-            .ok()
-            .flatten()
-            .filter(|message| now_ms.saturating_sub(message.header.at_unix_ms) < fresh_ms)
-            .and_then(|message| {
-                let said_ms = message.header.at_unix_ms;
-                Some((message.parse::<lamp_msgs::HumanDoing>().ok()?, said_ms))
-            });
+        let read = doing_read(
+            bus.latest(lamp_msgs::HumanDoing::TOPIC).ok().flatten(),
+            now_ms,
+        );
         let faces = crate::known_faces::faces_in_view(&bus);
         if let Ok(mut doing) = doing.lock() {
             doing.seen_in_view(read, faces, now_ms, monotonic_us());
         }
     }
+}
+
+/// The newest `humans/doing` message as [`doing_task`] keeps it, with the
+/// time it was said, at `now_ms` on the wall clock: none when it is older
+/// than `HumanDoing::LASTS` by its wall stamp, or expired as the bus has it
+/// (`message.expired`, as `faces_in_view` reads it): a stamp from another
+/// boot or ahead of now is never fresh, even with the wall clock stepped
+/// back (Heron's P3 on #6661).
+fn doing_read(
+    message: Option<lamp_bus::Message>,
+    now_ms: u64,
+) -> Option<(lamp_msgs::HumanDoing, u64)> {
+    let fresh_ms = lamp_msgs::HumanDoing::LASTS.as_millis() as u64;
+    message
+        .filter(|message| !message.expired)
+        .filter(|message| now_ms.saturating_sub(message.header.at_unix_ms) < fresh_ms)
+        .and_then(|message| {
+            let said_ms = message.header.at_unix_ms;
+            Some((message.parse::<lamp_msgs::HumanDoing>().ok()?, said_ms))
+        })
 }
 
 /// The most requests remembered as given the air's note and not yet heard.
@@ -2244,9 +2258,13 @@ fn seems_noting(
 }
 
 /// What a known person was last seen doing, as context only
-/// (`LAMP_SECOND_DOING=on`, `crate::doing_told`, #6543): given and spent as
-/// the air's note is ([`air_noting`]), not in a busy room. Which requests
-/// may be given it (a known person in view, spoken) is the engine's to say.
+/// (`LAMP_SECOND_DOING=on`, `crate::doing_told`, #6543): given as the air's
+/// note is ([`air_noting`]), not in a busy room, and spent once an answer
+/// it was given begins to be heard. Unlike the air's, each request keeps
+/// the sighting it was given, so an answer heard spends only that one and
+/// never a newer one given to a request still in flight (Heron's P3 on
+/// #6661). Which requests may be given it (a known person in view, spoken)
+/// is the engine's to say.
 fn doing_noting(
     doing: Arc<Mutex<crate::doing_told::DoingTold>>,
     busy: impl Fn(u64) -> bool + Send + Sync + 'static,
@@ -2256,19 +2274,22 @@ fn doing_noting(
     crate::second_provider::AirHeard,
 ) {
     let spent = doing.clone();
-    noting_once(
-        move |now| doing.lock().ok()?.due(now),
-        move |request, now| {
-            if let Ok(mut doing) = spent.lock() {
-                doing.told(now);
-                eprintln!(
-                    "lamp-voice second: request {request} is told what the person was last seen doing"
-                );
-            }
-        },
-        busy,
-        clock,
-    )
+    let note: crate::second_provider::TaskNote = Arc::new(move |request| {
+        let now = clock();
+        if busy(now) {
+            return None;
+        }
+        doing.lock().ok()?.due(request, now)
+    });
+    let heard: crate::second_provider::AirHeard = Arc::new(move |request| {
+        let Ok(mut doing) = spent.lock() else { return };
+        if doing.told(request, clock()) {
+            eprintln!(
+                "lamp-voice second: request {request} is told what the person was last seen doing"
+            );
+        }
+    });
+    (note, heard)
 }
 
 /// A note `due` says, given to a request unless the room is `busy`, and
@@ -14477,6 +14498,103 @@ mod tests {
             monotonic_us(),
         );
         assert_eq!(note(7), None, "two faces in view");
+        // Heron's P3 on #6661: A given one sighting, B a newer one; A's
+        // answer heard spends only A's, so B's is still due.
+        let ate = lamp_msgs::HumanDoing {
+            last: lamp_msgs::Doing::Eating,
+            ate_s_ago: 5,
+            ..drank
+        };
+        doing.lock().unwrap().seen_in_view(
+            Some((again, now_ms + 900_000)),
+            Some(1),
+            now_ms + 900_000,
+            monotonic_us(),
+        );
+        assert!(note(10).is_some(), "A given the drink");
+        doing.lock().unwrap().seen_in_view(
+            Some((ate, now_ms + 901_000)),
+            Some(1),
+            now_ms + 901_000,
+            monotonic_us(),
+        );
+        assert!(
+            note(11).unwrap().contains("seen eating"),
+            "B given the meal"
+        );
+        heard(10);
+        assert!(
+            note(12).unwrap().contains("seen eating"),
+            "B's not spent by A"
+        );
+        heard(11);
+        assert_eq!(note(13), None, "B's heard: told");
+    }
+
+    /// `humans/doing` as [`super::doing_task`] keeps it: fresh only within
+    /// `HumanDoing::LASTS` (90 s) by its wall stamp and never expired as the
+    /// bus has it, even when the wall clock says it is fresh (Heron's P3 on
+    /// #6661).
+    #[test]
+    fn a_doing_read_past_ninety_seconds_or_expired_is_not_kept() {
+        let now_ms = 1_800_000_000_000;
+        let drank = lamp_msgs::HumanDoing {
+            drank_s_ago: 120,
+            ate_s_ago: 3000,
+            break_s_ago: 3000,
+            last: lamp_msgs::Doing::Drinking,
+            confidence: 0.8,
+        };
+        let message = |at_unix_ms: u64, expired: bool| lamp_bus::Message {
+            header: lamp_bus::Header {
+                topic: lamp_msgs::HumanDoing::TOPIC.into(),
+                kind: lamp_bus::Kind::Latest,
+                enc: lamp_bus::JSON.into(),
+                type_name: Some(lamp_msgs::HumanDoing::TYPE.into()),
+                source: "seen".into(),
+                boot: "0123456789abcdef".into(),
+                seq: 1,
+                at_us: 1,
+                at_unix_ms,
+                expires_ms: Some(lamp_msgs::HumanDoing::LASTS.as_millis() as u64),
+                clock: None,
+            },
+            payload: serde_json::to_vec(&drank).unwrap(),
+            gap: 0,
+            publisher_restarted: false,
+            expired,
+        };
+        let lasts_ms = lamp_msgs::HumanDoing::LASTS.as_millis() as u64;
+        assert_eq!(lasts_ms, 90_000);
+        assert_eq!(
+            super::doing_read(Some(message(now_ms - 1_000, false)), now_ms),
+            Some((drank, now_ms - 1_000)),
+            "fresh"
+        );
+        assert!(
+            super::doing_read(Some(message(now_ms - lasts_ms + 1, false)), now_ms).is_some(),
+            "just inside 90 s"
+        );
+        assert_eq!(
+            super::doing_read(Some(message(now_ms - lasts_ms, false)), now_ms),
+            None,
+            "a latched value 90 s old is stale"
+        );
+        assert_eq!(
+            super::doing_read(Some(message(now_ms - 600_000, false)), now_ms),
+            None,
+            "a latched value ten minutes old is stale"
+        );
+        // Fresh by the wall clock (stepped back, or a stamp ahead of now)
+        // but expired as the bus judged it: not kept.
+        for at_unix_ms in [now_ms - 1_000, now_ms + 60_000] {
+            assert_eq!(
+                super::doing_read(Some(message(at_unix_ms, true)), now_ms),
+                None,
+                "expired at {at_unix_ms}"
+            );
+        }
+        assert_eq!(super::doing_read(None, now_ms), None, "none on the bus");
     }
 
     /// migrate-P2, the product's route: with the coordinator's mark, a line

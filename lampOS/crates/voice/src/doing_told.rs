@@ -18,7 +18,7 @@
 //!
 //! Off unless the service's environment says `on`.
 use lamp_msgs::{Doing, HumanDoing};
-use std::time::Duration;
+use std::{collections::VecDeque, time::Duration};
 
 /// Where the coordinator reads whether what the person was seen doing is
 /// told. `on` only.
@@ -38,6 +38,10 @@ const KEPT_FOR: Duration = Duration::from_secs(3);
 /// Two reads of one kind whose sighting falls this close are one sighting:
 /// each message's timer is whole seconds from its own time.
 const SAME_SIGHTING: Duration = Duration::from_secs(60);
+/// The most requests remembered as given a note and not yet heard: as many
+/// as may be in flight at once (the air's `AIR_GIVEN_MOST`); the oldest is
+/// let go past it.
+const GIVEN_MOST: usize = 4;
 
 /// One sighting: what, and when on the wall clock (ms since the epoch).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -67,9 +71,11 @@ struct Seen {
 #[derive(Debug, Default)]
 pub struct DoingTold {
     seen: Option<Seen>,
-    /// The sighting last given in a note, not yet heard.
-    given: Option<Sighting>,
-    /// The sighting last told, its answer heard.
+    /// Each request given a note and not yet heard, with the sighting it
+    /// was given, the newest last: an answer heard spends only its own
+    /// request's sighting (Heron's P3 on #6661). [`GIVEN_MOST`] at most.
+    given: VecDeque<(u64, Sighting)>,
+    /// The newest sighting told, its answer heard.
     told: Option<Sighting>,
 }
 
@@ -116,9 +122,10 @@ impl DoingTold {
         self.seen(read.filter(|_| faces_in_view == Some(1)), now_ms, now_us);
     }
 
-    /// The note, if one is due now: a fresh sighting not yet told. It is
-    /// remembered as given, to be spent by [`Self::told`].
-    pub fn due(&mut self, now_us: u64) -> Option<String> {
+    /// The note for `request`, if one is due now: a fresh sighting not yet
+    /// told. It is remembered as given to that request, to be spent by
+    /// [`Self::told`] once that request's answer is heard.
+    pub fn due(&mut self, request: u64, now_us: u64) -> Option<String> {
         let seen = self.seen?;
         let since_us = now_us.saturating_sub(seen.read_at_us);
         if since_us >= KEPT_FOR.as_micros() as u64 {
@@ -127,15 +134,34 @@ impl DoingTold {
         if self.told.is_some_and(|told| told.same(&seen.sighting)) {
             return None;
         }
-        self.given = Some(seen.sighting);
+        self.given.retain(|(given_to, _)| *given_to != request);
+        if self.given.len() == GIVEN_MOST {
+            self.given.pop_front();
+        }
+        self.given.push_back((request, seen.sighting));
         Some(note(seen.sighting.what, seen.ago_s + since_us / 1_000_000))
     }
 
-    /// The note given was heard: its sighting is told.
-    pub fn told(&mut self, _now_us: u64) {
-        if let Some(given) = self.given.take() {
-            self.told = Some(given);
+    /// `request`'s answer was heard: the sighting it was given, if any, is
+    /// told, and so spent for every request given that same sighting. A
+    /// request given another (a newer one) keeps it. Whether anything was
+    /// told.
+    pub fn told(&mut self, request: u64, _now_us: u64) -> bool {
+        let Some(at) = self
+            .given
+            .iter()
+            .position(|(given_to, _)| *given_to == request)
+        else {
+            return false;
+        };
+        let (_, sighting) = self.given.remove(at).expect("found just now");
+        self.given.retain(|(_, given)| !given.same(&sighting));
+        // An older sighting's answer heard after a newer one's never
+        // makes the newer one due again.
+        if self.told.is_none_or(|told| told.at_ms <= sighting.at_ms) {
+            self.told = Some(sighting);
         }
+        true
     }
 }
 
@@ -209,14 +235,14 @@ mod tests {
     fn a_sighting_is_told_once_and_only_once_heard() {
         let mut doing = DoingTold::default();
         doing.seen(Some((drank(120, 0.8), NOW_MS)), NOW_MS, 0);
-        let note = doing.due(0).expect("a fresh, sure sighting");
+        let note = doing.due(1, 0).expect("a fresh, sure sighting");
         assert!(note.starts_with("(Context only, not to answer"), "{note}");
         assert!(note.contains("seen drinking about 2 minutes ago"), "{note}");
         assert!(note.contains("Don't mention it unless they bring it up"));
         assert!(note.contains("never comment on it or on their body"));
         // Given, but its answer not heard (cut short): still due.
-        assert!(doing.due(SEC_US).is_some(), "not heard: due again");
-        doing.told(SEC_US);
+        assert!(doing.due(2, SEC_US).is_some(), "not heard: due again");
+        doing.told(2, SEC_US);
         // The same sighting, read again by the next message 30 s on with
         // its timer 30 s longer: one sighting, not told again.
         doing.seen(
@@ -224,17 +250,17 @@ mod tests {
             NOW_MS + 30_000,
             30 * SEC_US,
         );
-        assert_eq!(doing.due(30 * SEC_US), None, "told once");
+        assert_eq!(doing.due(3, 30 * SEC_US), None, "told once");
         // A new drink seen: told.
         doing.seen(
             Some((drank(5, 0.8), NOW_MS + 600_000)),
             NOW_MS + 600_000,
             600 * SEC_US,
         );
-        let note = doing.due(600 * SEC_US).expect("a new sighting");
+        let note = doing.due(4, 600 * SEC_US).expect("a new sighting");
         assert!(note.contains("just now"), "{note}");
         // Something else seen since: told.
-        doing.told(600 * SEC_US);
+        doing.told(4, 600 * SEC_US);
         let ate = HumanDoing {
             last: Doing::Eating,
             ate_s_ago: 60,
@@ -245,17 +271,17 @@ mod tests {
             NOW_MS + 700_000,
             700 * SEC_US,
         );
-        assert!(doing.due(700 * SEC_US).unwrap().contains("seen eating"));
+        assert!(doing.due(5, 700 * SEC_US).unwrap().contains("seen eating"));
     }
 
     #[test]
     fn a_stale_unsure_or_empty_read_is_not_told() {
         let mut doing = DoingTold::default();
         doing.seen(Some((drank(60, 0.8), NOW_MS)), NOW_MS, 0);
-        assert_eq!(doing.due(KEPT_FOR.as_micros() as u64), None, "stale");
+        assert_eq!(doing.due(1, KEPT_FOR.as_micros() as u64), None, "stale");
         for confidence in [0.49, f32::NAN] {
             doing.seen(Some((drank(60, confidence), NOW_MS)), NOW_MS, 0);
-            assert_eq!(doing.due(0), None, "{confidence}");
+            assert_eq!(doing.due(1, 0), None, "{confidence}");
         }
         let nothing = HumanDoing {
             last: Doing::Nothing,
@@ -263,9 +289,73 @@ mod tests {
             ..drank(600, 0.0)
         };
         doing.seen(Some((nothing, NOW_MS)), NOW_MS, 0);
-        assert_eq!(doing.due(0), None, "nothing seen this sitting");
+        assert_eq!(doing.due(1, 0), None, "nothing seen this sitting");
         doing.seen(None, NOW_MS, 0);
-        assert_eq!(doing.due(0), None, "none on the bus");
+        assert_eq!(doing.due(1, 0), None, "none on the bus");
+    }
+
+    #[test]
+    fn a_read_exactly_half_sure_is_told_and_one_just_under_is_not() {
+        let mut doing = DoingTold::default();
+        doing.seen(Some((drank(60, SURE_FROM), NOW_MS)), NOW_MS, 0);
+        assert!(doing.due(1, 0).is_some(), "0.5 or over is sure");
+        let under = f32::from_bits(SURE_FROM.to_bits() - 1);
+        assert!(under < SURE_FROM);
+        doing.seen(Some((drank(60, under), NOW_MS)), NOW_MS, 0);
+        assert_eq!(doing.due(2, 0), None, "just under 0.5 is unsure");
+    }
+
+    /// Heron's P3 on #6661: A is given one sighting, B a newer one, both in
+    /// flight; A's answer heard spends only A's, and B's is still told.
+    #[test]
+    fn an_answer_heard_spends_only_the_sighting_its_own_request_was_given() {
+        let mut doing = DoingTold::default();
+        doing.seen(Some((drank(120, 0.8), NOW_MS)), NOW_MS, 0);
+        assert!(doing.due(1, 0).is_some(), "A given the first drink");
+        let ate = HumanDoing {
+            last: Doing::Eating,
+            ate_s_ago: 5,
+            ..drank(125, 0.8)
+        };
+        doing.seen(Some((ate, NOW_MS + 1_000)), NOW_MS + 1_000, SEC_US);
+        assert!(doing.due(2, SEC_US).unwrap().contains("seen eating"));
+        // A request never given one, or one heard twice, spends nothing.
+        assert!(!doing.told(9, SEC_US), "never given a note");
+        assert!(doing.told(1, SEC_US), "A's answer heard");
+        assert!(!doing.told(1, SEC_US), "A's already spent");
+        // B's newer sighting is still due, to the next request too.
+        assert!(doing.due(3, SEC_US).unwrap().contains("seen eating"));
+        assert!(doing.told(2, SEC_US), "B's answer heard");
+        assert_eq!(doing.due(4, SEC_US), None, "B's sighting told once");
+        assert!(
+            !doing.told(3, SEC_US),
+            "3 was given B's sighting: spent with it"
+        );
+        // A late answer for an older sighting, heard after a newer one's,
+        // never makes the newer one due again.
+        let mut doing = DoingTold::default();
+        doing.seen(Some((drank(120, 0.8), NOW_MS)), NOW_MS, 0);
+        assert!(doing.due(1, 0).is_some(), "A given the drink");
+        doing.seen(Some((ate, NOW_MS + 1_000)), NOW_MS + 1_000, SEC_US);
+        assert!(doing.due(2, SEC_US).is_some(), "B given the meal");
+        assert!(doing.told(2, SEC_US), "B's answer heard first");
+        assert!(doing.told(1, SEC_US), "then A's");
+        assert_eq!(doing.due(3, SEC_US), None, "the meal stays told");
+    }
+
+    #[test]
+    fn what_was_given_is_kept_for_the_most_in_flight_and_no_more() {
+        let mut doing = DoingTold::default();
+        doing.seen(Some((drank(60, 0.8), NOW_MS)), NOW_MS, 0);
+        for request in 1..=10 {
+            assert!(doing.due(request, 0).is_some());
+            // The same request asked again is kept once.
+            assert!(doing.due(request, 0).is_some());
+        }
+        assert_eq!(doing.given.len(), GIVEN_MOST);
+        assert!(!doing.told(1, 0), "the oldest let go past the most");
+        assert!(doing.told(10, 0), "the newest kept");
+        assert!(doing.given.is_empty(), "all were given that one sighting");
     }
 
     #[test]
@@ -273,11 +363,11 @@ mod tests {
         for faces in [Some(0), Some(2), None] {
             let mut doing = DoingTold::default();
             doing.seen_in_view(Some((drank(60, 0.9), NOW_MS)), faces, NOW_MS, 0);
-            assert_eq!(doing.due(0), None, "{faces:?}");
+            assert_eq!(doing.due(1, 0), None, "{faces:?}");
         }
         let mut doing = DoingTold::default();
         doing.seen_in_view(Some((drank(60, 0.9), NOW_MS)), Some(1), NOW_MS, 0);
-        assert!(doing.due(0).is_some(), "one face");
+        assert!(doing.due(1, 0).is_some(), "one face");
     }
 
     #[test]
