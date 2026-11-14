@@ -3,7 +3,9 @@ use lamp_memory_bench::{
     audio, campaign, evaluation, files, hash,
     ledger::{self, Ledger, Manifest, Mode},
     live_http,
-    live_plan::{Adapter, Fixture, PRELIMINARY_LABEL, PRELIMINARY_ORDER, Policy, Run},
+    live_plan::{
+        Adapter, Fixture, PRELIMINARY_LABEL, PRELIMINARY_NEXT_ORDER, PRELIMINARY_ORDER, Policy, Run,
+    },
     live_run, live_speech, model,
     protocol::EventKind,
     speech,
@@ -571,7 +573,7 @@ fn empty_campaign_card_keeps_all_registered_slots_and_refuses_a_substituted_pare
     assert!(lamp_memory_bench::comparison::report(&p, approval(&p), &root, true).is_err());
 }
 #[test]
-fn preliminary_policy_is_one_development_run_of_four_setups() {
+fn preliminary_policy_is_one_development_run_of_three_setups() {
     let registered = policy();
     assert!(
         serde_json::to_value(&registered)
@@ -584,7 +586,7 @@ fn preliminary_policy_is_one_development_run_of_four_setups() {
     p.check_approval(&approval(&p), true).unwrap();
     assert_eq!(
         p.planned_microusd().unwrap(),
-        4 * 1_000_000 + p.fixtures["development"].speech_budget_microusd
+        3 * 1_000_000 + p.fixtures["development"].speech_budget_microusd
     );
     assert_ne!(p.hash().unwrap(), registered.hash().unwrap());
     let mut changed = p.clone();
@@ -617,6 +619,10 @@ fn preliminary_policy_is_one_development_run_of_four_setups() {
     assert!(changed.validate(true).is_err());
     assert!(p.admitted(&run("none", 2)).is_err());
     assert!(p.admitted(&run("tiers_minus_facts", 1)).is_err());
+    assert!(
+        p.admitted(&run("full_history", 1)).is_err(),
+        "full history is left out of the preliminary (3 Nov)"
+    );
     p.admitted(&run("tiers", 1)).unwrap();
 }
 fn copy_tree(from: &Path, to: &Path) {
@@ -678,7 +684,7 @@ fn score_card_refuses_a_preliminary_ledger() {
         lamp_memory_bench::comparison::preliminary_report(&p, approval(&p), &root, true).unwrap();
     assert!(card["label"].as_str().unwrap().contains(PRELIMINARY_LABEL));
     let setups = card["setups"].as_array().unwrap();
-    assert_eq!(setups.len(), 4);
+    assert_eq!(setups.len(), 3);
     assert_eq!(setups[0]["run"]["status"], "completed");
     assert!(setups[0]["run"]["scores"].is_null());
     assert_eq!(
@@ -740,7 +746,6 @@ fn preliminary_template_validates_once_filled_and_fits_the_cap() {
     let filled = [
         ("@RUNNER_REVISION@", "a".repeat(40)),
         ("@RUNNER_SHA256@", "b".repeat(64)),
-        ("@TIERS_SHA256@", "c".repeat(64)),
         ("@AUDIO_SHA256@", "d".repeat(64)),
         (
             "@CHAT_ENDPOINT@",
@@ -758,9 +763,47 @@ fn preliminary_template_validates_once_filled_and_fits_the_cap() {
     let p: Policy = serde_json::from_str(&filled).unwrap();
     p.validate(false).unwrap();
     assert!(p.preliminary);
+    assert_eq!(
+        p.fixtures["development"].setup_order,
+        PRELIMINARY_NEXT_ORDER.map(str::to_owned).to_vec()
+    );
     assert!(p.planned_microusd().unwrap() <= 40_000_000);
     assert_eq!(
         p.fixtures["development"].registration_sha256,
         hash(&fs::read(source().join("registration.json")).unwrap())
+    );
+}
+#[test]
+fn preliminary_next_order_runs_both_partials_and_no_tiers() {
+    let mut p = preliminary_policy();
+    p.fixtures.get_mut("development").unwrap().setup_order =
+        PRELIMINARY_NEXT_ORDER.map(str::to_owned).to_vec();
+    let partial = p.adapters.remove("tiers").unwrap();
+    p.adapters
+        .insert("lampos_today_partial_next".into(), partial);
+    p.check_approval(&approval(&p), true).unwrap();
+    p.admitted(&run("lampos_today_partial_next", 1)).unwrap();
+    assert!(p.admitted(&run("tiers", 1)).is_err());
+    let mut changed = p.clone();
+    changed
+        .fixtures
+        .get_mut("development")
+        .unwrap()
+        .setup_order
+        .swap(1, 2);
+    assert!(changed.validate(true).is_err(), "registered relative order");
+    let mut changed = p.clone();
+    changed
+        .adapters
+        .insert("tiers".into(), p.adapters["none"].clone());
+    assert!(changed.validate(true).is_err(), "no unrun Tiers pin");
+    let mut changed = policy();
+    changed.adapters.insert(
+        "lampos_today_partial_next".into(),
+        p.adapters["none"].clone(),
+    );
+    assert!(
+        changed.validate(true).is_err(),
+        "the registered order has no next setup"
     );
 }

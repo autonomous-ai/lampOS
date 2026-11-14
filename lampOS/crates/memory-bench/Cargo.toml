@@ -11,7 +11,9 @@ path = "src/main.rs"
 
 [dependencies]
 serde.workspace = true
-serde_json.workspace = true
+# Exact float parsing: a ledger re-hashes every row it reads back, and a mean
+# like 0.9008333333333333 otherwise parses one ULP off (run 7, 3 Nov).
+serde_json = { workspace = true, features = ["float_roundtrip"] }
 sha2.workspace = true
 jiff = { version = "0.2", features = ["tzdb-bundle-always"] }
 hmac = "=0.12.1"

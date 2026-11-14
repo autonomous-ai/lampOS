@@ -488,6 +488,70 @@ fn redirects_service_errors_and_non_streams_are_not_answers() {
         );
     }
 }
+/// A loopback service that sends `status` headers announcing a 100-byte JSON
+/// body, sends only `{}`, then closes: the body read fails after the status.
+fn truncated(status: &'static str) -> Server {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let endpoint = format!("http://{}/chat/completions", listener.local_addr().unwrap());
+    let request = Arc::new(Mutex::new(vec![]));
+    let seen = request.clone();
+    let worker = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        *seen.lock().unwrap() = read_request(&mut stream);
+        let _ = stream.write_all(
+            format!(
+                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: 100\r\nConnection: close\r\n\r\n{{}}"
+            )
+            .as_bytes(),
+        );
+    });
+    Server {
+        endpoint,
+        request,
+        worker: Some(worker),
+    }
+}
+#[test]
+fn a_refusal_whose_body_is_cut_short_still_stops_the_run() {
+    let cases = [
+        ("400 Bad Request", false),
+        ("401 Refused", false),
+        ("403 Forbidden", false),
+        ("404 Not Found", false),
+        ("429 Too Many Requests", true),
+        ("500 Internal Server Error", true),
+        ("503 Service Unavailable", true),
+    ];
+    for (status, transient) in cases {
+        let temp = Temp::new();
+        let mut server = truncated(status);
+        let mut client = client(&server, &temp);
+        let error = client
+            .call(&call(), Instant::now() + Duration::from_secs(3))
+            .unwrap_err();
+        server.finish();
+        assert_eq!(
+            matches!(error, lamp_memory_bench::Error::Transport(_)),
+            transient,
+            "{status}: {error}"
+        );
+        if !transient {
+            assert!(
+                matches!(error, lamp_memory_bench::Error::Invalid(_)),
+                "{status}: {error}"
+            );
+        }
+        let receipts = client.receipts();
+        assert_eq!(receipts.len(), 1, "{status}");
+        assert_eq!(
+            receipts[0].charged_microusd, receipts[0].reserved_microusd,
+            "{status}"
+        );
+    }
+}
 #[test]
 fn huge_lines_duplicate_tools_and_inconsistent_totals_fail_closed() {
     let oversized = format!("data: {}\n\n", "x".repeat(256 * 1024 + 1)).into_bytes();

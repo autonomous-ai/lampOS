@@ -24,6 +24,7 @@ pub mod smoke;
 pub mod speech;
 pub mod speech_cache;
 pub mod transport;
+pub mod when;
 
 use sha2::{Digest, Sha256};
 use std::{fmt, io};
@@ -34,6 +35,10 @@ pub enum Error {
     Json(serde_json::Error),
     Invalid(String),
     Unsupported(String),
+    /// A model call whose connection, headers or stream failed in transit:
+    /// the answer or judgment it was for is recorded as a failed question
+    /// (evaluation policy `failed_call`), not a failed run.
+    Transport(String),
 }
 
 impl fmt::Display for Error {
@@ -43,6 +48,7 @@ impl fmt::Display for Error {
             Self::Json(e) => write!(f, "benchmark JSON: {e}"),
             Self::Invalid(e) => f.write_str(e),
             Self::Unsupported(e) => write!(f, "unsupported: {e}"),
+            Self::Transport(e) => f.write_str(e),
         }
     }
 }

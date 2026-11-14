@@ -2,7 +2,7 @@
   "version": 1,
   "runner_revision": "@RUNNER_REVISION@",
   "runner_sha256": "@RUNNER_SHA256@",
-  "evaluation_sha256": "f9ea0d8b0ac4cb595219e9c9d04913d80ba0bdf33fbbfe832fc22103115a85d0",
+  "evaluation_sha256": "b0eec198b82f6b592411c90027238ef0bc0f9aeed8e33ad63b0400b60694f1d8",
   "chat": {
     "endpoint": "@CHAT_ENDPOINT@",
     "requested_model": "deepseek-flash",
@@ -29,7 +29,7 @@
   "fixtures": {
     "development": {
       "profile": "month",
-      "setup_order": ["none", "full_history", "lampos_today_partial", "tiers"],
+      "setup_order": ["none", "lampos_today_partial", "lampos_today_partial_next"],
       "registration_revision": "6420a2f490263df664a12c8f8848c95421c30abd",
       "registration_sha256": "3ee255b5921100c268314c905094094d8d2bc4bd87fd46a271c11a287ff50a35",
       "audio_manifest_sha256": "@AUDIO_SHA256@",
@@ -43,23 +43,17 @@
       "arguments": ["arm", "@RUNNER_REVISION@"],
       "budget_microusd": 4000000
     },
-    "full_history": {
-      "revision": "@RUNNER_REVISION@",
-      "executable_sha256": "@RUNNER_SHA256@",
-      "arguments": ["arm", "@RUNNER_REVISION@"],
-      "budget_microusd": 20000000
-    },
     "lampos_today_partial": {
       "revision": "@RUNNER_REVISION@",
       "executable_sha256": "@RUNNER_SHA256@",
       "arguments": ["arm", "@RUNNER_REVISION@"],
       "budget_microusd": 4000000
     },
-    "tiers": {
-      "revision": "7d6d0a2364bc2052c323327334633a97450b12b3",
-      "executable_sha256": "@TIERS_SHA256@",
-      "arguments": [],
-      "budget_microusd": 10000000
+    "lampos_today_partial_next": {
+      "revision": "@RUNNER_REVISION@",
+      "executable_sha256": "@RUNNER_SHA256@",
+      "arguments": ["arm", "@RUNNER_REVISION@"],
+      "budget_microusd": 4000000
     }
   },
   "preliminary": true
