@@ -34,7 +34,9 @@
 //! - **The window** ([`window`]): the share of bad samples and the region
 //!   most often bad over the last ten minutes, by V1's thresholds. It is
 //!   forgotten whenever the gate closes, for any reason (the privacy, sleep
-//!   and not known included), and on `room/stood_up`. No frame and no
+//!   and not known included), and on `room/stood_up`, except while the gate
+//!   is paused on a misread on the same tracked face ([`crate::pause`]):
+//!   then it is held, unsaid, for at most 5 s. No frame and no
 //!   per-person history is kept.
 //! - **Said** on `humans/posture` ([`HumanPosture`]) every 30 s while the
 //!   gate is open and the window holds at least [`window::MIN_SAMPLES`]
@@ -245,14 +247,10 @@ impl Pose {
         self.collect(now_us);
         self.open = gate.is_ok();
         // Any closing forgets the window: nothing old is said under the
-        // privacy or while asleep.
+        // privacy or while asleep. A pause on a misread holds it instead
+        // ([`Self::hold`], [`crate::pause`]).
         if stood_up || gate.is_err() {
-            self.cancel();
-            if self.window.begun() {
-                self.counts.resets = self.counts.resets.saturating_add(1);
-            }
-            self.window.reset();
-            self.open_at_us = None;
+            self.forget();
         }
         if gate.is_ok() {
             if self.open_at_us.is_none() {
@@ -277,6 +275,27 @@ impl Pose {
         let posture = self.window.summary(now_us)?;
         self.next_said_us = now_us.saturating_add(us(HumanPosture::EVERY));
         Some(posture).filter(|posture| posture.check().is_ok())
+    }
+
+    /// Forget the window and stop the running request: its answer is
+    /// dropped.
+    pub fn forget(&mut self) {
+        self.cancel();
+        if self.window.begun() {
+            self.counts.resets = self.counts.resets.saturating_add(1);
+        }
+        self.window.reset();
+        self.open_at_us = None;
+    }
+
+    /// One step at `now_us` while the gate is paused on a misread
+    /// ([`crate::pause`]): the window kept, in memory only; the running
+    /// request stopped and its answer dropped; no frame taken and nothing
+    /// said.
+    pub fn hold(&mut self, now_us: u64) {
+        self.cancel();
+        self.collect(now_us);
+        self.open = false;
     }
 
     /// What `diagnostics` says of posture.

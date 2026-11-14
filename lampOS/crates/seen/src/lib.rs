@@ -36,6 +36,9 @@
 //!   and activity's retreat after busy bursts and failures.
 //! - [`wire`]: V1's WebSocket messages for activity and pose, as types.
 //! - [`watch`]: the bus readings the gate is built from.
+//! - [`pause`]: a stranger reading on the same tracked face pauses the gate
+//!   (nothing sent, nothing said) instead of ending the sitting; anything
+//!   else, or 5 s, wipes what the pause kept.
 //! - [`pose`]: posture (phase 3): one frame every 30 s to the pose model,
 //!   one socket each, its RULA score kept as this sitting's rolling window
 //!   and said on `humans/posture`; off unless `LAMP_SEEN_POSTURE=on`, and
@@ -52,6 +55,7 @@ pub mod link;
 pub mod mark;
 pub mod opt_in;
 pub mod outlet;
+pub mod pause;
 pub mod pose;
 pub mod said_back;
 pub mod scale;
