@@ -3978,8 +3978,11 @@ gone ([switches.md](switches.md)). What happens:
     or both moving the head (a `[[do]]` step with `light`, or with
     `body`). Another trigger, or the same one with no shared output, is no
     clash. On a clash nothing is put on: the model is told the others'
-    spoken names (`clashes_with`, short: up to three, then "and N more",
-    as "a, b, c and 2 more", `made_clash::spoken_list`), what they use
+    spoken names (`clashes_with`), every one however many, as "a, b, c,
+    d and e" (`made_clash::spoken_list`; never cut to "and N more", so a
+    replace never takes off a skill the question didn't name, Heron's P2
+    on #6976), two with the same spoken words each told by its folder
+    too, as "glow a (folder glow-a) and glow_a (folder glow_a)", what they use
     (`shares`: the light, the head, or both, all told), a `clash_id`, and
     to say word for word, with one, "NEW would start at the same moment as
     OTHER, which is on the lamp, and both use the light. Shall I replace
@@ -3996,7 +3999,10 @@ gone ([switches.md](switches.md)). What happens:
     at the same moment and use the light. Ask me again to replace them or
     to keep them all." (`made_clash::cut_line`). The answer comes back as `make_skill`
     with `clash_id` and `choice` (`replace`, `keep` or `cancel`) alone, so
-    `request` is no longer required (`made_clash::chosen`); a make with no
+    `request` is no longer required (`made_clash::chosen`); a `choice`
+    that is none of the three is asked again as the question was, "replace
+    it, keep both, or cancel" or, with more, "replace them all, keep them
+    all, or cancel", and the clash waits on; a make with no
     `request`, or a `choice` with no `clash_id`, makes nothing and is told
     "nothing was made: a new skill needs request, what it should do and
     when" (`make_skill_local::NO_REQUEST`). The second route's
@@ -4024,15 +4030,26 @@ gone ([switches.md](switches.md)). What happens:
     clash waits on. **Replace** puts the new one on first by its SHA-256
     (`made_skill::put_on_within`), then, for each skill it clashes with in
     turn, asks the manage helper's own `{"remove": NAME}`, as the app's
-    remove does, and drops a made one from `made.json`; the result lists
-    those taken off (`replaced`) and any not (`not_removed`), and says
-    "Done: NEW is on, and I removed OTHER." If the put-on fails nothing
-    is taken off ("OTHER stays as it was", "A, B and C stay as they
-    were"); a remove that fails (a core skill is refused there) leaves
-    that one on and the others' removes as they were: with none removed
-    the lamp says "NEW is on, but OTHER wasn't removed: … Both are on."
-    ("… weren't removed: … All are on." with more), with some "NEW is on,
-    and I removed A, but B wasn't removed: … B is still on." **Keep** puts
+    remove does (each waited up to 8 s), and drops a made one from
+    `made.json`. All the removes end within 12 s
+    (`made_clash::REPLACE_WITHIN`, Heron's P2 on #6976: a hung helper and
+    six clashes held the turn about 48 s): a remove is started only while
+    its own 8 s still ends inside that, and one not started is not
+    removed, said as "… wasn't removed: there wasn't time to ask the lamp
+    in this turn". The result lists those taken off (`replaced`), those
+    still on (`not_removed`) and those the helper didn't answer for in
+    time (`may_still_be_on`), and says "Done: NEW is on, and I removed
+    OTHER." If the put-on fails nothing is taken off ("OTHER stays as it
+    was", "A, B and C stay as they were"); a remove that fails (a core
+    skill is refused there) leaves that one on and the others' removes as
+    they were. Each that wasn't removed says its own reason, together when
+    the reason is the same, and one the helper didn't answer for in time
+    "may still be on", never "is still on", and stays in `made.json`: with
+    none removed the lamp says "NEW is on, but OTHER wasn't removed: …
+    Both are on." ("… weren't removed: … All are on." with more), with
+    some "NEW is on, and I removed A, but B wasn't removed: …; C and D
+    weren't removed: …; E may still be on: …. B, C and D are still on."
+    (`made_clash::not_all_removed`). **Keep** puts
     the new one on beside them and says "Both are on." ("All are on." with
     more). **Cancel** puts nothing on, and the made one is
     dropped from `made.json` with its package
@@ -4046,7 +4063,12 @@ gone ([switches.md](switches.md)). What happens:
     `an_echoed_unsaid_or_live_replace_is_refused`,
     `replace_never_leaves_both_off`,
     `a_make_clashing_with_three_names_and_replaces_all_three`,
-    `many_clashes_are_named_short_and_each_is_removed_on_its_own`,
+    `many_clashes_are_all_named_and_each_is_removed_on_its_own`,
+    `five_clashes_are_all_named_and_a_replace_removes_exactly_those`,
+    `a_replace_ends_its_removes_within_one_deadline`,
+    `each_failed_remove_says_its_own_reason`,
+    `an_invalid_choice_is_asked_again_in_the_question_s_number`,
+    `two_skills_that_sound_the_same_are_told_apart_by_folder`,
     `cancel_and_expiry_forget_the_made_one`,
     `a_make_with_no_request_is_refused_plainly`,
     `the_waiting_note_shows_only_while_a_clash_waits`,
