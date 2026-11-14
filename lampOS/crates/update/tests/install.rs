@@ -2136,7 +2136,9 @@ fn the_product_tells_the_app_a_skill_needs_a_connector() {
 fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
     for (unit, text) in install::PRODUCT {
         let service = section(text, "Service");
-        let wanted = usize::from(*unit == "lamp-voice.service");
+        // Off again in every unit (14 Nov, the first builder, #1711): a voice
+        // make with code ran out its 45 s on 9adf, until a code make passes there.
+        let wanted = 0;
         assert_eq!(
             service
                 .iter()
