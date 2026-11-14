@@ -1646,7 +1646,9 @@ build could carry it units or settings.
    switched again, until a restart. So `serve` itself checks, at its start
    (after the confirmation above) and after each round, that
    `/proc/self/exe` is `update/current`'s binary (`own::reexec`, both
-   resolved). When it is another build's and no `self.json` waits, it
+   resolved; a binary whose build folder was cleaned away since it started
+   is read as the link's own text, `… (deleted)`, so it is another build's
+   too). When it is another build's and no `self.json` waits, it
    `exec`s that binary in its own place, with the same options and
    `LAMP_UPDATE_REEXECED=<sha256>`, saying `this program is not
    /opt/lampOS/update/current's build B: it starts that one in its place`.
