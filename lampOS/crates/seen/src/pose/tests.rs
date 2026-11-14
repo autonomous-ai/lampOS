@@ -525,3 +525,135 @@ fn said_while_the_gate_is_open_and_not_after() {
         "a new window"
     );
 }
+
+/// What `serve` does with the pause's verdict, posture and the sitting's
+/// timers together: what is said this step.
+fn as_serve(
+    pose: &mut Pose,
+    sitting: &mut Option<crate::sitting::Sitting>,
+    verdict: crate::pause::Verdict,
+    gate: Result<(), Closed>,
+    now: u64,
+) -> (Option<HumanPosture>, Option<lamp_msgs::HumanDoing>) {
+    if verdict.wipe {
+        *sitting = None;
+        pose.forget();
+    }
+    if !verdict.paused && matches!(gate, Err(Closed::Nobody | Closed::Stranger)) {
+        *sitting = None;
+    }
+    if gate.is_ok() && sitting.is_none() {
+        *sitting = Some(crate::sitting::Sitting::new(now));
+    }
+    let posture = if verdict.paused {
+        pose.hold(now);
+        None
+    } else {
+        pose.step(now, gate, false)
+    };
+    let doing = sitting
+        .as_ref()
+        .filter(|_| !verdict.paused)
+        .map(|sitting| sitting.doing(now));
+    (posture, doing)
+}
+
+/// The owner at the desk from 0 s, three slumped samples at 0, 30 and 60 s
+/// and a drink seen at 60 s; the posture said at 60 s last.
+fn sat_and_drank(
+    mock: &Mock,
+) -> (
+    Pose,
+    Option<crate::sitting::Sitting>,
+    crate::pause::tests::Scene,
+) {
+    use crate::pause::tests::Scene;
+    let mut pose = pose(mock);
+    let mut sitting = None;
+    let mut scene = Scene::owner_at(0);
+    for at in [0, 30 * S, 60 * S] {
+        scene.faces(&[("f1", 0.4)], at);
+        scene.known(at);
+        let verdict = scene.step(at);
+        as_serve(&mut pose, &mut sitting, verdict, scene.gate(at), at);
+        send(&mut pose, at);
+        settle(&mut pose, at, Ok(()));
+    }
+    assert_eq!(pose.samples(), 3);
+    let drink = lamp_msgs::DoingSeen {
+        what: lamp_msgs::Doing::Drinking,
+        confidence: 0.9,
+    };
+    sitting.as_mut().unwrap().saw(&[drink], 60 * S);
+    (pose, sitting, scene)
+}
+
+#[test]
+fn known_misread_known_within_5_s_keeps_the_window_and_the_drink() {
+    let mock = Mock::start(vec![Reply::Ergo(Some(slumped()))]);
+    let (mut pose, mut sitting, mut scene) = sat_and_drank(&mock);
+    // The owner looks down at 89 s: paused, through the posture due at 90 s.
+    let verdict = scene.misread(89 * S);
+    assert!(verdict.paused);
+    for at in [89 * S, 90 * S, 91 * S, 92 * S] {
+        scene.faces(&[("f1", 0.42)], at);
+        let verdict = scene.step(at);
+        assert!(verdict.paused && !verdict.wipe, "{at}");
+        let said = as_serve(&mut pose, &mut sitting, verdict, scene.gate(at), at);
+        assert_eq!(said, (None, None), "nothing said while paused: {at}");
+        assert!(!pose.ready(at), "no frame taken while paused");
+    }
+    assert_eq!(pose.samples(), 3, "the window kept, in memory");
+    // Recognised again at 93 s on the same face: the sitting goes on.
+    scene.faces(&[("f1", 0.4)], 93 * S);
+    scene.known(93 * S);
+    let verdict = scene.step(93 * S);
+    assert_eq!(verdict, crate::pause::Verdict::default());
+    let (posture, doing) = as_serve(&mut pose, &mut sitting, verdict, scene.gate(93 * S), 93 * S);
+    let posture = posture.expect("said at once, the 90 s one owed");
+    assert_eq!(posture.window_s, 93, "the window from 0 s, not reset");
+    assert!(posture.bad_share > 0.0, "the slumped samples kept");
+    assert_eq!(doing.unwrap().drank_s_ago, 33, "the drink at 60 s kept");
+}
+
+#[test]
+fn the_privacy_during_a_pause_wipes_and_says_nothing() {
+    let mock = Mock::start(vec![Reply::Ergo(Some(slumped()))]);
+    let (mut pose, mut sitting, mut scene) = sat_and_drank(&mock);
+    assert!(scene.misread(89 * S).paused);
+    let resets = pose.counts().resets;
+    scene.privacy = false;
+    for at in [90 * S, 95 * S, 120 * S] {
+        scene.faces(&[("f1", 0.4)], at);
+        let verdict = scene.step(at);
+        let said = as_serve(&mut pose, &mut sitting, verdict, scene.gate(at), at);
+        assert_eq!(said.0, None, "no posture under the privacy: {at}");
+        assert_eq!(pose.samples(), 0, "wiped: {at}");
+    }
+    assert_eq!(pose.counts().resets, resets + 1);
+    // Open again, recognised: a fresh window and timers, nothing carried.
+    scene.privacy = true;
+    scene.faces(&[("f1", 0.4)], 121 * S);
+    scene.known(121 * S);
+    let verdict = scene.step(121 * S);
+    let (posture, doing) = as_serve(
+        &mut pose,
+        &mut sitting,
+        verdict,
+        scene.gate(121 * S),
+        121 * S,
+    );
+    assert_eq!(posture, None, "no sample in the fresh window yet");
+    assert_eq!(doing.unwrap().drank_s_ago, 0, "from the new arrival");
+    send(&mut pose, 121 * S);
+    let said = settle(&mut pose, 121 * S, Ok(()));
+    assert_eq!(
+        pose.samples(),
+        1,
+        "the fresh window holds only the new sample"
+    );
+    assert!(
+        said.iter().all(|p| p.window_s == 0 && p.bad_share == 0.0),
+        "nothing slumped carried: {said:?}"
+    );
+}

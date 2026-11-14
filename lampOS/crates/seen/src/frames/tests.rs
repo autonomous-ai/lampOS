@@ -77,7 +77,7 @@ fn jpeg(len: usize) -> Vec<u8> {
 
 /// The camera's end, as told.
 #[derive(Default)]
-struct Fake {
+pub(crate) struct Fake {
     connected: bool,
     refuse: bool,
     outstanding: Option<u64>,

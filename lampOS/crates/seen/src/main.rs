@@ -30,6 +30,7 @@ use lamp_seen::{
     opt_in,
     opt_in::Reader as _,
     outlet::Outlet,
+    pause::{self, Pause},
     pose::{self, Pose},
     said_back::{self, SaidBack, SayService},
     sitting::Sitting,
@@ -325,7 +326,12 @@ fn said_word(said: opt_in::Said) -> &'static str {
 
 type Frames = (Taker<FrameClient>, Marked<BusRing, Outlet>);
 
-fn health(publisher: &mut Publisher, gate: Result<(), gate::Closed>, frames: Option<&Frames>) {
+fn health(
+    publisher: &mut Publisher,
+    gate: Result<(), gate::Closed>,
+    pause: pause::Counts,
+    frames: Option<&Frames>,
+) {
     let activity = frames.and_then(|(_, marked)| marked.inner().activity.as_deref());
     let posture = frames.and_then(|(_, marked)| marked.inner().pose.as_deref());
     let warn = activity.is_some_and(|activity| activity.retreat().warn())
@@ -342,7 +348,9 @@ fn health(publisher: &mut Publisher, gate: Result<(), gate::Closed>, frames: Opt
     .with(
         "gate",
         gate.map_or_else(|closed| closed.as_str(), |()| "open"),
-    );
+    )
+    .with("paused", pause.paused)
+    .with("misread_on_track", pause.misread_on_track);
     diagnostic = match activity {
         None => diagnostic.with("sends", "none"),
         Some(activity) => {
@@ -500,6 +508,7 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         )),
     };
     let mut sitting: Option<Sitting> = None;
+    let mut pause = Pause::default();
     let mut doing_said: Option<Instant> = None;
     let started = Instant::now();
     let mut said_at: Option<Instant> = None;
@@ -546,7 +555,36 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
         let now = monotonic_us();
         // No frame before the lamp has begun saying it will look.
         let said_on = said_back.said_on(&kept, &record);
-        let gate = gate::may_request(&readings.inputs(opted_in, said_on, now));
+        let now_inputs = readings.inputs(opted_in, said_on, now);
+        let gate = gate::may_request(&now_inputs);
+        // A stranger reading on the same tracked face pauses: the gate stays
+        // closed, and the window and timers are kept unsaid, at most 5 s.
+        let was_paused = pause.paused();
+        let before = pause.counts();
+        let verdict = pause.step(now, &now_inputs, &readings.on_track(now));
+        let verdict = pause::after_stood_up(&mut pause, verdict, came.stood_up);
+        if pause.counts().paused != before.paused {
+            let counts = pause.counts();
+            eprintln!(
+                "lamp-seen: gate paused on a misread (paused {}, misread_on_track {})",
+                counts.paused, counts.misread_on_track
+            );
+        } else if was_paused && !verdict.paused {
+            eprintln!(
+                "lamp-seen: the pause ended: {}",
+                if verdict.wipe { "wiped" } else { "kept" }
+            );
+        }
+        if verdict.wipe {
+            if sitting.take().is_some() {
+                doing_said = None;
+            }
+            if let Some((_, marked)) = frames.as_mut()
+                && let Some(pose) = marked.inner_mut().pose.as_mut()
+            {
+                pose.forget();
+            }
+        }
         if last_gate != Some(gate) {
             eprintln!(
                 "lamp-seen: gate {}",
@@ -563,11 +601,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             said_on: true,
             privacy_open: Some(true),
             asleep: Some(false),
-            ..readings.inputs(opted_in, said_on, now)
+            ..now_inputs
         });
-        if (came.stood_up || matches!(desk, Err(gate::Closed::Nobody | gate::Closed::Stranger)))
-            && sitting.take().is_some()
-        {
+        if pause::ends_sitting(verdict, came.stood_up, desk) && sitting.take().is_some() {
             doing_said = None;
         }
         if desk.is_ok() && sitting.is_none() {
@@ -577,7 +613,11 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             // Posture's own gate: closed `not_said_yet` until a line naming
             // posture was said for this yes, whatever activity's says.
             let posture_gate = pose::gate(gate, said_back.said_posture(&kept, &record));
-            if let (Some(pose), Some(posture_out)) =
+            if verdict.paused
+                && let Some(pose) = marked.inner_mut().pose.as_mut()
+            {
+                pose.hold(now);
+            } else if let (Some(pose), Some(posture_out)) =
                 (marked.inner_mut().pose.as_mut(), posture_out.as_mut())
                 && let Some(posture) = pose.step(now, posture_gate, came.stood_up)
                 && let Err(error) = posture_out.publish_json(now, &posture)
@@ -594,7 +634,9 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
                         eprintln!("lamp-seen: a burst failed ({})", failure.as_str())
                     }
                 }
-                if let Some(sitting) = sitting.as_mut() {
+                // Paused: the burst under way is aborted below, and what it
+                // saw is dropped, never said.
+                if let Some(sitting) = sitting.as_mut().filter(|_| !verdict.paused) {
                     for newly in sitting.saw(&finished.seen, now) {
                         if newly.check().is_ok() {
                             let _ = seen_out.publish_json(now, &newly);
@@ -608,7 +650,7 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             }
             taker.step(gate, now, marked);
         }
-        if let Some(sitting) = sitting.as_ref()
+        if let Some(sitting) = sitting.as_ref().filter(|_| !verdict.paused)
             && doing_said.is_none_or(|at| at.elapsed() >= HumanDoing::EVERY)
         {
             let doing = sitting.doing(now);
@@ -618,7 +660,7 @@ fn serve(config: Config, stop: &AtomicBool) -> io::Result<()> {
             doing_said = Some(Instant::now());
         }
         if said_at.is_none_or(|at| at.elapsed() >= HEALTH_EVERY) {
-            health(&mut diagnostics, gate, frames.as_ref());
+            health(&mut diagnostics, gate, pause.counts(), frames.as_ref());
             said_at = Some(Instant::now());
         }
         std::thread::sleep(TICK);
