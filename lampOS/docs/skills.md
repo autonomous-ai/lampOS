@@ -4334,7 +4334,7 @@ the same code for both writers.
   3 voice makes that send mail ("when I leave my desk, email me that I'm
   out") with a `cannot:` the brief asks for, so they were never handed
   over. When the agent gives no answer (no make run here, none within its
-  45 s, an error), DeepSeek is then asked once, given no repairs, and its
+  90 s, an error), DeepSeek is then asked once, given no repairs, and its
   answer is the make, as a make DeepSeek failed first has its one answer
   stand. With no Hermes agent on the lamp nothing changes: DeepSeek makes
   it alone with its repairs. Either switch off, every make tries DeepSeek
@@ -4423,30 +4423,47 @@ the same code for both writers.
   said plainly. The journal says "can't be run in a skill run's namespace
   here".
 - **A silent agent.** lamp-tasks kills the run's whole process group at
-  its 45 s. The voice waits that long and a little more (at most 5 s), and
+  its 90 s. The voice waits that long and a little more (at most 5 s), and
   its failure stands.
-- **Bounds.** Each of the agent's answers within 45 s
-  (`make_skill_agent::WRITE_WITHIN`); a repair is begun only while one
-  more answer fits the agent's 120 s (`make_skill_agent::MAKE_WITHIN`).
-  No answer from it in 45 s, an error, or its first answer not given: the
+- **Bounds.** Each of the agent's answers within 90 s
+  (`make_skill_agent::WRITE_WITHIN`, within lamp-tasks' most of 120 s,
+  `lamp_tasks::skill_make::MOST_WITHIN`). It was 45 s: on lamp-9adf, 14 Nov
+  (build 12958), a make with code ran out at 45 s 2 of 2, where `hermes
+  chat -q "Say OK."` alone takes about 24.5 s on that Orange Pi, about 13 s
+  of it before Hermes's own session starts, and a gmail make with no
+  script took 30 s on another lamp; 90 s leaves about a minute for the
+  work once Hermes is up. A repair is begun only while one more answer
+  fits the agent's 120 s (`make_skill_agent::MAKE_WITHIN`, unchanged), so
+  a repair is asked only after a first answer within 30 s.
+  No answer from it in 90 s, an error, or its first answer not given: the
   make is not made, and what is said is DeepSeek's one answer's failure,
   which had no repairs (with an agent on the lamp DeepSeek gets none), so
   this is not today's failure after 3 repairs. A make can go on up to
   240 s, which the second route's wait for a make's line follows
   (`make_skill_local::longest_make`).
 - **What is heard.** "I'll make it now" is said at once, unchanged. Once
-  lamp-tasks says the agent's first make run starts, the lamp says "Let me think about
-  that a little longer." through the say service
-  (`app_make::say_waiting_at`, once, not begun after 15 s); never when the
-  hand-over failed at once, nor when the turn was cut already. The made
-  line is the same either way.
+  lamp-tasks says the agent's first make run starts (it says so as it
+  starts Hermes, before Hermes's own start-up), the lamp says "Let me think
+  about that a little longer." in the make's own turn, after the turn's
+  words so far, as the lamp's words: the second route's worker is told it
+  is due (`make_skill_agent::waiting_due`, kept by `made_running` for the
+  turn's request) and gives it to the turn's speech
+  (`second_provider::said_while_made`). Before, it went through the say
+  service at priority 5 with 15 s to begin, and a say waits for the turn to
+  end, as every say does, and then for 15 s of quiet: on lamp-9adf, 14 Nov,
+  it was `Some(Expired)` 2 of 2 and the person waited about 49 s in
+  silence. A make with no voice turn waiting on it still asks the say
+  service, now urgent (`app_make::LINE_PRIORITY`), so it may begin a
+  second after the lamp's last turn (`app_make::say_waiting_at`, once, not
+  begun after 15 s). Never when the hand-over failed at once, nor when the
+  turn was cut already. The made line is the same either way.
 - **The journal.** "made by DeepSeek", "it asks for a linked service
   (gmail): straight to the agent (Hermes), DeepSeek not asked" (the
   service's code, never the person's words), "the agent (Hermes) made none
   (...): DeepSeek is asked once, given no repairs", "DeepSeek's cannot is a
   send, which the agent makes with its lamp-services tools", "DeepSeek
   failed: handed to the agent (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes)
-  wasn't kept", "the agent (Hermes) made none (no answer within 45 s):
+  wasn't kept", "the agent (Hermes) made none (no answer within 90 s):
   DeepSeek's one answer, given no repairs, stands as not made", "DeepSeek's
   cannot is one the brief asks for: not handed to the agent", "no agent on
   the lamp: DeepSeek makes it alone"; an agent's repair says "by the

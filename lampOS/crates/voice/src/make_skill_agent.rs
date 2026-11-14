@@ -42,16 +42,23 @@ use std::{
 /// The switch: `on`, and nothing else.
 pub const ENVIRONMENT: &str = "LAMP_MAKE_SKILL_AGENT";
 /// The longest one of the agent's answers is waited for, from the hand-over
-/// to its answer kept: the make run's own deadline.
-pub const WRITE_WITHIN: Duration = Duration::from_secs(45);
+/// to its answer kept: the make run's own deadline, within lamp-tasks'
+/// most (`lamp_tasks::skill_make::MOST_WITHIN`, 120 s). 45 s before #6749:
+/// on lamp-9adf (an Orange Pi, build 12958) a make with code ran out at
+/// 45 s 2 of 2, where `hermes chat -q "Say OK."` alone takes about 24.5 s,
+/// about 13 s of it before Hermes's own session; a gmail make with no
+/// script took 30 s on another lamp. 90 s leaves about a minute for the
+/// work once Hermes is up.
+pub const WRITE_WITHIN: Duration = Duration::from_secs(90);
 /// The longest the agent's part of a make goes on, its repairs included: a
 /// repair is begun only while one more answer ([`WRITE_WITHIN`]) still
 /// ends within it.
 pub const MAKE_WITHIN: Duration = Duration::from_secs(120);
 /// lamp-tasks' make socket in its folder (`lamp_tasks::skill_make::MAKE_SOCKET`).
 pub const MAKE_SOCKET_NAME: &str = "skill-make.sock";
-/// What the lamp says, through the say service, as the agent begins, so
-/// the person isn't left in silence.
+/// What the lamp says as the agent begins, so the person isn't left in
+/// silence: in the make's own voice turn when one waits on it
+/// ([`waiting_due`]), else through the say service.
 pub const WAITING_LINE: &str = "Let me think about that a little longer.";
 /// What the lamp says when the agent's own answer is `cannot:`: never the
 /// agent's words.
@@ -78,6 +85,76 @@ pub fn on() -> bool {
 /// Whether `value` turns the switch on: `on`, and nothing else.
 fn on_with(value: Option<&str>) -> bool {
     value == Some("on")
+}
+
+/// The voice turns waiting on a make, each with its request and the
+/// sender its waiting line is told on ([`waiting_in_turn`]).
+static IN_TURN: std::sync::Mutex<Vec<(u64, u64, tokio::sync::oneshot::Sender<()>)>> =
+    std::sync::Mutex::new(Vec::new());
+/// The last [`InTurn`]'s number.
+static IN_TURN_MADE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+std::thread_local! {
+    /// The voice request whose turn waits on the make on this thread
+    /// ([`set_made_for`]); 0 for none.
+    static MADE_FOR: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Kept on the thread a voice make runs on (the second route's
+/// `made_running`): the request whose turn waits on it, 0 for none.
+pub fn set_made_for(request: u64) {
+    MADE_FOR.with(|kept| kept.set(request));
+}
+
+/// A voice turn waiting on its make (#6749): while it is held, the make's
+/// waiting line is told to it ([`waiting_due`]), to be said in the turn
+/// itself, after its words so far. A say through the say service waits for
+/// the turn to end, as every say does: on lamp-9adf, 14 Nov, the line
+/// asked there was `Some(Expired)` 2 of 2 and the person waited about 49 s
+/// in silence. Dropped, the turn no longer waits.
+pub struct InTurn {
+    made: u64,
+    /// Sent once, when the make's waiting line is due.
+    pub due: tokio::sync::oneshot::Receiver<()>,
+}
+
+impl Drop for InTurn {
+    fn drop(&mut self) {
+        if let Ok(mut waiting) = IN_TURN.lock() {
+            waiting.retain(|(made, ..)| *made != self.made);
+        }
+    }
+}
+
+/// `request`'s turn waits on a make: its waiting line comes to it.
+pub fn waiting_in_turn(request: u64) -> InTurn {
+    let made = IN_TURN_MADE.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+    let (told, due) = tokio::sync::oneshot::channel();
+    if let Ok(mut waiting) = IN_TURN.lock() {
+        waiting.push((made, request, told));
+    }
+    InTurn { made, due }
+}
+
+/// Tells `request`'s waiting turn ([`waiting_in_turn`]) that its make's
+/// waiting line is due: true when a turn waited on it, which says it (or
+/// was cut, and nobody is left to hear it); false with none, and the say
+/// service is asked instead.
+pub fn waiting_due(request: u64) -> bool {
+    if request == 0 {
+        return false;
+    }
+    let told = IN_TURN.lock().ok().and_then(|mut waiting| {
+        let at = waiting.iter().position(|(_, of, _)| *of == request)?;
+        Some(waiting.remove(at).2)
+    });
+    match told {
+        Some(told) => {
+            let _ = told.send(());
+            true
+        }
+        None => false,
+    }
 }
 
 /// The tasks part's folder, as the second route's worker was given it
@@ -170,8 +247,13 @@ impl Agent {
         None
     }
 
-    /// Say [`WAITING_LINE`] on a thread of its own; nothing waits on it.
+    /// Say [`WAITING_LINE`]: in the voice turn waiting on this thread's
+    /// make, when one does ([`waiting_due`]); else through the say service
+    /// on a thread of its own, nothing waiting on it.
     pub fn say_waiting(&self) {
+        if waiting_due(MADE_FOR.with(std::cell::Cell::get)) {
+            return;
+        }
         let Some(socket) = self.say.clone() else {
             return;
         };
@@ -485,6 +567,70 @@ pub(crate) mod tests {
             ["op", "rules", "within_ms"]
         );
         assert!(!sent.iter().any(|line| line["op"] == "prepare"));
+    }
+
+    /// Fourteen on lamp-9adf (12958, #6749): a make with code ran out at
+    /// 45 s, 2 of 2, where `hermes chat -q "Say OK."` alone takes about
+    /// 24.5 s, 13 s of it before Hermes's own session. A voice make is
+    /// sent 90 s, within lamp-tasks' most, and the voice waits that and
+    /// its grace; the agent's part keeps room for that one answer, and the
+    /// second route's wait for the whole make stays past both parts.
+    #[test]
+    fn a_voice_make_is_given_time_for_the_agent_to_start_and_write_code() {
+        assert_eq!(WRITE_WITHIN, Duration::from_secs(90));
+        assert!(WRITE_WITHIN <= lamp_tasks::skill_make::MOST_WITHIN);
+        assert!(WRITE_WITHIN <= MAKE_WITHIN);
+        assert!(crate::make_skill_local::MAKE_WITHIN + MAKE_WITHIN <= Duration::from_secs(240));
+        let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("x".to_owned())));
+        let agent = Agent {
+            within: WRITE_WITHIN,
+            ..tasks.agent()
+        };
+        assert_eq!(agent.write("S", "B", false).unwrap(), "x");
+        let sent = tasks.sent.lock().unwrap().clone();
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        assert_eq!(make["within_ms"], 90_000);
+    }
+
+    /// #6749: with a voice turn waiting on this thread's make, the waiting
+    /// line goes to that turn once lamp-tasks says the run starts, never to
+    /// the say service; told once. With none waiting, the say service is
+    /// asked, as before.
+    #[test]
+    fn the_waiting_line_goes_to_the_turn_waiting_on_the_make() {
+        let tasks = stub(Some("hermes"), Arc::new(|_: &str| Some("x".to_owned())));
+        let dir = tasks.dir.path().to_path_buf();
+        let say = dir.join("say.sock");
+        let listener = UnixListener::bind(&say).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let agent = Agent {
+            say: Some(say),
+            ..tasks.agent()
+        };
+        let request = 6_749_100;
+        let mut in_turn = waiting_in_turn(request);
+        set_made_for(request);
+        assert_eq!(agent.write("S", "B", true).unwrap(), "x");
+        set_made_for(0);
+        assert_eq!(in_turn.due.try_recv(), Ok(()));
+        assert!(!waiting_due(request), "told once");
+        std::thread::sleep(Duration::from_millis(100));
+        assert!(listener.accept().is_err(), "the say service is not asked");
+        drop(in_turn);
+        // No turn waits: the say service is asked.
+        assert_eq!(agent.write("S", "B", true).unwrap(), "x");
+        let began = Instant::now();
+        let asked = loop {
+            if let Ok((stream, _)) = listener.accept() {
+                stream.set_nonblocking(false).unwrap();
+                let mut line = String::new();
+                BufReader::new(&stream).read_line(&mut line).unwrap();
+                break serde_json::from_str::<Value>(&line).unwrap();
+            }
+            assert!(began.elapsed() < Duration::from_secs(5), "never asked");
+            std::thread::sleep(Duration::from_millis(10));
+        };
+        assert_eq!(asked["text"], WAITING_LINE);
     }
 
     /// The first builder's guard on #6643: no make run, no hand-over.

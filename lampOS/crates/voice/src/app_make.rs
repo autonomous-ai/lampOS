@@ -632,17 +632,20 @@ pub const VOICE_MAKE_SKILL: &str = "voice-make";
 /// service isn't there.
 pub fn say_line_at(socket: &Path, line: &str) -> Option<crate::say::Outcome> {
     said("a skill made by voice", line, |words, note, within_ms| {
-        socket_ask(socket, words, note, within_ms)
+        socket_ask(socket, words, note, crate::say::NORMAL_PRIORITY, within_ms)
     })
 }
 
 /// One short `line` said while a voice make goes on (the lamp's agent
 /// writing it, `LAMP_MAKE_SKILL_AGENT`), asked as written on the say socket
 /// at `socket` under [`VOICE_MAKE_SKILL`], not begun after `within_ms`.
-/// Asked once, never again after a drop; nothing waits on it but the
-/// caller's own thread. Its outcome is journaled.
+/// Asked at [`LINE_PRIORITY`] (#6749): at priority 5 it needed the say
+/// service's whole 15 s of quiet after "I'll make it now", its own wait,
+/// and on lamp-9adf it was `expired` 2 of 2. Asked once, never again after
+/// a drop; nothing waits on it but the caller's own thread. Its outcome is
+/// journaled.
 pub fn say_waiting_at(socket: &Path, line: &str, within_ms: u64) {
-    let answered = socket_ask(socket, line, false, within_ms);
+    let answered = socket_ask(socket, line, false, LINE_PRIORITY, within_ms);
     let outcome = loop {
         match answered.recv() {
             Ok(crate::say::Answer::Done(outcome)) => break Some(outcome),
@@ -654,13 +657,14 @@ pub fn say_waiting_at(socket: &Path, line: &str, within_ms: u64) {
 }
 
 /// One ask of `words` on the say socket at `socket`, as a note or as
-/// written, not begun after `within_ms`: its answers, read until the
+/// written, at `priority`, not begun after `within_ms`: its answers, read until the
 /// outcome. The receiver's sender is dropped, with no outcome, when the
 /// socket isn't there or goes quiet past the ask's wait.
 fn socket_ask(
     socket: &Path,
     words: &str,
     note: bool,
+    priority: u8,
     within_ms: u64,
 ) -> std::sync::mpsc::Receiver<crate::say::Answer> {
     use crate::say::{Answer, Outcome};
@@ -669,7 +673,7 @@ fn socket_ask(
     let ask = json!({
         "skill": VOICE_MAKE_SKILL,
         key: words,
-        "priority": crate::say::NORMAL_PRIORITY,
+        "priority": priority,
         "expires_in_ms": within_ms,
     });
     let Ok(mut stream) = std::os::unix::net::UnixStream::connect(socket) else {
@@ -1361,6 +1365,34 @@ mod tests {
             assert!(asked["expires_in_ms"].as_u64().unwrap() <= LINE_WAITS_MS);
         }
         assert_eq!(say_line_at(&dir.join("none.sock"), line), None);
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    /// lamp-9adf, 14 Nov (#6749): a make's waiting line, asked at priority
+    /// 5 with 15 s to begin, needed the say service's whole 15 s of quiet
+    /// after "I'll make it now" and answered `expired`, unsaid. Asked on
+    /// the say socket, it is urgent, so it may begin a second after the
+    /// lamp's last turn, well within its own wait, and as written.
+    #[test]
+    fn a_makes_waiting_line_is_asked_urgent_within_its_wait() {
+        let dir = folder("say-waiting");
+        let socket = dir.join("say.sock");
+        let listener = UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut line = String::new();
+            BufReader::new(&stream).read_line(&mut line).unwrap();
+            writeln!(&stream, r#"{{"outcome":"spoken"}}"#).unwrap();
+            serde_json::from_str::<Value>(&line).unwrap()
+        });
+        let line = "Let me think about that a little longer.";
+        say_waiting_at(&socket, line, 15_000);
+        let asked = served.join().unwrap();
+        assert_eq!(asked["skill"], VOICE_MAKE_SKILL);
+        assert_eq!(asked["text"], line);
+        assert!(asked["priority"].as_u64().unwrap() >= u64::from(crate::say::URGENT_FROM));
+        let quiet_ms = crate::say::URGENT_QUIET_US / 1_000;
+        assert!(asked["expires_in_ms"].as_u64().unwrap() > quiet_ms);
         let _ = fs::remove_dir_all(&dir);
     }
 
