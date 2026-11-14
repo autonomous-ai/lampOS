@@ -2703,15 +2703,17 @@ pub fn serve(
         crate::tools::reminders_asked::force()
     });
     let set = first_force(set, list);
-    // A line that is only a plain ask for a light scene or a light show, or
-    // only a plain question about the lamp itself, must call its skill
-    // (`LAMP_SKILL_ASKED`, #5744, #5745).
+    // A line that is only a plain ask for a light scene or a light show,
+    // only a plain question about the lamp itself, or a plain ask to point
+    // the light at a thing, must call its skill (`LAMP_SKILL_ASKED`, #5744,
+    // #5745): pointing the light is point-light's, never `take_a_look`'s.
     let skill = crate::tools::skill_asked::on().then(|| {
         eprintln!(
-            "lamp-voice second: a line that plainly asks for a light scene or a light show, or plainly asks about the lamp itself, must call {}, {} or {} in its first round ({})",
+            "lamp-voice second: a line that plainly asks for a light scene or a light show, plainly asks about the lamp itself, or plainly asks to point the light at a thing, must call {}, {}, {} or {} in its first round, not take_a_look ({})",
             crate::tools::skill_asked::SCENE,
             crate::tools::skill_asked::SHOW,
             crate::tools::skill_asked::HELP,
+            crate::tools::skill_asked::POINT,
             crate::tools::skill_asked::ENVIRONMENT
         );
         let offered: Option<crate::tools::skill_asked::Offered> = tools
