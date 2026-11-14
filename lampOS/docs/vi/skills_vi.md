@@ -1906,7 +1906,7 @@ cả hai người viết.
   công tắc, công tắc của hướng dẫn và `LAMP_TASKS_DIR` tuyệt đối của phần
   tasks đọc từ môi trường của chính coordinator. Các lần tạo của ứng dụng
   chạy trong coordinator của lamp-voice, tiến trình của chính unit, nên
-  `LAMP_MAKE_SKILL_AGENT=on` và `LAMP_TASKS_DIR` của unit tới được nó mà
+  `LAMP_MAKE_SKILL_AGENT` (khi được đặt) và `LAMP_TASKS_DIR` của unit tới được nó mà
   không cần danh sách cho phép của worker, và lamp-tasks nhận dòng của nó,
   vì chỉ nhận dòng của `lamp-voice.service` chạy bằng root. Cùng thứ tự
   (DeepSeek một lần thử, rồi Hermes), cùng kiểm tra, cùng các lần sửa, giới
@@ -1925,9 +1925,10 @@ cả hai người viết.
   P2 của Heron trên #6788): một lần tạo từ ứng dụng mà DeepSeek làm đúng
   sau một lần sửa không bao giờ bị nói là không tạo được chỉ vì agent không
   nhận. Lần tạo bằng giọng nói giữ thứ tự của nó: ở đó một câu trả lời của
-  DeepSeek giữ nguyên. Có hiệu lực ngay khi gộp: unit lamp-voice của sản
-  phẩm đã đặt `LAMP_MAKE_SKILL_AGENT=on` và `LAMP_TASKS_DIR`, nên MAKE IT
-  giao các lần tạo của nó ngay khi thay đổi này vào. Thời gian vừa: `skills.make` của lamp-cloud chờ tối đa 2 giây
+  DeepSeek giữ nguyên. Chưa có hiệu lực khi gộp: từ #7014 unit lamp-voice
+  của sản phẩm không đặt `LAMP_MAKE_SKILL_AGENT` (có đặt `LAMP_TASKS_DIR`),
+  nên MAKE IT chỉ giao các lần tạo của nó khi công tắc đó bật lại; cho đến
+  lúc đó các lần tạo của ứng dụng vẫn do DeepSeek, với các lần sửa của nó. Thời gian vừa: `skills.make` của lamp-cloud chờ tối đa 2 giây
   (`make_skill::WAIT`), và giọng nói trả lời `{"making": true}` trước khi
   bắt đầu tạo, trên một luồng riêng; sau đó `skills.made` đọc `making` tới
   30 phút (`app_make::MAKING_LONGEST_MS`, mà `makingLongest` của ứng dụng

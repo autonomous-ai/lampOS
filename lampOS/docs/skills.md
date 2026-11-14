@@ -4612,8 +4612,8 @@ the same code for both writers.
   `make_skill_agent::Agent::for_app`: the switch, the guide's switch and
   the tasks part's absolute `LAMP_TASKS_DIR` read from the coordinator's
   own environment. The app's makes run in lamp-voice's coordinator, the
-  unit's own process, so the unit's `LAMP_MAKE_SKILL_AGENT=on` and
-  `LAMP_TASKS_DIR` reach it with no worker allow-list, and lamp-tasks
+  unit's own process, so the unit's `LAMP_MAKE_SKILL_AGENT` (when it is
+  set) and `LAMP_TASKS_DIR` reach it with no worker allow-list, and lamp-tasks
   takes its line, as it takes only `lamp-voice.service`'s run as root.
   The same order (DeepSeek's one try, then Hermes), the same checks, the
   same repairs, bounds and `"guide":true` with `LAMP_MAKE_AGENT_GUIDE`.
@@ -4630,9 +4630,11 @@ the same code for both writers.
   (`Agent::repairs_if_untaken`, set by `for_app` alone; Heron's P2 on
   #6788): an app make DeepSeek gets right on a repair is never said as not
   made because the agent couldn't take it. A voice make keeps its order:
-  there DeepSeek's one answer stands. Live at merge: the product's
-  lamp-voice unit already sets `LAMP_MAKE_SKILL_AGENT=on` and
-  `LAMP_TASKS_DIR`, so MAKE IT hands its makes over as soon as this lands. The
+  there DeepSeek's one answer stands. Not live at merge: since #7014 the
+  product's lamp-voice unit sets no `LAMP_MAKE_SKILL_AGENT` (it sets
+  `LAMP_TASKS_DIR`), so MAKE IT hands its makes over only once that switch
+  is on again; until then the app's makes stay DeepSeek's, with their
+  repairs. The
   time fits: lamp-cloud's `skills.make` waits at most 2 s
   (`make_skill::WAIT`), and the voice answers `{"making": true}` before the
   make begins, on a thread of its own; `skills.made` then reads `making`
