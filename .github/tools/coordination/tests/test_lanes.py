@@ -693,7 +693,12 @@ class BotDryRound(Repo):
                                   (env, "LAMP_X=\n", "off"), (env, 'LAMP_X=""\n', "off"), (unit, "Environment=LAMP_X=Off\n", "off"),
                                   (env, "# LAMP_X=on\n", "off"), (env, "#LAMP_X=checked\n", "off"),
                                   (["lampOS/deploy/other/x.env"], "LAMP_X=on\n", "off"),
-                                  (["lampOS/deploy/product/lamp-y.service"], "LAMP_X=on\n", "on")):
+                                  (["lampOS/deploy/product/lamp-y.service"], "LAMP_X=on\n", "on"),
+                                  # 14 Nov (the second reader's P3 on #7041): every assignment on the line.
+                                  (unit, "Environment=FOO=1 LAMP_X=on\n", "on"), (unit, 'Environment="A=1" "LAMP_X=on"\n', "on"),
+                                  (unit, "Environment=LAMP_A=off LAMP_B=checked\n", "on"),
+                                  (unit, "Environment=LAMP_A=off LAMP_B=0\n", "off"), (unit, "Environment=FOO_LAMP_X=on\n", "off"),
+                                  (env, "LAMP_A=off # LAMP_X=on\n", "off")):
             h = self.pr(8, files, body=body)
             r = self.switch_on(h)
             self.assertEqual((r.returncode, r.stdout.strip()), (0, want), (files, body))
