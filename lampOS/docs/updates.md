@@ -1006,6 +1006,26 @@ each under the quiet rule. A round
    trace on #3689, 29–30 Oct). Old voice and restarted new servers still
    need compatibility in both directions; restart order does not make the
    round atomic.
+   **lamp-body's one retry (#7067).** A part whose restart systemd refuses
+   puts the build back. lamp-body alone gets one more try first: its start
+   refuses a joint already under load beyond its start limit, and the
+   refused start lets go of the joints. So when lamp-body's restart is
+   refused, the switch says `lamp-body's restart was refused (…); tried once
+   more after 3 s, its let-go`, waits 3 s (`round::BODY_LET_GO`), and
+   restarts it once more. If that stands, the journal says `lamp-body's
+   restart tried once more: it stands` and the switch goes on to the watch.
+   If it is refused again, it says `lamp-body's restart tried once more:
+   refused again (…)` and the build is put back as before. Any other part's
+   refused restart puts the build back at once, with no retry.
+
+   **Why:** on lamp-fc4b (13050, 14 Nov 16:00) the new lamp-body refused its
+   first start because `wrist_pitch` already carried load 208 against its
+   start limit of 170. Its second start, 2 s later, stood, but by then
+   lamp-update had put 13039 back and refused 13050. The same switch to
+   13059 at 16:47, with the wrist not loaded, stood at the first start. A
+   customer lamp resting against something would miss an update the same
+   way.
+
 9. **Watch.** Every second for `--watch-s` (60): each restarted unit must
    not fail, stop, be in `auto-restart`, be started again by systemd
    (`NRestarts`) or change process (`MainPID`). At the end it must be
@@ -1472,6 +1492,9 @@ are by the step that says them, with `…` for what changes (`round.rs`'s
 | `waiting for a quiet moment: …` | once per wait, with why it isn't quiet yet |
 | `switching to build N` | the parts' switch begins |
 | `the voice is stopped before the parts it reads restart` | see "The voice stopped first" |
+| `lamp-body's restart was refused (…); tried once more after 3 s, its let-go` | lamp-body's restart in the switch was refused; it is tried once more after 3 s (#7067, "lamp-body's one retry") |
+| `lamp-body's restart tried once more: it stands` | that one retry stood; the switch goes on to the watch |
+| `lamp-body's restart tried once more: refused again (…)` | the retry was refused too; the build is put back |
 | `setup is complete; its phone grace period is not restarted` | a completed setup's unit changed, and isn't restarted |
 | `the first update after setup: setup is done; its phone grace period is not restarted` | the first update after setup, before the walk: setup is done and its new unit still skips once done, so it isn't restarted though its unit differs from this build's (#6284) |
 | `started lamp-setup-recover.service, its switch on` | the switch's watch passed and the build is kept; recovery is enabled and `LAMP_WIFI_RECOVERY` reads `on` (#4863, "A part added over the air") |
