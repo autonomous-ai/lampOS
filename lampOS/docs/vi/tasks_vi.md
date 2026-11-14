@@ -1245,8 +1245,11 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   máy tính (Claude Code khi chưa đọc được); không bao giờ là danh sách agent
   cố định. Tên chỉ tính khi là người làm: sau "ask", "have", "tell", "get"
   hoặc "let", hoặc "with", "using", "via" hoặc "use" (không tính "don't ask
-  …", "did you ask …"), hoặc đứng đầu câu trước dấu phẩy ("Hey Lamp,
-  Hermes, …"); hoa thường gì cũng được, các chữ của tên viết liền hay rời
+  …", "did you ask …"), hoặc đứng đầu câu (sau một từ mở đầu: hey, hi,
+  ok, okay, lamp, please; trước nó có dấu chấm cũng được) với dấu phẩy ngay
+  sau ("Hey Lamp, Hermes, …") hoặc, như speech to text hay nghe, với một
+  động từ làm việc (`WORK_VERBS`) ngay sau nó, kể cả sau "please" hay sau
+  dấu chấm ("Hey Lamp Hermes look up …", "Hermes. Look up …", #7023); hoa thường gì cũng được, các chữ của tên viết liền hay rời
   ("Open Claw"). Nêu một engine của đèn: `where` `lamp` và `engine` đó, bất
   kể model gửi gì. Nêu một staff: `where` `computer`, `who` là họ, không có
   `engine`. Tên có cả trên đèn và trên máy tính thì chạy trên đèn, trừ khi
@@ -1267,6 +1270,7 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   on the office computer"). Lượt mà model không gọi `start_agent_task` thì
   được bắt ở route thứ hai (mục kế tiếp). Test:
   `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
+  `agent_tasks::tests::a_name_called_first_is_the_doer_as_heard`,
   `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
   `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
   `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
@@ -1275,7 +1279,7 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   agent để làm việc, đọc đúng như trên (chỉ tính người làm, lấy từ các
   engine của đèn khi đèn có target riêng và từ staff, Claude Code khi chưa
   đọc được; chỉ nhắc tên như "What is Hermes?" thì không tính; một agent
-  chỉ được gọi tên ở đầu câu, "Hermes, …", chỉ tính khi phần còn lại của
+  chỉ được gọi tên ở đầu câu, "Hermes, …" hay "Hermes look up …", chỉ tính khi phần còn lại của
   câu nhờ làm việc: một động từ làm việc như write, make, fix, list hay
   look (`WORK_VERBS`), hoặc ít nhất `WHOLE_ASK_FEWEST` (4) từ nhờ việc
   ngoài các từ đồng ý, đếm như `new_ask`, `agent_tasks::asks_for_work`;
