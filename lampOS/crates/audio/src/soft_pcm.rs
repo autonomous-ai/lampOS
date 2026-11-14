@@ -15,8 +15,10 @@
 //!
 //! `discard` empties the queue and stops it, as `snd_pcm_drop` does; what the sink was already
 //! given is out and is not recalled, which is at most the queue's depth, 40 ms.
-use crate::{RENDER_RATE, RENDER_SAMPLES, pcm::PcmFormat, pcm::PlaybackPcm};
-use alsa::pcm::State;
+use crate::{
+    RENDER_RATE, RENDER_SAMPLES,
+    pcm::{PcmError, PcmFormat, PcmResult, PcmState, PlaybackPcm},
+};
 use std::sync::Mutex;
 
 /// The queue's depth in frames: what the speaker asks of ALSA.
@@ -53,8 +55,8 @@ pub struct SoftPcm {
     sink: Mutex<Sink>,
 }
 
-fn error(func: &'static str, errno: rustix::io::Errno) -> alsa::Error {
-    alsa::Error::new(func, errno.raw_os_error())
+fn error(func: &'static str, errno: rustix::io::Errno) -> PcmError {
+    PcmError::new(func, errno.raw_os_error())
 }
 
 impl SoftPcm {
@@ -104,17 +106,17 @@ impl SoftPcm {
 }
 
 impl PlaybackPcm for SoftPcm {
-    fn avail_delay(&self) -> alsa::Result<(i64, i64)> {
+    fn avail_delay(&self) -> PcmResult<(i64, i64)> {
         let inner = self.settled();
         Ok((DEPTH_FRAMES - inner.queued, inner.queued))
     }
 
-    fn start(&self) -> alsa::Result<()> {
+    fn start(&self) -> PcmResult<()> {
         self.settled().started = true;
         Ok(())
     }
 
-    fn writei(&self, samples: &[i16]) -> alsa::Result<usize> {
+    fn writei(&self, samples: &[i16]) -> PcmResult<usize> {
         let taken = {
             let mut inner = self.settled();
             let room = (DEPTH_FRAMES - inner.queued).max(0) as usize;
@@ -131,29 +133,29 @@ impl PlaybackPcm for SoftPcm {
         Ok(taken)
     }
 
-    fn drain(&self) -> alsa::Result<()> {
+    fn drain(&self) -> PcmResult<()> {
         if self.settled().queued > 0 {
             return Err(error("snd_pcm_drain", rustix::io::Errno::AGAIN));
         }
         Ok(())
     }
 
-    fn prepare(&self) -> alsa::Result<()> {
+    fn prepare(&self) -> PcmResult<()> {
         let mut inner = self.settled();
         inner.queued = 0;
         inner.started = false;
         Ok(())
     }
 
-    fn state(&self) -> State {
+    fn state(&self) -> PcmState {
         if self.settled().started {
-            State::Running
+            PcmState::Running
         } else {
-            State::Prepared
+            PcmState::Prepared
         }
     }
 
-    fn discard(&self) -> alsa::Result<()> {
+    fn discard(&self) -> PcmResult<()> {
         let mut inner = self.settled();
         inner.queued = 0;
         inner.started = false;
@@ -201,9 +203,9 @@ mod tests {
         now.fetch_add(100_000, Ordering::SeqCst);
         // Not started: nothing drains, however long it waits.
         assert_eq!(pcm.avail_delay().unwrap().1, 480);
-        assert_eq!(pcm.state(), State::Prepared);
+        assert_eq!(pcm.state(), PcmState::Prepared);
         pcm.start().unwrap();
-        assert_eq!(pcm.state(), State::Running);
+        assert_eq!(pcm.state(), PcmState::Running);
         now.fetch_add(10_000, Ordering::SeqCst);
         // 10 ms at 24 kHz is 240 frames.
         assert_eq!(pcm.avail_delay().unwrap(), (DEPTH_FRAMES - 240, 240));
@@ -216,7 +218,7 @@ mod tests {
         pcm.drain().unwrap();
         // Empty and started stays running: it never underruns.
         now.fetch_add(1_000_000, Ordering::SeqCst);
-        assert_eq!(pcm.state(), State::Running);
+        assert_eq!(pcm.state(), PcmState::Running);
         assert_eq!(pcm.avail_delay().unwrap(), (DEPTH_FRAMES, 0));
     }
 
@@ -240,7 +242,7 @@ mod tests {
         pcm.start().unwrap();
         pcm.discard().unwrap();
         assert_eq!(pcm.avail_delay().unwrap(), (DEPTH_FRAMES, 0));
-        assert_eq!(pcm.state(), State::Prepared);
+        assert_eq!(pcm.state(), PcmState::Prepared);
         pcm.writei(&[1; 240]).unwrap();
         pcm.prepare().unwrap();
         assert_eq!(pcm.avail_delay().unwrap(), (DEPTH_FRAMES, 0));

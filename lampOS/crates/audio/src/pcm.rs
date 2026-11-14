@@ -11,9 +11,10 @@ use crate::{
     ownership::{OwnershipFailure, PlaybackCursor, PlaybackOwnership, QueuedRange},
     underrun::UnderrunBudget,
 };
+#[cfg(target_os = "linux")]
 use alsa::{
     Direction, ValueOr,
-    pcm::{Access, Format, HwParams, PCM, State},
+    pcm::{Access, Format, HwParams, PCM},
 };
 use lamp_ipc::monotonic_us;
 use lamp_turn_owner::{
@@ -21,6 +22,8 @@ use lamp_turn_owner::{
 };
 use serde::Serialize;
 use std::{fmt, io};
+
+pub use crate::pcm_types::{PcmError, PcmResult, PcmState};
 
 /// 40 ms maximum negotiated PCM queue plus 60 ms scheduling/device margin.
 const MAX_FINISH_US: u64 = 100_000;
@@ -80,48 +83,50 @@ pub struct PlaybackStatus {
 }
 
 /// What [`Speaker`] asks of the queue it plays into: the seven calls it made on
-/// ALSA's [`PCM`], and no others. The ownership ledger, the privacy guard,
+/// ALSA's `PCM`, and no others. The ownership ledger, the privacy guard,
 /// the underrun budget and the echo reference all sit above this and do not
-/// know which queue is below. [`PCM`] is the board's; a developer's computer
-/// beside a simulator can give the speaker another.
+/// know which queue is below. `PCM` is the board's; a developer's computer
+/// beside a simulator can give the speaker another. The errors and the state
+/// are ALSA's own on Linux and a portable copy elsewhere (`pcm_types`).
 pub trait PlaybackPcm: Send {
     /// Available frames and total queued delay, as `snd_pcm_avail_delay`.
-    fn avail_delay(&self) -> alsa::Result<(i64, i64)>;
+    fn avail_delay(&self) -> PcmResult<(i64, i64)>;
     /// Starts playback of what is queued.
-    fn start(&self) -> alsa::Result<()>;
+    fn start(&self) -> PcmResult<()>;
     /// Writes at most `samples.len()` frames and returns how many were taken;
     /// never blocks (`EAGAIN` is the queue being full).
-    fn writei(&self, samples: &[i16]) -> alsa::Result<usize>;
+    fn writei(&self, samples: &[i16]) -> PcmResult<usize>;
     /// Plays out what is queued, `EAGAIN` while it has not finished.
-    fn drain(&self) -> alsa::Result<()>;
+    fn drain(&self) -> PcmResult<()>;
     /// Makes the queue ready to be written again.
-    fn prepare(&self) -> alsa::Result<()>;
+    fn prepare(&self) -> PcmResult<()>;
     /// The queue's state.
-    fn state(&self) -> State;
+    fn state(&self) -> PcmState;
     /// Throws away what is queued, never plays it.
-    fn discard(&self) -> alsa::Result<()>;
+    fn discard(&self) -> PcmResult<()>;
 }
 
+#[cfg(target_os = "linux")]
 impl PlaybackPcm for PCM {
-    fn avail_delay(&self) -> alsa::Result<(i64, i64)> {
+    fn avail_delay(&self) -> PcmResult<(i64, i64)> {
         PCM::avail_delay(self)
     }
-    fn start(&self) -> alsa::Result<()> {
+    fn start(&self) -> PcmResult<()> {
         PCM::start(self)
     }
-    fn writei(&self, samples: &[i16]) -> alsa::Result<usize> {
+    fn writei(&self, samples: &[i16]) -> PcmResult<usize> {
         self.io_i16()?.writei(samples)
     }
-    fn drain(&self) -> alsa::Result<()> {
+    fn drain(&self) -> PcmResult<()> {
         PCM::drain(self)
     }
-    fn prepare(&self) -> alsa::Result<()> {
+    fn prepare(&self) -> PcmResult<()> {
         PCM::prepare(self)
     }
-    fn state(&self) -> State {
+    fn state(&self) -> PcmState {
         PCM::state(self)
     }
-    fn discard(&self) -> alsa::Result<()> {
+    fn discard(&self) -> PcmResult<()> {
         PCM::drop(self)
     }
 }
@@ -152,10 +157,11 @@ pub struct Speaker {
 /// the speaker (#4332). None for an error that is not ALSA's.
 pub fn open_fault(error: &(dyn std::error::Error + Send + Sync + 'static)) -> Option<DeviceFault> {
     error
-        .downcast_ref::<alsa::Error>()
+        .downcast_ref::<PcmError>()
         .map(|error| DeviceFault::new(error.func(), error.errno()))
 }
 
+#[cfg(target_os = "linux")]
 impl Speaker {
     pub fn open(device: &str, boot: BootId) -> Result<Self> {
         Self::open_mode(device, boot, false)
@@ -214,7 +220,9 @@ impl Speaker {
         };
         Ok(Self::from_parts(Box::new(pcm), format, boot, clock_mode))
     }
+}
 
+impl Speaker {
     /// A speaker that plays into `pcm` rather than into an ALSA device (a software queue: see
     /// [`crate::soft_pcm`]), in the same modes as [`Speaker::open`] and [`Speaker::open_clock`].
     /// `format` must be one the speaker accepts of ALSA: the rendering rate, a period of at most a
@@ -357,7 +365,7 @@ impl Speaker {
         // never retire ownership using buffer_frames - available.
         #[cfg(test)]
         let observed = match self.avail_errno.take() {
-            Some(errno) => Err(alsa::Error::new("snd_pcm_avail_delay", errno)),
+            Some(errno) => Err(PcmError::new("snd_pcm_avail_delay", errno)),
             None => self.pcm.avail_delay(),
         };
         #[cfg(not(test))]
@@ -377,7 +385,7 @@ impl Speaker {
             Err(error)
                 if self.expected_end_state()
                     && (error.errno() == rustix::io::Errno::PIPE.raw_os_error()
-                        || error.errno() == rustix::io::Errno::BADFD.raw_os_error()) =>
+                        || error.errno() == crate::device::errno::BADFD) =>
             {
                 (0, 0)
             }
@@ -696,7 +704,7 @@ impl Speaker {
             Err(error)
                 if self.expected_end_state()
                     && (error.errno() == rustix::io::Errno::PIPE.raw_os_error()
-                        || error.errno() == rustix::io::Errno::BADFD.raw_os_error()) =>
+                        || error.errno() == crate::device::errno::BADFD) =>
             {
                 true
             }
@@ -725,7 +733,7 @@ impl Speaker {
     }
 
     fn expected_end_state(&self) -> bool {
-        self.is_finishing() && matches!(self.pcm.state(), State::XRun | State::Setup)
+        self.is_finishing() && matches!(self.pcm.state(), PcmState::XRun | PcmState::Setup)
     }
 
     pub fn is_finishing(&self) -> bool {
@@ -785,7 +793,7 @@ impl Speaker {
     /// A retiring tail, an unreported discard or underrun receipt, a
     /// disconnect or suspend (ENODEV, EBADFD, ESTRPIPE), or more underruns
     /// than `crate::underrun` allows latch the guard closed.
-    fn discontinuity(&mut self, error: alsa::Error) -> Box<dyn std::error::Error + Send + Sync> {
+    fn discontinuity(&mut self, error: PcmError) -> Box<dyn std::error::Error + Send + Sync> {
         if error.errno() == rustix::io::Errno::PIPE.raw_os_error()
             && !self.pending.is_retiring_tail()
             && self.discarded.is_none()
@@ -859,7 +867,7 @@ fn now() -> MonoTime {
     MonoTime::from_micros(monotonic_us())
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod finish_tests {
     use super::*;
     use lamp_turn_owner::{AdmissionState, AdmittedInput, CaptureState, Controller, Permission};
@@ -1143,7 +1151,7 @@ mod finish_tests {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 mod underrun_tests {
     use super::*;
     use crate::underrun::MAX_UNDERRUNS;

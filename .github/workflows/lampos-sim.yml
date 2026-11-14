@@ -19,6 +19,7 @@ on:
       - 'lampOS/crates/body/**'
       - 'lampOS/crates/control/**'
       - 'lampOS/crates/skills/**'
+      - 'lampOS/crates/audio/**'
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
       - 'lampOS/docs/lamp.model.json'
@@ -32,6 +33,7 @@ on:
       - 'lampOS/crates/body/**'
       - 'lampOS/crates/control/**'
       - 'lampOS/crates/skills/**'
+      - 'lampOS/crates/audio/**'
       - 'lampOS/sdk/**'
       - 'lampOS/docs/control*'
       - 'lampOS/docs/lamp.model.json'
@@ -149,6 +151,15 @@ jobs:
       - name: lamp-body's tests
         working-directory: lampOS
         run: cargo test --locked -p lamp-body
+      # lamp-audio under macOS's cfg (step 3, C1: the speaker's playback trait, its errors and the soft queue build
+      # off Linux): clippy, and its lib tests, which include the soft queue's and the speaker's portable ones. The
+      # ALSA null-device tests are cfg(linux); the debug timing test in its `it` target is left to the Linux runs.
+      - name: clippy for lamp-audio under macOS's cfg
+        working-directory: lampOS
+        run: cargo clippy --locked -p lamp-audio --all-targets -- -D warnings
+      - name: lamp-audio's lib tests
+        working-directory: lampOS
+        run: cargo test --locked -p lamp-audio --lib
       - name: lamp-sim's tests
         working-directory: lampOS
         run: |
