@@ -1011,8 +1011,14 @@ each under the quiet rule. A round
    refuses a joint already under load beyond its start limit, and the
    refused start lets go of the joints. So when lamp-body's restart is
    refused, the switch says `lamp-body's restart was refused (…); tried once
-   more after 3 s, its let-go`, waits 3 s (`round::BODY_LET_GO`), and
-   restarts it once more. If that stands, the journal says `lamp-body's
+   more after 3 s, its let-go`, waits 3 s (`round::BODY_LET_GO`), clears
+   its start count (`systemctl reset-failed lamp-body.service`), and
+   restarts it once more. lamp-body allows 3 starts in 600 s
+   (`StartLimitBurst=3`, `Restart=on-failure` after 15 s): without the
+   reset, the refused start, the retry and a put-back's restart would leave
+   systemd's own restart at `start-limit-hit`, and the old build's body
+   down. With it, the retry spends no more of the count than a refused
+   restart did before. If that stands, the journal says `lamp-body's
    restart tried once more: it stands` and the switch goes on to the watch.
    If it is refused again, it says `lamp-body's restart tried once more:
    refused again (…)` and the build is put back as before. Any other part's

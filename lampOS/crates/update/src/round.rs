@@ -2874,7 +2874,7 @@ impl Run<'_, '_> {
     /// failed (#7067): on lamp-fc4b (13050) its first start refused a joint
     /// already under load, 208 against its limit of 170, and its second,
     /// 2 s later, stood, after the build was put back. Only lamp-body, and
-    /// only once; the journal says the retry and its result. Any other part's
+    /// only once, its start count reset first; the journal says the retry and its result. Any other part's
     /// refused restart, or lamp-body's second, puts the build back as before.
     fn restart_part(&mut self, unit: &str) -> Result<(), String> {
         let why = match self.world.systemd.restart(unit) {
@@ -2886,6 +2886,14 @@ impl Run<'_, '_> {
             BODY_LET_GO.as_secs()
         ));
         self.listen(BODY_LET_GO);
+        // lamp-body allows 3 starts in 600 s (StartLimitBurst): the refused
+        // start and this retry would leave the put-back's restart and
+        // systemd's own `Restart=on-failure` one too few, and the old build's
+        // body down at start-limit-hit (Twelve's P1 on #7073). Cleared first,
+        // the retry spends no more of it than a refused restart did before.
+        if let Err(why) = self.world.systemd.reset_failed(unit) {
+            self.say(&format!("lamp-body's start count is not reset: {why}"));
+        }
         match self.world.systemd.restart(unit) {
             Ok(()) => {
                 self.say("lamp-body's restart tried once more: it stands");

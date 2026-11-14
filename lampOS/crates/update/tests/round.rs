@@ -467,6 +467,11 @@ impl Systemd for FakeSystemd {
         Ok(())
     }
 
+    fn reset_failed(&mut self, unit: &str) -> Result<(), String> {
+        self.calls.borrow_mut().push(format!("reset-failed {unit}"));
+        Ok(())
+    }
+
     fn start_unit(&mut self, unit: &str) -> Result<(), String> {
         self.calls.borrow_mut().push(format!("start {unit}"));
         if let Some(why) = &self.start_refused {
@@ -2152,6 +2157,44 @@ fn a_body_restart_refused_twice_puts_the_build_back() {
         lamp.said
     );
     assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+}
+
+/// Twelve's P1 on #7073: lamp-body allows 3 starts in 600 s. Refused, tried
+/// once more and refused, then put back, the round must leave systemd's own
+/// `Restart=on-failure` one start: its count is reset before the retry, so
+/// at most two of the round's starts of lamp-body count against the limit.
+#[test]
+fn a_refused_body_retry_leaves_its_start_limit_room_for_systemd() {
+    let mut lamp = Lamp::new();
+    lamp.systemd.refused_restarts.extend([
+        "lamp-body.service".to_owned(),
+        "lamp-body.service".to_owned(),
+    ]);
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    assert!(matches!(lamp.round(), Outcome::RolledBack { .. }));
+    let calls = lamp.calls.borrow();
+    let body: Vec<&String> = calls
+        .iter()
+        .filter(|call| call.ends_with(" lamp-body.service"))
+        .collect();
+    let reset = body
+        .iter()
+        .rposition(|call| *call == "reset-failed lamp-body.service")
+        .expect("lamp-body's start count reset");
+    assert_eq!(
+        body[reset - 1..=reset + 1],
+        [
+            "restart lamp-body.service",
+            "reset-failed lamp-body.service",
+            "restart lamp-body.service"
+        ],
+        "reset between the refused start and its retry: {body:?}"
+    );
+    let since = body[reset + 1..]
+        .iter()
+        .filter(|call| call.starts_with("restart ") || call.starts_with("start "))
+        .count();
+    assert!(since <= 2, "{since} starts after the reset: {body:?}");
 }
 
 /// Only lamp-body gets the retry: another part's refused restart puts the
