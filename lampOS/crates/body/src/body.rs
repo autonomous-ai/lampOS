@@ -87,6 +87,11 @@ const TAKE_HOLD_SLACK: u16 = 12;
 /// did not acknowledge its goal and the run ended; 15 s later it stood.
 const TAKE_HOLD_TRIES: u8 = 10;
 const TAKE_HOLD_RETRY: Duration = Duration::from_millis(300);
+/// A start's read-back of what it just wrote is asked this many times in all
+/// while no clean answer comes, `READ_BACK_RETRY` apart: one reply lost on the
+/// wire is not a servo that does not keep its settings (#6591).
+const READ_BACK_TRIES: u8 = 3;
+const READ_BACK_RETRY: Duration = Duration::from_millis(20);
 /// A joint that has arrived is given its own position as its goal, in any
 /// mood, and is left there until the pose wanted of it is this many counts
 /// from where it is. Asked for less, a servo pushes and does not move: on
@@ -2743,6 +2748,25 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
         }
     }
 
+    /// A read-only read back, asked again after `READ_BACK_RETRY` while it
+    /// fails, `READ_BACK_TRIES` times in all. Only a read that gives no clean
+    /// answer is asked again; a value read back is the caller's to judge.
+    fn read_back<T>(
+        &mut self,
+        mut read: impl FnMut(&mut Self) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let mut tries = 1;
+        loop {
+            match read(self) {
+                Err(_) if tries < READ_BACK_TRIES => {
+                    tries += 1;
+                    self.settle(READ_BACK_RETRY);
+                }
+                done => return done,
+            }
+        }
+    }
+
     /// A write acknowledged as in `write_acknowledged`, tried again after
     /// `TAKE_HOLD_RETRY` while it fails, `TAKE_HOLD_TRIES` times in all.
     fn write_patiently(&mut self, joint: Joint, packet: &[u8]) -> Result<(), String> {
@@ -5151,7 +5175,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 return report;
             }
         }
-        match bus.arm_profiles() {
+        match bus.read_back(Bus::arm_profiles) {
             Ok(now)
                 if now.iter().all(|profile| {
                     (profile.0, profile.1, profile.2) == (1, limits.servo_acceleration, arm_speed)
@@ -5170,7 +5194,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             }
         }
     }
-    match bus.profiles() {
+    match bus.read_back(Bus::profiles) {
         Ok(now)
             if now.iter().zip(COMMANDED).all(|(profile, joint)| {
                 bus.left[joint.index()]
@@ -5208,7 +5232,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 return report;
             }
         }
-        match bus.force_limits(&carrying) {
+        match bus.read_back(|bus| bus.force_limits(&carrying)) {
             Ok(now) if now.iter().all(|held| *held == force) => report.force = Some(force),
             Ok(now) => {
                 report.stop = Stop::Bus {
