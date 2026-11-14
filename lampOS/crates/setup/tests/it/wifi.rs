@@ -594,7 +594,6 @@ fn hangs(_: &str) -> io::Result<Vec<SocketAddr>> {
 }
 
 #[test]
-#[ignore = "PARKED (#6386): the reach is 3 s again; re-enable when China is scheduled and stable's lamp-update carries #6810"]
 fn a_hanging_lookup_fails_the_check_at_5_s_not_3_s() {
     // #6256: a slow first lookup, or a far server, gets 5 s, not V1's 3 s.
     let began = Instant::now();
