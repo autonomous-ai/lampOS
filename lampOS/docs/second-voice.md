@@ -3886,8 +3886,12 @@ after a take-over, but now for every turn:
   "I've kept the light on until ten.", and nothing held the light, so
   claimed-not-done stayed at 1). `action_claim::claim_as` reads, beside the
   strict lines above, a short run of words at the reply's start, bare or
-  after a lead-in and a mark ("Okay,", "Sure.", "All right,", "Got it,"),
-  each tied to one family with a call behind it (`action_claim::WORDED`):
+  after a lead-in and a mark ("Okay,", "Sure.", "All right,", "Got it,",
+  and for these runs alone a greeting, `action_claim::GREETINGS`: "Hello.",
+  "Hi,", "Hey,", "Morning!", "Good morning.", "Noted." and the like; GO-159
+  on a lamp, 14 Nov, 12958: "Hello. The light will stay on until ten." and
+  "Good morning. I'll keep it on until ten." beside only a `keep_rule`
+  were said as they were), each tied to one family with a call behind it (`action_claim::WORDED`):
   a timer, reminder or alarm set ("Timer set for one minute.", "I've set a
   timer for …", "Reminder set …", "I'll remind you in …", "Your
   one-minute timer is set.", the last also standing beside
@@ -3906,7 +3910,10 @@ after a take-over, but now for every turn:
   light stays on until …", "I'll keep my light on until …", with no "the",
   "my" or "your" too when a clock follows ("Light stays on until 10 pm.",
   "Light's on until ten.", #5215 claim #1; "Light stays on until you say
-  otherwise." is none), or "for" with
+  otherwise." is none), the hold said as never going out before its hour
+  ("The light will stay on and won't go out by itself before ten.", "It'll
+  stay on and won't go out before ten.", closing at the clock; GO-159, 14
+  Nov; "… won't go out by itself." is none), or "for" with
   a time after it: digits, a number word, "the night" or "tonight", so
   "I'll keep my light on for ten minutes." is one and "I left a light on
   for you." is not. State replies with "for" close at the duration and
@@ -4021,7 +4028,8 @@ after a take-over, but now for every turn:
   `a_limit_after_the_first_sentence_is_judged_only_in_its_piece`,
   `a_kept_lights_clock_beside_a_rule_and_a_timer_is_held`,
   `a_reminders_time_beside_only_a_listing_after_a_set_ask_is_held`,
-  `a_kept_lights_claim_is_held_beside_any_call` and
+  `a_kept_lights_claim_is_held_beside_any_call`,
+  `a_kept_lights_claim_after_a_greeting_beside_a_kept_rule_is_held` and
   `action_claim::tests::*`.
 - **A reply never offers to keep what its `remember` call keeps** (finding
   K2 on #3504: lamp-06c1, 28 Oct, "Want me to keep that as the change?

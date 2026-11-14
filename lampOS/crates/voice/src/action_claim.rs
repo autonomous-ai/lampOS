@@ -82,7 +82,11 @@
 //! or "for" ("The light is on until ten.", "Your light will be on until 10
 //! pm.", "The light's staying on until ten.", "It'll stay on until ten.",
 //! and with no "the", "my" or "your": "Light stays on until 10 pm.",
-//! "Light's on until ten." (#5215 claim #1)):
+//! "Light's on until ten." (#5215 claim #1)), and the hold said as never
+//! going out before its hour ("The light will stay on and won't go out by
+//! itself before ten."); these runs alone may also open after a greeting
+//! ([`GREETINGS`]: "Hello. The light will stay on until ten.", GO-159 on a
+//! lamp, 14 Nov, 12958, said beside only a `keep_rule`):
 //! "It stays on until you say otherwise.", "Keeping it on until ten would
 //! waste power." and "It's on until ten." (whose "it" may be anything) are
 //! none. Numeric clock and decimal punctuation stays inside the time for
@@ -487,19 +491,19 @@ pub fn claim(reply: &str, ended: bool) -> Option<Option<Claim>> {
     if let Some(kind) = judge(made_claim(&text, ended), Claim::Made) {
         return Some(Some(kind));
     }
-    match runs_claim(&SNOOZED, &text, ended, true, false) {
+    match runs_claim(&SNOOZED, &text, ended, true, false, &[]) {
         Some(Some(kind)) => return Some(Some(kind)),
         None => undecided = true,
         Some(None) => {}
     }
     // As SNOOZED: a lead-in is read once the first word is whole, so a
     // reply still streaming "The" is decided no claim.
-    match runs_claim(&PROMISED, &text, ended, true, true) {
+    match runs_claim(&PROMISED, &text, ended, true, true, &[]) {
         Some(Some(kind)) => return Some(Some(kind)),
         None => undecided = true,
         Some(None) => {}
     }
-    match runs_claim(&UNPLUGGED, &text, ended, true, true) {
+    match runs_claim(&UNPLUGGED, &text, ended, true, true, &[]) {
         Some(Some(kind)) => return Some(Some(kind)),
         None => undecided = true,
         Some(None) => {}
@@ -1256,7 +1260,7 @@ fn read_as_asked(said: &str) -> (bool, bool, bool) {
 /// After the run, the sentence it opens must not end in a '?'. Each run is
 /// tied to a family with a call behind it, and never a colour said ("My
 /// light is blue now." also answers a colour question).
-const WORDED: [(&str, Claim); 71] = [
+const WORDED: [(&str, Claim); 73] = [
     // "Timer set for one minute.", "Reminder set."
     ("timer|reminder|alarm set|started", Claim::Schedule),
     ("timer's|reminder's|alarm's set|started", Claim::Schedule),
@@ -1437,6 +1441,18 @@ const WORDED: [(&str, Claim); 71] = [
     ),
     (
         "?the|my|your light'll|lamp'll stay|be|remain on|off for @ %",
+        Claim::LightKept,
+    ),
+    // GO-159 (14 Nov, 12958): the hold said as never going out before its
+    // hour ("The light will stay on and won't go out by itself before
+    // ten."), closing at the clock as the state runs above do, so "… won't
+    // go out by itself." is none.
+    (
+        "?the|my|your light|lights|lamp|it will stay|remain on and won't go out|off * before|until|till @ ^",
+        Claim::LightKept,
+    ),
+    (
+        "it'll stay|remain on and won't go out|off * before|until|till @ ^",
         Claim::LightKept,
     ),
     ("it stays|remains on|off until|till @ ^", Claim::LightKept),
@@ -2106,6 +2122,15 @@ const LEAD_INS: [&str; 5] = [
     "you got it",
 ];
 
+/// The greetings a worded claim may also open after, with a mark ("Hello.
+/// The light will stay on until ten.", "Good morning. I'll keep it on until
+/// ten.": GO-159 on a lamp, 14 Nov, 12958, said as they were). The worded
+/// runs only ([`WORDED`]); the strict lines keep [`LEAD_INS`] alone.
+const GREETINGS: [&str; 2] = [
+    "hello|hi|hey|morning|evening|afternoon|noted",
+    "good morning|afternoon|evening|night",
+];
+
 /// How many words a `*` takes at most.
 const ANY_WORDS: usize = 3;
 
@@ -2434,7 +2459,7 @@ fn fits_numeric_time(
 /// Whether `text` (already [`normalised`]) claims an action in other words
 /// ([`WORDED`]), as [`claim`] says it.
 fn worded_claim(text: &str, ended: bool) -> Option<Option<Claim>> {
-    runs_claim(&WORDED, text, ended, false, true)
+    runs_claim(&WORDED, text, ended, false, true, &GREETINGS)
 }
 
 /// Whether `text` (already [`normalised`]) opens with one of `runs`, bare
@@ -2442,19 +2467,21 @@ fn worded_claim(text: &str, ended: bool) -> Option<Option<Claim>> {
 /// a lead-in is read only once the first word is whole, so a reply still
 /// streaming "The" is decided no claim, as the strict lines decide it.
 /// With `clocks`, a clock's mark stays inside its time ([`tokens`]).
+/// `greetings` are lead-ins too ([`GREETINGS`], the worded runs').
 fn runs_claim(
     runs: &[(&str, Claim)],
     text: &str,
     ended: bool,
     whole_lead: bool,
     clocks: bool,
+    greetings: &[&str],
 ) -> Option<Option<Claim>> {
     let tokens = tokens(text, ended, clocks);
     let more = !ended;
-    let leads: &[&str] = if whole_lead && matches!(tokens.first(), Some(Token::Part(_))) {
-        &[]
+    let leads: Vec<&str> = if whole_lead && matches!(tokens.first(), Some(Token::Part(_))) {
+        Vec::new()
     } else {
-        &LEAD_INS
+        LEAD_INS.iter().chain(greetings).copied().collect()
     };
     let mut undecided = false;
     for &(pattern, kind) in runs {
@@ -4012,5 +4039,75 @@ pub(crate) mod tests {
         ));
         assert!(worded_as_a_question("Could you check my reminders"));
         assert!(!worded_as_a_question("Lamp, remind me at ten."));
+    }
+
+    /// GO-159 on a lamp (14 Nov, 12958): "Keep the light on until ten."
+    /// got only a `keep_rule` (no end time) and these replies were said
+    /// as they are: a greeting before the claim ("Hello.", "Good
+    /// morning."), and the hold said as never going out before the hour.
+    /// Each is a kept light's claim, held beside the rule; the honest
+    /// replies are none, and a limit a set carried still stands.
+    #[test]
+    fn a_kept_lights_claim_after_a_greeting_or_as_not_going_out_is_held() {
+        let kept =
+            serde_json::json!({"rule": "Keep the light on.", "about": "light", "never": true});
+        for reply in [
+            "Hello. The light will stay on until ten.",
+            "Got it: the light will stay on and won't go out by itself before ten.",
+            "Good morning. I'll keep it on until ten.",
+            "I'll keep the light on until ten.",
+            "Got it \u{2014} the light stays on until ten.",
+            // A claim, then its correction: the first sentence is judged,
+            // so it is held (the safe side).
+            "I'll keep my light on until ten. I can only keep the light on outright, not until a set time \u{2014} so I'll just leave it on.",
+            "I'll keep my light on until ten. Noted \u{2014} it will stay on rather than dimming itself while nobody's around.",
+            "Hi, the light stays on until ten.",
+            "Morning! It'll stay on and won't go out before ten.",
+        ] {
+            assert_eq!(
+                claim_as(reply, true, true),
+                Some(Some(Claim::LightKept)),
+                "{reply}"
+            );
+            assert!(
+                !stands(Claim::LightKept, reply, false, [("keep_rule", &kept)]),
+                "{reply}"
+            );
+        }
+        for reply in [
+            "I'll keep it lit. Morning.",
+            "I'll keep the light on \u{2014} it won't go out by itself. Good morning.",
+            "I'll keep the light on from now on, and won't let it go out by itself. But I can only keep it on indefinitely, not just until ten \u{2014} want me to light a reminder at ten so I can dim it then?",
+            "I'll stay lit and won't let the light go out by itself. I can't schedule it to stop at ten, though \u{2014} just say the word then and I'll switch off.",
+            "I'll keep the light on from now on \u{2014} but I can't hold it until a set hour, so it'll just stay on.",
+            "Hello. The light will stay on and won't go out by itself.",
+            "Good morning. Will the light stay on until ten?",
+            "Hello. It stays on until you say otherwise.",
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(None), "{reply}");
+        }
+        // A greeting before a limit a set carried: it stands.
+        let timer = serde_json::json!({"text": "Tea", "seconds": 300});
+        let reminder = serde_json::json!({"text": "Lights", "time": "22:00"});
+        for (reply, kind, call) in [
+            (
+                "Good morning. Timer set for five minutes.",
+                Claim::Schedule,
+                ("set_timer", &timer),
+            ),
+            (
+                "Hello. I've set a reminder at ten.",
+                Claim::Schedule,
+                ("set_reminder", &reminder),
+            ),
+        ] {
+            assert_eq!(claim_as(reply, true, true), Some(Some(kind)), "{reply}");
+            assert!(stands(kind, reply, false, [call]), "{reply}");
+        }
+        // Undecided while the greeting's claim streams.
+        assert_eq!(
+            claim_as("Hello. The light will stay on until", false, true),
+            None
+        );
     }
 }
