@@ -612,11 +612,16 @@ fn light_now(bus: &Bus) -> Option<Light> {
 /// The newest value of `topic`, if it was said within 3 s: on the host's
 /// wall clock, as its publisher stamped it, never the program's own.
 fn said_lately<T: serde::de::DeserializeOwned>(bus: &Bus, topic: &str) -> Option<T> {
+    said_within(bus, topic, 3_000)
+}
+
+/// The same, said within `most_ms`.
+fn said_within<T: serde::de::DeserializeOwned>(bus: &Bus, topic: &str, most_ms: u64) -> Option<T> {
     let message = bus.latest(topic).ok()??;
     let now_ms = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_or(0, |since| since.as_millis() as u64);
-    (now_ms.saturating_sub(message.header.at_unix_ms) <= 3_000)
+    (now_ms.saturating_sub(message.header.at_unix_ms) <= most_ms)
         .then(|| message.parse().ok())
         .flatten()
 }
@@ -3150,6 +3155,24 @@ fn tool_call(
             sockets.gaze.display()
         );
         return refuse(lamp_skills::CANNOT_TURN);
+    }
+    // #6834: a gesture, a move or a stand the body would drop is never told
+    // to the model as done. Read without waiting: the health the bus keeps
+    // (it means nothing after 15 s) and the body's limits, said every 10 s.
+    if run
+        .calls
+        .iter()
+        .any(|call| matches!(call, Call::Gesture(_) | Call::Move(_) | Call::Stand(_)))
+    {
+        let health =
+            said_within::<lamp_msgs::Health>(&runner.bus, lamp_msgs::Health::TOPIC, 15_000);
+        let stands =
+            said_within::<lamp_msgs::BodyLimits>(&runner.bus, lamp_msgs::BodyLimits::TOPIC, 30_000)
+                .map(|limits| limits.stands);
+        if let Some(why) = lamp_skills::body_down(health.as_ref(), stands) {
+            eprintln!("lamp-skills: {name} with {args} not run: the body can't move: {why}");
+            return refuse(&format!("{} {why}", lamp_skills::CANNOT_MOVE));
+        }
     }
     let made: Vec<Call> = run
         .calls
