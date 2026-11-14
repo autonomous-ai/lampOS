@@ -231,6 +231,8 @@ pub mod worker_scheduling;
 
 #[cfg(target_os = "linux")]
 pub mod audio_workers;
+#[cfg(target_os = "linux")]
+pub mod bus_speaker;
 pub mod coordinator;
 
 mod receipt_history;

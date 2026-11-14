@@ -289,12 +289,52 @@ second (cb94 kept no stalls trail): the SD/MMC host's retune, which #784 found h
 some eleven times a day on lamp-4ace. On cb94 the ring's slow SPI write
 (its third in 4.5 h) came in the same second.
 
+## The speaker half (`bus:speaker1`)
+
+The speaker's privacy guard, ownership ledger, authority and underrun logic
+live in `Speaker` (`crates/audio/src/pcm.rs`) and do not know ALSA: it writes
+to a `Box<dyn PlaybackPcm>` (`avail_delay`, `start`, `writei`, `drain`,
+`prepare`, `state`, `discard`). ALSA's `PCM` implements the trait.
+`Speaker::with_pcm(pcm, format, boot, clock_mode)` builds a speaker over any
+other implementation and refuses the same formats `open` refuses (rate
+24 kHz, period at most 240 frames, buffer at most 960, and at least 480 in
+clock mode).
+
+`--speaker-device bus:speaker1` (the only `bus:` name the option takes)
+makes the speaker worker play into `SoftPcm` (`crates/audio/src/soft_pcm.rs`)
+instead of ALSA:
+
+- `SoftPcm` is a queue of at most 960 frames (40 ms) that drains at the
+  rendering rate once started, as a codec would. A write takes what fits and
+  the rest is `EAGAIN`, so the speaker's own pacing, underrun and drain code
+  runs unchanged. It never reports an xrun. `discard` and `prepare` empty it.
+- What a write accepts is handed once to a sink that
+  (`crates/voice/src/bus_speaker.rs`) publishes it on `Audio::PLAY_TOPIC`
+  (`speaker1/play`) as one `lamp_msgs::Audio` message: 24 kHz mono S16LE,
+  up to 10 ms a block (shorter if the queue had room for only part), the
+  sequence rising by one a block. It is paced by the voice's clock; the
+  subscriber gets no back-pressure.
+- A block the bus refuses is counted, its sequence still spent, and logged on
+  the first and every hundredth ("lamp-voice speaker: the bus refused a block").
+- `LAMP_BUS_ROOT` is passed to the speaker worker as it is to the capture
+  worker, as an absolute path only.
+- Cutting a say (`discard`) loses at most the 40 ms already published; the
+  subscriber's own queue is not told.
+- The device is off unless the flag is given: the lamp's units do not pass it
+  and nothing changes on a lamp. Linux only for now (`bus_speaker` sits behind
+  the same gate as `audio_workers`).
+
+Latency: the first block is published in the call that wrote it, with no
+thread, wait or copy beyond the one into the message. The sound the
+subscriber hears is the voice's pace plus its own buffering; the queue adds at
+most its 40 ms of depth.
+
 ## Not done
 
-- **The speaker half.** `pcm.rs` still calls ALSA directly and is Linux
-  only. The trait for it was published in `A1-007`. Until it exists there is
-  no scripted speaker and no accepted-PCM echo path through a scripted
-  device; the speaker loop's one test runs on ALSA's `null` device on Linux
+- **The speaker worker on a non-Linux host.** `pcm.rs` is still Linux only
+  (it names `alsa` types in the trait). The bus speaker works where the voice
+  builds today; the trait gate split and the worker's un-gating are later PRs.
+  The speaker loop's one test runs on ALSA's `null` device on Linux
   (`tests/speaker_lapse_worker.rs`), where its clock can never start.
 - **The capture loop itself has no test yet.** `capture_on` exists and
   compiles for the board; nothing drives it. `audio_workers` is compiled only

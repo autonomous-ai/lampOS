@@ -2075,15 +2075,16 @@ fn vad_input_worker_environment(
     (role == "capture").then_some((crate::activity::INPUT_ENVIRONMENT, value))
 }
 
-// The bus folder (`LAMP_BUS_ROOT`), to the capture worker only, as set and only
-// when an absolute path: `--microphone-device bus:mic1` opens the bus there, and
-// a worker without it opened `/run/lampos-bus`, never the folder beside lamp-sim.
+// The bus folder (`LAMP_BUS_ROOT`), to the capture and the speaker worker only, as set and only
+// when an absolute path: `--microphone-device bus:mic1` and `--speaker-device bus:speaker1` open
+// the bus there, and a worker without it opened `/run/lampos-bus`, never the folder beside
+// lamp-sim.
 fn bus_root_worker_environment(
     role: &str,
     value: Option<std::ffi::OsString>,
 ) -> Option<(&'static str, std::ffi::OsString)> {
     value
-        .filter(|path| role == "capture" && Path::new(path).is_absolute())
+        .filter(|path| matches!(role, "capture" | "speaker") && Path::new(path).is_absolute())
         .map(|path| (lamp_bus::ROOT_VARIABLE, path))
 }
 
@@ -3226,9 +3227,9 @@ mod tests {
         }
     }
 
-    /// The bus folder reaches the capture worker only, and only as an absolute path.
+    /// The bus folder reaches the capture and the speaker worker only, and only as an absolute path.
     #[test]
-    fn the_bus_root_reaches_capture_only_as_an_absolute_path() {
+    fn the_bus_root_reaches_capture_and_speaker_only_as_an_absolute_path() {
         use std::ffi::OsString;
         for role in BUS_ROOT_ROLES {
             for (value, passes) in [
@@ -3238,17 +3239,17 @@ mod tests {
                 (None, false),
             ] {
                 let got = bus_root_worker_environment(role, value.map(OsString::from));
-                let expected = (passes && role == "capture")
+                let expected = (passes && matches!(role, "capture" | "speaker"))
                     .then(|| ("LAMP_BUS_ROOT", OsString::from("/x/bus")));
                 assert_eq!(got, expected, "role {role}, value {value:?}");
             }
         }
     }
 
-    /// Started through `worker_command`, the capture worker has `LAMP_BUS_ROOT`
-    /// and no other worker does.
+    /// Started through `worker_command`, the capture and the speaker worker have
+    /// `LAMP_BUS_ROOT` and no other worker does.
     #[test]
-    fn the_bus_root_is_in_the_started_capture_workers_environment_alone() {
+    fn the_bus_root_is_in_the_started_capture_and_speaker_workers_environment_alone() {
         use std::os::unix::fs::PermissionsExt;
         let home = SessionDirectory::create().unwrap();
         let script = home.path.join("worker.sh");
@@ -3271,7 +3272,7 @@ mod tests {
                 std::fs::read_to_string(home.path.join(format!("env-{role}.txt"))).unwrap();
             assert_eq!(
                 written.lines().any(|line| line == "LAMP_BUS_ROOT=/x/bus"),
-                role == "capture",
+                matches!(role, "capture" | "speaker"),
                 "{role}"
             );
         }

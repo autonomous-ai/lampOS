@@ -27,6 +27,8 @@ pub mod process_wav;
 pub mod qualification;
 #[cfg(unix)]
 pub mod replay;
+#[cfg(target_os = "linux")]
+pub mod soft_pcm;
 pub mod steady;
 #[cfg(unix)]
 pub mod testing;
