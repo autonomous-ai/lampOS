@@ -5301,7 +5301,7 @@ fn a_round_writes_update_env_after_the_writer_refresh_and_the_switches_turn_on()
         UpdateSwitches {
             engines: true,
             tasks: true,
-            one_path: true,
+            one_path: false,
             gateway_runs: false,
         }
     );
