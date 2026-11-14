@@ -1493,6 +1493,11 @@ pub type TaskNote = Arc<dyn Fn(u64) -> Option<String> + Send + Sync>;
 /// (`crate::agent_tasks::declined`, #6582): with its request and words, the
 /// task dropped and the note it gets, or nothing.
 pub type TaskDeclined = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
+/// A heard line's whole plain yes to a task this voice prepared and read
+/// back (`crate::agent_tasks::yes_taken`, #7027): with its request and
+/// words, the task started in code and the note it gets, or nothing.
+/// Blocking: it asks the tasks part.
+pub type TaskYes = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
 /// [`TaskNote`] with the request's own words too: a new ask while a task
 /// waits replaces it (#6547 B, `crate::agent_tasks::pending_note`).
 pub type WaitingNote = Arc<dyn Fn(u64, &str) -> Option<String> + Send + Sync>;
@@ -1857,6 +1862,9 @@ struct Shared {
     task_waiting: Option<WaitingNote>,
     /// With the tasks part: a heard plain no drops the task waiting (#6582).
     task_declined: Option<TaskDeclined>,
+    /// With the tasks part: a heard whole plain yes starts the task waiting
+    /// in code, before the chat round (#7027).
+    task_yes: Option<TaskYes>,
     /// With the setup walk: a line that spells the person's name, told how
     /// to say it back ([`Engine::noting_a_spelled_name`]).
     spelled_name: Option<WordsNote>,
@@ -4589,6 +4597,7 @@ impl Engine {
                 name_fired: None,
                 task_waiting: None,
                 task_declined: None,
+                task_yes: None,
                 spelled_name: None,
                 air: None,
                 seems: None,
@@ -6444,6 +6453,19 @@ impl Engine {
     pub fn declining_a_task_waiting(mut self, declined: TaskDeclined) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.task_declined = Some(declined);
+        }
+        self
+    }
+
+    /// A heard line that is a whole plain yes to a task this voice prepared
+    /// and read back starts it in code (`yes`, with the tasks part, #7027),
+    /// before the chat round begins: on lamp-9adf 2 of 5 such yeses were
+    /// lost, one to a chat round that never began, one to a model that
+    /// answered in words and called nothing. The line is told so in place
+    /// of [`Engine::noting_a_task_waiting`]'s note. Before any turn only.
+    pub fn taking_a_task_yes(mut self, yes: TaskYes) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.task_yes = Some(yes);
         }
         self
     }
@@ -8446,11 +8468,14 @@ async fn spoken(
     // or no; any other words on the way are thrown away as before, and the
     // journal counts them all. Those words exist for a line in the clear only
     // with `LAMP_SECOND_UNFINISHED_WAIT` (`words_said` above); without it,
-    // nothing changes.
+    // nothing changes. So too while an agent task's read-back waits for its
+    // yes (#7027, `agent_tasks::awaits_yes`): the plain yes is then taken in
+    // code before the chat round.
     let text = if on_the_way.is_none() && text.trim().is_empty() {
         let awaited = line_words.as_deref().is_some_and(|words| {
             crate::services::answer_awaited(words)
                 || crate::skill_write_yes::answer_awaited(request, Instant::now())
+                || crate::agent_tasks::awaits_yes(Instant::now())
         });
         match answer_on_the_way(&text, line_words.clone(), awaited) {
             Some(words) => {
@@ -9350,7 +9375,14 @@ async fn spoken(
     // So too the answer a prepared write's read-back asked for, whatever it
     // says: the model judges it (`services::answer_awaited`).
     let answer_awaited = marked && crate::services::answer_awaited(&text);
-    let answers = asked_by_the_lamp || answer_awaited;
+    // And a whole plain yes or no while an agent task's read-back waits for
+    // its yes (#7027, `agent_tasks::awaits_yes`): taken in code below, never
+    // held as a short sound. Any other short sound is judged as before.
+    let task_answer = marked
+        && !answer_awaited
+        && crate::agent_tasks::awaits_yes(Instant::now())
+        && (crate::services::plain_yes(&text) || crate::services::plain_no(&text));
+    let answers = asked_by_the_lamp || answer_awaited || task_answer;
     if asked_by_the_lamp {
         eprintln!(
             "lamp-voice second: request {request}: a short sound with a word in it, right after the lamp's own question, in a conversation going on: judged as a line"
@@ -9358,6 +9390,10 @@ async fn spoken(
     } else if answer_awaited {
         eprintln!(
             "lamp-voice second: request {request}: a short sound that is the answer a waiting write's read-back asked for: judged as a line"
+        );
+    } else if task_answer {
+        eprintln!(
+            "lamp-voice second: request {request}: a short sound that is a plain yes or no to a task read back and waiting: judged as a line (#7027)"
         );
     }
     let held = marked && !answers;
@@ -9419,9 +9455,15 @@ async fn spoken(
     // "Send it."): a waiting write's send on it needs the asker's voice
     // (`services::Turn::in_echo_tail`, Thirteen's option 1 on #6009),
     // whether or not `LAMP_SECOND_OWN_ECHO` is on.
-    if !empty && !held && !echoed && in_echo_tail_of(&shared, request, &text, &said, &marks) {
+    let in_echo_tail =
+        !empty && !held && !echoed && in_echo_tail_of(&shared, request, &text, &said, &marks);
+    if in_echo_tail {
         crate::services::line_in_echo_tail(request);
     }
+    // Begun clear of the lamp's voice and its words' tail: only such a line's
+    // plain yes to a task read back is taken in code (#7027), never one that
+    // may be the lamp's own words heard back.
+    let began_clear = !marks.over_the_lamps_voice && !in_echo_tail;
     // The rule judges this very line (`carried_past_silent_undone`).
     let heed_ran = shared.heed.is_some() && !echoed && !empty && !held;
     let mut heeded = match &shared.heed {
@@ -10267,10 +10309,48 @@ async fn spoken(
     // And a write read back and waiting for its "send", with what it holds
     // (#5962): never asked for again.
     // A plain no to a task read back drops it at once (#6582).
-    let waiting = shared
+    let declined = shared
         .task_declined
         .as_ref()
-        .and_then(|declined| declined(request, &text))
+        .and_then(|declined| declined(request, &text));
+    if declined.is_some() {
+        eprintln!(
+            "lamp-voice second: request {request}: a plain no to the task read back: the no taken in code, the task dropped before the chat round (#7027)"
+        );
+    }
+    // A whole plain yes to it, heard clear of the lamp's voice, starts it in
+    // code before the chat round (#7027): on lamp-9adf a round that never
+    // began, or a model that answered in words alone, lost 2 of 5 such
+    // yeses. Asked of the tasks part off the runtime's thread, bounded by
+    // its deadline; the model's own confirm after it finds nothing waiting.
+    // Only a plain yes while a task waits leaves the runtime's thread: any
+    // other line costs nothing here.
+    let taken = match (&declined, &shared.task_yes) {
+        (None, Some(yes))
+            if began_clear
+                && crate::agent_tasks::awaits_yes(Instant::now())
+                && crate::services::plain_yes(&text) =>
+        {
+            let (yes, words) = (yes.clone(), text.clone());
+            tokio::task::spawn_blocking(move || yes(request, &words))
+                .await
+                .ok()
+                .flatten()
+        }
+        _ => None,
+    };
+    if taken.is_some() {
+        eprintln!(
+            "lamp-voice second: request {request}: a plain yes to the task read back: the yes taken in code, the task started before the chat round (#7027)"
+        );
+        // The lamp's own work, for a question about it later, as a model's
+        // task call marks it (#829).
+        if let Some(did) = &shared.did {
+            did(Did::Worked(monotonic_us()));
+        }
+    }
+    let waiting = declined
+        .or(taken)
         .or_else(|| {
             shared
                 .task_waiting
@@ -12154,7 +12234,8 @@ fn words_on_the_way(text: &str, interim: Option<String>, over: bool) -> Option<S
 /// The words speech to text had on the way for a line in the clear whose
 /// final words (`text`) came back empty, while a read-back awaits its
 /// answer (`awaited`: a services write's, [`crate::services::answer_awaited`],
-/// or a skill's yes, [`crate::skill_write_yes::answer_awaited`]): `line`,
+/// a skill's yes, [`crate::skill_write_yes::answer_awaited`], or an agent
+/// task's, [`crate::agent_tasks::awaits_yes`], #7027): `line`,
 /// the whole line's words on the way ([`add_line_words`]), only when all of
 /// them are a plain yes or no ([`crate::services::plain_yes`],
 /// [`crate::services::plain_no`]). None otherwise, so nothing changes with

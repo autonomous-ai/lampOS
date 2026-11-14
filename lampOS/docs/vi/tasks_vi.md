@@ -190,6 +190,71 @@ có chỗ gắn này: ở đó một tiếng không vẫn không gọi gì. Test
 `a_correction_after_the_read_back_is_not_a_plain_no`,
 `a_plain_no_with_nothing_pending_does_nothing`.
 
+### Một tiếng "có" cho lời đọc lại bắt đầu việc ngay trong code (#7027)
+
+Trên lamp-9adf, 2 trong 5 lần nhờ việc mất tiếng "có" của người dùng sau lời
+đọc lại: một lần lượt chat không bao giờ bắt đầu (`chat round 1 had not begun
+in 4500 ms; the turn ends unanswered`), nên không có gì gọi
+`confirm_agent_task`; một lần mô hình trả lời tiếng "có" bằng lời mà không gọi
+gì (`calls=none`). Nay, trên tuyến thứ hai, trước khi hỏi lượt chat, một câu
+nghe được là một tiếng có trọn vẹn và đơn thuần (`services::plain_yes`, phép
+thử cố định duy nhất; không thêm từ nào cho việc này) bắt đầu việc đang chờ
+ngay trong code (`agent_tasks::yes_taken`, gắn vào engine bằng
+`taking_a_task_yes`), chỉ khi tất cả những điều sau đều đúng:
+
+- đó là một yêu cầu sau yêu cầu đã chuẩn bị việc, trong `CONFIRM_WITHIN`
+  (120 s), nghe được, không bao giờ là tin nhắn gõ trong app (`may_confirm`,
+  và không phải `messages::is_text`);
+- câu bắt đầu khi đèn không nói và ngoài đuôi vọng lại của lời đèn (không
+  `over_the_lamps_voice`, không `in_echo_tail_of`), và không bị giữ như tiếng
+  vọng của chính đèn;
+- việc không có phiên nào được nêu tên (`LAMP_TASKS_REPLY_NAMED`), như với
+  quy tắc một tiếng có;
+- câu ngay trước đó của đèn đọc lại việc đúng như quy tắc một tiếng có đòi
+  hỏi (`read_back_heard`: trong 120 s, không bị cắt, kết thúc bằng câu hỏi,
+  nêu ai làm và mọi từ nội dung, `reads_back`).
+
+Nó đi qua chính đường của `confirm_agent_task` (`agent_tasks::run`), nên mọi
+kiểm tra của một lần xác nhận vẫn giữ, và phần tasks được gửi `status` và
+`confirm` một lần, ngoài luồng của runtime (`spawn_blocking`, giới hạn bởi
+`DEADLINE`, 3,5 s): lượt chat của câu "có" được hỏi sau đó, trong khi trước
+đây chính hai yêu cầu này đến sau cả một lượt chat. Nhật ký ghi
+`lamp-voice second: request N: a plain yes to the task read back: the yes
+taken in code, the task started before the chat round (#7027)` và
+`lamp-voice: tasks: request N: task <id> started: the yes taken in code,
+before the chat round (#7027)`; câu đó được báo, thay cho ghi chú việc đang
+chờ, rằng người ta đã nói có, việc đã được giao cho <ai> và
+confirm_agent_task đã được gọi, nên không gọi gì, rồi đến `next` mà một lần
+xác nhận đưa ra khi không có lead-in (không có gì được nói trước một lần gọi). Một tiếng không đơn thuần (ở trên) được ghi nhật ký theo cùng
+cách: `lamp-voice second: request N: a plain no to the task read back: the no
+taken in code, the task dropped before the chat round (#7027)`. Sau đó
+`confirm_agent_task` của chính mô hình trong yêu cầu ấy không thấy gì đang chờ
+và không hỏi phần tasks gì: sau tiếng có, nó trả lời `already_handed_over` với
+"It is already handed over on their yes: do not call this again. …", sau
+tiếng không là "Not started: they said no to it, and it was dropped. …", không
+bao giờ là "Nothing is prepared yet …"; và một việc mô hình chuẩn bị lại trong
+yêu cầu đó không bao giờ được bắt đầu bởi cùng tiếng có ấy.
+
+Mọi thứ khác vẫn do mô hình phán đoán như trước: "Yes, but make it six
+fruits.", một tiếng có gõ trong app, một tiếng có nói đè lên giọng đèn, một
+tiếng có trong chính yêu cầu đã chuẩn bị việc, hoặc một lần xác nhận phần tasks
+không nhận (nhật ký ghi `a plain yes to its read-back was not started in code
+(…); the line goes to the model`). Trong lúc một việc chờ, một câu chỉ gồm một
+tiếng có hoặc không đơn thuần không bao giờ bị giữ như một âm thanh ngắn, và
+một câu có lời cuối trả về rỗng nhưng trên đường đi có trọn một tiếng có hoặc
+không đơn thuần được coi như đã nói, như với một lần ghi đang chờ (#6840).
+Tuyến Live chưa có chỗ gắn này. Test:
+`a_whole_plain_yes_to_the_read_back_is_taken_in_code_and_nothing_else`,
+`a_plain_yes_taken_in_code_starts_it_once_and_the_models_confirm_is_a_no_op`,
+`a_yes_with_more_words_or_in_the_prepares_request_is_not_taken_in_code`,
+`a_plain_no_taken_in_code_leaves_the_models_confirm_nothing_to_redo`, và trên
+tuyến thứ hai (`second_provider/tests/task_yes_in_code.rs`)
+`a_plain_yes_starts_the_task_though_the_chat_round_never_begins`,
+`a_plain_yes_starts_the_task_though_the_model_calls_nothing`,
+`a_plain_no_drops_the_task_in_code`, `a_yes_with_more_in_it_goes_to_the_model`,
+`a_yes_over_the_lamps_voice_is_not_taken_in_code`,
+`a_typed_yes_is_not_taken_in_code`. Chưa được phát thử trên đèn.
+
 ## Việc của một kỹ năng trên Hermes của đèn (#6306, PR 3 của #6071, tắt trừ khi `LAMP_SKILL_TASKS=on`, bật trong sản phẩm)
 
 Bước `do.task` của một kỹ năng (#6305, docs/skills.md, "A skill's task")

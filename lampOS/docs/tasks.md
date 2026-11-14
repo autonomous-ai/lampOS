@@ -4379,6 +4379,67 @@ corrected ask, read back again, and started only on a yes:
   as above. A no with nothing waiting, in the request that prepared the
   task, or past the 120 s, does nothing. The Live route has no such hook
   yet: there a plain no still calls nothing.
+- **A plain yes starts the task in code (#7027, with or without the
+  switch).** On lamp-9adf 2 of 5 asks lost the person's yes after the
+  read-back: once the chat round never began (`chat round 1 had not begun
+  in 4500 ms; the turn ends unanswered`), so nothing called
+  `confirm_agent_task`; once the model answered the yes in words with
+  `calls=none`. Now, on the second route, before the chat round is asked, a
+  heard line that is a whole plain yes (`services::plain_yes`, the one
+  deterministic test; no word was added for this) starts the task waiting
+  in code (`agent_tasks::yes_taken`, hooked as the engine's
+  `taking_a_task_yes`), only when all of these hold:
+  - it is a later request than the one that prepared the task, within
+    `CONFIRM_WITHIN` (120 s), heard, never typed in the app (`may_confirm`,
+    and not `messages::is_text`);
+  - the line began clear of the lamp's voice and of its words' echo tail
+    (not `over_the_lamps_voice`, not `in_echo_tail_of`), and was not held as
+    the lamp's own echo;
+  - no session was named for the task (`LAMP_TASKS_REPLY_NAMED`), as for
+    the one yes below;
+  - the lamp's line just before it read the task back as the one-yes rule
+    requires (`read_back_heard`: within 120 s, not cut, ending with a
+    question, naming who and every content word, `reads_back`).
+
+  It goes through `confirm_agent_task`'s own path (`agent_tasks::run`), so
+  every check of a confirm holds and the tasks part is sent its `status`
+  and `confirm` once, off the runtime's thread (`spawn_blocking`, bounded
+  by `DEADLINE`, 3.5 s): the yes's round is asked after that, where before
+  the same two requests followed a whole chat round. The journal says
+  `lamp-voice second: request N: a plain yes to the task read back: the yes
+  taken in code, the task started before the chat round (#7027)` and
+  `lamp-voice: tasks: request N: task <id> started: the yes taken in code,
+  before the chat round (#7027)`; the line is told, in place of the
+  waiting note, "they said yes to the task you read back, and it is handed
+  over to <who> now: confirm_agent_task was called for it, so call
+  nothing.", then the `next` a confirm gives without the lead-in (nothing
+  was said before a call). A plain no (above) is
+  journalled the same way: `lamp-voice second: request N: a plain no to the
+  task read back: the no taken in code, the task dropped before the chat
+  round (#7027)`. The model's own `confirm_agent_task` in that request then
+  finds nothing waiting and asks the tasks part nothing: after the yes it
+  answers `already_handed_over` with "It is already handed over on their
+  yes: do not call this again. …", after the no "Not started: they said no
+  to it, and it was dropped. …", never "Nothing is prepared yet …"; and a
+  task it prepares again in that request is never started by the same yes.
+  Anything else stays the model's to judge, as before: "Yes, but make it
+  six fruits.", a typed yes, a yes over the lamp's voice, a yes in the
+  request that prepared the task, or a confirm the tasks part did not take
+  (journalled `a plain yes to its read-back was not started in code (…);
+  the line goes to the model`). While a task waits, a line of only a plain
+  yes or no is never held as a short sound, and one whose final words came
+  back empty with a whole plain yes or no on the way is taken as said, as
+  for a waiting write (#6840). The Live route has no such hook yet. Tests:
+  `a_whole_plain_yes_to_the_read_back_is_taken_in_code_and_nothing_else`,
+  `a_plain_yes_taken_in_code_starts_it_once_and_the_models_confirm_is_a_no_op`,
+  `a_yes_with_more_words_or_in_the_prepares_request_is_not_taken_in_code`,
+  `a_plain_no_taken_in_code_leaves_the_models_confirm_nothing_to_redo`, and
+  on the second route (`second_provider/tests/task_yes_in_code.rs`)
+  `a_plain_yes_starts_the_task_though_the_chat_round_never_begins`,
+  `a_plain_yes_starts_the_task_though_the_model_calls_nothing`,
+  `a_plain_no_drops_the_task_in_code`, `a_yes_with_more_in_it_goes_to_the_model`,
+  `a_yes_over_the_lamps_voice_is_not_taken_in_code`,
+  `a_typed_yes_is_not_taken_in_code`. Not yet played on a lamp.
 - a `start_agent_task` that prepares while another task still waits for its
   yes replaces it, but only from a request that could say yes to it
   (`may_confirm`): a later request than the one that prepared it, heard (or

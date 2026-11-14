@@ -10,7 +10,10 @@
 //! Autonomous app, `crate::messages`), within [`CONFIRM_WITHIN`]. The model
 //! hears the yes; the voice checks that there was one to hear. The
 //! confirmation goes on the tasks part's own socket for the voice, which
-//! nothing the model can name reaches.
+//! nothing the model can name reaches. On the second route a whole plain
+//! yes, heard after the read-back, is taken in code before the chat round,
+//! through [`CONFIRM`]'s own path ([`yes_taken`], #7027): a round that never
+//! began, or a model that answered in words alone, lost it.
 //!
 //! Off unless set: `LAMP_TASKS_DIR=/absolute/directory` holding `lamp-tasks`'s
 //! `request.sock` and `voice.sock`, passed to the provider worker as
@@ -3168,16 +3171,16 @@ fn yes_in_the_same_turn(
         && pending.session.is_none()
         && now.duration_since(pending.at) <= CONFIRM_WITHIN
         && words.is_some_and(plain_yes)
-        && read_back.is_some_and(|(line, ago, cut)| {
-            ago <= CONFIRM_WITHIN && !cut && asks(line) && reads_back(line, pending)
-        })
+        && read_back_heard(pending, read_back)
 }
 
 /// [`yes_in_the_same_turn`] with the person's words and the lamp's line
 /// before them as this process's thread has them. Read only when the cheap
 /// parts already hold.
 fn yes_in_the_same_turn_now(pending: &Pending, request: u64, heard: bool) -> bool {
-    if !heard || request != pending.request {
+    // A yes or no code already took in this request is spent (#7027): a
+    // task the model prepares again in it never starts on that line.
+    if !heard || request != pending.request || taken_in_code(request).is_some() {
         return false;
     }
     let now = Instant::now();
@@ -3233,6 +3236,156 @@ fn yes_to_a_question_now(request: u64, heard: bool) -> bool {
         last.as_ref()
             .map(|(line, ago, cut)| (line.as_str(), *ago, *cut)),
     )
+}
+
+/// What `confirm_agent_task` answers in a request whose plain yes code
+/// already took (#7027, [`yes_taken`]): it is handed over, nothing waits,
+/// and the tasks part is asked nothing.
+const YES_TAKEN_CONFIRM: &str = "It is already handed over on their yes: do not call this again. Say only, in a few natural words, that you are handing it over and will tell them when it is done.";
+
+/// What `confirm_agent_task` answers in a request whose plain no code
+/// already took (#7027, [`declined`]): never told to prepare it again
+/// ([`NOTHING_PREPARED`]).
+pub const NO_TAKEN_CONFIRM: &str = "Not started: they said no to it, and it was dropped. Say only that you won't start it. Call nothing.";
+
+/// The request whose plain yes (`true`) or no (`false`) to a read-back
+/// code took (#7027): the model's own `confirm_agent_task` in it finds
+/// nothing to do ([`YES_TAKEN_CONFIRM`], [`NO_TAKEN_CONFIRM`]), and a task
+/// it prepares again in it is never started by that same yes
+/// ([`yes_in_the_same_turn_now`]). Requests only grow, so an older one is
+/// never asked about again. A test reads only what its own thread took
+/// ([`TAKEN_IN_TEST`]): requests repeat from test to test.
+#[cfg(not(test))]
+static TAKEN_IN_CODE: Mutex<Option<(u64, bool)>> = Mutex::new(None);
+
+#[cfg(test)]
+thread_local! {
+    /// What code took, for [`taken_in_code`] on this test's thread.
+    static TAKEN_IN_TEST: std::cell::Cell<Option<(u64, bool)>> = const { std::cell::Cell::new(None) };
+}
+
+/// What code took in `request`: `Some(true)` a yes, `Some(false)` a no.
+fn taken_in_code(request: u64) -> Option<bool> {
+    #[cfg(test)]
+    let taken = TAKEN_IN_TEST.with(std::cell::Cell::get);
+    #[cfg(not(test))]
+    let taken = TAKEN_IN_CODE.lock().ok().and_then(|taken| *taken);
+    taken.filter(|(of, _)| *of == request).map(|(_, yes)| yes)
+}
+
+fn take_in_code(request: u64, yes: bool) {
+    #[cfg(test)]
+    TAKEN_IN_TEST.with(|taken| taken.set(Some((request, yes))));
+    #[cfg(not(test))]
+    if let Ok(mut taken) = TAKEN_IN_CODE.lock() {
+        *taken = Some((request, yes));
+    }
+}
+
+/// Whether the lamp's line just before a yes (`read_back`: the line, how
+/// long ago it was said, whether it was cut) read `pending` back for it:
+/// within [`CONFIRM_WITHIN`], not cut (the Reviewer-lead's P3 on #5609),
+/// ending with a question, naming who the task was prepared for and
+/// holding every one of its content words ([`reads_back`]). Shared by the
+/// one-yes rule ([`yes_in_the_same_turn`]) and the yes taken in code
+/// ([`yes_in_code`]).
+fn read_back_heard(pending: &Pending, read_back: Option<(&str, Duration, bool)>) -> bool {
+    read_back.is_some_and(|(line, ago, cut)| {
+        ago <= CONFIRM_WITHIN && !cut && asks(line) && reads_back(line, pending)
+    })
+}
+
+/// Whether the person's heard line `words` in `request` is a yes code takes
+/// for `pending` (#7027), before the chat round: on lamp-9adf 2 of 5 yeses
+/// to a read-back were lost, once to a chat round that never began ("chat
+/// round 1 had not begun in 4500 ms; the turn ends unanswered") and once to
+/// a model that answered in words and called nothing. Every one of these
+/// must hold, or the line is the model's, as before:
+///
+/// - [`may_confirm`]'s rule, heard: a later request than the prepare,
+///   within [`CONFIRM_WITHIN`], and not typed in the app;
+/// - the words are a whole plain yes (`services::plain_yes`, the one
+///   deterministic test, no word added): "Yes, but make it six fruits." is
+///   the model's to judge;
+/// - no session was named for it ([`REPLY_NAMED_FLAG`]): which session a
+///   read-back said can't be told from its words, as for
+///   [`yes_in_the_same_turn`];
+/// - the lamp's line just before it read the task back whole
+///   ([`read_back_heard`]), as the one-yes rule requires.
+///
+/// The caller holds the rest: the line was heard clear of the lamp's voice
+/// and is no echo of its words (`second_provider`).
+fn yes_in_code(
+    pending: &Pending,
+    request: u64,
+    words: &str,
+    read_back: Option<(&str, Duration, bool)>,
+    now: Instant,
+) -> bool {
+    !crate::messages::is_text(request)
+        && may_confirm(pending, request, true, now)
+        && pending.session.is_none()
+        && crate::services::plain_yes(words)
+        && read_back_heard(pending, read_back)
+}
+
+/// The person's heard line `words` in `request`, a whole plain yes to the
+/// task waiting ([`yes_in_code`]), starts it in code (#7027): through
+/// [`CONFIRM`]'s own path, as the model's call would reach it, so every
+/// check of it holds and the task starts once. The line is then told it
+/// was handed over and to call nothing; the model's own confirm after it
+/// finds nothing waiting ([`YES_TAKEN_CONFIRM`]). None, and the line goes
+/// to the model as before, when the yes is not taken or the tasks part did
+/// not start it. Blocking, bounded by [`DEADLINE`]: for a thread of its
+/// own, before the chat round.
+pub fn yes_taken(place: &Place, request: u64, words: &str) -> Option<String> {
+    let pending = PENDING.lock().ok()?.clone()?;
+    let now = Instant::now();
+    let read_back = crate::thread::THREAD
+        .lock()
+        .ok()?
+        .answered_last_but_cut(request, now);
+    if !yes_in_code(
+        &pending,
+        request,
+        words,
+        read_back
+            .as_ref()
+            .map(|(line, ago, cut)| (line.as_str(), *ago, *cut)),
+        now,
+    ) {
+        return None;
+    }
+    let call = ToolCall {
+        id: "yes_taken_in_code".into(),
+        name: CONFIRM.into(),
+        args: json!({}),
+    };
+    let (told, _) = run(place, &call, request, true, DEADLINE);
+    if told.get("handing_over") != Some(&json!(true)) {
+        eprintln!(
+            "lamp-voice: tasks: request {request}: task {}: a plain yes to its read-back was not started in code ({}); the line goes to the model (#7027)",
+            pending.id,
+            told.get("error")
+                .and_then(Value::as_str)
+                .unwrap_or("no answer")
+        );
+        return None;
+    }
+    take_in_code(request, true);
+    eprintln!(
+        "lamp-voice: tasks: request {request}: task {} started: the yes taken in code, before the chat round (#7027)",
+        pending.id
+    );
+    let who = pending.who;
+    let next = if place.questions && is_question(&pending.text) {
+        asked_next(false, who)
+    } else {
+        handing_over_next(false, who)
+    };
+    Some(format!(
+        "(For you to know: they said yes to the task you read back, and it is handed over to {who} now: {CONFIRM} was called for it, so call nothing. {next})"
+    ))
 }
 
 /// Lower-case words of letters and digits; an apostrophe stays inside one.
@@ -4008,8 +4161,9 @@ fn declined_with(
             .then(|| pending.take())
             .flatten()
     })?;
+    take_in_code(request, false);
     eprintln!(
-        "lamp-voice: tasks: request {request}: task {} dropped: the person said no to its read-back; this voice no longer confirms it and asks the tasks part to cancel it (#6582)",
+        "lamp-voice: tasks: request {request}: task {} dropped: the person said no to its read-back, the no taken in code; this voice no longer confirms it and asks the tasks part to cancel it (#6582, #7027)",
         dropped.id
     );
     cancel(dropped.id);
@@ -4584,6 +4738,20 @@ fn run_for_asked(
             }
         }
         CONFIRM => {
+            // The person's plain yes or no in this request was taken in
+            // code before the chat round (#7027): nothing waits, nothing is
+            // asked of the tasks part, and the model is never told to
+            // prepare it again.
+            match taken_in_code(request) {
+                Some(true) => {
+                    return (
+                        json!({"already_handed_over": true, "next": YES_TAKEN_CONFIRM}),
+                        true,
+                    );
+                }
+                Some(false) => return (json!({"error": NO_TAKEN_CONFIRM}), true),
+                None => {}
+            }
             let pending = PENDING.lock().ok().and_then(|pending| pending.clone());
             let Some(pending) = pending else {
                 // A words-only read-back the person said yes to (#6547 A):
@@ -13737,5 +13905,256 @@ pub(crate) mod tests {
         ] {
             assert!(!speaks_a_read_back(line), "{line}");
         }
+    }
+
+    /// No task waiting, nor a yes or no taken in code on this thread: for
+    /// tests elsewhere (`second_provider`'s, #7027).
+    pub(crate) fn forget_pending() {
+        *PENDING.lock().unwrap() = None;
+        TAKEN_IN_TEST.with(|taken| taken.set(None));
+    }
+
+    /// The id of the task waiting for a yes, if any: for tests elsewhere
+    /// (`second_provider`'s, #7027).
+    pub(crate) fn pending_id() -> Option<u64> {
+        PENDING.lock().unwrap().as_ref().map(|pending| pending.id)
+    }
+
+    /// #7027: what code takes as the person's yes to a read-back, on a
+    /// later request than the prepare: a whole plain yes
+    /// (`services::plain_yes`), heard, within [`CONFIRM_WITHIN`], with the
+    /// lamp's line just before it the read-back, said whole, uncut, and
+    /// asking. Anything else is left to the model, as before.
+    #[test]
+    fn a_whole_plain_yes_to_the_read_back_is_taken_in_code_and_nothing_else() {
+        let at = Instant::now();
+        let pending = Pending {
+            request: 8,
+            ..moon(at)
+        };
+        let now = at + Duration::from_secs(5);
+        let fresh = Duration::from_secs(4);
+        let back = Some((MOON_BACK, fresh, false));
+        for yes in ["Yes.", "Yeah, go ahead.", "Okay lamp, please do.", "Sure."] {
+            assert!(yes_in_code(&pending, 9, yes, back, now), "{yes}");
+        }
+        // The model's to judge: more than a plain yes, a no, a question.
+        for line in [
+            "Yes, but make it six fruits.",
+            "Yes?",
+            "No.",
+            "Sounds good.",
+            "Write a poem about tea instead.",
+        ] {
+            assert!(!yes_in_code(&pending, 9, line, back, now), "{line}");
+        }
+        // The request that prepared it, or one before it.
+        assert!(!yes_in_code(&pending, 8, "Yes.", back, now));
+        assert!(!yes_in_code(&pending, 7, "Yes.", back, now));
+        // Typed in the app, never a spoken task's yes taken in code.
+        let typed = crate::messages::REQUESTS_FROM + 9;
+        assert!(!yes_in_code(&pending, typed, "Yes.", back, now));
+        // Past the window, from the prepare.
+        let late = at + CONFIRM_WITHIN + Duration::from_secs(1);
+        assert!(!yes_in_code(&pending, 9, "Yes.", back, late));
+        // The read-back cut, old, not asking, or another line said since.
+        assert!(!yes_in_code(
+            &pending,
+            9,
+            "Yes.",
+            Some((MOON_BACK, fresh, true)),
+            now
+        ));
+        assert!(!yes_in_code(
+            &pending,
+            9,
+            "Yes.",
+            Some((MOON_BACK, CONFIRM_WITHIN + fresh, false)),
+            now
+        ));
+        assert!(!yes_in_code(
+            &pending,
+            9,
+            "Yes.",
+            Some(("It's sunny today. Anything else?", fresh, false)),
+            now
+        ));
+        assert!(!yes_in_code(
+            &pending,
+            9,
+            "Yes.",
+            Some((
+                "Claude Code will write a two-line poem about the moon on your office computer.",
+                fresh,
+                false
+            )),
+            now
+        ));
+        assert!(!yes_in_code(&pending, 9, "Yes.", None, now));
+        // A task for a session named: which session a read-back said can't
+        // be told from its words, so its yes stays the model's.
+        let named = Pending {
+            session: Some("docs".into()),
+            ..pending.clone()
+        };
+        assert!(!yes_in_code(&named, 9, "Yes.", back, now));
+    }
+
+    /// #7027: a heard plain "Yes." after the read-back starts the task in
+    /// code, once: the tasks part is asked to confirm it, nothing waits
+    /// after, and the model's own `confirm_agent_task` in the same request
+    /// finds it already handed over and asks the tasks part nothing. Nor
+    /// may the model prepare it again and have that yes start it twice.
+    #[test]
+    fn a_plain_yes_taken_in_code_starts_it_once_and_the_models_confirm_is_a_no_op() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _thread = crate::provider_worker::tests::one_thread();
+        *PENDING.lock().unwrap() = None;
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-yes-in-code-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::fs::create_dir_all(&directory).unwrap();
+        let status =
+            json!({"ok":true,"store_id":"s1","revision":0,"summary":{"session_id":"sess"}});
+        let seen = tasks_part(
+            &directory,
+            vec![
+                ("request.sock", status.clone()),
+                (
+                    "request.sock",
+                    json!({"ok":true,"id":4,"prepared_digest":"moon","revision":1}),
+                ),
+                ("request.sock", status),
+                (
+                    "voice.sock",
+                    json!({"ok":true,"id":4,"queued":true,"revision":2}),
+                ),
+            ],
+        );
+        let place = correcting(&directory, false);
+        let call = |name: &str, args: Value| ToolCall {
+            id: "c".into(),
+            name: name.into(),
+            args,
+        };
+        let (told, _) = run(
+            &place,
+            &call(
+                START,
+                json!({"task":"Write a two-line poem about the moon"}),
+            ),
+            8,
+            true,
+            PEER_WAIT,
+        );
+        assert!(told["prepared"] == json!(true), "{told}");
+        {
+            let now = Instant::now();
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            *thread = crate::thread::Thread::new();
+            thread.person(
+                "Ask Claude Code for a two-line poem about the moon",
+                true,
+                now,
+            );
+            thread.lamp(8, MOON_BACK, now);
+            thread.line_of(9, "Yes.");
+        }
+        let note = yes_taken(&place, 9, "Yes.").expect("the yes is taken in code");
+        assert!(note.contains("Claude Code"), "{note}");
+        assert!(note.contains(CONFIRM), "{note}");
+        assert!(PENDING.lock().unwrap().is_none(), "nothing waits after it");
+        let ops: Vec<String> = std::iter::from_fn(|| seen.recv_timeout(PEER_WAIT).ok())
+            .take(4)
+            .map(|line| line["op"].as_str().unwrap().to_owned())
+            .collect();
+        assert_eq!(ops, ["status", "prepare", "status", "confirm"]);
+        // The model's own confirm after it: nothing waits, nothing asked.
+        let (told, _) = run(&place, &call(CONFIRM, json!({})), 9, true, PEER_WAIT);
+        assert_eq!(told["already_handed_over"], json!(true), "{told}");
+        assert!(told.get("error").is_none(), "{told}");
+        // The model preparing it again in that request: its yes was taken,
+        // so it never starts it a second time.
+        let again = Pending {
+            request: 9,
+            ..moon(Instant::now())
+        };
+        assert!(!yes_in_the_same_turn_now(&again, 9, true));
+        // Nor is another yes in a later request taken: nothing waits.
+        assert!(yes_taken(&place, 10, "Yes.").is_none());
+        assert!(seen.try_recv().is_err(), "nothing more asked");
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    /// #7027: a line code does not take leaves the task waiting and the
+    /// tasks part unasked: more words than a plain yes, or the yes in the
+    /// very request that prepared it.
+    #[test]
+    fn a_yes_with_more_words_or_in_the_prepares_request_is_not_taken_in_code() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _thread = crate::provider_worker::tests::one_thread();
+        let now = Instant::now();
+        *PENDING.lock().unwrap() = Some(Pending {
+            request: 8,
+            ..moon(now)
+        });
+        {
+            let mut thread = crate::thread::THREAD.lock().unwrap();
+            *thread = crate::thread::Thread::new();
+            thread.lamp(8, MOON_BACK, now);
+        }
+        // No tasks part at all: anything asked of it would fail the test's
+        // checks below by leaving nothing waiting.
+        let directory = std::env::temp_dir().join(format!(
+            "agent-tasks-yes-not-in-code-{}",
+            std::process::id()
+        ));
+        let place = correcting(&directory, false);
+        assert!(yes_taken(&place, 9, "Yes, but make it six fruits.").is_none());
+        assert!(yes_taken(&place, 8, "Yes.").is_none());
+        let typed = crate::messages::REQUESTS_FROM + 9;
+        assert!(yes_taken(&place, typed, "Yes.").is_none());
+        assert_eq!(PENDING.lock().unwrap().as_ref().map(|p| p.id), Some(4));
+        *PENDING.lock().unwrap() = None;
+        *crate::thread::THREAD.lock().unwrap() = crate::thread::Thread::new();
+    }
+
+    /// #7027: a plain no taken in code (#6582) leaves the model's own
+    /// `confirm_agent_task` in that request nothing to redo: never told to
+    /// prepare the task again ([`NOTHING_PREPARED`], with
+    /// `LAMP_TASKS_ONE_YES`), only that it was dropped.
+    #[test]
+    fn a_plain_no_taken_in_code_leaves_the_models_confirm_nothing_to_redo() {
+        let _one = ONE_AT_A_TIME
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let now = Instant::now();
+        *PENDING.lock().unwrap() = Some(Pending {
+            request: 8,
+            ..moon(now)
+        });
+        let mut cancelled = None;
+        let note = declined_with(9, "No.", now, |id| cancelled = Some(id));
+        assert_eq!(note.as_deref(), Some(DECLINED_NOTE));
+        assert_eq!(cancelled, Some(4));
+        let directory =
+            std::env::temp_dir().join(format!("agent-tasks-no-in-code-{}", std::process::id()));
+        let place = Place {
+            one_yes: true,
+            ..correcting(&directory, false)
+        };
+        let call = ToolCall {
+            id: "c".into(),
+            name: CONFIRM.into(),
+            args: json!({}),
+        };
+        let (told, _) = run(&place, &call, 9, true, PEER_WAIT);
+        assert_eq!(told["error"], NO_TAKEN_CONFIRM, "{told}");
+        assert!(PENDING.lock().unwrap().is_none());
     }
 }
