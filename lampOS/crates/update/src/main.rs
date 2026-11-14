@@ -1407,14 +1407,14 @@ fn on_the_lamp(command: &str, options: &BTreeMap<String, String>) -> ExitCode {
                 Err(error) => eprintln!("lamp-update: its own program is not known: {error}"),
             }
         }
-        // After each round: `update/current` may have moved and been
-        // confirmed by another lamp-update meanwhile (#6898).
-        onto_current(&config, &mut reexec_tried);
         // A round that says what the one before said is not said again.
         if text != last {
             eprintln!("lamp-update: {text}");
             last = text;
         }
+        // After each round: `update/current` may have moved and been
+        // confirmed by another lamp-update meanwhile (#6898).
+        onto_current(&config, &mut reexec_tried);
         // Between rounds the bus is still read, so that what the voice said
         // meanwhile does not wait in the sockets. A check from the app ends
         // the wait (#4153); one that came during the round is dropped.
