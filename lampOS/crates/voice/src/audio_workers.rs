@@ -1288,6 +1288,11 @@ fn open_speaker(
     device: &str,
     controller: BootId,
 ) -> Result<Speaker> {
+    // `--speaker-device bus:speaker1` (a developer's computer): the voice's sound put on the
+    // bus for a simulator, by the same speaker; no sound card, so nothing to wait out.
+    if crate::bus_speaker::is_bus_device(device) {
+        return crate::bus_speaker::open(controller);
+    }
     let (speaker, waited) = open_waiting_out_busy(
         || Speaker::open_clock(device, controller),
         lamp_audio::pcm::open_fault,
