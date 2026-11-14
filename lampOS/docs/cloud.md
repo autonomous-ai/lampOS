@@ -1661,13 +1661,13 @@ from the file (`["light", "speak", "camera", "net"]` for a photo booth),
 null for any other skill. Off, a bare `SKILL.md` past 8 KiB is refused
 for its length as before. The file's words never reach the journal.
 
-### A skill's keys (`skills.secrets`, `skills.secret_set`, `skills.secret_unset`, `LAMP_SKILL_SECRETS`, off)
+### A skill's keys (`skills.secrets`, `skills.secret_set`, `skills.secret_unset`, `LAMP_SKILL_SECRETS`, on in the product)
 
 The first builder's ruling (12 Nov 19:44 on #6059): a file's keys go in
 through the app, never by voice (docs/skills.md, "Its keys, given in the
 app"). With `LAMP_SKILL_SECRETS=on` in `lamp-cloud`'s unit
-(`skill_secrets::product`), with the skills page, three kinds are taken
-over the lamp's own account channel and answered inline (`success` with
+(`skill_secrets::product`; on in the product's), with the skills page,
+three kinds are taken over the lamp's own account channel and answered inline (`success` with
 the data, or `failure` with the `error` below); `can` names them only
 while `lamp-services`' admin socket is there. An agent skill's upload
 `success` carries `secrets`, the names its file needs, when lamp-voice

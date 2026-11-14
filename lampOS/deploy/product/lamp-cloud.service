@@ -81,6 +81,9 @@ Environment=LAMP_SKILL_MESSAGES=on
 # A skill added from a file in the app, on a spoken yes (#5080): skills.upload, the file fetched from the backend
 # and handed to lamp-voice's app-make socket, the same line there.
 Environment=LAMP_SKILL_UPLOAD=on
+# A skill's keys given in the app (#6686, docs/skills.md "Its keys, given in the app"): skills.secrets, skills.secret_set
+# and skills.secret_unset, handed to lamp-services' admin socket; the same line there, in lamp-voice and lamp-tasks.
+Environment=LAMP_SKILL_SECRETS=on
 Environment=LAMP_APP_UPDATE=on
 # The lamp's agents for the app (#6240): `engines` in update.status and engines.install for a missing Hermes,
 # on in the product by the owner's rule of 11 Nov; `off` here takes it away.

@@ -58,6 +58,9 @@ Environment=LAMP_SKILL_WRITES=on
 # A skill's run on the lamp's Hermes (#6432, services.md): the lamp-control.service cgroup onto the tools socket
 # for service_read and service_write alone, by the run's grants; a write still waits for the person's yes.
 Environment=LAMP_SKILL_TASKS=on
+# A skill's keys given in the app (#6686, docs/skills.md "Its keys, given in the app"): kept root-only in the store's
+# skill-secrets folder, set and listed (names only) from lamp-cloud's admin door, read by lamp-tasks.service alone.
+Environment=LAMP_SKILL_SECRETS=on
 ExecStart=/opt/lampOS/services/current/lamp-services --store /var/lib/lampos-services --run /run/lampos-services
 Restart=on-failure
 RestartSec=5s

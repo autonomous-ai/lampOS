@@ -2239,6 +2239,62 @@ fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
     }
 }
 
+/// An uploaded skill's keys go in through the app and reach only its run
+/// (#6686, the first builder's ruling, 12 Nov 19:44 on #6059):
+/// `LAMP_SKILL_SECRETS=on` in the four units that read it, each once, and
+/// no other product unit names it: `lamp-services` (root's store, its two
+/// doors), `lamp-cloud` (the app's three kinds, with `LAMP_CLOUD` and the
+/// services' admin socket), `lamp-voice` (an agent skill's tool, never a
+/// key by voice) and `lamp-tasks` (a run's keys file, read once), each
+/// beside the parts it rides.
+#[test]
+fn the_product_takes_a_skills_keys_in_the_app() {
+    let name = "LAMP_SKILL_SECRETS";
+    let switch = format!("Environment={name}=on");
+    let owners: [(&str, &[&str]); 4] = [
+        (
+            "lamp-services.service",
+            &[
+                "Environment=LAMP_SERVICES=on",
+                "Environment=LAMP_SKILL_TASKS=on",
+            ],
+        ),
+        (
+            "lamp-cloud.service",
+            &[
+                "Environment=LAMP_CLOUD=on",
+                "Environment=LAMP_SERVICES=on",
+                "Environment=LAMP_SKILL_UPLOAD=on",
+            ],
+        ),
+        (
+            "lamp-voice.service",
+            &[
+                "Environment=LAMP_SKILL_UPLOAD=on",
+                "Environment=LAMP_SKILL_TASKS=on",
+            ],
+        ),
+        ("lamp-tasks.service", &["Environment=LAMP_SKILL_TASKS=on"]),
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let beside = owners.iter().find(|(owner, _)| owner == unit);
+        let on = service.iter().filter(|line| **line == switch).count();
+        let mentioned = service.iter().filter(|line| line.contains(name)).count();
+        assert_eq!(on, usize::from(beside.is_some()), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+        for line in beside.map_or(&[][..], |(_, lines)| lines) {
+            assert!(service.contains(line), "{unit} lacks {line}");
+        }
+    }
+    for (owner, _) in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story), and a cut-in with no words gets its
 /// question (the memory owner's call, 4 Nov; the lamp's own echo can still

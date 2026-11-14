@@ -1111,11 +1111,12 @@ sang runner chung của #6510 bước 2 mà không cần luật mới.
   Tắt, hoặc không được cấp dịch vụ nào: config không có mục này, như của
   một lần tạo.
 
-### Khóa của một lần chạy, đọc một lần (`LAMP_SKILL_SECRETS`, tắt)
+### Khóa của một lần chạy, đọc một lần (`LAMP_SKILL_SECRETS`, bật trong sản phẩm)
 
 Phán quyết của người xây đầu tiên (19:44 ngày 12/11, #6059): khóa và token
 của một kỹ năng nhập trong app, không bao giờ bằng giọng nói, không bao giờ
-nằm trong thư mục kỹ năng.
+nằm trong thư mục kỹ năng. Bật trong `lamp-tasks.service` của sản phẩm
+(`skill_keys::SWITCH`).
 
 - **Hỏi khóa:** trước khi có token, lamp-tasks hỏi socket công cụ của
   lamp-services (`{"op":"run_secrets","skill"}`), chỉ trả lời cho cgroup của

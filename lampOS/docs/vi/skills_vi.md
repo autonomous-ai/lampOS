@@ -2443,20 +2443,26 @@ chỉ tới dịch vụ qua lamp-control với token riêng của lần chạy, 
 bằng khóa của tệp. Tắt: tệp nêu một dịch vụ bị từ chối.
 `lamp_voice::upload_agent`; xem bản tiếng Anh, "Run by the lamp's agent".
 
-#### Khóa của kỹ năng, nhập trong app (`LAMP_SKILL_SECRETS=on`, tắt)
+#### Khóa của kỹ năng, nhập trong app (`LAMP_SKILL_SECRETS=on`, bật trong sản phẩm)
 
 Phán quyết của người xây dựng đầu tiên (12/11 19:44 trên #6059): bí mật của
 một tệp (khóa API, token bot) không bao giờ được nói ra hay giữ trong thư
 mục kỹ năng; chúng được nhập qua app, vào kho của root như token dịch vụ,
 và tới lần chạy chỉ qua một tệp môi trường đọc một lần; agent không bao giờ
-hỏi khóa bằng giọng nói. Tắt trừ khi `LAMP_SKILL_SECRETS=on`, không unit nào
-đặt; `lamp-voice`, `lamp-cloud`, `lamp-services` và `lamp-tasks serve` cùng
-đọc nó. Khi tắt, một tệp nêu tên biến của một khóa hay token (cùng
-`names_in`) bị từ chối ngay lúc tải lên bằng lời rõ ràng, "it needs a key or
-token, which a skill added from a file can't be given on this lamp yet
-(LAMP_SKILL_SECRETS is off)" (`upload_agent::NEEDS_SECRETS`), không bao giờ
-kèm tên: lần chạy của nó không thể được cho khóa, nên đèn nói ngay lúc đó
-thay vì để nó hỏng khi chạy (người xây dựng đầu tiên trên #6911, 14/11).
+hỏi khóa bằng giọng nói. Tắt trừ khi `LAMP_SKILL_SECRETS=on`;
+`lamp-voice`, `lamp-cloud`, `lamp-services` và `lamp-tasks serve` cùng đọc
+nó, và sản phẩm chỉ đặt nó trong bốn unit đó (#6686, test kiểm kê cài đặt
+`the_product_takes_a_skills_keys_in_the_app`), nên một drop-in đặt nó tắt
+trên cả bốn sẽ tắt nó. Tên khóa của một tệp tải lên chỉ vào `skill.toml`
+khi nó là kỹ năng agent (`LAMP_UPLOAD_TO_AGENT`, vẫn tắt); cho tới lúc đó
+công tắc phục vụ kỹ năng từ Store hay được đẩy lên có `do.task` nêu
+`secrets` của nó. Khi tắt, một tệp nêu tên biến của một khóa hay token
+(cùng `names_in`) bị từ chối ngay lúc tải lên bằng lời rõ ràng, "it needs
+a key or token, which a skill added from a file can't be given on this
+lamp yet (LAMP_SKILL_SECRETS is off)" (`upload_agent::NEEDS_SECRETS`),
+không bao giờ kèm tên: lần chạy của nó không thể được cho khóa, nên đèn
+nói ngay lúc đó thay vì để nó hỏng khi chạy (người xây dựng đầu tiên trên
+#6911, 14/11).
 
 - **Tên trong tệp, giá trị trong app.** Khi tải lên, đèn đọc tên các biến
   môi trường mà lần chạy cần (`^[A-Z][A-Z0-9_]{2,63}$`, như
