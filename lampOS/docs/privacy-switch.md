@@ -465,13 +465,14 @@ only a yes: a yes for this lamp, covering everyone it sees, not the yes of
 the one who answered; a no or silence leaves no file, as never asked does. `redo_setup`, a
 forget of everything and the reset plan remove it, as `room-sounds.json`
 ([onboarding.md](onboarding.md), "Face expressions"), whoever gave it. With
-`LAMP_APP_CONSENT=on` on `lamp-cloud` (#5500, off in the product for now) the
+`LAMP_APP_CONSENT=on` on `lamp-cloud` (#5500, on in the product since 9 Nov) the
 owner also turns it on and off in the app (`consent.set`, [cloud.md](cloud.md),
 "The two yeses from the app"): root's change helper writes the same file
 with `"by":"app"`, which the eyes ignore, and removes it for an off; the
 voice's starts and writes keep that yes until a redo or a "no" at the lamp
 after it, taken back when the voice first writes it, whatever the clocks
-say. Without the ask or the app (the
+say; a take-back the disk refused is retried every 2 s until the file
+goes, without a fence or restart. Without the ask or the app (the
 product's units set neither yet), a test lamp's yes is written by hand, as
 root:
 `printf '{"face_expressions":"yes"}' > /var/lib/lampOS/consent/face-expressions.json`,

@@ -10592,22 +10592,32 @@ impl DaysClient {
             // face seems: "a forget or the reset wipes it" (the lead on
             // #2110), whoever asked.
             if call.name == FORGET_EVERYTHING {
-                for (field, consent) in [
-                    ("sound_consent_result", self.room_sounds.clone()),
+                // Each through the consent folder held, a fresh revision
+                // kept first (#5500), so an app's set from before the
+                // forget never applies after it.
+                for (field, key, consent) in [
+                    (
+                        "sound_consent_result",
+                        lamp_msgs::consent::ROOM_SOUNDS,
+                        self.room_sounds.clone(),
+                    ),
                     (
                         "face_expression_consent_result",
+                        lamp_msgs::consent::FACE_EXPRESSIONS,
                         crate::onboarding::face_expressions_beside(&self.room_sounds),
                     ),
                 ] {
-                    let state = match std::fs::remove_file(&consent) {
+                    let there = consent.exists();
+                    let state = match lamp_msgs::consent::take_back_at(&consent, key) {
                         Ok(()) => {
-                            eprintln!(
-                                "lamp-voice provider: forget everything removed {}",
-                                consent.display()
-                            );
+                            if there {
+                                eprintln!(
+                                    "lamp-voice provider: forget everything removed {}",
+                                    consent.display()
+                                );
+                            }
                             "cleared"
                         }
-                        Err(error) if error.kind() == io::ErrorKind::NotFound => "cleared",
                         Err(error) => {
                             eprintln!(
                                 "lamp-voice provider: forget everything could not remove {}: {error}",
@@ -18422,6 +18432,17 @@ mod tests {
         assert_eq!(told["forgotten"], false, "{told}");
         assert!(!consent.exists());
         assert!(!face.exists());
+        // Each through a fresh revision (#5500): a set from before the
+        // forget is stale after it.
+        let state = consent.with_file_name(lamp_msgs::consent::STATE_FILE);
+        let revs = lamp_msgs::consent::Revs::read(consent.parent().unwrap());
+        for key in [
+            lamp_msgs::consent::ROOM_SOUNDS,
+            lamp_msgs::consent::FACE_EXPRESSIONS,
+        ] {
+            assert!(revs.wrote(key).is_some(), "{key}");
+        }
+        let _ = std::fs::remove_file(state);
         let read = served.join().unwrap();
         assert_eq!(read, [json!({"op":"forget_all","person":MINH})]);
         drop(client);
@@ -31624,7 +31645,13 @@ mod tests {
                 assert_eq!(served.join().unwrap().len(), requests);
                 drop(client);
                 std::fs::remove_file(socket).unwrap();
-                std::fs::remove_dir(folder).unwrap();
+                // Only the revisions the forget renewed (#5500), no yes.
+                assert!(
+                    std::fs::read_dir(&folder)
+                        .unwrap()
+                        .all(|entry| entry.unwrap().file_name() == lamp_msgs::consent::STATE_FILE)
+                );
+                std::fs::remove_dir_all(folder).unwrap();
             }
         }
 

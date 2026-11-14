@@ -1810,6 +1810,30 @@ fn stop_gateway(plan: &Plan, effects: &mut impl Effects) -> io::Result<()> {
     Ok(())
 }
 
+/// For one of the owner's yeses (`lamp_msgs::consent::FILES`, #5500): its
+/// folder held and a fresh revision kept for its key before it is wiped, as
+/// every change to a yes is made, so a `consent.set` from before the reset
+/// never matches after it, even for a key that read off before and after.
+/// None for any other path, or a yes whose folder is not there.
+fn consent_bumped(path: &Path) -> io::Result<Option<lamp_msgs::consent::Held>> {
+    let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else {
+        return Ok(None);
+    };
+    let Some((key, _)) = lamp_msgs::consent::FILES
+        .iter()
+        .find(|(_, known)| name == std::ffi::OsStr::new(known))
+    else {
+        return Ok(None);
+    };
+    let held = match lamp_msgs::consent::hold(folder) {
+        Ok(held) => held,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    held.bump(key)?;
+    Ok(Some(held))
+}
+
 fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
     for path in &plan.wipe {
         if path.file_name() == Some(WIFI_FILE.as_ref()) {
@@ -1819,8 +1843,10 @@ fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io:
         }
         // Setup's staging copy of a file it writes (`serve::stage`), left
         // beside it by a write cut mid-way (the reviewer-lead's P3 on #3579).
+        let held = consent_bumped(path)?;
         wipe(&path.with_extension(STAGED))?;
         wipe(path)?;
+        drop(held);
         steps.push(Step::Wiped(path.clone()));
         if path.file_name() == Some(KEPT_JOURNAL.as_ref()) {
             forget_this_boot(path);

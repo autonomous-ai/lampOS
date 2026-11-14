@@ -311,6 +311,11 @@ mod tests {
                 r#"{{"at_unix_s":7,"by":"{by}","face_expressions":"yes","version":1}}"#
             )));
         }
+        // With the revision every change keeps (#5500), as
+        // `lamp_msgs::consent::bytes_with_rev` writes it: still a yes.
+        assert!(read(
+            r#"{"at_unix_s":7,"by":"app","face_expressions":"yes","rev":"0123456789abcdef0123456789abcdef","version":1}"#
+        ));
         assert_eq!(due(None, &file), Due::Now);
         let long_ago = std::time::Instant::now().checked_sub(READ_EVERY);
         assert_eq!(due(long_ago, &file), Due::Now);

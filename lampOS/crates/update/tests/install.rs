@@ -1739,6 +1739,28 @@ fn the_product_lets_what_a_caller_said_follow_their_face() {
     );
 }
 
+/// The owner's two yeses from the app (`LAMP_APP_CONSENT`, #5500): on in
+/// the product since the first builder's yes on 9 Nov, once each set was a
+/// compare-and-set on the key's revision, so a retry of an old yes after a
+/// later "no" at the lamp changes nothing. Taken only with `LAMP_CLOUD=on`, which the
+/// same unit sets.
+#[test]
+fn the_product_takes_the_owners_yeses_from_the_app() {
+    let cloud = install::PRODUCT
+        .iter()
+        .find(|(unit, _)| *unit == "lamp-cloud.service")
+        .unwrap()
+        .1;
+    let service = section(cloud, "Service");
+    for line in [
+        "Environment=LAMP_CLOUD=on",
+        "Environment=LAMP_APP_CONSENT=on",
+        "Environment=LAMP_SETTINGS_CHANGE=on",
+    ] {
+        assert!(service.contains(&line), "lamp-cloud lacks {line}");
+    }
+}
+
 /// A kept thing is what the person said (`LAMP_MEMORY_KEEP_HEARD`, #2176):
 /// the memory owner's call on 5 Nov, after #5276 (N6) kept a yes from
 /// ever being kept as "They said: Yes.".

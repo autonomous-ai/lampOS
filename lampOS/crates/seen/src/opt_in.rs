@@ -394,6 +394,7 @@ mod tests {
             yes: true,
             by: None,
             at_unix_s: at,
+            rev: None,
         };
         // A record kept before posture: the plain line.
         std::fs::write(
@@ -449,6 +450,7 @@ mod tests {
             yes: true,
             by: Some("app".into()),
             at_unix_s: at,
+            rev: None,
         };
         let mut latch = OptIn::default();
         assert!(latch.on(&yes_at(Some(100))));

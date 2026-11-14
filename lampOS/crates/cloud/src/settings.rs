@@ -439,6 +439,11 @@ pub fn result(reply: &str) -> Result<Option<Value>, String> {
 
 /// The helper over its socket: one line out, one line back, within `wait`.
 pub fn ask(socket: &std::path::Path, line: &str, wait: Duration) -> Result<Option<Value>, String> {
+    result(&ask_line(socket, line, wait)?)
+}
+
+/// [`ask`], with the helper's reply line as it came.
+pub fn ask_line(socket: &std::path::Path, line: &str, wait: Duration) -> Result<String, String> {
     let unavailable = |_| "the lamp's settings are not running".to_owned();
     let mut stream = UnixStream::connect(socket).map_err(unavailable)?;
     stream
@@ -452,7 +457,7 @@ pub fn ask(socket: &std::path::Path, line: &str, wait: Duration) -> Result<Optio
     BufReader::new(stream.take(4_096))
         .read_line(&mut reply)
         .map_err(|_| "the lamp's settings did not answer in time".to_owned())?;
-    result(&reply)
+    Ok(reply)
 }
 
 /// A Wi-Fi change's hold on `lamp-cloud`'s link to the broker (the
