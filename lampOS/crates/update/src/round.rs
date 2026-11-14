@@ -70,6 +70,11 @@ pub const CONTROL_UNIT: &str = "lamp-control.service";
 pub const CONTROL_SWITCHES: [&str; 2] = ["LAMP_CONTROL", "LAMP_SKILL_TASKS"];
 /// The body; its unit declarations determine its restart order.
 pub const BODY_UNIT: &str = "lamp-body.service";
+
+/// How long a switch waits after lamp-body refused its restart before it
+/// tries once more (#7067): a refused start lets go of the joints, and on
+/// lamp-fc4b the second start, 2 s after the first, stood.
+pub const BODY_LET_GO: Duration = Duration::from_secs(3);
 /// How often the world is looked at while waiting and watching.
 const LOOK_EVERY: Duration = Duration::from_secs(1);
 
@@ -2795,7 +2800,7 @@ impl Run<'_, '_> {
             }
             backs[at].restarted = true;
             let back = &backs[at];
-            if let Err(why) = self.world.systemd.restart(&back.unit) {
+            if let Err(why) = self.restart_part(&back.unit) {
                 let unit = back.unit.clone();
                 let told = self.told(&unit);
                 return self.put_back(state, &build, &backs, Some(&unit), why, told);
@@ -2861,6 +2866,37 @@ impl Run<'_, '_> {
                 }
             }
             None => Outcome::Switched(build.sequence),
+        }
+    }
+
+    /// A part restarted for the switch. lamp-body's one refused restart is
+    /// tried once more after [`BODY_LET_GO`], before the build is judged
+    /// failed (#7067): on lamp-fc4b (13050) its first start refused a joint
+    /// already under load, 208 against its limit of 170, and its second,
+    /// 2 s later, stood, after the build was put back. Only lamp-body, and
+    /// only once; the journal says the retry and its result. Any other part's
+    /// refused restart, or lamp-body's second, puts the build back as before.
+    fn restart_part(&mut self, unit: &str) -> Result<(), String> {
+        let why = match self.world.systemd.restart(unit) {
+            Err(why) if unit == BODY_UNIT => why,
+            done => return done,
+        };
+        self.say(&format!(
+            "lamp-body's restart was refused ({why}); tried once more after {} s, its let-go",
+            BODY_LET_GO.as_secs()
+        ));
+        self.listen(BODY_LET_GO);
+        match self.world.systemd.restart(unit) {
+            Ok(()) => {
+                self.say("lamp-body's restart tried once more: it stands");
+                Ok(())
+            }
+            Err(again) => {
+                self.say(&format!(
+                    "lamp-body's restart tried once more: refused again ({again})"
+                ));
+                Err(format!("{why}; tried once more: {again}"))
+            }
         }
     }
 
