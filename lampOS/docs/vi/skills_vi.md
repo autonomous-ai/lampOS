@@ -2496,6 +2496,21 @@ Bảng đầy đủ các khóa trigger ở [skills.md](../skills.md).
 
 Bảng đầy đủ các khóa `[[while]]` ở [skills.md](../skills.md).
 
+## Khi nào màn trình diễn đèn dừng (`do.show`, #5744)
+
+Một màn trình diễn đèn (Light show, #1679) dừng trước khung kế tiếp, được
+xem mỗi 200 ms, khi thân đèn bị đẩy, đèn bị tạm dừng, hoặc nghe được lời
+(có chữ) của một lượt muộn hơn lượt đã xin màn trình diễn trên `voice/heard`
+(có người nói), giống như một lần tìm kiếm kết thúc (`SearchStop`); khi đó
+đèn được trả lại, và nhật ký ghi `show NAME: stopped in frame N of M,
+someone spoke to the lamp`. Chỉ riêng việc giọng nói đang nghe thì không làm
+nó dừng: trên lamp-52e6 một câu tiếng ồn trong phòng, 0 từ nghe được, đã
+dừng một màn trình diễn ở khung thứ ba (#5744); nay màn trình diễn chạy tiếp
+và ghi `show NAME: M frames shown` (kiểm thử
+`a_line_with_no_words_does_not_stop_a_light_show`,
+`a_later_turns_words_stop_a_light_show`). Chỉ khi không đọc được
+`voice/heard` thì việc giọng nói đang nghe mới làm nó dừng.
+
 ## Kỹ năng được gọi theo tên thì chạy trong code (#6772)
 
 Với `LAMP_SKILL_NAMED=on` (tắt trừ khi đặt đúng `on`; chỉ chuyển cho

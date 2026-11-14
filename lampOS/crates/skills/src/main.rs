@@ -4629,9 +4629,12 @@ fn act(
 
 /// A light show (#1679): each frame's light in turn, asked of the ring with
 /// `LAMP_LIGHT_REQUESTS=on` or set through the actions part, held its while.
-/// It stops before a frame once the body was pushed, the lamp paused, or the
-/// voice took a turn (someone spoke: the lamp stops and listens); what it
-/// showed is given back with the run's light.
+/// It stops before a frame once the body was pushed, the lamp paused, or
+/// words of a later turn were heard (someone spoke: the lamp stops and
+/// listens), as a search does ([`SearchStop`]). The voice listening alone
+/// does not stop it: on lamp-52e6 a line of room sound, 0 words heard,
+/// stopped a show in its third frame (#5744). What it showed is given back
+/// with the run's light.
 fn show(
     name: &str,
     frames: &[lamp_skills::Frame],
@@ -4639,9 +4642,11 @@ fn show(
     bus: &Bus,
     glow: &mut Option<Glow>,
 ) -> String {
+    // Subscribed before the first frame: words heard during it are kept.
+    let mut stop = SearchStop::new(bus);
     let mut shown = 0;
     for frame in frames {
-        if let Some(why) = show_stopped(bus) {
+        if let Some(why) = stop.why(bus) {
             return format!(
                 "show {name}: stopped after {shown} of {} frames, {why}",
                 frames.len()
@@ -4671,7 +4676,7 @@ fn show(
         // speaks stops the show within that, not at the frame's end.
         let until = clock::now() + Duration::from_micros(frame.lasting_us);
         while clock::now() < until {
-            if let Some(why) = show_stopped(bus) {
+            if let Some(why) = stop.why(bus) {
                 return format!(
                     "show {name}: stopped in frame {shown} of {}, {why}",
                     frames.len()
@@ -4729,8 +4734,8 @@ static NEWEST_HEARD: Mutex<Option<(String, u64)>> = Mutex::new(None);
 /// #1871). Words of the turn that asked for the search, or an earlier one,
 /// do not end it: on Live the last pieces of the asking line can come after
 /// the call. A turn of another voice boot is always later: a voice that
-/// started again numbers from 1. Without `voice/heard` it ends as a show
-/// does, on the voice listening.
+/// started again numbers from 1. Without `voice/heard` it ends on the voice
+/// listening. A light show stops on the same (#5744).
 struct SearchStop {
     heard: Option<Subscriber>,
     /// The turn of the newest words heard as the search began, and the
@@ -4801,13 +4806,6 @@ impl SearchStop {
         }
         Some(false)
     }
-}
-
-/// Why a show goes no further, if it should not: the body pushed, the lamp
-/// paused, or the voice listening to someone.
-fn show_stopped(bus: &Bus) -> Option<String> {
-    body_stopped(bus)
-        .or_else(|| voice_listening(bus).then(|| "the voice is listening to someone".into()))
 }
 
 /// The body pushed or the lamp paused.
