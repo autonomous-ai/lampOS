@@ -2,7 +2,8 @@
 //! lamp as it is today, exactly: the unit's own `--speed` and
 //! `--stand-seconds`, the idle waits of `crate::idle`. Levels 2 to 5 only go
 //! livelier, never under today, and only inside the caps fixed in code
-//! (`Tuning::SPEED_CAP`, the strain, tip and reach bounds, all untouched).
+//! (`Tuning::ENERGY_SPEED_CAP`, level 5's speed; `--speed` keeps
+//! `Tuning::SPEED_CAP`, 300; the strain, tip and reach bounds, all untouched).
 //!
 //! Applied so far: the pose's speed and acceleration, the stand and fold
 //! pace, the idle waits. `stand_roll`, `listen_lean` and `nod_share` are kept
