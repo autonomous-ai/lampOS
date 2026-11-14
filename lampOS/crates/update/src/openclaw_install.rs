@@ -647,7 +647,7 @@ pub fn under_way(records: &Path, now_unix_ms: u64) -> bool {
 }
 
 /// Whether Hermes's install is under way and not taken as stuck: what
-/// holds OpenClaw's ask to a later round.
+/// leaves OpenClaw's ask to that one-shot, none started for it.
 fn hermes_under_way(records: &Path, now_unix_ms: u64) -> bool {
     hermes_install::record(records).is_some_and(|said| {
         said.install == "installing"
@@ -774,8 +774,8 @@ pub fn withhold(records: &Path) -> bool {
 /// After a round that reached the channel, with the switch on, after
 /// Hermes's own [`hermes_install::after_round`]: as Hermes's, but first
 /// the gateway's unit is written (a round may, the one-shot may not) and
-/// systemd reloaded when it changed, and Hermes's install under way holds
-/// this one to a later round, its turn in the one-shot.
+/// systemd reloaded when it changed, and with Hermes's install under way
+/// only the ask is written: the one-shot installs OpenClaw after Hermes.
 pub fn after_round(
     root: &Path,
     records: &Path,
@@ -835,16 +835,21 @@ pub fn after_round(
             return None;
         }
     };
-    if hermes_under_way(records, now_unix_ms) {
-        say("OpenClaw waits its turn: Hermes's install is under way in Harness's one-shot");
-        return None;
+    let hermes_first = hermes_under_way(records, now_unix_ms);
+    if !hermes_first {
+        say(&format!("OpenClaw may be installed now: {}", window.name()));
     }
-    say(&format!("OpenClaw may be installed now: {}", window.name()));
     if let Err(error) = ask(records, false, shown) {
         say(&format!(
             "OpenClaw is not installed: {ASK} not written: {error}"
         ));
         return Some(write(records, failed(now_unix_ms, "not_started")));
+    }
+    // #7019: the one-shot running Hermes's reads this ask after Hermes's
+    // install (`install_now`), so OpenClaw's follows in it; none is started.
+    if hermes_first {
+        say("OpenClaw's ask is written: it runs after Hermes in Harness's one-shot");
+        return None;
     }
     if !harness_install::present(root) {
         say("OpenClaw waits for Harness: Harness's one-shot installs it after Harness and Hermes");
