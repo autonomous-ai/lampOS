@@ -30,6 +30,12 @@ pub trait Systemd {
     fn reload(&mut self) -> Result<(), String>;
     /// `systemctl restart`: returns once systemd has done it.
     fn restart(&mut self, unit: &str) -> Result<(), String>;
+    /// `systemctl reset-failed`: the unit's failed state and its start-limit
+    /// count cleared, so a restart after it starts from a fresh count
+    /// (#7067). Refused unless a world can.
+    fn reset_failed(&mut self, unit: &str) -> Result<(), String> {
+        Err(format!("{unit}'s start count cannot be reset here"))
+    }
     /// `systemctl stop`, of a unit a round added and takes away again
     /// (crate::added): one systemd never loaded is stopped already.
     /// Refused unless a world can.
@@ -267,6 +273,10 @@ impl Systemd for Systemctl {
         self.restarted.retain(|(name, _, _)| name != unit);
         self.restarted.push((unit.to_owned(), at, before));
         run(&["restart", unit], self.restart_within)
+    }
+
+    fn reset_failed(&mut self, unit: &str) -> Result<(), String> {
+        run(&["reset-failed", unit], self.restart_within)
     }
 
     fn start_unit(&mut self, unit: &str) -> Result<(), String> {
