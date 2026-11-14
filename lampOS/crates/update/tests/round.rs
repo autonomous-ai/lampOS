@@ -262,6 +262,9 @@ struct FakeSystemd {
     status: BTreeMap<String, String>,
     /// Units held from their next restart on (#6113).
     held_at_restart: Vec<String>,
+    /// Restarts systemctl refuses, one an entry, of that unit, as lamp-body
+    /// refused its first start on lamp-fc4b with a joint under load (#7067).
+    refused_restarts: Vec<String>,
     /// Explicit manager facts, independent of the filesystem classifier.
     setup_properties: Option<String>,
     remove_setup_marker_on_query: bool,
@@ -447,6 +450,12 @@ impl Systemd for FakeSystemd {
         if unit == apply::UNIT {
             return self.applier.as_mut().map_or(Ok(()), |applier| applier());
         }
+        if let Some(at) = self.refused_restarts.iter().position(|name| name == unit) {
+            self.refused_restarts.remove(at);
+            return Err(format!(
+                "systemctl restart {unit}: Job for {unit} failed because the control process exited with error code."
+            ));
+        }
         self.restarted_at.push((unit.to_owned(), self.now.get()));
         if self.held_at_restart.iter().any(|name| name == unit) {
             self.status.insert(unit.to_owned(), HELD_STATUS.into());
@@ -455,6 +464,11 @@ impl Systemd for FakeSystemd {
         self.failing += std::mem::take(&mut self.failing_after_restart);
         self.start(unit);
         self.setup_ends_armed |= unit == "lamp-setup.service" && self.setup_ends_in_watch.is_some();
+        Ok(())
+    }
+
+    fn reset_failed(&mut self, unit: &str) -> Result<(), String> {
+        self.calls.borrow_mut().push(format!("reset-failed {unit}"));
         Ok(())
     }
 
@@ -687,6 +701,7 @@ impl Lamp {
             condition_skipped: Vec::new(),
             status: BTreeMap::new(),
             held_at_restart: Vec::new(),
+            refused_restarts: Vec::new(),
             setup_properties: None,
             remove_setup_marker_on_query: false,
             setup_ends_in_watch: None,
@@ -2065,6 +2080,145 @@ fn a_body_held_or_broken_only_after_the_update_is_put_back() {
     lamp.systemd.crashing.push("lamp-body.service".into());
     lamp.publish(2, &[("lamp-body", "body 2")], &[]);
     assert!(matches!(lamp.round(), Outcome::RolledBack { .. }));
+}
+
+/// #7067, lamp-fc4b on 13050: lamp-body refused its first start, a joint
+/// already under load (208, its limit 170), and stood at its second, 2 s
+/// later. One refused restart of lamp-body is tried once more after its
+/// let-go, and the build is kept; the journal names the retry.
+#[test]
+fn a_body_restart_refused_once_is_tried_once_more_and_the_build_kept() {
+    let mut lamp = Lamp::new();
+    lamp.systemd
+        .refused_restarts
+        .push("lamp-body.service".into());
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    assert_eq!(lamp.round(), Outcome::Switched(2), "{:?}", lamp.said);
+    let restarts: Vec<u64> = lamp
+        .systemd
+        .restarted_at
+        .iter()
+        .filter(|(unit, _)| unit == "lamp-body.service")
+        .map(|(_, at)| *at)
+        .collect();
+    assert_eq!(restarts.len(), 1, "one restart stood: {restarts:?}");
+    let asked = lamp
+        .calls
+        .borrow()
+        .iter()
+        .filter(|call| *call == "restart lamp-body.service")
+        .count();
+    assert_eq!(asked, 2, "asked twice: refused, then once more");
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("lamp-body's restart was refused")
+                && line.contains("tried once more")),
+        "{:?}",
+        lamp.said
+    );
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("lamp-body's restart tried once more: it stands")),
+        "{:?}",
+        lamp.said
+    );
+}
+
+/// The retry is once: a lamp-body refused twice puts the build back, as a
+/// refused restart did before #7067.
+#[test]
+fn a_body_restart_refused_twice_puts_the_build_back() {
+    let mut lamp = Lamp::new();
+    lamp.systemd.refused_restarts.extend([
+        "lamp-body.service".to_owned(),
+        "lamp-body.service".to_owned(),
+    ]);
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    let outcome = lamp.round();
+    assert!(
+        matches!(outcome, Outcome::RolledBack { .. }),
+        "{outcome:?} {:?}",
+        lamp.said
+    );
+    let asked = lamp
+        .calls
+        .borrow()
+        .iter()
+        .filter(|call| *call == "restart lamp-body.service")
+        .count();
+    assert!(asked >= 2, "{:?}", lamp.calls.borrow());
+    assert!(
+        lamp.said
+            .iter()
+            .any(|line| line.contains("lamp-body's restart tried once more: refused again")),
+        "{:?}",
+        lamp.said
+    );
+    assert_eq!(lamp.state()["refused"][0]["sequence"], 2);
+}
+
+/// Twelve's P1 on #7073: lamp-body allows 3 starts in 600 s. Refused, tried
+/// once more and refused, then put back, the round must leave systemd's own
+/// `Restart=on-failure` one start: its count is reset before the retry, so
+/// at most two of the round's starts of lamp-body count against the limit.
+#[test]
+fn a_refused_body_retry_leaves_its_start_limit_room_for_systemd() {
+    let mut lamp = Lamp::new();
+    lamp.systemd.refused_restarts.extend([
+        "lamp-body.service".to_owned(),
+        "lamp-body.service".to_owned(),
+    ]);
+    lamp.publish(2, &[("lamp-body", "body 2")], &[]);
+    assert!(matches!(lamp.round(), Outcome::RolledBack { .. }));
+    let calls = lamp.calls.borrow();
+    let body: Vec<&String> = calls
+        .iter()
+        .filter(|call| call.ends_with(" lamp-body.service"))
+        .collect();
+    let reset = body
+        .iter()
+        .rposition(|call| *call == "reset-failed lamp-body.service")
+        .expect("lamp-body's start count reset");
+    assert_eq!(
+        body[reset - 1..=reset + 1],
+        [
+            "restart lamp-body.service",
+            "reset-failed lamp-body.service",
+            "restart lamp-body.service"
+        ],
+        "reset between the refused start and its retry: {body:?}"
+    );
+    let since = body[reset + 1..]
+        .iter()
+        .filter(|call| call.starts_with("restart ") || call.starts_with("start "))
+        .count();
+    assert!(since <= 2, "{since} starts after the reset: {body:?}");
+}
+
+/// Only lamp-body gets the retry: another part's refused restart puts the
+/// build back at once, asked once.
+#[test]
+fn another_parts_refused_restart_is_not_tried_again() {
+    let mut lamp = Lamp::new();
+    lamp.systemd
+        .refused_restarts
+        .push("lamp-controls.service".into());
+    lamp.publish(2, &[("lamp-controls", "controls 2")], &[]);
+    assert!(
+        matches!(lamp.round(), Outcome::RolledBack { .. }),
+        "{:?}",
+        lamp.said
+    );
+    assert!(
+        !lamp
+            .said
+            .iter()
+            .any(|line| line.contains("tried once more")),
+        "{:?}",
+        lamp.said
+    );
 }
 
 /// The Reviewer-lead's P2 on #5476: a build whose only change is a
