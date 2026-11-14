@@ -21,6 +21,19 @@ against lamp-06c1.
   then the broker's TLS port; if TLS cannot be set up it does not connect,
   never falling back to a plain connection. Off unless set, until the
   backend's broker is shown taking it on a lamp.
+  **With it off, the broker's TLS port is never connected to**
+  (`online::port_for`): an account naming 8883 is reached on the plain port,
+  1883, and the account is kept as the backend gave it, with one line,
+  `the account names the broker's TLS port 8883 with LAMP_CLOUD_TLS off:
+  connecting to its plain port 1883, the account kept as it is`. On a test
+  lamp, 14 Nov, a rotated account named 8883 with TLS off: lamp-cloud spoke
+  plain MQTT to it, read the broker's TLS alert (`15 03 03 00 02 02 0a`) as
+  "Promised boundary crossed, contains 768 bytes", and never came back online
+  after a restart. A reply that can't be read as MQTT also has its first
+  bytes said once a start (`online::first_bytes`): an anonymous MQTT 5
+  CONNECT, no login, to the same plain port, and at most 8 bytes of its
+  answer as hex within 3 s, `the broker's HOST:PORT answers an anonymous
+  CONNECT with N bytes: …`, so the packet that tripped it is known.
   The keepalive is 60 s (V1 asks 65,535 s, which never notices a dead link).
   One connection, TCP to CONNACK, may take 10 s (`wss::CONNECT`).
   **Over WSS when TCP keeps failing (#6256, F9).** After 3 failed
