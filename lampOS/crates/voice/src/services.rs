@@ -633,8 +633,7 @@ pub fn line_in_echo_tail(request: u64) {
 }
 
 /// The line of `request` heard no words, however it is asked (as the name,
-/// "Lamp.", when a call was heard in it), or was only the lamp's name
-/// ("Hey Lamp", answered as a call, #6363), or its answer only declined so
+/// "Lamp.", when a call was heard in it), or its answer only declined so
 /// the words it cut short are answered in its place (`second_provider`,
 /// `LAMP_CUT_ASK_ANSWERED`): the lamp's words in it answer no new request
 /// of the person's, so they never make it the read-back's one answer
