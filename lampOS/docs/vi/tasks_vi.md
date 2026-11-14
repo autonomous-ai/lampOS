@@ -1108,7 +1108,12 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   đầu chưa về (khoảng 30 s) hoặc bị hết giờ, việc không nêu engine chạy
   trên nó (Hermes trước, theo thứ tự của bản build), không bao giờ trên
   engine của target `lamp` còn lại trong file targets; engine đó chỉ dùng
-  khi đèn không có engine nào của riêng nó. Mục `lamp` trong câu trả lời
+  khi đèn không có engine nào của riêng nó, hoặc khi lựa chọn của chủ (của
+  app, nếu không thì của `LAMP_LAMP_ENGINE`) là một engine ngoài thứ tự
+  đang bật, như một engine thứ ba Harness báo trên đèn: điều đó không kiểm
+  tra được trước một lần xem, nên engine của file targets, do lần xem trước
+  ghi từ lựa chọn đó, được giữ (P2 của Reviewer-lead trên #7036; có trong
+  `engine::tests::before_a_look_an_app_choice_of_a_third_engine_keeps_the_targets_files_engine`). Mục `lamp` trong câu trả lời
   `targets` báo engine mặc định là `engine` của nó và liệt kê tất cả, mặc
   định đứng đầu:
   `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
