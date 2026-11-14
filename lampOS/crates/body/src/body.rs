@@ -325,6 +325,16 @@ const POSE_GESTURE: &str = "a gesture plays";
 /// and a lean are what read from the front, where the head is a disc
 /// facing the person (#933, lamp-4ace, 2026-10-16).
 pub const LEAN: [f32; 2] = [-45.0, -60.0];
+/// What a mood leans the arm toward at an energy level (`crate::energy`,
+/// #6891): speaking or reading `LEAN` at every level; listening the level's
+/// `listen_lean` (none at levels 1 and 2); nothing otherwise.
+pub fn mood_lean(mood: Mood, level: u8) -> [f32; 2] {
+    match mood {
+        Mood::Speaking | Mood::Reading => LEAN,
+        Mood::Listening => crate::energy::of(level).listen_lean.map(f32::from),
+        _ => [0.0; 2],
+    }
+}
 /// The lean takes at least this long each way, and longer if its farther
 /// joint would go faster than the pose follows at (`Limits::speed`).
 const LEAN_SECONDS: f32 = 1.5;
@@ -1185,7 +1195,9 @@ impl Tuning {
 impl Limits {
     /// These limits at an energy level (`crate::energy`): level 1 is these,
     /// above it the pose may move faster, never slower, its acceleration
-    /// six times its speed as `folded_with` sets it.
+    /// six times its speed as `folded_with` sets it, and the head may tilt
+    /// standing as far as the level's `stand_roll`, never less than these
+    /// (a body that cannot stand keeps its own: see `run_on_dyn`).
     pub fn at(self, level: u8) -> Self {
         if crate::energy::taken(level) == 1 {
             return self;
@@ -1194,6 +1206,9 @@ impl Limits {
         Self {
             speed,
             acceleration: self.acceleration.max(speed * 6.0),
+            stand_roll: self
+                .stand_roll
+                .max(f32::from(crate::energy::of(level).stand_roll)),
             ..self
         }
     }
@@ -5352,7 +5367,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let yaw_reach = limits
         .yaw
         .max(looking.map_or(0.0, |looking| looking.reach[0]));
-    let bounds = |home: [f32; 3], stand: f32| -> ([f32; 3], [f32; 3]) {
+    // `stand_roll` is the limits' own, taken from the energy level the body
+    // is at (`Limits::at`).
+    let bounds = |home: [f32; 3], stand: f32, stand_roll: f32| -> ([f32; 3], [f32; 3]) {
         let (floor, ceiling) = if head_share(stand) > 0.0 {
             (f32::from(limits.pitch_floor), 4_095.0)
         } else {
@@ -5366,7 +5383,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // it may look up; in between, in proportion to how clear it is.
         let clear = head_share(stand).powi(2);
         let down = limits.pitch_down + (limits.pitch_up - limits.pitch_down).max(0.0) * clear;
-        let roll = limits.roll + (limits.stand_roll - limits.roll).max(0.0) * clear;
+        let roll = limits.roll + (stand_roll - limits.roll).max(0.0) * clear;
         (
             [
                 (home[0] - limits.pitch_up).max(floor),
@@ -5381,7 +5398,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         )
     };
     let mut home_now = home_with(home, standing, stand);
-    let (mut low, mut high) = bounds(home_now, stand);
+    let (mut low, mut high) = bounds(home_now, stand, limits.stand_roll);
     let mut stand_velocity = 0.0f32;
     let mut awake_until: Option<Duration> = None;
     let mut tired_until: Option<Duration> = None;
@@ -5479,6 +5496,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut limits = limits;
     let stand_base = standing.map(|up| up.seconds);
     let mut energy = 1u8;
+    let mut said_no_stand = false;
     // Expression's rest offsets of the head (pitch, roll) averaged over a
     // breath, the average a drift last left, and when one last did.
     let mut rest_average: Option<([f32; 2], [f32; 2])> = None;
@@ -5658,6 +5676,9 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
     let mut slumped = false;
     // How far into its lean a speaking lamp is, 0 to 1 (`LEAN`).
     let mut lean = 0.0f32;
+    // What the lean is toward, counts of the shoulder and the elbow: `LEAN`
+    // speaking, the energy level's listening (`mood_lean`).
+    let mut lean_by = LEAN;
     // A shoulder and an elbow taken from a hand's hold into the lean: how
     // far from the pose they are, and whether the hand is above that.
     let mut lean_kept: [Option<(f32, bool)>; 2] = [None; 2];
@@ -5707,6 +5728,19 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         {
             energy = level;
             limits = base.at(level);
+            // Tilting stood up needs a stand (`--stand-roll needs --stand`):
+            // without one the head's roll stays as given at every level.
+            if standing.is_none() && limits.stand_roll != base.stand_roll {
+                limits.stand_roll = base.stand_roll;
+                if !said_no_stand {
+                    said_no_stand = true;
+                    eprintln!(
+                        "lamp-body: step {}: no --stand: the head's roll stays as given at every energy level",
+                        report.steps
+                    );
+                }
+            }
+            (low, high) = bounds(home_now, stand, limits.stand_roll);
             if let (Some(up), Some(seconds)) = (standing.as_mut(), stand_base) {
                 up.seconds = crate::energy::stand_seconds(seconds, level);
             }
@@ -5766,7 +5800,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 if home != configured {
                     home = configured;
                     home_now = home_with(home, standing, stand);
-                    (low, high) = bounds(home_now, stand);
+                    (low, high) = bounds(home_now, stand, limits.stand_roll);
                 }
                 kept = [0.0; 3];
                 glance_from = None;
@@ -5886,6 +5920,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 pending = Some((&clips::CALLED, now + Duration::from_secs_f32(rising)));
             }
         }
+        let by_name = mood == Mood::Resting;
         let mood = match called_at {
             Some(at) if mood == Mood::Resting && now.saturating_sub(at) < CALLED_FOR => {
                 Mood::Listening
@@ -6210,7 +6245,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             let next = home_with(home, standing, stand);
             carried = std::array::from_fn(|index| next[index] - home_now[index]);
             home_now = next;
-            (low, high) = bounds(home_now, stand);
+            (low, high) = bounds(home_now, stand, limits.stand_roll);
             if stand_velocity != 0.0 || wanted != stand {
                 // On its way up or down nothing of the head is left resting
                 // where it was: it has to come along.
@@ -6695,11 +6730,28 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         // as it began (above) is the pose it plays over. Speaking, a gesture
         // still takes the lean away: that lean is toward a person, and the
         // gesture is the move made at them instead.
+        // Listening, the energy level may lean it in too (#6891), only for a
+        // person heard, not its name alone, and never into a hand.
         let reading_through = mood == Mood::Reading && gesturing;
-        let leaning = matches!(mood, Mood::Speaking | Mood::Reading)
-            && upright
-            && (!gesturing || reading_through);
+        let lean_to = if mood == Mood::Listening && (by_name || in_hand_now) {
+            [0.0; 2]
+        } else {
+            mood_lean(mood, energy)
+        };
+        let leaning = lean_to != [0.0; 2] && upright && (!gesturing || reading_through);
         let rate = step / LEAN_SECONDS.max(1.5 * LEAN[1].abs() / limits.speed);
+        // From one mood's lean to another's (listening to speaking) at the
+        // pace a whole lean is eased; from none it is the new one at once.
+        if leaning {
+            for (index, by) in lean_by.iter_mut().enumerate() {
+                *by = if lean == 0.0 {
+                    lean_to[index]
+                } else {
+                    let most = LEAN[index].abs() * rate;
+                    *by + (lean_to[index] - *by).clamp(-most, most)
+                };
+            }
+        }
         // A hold on the arm is taken into the lean once the lean eases out
         // (the answer over, a gesture, folding), or once the lean is wanted
         // and no hand reads on that joint any more. From then on the joint
@@ -6728,7 +6780,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         }
         if lean_arm && (lean > 0.0 || lean_kept.iter().any(Option::is_some)) {
             let share = smooth(lean);
-            for (index, (goal, by)) in arm_goals.iter_mut().zip(LEAN).enumerate() {
+            for (index, (goal, by)) in arm_goals.iter_mut().zip(lean_by).enumerate() {
                 let eased = by * share;
                 let offset = match lean_kept[index] {
                     Some((from, _)) if blind => from,
@@ -6831,12 +6883,19 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         if !shifting {
             shift_from = None;
         }
+        // Speaking, the energy level sizes what Expression asks (its nods
+        // as speech pauses) before the reach cuts it: level 1 is as asked.
+        let nod = if mood == Mood::Speaking {
+            crate::energy::of(energy).nod_share
+        } else {
+            1.0
+        };
         let extra = match asked_now.expression {
             Some(asked) if !gesturing || shifting => {
                 report.expression_steps += 1;
                 let full = [0, 1, 2].map(|index| {
                     let asked = if asked[index].is_finite() {
-                        asked[index]
+                        asked[index] * nod
                     } else {
                         0.0
                     };
@@ -7196,7 +7255,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         stand = unsmooth(on_the_way(up, arm).0);
                         stand_velocity = 0.0;
                         home_now = home_with(home, standing, stand);
-                        (low, high) = bounds(home_now, stand);
+                        (low, high) = bounds(home_now, stand, limits.stand_roll);
                     }
                 }
                 if !tipping {
@@ -8349,7 +8408,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             stand_velocity = 0.0;
             slumped = true;
             home_now = home_with(home, standing, stand);
-            (low, high) = bounds(home_now, stand);
+            (low, high) = bounds(home_now, stand, limits.stand_roll);
             // The head, its roll and the base brought home as a lamp wakes
             // from a power cut: slowly, never away from home, a head that
             // drooped led enough to lift it, and woken where it settles.
@@ -8449,7 +8508,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 report.goal_writes += 1;
                 report.home = Some(home);
                 home_now = home_with(home, standing, stand);
-                (low, high) = bounds(home_now, stand);
+                (low, high) = bounds(home_now, stand, limits.stand_roll);
             }
             // Everything else starts again from where it is, as at start.
             written = goals;

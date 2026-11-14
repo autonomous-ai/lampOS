@@ -4,9 +4,10 @@
 //! livelier, never under today, and only inside the caps fixed in code
 //! (`Tuning::SPEED_CAP`, the strain, tip and reach bounds, all untouched).
 //!
-//! Applied so far: the pose's speed and acceleration, the stand and fold
-//! pace, the idle waits. `stand_roll`, `listen_lean` and `nod_share` are kept
-//! here for the next part (roll, nod and lean per level) and not read yet.
+//! Applied: the pose's speed and acceleration, the stand and fold pace, the
+//! idle waits (`Limits::at`, `crate::idle`), the head's roll standing
+//! (`Limits::at`), the listening lean (`crate::body::mood_lean`) and a spoken
+//! nod's size (`crate::body`).
 //! How often gesture clips play per level lives outside the body (the voice,
 //! Expression, the music skill) and comes in its own part.
 
@@ -18,12 +19,11 @@ pub struct Energy {
     /// Seconds a stand or a fold takes.
     pub stand_seconds: f32,
     /// The head's roll reach standing, counts; 0 is none (the unit's reach).
-    /// Not applied yet.
+    /// Only for a body with a stand.
     pub stand_roll: u16,
-    /// The shoulder and the elbow leant toward a listener, counts. Not
-    /// applied yet.
+    /// The shoulder and the elbow leant toward a listener, counts.
     pub listen_lean: [i16; 2],
-    /// How much a spoken nod is scaled. Not applied yet.
+    /// How much a spoken nod is scaled, before Expression's reach cuts it.
     pub nod_share: f32,
     /// How much each wait between shifts at rest is scaled.
     pub idle_share: f64,

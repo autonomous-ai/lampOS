@@ -1044,8 +1044,33 @@ A new level is taken only once the lamp is settled: no gesture playing or waitin
 still (every joint under 1 count a second) and the arm not rising or folding, so a speed cap never drops
 under a joint still moving. On the host, a 480-count turn of the base lands in 1.12 s at level 5 and
 1.92 s at level 1. Every other bound (strain, load, tip, reach, the servo's own speed) is untouched.
-The table also holds each level's head roll standing, lean toward a listener and nod size; those are
-not applied yet (a later part of #6893), nor how often gestures play, which lives outside the body.
+The same level also sets the head's roll standing, a lean toward a listener and the size of a nod
+while it speaks (`energy.rs` `TABLE`):
+
+| level | head roll standing, counts | listening lean, shoulder/elbow | nod x |
+|---|---|---|---|
+| 1 | the unit's (`--stand-roll`, none in the product) | none | 1.0 |
+| 2 | the unit's | none | 1.1 |
+| 3 | 120 | -10/-15 | 1.2 |
+| 4 | 160 | -20/-25 | 1.3 |
+| 5 | 200 | -25/-30 | 1.4 |
+
+- **Roll.** `Limits::at` raises `stand_roll` to the level's, never under the unit's. It is the head's
+  roll reach once stood, so it widens the moods' bounds (listening tilts 0.85 of it, about 170 counts
+  at level 5), a holder's pose and its glance, gestures (a clip's roll is laid over the pose instead of
+  dropped once `stand_roll` passes `roll`, played under the servo's speed by the stretch below) and the
+  tilting shifts at rest. Tilting stood up needs a stand: a body started without `--stand` keeps the
+  roll it was given at every level and says so once in the journal; it starts as ever.
+- **Nod.** Speaking, what Expression asks of the head (its nods as speech pauses) is scaled by the
+  level's share before `EXPRESSION_REACH` cuts it, so a nod never goes past that reach (60 counts of
+  pitch): on the host Expression's 30 counts nod 30 at level 1 and 42 at level 5.
+- **Listening lean (#6891).** `mood_lean(mood, level)`: speaking and reading lean `LEAN` at every level
+  (as above); listening leans the level's own, eased in as the speaking lean is, and from one to the
+  other at the same pace. Not for its name alone (`--look-at-name`), and let go while a hand on the
+  lamp is given way to; a strain sits it down as ever, and V1's anti-tip rule cuts any lean back past
+  its line (on the host, a stand at the line keeps the arm where level 1 has it).
+
+How often gestures play per level lives outside the body.
 
 ### A stand asked by voice
 
