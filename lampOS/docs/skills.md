@@ -1686,8 +1686,10 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   (`skill_write_yes::waiting_note`) no longer says the skill the lamp just
   said back waits for a yes, nor gives its `approve_id`: it says the
   say-back was cut and not heard whole, that no yes is taken yet, and that
-  it must be said again, word for word, before any yes, with the whole
-  say-back to say; then to end as it ends and ask nothing. Once an uncut
+  it must be said again, word for word, before any yes if they agree or
+  ask for it, with the whole say-back to say; that a decline or a wait
+  is told it stays off, with nothing called, and doesn't bring the
+  say-back back; then to end as it ends and ask nothing. Once an uncut
   answer has held it whole, the note is the usual one again, with the
   `approve_id`. The journal says what
   was kept: "a made skill's yes not taken: its say-back was not heard

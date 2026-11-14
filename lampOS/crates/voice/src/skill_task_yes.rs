@@ -1197,6 +1197,11 @@ mod tests {
         let cut = skill_write_yes::waiting_note(7, now).unwrap();
         assert!(cut.contains("was not heard whole"), "{cut}");
         assert!(cut.contains("say it again, word for word"), "{cut}");
+        // A no to a cut say-back keeps it off; it doesn't bring it back.
+        assert!(
+            cut.contains("If they decline or wait, say it stays off, and call nothing"),
+            "{cut}"
+        );
         assert!(cut.contains(&say_back), "{cut}");
         assert!(!cut.contains("waits for their yes"), "{cut}");
         assert!(!cut.contains("just said back"), "{cut}");
