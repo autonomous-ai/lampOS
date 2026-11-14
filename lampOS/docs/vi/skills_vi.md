@@ -1785,8 +1785,10 @@ cả hai người viết.
   (người nhận của chính họ khi ghi) không bao giờ nằm trong luật: mỗi địa
   chỉ là một chỗ giữ (`own1.lamp@example.invalid`), được đặt lại trong câu
   trả lời của agent trước khi kiểm tra.
-- **Với hướng dẫn skill-creator của đèn (`LAMP_MAKE_AGENT_GUIDE=on`, tắt
-  nếu không đặt; yêu cầu của chủ sở hữu, 13/11).** Như `skill-creator` của
+- **Với hướng dẫn skill-creator của đèn (`LAMP_MAKE_AGENT_GUIDE=on`, bật
+  trong sản phẩm, trong unit của lamp-voice; yêu cầu của chủ sở hữu, 13/11;
+  nó không tạo gì khi `LAMP_MAKE_SKILL_AGENT`, tắt lại từ 14/11, còn
+  tắt).** Như `skill-creator` của
   V1, agent viết nháp, kiểm tra và sửa trước khi trả lời. Dòng của mỗi lần
   tạo còn ghi `"guide":true`, và lamp-tasks ghi hướng dẫn, `guide.md`
   (0600), cạnh `rules.md` trong thư mục của lần tạo

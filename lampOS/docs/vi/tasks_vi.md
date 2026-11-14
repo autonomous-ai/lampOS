@@ -838,7 +838,7 @@ agent (`lamp_tasks::skill_make`).
   `switches`, luật (system prompt và brief) tối đa 48 KiB và không có NUL,
   `within_ms` từ 1 đến 120 giây.
 - **Hướng dẫn (`"guide":true`, `LAMP_MAKE_AGENT_GUIDE` của lamp-voice,
-  tắt):** chỉ khi dòng ghi `true` (một boolean, mặc định `false`), hướng dẫn
+  bật trong sản phẩm):** chỉ khi dòng ghi `true` (một boolean, mặc định `false`), hướng dẫn
   skill-creator của đèn (`skill_make::GUIDE`, từ `skill_make_guide.md`: bản
   cho đèn của `skills/skill-creator/SKILL.md` của V1, Apache-2.0, dòng đầu
   ghi nguồn gốc và giấy phép đó) được ghi cạnh luật thành `guide.md`, 0600,

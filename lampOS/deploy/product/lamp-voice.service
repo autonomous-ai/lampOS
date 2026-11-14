@@ -425,6 +425,9 @@ Environment=LAMP_TASK_NEWS=skill
 # voice and from the app, each put on by a plain "Yes." (#4946). A computer's agent no longer makes one
 # (the first builder, 3 Nov, on the Queue).
 Environment=LAMP_MAKE_SKILL=on
+# A make handed to the lamp's agent is drafted with the lamp's skill-creator guide and checked by its own pack (#6768).
+# It rides on the hand-over to the agent, off again since 14 Nov (#1711), so it makes nothing until that is back on.
+Environment=LAMP_MAKE_AGENT_GUIDE=on
 Environment=LAMP_APP_MAKE_SKILL=on
 # A skill added from a file in the app, on a spoken yes (#5080): lamp-cloud hands it over the app-make socket,
 # the same line in lamp-cloud.service; it never starts on its own.
