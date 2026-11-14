@@ -1198,8 +1198,9 @@ camera, so I can't take photos…" with `calls=none`.
   forced to `use_skill` with `skill` told only `point_light`, when
   point-light is offered; the route's own `take_a_look` is not the
   model's pick there. "Look at my book", "what do you see", "turn the
-  light on", "light scene", "reading light" and "point at the door" are
-  the model's, as before. English only.
+  light on", "light scene", "reading light", "light up the room", "light
+  my face", "light this up" and "point at the door" are the model's, as
+  before: a room, a place or a face is never the thing. English only.
 - **Which lines** (`skill_named::named`): the function's name said as words
   in a row, loosely (`photo_booth` as "photo booth" or "photobooth", a
   number as a word or a digit), with nothing else but a greeting, the

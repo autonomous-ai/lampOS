@@ -371,7 +371,8 @@ and none of the skills' own (`crate::use_skill`):
   plainly asks to point or shine the light at a thing
   (`tools::skill_asked::asks_to_point`: "point", "aim" or "shine" the
   light "at", "on", "over" or "to" a thing, "shine on" a thing, or "light
-  (up)" a thing said with "my", "the", "this" and the like; with only a
+  (up)" a thing said with "my", "the", "this" and the like, or "light" it
+  "up"; with only a
   greeting, the lamp's name, a request before it, and "please" or
   "thanks" after) is forced the same way to point-light: `skill` told only
   `point_light`, which way to turn still the model's. On lamp-52e6 on 13
@@ -380,8 +381,11 @@ and none of the skills' own (`crate::use_skill`):
   moved: both lines speak of looking at a thing on the desk, and a forced
   round leaves `take_a_look` out. A look ("look at my book", "what do you
   see"), the light itself ("turn the light on", "light scene", "reading
-  light"), a point with no light ("point at the door"), a no, a question,
-  a second ask, a person ("shine the light on me"), a thing of more than
+  light"), a room or a place ("light up the room", "light the kitchen",
+  "light the way": a brighter room, not a turn toward a thing), a person
+  or a face ("shine the light on me", "light my face"), a bare "this"
+  ("light this up"), a point with no light ("point at the door"), a no, a
+  question, a second ask, a thing of more than
   five words and any other language are the model's. Host tests:
   `a_plain_ask_for_a_scene_or_a_show_is_told_apart`,
   `a_plain_ask_forces_its_skill_only_when_offered`,

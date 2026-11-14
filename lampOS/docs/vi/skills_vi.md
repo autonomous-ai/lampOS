@@ -2528,8 +2528,10 @@ camera, so I can't take photos…" với `calls=none`.
   `use_skill` với `skill` chỉ được báo là `point_light`, khi point-light
   được đưa ra; `take_a_look` của chính route không còn là lựa chọn của
   model ở đó. "Look at my book", "what do you see", "turn the light on",
-  "light scene", "reading light" và "point at the door" vẫn là của model
-  như trước. Chỉ tiếng Anh.
+  "light scene", "reading light", "light up the room", "light my face",
+  "light this up" và "point at the door" vẫn là của model như trước: một
+  căn phòng, một nơi chốn hay một khuôn mặt không bao giờ là vật được
+  chiếu. Chỉ tiếng Anh.
 - **Câu nào** (`skill_named::named`): tên hàm nói thành các từ liền nhau,
   khớp lỏng (`photo_booth` là "photo booth" hay "photobooth", số nói bằng
   chữ hay chữ số), ngoài ra chỉ có lời chào, tên đèn, "please" hay

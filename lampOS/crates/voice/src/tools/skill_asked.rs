@@ -38,8 +38,9 @@
 //! the pick was the model's alone; a forced `use_skill` round leaves
 //! `take_a_look` out of it. Which way to turn (`toward`) is still the
 //! model's. A look ("look at my book", "what do you see"), the light itself
-//! ("turn the light on", "light scene", "reading light") and a point with
-//! no light ("point at the door") are the model's, as before.
+//! ("turn the light on", "light scene", "reading light"), a room or a face
+//! ("light up the room", "light my face") and a point with no light
+//! ("point at the door") are the model's, as before.
 use crate::known_faces::lower_words;
 use crate::second_provider::net::{Force, Forced, Message};
 
@@ -268,12 +269,70 @@ const AFTER_THING: &[&[&str]] = &[
 
 /// Words the thing to light never holds: a no or a question, a second ask,
 /// the light or a scene itself ("light the reading light", "light a
-/// scene"), a person (the lamp lights the desk, not a face), and a flame.
-/// Any of them leaves the line to the model.
+/// scene"), a person or a part of one (the lamp lights the desk, not a
+/// face: "light my face", "shine the light on my face"), a room or a place
+/// ("light up the room" asks for a brighter room, a scene or more light,
+/// not a turn toward a thing: Heron's hold on #7069), a bare "it", and a
+/// flame. Any of them leaves the line to the model.
 const NOT_A_THING: &[&str] = &[
-    "not", "don't", "dont", "no", "never", "what", "why", "how", "where", "when", "who", "which",
-    "and", "or", "but", "if", "later", "off", "light", "lights", "lamp", "scene", "scenes", "show",
-    "mode", "me", "us", "you", "yourself", "myself", "candle", "candles", "fire",
+    "not",
+    "don't",
+    "dont",
+    "no",
+    "never",
+    "what",
+    "why",
+    "how",
+    "where",
+    "when",
+    "who",
+    "which",
+    "and",
+    "or",
+    "but",
+    "if",
+    "later",
+    "off",
+    "light",
+    "lights",
+    "lamp",
+    "scene",
+    "scenes",
+    "show",
+    "mode",
+    "me",
+    "us",
+    "you",
+    "yourself",
+    "myself",
+    "it",
+    "face",
+    "eyes",
+    "head",
+    "hand",
+    "hands",
+    "body",
+    "hair",
+    "room",
+    "rooms",
+    "place",
+    "house",
+    "home",
+    "kitchen",
+    "office",
+    "bedroom",
+    "living",
+    "hall",
+    "space",
+    "area",
+    "way",
+    "whole",
+    "everything",
+    "everywhere",
+    "all",
+    "candle",
+    "candles",
+    "fire",
 ];
 
 /// The most words the thing to light is said in ("the book on my left").
@@ -282,7 +341,8 @@ const MOST_THING_WORDS: usize = 5;
 /// [`POINT`] when the line plainly asks to point or shine the light at a
 /// thing: past a greeting, the lamp's name or a request ([`AROUND`],
 /// [`REQUESTS`]), "point/aim/shine the light at/on X" or "light (up) my/the
-/// X", and after the thing only a "please" or a "thanks". English only, as
+/// X (up)", and after the thing only a "please" or a "thanks"; never a room,
+/// a place or a face ([`NOT_A_THING`]). English only, as
 /// the other asks here bar the help questions: a line in any other language
 /// is the model's. A missed ask only leaves the pick to the model, as
 /// before; a wrong one bends the head over the desk nobody asked about, so
@@ -319,8 +379,12 @@ pub fn asks_to_point(said: &str) -> Option<&'static str> {
     } else {
         return None;
     };
+    // "Light the book up" is "light up the book": a trailing "up" goes with
+    // the verb, and the thing before it is read as any other ("light this
+    // up" is a bare "this", no thing).
+    let trailing_up: &[&[&str]] = if verb == "light" { &[&["up"]] } else { &[] };
     let mut end = words.len();
-    while let Some(taken) = AFTER_THING.iter().find_map(|after| {
+    while let Some(taken) = AFTER_THING.iter().chain(trailing_up).find_map(|after| {
         (end >= thing_at + after.len()
             && words[end - after.len()..end]
                 .iter()
@@ -722,6 +786,7 @@ mod tests {
             "Please light up the plant.",
             "Can you light my desk?",
             "Light the book on my left.",
+            "Light my book up, please.",
         ] {
             assert_eq!(asks_to_point(said), Some(POINT), "{said}");
             assert_eq!(asks_for(said), None, "{said}");
@@ -754,6 +819,19 @@ mod tests {
             "I like the light on my book.",
             "Point the light at the very big old book on my desk.",
             "Đèn ơi, chiếu đèn vào sách của tôi.",
+            // Heron's hold on #7069: a room, a place, a face, a bare "this".
+            "Light up the room.",
+            "Lamp, light up the room please.",
+            "Light the room.",
+            "Light up my room",
+            "Light the whole room.",
+            "Light up the place.",
+            "Light up the kitchen.",
+            "Can you light the room up?",
+            "Light my face.",
+            "Shine the light on my face.",
+            "Light this up.",
+            "Light the way.",
             "",
         ] {
             assert_eq!(asks_to_point(said), None, "{said}");
