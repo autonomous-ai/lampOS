@@ -914,7 +914,22 @@ fn named_in_with_rest(
             return false;
         }
         if at == first {
-            return comma_after[after - 1] && after < words.len();
+            // Called by name first in the line: a comma after it ("Hermes,
+            // …"), or, as speech to text often hears it with the comma
+            // dropped or a stop for it, a work verb next, after "please"
+            // too ("Hermes look up …", "Hermes. Look up …", #7023).
+            if after >= words.len() {
+                return false;
+            }
+            if comma_after[after - 1] {
+                return true;
+            }
+            let verb = if words[after] == "please" {
+                after + 1
+            } else {
+                after
+            };
+            return word(Some(verb)).is_some_and(|verb| WORK_VERBS.contains(&verb));
         }
         if stopped[at] {
             return false;
@@ -12426,6 +12441,77 @@ pub(crate) mod tests {
         }
         // Past the kept few, the oldest is let go.
         assert!(asked.first(6_547_001));
+    }
+
+    /// #7023: a name called first in the line, as speech to text hears it:
+    /// the vocative comma dropped, a stop after the name or before it, the
+    /// name split or in lower case. The doer when a comma, or a work verb
+    /// (after "please" too, or a stop), comes after it; a mention stays one.
+    #[test]
+    fn a_name_called_first_is_the_doer_as_heard() {
+        let engines = ["hermes".to_owned(), "openclaw".to_owned()];
+        let staff = ["Claude Code", "Codex"];
+        let mut wrong: Vec<String> = Vec::new();
+        for (heard, agent) in [
+            // As typed, and as heard.
+            (
+                "Hey Lamp, Hermes, look up the weather in Hanoi this weekend",
+                Some("Hermes"),
+            ),
+            (
+                "Hey Lamp, Hermes look up the weather in Hanoi this weekend",
+                Some("Hermes"),
+            ),
+            (
+                "Hey Lamp Hermes look up the weather in Hanoi this weekend",
+                Some("Hermes"),
+            ),
+            (
+                "Hey Lamp. Hermes, look up the weather in Hanoi this weekend.",
+                Some("Hermes"),
+            ),
+            (
+                "Hey Lamp. Hermes. Look up the weather in Hanoi this weekend.",
+                Some("Hermes"),
+            ),
+            (
+                "Hermes. Look up the weather in Hanoi this weekend.",
+                Some("Hermes"),
+            ),
+            ("Hermes please look up the weather in Hanoi", Some("Hermes")),
+            ("hermes look up the weather in hanoi", Some("Hermes")),
+            (
+                "Hey Lamp, OpenClaw make a file called tea.md",
+                Some("OpenClaw"),
+            ),
+            ("Open Claw, make a file called tea.md", Some("OpenClaw")),
+            ("Open Claw make a file called tea.md", Some("OpenClaw")),
+            ("Codex fix my repo", Some("Codex")),
+            // Mentions, and a call with no work, name none.
+            ("Hermes is great", None),
+            ("Hermes is great. Look it up.", None),
+            ("What is OpenClaw?", None),
+            ("Is OpenClaw's update out?", None),
+            ("OpenClaw's update, look at it", None),
+            ("Hermes, what time is it?", None),
+            ("Hermes. What time is it?", None),
+            ("Hey Lamp Hermes", None),
+        ] {
+            let got = named_for_work_in(heard, &engines, &staff);
+            if got.as_deref() != agent {
+                wrong.push(format!("{heard}: {got:?}"));
+            }
+        }
+        assert!(wrong.is_empty(), "{wrong:#?}");
+        // The rest is the words after the name.
+        let (_, rest) = named_in_with_rest(
+            "Hey Lamp. Hermes. Look up the weather in Hanoi.",
+            &engines,
+            &staff,
+        );
+        assert_eq!(rest.as_deref(), Some("look up the weather in hanoi"));
+        let (_, rest) = named_in_with_rest("Hey Lamp, Open Claw make a file", &engines, &staff);
+        assert_eq!(rest.as_deref(), Some("make a file"));
     }
 
     /// #6492: the lamp's engines are whatever the tasks part reports there,
