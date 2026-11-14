@@ -681,6 +681,7 @@ const BUS_TOPICS: &[&str] = &[
     "body/unplug_request",
     "body/unplug_state",
     "camera/image",
+    "character/energy",
     "chat/in",
     "chat/out",
     "controls/gesture",

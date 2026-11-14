@@ -246,6 +246,8 @@ fn main() -> ExitCode {
         .clone()
         .zip(login.as_ref().map(|login| login.watch()));
     let alerts_bus = bus.clone();
+    // The energy kept with the character words, said for the body (#6893).
+    let energy_bus = bus.clone();
     let alerts_state = std::env::var_os("STATE_DIRECTORY").map(PathBuf::from);
     // A made skill sent to the Skills Store (fourteen-P13): only with
     // LAMP_SKILLS_SHARE=on and the skills page.
@@ -455,6 +457,12 @@ fn main() -> ExitCode {
                 None => std::future::pending().await,
             }
         };
+        let energy = async move {
+            match std::path::Path::new(lamp_msgs::chosen_voice::ENERGY_FILE).parent() {
+                Some(dir) => lamp_cloud::settings::tell_energy(dir.to_path_buf(), energy_bus).await,
+                None => std::future::pending().await,
+            }
+        };
         let staying = online::run(accounts, me, ws_url, &mut lamp, &mut said_too, ping::FIRST);
         let reporting = async move {
             match reporting {
@@ -500,6 +508,7 @@ fn main() -> ExitCode {
             () = looks => {}
             () = reporting => {}
             () = telling => {}
+            () = energy => {}
         }
     });
     ExitCode::from(1)

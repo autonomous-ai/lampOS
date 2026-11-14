@@ -582,6 +582,11 @@ pub fn answer(lamp: &mut impl Lamp, kind: &str, data: &Value) -> Result<Option<V
             if lamp.update_events().is_some() {
                 info["update_events_supported"] = json!(true);
             }
+            // `character_energy_supported` (#6893): `character.set` takes
+            // an `energy` and `voice.get` says it, whenever they are taken.
+            if on(lamp, "character.set") {
+                info["character_energy_supported"] = json!(true);
+            }
             some(info)
         }
         "system.version" => some(lamp.versions()),
@@ -1466,6 +1471,16 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(updated["update_events_supported"], true);
+        // #6893: `character_energy_supported` whenever `character.set` is taken.
+        assert!(info.get("character_energy_supported").is_none(), "{info}");
+        let mut chosen = Fake {
+            changes: changes_of(false, false).map(|changes| changes.taking_the_voice(true)),
+            ..Fake::default()
+        };
+        let told = answer(&mut chosen, "system.info", &Value::Null)
+            .unwrap()
+            .unwrap();
+        assert_eq!(told["character_energy_supported"], true);
         assert!(answer(&mut will, "onboarding.page", &json!({"page": "create"})).is_ok());
         assert!(
             answer(
