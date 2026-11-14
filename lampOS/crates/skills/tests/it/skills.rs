@@ -8853,7 +8853,7 @@ for = "2s"
 "#;
 
 /// #1679: a light show plays its frames in turn, each its while, and gives
-/// the light back after; someone speaking (the voice listening) stops it
+/// the light back after; someone speaking (words heard, #5744) stops it
 /// within a fifth of a second, and the light is given back then.
 #[test]
 fn a_light_show_plays_its_frames_in_turn_and_stops_when_someone_speaks() {
@@ -8889,6 +8889,7 @@ show = "short"
             },
         )
         .unwrap();
+    program.heard("wait");
     program.clock.skip(Duration::from_millis(400));
     // Within a fifth of a second of the program's clock, well before the
     // frame's two seconds end: a look at the frame's end alone is too late.
@@ -8898,6 +8899,80 @@ show = "short"
     );
     program.clock.skip(Duration::from_secs(5));
     assert_eq!(program.colours(0), Vec::<String>::new());
+}
+
+/// A light show asked in turn 23, with the voice listening to a line of
+/// turn 24 during its first frame, `words` heard in it: the run's done
+/// event, and the colours asked for in the 600 ms after the line.
+fn show_over_a_line(words: &str) -> (Vec<String>, SkillEvent) {
+    let show = r#"
+tool = "light_show"
+[[do]]
+show = "short"
+"#;
+    let mut program = ToolProgram::with("show", show, &[("short", SHORT_SHOW)]);
+    let bus = Bus::new(program._dir.path().join("bus")).unwrap();
+    let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+    program.heard_in("lamp, a party light show", Some(23));
+    // The program's loop reads the asking turn before the call.
+    std::thread::sleep(Duration::from_millis(100));
+    assert_eq!(program.call("light_show", "{}")["ok"], true);
+    assert_eq!(program.colours(1), ["purple"]);
+    program
+        .voice
+        .publish_json(
+            1,
+            &VoiceState {
+                state: lamp_msgs::Voice::Listening,
+            },
+        )
+        .unwrap();
+    program.heard_in(words, Some(24));
+    program.clock.skip(Duration::from_millis(400));
+    let after = program.colours_within(1, Duration::from_millis(600));
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let done = loop {
+        assert!(Instant::now() < deadline, "the run never ended");
+        program.clock.skip(Duration::from_millis(500));
+        if let Some(message) = events.recv(Duration::from_millis(100)).unwrap() {
+            let event: SkillEvent = message.parse().unwrap();
+            if event.stage == SkillStage::Done {
+                break event;
+            }
+        }
+    };
+    (after, done)
+}
+
+/// #5744, Fifth's row-5744e S2 on lamp-52e6: request 24, a line of room
+/// sound with 0 words, set the voice listening, and the show stopped in its
+/// third frame. The voice listening alone no longer stops a show: it plays
+/// all its frames and says so.
+#[test]
+fn a_line_with_no_words_does_not_stop_a_light_show() {
+    let (after, done) = show_over_a_line("");
+    // Nothing given back in the frame the line came in.
+    assert_eq!(after, Vec::<String>::new(), "{}", done.why);
+    assert!(
+        done.why.contains("show short: 3 frames shown"),
+        "{}",
+        done.why
+    );
+    assert!(!done.why.contains("stopped"), "{}", done.why);
+}
+
+/// Words of a later turn than the one that asked still stop a show in the
+/// frame they come in, and the light is given back then.
+#[test]
+fn a_later_turns_words_stop_a_light_show() {
+    let (after, done) = show_over_a_line("stop");
+    assert_eq!(after, ["blue"], "{}", done.why);
+    assert!(
+        done.why
+            .contains("show short: stopped in frame 1 of 3, someone spoke to the lamp"),
+        "{}",
+        done.why
+    );
 }
 
 /// A show after the model's line, as light-show has it (#5745).
