@@ -634,7 +634,7 @@ false cut-in was heard in either. Body's exit reports over 17.6 minutes at 300 a
 pitch's highest single 20 ms step read 328 and 281, roll 32 at both, the base 196 and 200, and the arm's shoulder and
 elbow 376 and 488 against 396 and 488. Single steps over the pitch's 240 come at both speeds; the strain bounds act on
 six steps in a row (pitch, roll and yaw 240, 150 and 220; the arm 560 under `--force-limit 600`), and at 300 nothing
-was eased and nothing retreated. The product runs 300; `Tuning::SPEED_CAP` is 800, energy level 5's (below). Folded, the head reaches 15 counts below
+was eased and nothing retreated. The product runs 300, `Tuning::SPEED_CAP`; only the energy level goes past it, to `Tuning::ENERGY_SPEED_CAP`, 800, level 5's (below). Folded, the head reaches 15 counts below
 home (`--reach`); stood up, its downward reach grows toward the upward one (`bounds()`), so a nod dips from wherever the
 speaking posture holds the head.
 
