@@ -993,3 +993,49 @@ fn offline_listening_is_not_drawn_as_ready() {
     engine.set_offline(false);
     assert_eq!(listen(&mut engine, 370_000), ExpressionFace::Listening);
 }
+
+/// The energy level (#6893): level 1, and 0 (nothing said), keep the
+/// catalogue's own gap between two pause nods; level 5 lets the next come
+/// 3 s after the last, never sooner. Its vetoes are the clip's, untouched.
+#[test]
+fn a_pause_nod_comes_sooner_only_above_level_one_and_never_under_three_seconds() {
+    // A nod, then a second pause whose nod would start `after` later.
+    let second = |level: u8, after: u64| {
+        let mut engine = engine();
+        engine.set_energy(level);
+        send(&mut engine, activity(0, 1, true));
+        send(&mut engine, activity(20_000, 2, false));
+        assert!(has(&engine.tick(140_000), "nod in a pause"));
+        let at = 140_000 + after;
+        // The voice listening all along, as it says each 100 ms.
+        for beat in (200_000..at - 130_000).step_by(100_000) {
+            heartbeat(&mut engine, beat, Voice::Listening);
+            engine.tick(beat);
+        }
+        heartbeat(&mut engine, at - 130_000, Voice::Listening);
+        send(&mut engine, activity(at - 130_000, at, true));
+        send(&mut engine, activity(at - 120_000, at + 1, false));
+        heartbeat(&mut engine, at, Voice::Listening);
+        has(&engine.tick(at), "nod in a pause")
+    };
+    for level in [0, 1] {
+        assert!(!second(level, 3_300_000), "level {level}");
+        assert!(second(level, 4_000_000), "level {level}");
+    }
+    assert!(second(5, 3_000_000));
+    assert!(!second(5, 2_900_000));
+    // The table's level 1 is the product catalogue's pause nod.
+    let product = Catalogue::from_json(include_str!(
+        "../../../../deploy/product/settings/expression.json"
+    ))
+    .unwrap();
+    let nod = product
+        .behaviours
+        .iter()
+        .find(|clip| clip.trigger == Trigger::Pause)
+        .unwrap();
+    assert_eq!(
+        nod.cooldown_us as f64,
+        f64::from(lamp_body::energy::GESTURE[0].pause_gap_s) * 1e6
+    );
+}

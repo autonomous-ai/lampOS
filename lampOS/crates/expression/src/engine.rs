@@ -378,6 +378,9 @@ pub struct Engine {
     routine: Option<rest::Rest>,
     routine_paused: bool,
     privacy_muted: bool,
+    /// The character's energy level (`lamp_body::energy`, #6893), 0 or 1
+    /// for today: a pause clip's cooldown is the catalogue's.
+    energy: u8,
     /// The skill that claims the night's sleep (#940), while its claim is
     /// fresh: only with rest requests on.
     sleep_claim: Option<String>,
@@ -475,6 +478,7 @@ impl Engine {
             routine: None,
             routine_paused: false,
             privacy_muted: false,
+            energy: 0,
             sleep_claim: None,
         })
     }
@@ -902,6 +906,14 @@ impl Engine {
         if let Some(life) = &mut self.life {
             life.set_mood_liveliness(liveliness);
         }
+    }
+
+    /// The character's energy level (`character/energy`, read under
+    /// `LAMP_BODY_ENERGY=on`, #6893): above 1 a pause nod may come sooner
+    /// after the last (`lamp_body::energy::pause_cooldown_us`, never under
+    /// 3 s); 1, the catalogue's own.
+    pub fn set_energy(&mut self, level: u8) {
+        self.energy = level;
     }
 
     /// Whether the privacy switch is closed, as `voice/privacy` says at a
@@ -1725,7 +1737,11 @@ impl Engine {
                             // than starting a fresh full nod after the pause.
                             if now_us <= start.saturating_add(clip.stroke_us)
                                 && runtime.last_started.is_none_or(|last| {
-                                    now_us.saturating_sub(last) >= clip.cooldown_us
+                                    now_us.saturating_sub(last)
+                                        >= lamp_body::energy::pause_cooldown_us(
+                                            clip.cooldown_us,
+                                            self.energy,
+                                        )
                                 })
                             {
                                 runtime.started = Some(start);
