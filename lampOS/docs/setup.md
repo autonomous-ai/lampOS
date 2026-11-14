@@ -454,9 +454,10 @@ example plan covering every store of the person's listed above.
 
 `lamp_setup::wifi` is V1's join (`system/network/service.go`, `SetupNetwork`;
 `setup_failure.go`) in Rust, with V1's numbers: up to 60 s for the named
-network **and** the Internet (ping `8.8.8.8`, else, as V1's `tlsReach`, a TLS
-handshake with the voice's service, `generativelanguage.googleapis.com:443`),
-checked every second; on every third
+network **and** the Internet (ping `223.5.5.5`, else `8.8.8.8`, each for at most
+2 s, else, as V1's `tlsReach`, a TLS handshake with the backend the setup request
+names in `llm_base_url`, or `campaign-api.autonomous.ai:443` when it names none;
+never Google's Gemini, which is blocked in China, #6256), checked every second; on every third
 check, two keys rejected by the router end it early as `wrong_password`. A
 failure is named as V1 names it (`wrong_password`, `association_rejected`,
 `ssid_not_found`, `no_dhcp`, `no_internet`, `ssid_too_long`,
@@ -486,18 +487,15 @@ stop, since a router can refuse a right password's first handshake: the join
 keeps waiting, a join at 20 s is kept, and one that never joins gets the whole
 minute, then `wrong_password` (#4348).
 
-**PARKED (#6386).** #6256's check for a lamp in China (ping `223.5.5.5`, then
-`8.8.8.8`, each for at most 2 s, then TLS to the backend named in `llm_base_url`
-or `campaign-api.autonomous.ai:443`, never Gemini; 5 s for the reach and the
-Wi-Fi change's broker; a journal line `the internet answered: ping 223.5.5.5 in
-48 ms`) is commented out in `crates/setup/src/{wifi,wifi_change,main}.rs`;
-re-enable when China is scheduled and stable's lamp-update carries #6810.
-
 **The TLS reach.** A TCP connection alone is not the Internet: anything that
 accepts and stays silent, or answers in plain text, would pass. So, as V1, the
 handshake must complete, and the name's lookup, the connection and the
-handshake together take at most 3 s (V1's `cloudProbeTimeout`; 5 s is
-PARKED (#6386), above). The lookup
+handshake together take at most 5 s (V1's `cloudProbeTimeout` was 3 s; 5 s
+lets a slow first lookup or a server about 450 ms away pass, #6256). A good
+network still passes on the first ping; a dead one spends at most 2 + 2 + 5 s a
+check, so the wrong-key stop on a dead network comes at about 30 s, not 20 s.
+The check that passed and its time are one journal line (`the internet
+answered: ping 223.5.5.5 in 48 ms`). The lookup
 runs on a thread of its own, since the system's has no time limit and cannot
 be stopped; one that has not come back is waited on by the next check, never
 started twice, and the whole service shares that one (`LookupSlot::process`),
@@ -910,7 +908,7 @@ the end, `{"done": {"ssid"}}` or `{"refused": why}`.
    restarts the radio, as setup's join does.
 3. **Proven** = the new name is the one joined, with a station address,
    and a TCP connection to the broker `lamp-cloud` is on is made and closed
-   (3 s at most, name lookup included; 5 s is PARKED (#6386)), within 60 s (setup's own bound). Two
+   (5 s at most, name lookup included, #6256), within 60 s (setup's own bound). Two
    rejected keys stop early, as setup's join does. **Kept** only once the app
    also confirms through it: the helper writes `{"joined": {"ssid",
    "online_within_ms", "confirm_within_ms"}}`, `lamp-cloud` makes its link
