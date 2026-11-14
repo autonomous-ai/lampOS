@@ -24,6 +24,30 @@ class Row(unittest.TestCase):
         self.assertEqual(rows([c("writer-a", "**ROW** 7016 on build 12701")], HEAD, W, "7016"), "row")
         self.assertEqual(rows([c("writer-a", "  **ROW 7016 on build 12701**")], HEAD, W, "7016"), "row")
 
+    def test_a_row_names_its_pr(self):
+        # 14 Nov (the readers' P3s on #7034).
+        for body in ("ROW #7016 on build 12701", "**ROW** #7016 on build 12701", "ROW **7016** on build 12701", "ROW 7016: x"):
+            self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "row", body)
+        for body in ("ROW 7017 on build 12701", "ROW 70160 on build 12701", "ROW #701 on build 12701",
+                     "ROW %s on build 12701" % HEAD[:10], "ROW on build 12701"):
+            self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "none", body)
+
+    def test_without_pr_a_row_never_counts(self):
+        self.assertEqual(rows([c("writer-a", "ROW 7016 on build 12701")], HEAD, W, None), "none")
+
+    def test_a_failed_row_is_no_row(self):
+        for body in ("ROW 7016 on build 12701: FAIL, the journal line", "ROW 7016 on build 12701: VOID (wrong kit)",
+                     "Fifth, 09:51 GMT+7: lamp row for #7016 on lamp-52e6: FAIL"):
+            self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "none", body)
+        for body in ("ROW 7016 on build 12701: PASS, the earlier FAIL was the kit", "ROW 7016: VOID then PASS on a rerun",
+                     "ROW 7016 on build 12701: no failure, fail-first test kept", "ROW 7016 " + "x" * 300 + " FAIL"):
+            self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "row", body)
+
+    def test_switch_on_needs_a_real_row(self):
+        ok = c("writer-a", "READ-OK %s\n\nSixth, 10:02: no row needed." % HEAD)
+        self.assertEqual(rows([ok], HEAD, W, "7016", switch_on=True), "none")
+        self.assertEqual(rows([ok, c("writer-b", "ROW 7016 on build 12701: PASS")], HEAD, W, "7016", switch_on=True), "row")
+
     def test_row_must_be_the_word_opening_the_comment(self):
         for body in ("ROWS for later", "row 7016 on build 12701", "Fifth: ROW 7016 on build 12701",
                      "Here is the line.\nROW 7016 on build 12701"):
@@ -106,6 +130,7 @@ class Writers(unittest.TestCase):
             self.assertEqual(cli("ROW 7016 on build 12701", HEAD), "row")
             self.assertEqual(cli("READ-OK %s no row needed" % EARLIER, HEAD, EARLIER), "no-row-needed")
             self.assertEqual(cli("READ-OK %s no row needed" % EARLIER, HEAD), "none")
+            self.assertEqual(cli("READ-OK %s no row needed" % HEAD, "--switch-on", HEAD), "none")
         finally:
             os.unlink(path)
 

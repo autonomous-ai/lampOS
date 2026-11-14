@@ -29,7 +29,10 @@ for p in "$@"; do
   two=$(cat $tmp/b $tmp/c | $PYTHON -I $TOOLS_DIR/reads2.py --always --writers $wf --queue $tmp/q --pr $p --pr-commits $tmp/commits $heads)
   [[ $two == none || $two == met* ]] || { echo "#$p: TWO READS ${two:-unread}"; exit 1; }
   # 14 Nov (the lead): its lamp row, as train-bot.sh asks it (rows.py): a ROW line or a reader's "no row needed" on this head.
-  rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf --pr $p $heads < $tmp/c)
+  # 14 Nov (the readers' P3s on #7034): a switch turned on needs a real row (rows.py --switch-on).
+  sw=$(coord_switch_on $head) || { echo "#$p: its diff can't be read for a switch turned on"; exit 1; }
+  so=(); [[ $sw == on ]] && so=(--switch-on)
+  rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf $so --pr $p $heads < $tmp/c)
   [[ $rw == row || $rw == no-row-needed ]] || { echo "#$p: no lamp row (rows.py: ${rw:-failed})"; exit 1; }
 done
 exit 0

@@ -65,6 +65,16 @@ coord_body() {
   gh pr view $1 -R $REPO --json body --jq '{login:"",body:.body,pr_body:true}' > $2.new 2>/dev/null && [[ -s $2.new ]] && mv $2.new $2
 }
 
+# coord_switch_on HEAD: prints "on" when the PR's own diff (from its merge base with origin/lamp-voice) adds a line
+# `Environment=LAMP_…=on` to a product unit (lampOS/deploy/product/, a .service or .conf file), else "off"; fails when
+# the diff can't be read (fail closed). 14 Nov (the readers' P3s on #7034): such a PR needs a real lamp row (rows.py
+# --switch-on), not a reader's "no row needed". A git pathspec's * crosses folders, so units in subfolders count too.
+coord_switch_on() {
+  local d
+  d=$(git diff --no-color --no-ext-diff -U0 origin/lamp-voice...$1 -- 'lampOS/deploy/product/*.service' 'lampOS/deploy/product/*.conf' 2>/dev/null) || return 1
+  if grep -qE '^\+Environment=LAMP_[A-Z0-9_]*=on([^A-Za-z0-9_]|$)' <<< "$d"; then print on; else print off; fi
+}
+
 # patch_of COMMIT: the commit's patch-id from its merge base with origin/lamp-voice. 31 Oct 04:0x (Fourth, 03:23): with
 # no context lines (-U0), so lamp-voice's own edits beside a hunk don't change the id; #4562 sat out trains 425-433 as
 # the same patch by range-diff.
