@@ -893,8 +893,9 @@ agent (`lamp_tasks::skill_make`).
   `generations` hay generation thì
   bỏ qua lock đó hoặc dừng lần tạo; mỗi lock hay `.leases` đã bind được
   kiểm tra lại sau khi mount, `stat -c %d:%i` trước khi bind so với của
-  đích bind sau đó, nên một liên kết bị tráo vào giữa hai bước sẽ được
-  unmount và dừng lần tạo theo cùng cách). Các dòng này mount bằng `mount -n`: chúng
+  đích bind sau đó, và một đích bind là liên kết cũng bị từ chối, nên
+  một liên kết bị tráo vào giữa hai bước sẽ được unmount và dừng lần
+  tạo theo cùng cách). Các dòng này mount bằng `mount -n`: chúng
   chạy sau khi `/run` đã chỉ đọc, nơi util-linux không ghi được utab. Nó để thư mục của Hermes và thư mục làm việc ở chế độ
   chỉ đọc, và che phần còn lại của `lamp` trong thư mục làm việc dưới một
   tmpfs khác, chỉ thư mục của lần tạo được đưa lại, đọc-ghi
