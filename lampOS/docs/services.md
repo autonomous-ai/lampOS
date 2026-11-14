@@ -2991,11 +2991,14 @@ reach. With `LAMP_SERVICES_TOLD=on` (passed to both routes' workers alone), on
 the second route a spoken line admitted as the owner's (`services::owner_of`) is told, beside its words, the services linked now by
 name, each once, and that the lamp uses them itself: "(For you to know, not
 to answer: the lamp's owner linked these services to you in the app's
-Connectors: Notion, Gmail. They are yours to use for the owner: read from
+Linked accounts: Notion, Gmail. They are yours to use for the owner: read from
 one with service_read, and send, post or create with service_write, when
 they ask. Asked about one, use it, or say plainly what you can do with it;
-never say it is the app's job or that you don't know it.)"
-(`services_told::note`). The names are what `lamp-services` last said on
+never say it is the app's job or that you don't know it. A service not in
+this list isn't linked to this lamp yet. It can be linked in the app: open
+this lamp, then Settings, then Linked accounts.)" (`services_told::note`,
+whose last sentence is `lamp-services`' own `NOT_LINKED`, so a service
+missing from the list is answered with where to link it, #5867). The names are what `lamp-services` last said on
 `services_connected` (its `name`, else its code; an expired link too, since
 a read renews it), asked off the line's path as each line begins
 (`services::Linked`, at most once a second, 500 ms at most) and after each
@@ -3020,7 +3023,8 @@ with `LAMP_PRIVATE_ROOM=on`: its session keeps what it was told, so with
 the private room off a guest later in the session would hear the names
 (#5598), and the Live route is told nothing there. It is told again when a
 link is made or removed, or in a fresh session; when everything it was told
-of is unlinked, it is told once that nothing is linked now
+of is unlinked, it is told once that nothing is linked now, and where a
+service is linked: open this lamp, then Settings, then Linked accounts
 (`services_told::UNLINKED_NOTE`). Every call from a line not the owner's is
 still refused (`OWNER_ONLY`).
 

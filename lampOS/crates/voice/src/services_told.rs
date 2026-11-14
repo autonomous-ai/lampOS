@@ -41,11 +41,16 @@ pub fn on_from_environment() -> bool {
     on(std::env::var(ENVIRONMENT).ok().as_deref())
 }
 
-/// What the model is told of `names`, the services linked now.
+/// What the model is told of `names`, the services linked now, and where
+/// one not among them is linked: the words `lamp-services` answers a call
+/// to an unlinked service with (`NOT_LINKED`, #6847). Without them the
+/// model, asked of a service missing from the list, never calls
+/// `service_read`, so never hears where to link it (#5867).
 pub fn note(names: &[String]) -> String {
     format!(
-        "(For you to know, not to answer: the lamp's owner linked these services to you in the app's Connectors: {}. They are yours to use for the owner: read from one with service_read, and send, post or create with service_write, when they ask. Asked about one, use it, or say plainly what you can do with it; never say it is the app's job or that you don't know it.)",
-        names.join(", ")
+        "(For you to know, not to answer: the lamp's owner linked these services to you in the app's Linked accounts: {}. They are yours to use for the owner: read from one with service_read, and send, post or create with service_write, when they ask. Asked about one, use it, or say plainly what you can do with it; never say it is the app's job or that you don't know it. A service not in this list {})",
+        names.join(", "),
+        lamp_services::serve::NOT_LINKED
     )
 }
 
@@ -58,8 +63,9 @@ pub fn note_for(owner: Option<&str>, names: &[String]) -> Option<String> {
 }
 
 /// What the Live route is told when everything it was told of in this
-/// session has since been unlinked (Jarvis's P3 on #5598).
-pub const UNLINKED_NOTE: &str = "(For you to know, not to answer: nothing is linked to you in the app's Connectors now. The services you were told of earlier in this conversation are no longer linked.)";
+/// session has since been unlinked (Jarvis's P3 on #5598), and where one is
+/// linked again, in `NOT_LINKED`'s words (#5867).
+pub const UNLINKED_NOTE: &str = "(For you to know, not to answer: nothing is linked to you in the app's Linked accounts now. The services you were told of earlier in this conversation are no longer linked. A service can be linked in the app: open this lamp, then Settings, then Linked accounts.)";
 
 /// What the Live route told of what is linked: once a session for each
 /// set of names, so a session is told again only when a link is made or
@@ -186,6 +192,29 @@ mod tests {
         live.told(1, Vec::new());
         assert_eq!(live.due(1, Some("owner"), &[], true), None);
         assert_eq!(live.due(2, Some("owner"), &[], true), None);
+    }
+
+    /// #5867: asked of a service not in the list, the model never calls
+    /// `service_read`, so the told note and [`UNLINKED_NOTE`] say where one
+    /// is linked themselves, in the words `lamp-services` uses
+    /// (`NOT_LINKED`), and never the old Connectors section.
+    #[test]
+    fn the_told_notes_say_where_a_service_is_linked() {
+        let not_linked = lamp_services::serve::NOT_LINKED;
+        let (_, path) = not_linked
+            .split_once("in the app: ")
+            .expect("NOT_LINKED says where in the app");
+        assert_eq!(path, "open this lamp, then Settings, then Linked accounts.");
+        let told = note(&names(&["Gmail"]));
+        assert!(
+            told.ends_with(&format!("A service not in this list {not_linked})")),
+            "{told}"
+        );
+        assert!(UNLINKED_NOTE.contains(&format!("in the app: {path}")));
+        for told in [told.as_str(), UNLINKED_NOTE] {
+            assert!(told.starts_with("(For you to know, not to answer: "));
+            assert!(!told.contains("Connectors"), "{told}");
+        }
     }
 
     #[test]
