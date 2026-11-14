@@ -1026,7 +1026,7 @@ async fn session(
                     format!(
                         "online on the broker {}:{}",
                         account.mqtt_endpoint.trim(),
-                        account.mqtt_port
+                        port_for(account.mqtt_port, tls_on())
                     ),
                 );
             }
