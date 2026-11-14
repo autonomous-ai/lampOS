@@ -1420,6 +1420,12 @@ pub fn stop_and_wait_keeping(
     {
         again.push("lamp-update.service".into());
     }
+    again.extend(
+        listed_writers
+            .iter()
+            .filter(|(unit, active)| *active && agent_manager(unit))
+            .map(|(unit, _)| unit.clone()),
+    );
     if listed_writers.iter().any(|(unit, _)| unit == SETUP_UNIT) {
         again.push(SETUP_UNIT.into());
     } else {
@@ -1509,10 +1515,11 @@ pub const STARTERS: [&str; 8] = [
 /// (`lamp_update::openclaw_install::UNIT`, #6226), always on under
 /// `multi-user.target` and writing its state as it runs: stopped before
 /// [`forget_agents`] empties that state (#6343), started again by the
-/// lamp's next boot or the updater's next round. Patterns name only loaded
-/// units, and none matches
-/// `lamp-setup-wipe.service`, the reset's own unit.
-pub const WRITERS: [&str; 12] = [
+/// lamp's next boot or the updater's next round. And the lingering service
+/// user's own manager ([`AGENT_MANAGERS`]), which runs Harness's daemon and
+/// the agents it launched. Patterns name only loaded units, and none
+/// matches `lamp-setup-wipe.service`, the reset's own unit.
+pub const WRITERS: [&str; 13] = [
     "lamp-setup.service",
     "lamp-setup-recover.service",
     "lamp-setup-change@*.service",
@@ -1525,7 +1532,27 @@ pub const WRITERS: [&str; 12] = [
     "lamp-setup-wifi-restore.service",
     "lamp-peek.service",
     OPENCLAW_GATEWAY,
+    AGENT_MANAGERS,
 ];
+
+/// The users' own systemd managers, `user@<uid>.service`: on a product lamp
+/// the lingering `lampos`'s (`lamp_update::install::harness_at_boot_with`),
+/// outside `lampos.target`, which runs Harness's daemon (`harnessd.service`)
+/// and the panes it launched, the lamp's own Hermes among them (#6343,
+/// lamp-c0a4, 13 and 14 Nov: a reset in place left the old daemon running
+/// with the last owner's connection and computer id, so `harness start`
+/// failed until a reboot, and the old Hermes kept writing its state). Its
+/// uid is the lamp's own, so it is named by pattern. Stopped with the lamp,
+/// before the wipe, and one that was running is started again in place, as
+/// a boot starts it, so the daemon starts fresh on the wiped folders.
+pub const AGENT_MANAGERS: &str = "user@*.service";
+
+/// Whether `unit` is one of [`AGENT_MANAGERS`].
+fn agent_manager(unit: &str) -> bool {
+    unit.strip_prefix("user@")
+        .and_then(|rest| rest.strip_suffix(".service"))
+        .is_some_and(|uid| !uid.is_empty())
+}
 
 /// OpenClaw's gateway unit (`lamp_update::openclaw_install::UNIT`).
 pub const OPENCLAW_GATEWAY: &str = "lamp-openclaw-gateway.service";
@@ -1779,16 +1806,30 @@ fn reboot(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) {
 /// under `multi-user.target`, not ordered against setup, and writes its
 /// state as it runs: it is stopped first, when loaded and the plan's stop
 /// is systemd's, as the reset itself stops it ([`WRITERS`]), so it never
-/// writes into what [`forget_agents`] empties (#6343). A stop that fails
-/// fails the start, and nothing is wiped. Returns the steps taken, empty
+/// writes into what [`forget_agents`] empties (#6343). So is the lingering
+/// user's manager ([`AGENT_MANAGERS`]), which a boot starts with Harness's
+/// daemon signed in as the last owner; one that was running is started
+/// again after the wipe, so the daemon starts fresh. A stop that fails
+/// fails the start, and nothing is wiped; a start again that fails is said
+/// and the start goes on, the wipe done. Returns the steps taken, empty
 /// when there was no reset.
 pub fn resume(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> {
     plan.check().map_err(io::Error::other)?;
     let mut steps = Vec::new();
     match fs::symlink_metadata(&plan.journal) {
         Ok(_) => {
-            stop_gateway(plan, effects)?;
+            let again = stop_agents(plan, effects)?;
             finish(plan, effects, &mut steps)?;
+            if !again.is_empty() {
+                let mut argv = vec![plan.stop[0].clone(), "start".into()];
+                argv.extend(again);
+                if let Err(error) = effects.run(&argv) {
+                    eprintln!(
+                        "lamp-setup: resume-reset: not started again ({error}): {}",
+                        argv[2..].join(" ")
+                    );
+                }
+            }
         }
         Err(error) if error.kind() == io::ErrorKind::NotFound => {}
         Err(error) => return Err(error),
@@ -1796,18 +1837,25 @@ pub fn resume(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> 
     Ok(steps)
 }
 
-/// OpenClaw's gateway stopped before a resumed reset, when loaded and the
-/// plan stops by `systemctl`.
-fn stop_gateway(plan: &Plan, effects: &mut impl Effects) -> io::Result<()> {
+/// OpenClaw's gateway and the users' managers stopped before a resumed
+/// reset, those loaded, when the plan stops by `systemctl`; the managers
+/// that were running, to start again after it.
+fn stop_agents(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<String>> {
     let systemctl = &plan.stop[0];
     if Path::new(systemctl).file_name() != Some("systemctl".as_ref()) {
-        return Ok(());
+        return Ok(Vec::new());
     }
-    let loaded = listed(systemctl, &[OPENCLAW_GATEWAY], effects)?;
-    if loaded.iter().any(|(unit, _)| unit == OPENCLAW_GATEWAY) {
-        effects.run(&[systemctl.clone(), "stop".into(), OPENCLAW_GATEWAY.into()])?;
+    let loaded = listed(systemctl, &[OPENCLAW_GATEWAY, AGENT_MANAGERS], effects)?;
+    if !loaded.is_empty() {
+        let mut argv = vec![systemctl.clone(), "stop".into()];
+        argv.extend(loaded.iter().map(|(unit, _)| unit.clone()));
+        effects.run(&argv)?;
     }
-    Ok(())
+    Ok(loaded
+        .into_iter()
+        .filter(|(unit, active)| *active && agent_manager(unit))
+        .map(|(unit, _)| unit)
+        .collect())
 }
 
 fn finish(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) -> io::Result<()> {
