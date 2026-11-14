@@ -14874,7 +14874,12 @@ fn play_exact_line(
     }
     // A skill's step's line (#5999) also waits for the quiet its priority
     // bought it as a say; a computer's or the unplug's does not.
-    let decided = crate::say::may_play_exact_after(now_is, says.exact_quiet_us());
+    // The unplug's lines answer the conversation they are in (#6899).
+    let gate = crate::say::SoundNow {
+        conversing: now_is.conversing && !says.exact_answers(),
+        ..*now_is
+    };
+    let decided = crate::say::may_play_exact_after(&gate, says.exact_quiet_us());
     match decided {
         crate::say::ExactNow::Wait(_) => return Ok(None),
         crate::say::ExactNow::Refuse(why) => {
