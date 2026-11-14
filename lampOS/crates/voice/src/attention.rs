@@ -2708,6 +2708,22 @@ impl Attention {
         name_said_to(heard, &self.alone_ins(), true) || self.one_counts && opens_with_one(heard)
     }
 
+    /// Whether `heard`, the final words of `request`, name the lamp as this
+    /// rule reads its name for the request it last judged: "Lamp" or
+    /// "Lamb" as a whole word anywhere, a word written for it at the
+    /// start, or the name as the owner's language writes it ([`called`]);
+    /// or a call by name as [`Self::called_by_name_here`] reads it, with the
+    /// request's own state: the stand-alone words on the second route,
+    /// and with [`Self::count_one_as_the_lamp`] "One," outside a busy room
+    /// ([`opens_with_one`]) and "Wang," or "Lung," with their sign. For the
+    /// second route's near-name at the night's rest
+    /// (`LAMP_REST_NAME_IN_WORDS`, #5226). A request other than the one in
+    /// hand (a newer one judged since) counts as named: its answer goes
+    /// out, as it would without the switch.
+    pub fn names_the_lamp(&self, request: u64, heard: &str) -> bool {
+        request != self.request || called(heard) || self.called_by_name_here(heard)
+    }
+
     /// With [`Self::count_one_as_the_lamp`], whether the request in hand
     /// mostly repeats the line it would be a reply to ([`retries`]).
     fn retries_the_held_line(&self) -> bool {

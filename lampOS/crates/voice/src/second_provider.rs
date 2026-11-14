@@ -1531,6 +1531,9 @@ pub type NameSounded = Arc<dyn Fn(u64) -> bool + Send + Sync>;
 /// Whether lamp-name heard the name in a request's line, by its request
 /// ([`Engine::knowing_the_name_fired`]).
 pub type NameFired = Arc<dyn Fn(u64) -> bool + Send + Sync>;
+/// Whether a request's final words name the lamp, as the rule that judged
+/// it reads the name ([`Engine::resting_with_the_name_in_words`]).
+pub type NamesTheLamp = Arc<dyn Fn(u64, &str) -> bool + Send + Sync>;
 /// The note a spoken request gets on whether it called the lamp by name
 /// ([`Engine::noting_whether_called`]): with its request and words.
 pub type CallNote = Arc<dyn Fn(u64, &str) -> Option<&'static str> + Send + Sync>;
@@ -1918,6 +1921,11 @@ struct Shared {
     /// (`LAMP_REST_THROUGH_SOUNDS=on`, [`Engine::resting_through_sounds`]):
     /// its answer to its name alone is then held back.
     night_rest: Option<NightRest>,
+    /// A line let out at the night's rest with the lamp's name heard in its
+    /// sound but not in its words is held as a near-name
+    /// (`LAMP_REST_NAME_IN_WORDS=on`, [`Engine::resting_with_the_name_in_words`]),
+    /// its words read by the rule's own reading of the name.
+    rest_name_in_words: Option<NamesTheLamp>,
     /// That line, while its answer waits ([`NameWait`]).
     name_waits: Mutex<Option<NameWait>>,
     /// The name whose words wait as words cut short because the line after
@@ -4202,6 +4210,15 @@ pub const RESTING_THROUGH_SOUNDS: &str = "resting_through_sounds";
 /// sleep ([`Engine::resting_through_sounds`]).
 const NIGHT_REST_HELD: &str = "only the lamp's name, and the lamp asleep for the night: it stirs and is not woken by its own answer (LAMP_REST_THROUGH_SOUNDS)";
 
+/// Where the second worker reads whether a name heard in a line's sound at
+/// the night's rest must also be in its words to be answered (`on`, #5226).
+pub const REST_NAME_IN_WORDS_ENVIRONMENT: &str = "LAMP_REST_NAME_IN_WORDS";
+
+/// Why a line is held back at the night's rest when `lamp-name` heard the
+/// name in its sound but its final words have none
+/// ([`Engine::resting_with_the_name_in_words`]).
+const NEAR_NAME_AT_REST_HELD: &str = "the lamp's name heard in its sound but not in its words, and the lamp asleep for the night: a near-name, it stirs at most and is not woken by its own answer (LAMP_REST_NAME_IN_WORDS)";
+
 /// Whether Expression's state says the night's sleep rests through sounds:
 /// from Expression, not expired, valid, and naming
 /// [`RESTING_THROUGH_SOUNDS`]. Anything else, as with no state at all, is
@@ -4603,6 +4620,7 @@ impl Engine {
                 pause_cut: Mutex::new(None),
                 name_carries: false,
                 night_rest: None,
+                rest_name_in_words: None,
                 name_waits: Mutex::new(None),
                 name_refused: Mutex::new(None),
                 one_speaker: None,
@@ -5444,6 +5462,26 @@ impl Engine {
     pub fn resting_through_sounds(mut self, night: NightRest) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.night_rest = Some(night);
+        }
+        self
+    }
+
+    /// With `LAMP_REST_NAME_IN_WORDS=on` (#5226), and only with
+    /// [`Self::resting_through_sounds`]: while the lamp rests through
+    /// sounds, a line `lamp-name` heard the name in is answered only when
+    /// its final words name the lamp too, as `names` reads them: the rule's
+    /// own reading ([`crate::attention::Attention::names_the_lamp`]), so
+    /// "One," with `LAMP_ONE_AS_LAMP` counts here as it counts there. A
+    /// longer word is not the name: "lamppost" and "lamps" are not. Without the
+    /// name in them, it is a near-name: held back, so the name's hearing
+    /// stirs the lamp at most and its answer never wakes it. On night 7
+    /// (#5226, row T), `lamp-name` scored room talk with nobody saying the
+    /// name 0.994 ("…since August. Right. The pump. The front tire has
+    /// been flat…"), and the lamp answered the room for about 50 s. Before
+    /// any turn only.
+    pub fn resting_with_the_name_in_words(mut self, names: NamesTheLamp) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.rest_name_in_words = Some(names);
         }
         self
     }
@@ -9657,6 +9695,26 @@ async fn spoken(
         && shared.night_rest.as_ref().is_some_and(|night| night())
     {
         heeded = Some(NIGHT_REST_HELD);
+    }
+    // A line let out because `lamp-name` heard the name in its sound, while
+    // the lamp rests through sounds, with no name in its final words
+    // (`LAMP_REST_NAME_IN_WORDS`, #5226): a near-name, held back as the
+    // name alone is, so it stirs the lamp at most and never wakes it. The
+    // words here are the final ones the rule just judged, so this adds no
+    // wait. A line said by the name before it carries that name in its words.
+    if heeded.is_none()
+        && !echoed
+        && !held
+        && !empty
+        && let Some(names) = shared.rest_name_in_words.as_ref()
+        && shared
+            .name_fired
+            .as_ref()
+            .is_some_and(|fired| fired(request))
+        && !names(request, &text)
+        && shared.night_rest.as_ref().is_some_and(|night| night())
+    {
+        heeded = Some(NEAR_NAME_AT_REST_HELD);
     }
     // A held echo's journal line, with its counts, is said above.
     if let Some(why) = heeded.filter(|_| !echoed) {

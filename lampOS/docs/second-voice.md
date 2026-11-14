@@ -1707,6 +1707,22 @@ order is kept. A written turn is the same from the chat on.
     `name_carries.rs`
     `asleep_for_the_night_a_held_name_carries_for_the_stirs_hold` and
     `a_held_names_window_is_the_stirs_hold`.
+    With `LAMP_REST_NAME_IN_WORDS=on` too (#5226, row T: on night 7
+    lamp-name scored room talk 0.994 with nobody saying the name, and the
+    lamp answered the room for about 50 s), a line lamp-name heard the
+    name in and the rule let out, asleep for the night, is answered only
+    when its final words name the lamp as the rule read the name when it
+    judged the line (`Attention::names_the_lamp`: "Lamp" or "Lamb" as a
+    whole word anywhere, a word written for it at the start or set off, or
+    the name as the owner's language writes it; under `LAMP_ONE_AS_LAMP`,
+    "One," opening a request outside a busy room and "Wang,"/"Lung," with
+    their sign, as the rule counts them; not "lamppost"). With no name in
+    them it is a near-name, held back as the name alone is, so it stirs at
+    most. The words are the final ones the rule has just judged, so this
+    adds no wait. The switch is read, and said in the journal, only where
+    `LAMP_REST_THROUGH_SOUNDS` has a bus to read the rest from. Test:
+    `name_carries.rs`
+    `asleep_for_the_night_a_name_heard_with_none_in_the_words_is_held_back`.
   - **A line begun in that wait is said by the name, only when one person
     said both** (El's P1s on the branch, 22 Oct). Its Start takes the wait
     (`Engine::name_said_before`); `begin` drops the name's request. The
