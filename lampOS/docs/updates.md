@@ -1648,7 +1648,13 @@ build could carry it units or settings.
    `/proc/self/exe` is `update/current`'s binary (`own::reexec`, both
    resolved; a binary whose build folder was cleaned away since it started
    is read as the link's own text, `… (deleted)`, so it is another build's
-   too). When it is another build's and no `self.json` waits, it
+   too). Only a build's own binary goes: one run from anywhere but
+   `/opt/lampOS/update/<sha256>/lamp-update`, such as a test binary a
+   drop-in's `ExecStart` names, serves on as it is, saying once `this
+   program (<path>) is no build's under /opt/lampOS/update/: it serves on,
+   not /opt/lampOS/update/current's`. The product unit runs
+   `/opt/lampOS/update/current/lamp-update`, so a lamp always runs a
+   build's. When it is another build's and no `self.json` waits, it
    `exec`s that binary in its own place, with the same options and
    `LAMP_UPDATE_REEXECED=<sha256>`, saying `this program is not
    /opt/lampOS/update/current's build B: it starts that one in its place`.
@@ -1656,7 +1662,9 @@ build could carry it units or settings.
    A binary started so that still is not `update/current`'s never goes
    again for that build (`… still runs another build than … after starting
    it in its place: it serves on`). An `exec` that fails is said, and this
-   build serves on.
+   build serves on. It goes with `--apply off` too: it only follows a link
+   another lamp-update already switched and confirmed, and applies nothing
+   itself.
 3. **Back.** `lamp-update-back` is a copy of the installed build's
    `lamp-update` at `/usr/local/lib/lampos/lamp-update-back`. It is outside
    `lamp-update.service`'s `ReadWritePaths`, so no round writes it itself.
