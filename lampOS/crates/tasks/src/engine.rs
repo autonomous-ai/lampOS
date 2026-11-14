@@ -1359,7 +1359,9 @@ pub struct Engine<P: Persistence> {
     /// The lamp's default engine (#6492, [`crate::runtime::lamp_default`]),
     /// while it is in [`Self::lamp_order`]: work for the lamp naming no
     /// engine runs on it, and the targets answer says it. None: the
-    /// targets file's engine.
+    /// targets file's engine, only while the lamp has no engine of its own
+    /// (#7019: [`crate::runtime::lamp_default`] is the build's order's
+    /// first before a look, never the file's).
     lamp_default: Option<EngineKind>,
 }
 impl<P: Persistence> Engine<P> {

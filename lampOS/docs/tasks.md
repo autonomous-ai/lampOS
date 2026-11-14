@@ -2191,6 +2191,11 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     Harness's order (`lamp_order`): the owner's choice in the app when it is
     among them, else `LAMP_LAMP_ENGINE`'s (any engine's name), else the
     build's (`lamp_engines`' first switched on), else the first of them.
+    The default is the same before any look (`lamp_default`, #7019): after
+    a start, while the first look is not back (about 30 s) or when it times
+    out, work naming no engine runs on it (Hermes first, by the build's
+    order), never on the `lamp` target's engine left in the targets file;
+    that engine is used only while the lamp has no engine of its own.
     The `targets` answer's `lamp` entry says the default as its `engine`
     and lists them all, default first:
     `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
@@ -2223,13 +2228,27 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     missing, not valid, or naming an engine Harness starts with no task is
     no choice. A choice no longer among the lamp's engines (Harness no
     longer reports it, or its switch is off) is passed over, not wiped.
-    The lamp's reset wipes it with the tasks folder. Shown in tests:
+    The lamp's reset wipes it with the tasks folder. When the app's choice
+    goes (#7019), the `lamp` target's `engine` in the targets file is
+    written as the lamp's default at once (`runtime::lamp_target_to_default`),
+    not left until the next machines' look: at start when no choice is kept
+    (no file, or one not valid), and while running when the file is removed
+    (at each look at the targets, at least every 60 s: `runtime::app_choice_dropped`,
+    only a file not found, so a read error keeps the choice). Only a
+    targets file this part wrote from the machines (its mark beside it) is
+    written, the mark first as there; one written by hand or a pairing, the
+    other targets and the lamp target's machine are left as they are. One
+    journal line: `no app choice: the lamp's target written on its default
+    engine, hermes`. Shown in tests:
     `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
     `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
     `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
+    `engine::tests::with_no_app_choice_and_no_look_yet_the_builds_default_wins_over_the_targets_file`,
     `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default`,
     `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
     `runtime::tests::the_lamps_engines_are_harness_s_the_default_first_then_harness_s_order`,
+    `runtime::tests::a_first_look_that_times_out_leaves_the_builds_default_hermes`,
+    `runtime::tests::when_the_apps_choice_goes_the_lamp_targets_engine_is_rewritten_to_the_default`,
     `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
     `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
     `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.
@@ -2775,7 +2794,7 @@ for each run, and is answered once the run ends
     reads). One way to run a skill for every agent in the lamp's Harness:
     no per-agent code and no engine name in the run path. lamp-tasks reads
     the lamp's default engine at each run (`runtime::lamp_default`, the
-    app's choice first; before Harness has said, the lamp target's engine)
+    app's choice first; before Harness has said, the build's order, #7019)
     and makes one check for whichever it is
     (`skill_task::default_agent_takes_runs`):
     - an agent in its maker's cloud (`EngineKind::cloud`, Devin Cloud) never
