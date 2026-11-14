@@ -45,6 +45,10 @@ Environment=LAMP_AGENT_SERVICES=on
 # content sent once through lamp-services' service_write. The same line in lamp-skills, lamp-control and
 # lamp-services. On in the product (owner, 13 Nov).
 Environment=LAMP_SKILL_WRITE_AGENT=on
+# The one run path (#6685, docs/tasks.md "The lamp's default agent, by the one run path"): a skill's run goes to the
+# lamp's default agent when its wrapper is lamp-update's one run path for it, else it is refused in words; set alike in
+# lamp-update (its unit and /etc/lampOS/update.env), and only with LAMP_SKILL_TASKS on. On in the product (13 Nov).
+Environment=LAMP_SKILL_DEFAULT_AGENT=on
 # The same for the lamp's own OpenClaw (#6226; no memory floor, every lamp has 6 GB): with both installed the
 # lamp's target is Hermes, the default again (#6498, the lead's decision); LAMP_LAMP_ENGINE=openclaw picks
 # OpenClaw, and either falls back to the other when it is not installed. Its Gateway runs always under
