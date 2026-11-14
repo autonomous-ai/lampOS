@@ -595,6 +595,9 @@ pub enum Reexec {
     /// Started in its place once already for `build` and still not it:
     /// not again.
     Looped(String),
+    /// This program is no build's binary (not `<FOLDER>/<build>/<BINARY>`),
+    /// such as a test binary a drop-in names: it serves on as it is.
+    Outside(PathBuf),
 }
 
 /// Compares the binary this process runs (`self_exe`, [`SELF_EXE`] on the
@@ -621,6 +624,12 @@ pub fn reexec(root: &Path, self_exe: &Path, records: &Path, marker: Option<&str>
     else {
         return Reexec::Same;
     };
+    // Only a build's own binary goes: one run from anywhere else (a test
+    // binary a drop-in's `ExecStart` names) serves on, so a row of it runs
+    // its own code.
+    if !is_builds_binary(root, &running) {
+        return Reexec::Outside(running);
+    }
     // Mid-switch (phase 1 done, phase 2 not): the process that switched
     // runs its phases; this one goes only to a confirmed link.
     if !matches!(waiting(records), Ok(None)) {
@@ -633,6 +642,23 @@ pub fn reexec(root: &Path, self_exe: &Path, records: &Path, marker: Option<&str>
         program: wanted,
         build,
     }
+}
+
+/// Whether `running` (resolved, or read as `<path> (deleted)` once removed)
+/// is a build's binary: `<FOLDER>/<build>/<BINARY>` under `root`.
+fn is_builds_binary(root: &Path, running: &Path) -> bool {
+    let text = running.to_string_lossy();
+    let path = Path::new(text.strip_suffix(" (deleted)").unwrap_or(&text));
+    let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else {
+        return false;
+    };
+    let (Some(builds), Some(build)) = (folder.parent(), folder.file_name()) else {
+        return false;
+    };
+    let resolved = |p: &Path| p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+    name == BINARY
+        && is_build(&build.to_string_lossy())
+        && resolved(builds) == resolved(&on_root(root, FOLDER))
 }
 
 #[cfg(test)]
@@ -724,6 +750,47 @@ mod tests {
         fs::write(other.join(BINARY), "x").unwrap();
         std::os::unix::fs::symlink("not-a-build", &link).unwrap();
         assert_eq!(reexec(root.path(), &exe, &records, None), Reexec::Same);
+    }
+
+    #[test]
+    fn a_binary_run_from_outside_the_builds_serves_on() {
+        // A drop-in's `ExecStart` names a test binary: it runs its own code.
+        let (root, exe, records) = lamp(B, A);
+        let test_bin = root.path().join("opt/test/lamp-update");
+        fs::create_dir_all(test_bin.parent().unwrap()).unwrap();
+        fs::write(&test_bin, "test").unwrap();
+        fs::remove_file(&exe).unwrap();
+        std::os::unix::fs::symlink(&test_bin, &exe).unwrap();
+        assert!(matches!(
+            reexec(root.path(), &exe, &records, None),
+            Reexec::Outside(_)
+        ));
+        // Under a folder named like a build but outside the builds' folder.
+        let fake = root.path().join("opt/test").join(A).join(BINARY);
+        fs::create_dir_all(fake.parent().unwrap()).unwrap();
+        fs::write(&fake, "test").unwrap();
+        fs::remove_file(&exe).unwrap();
+        std::os::unix::fs::symlink(&fake, &exe).unwrap();
+        assert!(matches!(
+            reexec(root.path(), &exe, &records, None),
+            Reexec::Outside(_)
+        ));
+    }
+
+    #[test]
+    fn a_removed_build_s_binary_read_as_deleted_still_goes() {
+        let root = tempfile::tempdir().unwrap();
+        let deleted = format!(
+            "{} (deleted)",
+            on_root(root.path(), FOLDER).join(A).join(BINARY).display()
+        );
+        fs::create_dir_all(on_root(root.path(), FOLDER)).unwrap();
+        assert!(is_builds_binary(root.path(), Path::new(&deleted)));
+        let elsewhere = format!(
+            "{} (deleted)",
+            root.path().join("tmp/lamp-update").display()
+        );
+        assert!(!is_builds_binary(root.path(), Path::new(&elsewhere)));
     }
 
     #[test]
