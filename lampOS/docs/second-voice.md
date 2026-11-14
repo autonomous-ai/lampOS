@@ -2349,6 +2349,14 @@ order is kept. A written turn is the same from the chat on.
     second of the lamp's own arrival move was answered as the name, and the
     one "Yes." after it found the mail dropped. Test:
     `a_wordless_call_between_a_read_back_and_its_yes_keeps_the_write`.
+  - So too a line that is only the lamp's name, with words ("Hey Lamp"):
+    answered as a call, with or without `LAMP_SECOND_NAME_CARRIES`, its
+    answer is no answer to a waiting write's read-back
+    (`services::answered_in_place`), unless said by the name just before,
+    so the yes after it still sends. On lamp-9adf on 14 Nov "Hey Lamp"
+    between an event's read-back and its "Yes." was answered as a call, and
+    the yes found the event dropped (#6363). Test:
+    `a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write`.
 - **In a busy room, a line going on waits for the Policy**
   (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
   4): a line the rule would let out only as a conversation going on, and

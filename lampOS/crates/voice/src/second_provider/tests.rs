@@ -14677,6 +14677,79 @@ async fn a_wordless_call_between_a_read_back_and_its_yes_keeps_the_write() {
     assert_eq!(refused["error"], NOTHING_WAITING);
 }
 
+/// #6363, lamp-9adf on 14 Nov (build 12958): an event read back, then "Hey
+/// Lamp", only the lamp's name, waited for the line after it, was answered
+/// as a call, and the one "Yes." after it found the event dropped ("the
+/// lamp answered request 14 after its read-back with no send"). A line that
+/// is only the name, with or without its carry and the coordinator's mark,
+/// is answered as a call, and its answer is no other request: the yes after
+/// it sends. A worded line begun with the name and answered with no send
+/// still drops the write.
+#[tokio::test(start_paused = true)]
+async fn a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write() {
+    use crate::services::{NOTHING_WAITING, Pending, Turn, WRITE};
+    let now = std::time::Instant::now();
+    let waiting = || Pending {
+        began_clear: true,
+        service: "google_calendar".to_owned(),
+        ..Pending::new("s1", 0, now, "Add the dentist.", "ann")
+    };
+    let yes = Turn {
+        heard: true,
+        owner: Some("ann"),
+        sends: true,
+        seen_owner: true,
+        ..Turn::default()
+    };
+    let send = lamp_gemini::ToolCall {
+        id: "c1".to_owned(),
+        name: WRITE.to_owned(),
+        args: json!({"service": "google_calendar", "send_id": "s1"}),
+    };
+    let sends = |said: &str| {
+        crate::services::lamp_said(1, said, now);
+        let mut pending = crate::services::pending_for_test_take();
+        crate::services::gate(&mut pending, &send, 2, &yes, now)
+    };
+    // As `asked_with`, with the name's carry, whose wait runs past `turn`'s.
+    let asked = |words: &'static str, carries: bool, marked: bool| async move {
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(words.to_owned())].into()),
+            chats: Mutex::new([vec![text("Yes?"), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (engine, _, _) = scripted(script.clone());
+        let mut engine = engine.carrying_the_name(carries);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        if marked {
+            engine.submit(ProviderInput::Called {
+                request: 1,
+                privacy_generation: 1,
+            });
+        }
+        engine.submit(end(1));
+        turn_within(&mut engine, Duration::from_secs(5)).await;
+        script.asked.lock().unwrap().clone()
+    };
+    let called = Message::system(crate::provider_worker::CALLED_NOTE);
+    for (words, carries, marked) in [
+        ("Hey Lamp", true, true),
+        ("Hey Lamp", true, false),
+        ("Lamp", false, true),
+    ] {
+        crate::services::pending_for_test(Some(waiting()));
+        let asked = asked(words, carries, marked).await;
+        assert!(asked[0].contains(&called), "{words}: {:?}", asked[0]);
+        assert!(sends("Yes?").is_ok(), "{words}: the yes after a call sends");
+    }
+    crate::services::pending_for_test(Some(waiting()));
+    let asked = asked("Hey Lamp, what time is it?", true, false).await;
+    assert!(!asked[0].contains(&called), "{:?}", asked[0]);
+    let refused = sends("It's three.").unwrap_err();
+    assert_eq!(refused["error"], NOTHING_WAITING);
+}
+
 /// A line marked as only the lamp's name (`Called`) whose words came back
 /// as a whole line is asked as it is, without the call's note (lamp-4ace,
 /// 25 Oct: "Nice. And what was my sister's name again?" was told it was only

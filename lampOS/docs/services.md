@@ -1579,8 +1579,16 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   write waits for its answer: not answered as a call"): on a tester's lamp
   on 13 Nov a line of no words at the second of the lamp's own arrival move
   was answered as the name, and the one "Yes." after it found the mail
-  dropped (#6363). A line with words of its own answered in a held line's
-  place (a real question cut short) still counts as another request (the
+  dropped (#6363). So too a line that is only the lamp's name ("Hey
+  Lamp", told to the model as only the name and answered as a call, with or
+  without `LAMP_SECOND_NAME_CARRIES`), unless said by the name just before:
+  it is answered, and the yes after it still sends. On a tester's lamp on
+  14 Nov "Hey Lamp" between an event's read-back and its "Yes." was
+  answered as a call, and the yes found the event dropped (#6363). Test:
+  `a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write`. A
+  line with words of its own answered in a held line's place (a real
+  question cut short), or begun with the name and answered with no send
+  ("Hey Lamp, what time is it?"), still counts as another request (the
   Reviewer-lead's P3 on #6367).
 - **The lamp's own echo is no line of the person's** (#5846). A line the
   second route holds as the lamp's own words heard back (`own_echo`,

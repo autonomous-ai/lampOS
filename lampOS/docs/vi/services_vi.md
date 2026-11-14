@@ -1659,9 +1659,18 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   as a call"): trên đèn của một người thử ngày 13/11, một câu không có từ
   nào vào đúng giây của động tác chào khi có người đến của chính đèn đã được
   trả lời như tên, và câu "Yes." duy nhất sau đó thấy thư đã bị bỏ (#6363).
-  Một câu có lời riêng được trả lời thay cho một câu bị giữ (một câu hỏi thật
-  bị cắt ngang) vẫn tính là một yêu cầu khác (P3 của Reviewer-lead trên
-  #6367).
+  Một câu chỉ có tên của đèn ("Hey Lamp", được báo cho mô hình là chỉ có tên
+  và được trả lời như một lời gọi, có hay không có
+  `LAMP_SECOND_NAME_CARRIES`) cũng vậy, trừ khi nó được nói bởi cái tên ngay
+  trước đó: nó được trả lời, và câu đồng ý sau nó vẫn gửi. Trên đèn của một
+  người thử ngày 14/11, câu "Hey Lamp" giữa phần đọc lại một sự kiện và câu
+  "Yes." của nó đã được trả lời như một lời gọi, và câu đồng ý thấy sự kiện
+  đã bị bỏ (#6363). Kiểm thử:
+  `a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write`. Một
+  câu có lời riêng được trả lời thay cho một câu bị giữ (một câu hỏi thật bị
+  cắt ngang), hoặc bắt đầu bằng tên và được trả lời mà không gửi ("Hey Lamp,
+  what time is it?"), vẫn tính là một yêu cầu khác (P3 của Reviewer-lead
+  trên #6367).
 - **Tiếng vọng của chính đèn không phải câu của người nói** (#5846). Một câu
   mà tuyến thứ hai giữ lại là lời của chính đèn vọng lại (`own_echo`,
   `Echo::Held`) được báo qua thread (`Thread::own_echo_held` →

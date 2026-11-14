@@ -9291,11 +9291,15 @@ async fn spoken(
         eprintln!("lamp-voice second: request {request}: no name came after it: answered as it is");
     }
     let empty = text.trim().is_empty();
-    // A line of no words, even one asked as the name ("Lamp."): the lamp's
-    // answer to it is no answer of a new request's to a waiting write's
-    // read-back (`services::answered_in_place`). Not one said by the name
-    // just before, whose words go with it.
-    if empty || (heard_none && name_of.is_none()) {
+    // A line of no words, even one asked as the name ("Lamp."), or one that
+    // was only the lamp's name (`called`, as the model is told below:
+    // "Hey Lamp"): the lamp's answer to it is no answer of a new request's
+    // to a waiting write's read-back (`services::answered_in_place`), so
+    // the yes after it still sends (lamp-9adf, 14 Nov: "Hey Lamp" between
+    // an event's read-back and its "Yes." was answered as a call, and the
+    // yes found the event dropped, #6363). Not one said by the name just
+    // before, whose words go with it.
+    if empty || ((heard_none || called) && name_of.is_none()) {
         crate::services::answered_in_place(request);
     }
     // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it
