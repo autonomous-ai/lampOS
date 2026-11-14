@@ -229,16 +229,17 @@ lamp-setup reset-now`). That unit, in this order:
    monitor, #5883), which a reboot kept off by
    its setup condition and which would otherwise keep port 80 from setup's
    page after a start in place (#4574; not started again until the next
-   boot), and the users' own systemd managers (`user@*.service`,
-   `reset::AGENT_MANAGERS`): on a product lamp the lingering `lampos`'s,
-   which runs Harness's daemon (`harnessd.service`) and the panes it
-   launched, the lamp's own Hermes among them. On lamp-c0a4 on 13 and 14 Nov
+   boot), and `lampos`'s own systemd manager, `user@<uid>.service`, its uid
+   read from `/etc/passwd` at the reset (`reset::agent_manager_unit`; no
+   other user's manager is named, and a lamp without `lampos` stops none
+   and says so): on a product lamp it lingers, and it runs Harness's
+   daemon (`harnessd.service`) and the panes it launched, the lamp's own Hermes among them. On lamp-c0a4 on 13 and 14 Nov
    a reset in place left both running: the old daemon kept the last
    owner's connection and computer id, so `harness start` failed until a
-   reboot, and the old Hermes kept writing its state (#6343). A manager
-   that was running is started again in place, before setup (step 5), so
-   the daemon starts fresh on the wiped folders. What starts them (`reset::STARTERS`: the helpers' and the
-   skills' sockets, the records' timer, the updater's way back, its timer
+   reboot, and the old Hermes kept writing its state (#6343). The manager,
+   when it was running, is started again in place, before setup (step 5), so
+   the daemon starts fresh on the wiped folders. What starts them
+   (`reset::STARTERS`: the helpers' and the skills' sockets, the records' timer, the updater's way back, its timer
    and a worker already running, which can restart the updater for a pending
    self-switch, and the keeper's restart socket) is stopped first, so none
    starts after they are listed, and they
@@ -325,10 +326,10 @@ lamp-setup reset-now`). That unit, in this order:
    writers stopped before the wipe, and `resume-reset` stops it too before
    it finishes an interrupted reset, since it starts at boot under
    `multi-user.target`, not ordered against setup; the next boot or the
-   updater's next round starts it again. `resume-reset` stops the users'
-   managers too (a boot starts the lingering `lampos`'s, with Harness's
-   daemon signed in as the last owner), and starts again the ones that were
-   running once the wipe is done; a start that fails is said and setup
+   updater's next round starts it again. `resume-reset` stops `lampos`'s
+   manager too (a boot starts it, lingering, with Harness's daemon signed
+   in as the last owner), and starts it again, when it was running, once
+   the wipe is done; a start that fails is said and setup
    goes on. `lamp-setup forget-agents
    --dry-run [--root DIR]` lists what this step would do under DIR (`/` by
    default) and changes nothing: one line an entry, `keep PATH`, `remove
@@ -341,8 +342,8 @@ lamp-setup reset-now`). That unit, in this order:
    lampos.target` and which has `lamp-setup.service`. It runs `systemctl
    start` on what it stopped that a boot starts outside the target and was
    running (`reset::STARTERS`, but not the updater's way back, whose timer
-   starts it, and `lamp-update.service`), the users' managers that were
-   running (`reset::AGENT_MANAGERS`), and `lamp-setup.service`
+   starts it, and `lamp-update.service`), `lampos`'s manager when it was
+   running (`reset::agent_manager_unit`), and `lamp-setup.service`
    (`reset::stop_and_wait_keeping`). First it empties what a reboot
    emptied by being memory, `reset::VOLATILE`: every folder a part keeps in
    `/run` past its stop, the tmpfiles' `/run/lampos-bus` (the bus's latest

@@ -315,6 +315,12 @@ pub trait Effects {
     /// Hermes's and OpenClaw's per-person files removed and both programs
     /// kept, [`forget_agents`] in [`AGENT_FOLDERS`] (#6343); how many.
     fn forget_agents(&mut self) -> io::Result<usize>;
+    /// [`AGENT_USER`]'s own systemd manager, `user@<uid>.service`, its uid
+    /// read from [`PASSWD`] at the reset ([`agent_manager_unit`]); none when
+    /// there is no such user or the file can't be read (#6343).
+    fn agent_manager(&mut self) -> Option<String> {
+        agent_manager_unit(&fs::read_to_string(PASSWD).ok()?)
+    }
 }
 
 /// The product's skills folder (`lamp_update::product_skills::FOLDER`).
@@ -1397,10 +1403,17 @@ pub fn stop_and_wait_keeping(
         argv.extend(starters.iter().cloned());
         effects.run(&argv)?;
     }
+    let manager = if product {
+        agent_manager(effects)
+    } else {
+        None
+    };
+    let mut writer_names: Vec<&str> = WRITERS.to_vec();
+    writer_names.extend(manager.as_deref());
     let writers = |effects: &mut _| -> io::Result<(Vec<String>, Listed)> {
         let mut parts = parts_of(stop, effects)?;
         let found = if product {
-            listed(&stop[0], &WRITERS, effects)?
+            listed(&stop[0], &writer_names, effects)?
         } else {
             Vec::new()
         };
@@ -1423,7 +1436,7 @@ pub fn stop_and_wait_keeping(
     again.extend(
         listed_writers
             .iter()
-            .filter(|(unit, active)| *active && agent_manager(unit))
+            .filter(|(unit, active)| *active && Some(unit) == manager.as_ref())
             .map(|(unit, _)| unit.clone()),
     );
     if listed_writers.iter().any(|(unit, _)| unit == SETUP_UNIT) {
@@ -1515,11 +1528,11 @@ pub const STARTERS: [&str; 8] = [
 /// (`lamp_update::openclaw_install::UNIT`, #6226), always on under
 /// `multi-user.target` and writing its state as it runs: stopped before
 /// [`forget_agents`] empties that state (#6343), started again by the
-/// lamp's next boot or the updater's next round. And the lingering service
-/// user's own manager ([`AGENT_MANAGERS`]), which runs Harness's daemon and
-/// the agents it launched. Patterns name only loaded units, and none
-/// matches `lamp-setup-wipe.service`, the reset's own unit.
-pub const WRITERS: [&str; 13] = [
+/// lamp's next boot or the updater's next round. Beside them, `lampos`'s own
+/// manager ([`agent_manager_unit`], [`Effects::agent_manager`]). Patterns
+/// name only loaded units, and none matches `lamp-setup-wipe.service`, the
+/// reset's own unit.
+pub const WRITERS: [&str; 12] = [
     "lamp-setup.service",
     "lamp-setup-recover.service",
     "lamp-setup-change@*.service",
@@ -1532,26 +1545,49 @@ pub const WRITERS: [&str; 13] = [
     "lamp-setup-wifi-restore.service",
     "lamp-peek.service",
     OPENCLAW_GATEWAY,
-    AGENT_MANAGERS,
 ];
 
-/// The users' own systemd managers, `user@<uid>.service`: on a product lamp
-/// the lingering `lampos`'s (`lamp_update::install::harness_at_boot_with`),
-/// outside `lampos.target`, which runs Harness's daemon (`harnessd.service`)
-/// and the panes it launched, the lamp's own Hermes among them (#6343,
-/// lamp-c0a4, 13 and 14 Nov: a reset in place left the old daemon running
-/// with the last owner's connection and computer id, so `harness start`
-/// failed until a reboot, and the old Hermes kept writing its state). Its
-/// uid is the lamp's own, so it is named by pattern. Stopped with the lamp,
-/// before the wipe, and one that was running is started again in place, as
-/// a boot starts it, so the daemon starts fresh on the wiped folders.
-pub const AGENT_MANAGERS: &str = "user@*.service";
+/// The parts' user, whose own systemd manager the reset stops
+/// (`lamp_update::install::USER`).
+pub const AGENT_USER: &str = lamp_update::install::USER;
 
-/// Whether `unit` is one of [`AGENT_MANAGERS`].
-fn agent_manager(unit: &str) -> bool {
-    unit.strip_prefix("user@")
-        .and_then(|rest| rest.strip_suffix(".service"))
-        .is_some_and(|uid| !uid.is_empty())
+/// Where [`Effects::agent_manager`] looks [`AGENT_USER`] up, as setup's
+/// accounts and lamp-update's install do.
+pub const PASSWD: &str = "/etc/passwd";
+
+/// [`AGENT_USER`]'s own systemd manager, `user@<uid>.service`, from the text
+/// of `/etc/passwd`; none when there is no such user. On a product lamp it
+/// lingers (`lamp_update::install::harness_at_boot_with`), outside
+/// `lampos.target`, and runs Harness's daemon (`harnessd.service`) and the
+/// panes it launched, the lamp's own Hermes among them (#6343, lamp-c0a4,
+/// 13 and 14 Nov: a reset in place left the old daemon running with the
+/// last owner's connection and computer id, so `harness start` failed until
+/// a reboot, and the old Hermes kept writing its state). Its uid is the
+/// lamp's own, so it is read at the reset, and no other user's manager is
+/// named. Stopped with the lamp, before the wipe; one that was running is
+/// started again in place, as a boot starts it, so the daemon starts fresh
+/// on the wiped folders.
+pub fn agent_manager_unit(passwd: &str) -> Option<String> {
+    passwd.lines().find_map(|line| {
+        let mut fields = line.split(':');
+        (fields.next() == Some(AGENT_USER)).then_some(())?;
+        let uid = fields.nth(1)?;
+        (!uid.is_empty() && uid.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| format!("user@{uid}.service"))
+    })
+}
+
+/// [`Effects::agent_manager`]'s answer, with a line when there is none: no
+/// [`AGENT_USER`] (or no `/etc/passwd`) means no manager of it to stop, and
+/// the reset goes on.
+fn agent_manager(effects: &mut impl Effects) -> Option<String> {
+    let unit = effects.agent_manager();
+    if unit.is_none() {
+        eprintln!(
+            "lamp-setup: reset: no user {AGENT_USER} in {PASSWD}; its manager is not stopped"
+        );
+    }
+    unit
 }
 
 /// OpenClaw's gateway unit (`lamp_update::openclaw_install::UNIT`).
@@ -1807,7 +1843,7 @@ fn reboot(plan: &Plan, effects: &mut impl Effects, steps: &mut Vec<Step>) {
 /// state as it runs: it is stopped first, when loaded and the plan's stop
 /// is systemd's, as the reset itself stops it ([`WRITERS`]), so it never
 /// writes into what [`forget_agents`] empties (#6343). So is the lingering
-/// user's manager ([`AGENT_MANAGERS`]), which a boot starts with Harness's
+/// `lampos`'s manager ([`agent_manager_unit`]), which a boot starts with Harness's
 /// daemon signed in as the last owner; one that was running is started
 /// again after the wipe, so the daemon starts fresh. A stop that fails
 /// fails the start, and nothing is wiped; a start again that fails is said
@@ -1837,15 +1873,18 @@ pub fn resume(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<Step>> 
     Ok(steps)
 }
 
-/// OpenClaw's gateway and the users' managers stopped before a resumed
-/// reset, those loaded, when the plan stops by `systemctl`; the managers
-/// that were running, to start again after it.
+/// OpenClaw's gateway and `lampos`'s manager stopped before a resumed
+/// reset, those loaded, when the plan stops by `systemctl`; the manager,
+/// when it was running, to start again after it.
 fn stop_agents(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<String>> {
     let systemctl = &plan.stop[0];
     if Path::new(systemctl).file_name() != Some("systemctl".as_ref()) {
         return Ok(Vec::new());
     }
-    let loaded = listed(systemctl, &[OPENCLAW_GATEWAY, AGENT_MANAGERS], effects)?;
+    let manager = agent_manager(effects);
+    let mut units = vec![OPENCLAW_GATEWAY];
+    units.extend(manager.as_deref());
+    let loaded = listed(systemctl, &units, effects)?;
     if !loaded.is_empty() {
         let mut argv = vec![systemctl.clone(), "stop".into()];
         argv.extend(loaded.iter().map(|(unit, _)| unit.clone()));
@@ -1853,7 +1892,7 @@ fn stop_agents(plan: &Plan, effects: &mut impl Effects) -> io::Result<Vec<String
     }
     Ok(loaded
         .into_iter()
-        .filter(|(unit, active)| *active && agent_manager(unit))
+        .filter(|(unit, active)| *active && Some(unit) == manager.as_ref())
         .map(|(unit, _)| unit)
         .collect())
 }
