@@ -294,11 +294,14 @@ fn arm_rests(arm: [u16; 2], folded: [u16; 2]) -> bool {
 /// torque off). The arm cannot fold through the base, so a reading far
 /// under folded is the joint pushed back past 4,095 and counting on from 0:
 /// dbda's elbow read 196, 255 and 668 with its shoulder far back, and its
-/// shoulder 167 with the arm back past its stand. In position mode a goal
+/// shoulder 167 with the arm back past its stand. 300 (26 degrees under
+/// folded, where the arm already leans on the base) leaves a wrapped joint
+/// read up to folded-300 its margin; a lower reading is never folded
+/// "a little further" (the Reviewer-lead's P3 on #6836). In position mode a goal
 /// across that seam drives the joint the long way round, through the arm,
 /// so it is never given one: it is held where it lies, giving way to a
 /// hand, until a hand brings it back across the seam to folded.
-const WRAP_UNDER_FOLD: u16 = 600;
+const WRAP_UNDER_FOLD: u16 = 300;
 /// While a wrapped arm is held for a hand, a joint carried this far from
 /// its goal is held again where it is now, a step at a time: the hand meets
 /// a step of resistance, never a push back, and an arm sinking under its
@@ -1918,9 +1921,11 @@ fn write_force<P: PortIo, R: Runtime>(
     }
     for joint in &carrying {
         report.force_writes += 1;
-        // Written before a latched overload is cleared: an acknowledgement
-        // that carries the flag is still one.
-        if let Err(detail) = bus.write_acknowledged(*joint, &force_write(*joint, force), true) {
+        // The first write after a power-up, which a just-powered servo
+        // often misses: tried again as a take-hold's is. Written before a
+        // latched overload is cleared: an acknowledgement that carries the
+        // flag is still one.
+        if let Err(detail) = bus.write_patiently(*joint, &force_write(*joint, force)) {
             return Err(Stop::Bus {
                 detail: format!("force limit of {joint}: {detail}"),
             });
@@ -2169,6 +2174,10 @@ struct Bus<'a, P, R> {
     goals: [Option<u16>; 5],
     bad_reads: [u16; 5],
     bad_in_row: [u8; 5],
+    /// The last read of each joint was across the 0/4095 seam from its
+    /// last good one (#5693): taken only once a second read agrees, so one
+    /// junk 4,095 from a joint near 0 is not a crossing.
+    seam_seen: [bool; 5],
     /// Each joint's last good temperature and its bad temperature reads
     /// (`judge_temperatures`).
     warm: [Option<u8>; 5],
@@ -2225,6 +2234,7 @@ impl<'a, P: PortIo, R: Runtime> Bus<'a, P, R> {
             goals: [None; 5],
             bad_reads: [0; 5],
             bad_in_row: [0; 5],
+            seam_seen: [false; 5],
             warm: [None; 5],
             bad_temperatures: [0; 5],
             temperature_flaps: [0; 5],
@@ -2365,6 +2375,16 @@ impl<P: PortIo, R: Runtime> Bus<'_, P, R> {
             // A jump of nearly a whole turn is the joint carried across the
             // 0/4095 seam by a hand (#5693), not a bad read.
             let seam = |from: u16| u128::from(read.abs_diff(from)) >= u128::from(4_096 - READ_JUMP);
+            // A crossing is taken only when two reads in a row say so.
+            let crossing = read <= 4_095 && self.good[index].is_some_and(seam);
+            if crossing && !self.seam_seen[index] {
+                self.seam_seen[index] = true;
+                if let Some(good) = self.good[index] {
+                    sample.position = good;
+                }
+                continue;
+            }
+            self.seam_seen[index] = false;
             let off = |from: u16| u128::from(read.abs_diff(from)) > reach && !seam(from);
             let bad = read > 4_095
                 || self.good[index]
@@ -2976,10 +2996,12 @@ type Watching<'a> = (&'a mut dyn FnMut(&Glimpse), Glimpse);
 /// step never makes the next goal jump. Returns what the joints read at
 /// the end, and what it did. With `watching`, each step read is a step of
 /// the run and is watched, as a body that is already running must be.
+#[allow(clippy::too_many_arguments)]
 fn wake<P: PortIo, R: Runtime>(
     bus: &mut Bus<'_, P, R>,
     report: &mut BodyReport,
     limits: &Limits,
+    speed: f32,
     (from, to): ([u16; 3], [u16; 3]),
     arm: Option<[u16; 2]>,
     found: [Sample; 5],
@@ -3013,12 +3035,7 @@ fn wake<P: PortIo, R: Runtime>(
             ));
             return Err(Stop::Cancelled);
         }
-        let (pose, over_now) = wake_pose(
-            leg.0,
-            leg.1,
-            TICK.as_secs_f32() * done as f32,
-            limits.wake_speed(),
-        );
+        let (pose, over_now) = wake_pose(leg.0, leg.1, TICK.as_secs_f32() * done as f32, speed);
         let goals = pose.map(|goal| goal.round() as u16);
         let outcome = if goals == written {
             Ok(())
@@ -3532,7 +3549,16 @@ fn fold_arm<P: PortIo, R: Runtime>(
         let watch = watching
             .as_mut()
             .map(|(watch, glimpse)| (&mut **watch as &mut dyn FnMut(&Glimpse), *glimpse));
-        let lifted = wake(bus, report, limits, (from, to), Some(arm), now, watch);
+        let lifted = wake(
+            bus,
+            report,
+            limits,
+            limits.wake_speed(),
+            (from, to),
+            Some(arm),
+            now,
+            watch,
+        );
         // The head's lift is the fold's: `woke` is the wake's after it.
         let woke = report.woke.take();
         report.lowered = woke;
@@ -3801,7 +3827,7 @@ const FOLD_LEAN_SLACK: f64 = 0.1;
 /// not folded. A head pitched past its folded window (`Limits::pitch_window`,
 /// where the head meets the base) is lifted to that window's edge first,
 /// before the arm brings it down beside the base: no farther than
-/// [`WAKE_REACH`], or it is not folded. Each joint must be inside its window
+/// [`RECOVER_REACH`], or it is not folded. Each joint must have torque on
 /// (`arm_windows`), have torque on, a clear status and not be warm.
 fn fold_plan(
     up: Standing,
@@ -4274,6 +4300,10 @@ const PROPPED: &str = "My head is tipped up too far, and I am holding it so it d
 /// folded (#2940, El's lamp-06c1 case): the lamp lets go of its arm, holds
 /// its head, and starts again once a hand has folded the arm.
 const ARM_FOLD: &str = "My arm is not folded all the way down. Please fold it gently down, and I will start by myself.";
+/// Said when the recovery stopped part way (a load, a joint that would not
+/// follow, a joint that moved by itself) and the lamp holds where it is
+/// (#5693): it stays up, watching, and a hand folds the arm.
+const ARM_HELD: &str = "I stopped partway and I am holding still. Please fold my arm gently down, and I will start by myself.";
 /// Said when an arm joint is round past the end of its range (#5693): the
 /// lamp holds its arm, gives way to a hand, and cannot bring it back itself.
 const ARM_WRAPPED: &str = "My arm is bent back too far for me to move it. Please bring it gently forward and fold it down, and I will start by myself.";
@@ -4414,14 +4444,37 @@ fn follow_hand<P: PortIo, R: Runtime>(
             std::array::from_fn(|index| bus.goals[COMMANDED[index].index()].unwrap_or(pose[index]));
         let arm = ARM.map(|joint| {
             let at = now[joint.index()].position;
+            // A joint whose status is flagged is not followed: its reading
+            // is not trusted, and it holds its last goal.
+            if now[joint.index()].status != 0
+                && let Some(goal) = bus.goals[joint.index()]
+            {
+                return goal;
+            }
             match bus.goals[joint.index()] {
+                // Across the seam (the hand carried a wrapped joint back
+                // through 0/4095): the short way is one position mode
+                // cannot take, so no step is written toward it. Once the
+                // read has held still it is held where it reads.
+                Some(goal) if goal.abs_diff(at) > 2_048 => {
+                    if bus.steady[joint.index()] {
+                        at
+                    } else {
+                        goal
+                    }
+                }
+                // A step toward a reading the joint has held still: one
+                // read off is not a hand.
                 Some(goal) if goal.abs_diff(at) > ARM_GOAL_STEP => {
-                    if at > goal {
+                    if !bus.steady[joint.index()] {
+                        goal
+                    } else if at > goal {
                         goal + ARM_GOAL_STEP
                     } else {
                         goal - ARM_GOAL_STEP
                     }
                 }
+                Some(goal) if !bus.steady[joint.index()] => goal,
                 _ => at,
             }
         });
@@ -5707,11 +5760,23 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         ));
                         return report;
                     }
-                    // The run ends on what ended it, the lamp held where it
-                    // stopped with torque on all five: nothing falls, and
-                    // the next start takes it from there.
+                    // Held where it stopped with torque on all five: nothing
+                    // falls. The run stays up and watches (#5693, the
+                    // Reviewer-lead on #6836: an exit would be restarted
+                    // into the same fold and die holding a raised arm): it
+                    // says so, gives way to a hand and follows it, and
+                    // starts again once the arm is folded and still.
+                    report.pose_wait = Some(PoseWait {
+                        ranges: [(0, 4_095); 3],
+                        joints: ARM.to_vec(),
+                        say: ARM_HELD,
+                        arm: Some(up.folded),
+                        follow_arm: true,
+                        follow_force: start_force,
+                    });
+                    bus.after_arm_wait = true;
                     report.kept_holding = true;
-                    report.stop = stop;
+                    report.stop = refused(format!("held where the fold stopped: {stop:?}"));
                     return report;
                 }
             }
@@ -6113,6 +6178,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
             bus,
             &mut report,
             &limits,
+            limits.wake_speed(),
             (found_pose, to),
             standing.map(|_| arm_written),
             found,
@@ -6182,7 +6248,22 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         bus.refused = None;
                     }
                 }
-                report.kept_holding = standing.is_some();
+                // A lamp that may stand is held and stays up for a hand
+                // (as a fold that stopped is); one with no arm to hold ends.
+                if let Some(up) = standing {
+                    report.pose_wait = Some(PoseWait {
+                        ranges: [(0, 4_095); 3],
+                        joints: ARM.to_vec(),
+                        say: ARM_HELD,
+                        arm: Some(up.folded),
+                        follow_arm: true,
+                        follow_force: start_force,
+                    });
+                    bus.after_arm_wait = true;
+                    report.kept_holding = true;
+                    report.stop = refused(format!("held where the wake stopped: {stop:?}"));
+                    return report;
+                }
                 report.stop = stop;
                 return report;
             }
@@ -9175,6 +9256,7 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 bus,
                 &mut report,
                 &limits,
+                WAKE_SPEED,
                 (from, to),
                 standing.map(|_| arm_written),
                 now,

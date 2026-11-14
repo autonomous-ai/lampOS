@@ -2969,7 +2969,6 @@ mod tests {
                     "@BODY_POSES@" | "$BODY_POSES" => {
                         SEATED.split_whitespace().map(str::to_owned).collect()
                     }
-                    "$BODY_EXTRA" => Vec::new(),
                     "@SERVO_DEVICE@" => vec!["/dev/ttyACM0".to_owned()],
                     "@MOTOR_LOCK_DIR@" => vec!["/var/lib/lampos-locks/motor".to_owned()],
                     "@UNIT_ID@" | "%H" => vec!["lamp-a63e".to_owned()],
@@ -4451,8 +4450,6 @@ mod tests {
                 .split_whitespace()
                 .skip(1)
                 .flat_map(|word| match word {
-                    // Empty in the product; a bench drop-in may fill it (#5693).
-                    "$BODY_EXTRA" => Vec::new(),
                     "$BODY_POSES" => poses.split_whitespace().map(str::to_owned).collect(),
                     "%H" => vec!["lamp-a63e".to_owned()],
                     word => vec![word.to_owned()],
@@ -4519,7 +4516,6 @@ mod tests {
             .split_whitespace()
             .skip(1)
             .flat_map(|word| match word {
-                "$BODY_EXTRA" => Vec::new(),
                 "$BODY_POSES" => poses.split_whitespace().map(str::to_owned).collect(),
                 "%H" | "@UNIT_ID@" => vec!["lamp-a63e".to_owned()],
                 "@SERVO_DEVICE@" => vec!["/dev/ttyACM0".to_owned()],

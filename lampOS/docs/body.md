@@ -723,7 +723,8 @@ is found is its home and there is nothing to wake to):
   joints are.
 - A head found outside its start window, or a commanded joint found farther
   from its home than it may start (60 counts folded, or the widest of
-  `--reach`), but no more than 400 counts from it, is not refused. Before
+  `--reach`) is not refused: within 400 counts on a lamp found folded, from
+  anywhere in its range after a power-up fold (`RECOVER_REACH`, #5693). Before
   the body runs, the three joints are brought to their home the way
   something alive wakes, not the way a machine homes (the repository's
   rule 8): first a stir of up to 24 counts toward home (80 for a head that
@@ -766,7 +767,8 @@ is found is its home and there is nothing to wake to):
   30 to 40 counts. A step whose write or read failed
   does not advance the wake, so the next goal cannot jump. Asked to stop
   while waking, it holds where it is and ends.
-- Farther than 400 counts from its home it still refuses, saying why
+- A lamp found folded with a joint farther than 400 counts from its home
+  still refuses, saying why
   ("base_yaw is 450 counts from its home, more than waking brings back
   (400)"). 400 is about 35 degrees: a head on the base was 145 from
   lamp-4ace's home, and lamp-52e6's home pitch of 1,771 would put its head
@@ -797,22 +799,23 @@ is found is its home and there is nothing to wake to):
   what it did (`lowered`, as `woke`). Then the lamp may stand as it would
   have.
 - Any other arm off its way is folded the same way before it wakes (#5693):
-  the elbow first, onto its folded count, then the shoulder, each eased
-  from where it is found at 40 counts a second at most with every other
-  joint held, under the same reads and stops as above (for the elbow, the
-  held shoulder is judged by its `--arm-load` as the held elbow is), and a
-  pause of 0.3 s between one move and the next (a breath, not the wake's
-  second, so it reads less like a machine homing each axis). Each arm joint
+  the shoulder and the elbow together along one eased line onto their
+  folded counts, at `--recover-speed` counts a second (40 unless given; the
+  product unit gives 100) for the one that travels farther, with the head
+  and the base held, under the same reads and stops as above; the elbow
+  first or the shoulder first only where together would tip the lamp
+  (below), and then a pause of 0.3 s between one move and the next (a
+  breath, not the wake's second, so it reads less like a machine homing
+  each axis). Each arm joint
   farther than 80 counts from its folded count folds; when folding only
   those would still leave the arm off its way, every arm joint not at its
   folded count folds, so a fold that is needed is never empty. A lamp nudged
   at rest, shoulder 60 up and elbow 45 under folded, is 98 counts off its
   way with each joint within 80 of folded: both fold, and it stands. The
-  elbow and the shoulder move one after the other, never together: an
-  overlap would need the anti-tip check on the combined path and both
-  joints' tracking at once, so it is not done. Elbow first is the
-  shape a power cut leaves a standing lamp in, and the head stays carried
-  above the base until the shoulder brings it down beside it, last. By V1's
+  elbow and the shoulder move together (#5693, V1's shape: the elbow's
+  lever shortens from the first tick), the anti-tip check run on the
+  combined path and both joints tracked at once; one after the other only
+  where together would tip. By V1's
   body model ("Not tipping over"), the other order takes the centre of
   gravity 46 mm off the base's axis from shoulder 2,657 and elbow 2,900 on
   lamp-52e6's poses, past V1's 22 mm, where elbow first never passes the
@@ -840,7 +843,7 @@ is found is its home and there is nothing to wake to):
   the journal and on the body's diagnostic. A head
   pitched past its folded window's edge (`pitch_window`, 2,030: where the
   head meets the base) is first lifted to that edge as the wake lifts a
-  head, at most 400 counts, before the arm brings it down beside the base;
+  head, from anywhere below it (`RECOVER_REACH`), before the arm brings it down beside the base;
   from there it wakes home as any head found there does. A lamp found up
   on its way, its head pitched farther from its pitch there than waking
   brings back, is folded so too, and its head judged from folded: woken
@@ -866,8 +869,8 @@ is found is its home and there is nothing to wake to):
   2,899 and head pitch 2,420 on lamp-52e6's poses. So before each move
   (the head's lift, each arm joint's fold, the wake) the body tells systemd
   how long it takes, `EXTEND_TIMEOUT_USEC` sized from that move's distance
-  at its speed (40 counts a second for the arm, the wake's 20 for the head
-  and base, eased) and the 0.3 s pause, plus 15 s; systemd then waits at
+  at its speed (`--recover-speed` for the arm and the head's lift, 20 for
+  a wake outside the recovery, eased) and the 0.3 s pause, plus 15 s; systemd then waits at
   least that long from that moment. The product unit also sets
   `TimeoutStartSec=180` as a backstop under that. After a wait for a hand
   READY=1 has gone out and each step is watched instead, so nothing is
@@ -936,8 +939,9 @@ rest by itself and then stands as ever:
    keeps the hand's help for a head or base far off (`WAKE_REACH`, #2602).
 5. **A stop holds; nothing falls.** A load, tracking, status or drift stop
    inside the recovery holds all five where they are, torque kept on
-   (`kept_holding` in the report), and the run ends there: the next start
-   takes it from where it stopped. The arm is let go for a hand only within
+   (`kept_holding` in the report), and the run stays up: it says `ARM_HELD`,
+   watches the head's load and heat, gives way to a hand on the arm and
+   follows it, and starts again once the arm is folded and still. The arm is let go for a hand only within
    `ARM_LET_GO_NEAR` (150) of folded; raised, let go, it would fall. The load
    stop while folding is `--recover-load` (the standing load unless given).
 6. **A joint round past the end of its range.** An arm joint read more than
@@ -957,7 +961,7 @@ rest by itself and then stands as ever:
    `--recover-wrap` may add it after a bench proof.
 
 On the bench (the hardware lead's rules): `--force-limit 300 --recover-force
-300 --recover-load 300 --recover-speed 20` through `$BODY_EXTRA` in a drop-in,
+300 --recover-load 250 --recover-speed 100` through a drop-in that replaces `ExecStart`,
 hands off confirmed before any start, and lamp-body masked while a person
 handles the lamp.
 
