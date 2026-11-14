@@ -118,6 +118,8 @@ struct Lamp {
     /// More hands, one after another, each a quick turn of 1,000 counts a
     /// second: from, until, servo, position.
     hands: Vec<(Duration, Duration, usize, f32)>,
+    /// Which servos a hand last moved against their torque (`hands`).
+    handed: [bool; 5],
     /// Positions read that are not where a servo is: from this time, its
     /// next reads give this, this many times. From, servo, reading, reads.
     misreads: Vec<(Duration, usize, u16, u8)>,
@@ -210,6 +212,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             mute: None,
             hand: None,
             hands: Vec::new(),
+            handed: [false; 5],
             misreads: Vec::new(),
             read_times: Vec::new(),
             limit_reads: Vec::new(),
@@ -293,7 +296,22 @@ impl Lamp {
                 *handled == index && (*from..*until).contains(&now)
             }) {
                 servo.position += (to - servo.position).clamp(-1_000.0 * step, 1_000.0 * step);
+                // A hand moving a held servo is felt as load: the servo
+                // pushes back toward its goal (#5693, the give-way).
+                // (The shoulder and the elbow only: the head's and base's
+                // hands are modelled by the give-way tests' own loads.)
+                if servo.torque == 1
+                    && (index == 1 || index == 2)
+                    && (f32::from(servo.goal) - servo.position).abs() > 12.0
+                {
+                    servo.load = 400;
+                    self.handed[index] = true;
+                }
                 continue;
+            }
+            if self.handed[index] {
+                servo.load = 20;
+                self.handed[index] = false;
             }
             if let Some((stuck, load)) = self.pinned
                 && stuck == index
@@ -306,10 +324,17 @@ impl Lamp {
                 continue;
             }
             // The register's unit is not known; here it is counts a second.
+            // A servo whose force limit is low (giving way, #5693) is slow:
+            // under 300 its speed scales with its force.
             let fastest = if servo.speed == 0 {
                 3_000.0
             } else {
                 f32::from(servo.speed)
+            };
+            let fastest = if servo.force < 300 {
+                fastest * f32::from(servo.force) / 1_000.0
+            } else {
+                fastest
             };
             // A goal is taken in the turn the servo is in: from a true
             // angle past 4,095 a goal under it is the long way round, as a
@@ -19197,8 +19222,142 @@ fn from_a_grid_of_poses_the_arm_is_never_dropped_nor_stepped_far() {
         *outcomes.entry(outcome).or_insert(0) += 1;
     }
     eprintln!("grid outcomes: {outcomes:?}");
+    // In range are the poses with the shoulder and the elbow 2,200 and up
+
+    // (1,700 is more than `WRAP_UNDER_FOLD` under folded, so it reads as round
+
+    // past the range and waits for a hand): 32 of the grid, and most of those
+
+    // stand by themselves; the rest wait held.
+
     assert!(
         outcomes.get("stood").copied().unwrap_or(0) >= 20,
         "{outcomes:?}"
+    );
+}
+
+/// The Reviewer-lead's repro on #6836: lamp-dbda's run-1 pose, the elbow
+/// round past its range; a hand carries the elbow back across the seam
+/// (true 4,314 to 3,950) and lets go just after the crossing, 0.3 s or
+/// 0.4 s in. The joint is held where it reads and never driven the long
+/// way toward its old goal: its true angle stays by 3,950.
+#[test]
+fn a_wrapped_arm_let_go_just_after_the_seam_is_not_driven_the_long_way() {
+    for held_for in [0.3f32, 0.4] {
+        let found = [2_035, 3_441, 218, 2_035, 2_478];
+        let powered = powered_up_on(
+            &LAMP_52E6,
+            found,
+            |lamp| {
+                lamp.servos[Joint::ElbowPitch.index()].position += 4_096.0;
+                lamp.hands.push((
+                    Duration::from_secs(20),
+                    Duration::from_secs_f32(20.0 + held_for),
+                    2,
+                    3_950.0,
+                ));
+            },
+            Duration::from_secs(60),
+        );
+        let lamp = &powered.lamp;
+        let elbow = lamp.servos[Joint::ElbowPitch.index()].position;
+        assert!(
+            (3_850.0..=4_050.0).contains(&elbow),
+            "held {held_for} s: the elbow ended at true {elbow}; stop {:?}",
+            powered.report.stop
+        );
+        assert!(
+            held_with_torque_on(lamp) || powered.report.stood,
+            "held {held_for} s"
+        );
+        assert!(
+            !matches!(powered.report.stop, Stop::BadRead { .. }),
+            "held {held_for} s: {:?}",
+            powered.report.stop
+        );
+    }
+}
+
+/// A lamp found folded whose head cannot rise (the pitch pinned) stops its
+/// wake and ends held, as before #5693: it does not take the held wait,
+/// whose arm condition it already meets, and loop into the same wake.
+#[test]
+fn a_found_folded_lamp_whose_wake_stops_ends_held_and_does_not_loop() {
+    let powered = powered_up([2_035, 2_053, 2_069, 2_035, 1_500], |lamp| {
+        lamp.pinned = Some((PITCH, 100));
+    });
+    let report = &powered.report;
+    assert!(report.kept_holding, "{report:?}");
+    assert_ne!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!(report.refused_let_go, None, "{report:?}");
+    assert!(!powered.said.iter().flatten().any(|say| *say == ARM_HELD));
+    assert!(powered.lamp.servos.iter().all(|servo| servo.torque == 1));
+}
+
+/// While a raised, wrapped arm is held for a hand, a push on the head (its
+/// load over the bound) does not end the run: the head stops pushing, held
+/// where it is, and the wait goes on; a hot head joint is let go, the arm
+/// kept.
+#[test]
+fn a_head_pushed_or_hot_while_the_arm_is_held_does_not_end_the_run() {
+    let found = [2_035, 3_441, 218, 2_035, 2_478];
+    let pushed = powered_up(found, |lamp| {
+        lamp.servos[Joint::ElbowPitch.index()].position += 4_096.0;
+        lamp.strains
+            .push((Duration::from_secs(5), Duration::from_secs(9), PITCH, 900));
+    });
+    assert_eq!(
+        pushed.report.stop,
+        Stop::Cancelled,
+        "{:?}",
+        pushed.report.stop
+    );
+    assert!(held_with_torque_on(&pushed.lamp));
+    let hot = powered_up(found, |lamp| {
+        lamp.servos[Joint::ElbowPitch.index()].position += 4_096.0;
+        lamp.heats.push((Duration::from_secs(5), PITCH, 70));
+    });
+    assert_eq!(hot.report.stop, Stop::Cancelled, "{:?}", hot.report.stop);
+    assert_eq!(
+        hot.lamp.servos[PITCH].torque, 0,
+        "the hot head joint is let go"
+    );
+    assert!(
+        hot.lamp.servos[1].torque == 1
+            && hot.lamp.servos[2].torque == 1
+            && !hot.lamp.registers.iter().any(|(id, address, bytes)| {
+                (*id == 2 || *id == 3) && *address == 40 && bytes == &vec![0]
+            }),
+        "the arm is kept"
+    );
+}
+
+/// A held arm that gets too warm is let down slowly: its force limit drops
+/// to `GIVE_WAY_FORCE` and stays there, torque on.
+#[test]
+fn a_held_arm_that_heats_is_let_down_slowly() {
+    let found = [2_035, 3_441, 218, 2_035, 2_478];
+    let powered = powered_up(found, |lamp| {
+        lamp.servos[Joint::ElbowPitch.index()].position += 4_096.0;
+        lamp.heats.push((Duration::from_secs(5), 2, 63));
+    });
+    let lamp = &powered.lamp;
+    assert!(held_with_torque_on(lamp));
+    let last_force: Vec<u16> = ARM
+        .iter()
+        .map(|joint| {
+            lamp.registers
+                .iter()
+                .filter(|(id, address, _)| *id == joint.id() && *address == 48)
+                .map(|(_, _, bytes)| u16::from_le_bytes([bytes[0], bytes[1]]))
+                .next_back()
+                .unwrap_or(0)
+        })
+        .collect();
+    assert_eq!(
+        last_force,
+        vec![GIVE_WAY_FORCE, GIVE_WAY_FORCE],
+        "{:?}",
+        lamp.registers
     );
 }

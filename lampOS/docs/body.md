@@ -946,9 +946,18 @@ rest by itself and then stands as ever:
    keeps the hand's help for a head or base far off (`WAKE_REACH`, #2602).
 5. **A stop holds; nothing falls.** A load, tracking, status or drift stop
    inside the recovery holds all five where they are, torque kept on
-   (`kept_holding` in the report), and the run stays up: it says `ARM_HELD`,
-   watches the head's load and heat, gives way to a hand on the arm and
-   follows it, and starts again once the arm is folded and still. The arm is let go for a hand only within
+   (`kept_holding` in the report). With the arm raised the run stays up: it
+   says `ARM_HELD`, gives way to a hand on the arm and follows it, and starts
+   again once the arm is folded and still. The head is watched meanwhile: a
+   head joint pushed over its load bound stops pushing, held where it is; a
+   hot one is let go (it falls at most onto the arm); the arm is kept. A held
+   arm that reaches 62 degrees, or that nobody has folded by `WAIT_ASKING`
+   (10 min), is let down slowly: its force drops to `GIVE_WAY_FORCE` (12%)
+   and stays there, so it sinks under its own weight. With the arm already
+   resting the run ends held, as before, and systemd's start limit bounds
+   the retries. The base and the roll keep inside one turn by their own
+   stored limits; a head or base joint found more than half a turn from
+   home is refused rather than woken across the seam. The arm is let go for a hand only within
    `ARM_LET_GO_NEAR` (150) of folded; raised, let go, it would fall. The load
    stop while folding is `--recover-load` (the standing load unless given).
 6. **A joint round past the end of its range.** An arm joint read more than

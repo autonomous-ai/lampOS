@@ -4454,15 +4454,12 @@ fn follow_hand<P: PortIo, R: Runtime>(
             match bus.goals[joint.index()] {
                 // Across the seam (the hand carried a wrapped joint back
                 // through 0/4095): the short way is one position mode
-                // cannot take, so no step is written toward it. Once the
-                // read has held still it is held where it reads.
-                Some(goal) if goal.abs_diff(at) > 2_048 => {
-                    if bus.steady[joint.index()] {
-                        at
-                    } else {
-                        goal
-                    }
-                }
+                // cannot take, so no step is written toward it. The read is
+                // already two agreeing reads (`judge_positions`), so the
+                // joint is held where it reads at once: a goal left across
+                // the seam would drive it the long way the moment the hand
+                // let go (the Reviewer-lead on #6836).
+                Some(goal) if goal.abs_diff(at) > 2_048 => at,
                 // A step toward a reading the joint has held still: one
                 // read off is not a hand.
                 Some(goal) if goal.abs_diff(at) > ARM_GOAL_STEP => {
@@ -4494,10 +4491,15 @@ fn follow_hand<P: PortIo, R: Runtime>(
             pushed[index] = 0;
             eased[index] = eased[index].saturating_add(1);
         }
+        // A first read across the seam (not yet a crossing, `seam_seen`):
+        // the joint's force drops at once, so that if the hand has let go
+        // the servo cannot drive toward its old goal the long way in the
+        // 100 ms before the read that confirms the crossing.
+        let crossing = bus.seam_seen[joint.index()];
         let want = if yielding[index] {
-            eased[index] < GIVE_WAY_EASED_READS
+            eased[index] < GIVE_WAY_EASED_READS || crossing
         } else {
-            pushed[index] >= GIVE_WAY_READS
+            pushed[index] >= GIVE_WAY_READS || crossing
         };
         if want != yielding[index] {
             let to = if want { GIVE_WAY_FORCE } else { force };
@@ -4545,6 +4547,9 @@ fn wait_in_range<P: PortIo, R: Runtime>(
     // over `GIVE_WAY_LOAD`, whether its force is lowered now, and reads in
     // a row its load has eased since.
     let (mut pushed, mut yielding, mut eased) = ([0u8; 2], [false; 2], [0u8; 2]);
+    // Reads in a row a held arm joint has been at `Standing::TEMPERATURE`,
+    // and whether the arm has been let down slowly for it.
+    let (mut arm_hot, mut let_down) = (0u8, false);
     // Steps in a row a commanded joint still held (a head tipped up,
     // #2938) has read over its load bound, and at its temperature bound.
     let (mut held_over, mut held_hot) = ([0u8; 3], [0u8; 3]);
@@ -4573,7 +4578,7 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                 // (El's P2 on #2940). Over either, the wait ends as the
                 // run's check would.
                 for (slot, joint) in COMMANDED.iter().enumerate() {
-                    if wait.joints.contains(joint) {
+                    if wait.joints.contains(joint) || holding.contains(joint) {
                         continue;
                     }
                     let is = now[joint.index()];
@@ -4588,16 +4593,85 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                         0
                     };
                     if held_over[slot] >= limits.load_steps.max(1) {
+                        // Holding a raised arm (`follow_arm`), the run must
+                        // not end: the head joint stops pushing, its goal
+                        // where it is, and the wait goes on.
+                        if wait.follow_arm {
+                            let mut head = COMMANDED.map(|joint| {
+                                bus.goals[joint.index()].unwrap_or(now[joint.index()].position)
+                            });
+                            head[slot] = is.position;
+                            let arm = ARM.map(|joint| {
+                                bus.goals[joint.index()].unwrap_or(now[joint.index()].position)
+                            });
+                            if bus.send_holds_where_they_are(head, arm).is_ok() {
+                                report.goal_writes += 1;
+                            } else {
+                                bus.refused = None;
+                            }
+                            held_over[slot] = 0;
+                            continue;
+                        }
                         return Err(Stop::Load {
                             joint: joint.id(),
                             load: is.load,
                         });
                     }
                     if held_hot[slot] >= limits.temperature_steps.max(1) {
+                        // Holding a raised arm, a hot head joint is let go
+                        // (the head falls at most onto the arm); the arm
+                        // stays held and the wait goes on.
+                        if wait.follow_arm {
+                            holding.push(*joint);
+                            held_hot[slot] = 0;
+                            eprintln!(
+                                "lamp-body: {joint} at {} while the arm is held: let go",
+                                is.temperature
+                            );
+                            continue;
+                        }
                         return Err(Stop::Temperature {
                             joint: joint.id(),
                             temperature: is.temperature,
                         });
+                    }
+                }
+                // A held arm too warm (`Standing::TEMPERATURE`), or one
+                // nobody has folded by `WAIT_ASKING`, is let down slowly:
+                // its force drops to `GIVE_WAY_FORCE` and stays there, so it
+                // sinks under its own weight instead of holding on hot or
+                // for good (the Reviewer-lead on #6836).
+                if wait.follow_arm
+                    && let Some(force) = wait.follow_force
+                    && !let_down
+                {
+                    let hot = ARM
+                        .iter()
+                        .any(|joint| now[joint.index()].temperature >= Standing::TEMPERATURE);
+                    arm_hot = if hot { arm_hot.saturating_add(1) } else { 0 };
+                    if arm_hot >= limits.temperature_steps.max(1) || late {
+                        let _ = force;
+                        for joint in ARM {
+                            if bus
+                                .write_acknowledged(
+                                    joint,
+                                    &force_write(joint, GIVE_WAY_FORCE),
+                                    true,
+                                )
+                                .is_ok()
+                            {
+                                report.force_writes += 1;
+                            }
+                        }
+                        let_down = true;
+                        eprintln!(
+                            "lamp-body: the held arm is let down slowly at force {GIVE_WAY_FORCE} ({})",
+                            if late {
+                                "nobody folded it"
+                            } else {
+                                "it is too warm"
+                            }
+                        );
                     }
                 }
                 let pose = COMMANDED.map(|joint| now[joint.index()].position);
@@ -4605,7 +4679,7 @@ fn wait_in_range<P: PortIo, R: Runtime>(
                     follow_hand(
                         bus,
                         report,
-                        wait.follow_force,
+                        if let_down { None } else { wait.follow_force },
                         &now,
                         pose,
                         (&mut pushed, &mut yielding, &mut eased),
@@ -5762,12 +5836,19 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         ));
                         return report;
                     }
-                    // Held where it stopped with torque on all five: nothing
-                    // falls. The run stays up and watches (#5693, the
-                    // Reviewer-lead on #6836: an exit would be restarted
-                    // into the same fold and die holding a raised arm): it
-                    // says so, gives way to a hand and follows it, and
-                    // starts again once the arm is folded and still.
+                    // An arm that rests ends the run held, as before: the
+                    // restart is bounded by systemd and nothing is raised.
+                    if near_folded {
+                        report.kept_holding = true;
+                        report.stop = stop;
+                        return report;
+                    }
+                    // A raised arm, held where it stopped with torque on all
+                    // five: nothing falls. The run stays up and watches
+                    // (#5693, the Reviewer-lead on #6836: an exit would be
+                    // restarted into the same fold and die holding a raised
+                    // arm): it says so, gives way to a hand and follows it,
+                    // and starts again once the arm is folded and still.
                     report.pose_wait = Some(PoseWait {
                         ranges: [(0, 4_095); 3],
                         joints: ARM.to_vec(),
@@ -5962,6 +6043,16 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
         } else {
             limits.start_reach.max(150)
         };
+        // More than half a turn from its home, the short way is across the
+        // seam, which a linear wake cannot take (the base and the roll keep
+        // inside one turn by their own stored limits; this is the guard if
+        // they did not).
+        if may_wake && apart > 2_048.0 {
+            report.stop = refused(format!(
+                "{joint} is {apart:.0} counts from its home, more than half a turn: not woken across the seam"
+            ));
+            return report;
+        }
         if may_wake && apart > f32::from(allowed.max(wake_reach)) {
             // `--limp on`: a head roll or a base that a hand left far off,
             // as after the lamp slumped, is taken hold of where it lies, as
@@ -6258,9 +6349,17 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                         bus.refused = None;
                     }
                 }
-                // A lamp that may stand is held and stays up for a hand
-                // (as a fold that stopped is); one with no arm to hold ends.
-                if let Some(up) = standing {
+                // A lamp whose arm is raised is held and stays up for a hand
+                // (as a fold that stopped is); one whose arm rests, or with
+                // no arm to hold, ends held as before (a found-folded lamp
+                // whose wake stops must not loop into a wait its arm already
+                // satisfies: the Reviewer-lead's P2 on #6836).
+                let raised = standing.zip(report.last).is_some_and(|(up, last)| {
+                    !arm_rests(ARM.map(|joint| last[joint.index()].position), up.folded)
+                });
+                if let Some(up) = standing
+                    && raised
+                {
                     report.pose_wait = Some(PoseWait {
                         ranges: [(0, 4_095); 3],
                         joints: ARM.to_vec(),
@@ -6274,6 +6373,8 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                     report.stop = refused(format!("held where the wake stopped: {stop:?}"));
                     return report;
                 }
+                // Held as it is: a resting arm is nothing to let go of.
+                report.kept_holding = standing.is_some();
                 report.stop = stop;
                 return report;
             }
