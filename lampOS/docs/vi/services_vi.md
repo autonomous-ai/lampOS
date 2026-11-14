@@ -3078,11 +3078,15 @@ kết, và phần tính cách dặn nó đừng giả vờ làm được việc 
 `LAMP_SERVICES_TOLD=on` (chỉ truyền cho worker của hai tuyến), ở tuyến thứ hai một câu nói
 được nhận là của chủ đèn (`services::owner_of`) được báo, cạnh lời của nó, các dịch vụ đang liên kết theo tên,
 mỗi cái một lần, và rằng đèn tự dùng chúng: "(For you to know, not to answer:
-the lamp's owner linked these services to you in the app's Connectors:
+the lamp's owner linked these services to you in the app's Linked accounts:
 Notion, Gmail. They are yours to use for the owner: read from one with
 service_read, and send, post or create with service_write, when they ask.
 Asked about one, use it, or say plainly what you can do with it; never say
-it is the app's job or that you don't know it.)" (`services_told::note`). Các
+it is the app's job or that you don't know it. A service not in this list
+isn't linked to this lamp yet. It can be linked in the app: open this lamp,
+then Settings, then Linked accounts.)" (`services_told::note`, câu cuối của
+nó chính là `NOT_LINKED` của `lamp-services`, nên một dịch vụ không có trong
+danh sách được trả lời kèm chỗ liên kết nó, #5867). Các
 tên là những gì `lamp-services` nói lần gần nhất qua `services_connected`
 (`name` của nó, không có thì mã; cả liên kết đã hết hạn, vì một lần đọc sẽ
 làm mới nó), được hỏi ngoài đường đi của câu khi mỗi câu bắt đầu
@@ -3109,7 +3113,8 @@ phiên của nó giữ những gì đã được báo, nên khi tắt căn phòn
 khách nói sau trong phiên sẽ nghe được các tên (#5598), vì vậy khi đó tuyến
 Live không được báo gì. Nó được báo lại khi có liên kết được thêm hay gỡ, hoặc
 ở một phiên mới; khi mọi thứ đã báo đều bị gỡ, nó được báo một lần rằng giờ
-không có gì liên kết (`services_told::UNLINKED_NOTE`). Mọi lời gọi từ một câu
+không có gì liên kết, và chỗ liên kết một dịch vụ: open this lamp, then
+Settings, then Linked accounts (`services_told::UNLINKED_NOTE`). Mọi lời gọi từ một câu
 không phải của chủ đèn vẫn bị từ chối (`OWNER_ONLY`).
 
 ## Những gì chưa làm
