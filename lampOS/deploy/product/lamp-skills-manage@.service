@@ -42,6 +42,10 @@ Environment=LAMP_AGENT_SERVICES=on
 # A skill made here is the person's own (#6059): a made say's cooldown held to a minute, not an hour, as it is
 # put on (made_skill::capped). The same line in lamp-voice and lamp-skills.
 Environment=LAMP_MADE_SKILL_LOOSE=on
+# An uploaded SKILL.md run by the lamp's agent (the owner's ruling, 13 Nov; docs/skills.md "Run by the lamp's agent"):
+# the file kept whole and followed by Hermes in a fresh home, its grants read from it and said back. The same line
+# in lamp-cloud, lamp-voice, lamp-skills and lamp-skills-manage@.
+Environment=LAMP_UPLOAD_TO_AGENT=on
 # Wellbeing nudges at a present spacing and Comfort break (#5207): the skills' [present] values, as lamp-skills
 # loads them, so the app's on and off act on the skills as they run. The same line in lamp-skills.service and lamp-cloud.service.
 Environment=LAMP_NUDGES_PRESENT=on

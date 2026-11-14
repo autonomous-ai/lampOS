@@ -81,6 +81,10 @@ Environment=LAMP_SKILL_MESSAGES=on
 # A skill added from a file in the app, on a spoken yes (#5080): skills.upload, the file fetched from the backend
 # and handed to lamp-voice's app-make socket, the same line there.
 Environment=LAMP_SKILL_UPLOAD=on
+# An uploaded SKILL.md run by the lamp's agent (the owner's ruling, 13 Nov; docs/skills.md "Run by the lamp's agent"):
+# the file kept whole and followed by Hermes in a fresh home, its grants read from it and said back. The same line
+# in lamp-cloud, lamp-voice, lamp-skills and lamp-skills-manage@.
+Environment=LAMP_UPLOAD_TO_AGENT=on
 Environment=LAMP_APP_UPDATE=on
 # The lamp's agents for the app (#6240): `engines` in update.status and engines.install for a missing Hermes,
 # on in the product by the owner's rule of 11 Nov; `off` here takes it away.

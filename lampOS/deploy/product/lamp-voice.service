@@ -429,6 +429,10 @@ Environment=LAMP_APP_MAKE_SKILL=on
 # A skill added from a file in the app, on a spoken yes (#5080): lamp-cloud hands it over the app-make socket,
 # the same line in lamp-cloud.service; it never starts on its own.
 Environment=LAMP_SKILL_UPLOAD=on
+# An uploaded SKILL.md run by the lamp's agent (the owner's ruling, 13 Nov; docs/skills.md "Run by the lamp's agent"):
+# the file kept whole and followed by Hermes in a fresh home, its grants read from it and said back. The same line
+# in lamp-cloud, lamp-voice, lamp-skills and lamp-skills-manage@.
+Environment=LAMP_UPLOAD_TO_AGENT=on
 Environment=LAMP_SCHEDULE_TOOLS=on
 # The person's linked services, read by voice for the owner only (Queue #4710): declared only when
 # lamp-services' tools.json is there, so a lamp whose update has not yet put lamp-services on is told
