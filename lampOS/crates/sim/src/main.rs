@@ -504,6 +504,15 @@ fn run(dir: &Path, args: &[String]) -> std::io::Result<()> {
             }
         }));
     }
+    // The real voice's speaker on the bus (`LAMP_SIM_VOICE_SPEAKER=bus:speaker1`): lamp-sim plays it on the host,
+    // subscribed before the voice starts (bus_speaker.rs).
+    let voice_speaker = std::env::var(lamp_sim::real_voice::SPEAKER_ENVIRONMENT).ok();
+    if real_voice.is_some() && lamp_sim::bus_speaker::wanted(voice_speaker.as_deref()) {
+        let bus = lamp_bus::Bus::new(&bus_root)?;
+        threads.push(spawn_named("voice speaker", move || {
+            lamp_sim::bus_speaker::run(&bus);
+        }));
+    }
     threads.push(spawn_named("ring", move || {
         let mut tick = 0u32;
         loop {
