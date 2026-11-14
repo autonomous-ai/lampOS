@@ -121,6 +121,9 @@ struct Lamp {
     read_times: Vec<Duration>,
     /// Each servo id asked for its position limits (registers 9..=12).
     limit_reads: Vec<u8>,
+    /// This many reads of the force limits (register 48) go unanswered, as
+    /// when a servo just started is slow on the wire (#6591).
+    lost_force_reads: u8,
 }
 
 struct Clock {
@@ -201,6 +204,7 @@ fn folded(cancel_at: Duration) -> (Lamp, Clock) {
             misreads: Vec::new(),
             read_times: Vec::new(),
             limit_reads: Vec::new(),
+            lost_force_reads: 0,
         },
         Clock {
             time,
@@ -408,6 +412,10 @@ impl Lamp {
                     }
                     if address == 9 {
                         self.limit_reads.extend(parameters[2..].iter().copied());
+                    }
+                    if address == 48 && self.lost_force_reads > 0 {
+                        self.lost_force_reads -= 1;
+                        continue;
                     }
                     for asked in parameters[2..].iter().copied() {
                         let index = usize::from(asked) - 1;
@@ -1498,6 +1506,39 @@ fn a_force_limit_that_is_not_kept_ends_the_run_before_anything_moves() {
         report.stop,
         Stop::Bus {
             detail: "force limit read back as [1000]".into()
+        },
+        "{report:?}"
+    );
+    assert!(!report.moved && lamp.goals.is_empty());
+    assert_eq!(report.force, None);
+}
+
+/// A force limit read back that is not answered once is asked again: a
+/// servo slow on the wire at start does not stop the run (#6591, lamp-e82d
+/// on 13 Nov: "force limit read back: a reply did not come in time").
+#[test]
+fn a_force_limit_read_back_that_goes_unanswered_once_is_asked_again() {
+    let capped = Limits {
+        force: Some(600),
+        ..Limits::FOLDED
+    };
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    lamp.lost_force_reads = 1;
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, capped, None, news, |_| {});
+    assert_eq!(report.stop, Stop::Cancelled, "{report:?}");
+    assert_eq!((report.force_writes, report.force), (1, Some(600)));
+    assert!(report.moved);
+
+    // A servo that never answers still ends the run before anything moves.
+    let (mut lamp, mut clock) = folded(Duration::from_secs(8));
+    lamp.lost_force_reads = u8::MAX;
+    let news = script(&clock.time);
+    let report = run(&mut lamp, &mut clock, capped, None, news, |_| {});
+    assert_eq!(
+        report.stop,
+        Stop::Bus {
+            detail: "force limit read back: a reply did not come in time".into()
         },
         "{report:?}"
     );
