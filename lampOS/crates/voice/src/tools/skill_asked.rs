@@ -27,6 +27,19 @@
 //! are forced too, with diacritics as speech-to-text writes them; "ai làm
 //! bạn buồn" (who made you sad) and "mua sữa ở đâu" (where to buy milk)
 //! are the model's.
+//!
+//! A line that plainly asks to point or shine the light at a thing ("point
+//! the light at my book", "light my book", "shine the light on the plant")
+//! calls point-light (`point_light`) the same way ([`asks_to_point`]). On
+//! lamp-52e6 on 13 Nov (Fifth's row P on #5744) "Lamp, point the light at
+//! my book" called the route's own `take_a_look` instead: it looked, asked
+//! "Want me to light the screen instead?", and the head and the light never
+//! moved. Both functions' lines speak of looking at a thing on the desk, so
+//! the pick was the model's alone; a forced `use_skill` round leaves
+//! `take_a_look` out of it. Which way to turn (`toward`) is still the
+//! model's. A look ("look at my book", "what do you see"), the light itself
+//! ("turn the light on", "light scene", "reading light") and a point with
+//! no light ("point at the door") are the model's, as before.
 use crate::known_faces::lower_words;
 use crate::second_provider::net::{Force, Forced, Message};
 
@@ -45,6 +58,8 @@ pub const SHOW: &str = "light_show";
 /// The lamp's help skill's function (faq's `tool`): the name `use_skill`
 /// gives it, as it gives light-scenes' as `light_scene`.
 pub const HELP: &str = "lamp_help";
+/// Point the light's function (point-light's `tool`).
+pub const POINT: &str = "point_light";
 
 /// The asks, as words in a row, and the skill's function each calls: the
 /// scenes' names before "light" (light-scenes' `one_of`, and "relaxing" as
@@ -215,6 +230,117 @@ pub fn asks_about(said: &str) -> Option<&'static str> {
     plainly(said, QUESTIONS, &[], AROUND_VI)
 }
 
+/// The verbs that point the light, each before the light it points
+/// ([`LIGHT_POINTED`]) and a word that says at what ([`AT`]): "point the
+/// light at", "aim your light on", "shine a light over". "Shine" alone may
+/// go without the light ("shine on my book").
+const POINTS: &[&str] = &["point", "aim", "shine"];
+
+/// The light a pointing verb points, whole.
+const LIGHT_POINTED: &[&[&str]] = &[
+    &["the", "light"],
+    &["your", "light"],
+    &["a", "light"],
+    &["some", "light"],
+    &["light"],
+];
+
+/// The words that say at what the light is pointed.
+const AT: &[&str] = &["at", "on", "onto", "over", "to", "toward", "towards"];
+
+/// The words a thing lit by "light ..." starts with ("light my book",
+/// "light up the plant"), so that "light scene" or "light show" is never a
+/// thing to light.
+const THING_STARTS: &[&str] = &[
+    "my", "the", "this", "that", "these", "those", "your", "our", "his", "her", "a", "an",
+];
+
+/// Words that may end a line past the thing: a "please", a "thanks".
+const AFTER_THING: &[&[&str]] = &[
+    &["please"],
+    &["now"],
+    &["thanks"],
+    &["thank", "you"],
+    &["lamp"],
+    &["ok"],
+    &["okay"],
+];
+
+/// Words the thing to light never holds: a no or a question, a second ask,
+/// the light or a scene itself ("light the reading light", "light a
+/// scene"), a person (the lamp lights the desk, not a face), and a flame.
+/// Any of them leaves the line to the model.
+const NOT_A_THING: &[&str] = &[
+    "not", "don't", "dont", "no", "never", "what", "why", "how", "where", "when", "who", "which",
+    "and", "or", "but", "if", "later", "off", "light", "lights", "lamp", "scene", "scenes", "show",
+    "mode", "me", "us", "you", "yourself", "myself", "candle", "candles", "fire",
+];
+
+/// The most words the thing to light is said in ("the book on my left").
+const MOST_THING_WORDS: usize = 5;
+
+/// [`POINT`] when the line plainly asks to point or shine the light at a
+/// thing: past a greeting, the lamp's name or a request ([`AROUND`],
+/// [`REQUESTS`]), "point/aim/shine the light at/on X" or "light (up) my/the
+/// X", and after the thing only a "please" or a "thanks". English only, as
+/// the other asks here bar the help questions: a line in any other language
+/// is the model's. A missed ask only leaves the pick to the model, as
+/// before; a wrong one bends the head over the desk nobody asked about, so
+/// the words are kept narrow.
+pub fn asks_to_point(said: &str) -> Option<&'static str> {
+    let words = lower_words(said);
+    let mut at = 0;
+    while let Some(taken) =
+        phrase_at(&words, at, AROUND).or_else(|| phrase_at(&words, at, REQUESTS))
+    {
+        at += taken;
+    }
+    let verb = words.get(at)?.as_str();
+    let thing_at = if POINTS.contains(&verb) {
+        at += 1;
+        match phrase_at(&words, at, LIGHT_POINTED) {
+            Some(taken) => at += taken,
+            None if verb == "shine" => {}
+            None => return None,
+        }
+        if !AT.contains(&words.get(at)?.as_str()) {
+            return None;
+        }
+        at + 1
+    } else if verb == "light" {
+        at += 1;
+        if words.get(at).is_some_and(|word| word == "up") {
+            at += 1;
+        }
+        if !THING_STARTS.contains(&words.get(at)?.as_str()) {
+            return None;
+        }
+        at
+    } else {
+        return None;
+    };
+    let mut end = words.len();
+    while let Some(taken) = AFTER_THING.iter().find_map(|after| {
+        (end >= thing_at + after.len()
+            && words[end - after.len()..end]
+                .iter()
+                .zip(after.iter())
+                .all(|(said, word)| said == word))
+        .then_some(after.len())
+    }) {
+        end -= taken;
+    }
+    let thing = &words[thing_at..end];
+    let only_a_start = thing.len() == 1 && THING_STARTS.contains(&thing[0].as_str());
+    (!thing.is_empty()
+        && thing.len() <= MOST_THING_WORDS
+        && !only_a_start
+        && !thing
+            .iter()
+            .any(|word| NOT_A_THING.contains(&word.as_str())))
+    .then_some(POINT)
+}
+
 /// The function of the one entry of `table` that `said` holds, with
 /// `requests` only before it and no word but those [`AROUND`] or `also`.
 fn plainly(
@@ -258,8 +384,9 @@ pub type Offered = std::sync::Arc<dyn Fn(&str) -> bool + Send + Sync>;
 
 /// The force the second route's chat is given with the switch on
 /// (`second_provider::net::Chat::forcing`): a request whose last message is
-/// a person's line that plainly asks for a scene or a show, or plainly
-/// asks a question about the lamp itself, must call its skill. `offered`
+/// a person's line that plainly asks for a scene or a show, plainly asks a
+/// question about the lamp itself, or plainly asks to point the light at a
+/// thing, must call its skill. `offered`
 /// says, at each request, whether `use_skill` offers a skill: then
 /// `use_skill` is forced with its `skill` pinned to it, and nothing when it
 /// is not offered (a skill turned off is never forced); without `use_skill`
@@ -269,7 +396,9 @@ pub fn force(offered: Option<Offered>) -> Force {
     std::sync::Arc::new(move |messages: &[Message]| {
         let last = messages.last().filter(|message| message.role == "user")?;
         let said = last.words()?;
-        let skill = asks_for(said).or_else(|| asks_about(said))?;
+        let skill = asks_for(said)
+            .or_else(|| asks_about(said))
+            .or_else(|| asks_to_point(said))?;
         match &offered {
             Some(offered) => offered(skill).then_some(Forced {
                 name: crate::use_skill::NAME,
@@ -570,6 +699,101 @@ mod tests {
         let mut after = movie.to_vec();
         after.push(Message::tool("1", "{\"next\":\"Say it.\"}"));
         assert_eq!(wrapped(&after), None);
-        assert_eq!(own(&[Message::user("Lamp, light my book.")]), None);
+        assert_eq!(own(&[Message::user("Lamp, look at my book.")]), None);
+    }
+
+    /// Fifth's row P on #5744 (lamp-52e6, 13 Nov): "Lamp, point the light at
+    /// my book" called `take_a_look`. A plain ask to point or shine the
+    /// light at a thing is point-light's; a look, the light itself and a
+    /// point with no light are not.
+    #[test]
+    fn a_plain_ask_to_point_the_light_is_point_lights() {
+        for said in [
+            "Lamp, point the light at my book.",
+            "Point the light at my book",
+            "Hey lamp, can you point the light at my book?",
+            "Could you point your light at the plant, please?",
+            "Aim the light at my keyboard.",
+            "Shine the light on the plant.",
+            "Shine a light on my notes, thanks.",
+            "Shine on my book please.",
+            "Lamp, light my book.",
+            "Light my book",
+            "Please light up the plant.",
+            "Can you light my desk?",
+            "Light the book on my left.",
+        ] {
+            assert_eq!(asks_to_point(said), Some(POINT), "{said}");
+            assert_eq!(asks_for(said), None, "{said}");
+            assert_eq!(asks_about(said), None, "{said}");
+        }
+        for said in [
+            "Lamp, look at my book.",
+            "Look at my book",
+            "What do you see?",
+            "Lamp, turn the light on.",
+            "Turn on the light.",
+            "Light scene",
+            "Lamp, light scene please.",
+            "Reading light",
+            "Lamp, reading light please.",
+            "Light show",
+            "Point at the door.",
+            "Lamp, point at my book.",
+            "Don't point the light at my book.",
+            "Why did you point the light at my book?",
+            "Point the light at my book and play some music.",
+            "Light the reading light.",
+            "Light a scene.",
+            "Light a candle.",
+            "Shine the light on me.",
+            "Point the light.",
+            "Light up",
+            "Light my",
+            "Light the lamp.",
+            "I like the light on my book.",
+            "Point the light at the very big old book on my desk.",
+            "Đèn ơi, chiếu đèn vào sách của tôi.",
+            "",
+        ] {
+            assert_eq!(asks_to_point(said), None, "{said}");
+        }
+    }
+
+    /// Pointing the light forces `use_skill`, pinned to `point_light`, only
+    /// when point-light is offered (installed and on); never a look or a
+    /// round after a call.
+    #[test]
+    fn a_plain_ask_to_point_the_light_forces_point_light_only_when_offered() {
+        let book = [Message::user("Lamp, point the light at my book.")];
+        let every: Offered = Arc::new(|_| true);
+        let wrapped = force(Some(every));
+        assert_eq!(
+            wrapped(&book),
+            Some(Forced {
+                name: crate::use_skill::NAME,
+                only: Some(("skill", POINT)),
+                fields: None
+            })
+        );
+        let without_point: Offered = Arc::new(|skill| skill != POINT);
+        assert_eq!(
+            force(Some(without_point))(&book),
+            None,
+            "point-light not offered"
+        );
+        assert_eq!(
+            force(None)(&book),
+            Some(Forced {
+                name: POINT,
+                only: None,
+                fields: None
+            })
+        );
+        let mut after = book.to_vec();
+        after.push(Message::tool("1", "{\"next\":\"Say it.\"}"));
+        assert_eq!(wrapped(&after), None);
+        assert_eq!(wrapped(&[Message::user("Lamp, look at my book.")]), None);
+        assert_eq!(wrapped(&[Message::user("What do you see?")]), None);
     }
 }

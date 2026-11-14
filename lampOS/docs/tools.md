@@ -367,12 +367,29 @@ and none of the skills' own (`crate::use_skill`):
   line stay the model's. Those Vietnamese words never let a light ask
   through. On build 11756 on 11 Nov (#6216's row) "Hey Lamp, who made
   you?" and "Hey Lamp, where can I buy you?" called nothing, and the
-  second said "autonomous.ai" without faq's /lamp page. Host tests:
+  second said "autonomous.ai" without faq's /lamp page. A line that
+  plainly asks to point or shine the light at a thing
+  (`tools::skill_asked::asks_to_point`: "point", "aim" or "shine" the
+  light "at", "on", "over" or "to" a thing, "shine on" a thing, or "light
+  (up)" a thing said with "my", "the", "this" and the like; with only a
+  greeting, the lamp's name, a request before it, and "please" or
+  "thanks" after) is forced the same way to point-light: `skill` told only
+  `point_light`, which way to turn still the model's. On lamp-52e6 on 13
+  Nov (Fifth's row P on #5744) "Lamp, point the light at my book" called
+  the route's own `take_a_look` instead, and the head and the light never
+  moved: both lines speak of looking at a thing on the desk, and a forced
+  round leaves `take_a_look` out. A look ("look at my book", "what do you
+  see"), the light itself ("turn the light on", "light scene", "reading
+  light"), a point with no light ("point at the door"), a no, a question,
+  a second ask, a person ("shine the light on me"), a thing of more than
+  five words and any other language are the model's. Host tests:
   `a_plain_ask_for_a_scene_or_a_show_is_told_apart`,
   `a_plain_ask_forces_its_skill_only_when_offered`,
   `a_plain_question_about_the_lamp_asks_its_help`,
   `a_plain_question_about_the_lamp_in_vietnamese_asks_its_help`,
-  `a_plain_question_about_the_lamp_forces_its_help_only_when_offered`.
+  `a_plain_question_about_the_lamp_forces_its_help_only_when_offered`,
+  `a_plain_ask_to_point_the_light_is_point_lights`,
+  `a_plain_ask_to_point_the_light_forces_point_light_only_when_offered`.
 - **A skill asked for by its name** (the second route,
   `LAMP_SKILL_NAMED=on`, off unless set, on in the product's
   `lamp-voice.service`, #6772): a line that is only an
