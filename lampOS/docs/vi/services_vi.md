@@ -1662,7 +1662,10 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   Một câu chỉ có tên của đèn ("Hey Lamp", được báo cho mô hình là chỉ có tên
   và được trả lời như một lời gọi, có hay không có
   `LAMP_SECOND_NAME_CARRIES`) cũng vậy, trừ khi nó được nói bởi cái tên ngay
-  trước đó: nó được trả lời, và câu đồng ý sau nó vẫn gửi. Trên đèn của một
+  trước đó: nó được trả lời, và câu đồng ý sau nó vẫn gửi. Chỉ tính khi
+  câu chỉ có tên: một lời gọi có thêm một từ sau tên ("Hey Lamp, no.") hoặc
+  một từ được hỏi như cái tên ("No.") vẫn bỏ lệnh ghi, để một câu "Yes."
+  lạc không bao giờ gửi điều vừa bị từ chối. Trên đèn của một
   người thử ngày 14/11, câu "Hey Lamp" giữa phần đọc lại một sự kiện và câu
   "Yes." của nó đã được trả lời như một lời gọi, và câu đồng ý thấy sự kiện
   đã bị bỏ (#6363). Kiểm thử:
