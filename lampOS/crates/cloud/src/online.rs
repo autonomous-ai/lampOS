@@ -107,15 +107,100 @@ pub fn tls_from(value: Option<&str>) -> bool {
     value == Some("on")
 }
 
+/// The broker's plain MQTT port.
+pub const PLAIN_PORT: u16 = 1883;
+/// The broker's TLS port (MQTT over TLS).
+pub const TLS_PORT: u16 = 8883;
+
+/// The port the lamp connects to for an account's `port`: with TLS off,
+/// never the broker's TLS port but its plain one; else as given. On
+/// Fourteen's lamp, 14 Nov, a rotated account named 8883 with TLS off: the
+/// lamp spoke plain MQTT to it, read the broker's TLS alert as "Promised
+/// boundary crossed, contains 768 bytes" and never came back online.
+pub fn port_for(port: u16, tls: bool) -> u16 {
+    if !tls && port == TLS_PORT {
+        PLAIN_PORT
+    } else {
+        port
+    }
+}
+
+/// The one line said when [`port_for`] moves `account` off its port: the
+/// account itself is kept as the backend gave it.
+pub fn plain_port_line(account: &Account, tls: bool) -> Option<String> {
+    (port_for(account.mqtt_port, tls) != account.mqtt_port).then(|| {
+        format!(
+            "the account names the broker's TLS port {TLS_PORT} with {TLS_ENVIRONMENT} off: \
+             connecting to its plain port {PLAIN_PORT}, the account kept as it is"
+        )
+    })
+}
+
 /// The client's options for `account`: V1's, with this lamp's keepalive,
-/// over TLS (1.2 and 1.3, the webpki roots, as the ping has it) when `tls`.
+/// over TLS (1.2 and 1.3, the webpki roots, as the ping has it) when `tls`,
+/// on [`port_for`]'s port.
 pub fn options_with(account: &Account, tls: bool) -> Option<MqttOptions> {
     options_at(
         account,
         account.mqtt_endpoint.trim(),
-        account.mqtt_port,
+        port_for(account.mqtt_port, tls),
         tls,
     )
+}
+
+/// The most of a reply [`first_bytes`] says.
+const FIRST_BYTES: usize = 8;
+/// How long [`first_bytes`] waits, connecting and reading.
+const FIRST_BYTES_WITHIN: Duration = Duration::from_secs(3);
+
+/// Whether the broker's reply could not be read as MQTT (Backend, 14 Nov:
+/// "which packet trips it"), so its first bytes are worth a line.
+pub fn not_mqtt(error: &rumqttc::v5::ConnectionError) -> bool {
+    matches!(
+        error,
+        rumqttc::v5::ConnectionError::MqttState(rumqttc::v5::StateError::Deserialization(_))
+    )
+}
+
+/// What `host:port` answers an anonymous MQTT 5 CONNECT with: at most
+/// [`FIRST_BYTES`] of it, as hex, within [`FIRST_BYTES_WITHIN`]. The probe
+/// carries no login, so the line never holds one, and only the reply's
+/// first bytes are said, never what a message may carry past them.
+pub async fn first_bytes(host: &str, port: u16) -> String {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    const CLIENT: &[u8] = b"lamp-cloud-probe";
+    // Protocol "MQTT", level 5, a clean start, a 60 s keepalive, no
+    // properties; the payload is the client id alone.
+    let mut body = vec![
+        0x00, 0x04, b'M', b'Q', b'T', b'T', 0x05, 0x02, 0x00, 0x3c, 0x00,
+    ];
+    body.extend_from_slice(&(CLIENT.len() as u16).to_be_bytes());
+    body.extend_from_slice(CLIENT);
+    let mut connect = vec![0x10, body.len() as u8];
+    connect.extend_from_slice(&body);
+    let asked = async {
+        let mut stream = tokio::net::TcpStream::connect((host, port)).await?;
+        stream.write_all(&connect).await?;
+        let mut reply = [0u8; FIRST_BYTES];
+        let read = stream.read(&mut reply).await?;
+        Ok::<_, std::io::Error>(reply[..read].to_vec())
+    };
+    let at = format!("the broker's {host}:{port}");
+    match tokio::time::timeout(FIRST_BYTES_WITHIN, asked).await {
+        Ok(Ok(reply)) => {
+            let hex: Vec<String> = reply.iter().map(|byte| format!("{byte:02x}")).collect();
+            format!(
+                "{at} answers an anonymous CONNECT with {} bytes: {}",
+                reply.len(),
+                hex.join(" ")
+            )
+        }
+        Ok(Err(error)) => format!("{at} answers no anonymous CONNECT: {}", error.kind()),
+        Err(_) => format!(
+            "{at} answers no anonymous CONNECT within {} s",
+            FIRST_BYTES_WITHIN.as_secs()
+        ),
+    }
 }
 
 /// [`options_with`] to `host` and `port` in place of the account's broker:
@@ -617,6 +702,11 @@ async fn session(
         say.line("the broker's TLS cannot be set up (LAMP_CLOUD_TLS): not connecting in the clear in its place");
         return std::future::pending().await;
     };
+    if let Some(line) = plain_port_line(account, tls_on()) {
+        say.line(&line);
+    }
+    // A reply that is not MQTT has its first bytes said once (Backend, 14 Nov).
+    let mut first_bytes_said = false;
     let (mut client, mut events) = AsyncClient::new(options, 64);
     let mut wait = first;
     // Over WSS after `wss::FAILURES` failed TCP connections in a row, with
@@ -1009,11 +1099,19 @@ async fn session(
                 }
                 // The error names a code or an I/O kind, never the login.
                 tell(say, format!("offline, trying again: {error}"));
+                if not_mqtt(&error) && bridge.is_none() && !tls_on() && !first_bytes_said {
+                    first_bytes_said = true;
+                    let port = port_for(account.mqtt_port, false);
+                    say.line(&first_bytes(account.mqtt_endpoint.trim(), port).await);
+                }
                 if bridge.is_none() {
                     tcp_failures = if failed { tcp_failures + 1 } else { 0 };
                     let url = ws_url.borrow().clone();
                     if crate::wss::over(tcp_failures, &url) == crate::wss::Over::Wss {
-                        let tcp = (account.mqtt_endpoint.trim().to_owned(), account.mqtt_port);
+                        let tcp = (
+                            account.mqtt_endpoint.trim().to_owned(),
+                            port_for(account.mqtt_port, tls_on()),
+                        );
                         match crate::wss::Bridge::open(url, tcp, crate::wss::TCP_AGAIN).await {
                             Ok(opened) => {
                                 say.line(&format!(
@@ -1807,6 +1905,77 @@ mod tests {
                 .max_packet_size(),
             Some(MOST_PACKET_BYTES)
         );
+    }
+
+    /// The first builder, 14 Nov 13:5x: a lamp with `LAMP_CLOUD_TLS` off whose
+    /// rotated account names the broker's TLS port spoke plain MQTT to 8883 on
+    /// Fourteen's lamp, and the broker's TLS alert (`15 03 03 00 02 02 0a`) was
+    /// read as "Promised boundary crossed, contains 768 bytes"; it never came
+    /// back online. With TLS off it never connects to the TLS port: the plain
+    /// one, the account as it is. With TLS on, or any other port, as given.
+    #[test]
+    fn with_tls_off_the_broker_s_tls_port_is_never_connected_to() {
+        assert_eq!(port_for(TLS_PORT, false), PLAIN_PORT);
+        assert_eq!(port_for(TLS_PORT, true), TLS_PORT);
+        assert_eq!(port_for(PLAIN_PORT, false), PLAIN_PORT);
+        assert_eq!(port_for(1884, false), 1884);
+        let rotated = account(TLS_PORT);
+        let plain = options_with(&rotated, false).unwrap();
+        assert_eq!(plain.broker_address(), ("127.0.0.1".to_owned(), PLAIN_PORT));
+        assert!(matches!(plain.transport(), rumqttc::Transport::Tcp));
+        assert_eq!(rotated.mqtt_port, TLS_PORT, "the account is kept");
+        let tls = options_with(&rotated, true).unwrap();
+        assert_eq!(tls.broker_address(), ("127.0.0.1".to_owned(), TLS_PORT));
+        assert_eq!(
+            plain_port_line(&rotated, false).as_deref(),
+            Some(
+                "the account names the broker's TLS port 8883 with LAMP_CLOUD_TLS off: \
+                 connecting to its plain port 1883, the account kept as it is"
+            )
+        );
+        assert_eq!(plain_port_line(&rotated, true), None);
+        assert_eq!(plain_port_line(&account(PLAIN_PORT), false), None);
+    }
+
+    /// Backend, 14 Nov 13:5x: before a reply that can't be read as MQTT, the
+    /// lamp journals what the broker's port first answers, so the packet
+    /// that tripped it is known. The captured reply of a TLS port to plain
+    /// MQTT is that error, and its first bytes are said as they came: never
+    /// the login, which the probe's anonymous CONNECT doesn't carry.
+    #[tokio::test]
+    async fn a_reply_that_is_not_mqtt_has_its_first_bytes_journaled() {
+        const ALERT: [u8; 7] = [0x15, 0x03, 0x03, 0x00, 0x02, 0x02, 0x0a];
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let served = tokio::spawn(async move {
+            let mut asked = Vec::new();
+            for _ in 0..2 {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut connect = [0u8; 256];
+                let read = stream.read(&mut connect).await.unwrap();
+                asked.push(connect[..read].to_vec());
+                stream.write_all(&ALERT).await.unwrap();
+            }
+            asked
+        });
+        let (_client, mut events) =
+            rumqttc::v5::AsyncClient::new(options_with(&account(port), false).unwrap(), 4);
+        let error = events.poll().await.unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Mqtt state: Mqtt serialization/deserialization error: Promised boundary crossed, contains 768 bytes"
+        );
+        assert!(not_mqtt(&error));
+        assert_eq!(
+            first_bytes("127.0.0.1", port).await,
+            "the broker's 127.0.0.1:".to_owned()
+                + &port.to_string()
+                + " answers an anonymous CONNECT with 7 bytes: 15 03 03 00 02 02 0a"
+        );
+        let asked = served.await.unwrap();
+        assert!(!String::from_utf8_lossy(&asked[1]).contains("s3cret-pw"));
+        assert!(!String::from_utf8_lossy(&asked[1]).contains("lamp\0"));
+        assert_eq!(asked[1][0], 0x10, "a CONNECT");
     }
 
     /// `LAMP_CLOUD_TLS`: on, the broker is reached over TLS; off, as V1's.
