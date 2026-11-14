@@ -3310,6 +3310,7 @@ pub fn serve(
     // A skill the heard words plainly ask for by its name, called in code
     // as round 1 with the skills as they are offered now (#6772): with a
     // skills' folder and `LAMP_SKILL_NAMED=on`. The start says it once.
+    let tools_for_asks = tools.clone();
     let skills_named = (crate::skill_named::on()
         && !crate::tools::every_skills_folder(&tools).is_empty())
     .then(|| {
@@ -4071,6 +4072,15 @@ pub fn serve(
     }
     if reads_back_by_words {
         engine = engine.reading_back_by_words(Arc::new(crate::make_skill_local::read_back_heard));
+    }
+    // A called skill's recording plays for a line holding its own ask to
+    // play (#5749), the skills' files read only for such a refusal.
+    if !crate::tools::every_skills_folder(&tools_for_asks).is_empty() {
+        engine = engine.playing_for_skill_asks(Arc::new(move |function: &str| {
+            crate::tools::skill_asks(&tools_for_asks)
+                .remove(function)
+                .unwrap_or_default()
+        }));
     }
     if let Some(settings) = skills_named {
         let named = crate::skill_named::Heard::new(settings);

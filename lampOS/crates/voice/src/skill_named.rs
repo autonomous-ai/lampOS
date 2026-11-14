@@ -282,6 +282,16 @@ fn holds(words: &[String], phrase: &[&str]) -> bool {
             .any(|window| window.iter().zip(phrase).all(|(said, word)| said == word))
 }
 
+/// Whether the heard line holds `ask`, one of a skill's `asks` never
+/// refused ([`ask_refused`]), as words in a row ([`holds`]), wherever in
+/// the line: what `crate::requested_audio::asks_to_play_or_skill_ask`
+/// lets a called skill's recording play for (#5749).
+pub fn line_holds_ask(heard: &str, ask: &str) -> bool {
+    let phrase = lower_words(ask);
+    let phrase: Vec<&str> = phrase.iter().map(String::as_str).collect();
+    ask_refused(ask).is_none() && holds(&lower_words(heard), &phrase)
+}
+
 /// Why `ask`, one of a skill's `asks` (#6772), is never matched, if it is
 /// refused: lamp-skills refuses such a skill as it loads
 /// (`lamp_skills`' `checked_asks`), and [`wanted`] drops the phrase all
