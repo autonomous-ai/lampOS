@@ -5197,6 +5197,30 @@ mod tests {
         );
     }
 
+    /// #7019 (a): no app choice and no look yet after a start, the targets
+    /// file saying OpenClaw: work naming no engine runs on the build's
+    /// default, Hermes, and the targets answer says it.
+    #[test]
+    fn with_no_app_choice_and_no_look_yet_the_builds_default_wins_over_the_targets_file() {
+        use crate::runtime::{LampSide, lamp_default, lamp_order};
+        let side = LampSide::new(std::path::PathBuf::new());
+        assert_eq!(side.app_choice(), None);
+        assert_eq!(side.reported(), None);
+        let mut engine = lamp_engine_rig(lamp_order(&side), lamp_default(&side));
+        let request = lamp_prepare(&engine, "lamp", None);
+        engine.handle(&request, &clock(0), false).unwrap();
+        assert_eq!(launched_engine(&engine), EngineKind::Hermes);
+        let told = engine
+            .handle(&Request::Targets {}, &clock(0), false)
+            .unwrap();
+        assert!(
+            told["targets"].as_array().unwrap().contains(
+                &json!({"alias":"lamp","engine":"hermes","engines":["hermes","openclaw"]})
+            ),
+            "{told}"
+        );
+    }
+
     #[test]
     fn no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it() {
         use EngineKind::{Codex, Hermes, Openclaw};

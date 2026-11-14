@@ -429,6 +429,21 @@ fn refresh_lamp_reported(side: &LampSide, known: &Known, listed: &[AccountMachin
     }
 }
 
+/// Whether the app's choice went while the part runs (#7019): not yet
+/// built, nothing goes.
+pub fn app_choice_dropped(_side: &LampSide, _engine_default: &Path) -> bool {
+    false
+}
+
+/// The lamp target's engine in the targets file put to the lamp's default
+/// (#7019): not yet built, nothing is written.
+pub fn lamp_target_to_default(_targets: &Path, _side: &LampSide) -> io::Result<Written> {
+    Ok(Written {
+        changed: false,
+        said: String::new(),
+    })
+}
+
 /// The file in the tasks folder where the owner's choice of the lamp's
 /// default engine in the app is kept (#6492): `{"version":1,"engine":
 /// "hermes"}`. Read at start; the lamp's reset wipes it with the folder.
@@ -5927,7 +5942,9 @@ mod tests {
         // The build's default (the switches' order) first, then Harness's.
         let side = LampSide::with_order(PathBuf::new(), vec![Openclaw, Hermes]);
         assert_eq!(lamp_order(&side), [Openclaw, Hermes], "before a look");
-        assert_eq!(lamp_default(&side), None, "the targets file's, as before");
+        // #7019: the build's default before a look, never the targets
+        // file's.
+        assert_eq!(lamp_default(&side), Some(Openclaw), "before a look");
         *side.reported.lock().unwrap() = Some(reported.clone());
         assert_eq!(lamp_order(&side), [Openclaw, Codex, Hermes, Claude]);
         assert_eq!(lamp_default(&side), Some(Openclaw));
@@ -6053,6 +6070,77 @@ mod tests {
         );
         assert!(targets["lamp"].validate().is_ok());
         assert_eq!(targets["office"].engine, EngineKind::Claude);
+    }
+
+    /// #7019 (lamp-52e6, 10:35): the first look at the machines timed
+    /// out, so nothing is known of the lamp's engines and nothing is
+    /// reported. The default is still the build's, Hermes, never the
+    /// targets file's OpenClaw.
+    #[test]
+    fn a_first_look_that_times_out_leaves_the_builds_default_hermes() {
+        let side = LampSide::new(PathBuf::new());
+        assert_eq!(side.app_choice(), None);
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+        ];
+        // The look timed out: no engines known for any computer.
+        refresh_lamp_reported(&side, &Known::default(), &listed);
+        assert_eq!(side.reported(), None);
+        assert_eq!(lamp_default(&side), Some(EngineKind::Hermes));
+        assert_eq!(lamp_order(&side).first(), Some(&EngineKind::Hermes));
+    }
+
+    /// #7019 (b): when the app's choice goes (its file removed), the lamp
+    /// target's engine in the targets file is written as the lamp's
+    /// default, Hermes; the other targets are kept, the file stays this
+    /// part's own, and a file someone wrote by hand is left as it is.
+    #[test]
+    fn when_the_apps_choice_goes_the_lamp_targets_engine_is_rewritten_to_the_default() {
+        use EngineKind::{Claude, Hermes, Openclaw};
+        let dir = tempfile::tempdir().unwrap();
+        let targets = dir.path().join("targets.json");
+        let file = dir.path().join(ENGINE_DEFAULT_FILE);
+        let listed = [
+            machine('a', "lamp", true),
+            machine('b', "Office iMac", false),
+        ];
+        let lamp = "a".repeat(32);
+        let on = |engine| BTreeMap::from([(lamp.clone(), engine)]);
+        // The app chose OpenClaw, and the machines' look wrote the lamp on it.
+        let side = LampSide::new(dir.path().join("home"));
+        let openclaw = Request::AppEngineDefault {
+            engine: "openclaw".into(),
+        };
+        app_engine_default_operation(&openclaw, Some(&side), &file).unwrap();
+        write_targets_from_machines(&targets, &listed, Claude, &on(Openclaw)).unwrap();
+        assert_eq!(read_targets(&targets).unwrap()["lamp"].engine, Openclaw);
+        // Kept: nothing goes.
+        assert!(!app_choice_dropped(&side, &file));
+        assert_eq!(side.app_choice(), Some(Openclaw));
+        // The file removed: the choice goes, and the lamp's target is the
+        // default's.
+        fs::remove_file(&file).unwrap();
+        assert!(app_choice_dropped(&side, &file));
+        assert_eq!(side.app_choice(), None);
+        assert!(!app_choice_dropped(&side, &file), "gone once");
+        let written = lamp_target_to_default(&targets, &side).unwrap();
+        assert!(written.changed, "{}", written.said);
+        let now = read_targets(&targets).unwrap();
+        assert_eq!(now["lamp"].engine, Hermes);
+        assert_eq!(now["lamp"].machine_id, lamp);
+        assert_eq!(now["office"].engine, Claude);
+        // Again: unchanged.
+        assert!(!lamp_target_to_default(&targets, &side).unwrap().changed);
+        // Still this part's own: the machines write it again.
+        let again = write_targets_from_machines(&targets, &listed, Claude, &on(Openclaw)).unwrap();
+        assert!(again.changed, "{}", again.said);
+        // A targets file written by hand is never touched.
+        let hand = fs::read(&targets).unwrap();
+        let _ = fs::remove_file(written_mark(&targets));
+        let left = lamp_target_to_default(&targets, &side).unwrap();
+        assert!(!left.changed, "{}", left.said);
+        assert_eq!(fs::read(&targets).unwrap(), hand);
     }
 
     /// #6226: OpenClaw's settings at the part's start: merged into
