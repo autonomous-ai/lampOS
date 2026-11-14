@@ -4,7 +4,7 @@
 # bot gives it, so a hold lifted in holds-lifted.tsv is lifted here too (its absence threw away trains 129 and 130).
 # 3 Nov 15:4x (the Reviewer-lead's read of #5068): it rechecks everything the bot's eligibility reads from comments, not
 # only markers.py: a Queue HOLD (on any Queue issue, lib.sh) on the PR's head (qholds.py) and a TWO READS ask now short (reads2.py), with
-# markers only from writers (lib.sh). Any fetch error fails (exit 1): the train isn't merged.
+# markers only from writers (lib.sh). 14 Nov: and its lamp row (rows.py). Any fetch error fails (exit 1): the train isn't merged.
 # Paths from the environment (README.md): TOOLS_DIR (default: this folder), LAMP_COORD_STATE, PYTHON (default: python3).
 TOOLS_DIR="${TOOLS_DIR:-${0:A:h}}"
 source $TOOLS_DIR/lib.sh
@@ -28,5 +28,8 @@ for p in "$@"; do
   git rev-list origin/lamp-voice..$head > $tmp/commits 2>/dev/null || { echo "#$p: its commits can't be listed"; exit 1; }
   two=$(cat $tmp/b $tmp/c | $PYTHON -I $TOOLS_DIR/reads2.py --always --writers $wf --queue $tmp/q --pr $p --pr-commits $tmp/commits $heads)
   [[ $two == none || $two == met* ]] || { echo "#$p: TWO READS ${two:-unread}"; exit 1; }
+  # 14 Nov (the lead): its lamp row, as train-bot.sh asks it (rows.py): a ROW line or a reader's "no row needed" on this head.
+  rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf --pr $p $heads < $tmp/c)
+  [[ $rw == row || $rw == no-row-needed ]] || { echo "#$p: no lamp row (rows.py: ${rw:-failed})"; exit 1; }
 done
 exit 0

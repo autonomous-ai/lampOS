@@ -18,7 +18,7 @@
 #   WORKTREE_NC       the no-crates lane's (default: $LAMP_COORD_STATE/wt-trainbot-nc)
 #   NOCRATES_LANE     on (default): two lanes, crate trains and no-crates trains side by side (#5212 part 3, below);
 #                     off: one lane, as before
-#   PYTHON            the Python for markers.py, reads2.py and qholds.py (default: python3)
+#   PYTHON            the Python for markers.py, reads2.py, rows.py and qholds.py (default: python3)
 #   Markers count only from logins with write access: $LAMP_COORD_STATE/writers.txt (fetched, an hour's cache) plus
 #   $LAMP_COORD_STATE/writers-extra.txt (lib.sh). A PR whose head is in another repository is never carried.
 TOOLS_DIR="${TOOLS_DIR:-${0:A:h}}"
@@ -84,7 +84,7 @@ head_green() {
   return 1
 }
 eligible() {
-  local p head ok sha held two own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
+  local p head ok sha held two rw own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
   # 3 Nov 15:4x (the Reviewer-lead's HOLD on #5068): the repo is public, so markers count only from accounts with write
   # access (lib.sh, coord_writers). Every fetch fails closed: without the writers list, or without the Queue (every
   # issue in lib.sh's COORD_QUEUE_ISSUES) and so its HOLDs, no PR is eligible this round; without a PR's head, comments or body, that PR is not.
@@ -199,6 +199,16 @@ eligible() {
     fi
     [[ $two == none || $two == met* ]] || { once reads2$p "#$p left out: reads2.py said '${two}'"; continue; }
     fine reads2$p
+    # 14 Nov (the lead): a behaviour PR's lamp row comes before its train. A writer's `ROW` line on the PR (or a tester's
+    # "lamp row for #N"), or a reader's "no row needed" in a READ-OK on this head (or a same-patch one), for docs, tests,
+    # or code behind a switch that's off (rows.py). A DEFAULT-ON always needs its row. Any other answer fails closed.
+    rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf --pr $p $heads < $cf)
+    if [[ $rw == none ]]; then
+      grep -qx "$p norow $head" $told || { say "#$p left out: no ROW line and no reader's \"no row needed\" on head ${head:0:9}" >&2; tell "$p norow $head"; }
+      continue
+    fi
+    [[ $rw == row || $rw == no-row-needed ]] || { once rows$p "#$p left out: rows.py said '${rw}'"; continue; }
+    fine rows$p
     # 13 Nov: with --always no PR rides on one read, so a ONE READ opt-out (4 Nov, #5305; 7 Nov, #5635) no longer lowers
     # it, and its once-a-head line is gone with it.
     # 30 Oct 15:0x (the Reviewer-lead's 14:58): a PR whose own ARM64 run on this head is red sits out. #4507's run was red
@@ -514,6 +524,13 @@ lane_round() {
   if (( two )); then run_train $lane & job[$lane]=$!; else run_train $lane; fi
   return 0
 }
+# dropped PR KEY WHY: say "#PR left out: WHY" once per head (its ref eligible() fetched), for the PRs train-hold.txt and
+# train-only.txt drop below. 14 Nov: trains 905-907 left out #7016 and #7022 with no line in the log because
+# train-only.txt didn't name them.
+dropped() {
+  local h=$(git rev-parse -q --verify refs/remotes/pr/$1 2>/dev/null)
+  grep -qx -- "$1 $2 $h" $told || { say "#$1 left out: $3" >&2; tell "$1 $2 $h"; }
+}
 while true; do
   # A lane in the background stopped the bot (halt): let the other lane's train finish, then stop.
   if [[ -f $SP/train-bot.stop ]]; then (( ${#job} )) && wait; say "stopped for the first builder"; exit 2; fi
@@ -542,12 +559,12 @@ while true; do
   # 28 Oct 11:5x (first builder): PRs named in $LAMP_COORD_STATE/train-hold.txt sit out (read, but owing a lamp run the
   # lead's 09:36 merge condition asks of onboarding fixes), so a READ-OK alone doesn't carry them.
   if [[ -s $SP/train-hold.txt && -n ${list[1]} ]]; then
-    kept=(); for p in $list; do grep -qw $p $SP/train-hold.txt || kept+=$p; done; list=($kept)
+    kept=(); for p in $list; do if grep -qw $p $SP/train-hold.txt; then dropped $p hold "named in train-hold.txt"; else kept+=$p; fi; done; list=($kept)
   fi
   # 28 Oct 09:5x (first builder): the lead's 12:00 onboarding deadline. While $LAMP_COORD_STATE/train-only.txt is there, a
   # train carries only the PRs it names (in train-first.txt's order), so a failure elsewhere costs no onboarding rerun.
   if [[ -f $SP/train-only.txt && -n ${list[1]} ]]; then
-    only=(); for p in $list; do grep -qw $p $SP/train-only.txt && only+=$p; done; list=($only)
+    only=(); for p in $list; do if grep -qw $p $SP/train-only.txt; then only+=$p; else dropped $p only "not named in train-only.txt"; fi; done; list=($only)
   fi
   if (( ! two )); then
     # One lane, as before.

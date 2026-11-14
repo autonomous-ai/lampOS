@@ -166,11 +166,12 @@ class Repo(unittest.TestCase):
         self.git("push", "-q", "-f", "origin", "HEAD:refs/pull/%d/head" % n)
         self.git("fetch", "-q", "origin", "+refs/pull/%d/head:refs/remotes/pr/%d" % (n, n))
         self.fakefile("head-%d.txt" % n, h + "\n")
-        # 13 Nov: every PR needs two signed readers (reads2.py --always), so a ready PR here has two.
+        # 13 Nov: every PR needs two signed readers (reads2.py --always), so a ready PR here has two. 14 Nov: and its lamp
+        # row (rows.py), here a reader's "no row needed".
         self.fakefile("comments-%d.json" % n,
                       json.dumps({"login": "w1", "body": "READ-OK " + h + "\n\nReviewer-lead, 01:00",
                                   "created_at": "2026-11-04T01:00:00Z"}) + "\n"
-                      + json.dumps({"login": "w1", "body": "READ-OK " + h + "\n\nHeron, 01:05",
+                      + json.dumps({"login": "w1", "body": "READ-OK " + h + "\n\nHeron, 01:05: no row needed, tests only.",
                                     "created_at": "2026-11-04T01:05:00Z"}) + "\n")
         return h
 
@@ -417,10 +418,12 @@ class MergeNoArm64(Repo):
 
 
 class BotDryRound(Repo):
-    def bot(self, before=None, **extra):
-        self.pr(7, [TOOL])
-        self.pr(8, ["lampOS/crates/x/src/lib.rs"])
-        self.pr(9, ["lampOS/docs/controls.md"])
+    def bot(self, before=None, again=False, **extra):
+        # again: the same PRs and heads as the last round (a new commit could get a new head).
+        if not again:
+            self.pr(7, [TOOL])
+            self.pr(8, ["lampOS/crates/x/src/lib.rs"])
+            self.pr(9, ["lampOS/docs/controls.md"])
         self.fakefile("prs.txt", "7\n8\n9\n")
         self.fakefile("heads.txt", "".join("%d %s\n" % (n, open(os.path.join(self.fake, "head-%d.txt" % n)).read().strip())
                                            for n in (7, 8, 9)))
@@ -563,6 +566,84 @@ class BotDryRound(Repo):
         r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("#8: TWO READS short 1", r.stdout)
+
+    # 14 Nov (the lead): a PR's lamp row comes before its train: a ROW line on the PR, or a reader's "no row needed" in a
+    # READ-OK on its head (rows.py), in the bot and in still-eligible.sh.
+    def no_row(self, n, *more):
+        with open(os.path.join(self.fake, "head-%d.txt" % n)) as f:
+            h = f.read().strip()
+        cs = [{"login": "w1", "body": "READ-OK " + h + "\n\nReviewer-lead, 01:00", "created_at": "2026-11-04T01:00:00Z"},
+              {"login": "w1", "body": "READ-OK " + h + "\n\nHeron, 01:05", "created_at": "2026-11-04T01:05:00Z"}]
+        cs += [{"login": "w1", "body": b % h, "created_at": "2026-11-04T01:10:00Z"} for b in more]
+        self.fakefile("comments-%d.json" % n, "".join(json.dumps(c) + "\n" for c in cs))
+        return h
+
+    def test_a_pr_with_two_reads_and_no_row_sits_out(self):
+        hs = []
+        r, lines = self.bot(before=lambda: hs.append(self.no_row(7)))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn('#7 left out: no ROW line and no reader\'s "no row needed" on head %s' % hs[0][:9], r.stderr)
+        self.assertIn("dry: crate lane: would carry 8 9 onto " + self.base[:9], lines)
+        self.assertIn("dry: no-crates lane: nothing eligible", lines)
+        # Said once per head.
+        r, lines = self.bot(again=True)
+        self.assertNotIn("#7 left out: no ROW line", r.stderr)
+        self.assertNothingChanged()
+
+    def test_a_row_line_carries_it(self):
+        for row in ("ROW 7 %s on build 12700: the journal line", "**ROW** 7 %s on build 12700",
+                    "Fifth, 09:51 GMT+7: lamp row for #7 on lamp-52e6 at %s"):
+            shutil.rmtree(self.state, ignore_errors=True)
+            r, lines = self.bot(before=lambda: self.no_row(7, row))
+            self.assertIn("dry: no-crates lane: would carry 7 onto " + self.base[:9], lines, row)
+
+    def test_a_quoted_row_or_another_prs_row_does_not(self):
+        for row in ("> ROW 7 %s on build 12700", "lamp row for #70 on lamp-52e6 at %s"):
+            shutil.rmtree(self.state, ignore_errors=True)
+            r, lines = self.bot(before=lambda: self.no_row(7, row))
+            self.assertIn("dry: no-crates lane: nothing eligible", lines, row)
+
+    def test_no_row_needed_in_a_read_ok_on_the_head_carries_it(self):
+        r, lines = self.bot(before=lambda: self.no_row(7, "READ-OK %s\n\nSixth, 01:10: docs only, no row needed."))
+        self.assertIn("dry: no-crates lane: would carry 7 onto " + self.base[:9], lines)
+        self.assertNotIn("#7 left out", r.stderr)
+
+    def test_no_row_needed_outside_a_read_ok_does_not(self):
+        r, lines = self.bot(before=lambda: self.no_row(7, "Sixth, 01:10: on %s, no row needed."))
+        self.assertIn("#7 left out: no ROW line", r.stderr)
+        self.assertIn("dry: no-crates lane: nothing eligible", lines)
+
+    def test_still_eligible_fails_with_no_row(self):
+        self.pr(8, ["lampOS/crates/x/src/lib.rs"])
+        os.makedirs(self.state, exist_ok=True)
+        self.no_row(8)
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("#8: no lamp row (rows.py: none)", r.stdout)
+        self.no_row(8, "ROW 8 %s on build 12700")
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    # 14 Nov: trains 905-907 left out #7016 and #7022 with no line because train-only.txt didn't name them. Each PR
+    # train-hold.txt or train-only.txt drops is said once per head.
+    def state_file(self, name, body):
+        os.makedirs(self.state, exist_ok=True)
+        with open(os.path.join(self.state, name), "w") as f:
+            f.write(body)
+
+    def test_the_prs_train_only_and_train_hold_drop_are_said(self):
+        r, lines = self.bot(before=lambda: (self.state_file("train-only.txt", "8\n9\n"), self.state_file("train-hold.txt", "9\n")))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("#9 left out: named in train-hold.txt", r.stderr)
+        self.assertIn("#7 left out: not named in train-only.txt", r.stderr)
+        self.assertNotIn("#8 left out", r.stderr)
+        self.assertIn("dry: crate lane: would carry 8 onto " + self.base[:9], lines)
+        self.assertIn("dry: no-crates lane: nothing eligible", lines)
+        # Said once per head.
+        r, lines = self.bot(again=True)
+        self.assertNotIn("left out: not named in train-only.txt", r.stderr)
+        self.assertNotIn("left out: named in train-hold.txt", r.stderr)
+        self.assertNothingChanged()
 
     def test_either_queue_unread_makes_nothing_eligible(self):
         for issue in QUEUE:
