@@ -1053,9 +1053,6 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    V1's Jev client does (#811 point 2).
    It never writes `/etc/lampOS/body/lamp.env`, and says that the body waits
    for it.
-   **PARKED (#6386): install does none of this paragraph and touches no
-   name or time server; `lamp-update region` and the two units are out of
-   the product (the units in `deploy/product/parked/`); re-enable when China is scheduled and stable's lamp-update carries #6810.**
    **Name and time servers: China's on a lamp placed in China only**
    (#6256, #6414; `install::region_servers`, also `lamp-update region`). The
    region is the one `lamp-cloud` keeps from the ping's reply in
@@ -1121,8 +1118,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    target (`lamp-setup.service`, `lamp-waking.service`,
    `lamp-setup-wifi-restore.service` and `lamp-setup-recover.service`,
    [setup.md](setup.md)), `lamp-records.timer`, `lamp-selftest.timer`,
-   `lamp-update-back.timer`, `lampos-setup-done.path` (`lamp-region.service`
-   and `lamp-region.path`, #6256, are PARKED (#6386), above), and the helpers'
+   `lamp-update-back.timer`, `lampos-setup-done.path`, `lamp-region.service`
+   and `lamp-region.path` (#6256, below), and the helpers'
    sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket`,
    `lamp-setup-wifi.socket` and `lamp-eyes-camera.socket` (`install::enabled`;
    a test holds this list to it; #2853; each template is started by its socket,
