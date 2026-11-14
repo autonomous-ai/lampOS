@@ -2791,6 +2791,15 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
             false,
         ),
         ("var/lib/lampos-hermes/.hermes/kanban.db", false),
+        // lamp-c0a4's own names, 14 Nov 15:47 (#6343): Hermes 0.22.2's
+        // logins and locks, gone; its dependency record, kept.
+        ("var/lib/lampos-hermes/.hermes/auth.json", false),
+        ("var/lib/lampos-hermes/.hermes/shared/nous_auth.json", false),
+        ("var/lib/lampos-hermes/.hermes/.mcp-discovery.lock", false),
+        (
+            "var/lib/lampos-hermes/.hermes/installs/3ecd8e65a8ac18db/facts.json",
+            true,
+        ),
         // OpenClaw: the program, kept.
         ("var/lib/lampos-openclaw/node/bin/node", true),
         ("var/lib/lampos-openclaw/npm/bin/openclaw", true),
@@ -2824,6 +2833,19 @@ fn a_reset_forgets_hermes_and_openclaw_per_person_files_and_keeps_both_programs(
         ),
         (
             "var/lib/lampos-openclaw/state/config-journal-fingerprint.key",
+            false,
+        ),
+        // lamp-c0a4's own names, 14 Nov 15:47 (#6343): OpenClaw's databases.
+        (
+            "var/lib/lampos-openclaw/state/state/openclaw.sqlite-wal",
+            false,
+        ),
+        (
+            "var/lib/lampos-openclaw/state/state/openclaw-quarantine.sqlite",
+            false,
+        ),
+        (
+            "var/lib/lampos-openclaw/state/agents/main/agent/openclaw-agent.sqlite",
             false,
         ),
     ];
@@ -3309,6 +3331,106 @@ fn a_resumed_reset_stops_the_openclaw_gateway_before_finishing() {
         ["list-units", "stop", "skills", "agents", "sync", "sync"]
     );
     assert!(reset::WRITERS.contains(&reset::OPENCLAW_GATEWAY));
+}
+
+/// lamp-c0a4, 13 and 14 Nov (#6343): the lingering service user's own
+/// systemd manager, outside `lampos.target`, runs Harness's daemon and the
+/// Hermes it launched. A reset in place left both running: the old daemon
+/// kept the last owner's connection and computer id, `harness start` failed
+/// until a reboot, and the old Hermes kept writing its state. A product
+/// reset stops that manager with the lamp, before the wipe, and starts it
+/// again in place, before setup, as a boot would.
+#[test]
+fn a_product_reset_stops_the_agents_user_manager_and_starts_it_again() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    let manager = "user@996.service loaded active running User Manager for UID 996\n";
+    let mut fake = product_lamp();
+    fake.writers.push_str(manager);
+    fake.agents = 1;
+    let steps = reset::reset(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert_eq!(steps.last(), Some(&Step::Started));
+    let argvs = fake.argvs.borrow();
+    let calls = fake.calls.borrow();
+    let stop = argvs
+        .iter()
+        .position(|argv| argv[1] == "stop" && argv.iter().any(|unit| unit == "lampos.target"))
+        .unwrap();
+    assert!(
+        argvs[stop].iter().any(|unit| unit == "user@996.service"),
+        "stopped with the lamp: {:?}",
+        argvs[stop]
+    );
+    assert!(stop < calls.iter().position(|call| call == "agents").unwrap());
+    assert_eq!(
+        argvs.last().unwrap(),
+        &[
+            "/bin/systemctl",
+            "start",
+            "lamp-skills-manage.socket",
+            "lamp-update-back.timer",
+            "lamp-update.service",
+            "user@996.service",
+            "lamp-setup.service"
+        ]
+        .map(String::from)
+    );
+    // An inactive manager (Harness off, no linger) is not started.
+    let mut fake = product_lamp();
+    fake.writers
+        .push_str("user@996.service loaded inactive dead User Manager for UID 996\n");
+    let plan = lamp(&root);
+    reset::reset(&plan, &mut fake).unwrap();
+    assert!(
+        !fake
+            .argvs
+            .borrow()
+            .last()
+            .unwrap()
+            .iter()
+            .any(|unit| unit == "user@996.service")
+    );
+}
+
+/// A reset finished at boot after a power cut: the lingering user's manager
+/// started at boot, its Harness daemon with the old owner's sign-in. It is
+/// stopped before the wipe, as OpenClaw's gateway is, and started again
+/// after it, so the daemon starts fresh (#6343).
+#[test]
+fn a_resumed_reset_stops_the_agents_user_manager_and_starts_it_after() {
+    let root = Root::new();
+    let plan = lamp(&root);
+    fs::write(&plan.journal, b"{}").unwrap();
+    let mut fake = Fake {
+        writers: "user@996.service loaded active running User Manager for UID 996\n".into(),
+        agents: 1,
+        ..Fake::default()
+    };
+    let steps = reset::resume(&plan, &mut fake).unwrap();
+    wiped(&root);
+    assert!(steps.contains(&Step::AgentsForgotten));
+    let argvs = fake.argvs.borrow();
+    assert_eq!(
+        argvs[1],
+        ["/bin/systemctl", "stop", "user@996.service"].map(String::from)
+    );
+    assert_eq!(
+        argvs.last().unwrap(),
+        &["/bin/systemctl", "start", "user@996.service"].map(String::from)
+    );
+    assert_eq!(
+        *fake.calls.borrow(),
+        [
+            "list-units",
+            "stop",
+            "skills",
+            "agents",
+            "sync",
+            "sync",
+            "start"
+        ]
+    );
 }
 
 /// The agents' files go after the plan's wipes and the skills, said by no
