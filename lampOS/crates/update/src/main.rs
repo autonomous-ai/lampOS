@@ -822,6 +822,17 @@ fn onto_current(config: &Config, tried: &mut Option<String>) {
                 *tried = Some(build);
             }
         }
+        own::Reexec::Outside(running) => {
+            static SAID: std::sync::Once = std::sync::Once::new();
+            SAID.call_once(|| {
+                eprintln!(
+                    "lamp-update: this program ({}) is no build's under {}: it serves on, not {}'s",
+                    running.display(),
+                    own::FOLDER,
+                    own::CURRENT
+                )
+            });
+        }
         own::Reexec::Same | own::Reexec::Waits => {}
     }
 }
