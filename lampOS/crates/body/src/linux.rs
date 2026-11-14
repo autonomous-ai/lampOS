@@ -353,10 +353,12 @@ pub fn run_body(
     match owner.prepare(config, None, &mut port, origin, &mut cancelled) {
         Ok(()) => {
             port.prepared_us = Some(micros(origin));
+            let notify = lamp_keeper::Notify::from_environment();
             let mut runtime = HostRuntime {
                 origin,
                 cancelled: &mut cancelled,
                 recovery_inhibited: Some(&recovery_inhibited),
+                notify: Some(&notify),
             };
             let mut io = LinuxPort {
                 fd: owner.fd.as_ref().expect("prepared tty"),
@@ -409,6 +411,7 @@ pub fn let_go_once(
                 origin,
                 cancelled: &mut cancelled,
                 recovery_inhibited: None,
+                notify: None,
             };
             let mut io = LinuxPort {
                 fd: owner.fd.as_ref().expect("prepared tty"),
@@ -442,6 +445,7 @@ fn inspect_once_with(
                 origin,
                 cancelled: &mut cancelled,
                 recovery_inhibited: None,
+                notify: None,
             };
             // The only hardware write path is the private, fixed inspection plan.
             let mut port = LinuxPort {
@@ -481,6 +485,7 @@ pub fn inspect_repeatedly(
                 origin,
                 cancelled: &mut cancelled,
                 recovery_inhibited: None,
+                notify: None,
             };
             let mut port = LinuxPort {
                 fd: owner.fd.as_ref().expect("prepared tty"),
@@ -535,6 +540,8 @@ struct HostRuntime<'a, F> {
     origin: Instant,
     cancelled: &'a mut F,
     recovery_inhibited: Option<&'a dyn Fn() -> bool>,
+    /// systemd, for a start that moves before READY=1 (#5693).
+    notify: Option<&'a lamp_keeper::Notify>,
 }
 impl<F: FnMut() -> io::Result<bool>> Runtime for HostRuntime<'_, F> {
     fn now(&self) -> Duration {
@@ -545,6 +552,11 @@ impl<F: FnMut() -> io::Result<bool>> Runtime for HostRuntime<'_, F> {
     }
     fn recovery_inhibited(&self) -> bool {
         self.recovery_inhibited.is_some_and(|inhibited| inhibited())
+    }
+    fn extend_start(&mut self, by: Duration) {
+        if let Some(notify) = self.notify {
+            notify.extend_timeout(by);
+        }
     }
 }
 

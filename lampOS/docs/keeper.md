@@ -156,10 +156,16 @@ Through the keeper's helper (`crates/keeper`), each part:
 Without `NOTIFY_SOCKET` (a part run by hand) the helper does nothing.
 A part's unit becomes `Type=notify` with a `WatchdogSec=` only once the
 part calls the helper; a `Type=notify` unit whose process never says ready
-fails its start after `TimeoutStartSec` (90 s). Today only the body does:
-`WatchdogSec=5`. A body whose loop is silent for five seconds is ended and
-started again after 15 s, within its limit. Its servos hold their last goal
-meanwhile, with torque on; it does not fold.
+fails its start after `TimeoutStartSec` (90 s by default). Today only the
+body does: `WatchdogSec=5`. A body whose loop is silent for five seconds is
+ended and started again after 15 s, within its limit. Its servos hold their
+last goal meanwhile, with torque on; it does not fold.
+
+A part still starting that knows it needs longer says so with
+`extend_timeout` (`EXTEND_TIMEOUT_USEC`): systemd then waits at least that
+long from then. The body does before each move of a fold and wake at
+power-up, which come before it says ready (#5693), and its product unit
+sets `TimeoutStartSec=180` as a backstop.
 
 ## Named states and the pause
 
