@@ -569,7 +569,7 @@ mod tests {
                 engines: true,
                 tasks: true,
                 one_path: true,
-                gateway_runs: false,
+                gateway_runs: true,
             }
         );
         assert!(restart_for(started, now));
@@ -591,9 +591,11 @@ mod tests {
         let no_path = update_switches(root.path(), true, one_path_off);
         assert!(no_path.tasks && !no_path.one_path);
         assert!(restart_for(now, no_path));
-        // A gateway default agent's runs (#6882): no product file sets it,
-        // so off; set in the environment, on, with tasks on only.
-        assert!(!now.gateway_runs);
+        // A gateway default agent's runs (#6882): on from the product file
+        // since 14 Nov (#7019), on a product lamp only, as tasks; set in the
+        // environment, on, with tasks on only.
+        assert!(now.gateway_runs);
+        assert!(!other.gateway_runs);
         let runs = |name: &str| (name == crate::agent_ns::GATEWAY_RUNS_SWITCH).then(|| "on".into());
         assert!(update_switches(root.path(), true, runs).gateway_runs);
         assert!(!update_switches(root.path(), false, runs).gateway_runs);
@@ -611,13 +613,12 @@ mod tests {
         let not_exact =
             |name: &str| (name == crate::agent_ns::GATEWAY_RUNS_SWITCH).then(|| "On".into());
         assert!(!update_switches(root.path(), true, not_exact).gateway_runs);
-        // From the file on a product lamp, as tasks; on another lamp, not.
-        let mut file = std::fs::read(&at).unwrap();
-        file.extend_from_slice(b"LAMP_SKILL_GATEWAY_RUNS=on\n");
-        std::fs::write(&at, &file).unwrap();
-        assert!(update_switches(root.path(), true, unset).gateway_runs);
-        assert!(!update_switches(root.path(), false, unset).gateway_runs);
+        // Off in the environment holds it off over the file.
         assert!(!update_switches(root.path(), true, runs_off).gateway_runs);
+        // A file without its line (a build before 14 Nov): off, tasks on.
+        std::fs::write(&at, b"LAMP_APP_ENGINES=on\nLAMP_SKILL_TASKS=on\n").unwrap();
+        let older = update_switches(root.path(), true, unset);
+        assert!(older.tasks && !older.gateway_runs);
         std::fs::write(
             &at,
             include_bytes!("../../../deploy/product/settings/update.env"),

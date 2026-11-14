@@ -64,6 +64,10 @@ Environment=LAMP_SKILL_TASKS=on
 # included, running the one agent namespace; read only with LAMP_SKILL_TASKS on, and taken from
 # /etc/lampOS/update.env like the two above. lamp-tasks reads the same name. On in the product (13 Nov).
 Environment=LAMP_SKILL_DEFAULT_AGENT=on
+# A skill's run on a gateway agent (#6882, docs/tasks.md): OpenClaw's wrapper carries its gateway data and its
+# namespace shows lamp-control's socket; read only with LAMP_SKILL_TASKS and LAMP_SKILL_DEFAULT_AGENT on, and taken
+# from /etc/lampOS/update.env like the three above. lamp-tasks reads the same name. On in the product (14 Nov, #7019).
+Environment=LAMP_SKILL_GATEWAY_RUNS=on
 
 [Install]
 WantedBy=multi-user.target
