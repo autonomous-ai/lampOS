@@ -74,8 +74,8 @@
 //!   lamp, its speaker is busy or an answer is owed (never for the room's
 //!   speech nobody addresses to it), is refused paused or muted, and has no
 //!   quiet gap or one-in-30-s rarity. The prepare-unplug skill's exact lines
-//!   don't wait for a conversation, as they answer it
-//!   ([`Says::exact_answers`], #6899). `spoken` means played whole, as a sound's.
+//!   don't wait for a conversation, as they answer it, only for a turn
+//!   still on its way and anyone heard ([`Says::exact_answers`], #6899). `spoken` means played whole, as a sound's.
 //!   lamp-control adds `by`, the asking computer's name (lamp-control's
 //!   alone, with exact `text` only), so that `voice/line` (#4209) can tell
 //!   whose words they were; every line the voice plays without the model,
@@ -2275,8 +2275,10 @@ impl Says {
     /// Whether the next exact line is the prepare-unplug skill's (#6899):
     /// its lines answer the person's own unplug conversation (the turn-off
     /// ask, the update line after a yes, the stay after a no), so a
-    /// conversation going on doesn't hold them, only the lamp's speaker
-    /// and an answer owed. Held for the conversation, the update line
+    /// conversation going on doesn't hold them, only the lamp's speaker,
+    /// a turn still on its way to it, anyone heard and an answer owed
+    /// (#7060: taken while the "No." was still queued, the stay line was
+    /// dropped). Held for the conversation, the update line
     /// after "Yes." waited out its 30 s and was never said (row-5747n D,
     /// lamp-52e6, build 12200).
     pub fn exact_answers(&self) -> bool {

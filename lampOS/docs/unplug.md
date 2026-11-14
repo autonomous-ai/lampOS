@@ -101,7 +101,11 @@ below). An ordinary bedtime request belongs to the bedtime skill.
    a computer's exact line: they answer the person's own unplug conversation
    (`Says::exact_answers`, #6899: on lamp-52e6 at 12200, 12 Nov, "Yes." under
    an update lock got the model's own turn, and the `updating` line waited out
-   its 30 s behind it and was never said). An owner's language other than English hears them in
+   its 30 s behind it and was never said). They still wait, as a `quiet` line
+   with no gap, for a turn still on its way to the speaker and for anyone
+   heard (#7060: on lamp-52e6, "No." to the ask was still queued when the
+   `stay` line came, and taken at once the line was dropped, "the voice has
+   gone"). An owner's language other than English hears them in
    its own words: each is a fixed line (`language::FIXED_LINES`, second-voice.md,
    "The fixed lines"; #5777's P3). Once one is played to `spoken`, Voice keeps
    it in the thread as the lamp's own line, so the chat model's next turn has it
