@@ -1038,7 +1038,7 @@ fn a_wider_reach_and_speed_can_be_chosen_only_inside_their_caps() {
             ..tuning
         },
         Tuning {
-            speed: 801,
+            speed: 301,
             ..tuning
         },
         Tuning {
@@ -18201,8 +18201,9 @@ fn unit_limits() -> Limits {
 }
 
 /// Level 1 is today exactly: the unit's limits and stand pace come back
-/// unchanged, and 0 (the switch off, nothing said) is level 1. The cap
-/// takes level 5's 800 and refuses 801.
+/// unchanged, and 0 (the switch off, nothing said) is level 1. `--speed`
+/// keeps its 300 cap, switch on or off; only the energy table goes past it,
+/// to `ENERGY_SPEED_CAP`.
 #[test]
 fn energy_level_one_is_the_unit_exactly() {
     let unit = unit_limits();
@@ -18229,16 +18230,19 @@ fn energy_level_one_is_the_unit_exactly() {
         ),
         format!("{unit:?}")
     );
+    let top = crate::energy::TABLE.iter().map(|row| row.speed).max();
+    assert_eq!(top, Some(Tuning::ENERGY_SPEED_CAP));
+    const { assert!(Tuning::ENERGY_SPEED_CAP <= Tuning::SERVO_SPEED_CAP) };
     let tuning = Tuning {
         reach: [150, 15, 1, 250],
-        speed: 800,
+        speed: 300,
         servo_speed: 1_000,
         servo_acceleration: 60,
     };
     assert!(Limits::folded_with(tuning).is_ok());
     assert!(
         Limits::folded_with(Tuning {
-            speed: 801,
+            speed: 800,
             ..tuning
         })
         .is_err()
