@@ -7785,8 +7785,16 @@ impl Engine {
             ]);
         }
         // A search reads what was heard before its call, to know which
-        // turn asked for it (#2179): the program's own reading too.
-        if self.skills.iter().any(|skill| skill.search.is_some()) {
+        // turn asked for it (#2179): the program's own reading too. So does
+        // a light show, which stops on the same words (#5744): without it,
+        // the asking turn is not known and its own late words stop it.
+        if self.skills.iter().any(|skill| {
+            skill.search.is_some()
+                || skill
+                    .steps
+                    .iter()
+                    .any(|(_, step)| matches!(step, Step::Call(Call::Show { .. })))
+        }) {
             topics.push(Speech::TOPICS[0].to_owned());
         }
         topics.sort();
