@@ -160,6 +160,8 @@ Keys of a trigger:
 - Timing: `for` (the test holds this long), `absent_for`, `gap`,
   `cooldown`, `wait` (at most 1 h), `rise = { by, within }`,
   `rearm` (`"leaves"`, `"ends"`, or `{ above | below, for }`).
+- `lively = true`: its `cooldown` and `rearm` follow the energy level
+  (`LAMP_BODY_ENERGY`, [skills.md](skills.md)); level 1 as written.
 - `during` (a window), `days` (with `during`: `["mon", "fri"]`,
   `"weekdays"` or `"weekend"`, the days the window opens on),
   `once_per_day` (with a `name` and `during`), `unless_heard`.
