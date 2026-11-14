@@ -84,7 +84,7 @@ head_green() {
   return 1
 }
 eligible() {
-  local p head ok sha held two rw own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl
+  local p head ok sha held two rw sw own wf qf=$SP/queue.jsonl cf=$SP/pr-comments.jsonl bf=$SP/pr-body.jsonl; local -a so
   # 3 Nov 15:4x (the Reviewer-lead's HOLD on #5068): the repo is public, so markers count only from accounts with write
   # access (lib.sh, coord_writers). Every fetch fails closed: without the writers list, or without the Queue (every
   # issue in lib.sh's COORD_QUEUE_ISSUES) and so its HOLDs, no PR is eligible this round; without a PR's head, comments or body, that PR is not.
@@ -202,7 +202,17 @@ eligible() {
     # 14 Nov (the lead): a behaviour PR's lamp row comes before its train. A writer's `ROW` line on the PR (or a tester's
     # "lamp row for #N"), or a reader's "no row needed" in a READ-OK on this head (or a same-patch one), for docs, tests,
     # or code behind a switch that's off (rows.py). A DEFAULT-ON always needs its row. Any other answer fails closed.
-    rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf --pr $p $heads < $cf)
+    # 14 Nov (the readers' P3s on #7034): a ROW line names this PR, a FAIL row is no row, and a PR whose diff turns a
+    # LAMP_ switch on in a product unit (coord_switch_on; an unread diff leaves it out) needs a row: "no row needed"
+    # doesn't carry it (rows.py --switch-on).
+    sw=$(coord_switch_on $head) || { once switch$p "#$p left out: its diff can't be read for a switch turned on"; continue; }
+    fine switch$p
+    so=(); [[ $sw == on ]] && so=(--switch-on)
+    rw=$($PYTHON -I $TOOLS_DIR/rows.py --writers $wf $so --pr $p $heads < $cf)
+    if [[ $rw == none && $sw == on ]]; then
+      grep -qx "$p norow-on $head" $told || { say "#$p left out: it turns a switch on in the product, and no ROW line names it on head ${head:0:9}" >&2; tell "$p norow-on $head"; }
+      continue
+    fi
     if [[ $rw == none ]]; then
       grep -qx "$p norow $head" $told || { say "#$p left out: no ROW line and no reader's \"no row needed\" on head ${head:0:9}" >&2; tell "$p norow $head"; }
       continue

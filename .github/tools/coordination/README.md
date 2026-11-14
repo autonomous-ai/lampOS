@@ -18,7 +18,7 @@ Each script keeps its dated comments. They are the history of each rule.
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
 | `markers.py [--writers FILE] [--held] [PR]` | Reads a PR's comments and review bodies as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. With `--held`, a held PR that has a READ-OK prints `<READ-OK sha> <key>=<commit> …`, one per standing HOLD (the train bot logs it once per head), else nothing. With `--ignored`, it prints `READ-OK <sha7> by <login> ignored: not a writer` for each READ-OK skipped because its login isn't a writer (the train bot logs each once per head). `markers.py --merge COMMENTS REVIEWS` merges the two fetches into one list in time order (`lib.sh`). |
 | `reads2.py [--always] [--writers FILE] [--queue QUEUE_JSONL --pr N] HEAD_SHA [EARLIER_HEAD...]` | Reads the PR body, comments and review bodies as JSON lines, and the Queue's comments with `--queue`. Prints `none`, `met N` or `short N` for a TWO READS ask. A READ-OK for an earlier head given (the bot gives those with the same patch) counts as one for the head. |
-| `rows.py [--writers FILE] --pr N HEAD_SHA [EARLIER_HEAD...]` | Reads the PR's comments and review bodies as JSON lines. Prints `row`, `no-row-needed` or `none`: whether the PR has its lamp row (see "A lamp row before a train" below). |
+| `rows.py [--writers FILE] [--switch-on] --pr N HEAD_SHA [EARLIER_HEAD...]` | Reads the PR's comments and review bodies as JSON lines. Prints `row`, `no-row-needed` or `none`: whether the PR has its lamp row (see "A lamp row before a train" below). With `--switch-on`, "no row needed" never carries. |
 | `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments and review bodies as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
 | `lib.sh` | Sourced by the scripts: the writers list and the fetches, each failing closed, and the build-input and lane tests (`coord_input`, `coord_lane`), read from `lampos-arm64.yml`'s and `lampos-sdk.yml`'s `pull_request` paths. |
 | `lane.sh PR...` | Prints the lane each PR goes to, as the bot decides it. Read-only but for local fetches. |
@@ -182,10 +182,12 @@ If any Queue issue (#4710, #5385, #6059, #6809 or #6811) can't be fetched, no PR
 
 **A lamp row before a train (14 Nov, the lead).** A PR's lamp row comes before its train. The train bot and `still-eligible.sh` call `rows.py`, and a PR is eligible only when a writer's comment has one of these:
 
-- a first line opening with `ROW` (bold allowed): `ROW <PR> <head> on build N …`, with the journal line;
+- a first line opening with `ROW` and this PR's number, with or without `#` (bold allowed): `ROW <PR> <head> on build N …`, with the journal line. A ROW line naming another PR, or no PR, is no row;
 - `lamp row for #N`, for this PR, in its first 300 characters (a tester's row: "Fifth, 09:51 GMT+7: lamp row for #6907 on lamp-52e6 …");
-- "no row needed" in a READ-OK whose first line is the marker, for the PR's head (or an earlier head with the same patch). This is for docs, tests, or code behind a switch that's off. A DEFAULT-ON always needs its row.
+- "no row needed" in a READ-OK whose first line is the marker, for the PR's head (or an earlier head with the same patch). This is for docs, tests, or code behind a switch that's off.
 
+A failed row is no row: a ROW or `lamp row for #N` comment whose first 300 characters say `FAIL` or `VOID`, and not `PASS` (the words, in capitals), doesn't count.
+A switch-on needs a real row: when the PR's own diff adds a line `Environment=LAMP_…=on` to a `.service` or `.conf` file under `lampOS/deploy/product/` (`lib.sh`, `coord_switch_on`), the bot and `still-eligible.sh` pass `--switch-on`, and "no row needed" doesn't carry it. Its log line says so: `#N left out: it turns a switch on in the product, and no ROW line names it on head <sha>`. A diff that can't be read leaves the PR out.
 None of them counts on a quoted line or inside a fenced code block. Without one, the PR sits out: `#N left out: no ROW line and no reader's "no row needed" on head <sha>`, once per head. Any other answer from `rows.py` leaves the PR out too (fail closed).
 
 **Markers.**
