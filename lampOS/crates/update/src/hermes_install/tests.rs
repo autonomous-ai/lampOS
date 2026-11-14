@@ -3313,7 +3313,13 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     fs::create_dir_all(&stubs).unwrap();
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
                 if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
-                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n";
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n\
+                if [ \"${0##*/}\" = mount ] && [ -f \"$LINK\" ] && [ \"$4\" = \"$(cat \"$LINK\")\" ]; then /bin/mkdir -p \"${4%/*}\" && /bin/ln -s /elsewhere \"$4\" || exit 9; fi\n";
+    // `mount`, for the path named in the `link` file, leaves a link at
+    // that bind target: the target, seen through the `installs` bind, is
+    // the source's directory entry swapped for a link after the `-L`
+    // checks, and a `stat` of it matches the source's (#7043).
+    let link = base.join("link");
     for name in ["mount", "umount", "findmnt", "mkdir", "rmdir"] {
         let path = stubs.join(name);
         fs::write(&path, stub).unwrap();
@@ -3345,6 +3351,7 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
             .env("LOG", &log)
             .env("FAIL_ON", fail_on)
             .env("SWAP", &swap)
+            .env("LINK", &link)
             .env("HOME", "/lasting");
         match home {
             Some(home) => command.env(HOME_ENV, home),
@@ -3602,6 +3609,53 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         );
     }
     fs::remove_file(&swap).unwrap();
+    // Heron's P3 on #7043: a source swapped for a link after the `-L`
+    // checks but before its `stat` gives the link's own device and inode,
+    // and the target, the same directory entry seen through the
+    // `installs` bind, is that link, so the two match. A bind target that
+    // is a link after the mount is unmounted at once all the same, and the
+    // make ends before the lasting home is hidden.
+    for (target, refusal) in [
+        (
+            format!("{x}/i/k/.install.lock"),
+            "Hermes install lock not shown",
+        ),
+        (
+            format!("{x}/i/k/pm-runtime/.prepare.lock"),
+            "Hermes runtime lock not shown",
+        ),
+        (
+            format!("{x}/i/k/environments/g1/.leases"),
+            "Hermes leases not shown",
+        ),
+        (
+            format!("{x}/i/k/pm-runtime/generations/r1/.leases"),
+            "Hermes leases not shown",
+        ),
+    ] {
+        let _ = fs::remove_dir_all(base.join("x"));
+        fs::write(&link, &target).unwrap();
+        let (out, lines) = run(Some(&home), "");
+        assert!(!out.status.success(), "{target}");
+        assert!(out.stdout.is_empty(), "Hermes never runs: {target}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains(refusal),
+            "{target} {out:?}"
+        );
+        let bound = lines
+            .iter()
+            .position(|line| {
+                line.starts_with("mount -n --bind ") && line.ends_with(&format!(" {target}"))
+            })
+            .expect(&target);
+        assert_eq!(
+            lines[bound + 1..],
+            [format!("umount -n {target}")],
+            "{target}"
+        );
+    }
+    fs::remove_file(&link).unwrap();
+    let _ = fs::remove_dir_all(base.join("x"));
     // A home outside the work folder's `lamp`, or missing, is refused
     // before anything is mounted.
     let other = base.join("other/make-task-1/home");
