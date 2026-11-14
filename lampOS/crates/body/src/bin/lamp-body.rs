@@ -799,6 +799,8 @@ fn gesture_asked(
         priority: Option<lamp_body::moves::Priority>,
         #[serde(default)]
         replace: bool,
+        #[serde(default)]
+        lively: bool,
     }
     let message: Message = serde_json::from_slice(datagram).ok()?;
     let clip = lamp_body::clips::named(message.gesture).or_else(|| moves.named(message.gesture))?;
@@ -806,6 +808,7 @@ fn gesture_asked(
         source: message.source,
         priority: message.priority,
         replace: message.replace,
+        lively: message.lively,
     };
     Some((clip, asker))
 }
@@ -909,6 +912,7 @@ fn held_to(
             source,
             priority: Some(held),
             replace: asker.replace,
+            lively: asker.lively,
         },
         cut,
     )
@@ -1735,6 +1739,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
     let gesture_asked = std::cell::Cell::new(None);
     // Whether the gesture kept this step asked to replace the one playing.
     let gesture_replace = std::cell::Cell::new(false);
+    let gesture_lively = std::cell::Cell::new(false);
     let asked_by: std::cell::RefCell<Option<(&'static str, String)>> = Default::default();
     // What was dropped as it was read, two asks in one step, to be told on
     // `body/gesture` with the step's news.
@@ -1848,6 +1853,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                             };
                             let asked = (clip, asker.priority());
                             let replace = asker.replace;
+                            let lively = asker.lively;
                             let source = asker
                                 .source
                                 .map(|source| source.chars().take(64).collect::<String>());
@@ -1890,6 +1896,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                             if kept == asked {
                                 *asked_by.borrow_mut() = source.map(|source| (clip.name, source));
                                 gesture_replace.set(replace);
+                                gesture_lively.set(lively);
                             }
                         }
                         (Heard::Mood(mood, level), _) => {
@@ -2547,6 +2554,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 |(clip, priority)| (Some(clip), priority),
             );
             let replace = gesture_replace.take() && gesture.is_some();
+            let lively = gesture_lively.take() && gesture.is_some();
             let asked = lamp_body::body::Asked {
                 seen: eyes(),
                 gesture,
@@ -2574,6 +2582,7 @@ fn run(arguments: Arguments) -> Result<bool, Box<dyn std::error::Error>> {
                 night_woke: night.as_ref().is_some_and(|night| night.waking()),
                 aim_from_home: false,
                 replace,
+                lively,
                 energy: energy_in.as_mut().map_or(0, |energy| energy.level()),
             };
             // Read all the same, so that nothing kept from before the pause
@@ -3484,6 +3493,7 @@ mod tests {
             source: source.map(str::to_owned),
             priority,
             replace: false,
+            lively: false,
         };
         let skills = caller("lamp-skills.service", 990);
         // A skill claiming the person is held to skill, its own name kept.
@@ -4633,6 +4643,22 @@ mod tests {
         }
     }
 
+    /// `"lively": true` (an energy level's own start, #6893) is read on a
+    /// gesture and on a move, with or without arbitration; absent, false.
+    #[test]
+    fn a_lively_mark_is_read_on_a_gesture_and_a_move() {
+        let moves = lamp_body::moves::Loaded::default();
+        let mut sent = lamp_body::moves::Sent::default();
+        for on in [true, false] {
+            let mut heard =
+                |datagram: &str| heard_asked(datagram.as_bytes(), &moves, &mut sent, on).1;
+            assert!(heard(r#"{"gesture":"nod","lively":true}"#).lively, "{on}");
+            assert!(!heard(r#"{"gesture":"nod"}"#).lively, "{on}");
+            let moved = r#"{"move":{"name":"lively","step_ms":500,"frames":[[0,0,0,0,0],[20,0,30,0,0],[20,0,30,0,0],[0,0,0,0,0]]},"lively":true,"source":"skill:music-sway","priority":"skill"}"#;
+            assert!(heard(moved).lively, "{on}");
+        }
+    }
+
     /// A gesture or a move may say who asks, and a priority that is not one
     /// of the five refuses it, as does any other field. Only under
     /// --arbitration on is who asks weighed; off it is ignored.
@@ -4647,6 +4673,7 @@ mod tests {
             source: Some("skill:dance".into()),
             priority: Some(Priority::Skill),
             replace: false,
+            lively: false,
         };
         let asked = r#"{"gesture":"nod","source":"skill:dance","priority":"skill"}"#;
         assert_eq!(
@@ -4692,6 +4719,7 @@ mod tests {
             source: None,
             priority: Some(Priority::Skill),
             replace: false,
+            lively: false,
         };
         assert_eq!(
             heard(asked, false),
