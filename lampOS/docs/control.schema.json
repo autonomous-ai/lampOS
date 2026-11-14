@@ -2218,17 +2218,6 @@
         },
         "asleep": {
           "type": "boolean"
-        },
-        "quiet_hours": {
-          "description": "Planned: not produced yet. With quiet hours set (off by default), the door refuses say and sound in them, or while the lamp's local time isn't known, with the error `quiet_hours` (control.md, quiet hours); this state key is a later piece.",
-          "type": "boolean"
-        },
-        "lease": {
-          "description": "Who holds a lease now, by client name, if anyone.",
-          "type": [
-            "string",
-            "null"
-          ]
         }
       }
     },
