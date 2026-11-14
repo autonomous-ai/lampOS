@@ -1135,8 +1135,10 @@ impl Tuning {
     /// The largest reach that may be chosen: about 16 degrees up, 2 down,
     /// 9 of roll and 22 of yaw.
     pub const REACH_CAP: [u16; 4] = [180, 25, 100, 250];
-    /// Level 5 of `crate::energy` (#6893, #6885); the unit runs 300.
-    pub const SPEED_CAP: u16 = 800;
+    pub const SPEED_CAP: u16 = 300;
+    /// The pose's top speed at any level of `crate::energy` (#6893): level
+    /// 5's. Only the energy table goes past `SPEED_CAP`; `--speed` does not.
+    pub const ENERGY_SPEED_CAP: u16 = 800;
     pub const SERVO_SPEED_CAP: u16 = 1_000;
     pub const SERVO_ACCELERATION_CAP: u8 = 150;
 }
