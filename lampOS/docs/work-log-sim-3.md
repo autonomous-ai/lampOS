@@ -3,6 +3,24 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 11:0x GMT+7: ten's bus speaker PR B (#7020); the contract checked
+
+- **A gap of about 3 hours** between checks (loop prompts queued). Meanwhile:
+  - trains 899–905 landed, including #7002 (PR A, train 902);
+  - the freeze before the promote; 12987 promoted.
+  - Nothing named me but #7020.
+- **#7020** (ten, PR B, voice half, behind `--speaker-device bus:speaker1`):
+  - The contract matches my `bus_speaker.rs`: `Audio::PLAY_TOPIC` =
+    `speaker1/play`; header and `json+pcm` 24 kHz mono S16LE; blocks up to
+    10 ms; a refused block still spends its number, so it shows as missing
+    on my side.
+  - On macOS, `cargo check` exits 0 at c5b1b118fe, but `soft_pcm` and
+    voice's `bus_speaker` are `cfg(linux)`. Noted on #7020 (not a read);
+    the split goes with step 3.
+  - On Linux, `--real-voice=second` could use `bus:speaker1` once it lands
+    (my follow-up).
+- My #7020 note's header said 10:5x at 11:03; edited.
+
 ## 2026-11-14 06:0x GMT+7: #7000 merged (train 898)
 
 - Train 898 (#7004) merged #7000 as b7ab44c730: the voice's watcher now ends
