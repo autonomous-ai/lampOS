@@ -2451,7 +2451,12 @@ mục kỹ năng; chúng được nhập qua app, vào kho của root như token
 và tới lần chạy chỉ qua một tệp môi trường đọc một lần; agent không bao giờ
 hỏi khóa bằng giọng nói. Tắt trừ khi `LAMP_SKILL_SECRETS=on`, không unit nào
 đặt; `lamp-voice`, `lamp-cloud`, `lamp-services` và `lamp-tasks serve` cùng
-đọc nó.
+đọc nó. Khi tắt, một tệp nêu tên biến của một khóa hay token (cùng
+`names_in`) bị từ chối ngay lúc tải lên bằng lời rõ ràng, "it needs a key or
+token, which a skill added from a file can't be given on this lamp yet
+(LAMP_SKILL_SECRETS is off)" (`upload_agent::NEEDS_SECRETS`), không bao giờ
+kèm tên: lần chạy của nó không thể được cho khóa, nên đèn nói ngay lúc đó
+thay vì để nó hỏng khi chạy (người xây dựng đầu tiên trên #6911, 14/11).
 
 - **Tên trong tệp, giá trị trong app.** Khi tải lên, đèn đọc tên các biến
   môi trường mà lần chạy cần (`^[A-Z][A-Z0-9_]{2,63}$`, như
