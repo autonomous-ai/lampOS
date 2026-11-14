@@ -1060,7 +1060,12 @@ while it speaks (`energy.rs` `TABLE`):
   at level 5), a holder's pose and its glance, gestures (a clip's roll is laid over the pose instead of
   dropped once `stand_roll` passes `roll`, played under the servo's speed by the stretch below) and the
   tilting shifts at rest. Tilting stood up needs a stand: a body started without `--stand` keeps the
-  roll it was given at every level and says so once in the journal; it starts as ever.
+  roll it was given at every level and says so once in the journal; it starts as ever. The roll's goal
+  moves no faster than `ROLL_SPEED` (300 counts a second, acceleration 6x; `Limits::for_roll`) at any
+  level, never under the unit's speed, while the rest of the pose takes the level's: at 800 a listening
+  tilt that swapped sides (about 340 counts) left the servo about 95 counts behind at a load of about
+  210, and the head met resistance on its roll 1 and 3 times in two level-5 windows against 0 at level 1
+  (lamp-52e6, row-6893g, 15 Nov).
 - **Nod.** Speaking, what Expression asks of the head (its nods as speech pauses) is scaled by the
   level's share before `EXPRESSION_REACH` cuts it, so a nod never goes past that reach (60 counts of
   pitch): on the host Expression's 30 counts nod 30 at level 1 and 42 at level 5.

@@ -18492,6 +18492,101 @@ fn listening_at_level_five_tilts_and_leans_in_and_level_one_is_today() {
     }
 }
 
+/// A standing lamp at an energy `level` listening, at rest for a moment at
+/// 7 s, and listening again (its tilt to the other side) until 14 s: when,
+/// the head's roll goal, the stand.
+fn roll_swapped_at(level: u8) -> Vec<(Duration, u16, f32)> {
+    let (mut lamp, mut clock) = folded(Duration::from_secs(14));
+    lamp.arm_moves = true;
+    lamp.overload_clears = 1;
+    let limits = Limits::folded_with(Tuning {
+        reach: [150, 15, 1, 250],
+        speed: 300,
+        servo_speed: 1_000,
+        servo_acceleration: 60,
+    })
+    .unwrap();
+    let now = clock.time.clone();
+    let seen_at = clock.time.clone();
+    let mut seen = Vec::new();
+    run_alive(
+        &mut lamp,
+        &mut clock,
+        limits,
+        Some(HOME),
+        Some(standing(100, 60)),
+        None,
+        move || {
+            let at = now.get();
+            let resting = at >= Duration::from_secs(7) && at < Duration::from_millis(7_200);
+            Some((
+                if resting {
+                    Mood::Resting
+                } else {
+                    Mood::Listening
+                },
+                60,
+            ))
+        },
+        move || Asked {
+            energy: level,
+            ..Asked::default()
+        },
+        |glimpse| seen.push((seen_at.get(), glimpse.goals[1], glimpse.stand)),
+    );
+    seen
+}
+
+/// #6893, row-6893g on lamp-52e6: at level 5 a listening tilt that swaps
+/// sides (about 340 counts) is followed no faster than `ROLL_SPEED`, level
+/// 1's pace, so the roll servo is not outrun into meeting resistance; level
+/// 1 is today exactly, and the rest of the pose keeps the level's speed.
+#[test]
+fn at_level_five_the_heads_roll_swaps_sides_no_faster_than_level_one() {
+    let lively = roll_swapped_at(5);
+    let stood: Vec<_> = lively
+        .iter()
+        .filter(|step| step.2 >= 1.0 && step.0 < Duration::from_secs(13))
+        .collect();
+    // It does tilt both ways, about 170 counts each.
+    for side in [
+        stood.iter().map(|step| step.1).max().unwrap() - HOME[1],
+        HOME[1] - stood.iter().map(|step| step.1).min().unwrap(),
+    ] {
+        assert!(side >= 160, "{side}");
+    }
+    let mut fastest = 0.0f32;
+    for pair in stood.windows(2) {
+        let seconds = (pair[1].0 - pair[0].0).as_secs_f32();
+        let moved = f32::from(pair[1].1.abs_diff(pair[0].1));
+        // A count of rounding either side.
+        assert!(moved <= ROLL_SPEED * seconds + 2.0, "{pair:?}");
+        fastest = fastest.max(moved / seconds);
+    }
+    assert!(fastest > ROLL_SPEED * 0.8, "{fastest}");
+    assert_eq!(roll_swapped_at(1), roll_swapped_at(0));
+    // Level 1, for any unit's speed, is its own limits; above it only the
+    // roll is held back, and never under the unit's own speed (`--speed`
+    // goes no higher than `Tuning::SPEED_CAP`, 300).
+    for speed in [120, Tuning::SPEED_CAP] {
+        let base = Limits::folded_with(Tuning {
+            reach: [150, 15, 1, 250],
+            speed,
+            servo_speed: 1_000,
+            servo_acceleration: 60,
+        })
+        .unwrap();
+        let same = base.for_roll(base);
+        assert_eq!(
+            [same.speed, same.acceleration],
+            [base.speed, base.acceleration]
+        );
+        let five = base.at(5).for_roll(base);
+        assert_eq!(five.speed, f32::from(speed).max(ROLL_SPEED));
+        assert_eq!(base.at(5).speed, 800.0);
+    }
+}
+
 /// What each mood leans toward: speaking and reading `LEAN` at every
 /// level, listening only from level 3, resting and thinking never.
 #[test]
