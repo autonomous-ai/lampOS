@@ -43,7 +43,7 @@ fn main() -> std::process::ExitCode {
         }
     }
 }
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 fn run(args: Args) -> io::Result<()> {
     let config = Config::read(&args.config)?;
     let channels = lamp_body::runtime::channel::Channels::bind(
@@ -54,7 +54,7 @@ fn run(args: Args) -> io::Result<()> {
     )?;
     lamp_body::runtime::native::run(config, channels, args.parent, args.worker, args.parent_pid)
 }
-#[cfg(not(target_os = "linux"))]
+#[cfg(not(unix))]
 fn run(args: Args) -> io::Result<()> {
     let _ = (
         args.config,
@@ -66,7 +66,7 @@ fn run(args: Args) -> io::Result<()> {
     );
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
-        "motor serial worker requires Linux; no device was opened",
+        "motor serial worker requires a unix system; no device was opened",
     ))
 }
 #[cfg(test)]

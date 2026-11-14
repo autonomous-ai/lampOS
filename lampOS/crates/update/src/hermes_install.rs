@@ -328,6 +328,27 @@ pub const RUNS: &str = "/run/lampos-tasks/runs";
 /// `lamp_tasks::skill_task::SDK_PYTHONPATH`): a run's `PYTHONPATH`.
 pub const SDK_PYTHONPATH: &str = "/usr/local/lib/lampos/sdk-python";
 
+/// The file Hermes's terminal sources before its session's login snapshot
+/// (`terminal.shell_init_files`, written there by lamp-tasks'
+/// `hermes_config::RUN_ENV`, #6684): Hermes's own launcher replaces the
+/// `PYTHONPATH` it is started with, so a skill run's [`SDK_PYTHONPATH`]
+/// never reaches its commands any other way. Root's, 0644: Hermes reads it
+/// and cannot change it.
+pub const RUN_ENV: &str = "/usr/local/lib/lampos/hermes-run-env.sh";
+
+/// [`RUN_ENV`]'s text: [`SDK_PYTHONPATH`] put first on `PYTHONPATH` only
+/// when `LAMP_CONTROL_SOCKET` is set, which only a skill run's start sets
+/// (the wrapper's run lines); a person's own Hermes, or a spoken task,
+/// gets nothing. Already first, it is not added again.
+pub const RUN_ENV_TEXT: &str = "\
+# lampOS: a skill run's lampos SDK on PYTHONPATH (lamp-update writes this file).
+case ${LAMP_CONTROL_SOCKET-} in ?*)
+  case ${PYTHONPATH-} in /usr/local/lib/lampos/sdk-python|/usr/local/lib/lampos/sdk-python:*) ;;
+  *) PYTHONPATH=/usr/local/lib/lampos/sdk-python${PYTHONPATH:+:$PYTHONPATH}; export PYTHONPATH ;;
+  esac ;;
+esac
+";
+
 /// The lines a wrapper finds a skill's run by (#6510 Part 1 step 2), as
 /// text for `concat!`: Harness passes an engine no variable of
 /// lamp-tasks', so the run is named by its folder. Only when `pwd -P` is
@@ -424,7 +445,64 @@ pub const ONE_RUN_LINES: &str = one_run_lines!();
 /// namespace is owned by the new user namespace (one `unshare(2)` with
 /// `CLONE_NEWUSER`), and the variable passed on to [`NS`]; any other
 /// value is unset, so [`NS`] never sees `run` without `--net`.
-const WRAPPER_TASKS_EDITS: [(&str, &str); 2] = [
+/// Where a voice make's own home may be (`lamp_tasks::skill_make`, #6643,
+/// the first builder's 19:14 ruling): a fresh, empty folder in the make's
+/// folder in lamp-tasks' work folder, removed after. With [`TASKS_SWITCH`]
+/// on, [`wrapper_text`] takes [`HOME_ENV`] only when it names one of these
+/// (never with `..`), and [`ns_text`] then makes it Hermes's `HOME`, with
+/// `HERMES_HOME` under it. For a make it also hides Hermes's lasting home
+/// ([`HERMES_HOME`]) under an empty read-only tmpfs, with only the
+/// checkout ([`CHECKOUT`]), `tools` (uv, Python, the package manager) and
+/// `installs` (the dependency record) shown again in it, read-only (but
+/// for what Hermes writes at every start, bound back read-write from the
+/// lasting home before it is hidden: each `installs/<key>/.install.lock`,
+/// `hermes_cli/runtime_state.py` `runtime_lock`, and each lease-managed
+/// generation's `installs/<key>/environments/<gen>/.leases`,
+/// `lease_directory`, and `installs/<key>/pm-runtime/.prepare.lock`,
+/// `pm/runtime.py` `prepare_runtime`, with its generations' `.leases`; no
+/// install lock at all ends it; each of these mounts is `mount -n`, as
+/// `/run` is read-only by then and util-linux could not write its utab),
+/// so the program runs on its prepared runtime (the make's home links `installs`
+/// and `tools` there, `lamp_tasks::skill_make::RUNTIME_LINKS`: Hermes
+/// keeps dependency state per data root and, finding none, would sync its
+/// own first, #6643 on lamp-c0a4) but a make never reads or leaves memory,
+/// sessions or state
+/// there (#6643's HOLDs, 12 Nov 19:58 and 20:0x); leaves [`PLACE`] and
+/// [`WORK`] read-only; and hides the rest of `WORK/lamp` under another,
+/// showing only the make's own folder there, read-write. Any other value
+/// is unset: Hermes started any other way is as before.
+pub const MAKE_HOME_GLOB: &str = "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home";
+/// The variable a voice make's run names its own home in ([`MAKE_HOME_GLOB`]).
+pub const HOME_ENV: &str = "LAMP_NS_HOME";
+/// The line [`wrapper_text`] adds for [`HOME_ENV`], after the token is
+/// exported: lamp-tasks checks it is there before it starts a make.
+pub const WRAPPER_HOME_LINE: &str = "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n";
+/// The lines [`ns_text`] adds for [`HOME_ENV`], before the ids are
+/// dropped (see [`MAKE_HOME_GLOB`]); any step failing ends it before
+/// Hermes runs. lamp-tasks checks they are there before it starts a make.
+pub const NS_HOME_LINE: &str = "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" || fail \"no make staging\"\n  mount -n --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount -n --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount -n --bind \"$H/.hermes/tools\" \"$X/t\" || fail \"no Hermes tools\"\n  mount -n --bind \"$H/.hermes/installs\" \"$X/i\" || fail \"no Hermes installs\"\n  k=\n  for p in \"$H/.hermes/installs\"/*/.install.lock; do\n    [ -f \"$p\" ] && [ ! -L \"$p\" ] || continue\n    mount -n --bind \"$p\" \"$X/i/${p#\"$H/.hermes/installs/\"}\" || fail \"Hermes install lock not shown\"\n    k=1\n  done\n  [ -n \"$k\" ] || fail \"no Hermes install lock: the lasting Hermes has not run\"\n  for p in \"$H/.hermes/installs\"/*/pm-runtime; do\n    [ -d \"$p\" ] || continue\n    [ -f \"$p/.prepare.lock\" ] && [ ! -L \"$p/.prepare.lock\" ] && mount -n --bind \"$p/.prepare.lock\" \"$X/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\" || fail \"Hermes runtime lock not shown\"\n  done\n  for p in \"$H/.hermes/installs\"/*/environments/*/.lease-managed \"$H/.hermes/installs\"/*/pm-runtime/generations/*/.lease-managed; do\n    [ -f \"$p\" ] || continue\n    g=${p%/.lease-managed}\n    { [ -d \"$g/.leases\" ] || mkdir \"$g/.leases\"; } && [ ! -L \"$g/.leases\" ] && mount -n --bind \"$g/.leases\" \"$X/i/${g#\"$H/.hermes/installs/\"}/.leases\" || fail \"Hermes leases not shown\"\n  done\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount -n --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount -n --move \"$X/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  mkdir \"$H/.hermes/installs\" && mount -n --move \"$X/i\" \"$H/.hermes/installs\" && ro \"$H/.hermes/installs\" || fail \"Hermes installs not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount -n --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X k p g\n";
+
+/// With the one run path (#6685, `LAMP_SKILL_DEFAULT_AGENT` on), the
+/// variable Hermes's wrapper data hands a make's home on in to
+/// [`agent_ns::wrapper::NS`]: the run path itself sets [`HOME_ENV`] to the
+/// agent's own home there, so a make's home needs a name of its own.
+pub const MAKE_ENV: &str = "LAMP_NS_MAKE";
+/// [`WRAPPER_HOME_LINE`]'s semantics in Hermes's one run path data
+/// ([`agent`]'s `env`, after [`AGENT_ENV`]): a make's home in
+/// [`MAKE_HOME_GLOB`] (never with `..`) is passed on as [`MAKE_ENV`],
+/// with `HERMES_HOME` under it; any other value leaves [`MAKE_ENV`] unset.
+/// lamp-tasks checks it is there before it starts a make with the one run
+/// path.
+pub const ONE_PATH_HOME_LINE: &str = "  case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_MAKE ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) LAMP_NS_MAKE=$LAMP_NS_HOME HERMES_HOME=\"$LAMP_NS_HOME/.hermes\"; export LAMP_NS_MAKE HERMES_HOME ;; *) unset LAMP_NS_MAKE ;; esac\n";
+/// [`NS_HOME_LINE`]'s make lines as Hermes's data in
+/// [`agent_ns::wrapper::NS`] ([`agent_ns::wrapper::MAKE_HOMES`]), run
+/// only for a [`MAKE_ENV`] that names a make's home for Hermes: the same
+/// steps, with the home in [`MAKE_ENV`] and the staging folder in `Y`
+/// (`X` there is the agent's program). lamp-tasks checks they are there
+/// before it starts a make with the one run path.
+pub const ONE_PATH_NS_MAKE_LINES: &str = "  F=${LAMP_NS_MAKE%/home} Y=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_MAKE\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_MAKE\"\n  mkdir -m 0700 \"$Y\" \"$Y/f\" \"$Y/c\" \"$Y/t\" \"$Y/i\" || fail \"no make staging\"\n  mount -n --bind \"$F\" \"$Y/f\" || fail \"no $F\"\n  mount -n --bind \"$H/.hermes/hermes-agent\" \"$Y/c\" || fail \"no Hermes checkout\"\n  mount -n --bind \"$H/.hermes/tools\" \"$Y/t\" || fail \"no Hermes tools\"\n  mount -n --bind \"$H/.hermes/installs\" \"$Y/i\" || fail \"no Hermes installs\"\n  k=\n  for p in \"$H/.hermes/installs\"/*/.install.lock; do\n    [ -f \"$p\" ] && [ ! -L \"$p\" ] || continue\n    mount -n --bind \"$p\" \"$Y/i/${p#\"$H/.hermes/installs/\"}\" || fail \"Hermes install lock not shown\"\n    k=1\n  done\n  [ -n \"$k\" ] || fail \"no Hermes install lock: the lasting Hermes has not run\"\n  for p in \"$H/.hermes/installs\"/*/pm-runtime; do\n    [ -d \"$p\" ] || continue\n    [ -f \"$p/.prepare.lock\" ] && [ ! -L \"$p/.prepare.lock\" ] && mount -n --bind \"$p/.prepare.lock\" \"$Y/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\" || fail \"Hermes runtime lock not shown\"\n  done\n  for p in \"$H/.hermes/installs\"/*/environments/*/.lease-managed \"$H/.hermes/installs\"/*/pm-runtime/generations/*/.lease-managed; do\n    [ -f \"$p\" ] || continue\n    g=${p%/.lease-managed}\n    { [ -d \"$g/.leases\" ] || mkdir \"$g/.leases\"; } && [ ! -L \"$g/.leases\" ] && mount -n --bind \"$g/.leases\" \"$Y/i/${g#\"$H/.hermes/installs/\"}/.leases\" || fail \"Hermes leases not shown\"\n  done\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount -n --move \"$Y/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount -n --move \"$Y/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  mkdir \"$H/.hermes/installs\" && mount -n --move \"$Y/i\" \"$H/.hermes/installs\" && ro \"$H/.hermes/installs\" || fail \"Hermes installs not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount -n --move \"$Y/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$Y/f\" \"$Y/c\" \"$Y/t\" \"$Y/i\" \"$Y\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_MAKE\n  unset F Y k p g\n";
+
+const WRAPPER_TASKS_EDITS: [(&str, &str); 3] = [
     (
         "# serial device and no lamp process; it is given only lamp-cloud's local forwarder token. It is never run any other way.\n",
         concat!(
@@ -439,6 +517,14 @@ const WRAPPER_TASKS_EDITS: [(&str, &str); 2] = [
         "unset T\n\
          if [ \"${LAMP_NS_NET-}\" = run ]; then N=--net; else N=; unset LAMP_NS_NET; fi\n\
          exec /usr/bin/unshare --map-root-user $N --mount ",
+    ),
+    (
+        "LAMP_NS_UID LAMP_NS_GID\nunset T",
+        concat!(
+            "LAMP_NS_UID LAMP_NS_GID\n",
+            "case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME=\"$LAMP_NS_HOME/.hermes\" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac\n",
+            "unset T"
+        ),
     ),
 ];
 
@@ -474,17 +560,28 @@ pub const AGENT_RUN_ENV: &str = "  # Nobody answers a skill's run: Hermes asks n
   export HERMES_YOLO_MODE
 ";
 
+/// How Hermes takes a skill's run lamp-tasks starts with no Harness
+/// (#6685, the one run path's `agent_task`, `$1` the run's task file): the
+/// task's words read whole (none ends it) and given to `chat -q`, one turn
+/// then its end, as Harness starts the lamp's Hermes with a first prompt
+/// and as lamp-tasks' `skill_task::HermesRunner` (`HERMES_ARGS`) starts
+/// it for a make. Data of Hermes's: only in its wrapper's data block.
+pub const AGENT_TASK: &str = r#"  M=$(cat -- "$1") && [ -n "$M" ] || fail "no task in $1"
+  agent_start chat -q "$M"
+"#;
+
 /// Hermes's data in the one run path's wrapper ([`Shown::one_path`]): its
 /// home [`PLACE`], shown at that path (its checkout's scripts and its
-/// Python name it), its program [`HERMES`], [`AGENT_ENV`] and
-/// [`AGENT_RUN_ENV`].
+/// Python name it), its program [`HERMES`], [`AGENT_ENV`] with a make's
+/// home line ([`ONE_PATH_HOME_LINE`]), [`AGENT_RUN_ENV`] and [`AGENT_TASK`].
 pub fn agent() -> agent_ns::wrapper::Agent {
     agent_ns::wrapper::Agent {
         engine: "hermes".to_owned(),
         home: PLACE.to_owned(),
         program: Some(HERMES.to_owned()),
-        env: AGENT_ENV.to_owned(),
+        env: format!("{AGENT_ENV}{ONE_PATH_HOME_LINE}"),
         run_env: AGENT_RUN_ENV.to_owned(),
+        task: AGENT_TASK.to_owned(),
     }
 }
 
@@ -628,7 +725,7 @@ const SKILLS_EDITS: [(&str, &str); 6] = [
 /// moved back as the skills are (skipped when the folder is not there),
 /// so a pushed skill's script is there for its run; Hermes started any
 /// other way (Harness's panes) never sees it.
-const TASKS_EDITS: [(&str, &str); 6] = [
+const TASKS_EDITS: [(&str, &str); 7] = [
     (
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n",
         "# where these mounts are locked. Any step failing ends it before Hermes runs.\n\
@@ -672,6 +769,13 @@ const TASKS_EDITS: [(&str, &str); 6] = [
          \x20 [ \"$M\" = ready ] || fail \"no model relay on 127.0.0.1:7741\"\n\
          fi\n\
          unset LAMP_NS_NET\n",
+    ),
+    (
+        "U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H\n",
+        concat!(
+            "U=$LAMP_NS_UID G=$LAMP_NS_GID HOME=$H\n",
+            "if [ -n \"${LAMP_NS_HOME-}\" ]; then\n  F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk\n  [ -d \"$LAMP_NS_HOME\" ] && [ -n \"$W\" ] && [ \"${F%/*}\" = \"$W/lamp\" ] || fail \"no $LAMP_NS_HOME\"\n  mkdir -m 0700 \"$X\" \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" || fail \"no make staging\"\n  mount -n --bind \"$F\" \"$X/f\" || fail \"no $F\"\n  mount -n --bind \"$H/.hermes/hermes-agent\" \"$X/c\" || fail \"no Hermes checkout\"\n  mount -n --bind \"$H/.hermes/tools\" \"$X/t\" || fail \"no Hermes tools\"\n  mount -n --bind \"$H/.hermes/installs\" \"$X/i\" || fail \"no Hermes installs\"\n  k=\n  for p in \"$H/.hermes/installs\"/*/.install.lock; do\n    [ -f \"$p\" ] && [ ! -L \"$p\" ] || continue\n    mount -n --bind \"$p\" \"$X/i/${p#\"$H/.hermes/installs/\"}\" || fail \"Hermes install lock not shown\"\n    k=1\n  done\n  [ -n \"$k\" ] || fail \"no Hermes install lock: the lasting Hermes has not run\"\n  for p in \"$H/.hermes/installs\"/*/pm-runtime; do\n    [ -d \"$p\" ] || continue\n    [ -f \"$p/.prepare.lock\" ] && [ ! -L \"$p/.prepare.lock\" ] && mount -n --bind \"$p/.prepare.lock\" \"$X/i/${p#\"$H/.hermes/installs/\"}/.prepare.lock\" || fail \"Hermes runtime lock not shown\"\n  done\n  for p in \"$H/.hermes/installs\"/*/environments/*/.lease-managed \"$H/.hermes/installs\"/*/pm-runtime/generations/*/.lease-managed; do\n    [ -f \"$p\" ] || continue\n    g=${p%/.lease-managed}\n    { [ -d \"$g/.leases\" ] || mkdir \"$g/.leases\"; } && [ ! -L \"$g/.leases\" ] && mount -n --bind \"$g/.leases\" \"$X/i/${g#\"$H/.hermes/installs/\"}/.leases\" || fail \"Hermes leases not shown\"\n  done\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$H/.hermes\" || fail \"$H/.hermes not hidden\"\n  mkdir \"$H/.hermes/hermes-agent\" && mount -n --move \"$X/c\" \"$H/.hermes/hermes-agent\" && ro \"$H/.hermes/hermes-agent\" || fail \"Hermes checkout not shown\"\n  mkdir \"$H/.hermes/tools\" && mount -n --move \"$X/t\" \"$H/.hermes/tools\" && ro \"$H/.hermes/tools\" || fail \"Hermes tools not shown\"\n  mkdir \"$H/.hermes/installs\" && mount -n --move \"$X/i\" \"$H/.hermes/installs\" && ro \"$H/.hermes/installs\" || fail \"Hermes installs not shown\"\n  ro \"$H/.hermes\"; ro \"$H\"; ro \"$W\"\n  mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none \"$W/lamp\" || fail \"$W/lamp not hidden\"\n  mkdir \"$F\" && mount -n --move \"$X/f\" \"$F\" || fail \"$F not shown\"\n  ro \"$W/lamp\"\n  rmdir \"$X/f\" \"$X/c\" \"$X/t\" \"$X/i\" \"$X\" || fail \"make staging left\"\n  cd \"$F\" || fail \"$F not visible\"\n  HOME=$LAMP_NS_HOME\nfi\nunset LAMP_NS_HOME F X k p g\n"
+        ),
     ),
 ];
 
@@ -912,7 +1016,7 @@ pub(crate) fn on(root: &Path, path: &str) -> PathBuf {
 
 /// The entry points `lampos` reaches Hermes by, any of them there.
 fn entry_points(root: &Path) -> impl Iterator<Item = PathBuf> + '_ {
-    [WRAPPER, NS]
+    [WRAPPER, NS, RUN_ENV]
         .into_iter()
         .map(|path| on(root, path))
         .filter(|path| fs::symlink_metadata(path).is_ok())
@@ -952,6 +1056,8 @@ pub fn present(root: &Path, shown: Shown) -> bool {
             let (ns, text) = ns_for(shown);
             holds(root, ns, &text)
         }
+        // What Hermes's terminal sources for a skill run's SDK path (#6684).
+        && holds(root, RUN_ENV, RUN_ENV_TEXT)
         // The build's own lampos SDK, one copy for every agent (#6507).
         && crate::sdk_tree::present(root)
         && agent_ns::hook_shim_there(root)
@@ -1386,7 +1492,7 @@ fn install_with(
 /// another engine's namespace script still uses it. Hermes's folder and
 /// Hermes in it stay.
 fn remove_entry_points(root: &Path, say: &mut dyn FnMut(&str)) {
-    for path in [WRAPPER, NS] {
+    for path in [WRAPPER, NS, RUN_ENV] {
         match fs::remove_file(on(root, path)) {
             Ok(()) => say(&format!("{path} taken out")),
             Err(error) if error.kind() == ErrorKind::NotFound => {}
@@ -1771,6 +1877,10 @@ pub fn userns_argv(uid: &str, gid: &str) -> Vec<String> {
 fn write_entry_points(root: &Path, shown: Shown) -> Result<(), String> {
     // The build's own lampos SDK first (#6507): the one read-only copy a skill's script imports.
     crate::sdk_tree::write(root)?;
+    // What Hermes's terminal sources for a skill run's SDK path (#6684): 0644, never run.
+    let place = on(root, RUN_ENV);
+    write_whole(&place, RUN_ENV_TEXT.as_bytes(), 0o644)
+        .map_err(|error| format!("{RUN_ENV}: {error}"))?;
     let (ns_path, ns) = ns_for(shown);
     let wrapper = wrapper_for(shown);
     for (path, text) in [(ns_path, ns.as_str()), (WRAPPER, wrapper.as_str())] {

@@ -117,7 +117,7 @@ against lamp-06c1.
   the same folder (`/var/lib/lampos-cloud/region`, 0644, written whole and
   renamed into place) and the journal says `the backend places the lamp in
   region "CN"`. It is kept across boots and read at start, so only a change
-  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256). A failing ping is said once, and
+  is written; the voice reads it (`second-voice.md`), and on a change root's `lamp-region.service` gives a lamp in `CN`, and only it, China's name and time servers (`install.md`, #6256); PARKED (#6386): that unit is out of the product until China is scheduled and stable's lamp-update carries #6810. A failing ping is said once, and
   once when it answers again. When the lamp's address moves, the HTTP
   client is made afresh, as V1 drops its idle connections.
 
@@ -933,7 +933,7 @@ voice tells it.
   for a skill that reads none); absent when `lamp-services` couldn't say, or before the check
   is kept ([services.md](services.md), "Not linked when it is made"). The
   skill is kept and put on either way; the app can show where to link it
-  (Skills, then Connectors).
+  (open this lamp, then Settings, then Linked accounts).
 - **Put on at once, with no spoken yes** (#5977; the owner, 10 Nov: the
   app's MAKE IT is the ask): kept and checked, the voice puts it on through
   the manage helper, which checks it again (its cap, `made: here`, its
@@ -1140,6 +1140,7 @@ build; not yet timed on a lamp). A folder that can't be read is answered
   | `faces` | notices faces in front of it, with the camera | the privacy switch stops it | `humans/faces/tracked` |
   | `known_faces` | knows whether a face is one it has met, never whose | the privacy switch stops it | `known_faces` |
   | `presence` | notices whether someone is at the desk, with the camera | the privacy switch stops it | `room/presence`, `room/activity` |
+  | `seen` | knows when you were last seen drinking, eating or stretching, and how you sat, from pictures sent to be labelled | the privacy switch stops it | `humans/doing`, `humans/doing_seen`, `humans/posture` (#6543; `lamp-seen` publishes them, coming with phases 2 and 3) |
   | `hearing` | hears what is said to it | the privacy switch stops it | `voice/heard`, `name/heard` |
   | `room_sound` | hears how loud the room is | the privacy switch stops it | `ears/level`, `ears/sudden` |
   | `touch` | feels a touch on the lamp | — | `controls/touch`, `controls/gesture`, `controls/pet` |
@@ -1632,6 +1633,20 @@ while fetching still telling the app, and one before the voice is up
 handed over once it is; the state file never naming the skill
 or holding its words, 0600), and
 `online::tests::a_skill_from_a_file_is_acked_starting_and_its_result_follows`.
+
+### Run by the lamp's agent (`LAMP_UPLOAD_TO_AGENT`, off)
+
+The owner's ask (12 Nov): a `SKILL.md` uploaded from the app runs through
+the lamp's agent, as V1's did; the first builder's yes at 19:44, behind
+two switches, both off and set in no unit. With `LAMP_UPLOAD_TO_AGENT=on`
+in `lamp-cloud`'s unit (`upload::AGENT_ENVIRONMENT`, `Uploads::to_agent`),
+a bare `SKILL.md` may be up to 64 KiB (`MOST_AGENT_BYTES`; past it,
+`failure` with "its SKILL.md is longer than 64 KiB") and goes to
+`lamp-voice` whole, which makes it an agent skill (docs/skills.md, "Run by
+the lamp's agent"). Its `success` carries `grants`, the task grants read
+from the file (`["light", "speak", "camera", "net"]` for a photo booth),
+null for any other skill. Off, a bare `SKILL.md` past 8 KiB is refused
+for its length as before. The file's words never reach the journal.
 
 ## Health and crash reports (#1683, step 1)
 
@@ -2816,7 +2831,7 @@ app that asks anyway is told `developer access is off on this lamp`.
   it with a stock HPKE library (CryptoKit's `HPKE`, Tink's `HpkeDecrypt`) and
   drops its key, the code and the pin at `until_unix_ms`. Built from `ring`
   alone (`crate::seal`).
-- **`control.clients`** (`{}`): `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}], "shown": {"body": "can move the lamp's body", …}}`. `shown` is the lamp's words for every grant it knows, by wire name, once per answer (absent from an older lamp-control), so the app never shows a raw wire name for a grant it has no label of its own for.
+- **`control.clients`** (`{}`): `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}], "shown": {"body": "can move the lamp's body", …}, "listening": true}`. `listening` is whether the door listens on the network: false while lamp-control serves only the owner's side and skill runs (`LAMP_CONTROL` not on, #6059), when its admin socket is there with no door behind it, so the app shows the switch off or "not listening" and never "On" for the socket alone (absent from an older lamp-control: the socket's being there is all the app has). `shown` is the lamp's words for every grant it knows, by wire name, once per answer (absent from an older lamp-control), so the app never shows a raw wire name for a grant it has no label of its own for.
   Nothing in it is secret, so it is not sealed.
 - **`control.revoke`** (`{"client": "c_1"}`): `{"revoked": true|false, "saved": true}`,
   `revoked` whether it was paired. It takes effect at once either way; when

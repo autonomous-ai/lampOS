@@ -9,7 +9,7 @@
     "lamp-surround", "lamp-update", "lamp-ears", "lamp-schedule", "lamp-tasks", "lamp-air",
     "lamp-records", "lamp-mood", "lamp-bus", "lamp-selftest", "lamp-settings", "lamp-setup",
     "lamp-cloud", "lamp-skills", "lamp-peek", "lamp-addons", "lamp-control", "lamp-services",
-    "lamp-same-voice"
+    "lamp-same-voice", "lamp-seen"
   ],
   "provisioning": [
     "lamp-body-measure", "lamp-body-mood"
@@ -17,7 +17,8 @@
   "development": [
     "lamp-audio", "lamp-body-inspect", "lamp-ipc-probe", "lamp-memory-eval", "lamp-observer",
     "lamp-policy-fit", "lamp-policy-judges", "lamp-sound-fixtures", "lamp-tasks-harness-fixture",
-    "lamp-voice-eval", "lamp-memory-fixture", "lamp-records-fixture",
-    "lamp-policy-replay", "lamp-station", "lamp-seems-measure", "lamp-sim"
+    "lamp-voice-eval", "lamp-memory-bench", "lamp-memory-fixture", "lamp-records-fixture",
+    "lamp-policy-replay", "lamp-station", "lamp-seems-measure", "lamp-sim",
+    "lamp-memory-tiers-arm"
   ]
 }

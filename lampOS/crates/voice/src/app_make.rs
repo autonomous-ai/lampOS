@@ -78,6 +78,9 @@ const LINE_WAIT: Duration = Duration::from_secs(2);
 /// It also holds a written skill's 2,000 bytes of instructions and 200 of
 /// its `when` ([`begin_written`]).
 const MOST_LINE_BYTES: u64 = 64 * 1_024;
+/// [`MOST_LINE_BYTES`] with `LAMP_UPLOAD_TO_AGENT` on: an agent skill's
+/// file of at most 64 KiB, escaped (`crate::upload_agent::MOST_BYTES`).
+const MOST_AGENT_LINE_BYTES: u64 = 7 * crate::upload_agent::MOST_BYTES as u64;
 const MOST_REQUEST_ID_BYTES: usize = 64;
 
 /// Now, as `made.json`'s times are kept.
@@ -1014,7 +1017,14 @@ fn accept(
         let _ = stream.set_read_timeout(Some(LINE_WAIT));
         let _ = stream.set_write_timeout(Some(LINE_WAIT));
         let mut line = String::new();
-        if BufReader::new(Read::by_ref(&mut stream).take(MOST_LINE_BYTES))
+        // An agent skill's file is at most 64 KiB, every byte escaped at
+        // worst (`LAMP_UPLOAD_TO_AGENT`).
+        let most = if crate::upload_agent::on() {
+            MOST_AGENT_LINE_BYTES
+        } else {
+            MOST_LINE_BYTES
+        };
+        if BufReader::new(Read::by_ref(&mut stream).take(most))
             .read_line(&mut line)
             .is_err()
         {
@@ -1040,10 +1050,7 @@ fn accept(
                 let _ = std::thread::Builder::new()
                     .name("lamp-voice-upload-on".into())
                     .spawn(move || {
-                        let line = match made_skill::put_on(&keeping, &made) {
-                            Ok(()) => crate::upload_skill::on_line(&made),
-                            Err(why) => crate::upload_skill::not_on_line(&why),
-                        };
+                        let line = crate::upload_skill::put_on_said(&keeping, &made);
                         say_line(&asks, &line);
                     });
             }

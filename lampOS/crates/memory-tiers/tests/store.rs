@@ -608,6 +608,12 @@ fn forgotten_episode_boundaries_only_describe_survivors() {
 }
 
 #[test]
+fn owner_identity_accepts_the_bench_contract_limit() {
+    assert!(Store::in_memory(&"x".repeat(128)).is_ok());
+    assert!(Store::in_memory(&"x".repeat(129)).is_err());
+}
+
+#[test]
 fn weekly_window_uses_calendar_days_across_both_dst_transitions() {
     fn ms(s: &str) -> i64 {
         s.parse::<jiff::Timestamp>().unwrap().as_millisecond()

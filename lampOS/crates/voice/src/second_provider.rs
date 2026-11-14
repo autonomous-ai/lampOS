@@ -1471,6 +1471,9 @@ pub type NamedAsk = Arc<dyn Fn(&str) -> Vec<&'static str> + Send + Sync>;
 /// The skill a heard line asks what it uses, by name, or none
 /// (`crate::make_skill_local::read_back_heard`, V2 on #6413).
 pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
+/// The call a heard line plainly asks for by an installed skill's name, as
+/// its name and arguments, or none (`crate::skill_named::heard`, #6772).
+pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>;
 /// The agent a spoken line's own words name to do the work, as the person
 /// calls it, or none (#6547 (1b), `crate::agent_tasks::named_for_work`).
 pub type NamedAgent = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
@@ -1815,6 +1818,9 @@ struct Shared {
     /// Which skill a heard line asks what it uses: read back in code
     /// before round 1 ([`Engine::reading_back_by_words`]).
     read_back_asked: Option<ReadBackAsked>,
+    /// The skill a heard line plainly asks for by its name: called in code
+    /// as round 1 ([`Engine::calling_skills_named`]).
+    skill_named: Option<SkillNamed>,
     /// With the tasks part: the agent a spoken line's words name for the
     /// work, whose round 1 answered in words alone is asked again once
     /// ([`Engine::catching_named_agents`], #6547 (1b)).
@@ -2005,6 +2011,11 @@ struct Shared {
     /// The first setup save refused only for the read-back's yes, held for
     /// the person's next turn ([`HeldSave`]).
     held_save: Mutex<Option<HeldSave>>,
+    /// When the lamp last asked about a face added from a photo
+    /// ([`crate::photo_faces::is_ask`]), until its answer is called
+    /// (`photo_face_yes`, `photo_face_no`): a yes is held for it
+    /// ([`a_yes_held`]) within [`crate::photo_faces::ANSWER_WITHIN`].
+    photo_asked_at: Mutex<Option<Instant>>,
     /// The save a held one ran: its request, name and answer, so a model
     /// call after the yes never saves twice.
     saved_by_hold: Mutex<Option<(u64, String, Value, Instant)>>,
@@ -2048,6 +2059,10 @@ struct Shared {
     /// ([`ask_once_forget`]); `None`, the memory's own
     /// (`remember::one_face_forget_target`). A test's in its place.
     forget_target: Option<ForgetTarget>,
+    /// A keep whose sentence has a near spelling of a heard word is held
+    /// for their yes to that word (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37,
+    /// [`Engine::asking_near_heard_words`]).
+    near_heard_asks: bool,
     remember_speaker: bool,
     enrollment_sight: Option<Arc<crate::speaking_faces::SpeakingFaces>>,
     /// A line is a known person's only when their own face was seen
@@ -4552,6 +4567,7 @@ impl Engine {
                 untied: None,
                 named_ask: None,
                 read_back_asked: None,
+                skill_named: None,
                 named_agent: None,
                 named_asked_again: crate::agent_tasks::AskedAgain::default(),
                 #[cfg(test)]
@@ -4616,6 +4632,7 @@ impl Engine {
                 speaking: None,
                 held_forget: Mutex::new(HeldForgets::default()),
                 held_save: Mutex::new(None),
+                photo_asked_at: Mutex::new(None),
                 saved_by_hold: Mutex::new(None),
                 face_kept_at: Mutex::new(None),
                 rename_yes: false,
@@ -4627,6 +4644,7 @@ impl Engine {
                 face_claims: false,
                 doubt_undoes: false,
                 forget_target: None,
+                near_heard_asks: false,
                 remember_speaker: false,
                 enrollment_sight: None,
                 scope_seen: false,
@@ -4943,7 +4961,8 @@ impl Engine {
     /// (`LAMP_CONVERSATION_CARRIED_MEMORY=on`, `ScopeLease::read_carried`):
     /// its recall, hits and note read their memory, and its `remember` is
     /// written in their scope at once, not held for a yes. No forget,
-    /// correction, rule or yes runs on it, and it is never journalled. A
+    /// correction or rule runs on it, no yes but to a face rename held for
+    /// them (`LAMP_NAMES_RENAME_YES`, #6859), and it is never journalled. A
     /// line carried for a keep only stays as before. Only with
     /// [`Self::scoping_by_one_face`]'s tracker showing no other voice, their
     /// own face the one face in view through the line, and the rule having
@@ -5195,6 +5214,22 @@ impl Engine {
     pub(crate) fn targeting_one_face_forgets(mut self, target: ForgetTarget) -> Self {
         let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
         shared.forget_target = Some(target);
+        self
+    }
+
+    /// A spoken `remember` whose sentence has a word not heard that is a
+    /// near spelling of one heard ("ranunculus" for a heard "renunculus",
+    /// `remember::heard::near_heard`) is not kept: it is held for the same
+    /// known person's plain yes, seen said, as a carried line's keep is, and
+    /// the model asks once "Is that ranunculus?" (`LAMP_MEMORY_ASK_NEAR_HEARD`,
+    /// C37). Their yes keeps the model's sentence; a no, anything else or
+    /// silence keeps nothing. Needs the held forget's sight
+    /// ([`Self::confirming_forgets_by_sight`]); without it, or for nobody
+    /// known, the keep runs as before (`LAMP_MEMORY_KEEP_HEARD` keeps the
+    /// heard line). Off, as before.
+    pub fn asking_near_heard_words(mut self, on: bool) -> Self {
+        let shared = Arc::get_mut(&mut self.shared).expect("configured before admission");
+        shared.near_heard_asks = on;
         self
     }
 
@@ -6216,6 +6251,24 @@ impl Engine {
     pub fn reading_back_by_words(mut self, asked: ReadBackAsked) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.read_back_asked = Some(asked);
+        }
+        self
+    }
+
+    /// A heard line that plainly asks for an installed skill by its name
+    /// (`named`: "photo booth", "run photo booth", `LAMP_SKILL_NAMED`) has
+    /// that skill's function called in code as round 1, asked of no chat:
+    /// the call goes the way a model's round-1 call goes, the rule's hold
+    /// and the Policy's (a hold ends the turn, nothing run), the pause's
+    /// grace, the turn's runner, and what its answer asks for (a look, a
+    /// search walked on, a recording); round 2 words its answer, and the
+    /// model's own call of the same skill after it is not run twice (#6772:
+    /// on lamp-52e6 at 12587 the model answered "I don't have a camera"
+    /// over the pushed photo-booth skill, with no call). Before any turn
+    /// only.
+    pub fn calling_skills_named(mut self, named: SkillNamed) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.skill_named = Some(named);
         }
         self
     }
@@ -8139,6 +8192,14 @@ async fn spoken(
     // none empty: a cut-in whose final words come back empty may still have
     // had some on the way ([`words_on_the_way`]).
     let mut interim: Option<String> = None;
+    // Every result's words for this line, in order, a result that only
+    // grows the one before it standing in its place ([`add_line_words`]):
+    // speech to text sends each result's own words, one segment at a time,
+    // so a line whose finals all come back empty is judged on all of them,
+    // never its last segment alone ([`answer_on_the_way`], Heron's P2 on
+    // #6992). Like `interim`, only while `words_said` is taken: for a line in
+    // the clear, with `LAMP_SECOND_UNFINISHED_WAIT` alone.
+    let mut line_words: Vec<String> = Vec::new();
     let mut enrollment_audio = None;
     let mut enrollment_audio_valid = true;
     loop {
@@ -8146,6 +8207,7 @@ async fn spoken(
             Some(words) = next_said(&mut words_said) => {
                 if !words.trim().is_empty() {
                     interim = Some(words.clone());
+                    add_line_words(&mut line_words, &words);
                 }
                 if shared.unfinished_words {
                     let unfinished = crate::unfinished_words::trailing(&words);
@@ -8254,10 +8316,14 @@ async fn spoken(
     // And the words that came while the final ones were asked for.
     while let Some(words) = words_said.as_mut().and_then(|said| said.try_recv().ok()) {
         if !words.trim().is_empty() {
+            add_line_words(&mut line_words, &words);
             interim = Some(words);
         }
     }
     let interim = interim
+        .map(|words| crate::unfinished_words::without_fillers(&words))
+        .filter(|words| !words.trim().is_empty());
+    let line_words = Some(line_words.join(" "))
         .map(|words| crate::unfinished_words::without_fillers(&words))
         .filter(|words| !words.trim().is_empty());
     // The coordinator's call, its words back after the next line began
@@ -8328,7 +8394,7 @@ async fn spoken(
     // as a cough). A stop among them is the stop it was
     // (`LAMP_SPOKEN_STOP_ENDS`); any other words keep it from being taken
     // for a wordless sound (`LAMP_CUT_IN_WORDLESS_ASKS`).
-    let on_the_way = words_on_the_way(&text, interim, marks.over_the_lamps_voice);
+    let on_the_way = words_on_the_way(&text, interim.clone(), marks.over_the_lamps_voice);
     let text = match on_the_way.as_deref() {
         Some(words) if shared.spoken_stop_ends && crate::spoken_stop::is_stop_request(words) => {
             eprintln!(
@@ -8362,6 +8428,43 @@ async fn spoken(
         _ => text,
     };
     let words_were_on_the_way = on_the_way.is_some() && text.trim().is_empty();
+    // A line in the clear whose final words came back empty, though speech
+    // to text had a plain yes or no on the way, while a read-back awaits its
+    // answer (#6840, lamp-9adf on 13 Nov: the owner's "Yes." to a calendar
+    // move came back as 0 words, opened nothing, and the waiting write was
+    // dropped at the next line). Only then, and only when the whole line's
+    // words on the way (`line_words`, every result's, not the last segment's
+    // alone: "Wait, not that one." then "Okay." is no yes) are the plain yes
+    // or no; any other words on the way are thrown away as before, and the
+    // journal counts them all. Those words exist for a line in the clear only
+    // with `LAMP_SECOND_UNFINISHED_WAIT` (`words_said` above); without it,
+    // nothing changes.
+    let text = if on_the_way.is_none() && text.trim().is_empty() {
+        let awaited = line_words.as_deref().is_some_and(|words| {
+            crate::services::answer_awaited(words)
+                || crate::skill_write_yes::answer_awaited(request, Instant::now())
+        });
+        match answer_on_the_way(&text, line_words.clone(), awaited) {
+            Some(words) => {
+                eprintln!(
+                    "lamp-voice second: request {request}: its final words came back empty; its {} words on the way answer a waiting read-back: taken as said (#6840)",
+                    words.split_whitespace().count()
+                );
+                words
+            }
+            None => {
+                if let Some(words) = line_words.as_deref() {
+                    eprintln!(
+                        "lamp-voice second: request {request}: its final words came back empty; its {} words on the way are thrown away (#6840)",
+                        words.split_whitespace().count()
+                    );
+                }
+                text
+            }
+        }
+    } else {
+        text
+    };
     // Snapshot the actual line before name carries or older words are
     // joined. Those may belong to someone else and never prove this name.
     let enrollment_allowed = shared.remember_speaker
@@ -8735,8 +8838,10 @@ async fn spoken(
     // Carried in full, by either rule above, with
     // `LAMP_CONVERSATION_CARRIED_MEMORY` (the memory owner's decision of 9
     // Nov, after lamp-06c1's S14 run): read and kept as the carried person's,
-    // as a lone known face's line is, no forget, correction, rule or yes run
-    // on it, never journalled. Only with the one-face rule's tracker there
+    // as a lone known face's line is, no forget, correction or rule run on
+    // it, and no yes but to a face rename held for them
+    // (`LAMP_NAMES_RENAME_YES`, `held_rename::carried_one_face`, #6859),
+    // never journalled. Only with the one-face rule's tracker there
     // and no other voice it recorded in the conversation, nor
     // `past_silent`'s sign of another person: fails closed, so with no
     // tracker an off-camera guest's line just after their face stays held
@@ -8759,7 +8864,7 @@ async fn spoken(
     {
         carried_memory = true;
         eprintln!(
-            "lamp-voice second: request {request}: carried: read and kept as theirs, a keep written at once; no forget, correction, rule or yes runs on it, never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
+            "lamp-voice second: request {request}: carried: read and kept as theirs, a keep written at once; no forget, correction or rule runs on it, and no yes but to a face rename held for them (LAMP_NAMES_RENAME_YES), never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
         );
     }
     // Carried, by either rule above, with `LAMP_CONVERSATION_CARRIED_SAVES`:
@@ -9019,6 +9124,8 @@ async fn spoken(
         }
         _ => text,
     };
+    // No words of the person's in it, however it is asked below.
+    let heard_none = text.trim().is_empty();
     // Only the lamp's name, and its words came back empty, as a lone name
     // often does: asked as the name the coordinator heard, or it would go
     // unanswered as a sound (#1712).
@@ -9041,6 +9148,18 @@ async fn spoken(
         }
         _ => called,
     };
+    // Nor while a write waits for the answer its read-back asked for: there
+    // the lamp's own move, or the room, set the call off as the person was
+    // to answer, and it is left as a sound (lamp-9adf, 13 Nov: a line of no
+    // words at the arrival move's second was answered as the name, and the
+    // one "Yes." after it found the mail dropped, #6363).
+    let held_call = called && heard_none && crate::services::awaits_an_answer();
+    if held_call {
+        eprintln!(
+            "lamp-voice second: request {request}: only the lamp's name, and no words of it came back, while a write waits for its answer: not answered as a call"
+        );
+    }
+    let called = called && !held_call;
     let text = if called && text.trim().is_empty() {
         eprintln!(
             "lamp-voice second: request {request}: only the lamp's name was said, and no words of it came back: asked as the name"
@@ -9196,9 +9315,11 @@ async fn spoken(
         eprintln!("lamp-voice second: request {request}: no name came after it: answered as it is");
     }
     let empty = text.trim().is_empty();
-    // A line of no words: the lamp's answer to it is no answer of a new
-    // request's to a waiting write's read-back (`services::answered_in_place`).
-    if empty {
+    // A line of no words, even one asked as the name ("Lamp."): the lamp's
+    // answer to it is no answer of a new request's to a waiting write's
+    // read-back (`services::answered_in_place`). Not one said by the name
+    // just before, whose words go with it.
+    if empty || (heard_none && name_of.is_none()) {
         crate::services::answered_in_place(request);
     }
     // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it
@@ -12022,6 +12143,46 @@ fn words_on_the_way(text: &str, interim: Option<String>, over: bool) -> Option<S
     interim.filter(|words| over && text.trim().is_empty() && !words.trim().is_empty())
 }
 
+/// The words speech to text had on the way for a line in the clear whose
+/// final words (`text`) came back empty, while a read-back awaits its
+/// answer (`awaited`: a services write's, [`crate::services::answer_awaited`],
+/// or a skill's yes, [`crate::skill_write_yes::answer_awaited`]): `line`,
+/// the whole line's words on the way ([`add_line_words`]), only when all of
+/// them are a plain yes or no ([`crate::services::plain_yes`],
+/// [`crate::services::plain_no`]). None otherwise, so nothing changes with
+/// no answer awaited (#6840), and other words anywhere in the line keep it
+/// from being an answer (Heron's P2 on #6992).
+fn answer_on_the_way(text: &str, line: Option<String>, awaited: bool) -> Option<String> {
+    line.filter(|words| {
+        awaited
+            && text.trim().is_empty()
+            && (crate::services::plain_yes(words) || crate::services::plain_no(words))
+    })
+}
+
+/// Adds one result's `words` to the line's (`line`), in order. A result
+/// whose words begin with all of the last one's (an interim growing, or its
+/// final) stands in its place, so a segment is kept once; any other result
+/// is its own segment, added after. A revision that changes earlier words
+/// is kept beside them: more words, never fewer, so never more of an answer
+/// than was said (#6840, Heron's P2 on #6992).
+fn add_line_words(line: &mut Vec<String>, words: &str) {
+    if words.trim().is_empty() {
+        return;
+    }
+    let grows = line.last().is_some_and(|last| {
+        let last = plain_words(last);
+        let words = plain_words(words);
+        let last: Vec<&str> = last.split_whitespace().collect();
+        let words: Vec<&str> = words.split_whitespace().collect();
+        words.starts_with(&last)
+    });
+    if grows {
+        line.pop();
+    }
+    line.push(words.to_owned());
+}
+
 /// The next of a listener's early words; never, once there are none.
 /// The next result's words while the line is heard; pending once there are
 /// none to come.
@@ -12761,13 +12922,24 @@ struct HeldForget {
     /// their yes within `remember::ONE_FACE_FORGET_YES_FOR`, seen said or
     /// in the private room, runs it ([`take_held_forget`]).
     one_face: bool,
+    /// A keep held because a word of its sentence was a near spelling of
+    /// a heard one (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37,
+    /// [`hold_near_heard_keep`]): the line's heard words, so its answer
+    /// counts as asking about it when it offers that word
+    /// ([`settle_held_forget`]). `None` for every other held call.
+    near: Option<String>,
 }
 
 /// The one kept thing of a person's a named forget asks to remove, by its
 /// id, and the subject to ask about in their words (never the kept text): the call, the line's words, the person and the line's
 /// lease ([`ask_once_forget`]).
 pub(crate) type ForgetTarget = Arc<
-    dyn Fn(&net::ToolCall, &str, &str, &crate::memory_scope::ScopeLease) -> Option<(u64, String)>
+    dyn Fn(
+            &net::ToolCall,
+            &str,
+            &str,
+            &crate::memory_scope::ScopeLease,
+        ) -> Result<(u64, String), crate::remember::ForgetNotAsked>
         + Send
         + Sync,
 >;
@@ -13032,6 +13204,18 @@ fn chat_for(
     }
 }
 
+/// Round 1 of a line that named a skill ([`Engine::calling_skills_named`]):
+/// its call, as a chat would end a round that only calls it, asked of none.
+fn named_round(
+    call: Option<net::ToolCall>,
+) -> futures_util::stream::BoxStream<'static, net::Result<ChatEvent>> {
+    futures_util::stream::iter([
+        Ok(ChatEvent::ToolCalls(call.into_iter().collect())),
+        Ok(ChatEvent::Done),
+    ])
+    .boxed()
+}
+
 /// [`chat_for`], saying how far it gets to `watch` when given.
 fn chat_watching(
     shared: &Shared,
@@ -13229,6 +13413,86 @@ fn hold_carried_keep(
     }
 }
 
+/// A spoken `remember` of `call` whose sentence has words not heard in
+/// `said`, the line's words, each a near spelling of a heard word
+/// (`remember::heard::near_heard`, `LAMP_MEMORY_ASK_NEAR_HEARD`, C37:
+/// heard "renunculus", the model wrote "ranunculus", and the heard line was
+/// kept while the lamp said the other word). Held as a carried line's keep
+/// is ([`hold_carried_keep`]), for the same known person's plain yes seen
+/// said ([`take_held_forget`]), which keeps the model's sentence; anything
+/// else drops it, so nothing is kept. Only when the line asked to keep
+/// (`remember::asked::asks_to_keep`): an unasked keep is
+/// `keep_quietly::unheard`'s, which refuses a word not heard. Not a
+/// correction (`replaces`), only on a spoken turn with the eyes reading speaking, for a known person,
+/// and not after a held call ran this turn. What the model is told, or
+/// `None` when it is not held: then it runs as before. The journal has
+/// counts only.
+fn hold_near_heard_keep(
+    shared: &Shared,
+    (request, said): (u64, &str),
+    heard: bool,
+    call: &net::ToolCall,
+    scope: Option<&crate::memory_scope::ScopeLease>,
+) -> Option<Value> {
+    // Only a line that itself asked to keep: a keep it didn't ask for goes
+    // on to `keep_quietly::unheard`, which keeps nothing with a word not
+    // heard, so a yes about a spelling never becomes consent to keep
+    // (Reviewer-lead on #6850).
+    if !shared.near_heard_asks
+        || !heard
+        || call.name != crate::remember::REMEMBER
+        || call.args.get("replaces").is_some_and(|id| !id.is_null())
+        || !crate::remember::asked::asks_to_keep(said)
+    {
+        return None;
+    }
+    let near = crate::remember::heard::near_heard(call.args["text"].as_str()?, said);
+    if near.is_empty() {
+        return None;
+    }
+    let not = if shared.forget_sight.is_none() {
+        Some("the eyes don't read who speaks")
+    } else {
+        None
+    };
+    let asker = forget_asker(scope);
+    let why = not.or(asker.is_none().then_some("nobody known"));
+    if let Some(why) = why {
+        eprintln!(
+            "lamp-voice second: request {request}: a keep with {} near word(s) not heard is not held: {why} ({})",
+            near.len(),
+            crate::remember::heard::NEAR_ENVIRONMENT
+        );
+        return None;
+    }
+    let asker = asker?;
+    match hold_forget(shared, request, call, asker, (shared.clock)()) {
+        Holding::Held => {}
+        Holding::OneWaits | Holding::Stale => {
+            eprintln!(
+                "lamp-voice second: request {request}: a keep with {} near word(s) not heard is not held: another call is held ({})",
+                near.len(),
+                crate::remember::heard::NEAR_ENVIRONMENT
+            );
+            return None;
+        }
+    }
+    if let Ok(mut hold) = shared.held_forget.lock()
+        && let Some(held) = hold.held.as_mut().filter(|held| held.request == request)
+    {
+        // Their yes keeps the model's sentence: its words are the line
+        // the memory's route holds it against (`heard::released`).
+        held.line = call.args["text"].as_str().map(str::to_owned);
+        held.near = Some(said.to_owned());
+    }
+    eprintln!(
+        "lamp-voice second: request {request}: a keep with {} near word(s) not heard is held for their yes ({})",
+        near.len(),
+        crate::remember::heard::NEAR_ENVIRONMENT
+    );
+    Some(crate::remember::heard::near_held_told(&near))
+}
+
 /// The same-voice check's hook (#4339's follow-up): whether the voice of
 /// `request`'s line is the held keep's person's, from their last line seen
 /// speaking. It would let their yes release a carried line's held keep
@@ -13312,6 +13576,61 @@ enum Taken {
 /// ([`Taken::AskAgain`]); it runs nothing. Any other turn drops it,
 /// running nothing. The journal never has the words.
 #[allow(clippy::too_many_arguments)]
+/// Whether the lamp waits for an answer: a yes of any kind is held for it
+/// (`held`: [`a_yes_held`] read before the holds took the line, or the
+/// holds took it as one), or the lamp's newest words in `messages` (the
+/// turn's history, as round 1 is asked it) asked something
+/// ([`crate::remarks::lamp_asked`]). A line then is never read for a skill
+/// by its name or its asks: whether it is that answer or a skill's ask is
+/// the model's to judge, in context (the owner's ruling on #6842).
+/// "Sounds good." after "Shall I start it?" is the model's, whatever a
+/// skill's `asks` say.
+fn lamp_awaits_answer(held: bool, messages: &[Message]) -> bool {
+    held || messages
+        .iter()
+        .rev()
+        .filter(|message| message.role == "assistant")
+        .find_map(|message| {
+            message
+                .words()
+                .filter(|words| words.chars().any(char::is_alphanumeric))
+        })
+        .is_some_and(crate::remarks::lamp_asked)
+}
+
+/// Whether a yes of any kind is held for the person's next words: a keep or
+/// a forget ([`HeldForget`]), a setup face save ([`HeldSave`]), a face
+/// added from a photo asked about and not yet answered (`photo_asked_at`,
+/// within `photo_faces::ANSWER_WITHIN`: "Shall I remember you?" said, and
+/// the lamp said something else after it), a face
+/// rename held or asked ([`held_rename::waits`]), a skill's write or task
+/// yes (`skill_write_yes::awaited`, which `skill_task_yes` waits through),
+/// a made skill's clash waiting for their choice, an agent task read back
+/// for `confirm_agent_task` (`agent_tasks::awaits_yes`), or a write waiting
+/// for its send: the voice's own mail read back (#6009) or a skill run's
+/// held write (`run_write_yes`, `services::write_waits`; Heron's P2 on
+/// #6842). A line said then is
+/// never read for a skill by its name or its asks
+/// ([`crate::skill_named`], Thirteen's P1 on #6842).
+fn a_yes_held(shared: &Shared) -> bool {
+    let now = std::time::Instant::now();
+    shared
+        .held_forget
+        .lock()
+        .is_ok_and(|hold| hold.held.is_some())
+        || shared.held_save.lock().is_ok_and(|hold| hold.is_some())
+        || shared.photo_asked_at.lock().is_ok_and(|asked| {
+            asked.is_some_and(|at| {
+                now.saturating_duration_since(at) <= crate::photo_faces::ANSWER_WITHIN
+            })
+        })
+        || held_rename::waits(shared)
+        || crate::skill_write_yes::awaited(now)
+        || crate::made_clash::awaited(now)
+        || crate::agent_tasks::awaits_yes(now)
+        || crate::services::write_waits(now)
+}
+
 fn take_held_forget(
     shared: &Shared,
     request: u64,
@@ -13994,6 +14313,7 @@ fn hold_forget_as(
         line: None,
         asked_again: false,
         one_face,
+        near: None,
     });
     Holding::Held
 }
@@ -14041,11 +14361,12 @@ fn ask_once_forget(
             lease,
         ),
     };
-    let Some((id, subject)) = target else {
-        eprintln!(
-            "lamp-voice second: request {request}: a forget on a one-face line names no one kept thing of theirs: not asked (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
-        );
-        return None;
+    let (id, subject) = match target {
+        Ok(target) => target,
+        Err(why) => {
+            eprintln!("{}", one_face_forget_not_asked(request, &why));
+            return None;
+        }
     };
     let held = net::ToolCall {
         id: call.id.clone(),
@@ -14063,6 +14384,15 @@ fn ask_once_forget(
         Holding::OneWaits => Some(serde_json::json!({"error": crate::remember::ONE_FORGET_HELD})),
         Holding::Stale => None,
     }
+}
+
+/// The journal line for a forget on a one-face line [`ask_once_forget`]
+/// asks nothing about, saying why (Thirteen's row on #5627). Its words
+/// before the reason are the line's from before, so old greps still match.
+fn one_face_forget_not_asked(request: u64, why: &crate::remember::ForgetNotAsked) -> String {
+    format!(
+        "lamp-voice second: request {request}: a forget on a one-face line names no one kept thing of theirs: not asked: {why} (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+    )
 }
 
 /// The held turn `request` is over: its hold stands only if `answer`, the
@@ -14084,7 +14414,12 @@ fn settle_held_forget(shared: &Shared, request: u64, answer: Option<&str>) {
     let why = match answer {
         Some(answer)
             if if held.call.name == crate::remember::REMEMBER {
-                crate::remember::asks_about_keeping(answer)
+                match (&held.near, held.call.args["text"].as_str()) {
+                    (Some(heard), Some(model)) => {
+                        crate::remember::heard::asks_about_near(answer, model, heard)
+                    }
+                    _ => crate::remember::asks_about_keeping(answer),
+                }
             } else {
                 crate::remember::asks_about_forgetting(answer, &held.call.name)
             } =>
@@ -14582,6 +14917,11 @@ async fn answer(
     // One the same person asked for in words on their turn just before
     // runs at once ([`asked_just_before`]).
     let asks_now = crate::remember::asks_to_forget(&said);
+    // Whether a yes of any kind waits for these words, read before the
+    // holds below take it: then the line is never read for a skill by its
+    // name or its asks (Thirteen's P1 on #6842: a pushed skill's "yes
+    // please" ran beside a held keep's yes).
+    let yes_held = heard && a_yes_held(shared);
     // What these words, the request's own, say of forgetting everything
     // ([`crate::remember::everything_asked`]): `Some(false)`, a refusal or
     // a smaller ask such as "forget that", outweighs an ask just before and
@@ -14654,6 +14994,31 @@ async fn answer(
                 .read_back_asked
                 .as_ref()
                 .and_then(|asked| asked(&said))
+        })
+        .flatten();
+    // A spoken line that plainly asks for an installed skill by its name
+    // ("photo booth"): its function is round 1's call, never left to the
+    // model (#6772: on lamp-52e6 at 12587 the model answered "I don't have
+    // a camera" over the pushed photo-booth skill, with no call). Never
+    // beside a read-back: a question about a skill is not an ask to run it.
+    // Whether the holds above took these words as a yes (a keep or forget,
+    // a face save or rename, a face question asked): then, as while a yes
+    // is held, the lamp awaits an answer ([`lamp_awaits_answer`]).
+    let yes_taken = held_forget_runs.is_some()
+        || unseen_yes.is_some()
+        || held_save_runs.is_some()
+        || held_save_dropped.is_some()
+        || face_to_ask.is_some()
+        || held_rename_runs.is_some()
+        || held_rename_dropped.is_some()
+        || rename_note.is_some();
+    let skill_named = heard
+        .then(|| {
+            shared
+                .skill_named
+                .as_ref()
+                .filter(|_| read_back_named.is_none())
+                .and_then(|named| named(&said))
         })
         .flatten();
     // Whom the line's own words ask by name (`LAMP_TASKS_NAMED_ASK`): told
@@ -14753,6 +15118,14 @@ async fn answer(
     // One the walk says itself (#3769, lamp-52e6 30 Oct 08:22: the model
     // said its own small talk in place of the sentence prompt): its words,
     // and no chat at all.
+    // The photo face's ask (`photo_faces::turn`), the coordinator's: a yes
+    // is held for it from now ([`a_yes_held`]), known from the turn alone.
+    if written
+        && crate::photo_faces::is_ask(&said)
+        && let Ok(mut asked) = shared.photo_asked_at.lock()
+    {
+        *asked = Some(Instant::now());
+    }
     let own = written
         .then(|| crate::onboarding::own_words(&said).map(str::to_owned))
         .flatten()
@@ -14777,6 +15150,7 @@ async fn answer(
                 && held_rename_dropped.is_none()
                 && rename_note.is_none()
                 && read_back_named.is_none()
+                && skill_named.is_none()
         })
         .map(|prepared| (prepared, said.clone()));
     // Only a note for the model, no one's words (a wordless cut's ask to go
@@ -14786,6 +15160,9 @@ async fn answer(
     // first sentence that it is kept ("Your goldfish's name, Pip, is
     // kept.") is a keep claim too (lamp-06c1, 6 Nov, S14 req 363).
     let yes_line = heard && crate::remember::heard::only_a_yes(&said);
+    // The heard words, kept for a hand-over made in code when an agent
+    // they name is still given no `start_agent_task` (#6547 cause 3).
+    let named_words = named_agent.is_some().then(|| said.clone());
     let question = match picture {
         Some(jpeg) => Message::user_seeing(said, &jpeg),
         None => Message::user(said),
@@ -15190,6 +15567,40 @@ async fn answer(
                 read_back_ran = Some((name.to_owned(), result));
             }
         }
+        // The skill the heard words ask for by its name
+        // ([`Engine::calling_skills_named`]): round 1 is its call, not the
+        // model's, and goes through the round's own call path as a model's
+        // round-1 call does: the rule's hold, the Policy's for a spoken
+        // turn (which ends the turn held, nothing run: Twelve's P1 1 and the
+        // Reviewer-lead's P2 on #6782), the pause's grace, the runner, a
+        // recording offered, and what its answer asks for (a look, a search
+        // walked on: Twelve's P1 2). The model words its answer in round 2,
+        // told so beside the request. Its answer, once run, for a model's
+        // call of the same skill after it.
+        // Never while the lamp waits for an answer (the owner's ruling on
+        // #6842): its last words asked something, or a yes is held
+        // ([`lamp_awaits_answer`]); the model reads the line in context.
+        let mut named_call: Option<net::ToolCall> = skill_named
+            .filter(|_| {
+                !forgot_before_question && !lamp_awaits_answer(yes_held || yes_taken, &messages)
+            })
+            .map(|(name, args)| net::ToolCall {
+                extra: None,
+                id: crate::skill_named::CALL_ID.into(),
+                name,
+                args,
+            });
+        let named_by_words = named_call.is_some();
+        let mut skill_ran: Option<((String, Value), Value)> = None;
+        if let Some(call) = &named_call {
+            let function = crate::skill_named::function_of(&call.name, &call.args);
+            eprintln!(
+                "lamp-voice second: request {request}: the heard words named a skill: round 1 calls it in code ({function})"
+            );
+            messages.push(Message::system(crate::skill_named::ran_note(
+                &crate::skill_named::spoken(function),
+            )));
+        }
         // Their yes did not count (#2377): told once, beside the request.
         if let Some(told) = unseen_yes {
             messages.push(Message::system(told));
@@ -15372,17 +15783,24 @@ async fn answer(
             // What the voice was given before this round: whether it said any.
             let pieces_before = queue.pieces;
             let mut refused = false;
+            // Round 1 of a line that named a skill: its call, asked of no
+            // chat ([`Engine::calling_skills_named`]).
+            let mut by_words = (round == 1 && !quoted && !words_round)
+                .then(|| named_call.take())
+                .flatten();
             // At most one second try in a turn, whatever round 1 is asked again.
-            let watch =
-                (may_go_twice && round == 1 && !tries.as_ref().is_some_and(|tries| tries.went()))
-                    .then(net::Watch::default);
+            let watch = (by_words.is_none()
+                && may_go_twice
+                && round == 1
+                && !tries.as_ref().is_some_and(|tries| tries.went()))
+            .then(net::Watch::default);
             let mut first_reach = watch.as_ref().map(net::Watch::reach);
             let told = if quoted || words_round {
                 ChatTold::Only(&[])
             } else {
                 told_for(scope.as_ref())
             };
-            if logs_prompt {
+            if logs_prompt && by_words.is_none() {
                 // Round 1 begun early is asked as it was begun.
                 let asked = match &prepared {
                     Some(prepared) if round == 1 && !quoted => &prepared.messages,
@@ -15391,6 +15809,8 @@ async fn answer(
                 shared.log_prompt((request, round), asked, told);
             }
             let mut stream = match prepared.take() {
+                // The skill the heard words named: its call alone, at once.
+                _ if by_words.is_some() => named_round(by_words.take()),
                 // A quoted line's every round declares no function at all.
                 _ if quoted => match watch.clone() {
                     Some(watch) => shared.services.chat_watched(messages.clone(), told, watch),
@@ -16047,9 +16467,12 @@ async fn answer(
             // own tools instead ("Hermes, look up the weather" answered with
             // `weather`: V2's P1 on 12587, Fifth's row-6547): none of them
             // runs; each is answered as not run, and the turn is asked again
-            // once to hand it over. Its held words are not said.
+            // once to hand it over. Its held words are not said. Never on a
+            // line that named a skill, whose round 1 is the code's call, not
+            // the model's (#6782).
             if catching
                 && round == 1
+                && !named_by_words
                 && round < MAX_ROUNDS
                 && decline_held.is_some()
                 && !calls.is_empty()
@@ -16099,7 +16522,9 @@ async fn answer(
                 catch_owed = Some("named agent");
                 continue;
             }
-            if catching && round == 1 && calls.is_empty() {
+            // Never on a line that named a skill, whose round 1 is its call
+            // and whose words come after it (Twelve's P3 2 on #6782).
+            if catching && round == 1 && calls.is_empty() && !named_by_words {
                 let named_held = named_agent.is_some() && decline_held.is_some();
                 if named_held || crate::agent_tasks::speaks_a_read_back(&text) {
                     let what = if named_held {
@@ -16162,7 +16587,31 @@ async fn answer(
                     ));
                 }
             } else if let Some(what) = catch_owed.take() {
-                let came = if calls.iter().any(|call| call.name == start) {
+                // An agent named for the work and still no call once asked
+                // again (#6547 cause 3, the first builder's yes): code calls
+                // `start_agent_task` itself with the heard words as the task
+                // and nothing else, so the tasks part sets the agent and its
+                // place from those words as for a model's call (a computer
+                // named with none paired is refused the same way, #6786).
+                // The call only prepares: its answer goes to the next round,
+                // which says the task back and asks for the person's yes;
+                // their no cancels it. This round's words are not said.
+                let handed = (what == "named agent" && calls.is_empty())
+                    .then_some(named_agent.as_deref())
+                    .flatten();
+                let came = if let Some(agent) = handed {
+                    calls.push(net::ToolCall {
+                        id: format!("handed-{request}"),
+                        name: start.to_owned(),
+                        args: serde_json::json!({ "task": named_words.as_deref().unwrap_or_default() }),
+                        extra: None,
+                    });
+                    decline_held = None;
+                    text.clear();
+                    format!(
+                        "still no call: the heard words are handed over in code to {agent}, said back for a yes"
+                    )
+                } else if calls.iter().any(|call| call.name == start) {
                     format!("{start} called")
                 } else if calls.is_empty() {
                     "still no call, said it wasn't done".to_owned()
@@ -16579,6 +17028,14 @@ async fn answer(
             // holding answer (#1712; the peer read on #1986).
             if !calls.is_empty() {
                 called.store(true, Ordering::Relaxed);
+            }
+            // The photo face's answer called: no yes is held for it after.
+            if calls
+                .iter()
+                .any(|call| crate::photo_faces::is_tool(&call.name))
+                && let Ok(mut asked) = shared.photo_asked_at.lock()
+            {
+                *asked = None;
             }
             // A linked service called (lamp-9adf, 4 Nov 21:45: "Let me
             // look." then `service_read` for a calendar, and a picture of
@@ -17097,6 +17554,20 @@ async fn answer(
                     messages.push(Message::tool(call.id.clone(), told.to_string()));
                     continue;
                 }
+                // A keep with a near spelling of a heard word waits for
+                // their yes to that word (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37).
+                if !held_forget_ran
+                    && let Some(told) = hold_near_heard_keep(
+                        shared,
+                        (request, &carried_line),
+                        heard,
+                        call,
+                        scope.as_ref(),
+                    )
+                {
+                    messages.push(Message::tool(call.id.clone(), told.to_string()));
+                    continue;
+                }
                 // A face rename their yes already ran
                 // ([`held_rename::HeldRename`]): never a second.
                 if let Some(told) = held_rename::renamed_already(shared, request, call) {
@@ -17129,6 +17600,21 @@ async fn answer(
                     messages.push(Message::tool(
                         call.id.clone(),
                         crate::make_skill_local::read_back_already(told).to_string(),
+                    ));
+                    continue;
+                }
+                // The skill the heard words ran by its name already: never
+                // run twice (#6772).
+                if let Some((named, told)) = &skill_ran
+                    && crate::skill_named::same_skill_again(&call.name, &call.args, named)
+                {
+                    eprintln!(
+                        "lamp-voice second: request {request} chat round {round}: {} not run: the heard words ran that skill by its name already",
+                        call.name
+                    );
+                    messages.push(Message::tool(
+                        call.id.clone(),
+                        crate::skill_named::ran_already(told).to_string(),
                     ));
                     continue;
                 }
@@ -17297,6 +17783,11 @@ async fn answer(
                 };
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
+                }
+                // The skill the heard words named, run: a model's call of it
+                // after is given this answer, never run again.
+                if call.id == crate::skill_named::CALL_ID {
+                    skill_ran = Some(((call.name.clone(), call.args.clone()), answer.told.clone()));
                 }
                 // The first setup save refused only for the read-back's yes
                 // is held for that yes ([`HeldSave`]); any other answer to a

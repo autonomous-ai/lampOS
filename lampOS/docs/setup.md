@@ -144,7 +144,7 @@ the plan's paths (`reset::forget_agents`, #6343, below), the user's key
 (`/etc/lampOS/voice/credential` and `/etc/lampOS/policy/jev.key`, #806,
 16:13), the person's own keys (`/etc/lampOS/voice/own`, `LAMP_OWN_KEYS`), the
 name (`/etc/lampOS/person/name`), the owner's place from the app
-(`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the owner's chosen voice and character words from the app (`/etc/lampOS/setup/voice` and `/etc/lampOS/setup/character`, #5394), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), lamp-control's certificate and paired computers (`/var/lib/lampos-control`) and the owner's developer setting, its drop-in (`/etc/systemd/system/lamp-control.service.d/developer.conf`, `control.set`), and the owner's local agent switch, its drop-in (`/etc/systemd/system/lamp-control.service.d/agent.conf`, `control.set_agent`), the owner's dev monitor, lamp-peek's drop-in (`/etc/systemd/system/lamp-peek.service.d/monitor.conf`, `monitor.set`, #5883), the person's linked services' tokens (`/var/lib/lampos-services`, `lamp-services`' store, Queue #4710), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
+(`/etc/lampOS/person/place`, #4333), the lamp's name in the app given after setup (`/etc/lampOS/setup/display-name`, #1959), the owner's chosen voice and character words from the app (`/etc/lampOS/setup/voice` and `/etc/lampOS/setup/character`, #5394), the backend's link (`/etc/lampOS/setup/backend.json`, with the broker's password, #1396) and `lamp-cloud`'s rotated login (`/var/lib/lampos-cloud`, the same), lamp-control's certificate and paired computers (`/var/lib/lampos-control`) and the owner's developer setting, its drop-in (`/etc/systemd/system/lamp-control.service.d/developer.conf`, `control.set`), and the owner's local agent switch, its drop-in (`/etc/systemd/system/lamp-control.service.d/agent.conf`, `control.set_agent`), the owner's dev monitor, lamp-peek's drop-in (`/etc/systemd/system/lamp-peek.service.d/monitor.conf`, `monitor.set`, #5883), lamp-seen's record of the opt-in said back (`/var/lib/lampos-seen`, #6543), the person's linked services' tokens (`/var/lib/lampos-services`, `lamp-services`' store, Queue #4710), the answer on reports (`/etc/lampOS/setup/reports.json`) and `lamp-cloud`'s later record of it and its queue of reports (in `/var/lib/lampos-cloud` too, #1683), the Wi-Fi configuration (`/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`) and
 the setup marker. Kept: the
 software, its releases, the update key, the touch calibration and other
 per-lamp facts (the servos' daily load and temperature peaks in
@@ -155,7 +155,8 @@ checkpoint and transient handoff files share its root-owned 0700 directory.
 The room sounds yes (#1722 item 1) is `/var/lib/lampOS/consent/room-sounds.json`,
 0640 root:lampos so lamp-ears can read it, and the face expressions yes
 (`LAMP_FACE_EXPRESSIONS_ASK`) is `/var/lib/lampOS/consent/face-expressions.json`
-beside it; both reset plans wipe both files.
+beside it, and lamp-seen's opt-in (#6543, seen.md) is `seen-activity.json` there
+too; both reset plans wipe all three files.
 The product unit names that canonical file and turns `LAMP_ONBOARDING` on.
 Both reset plans wipe the entire directory's contents, including pending writes,
 temporary files and mailbox descendants, retaining the empty private container.
@@ -333,9 +334,11 @@ lamp-setup reset-now`). That unit, in this order:
    emptied by being memory, `reset::VOLATILE`: every folder a part keeps in
    `/run` past its stop, the tmpfiles' `/run/lampos-bus` (the bus's latest
    messages, which can say a person's name or words),
-   `/run/lampos-photos` and `/run/lampos-eyes-kept` (the eyes' sitting kept
-   across a restart, eyes.md), and the voice's and the records' own folders
-   (`RuntimeDirectoryPreserve=yes`: the thread's set-aside words, the room).
+   `/run/lampos-photos`, `/run/lampos-eyes-kept` (the eyes' sitting kept
+   across a restart, eyes.md) and `/run/lampos-eyes-frames` (the frame
+   link's socket for lamp-seen), and the voice's, the records' and
+   lamp-seen's own folders (`RuntimeDirectoryPreserve=yes`: the thread's
+   set-aside words, the room, the frame link's boots).
    Every other part's `RuntimeDirectory=` goes as its unit stops. If they
    can't be emptied it reboots instead. Then, best effort, it forgets what
    else a reboot dropped from memory (`reset::FORGET`): `wpa_cli -i wlan0
@@ -451,10 +454,9 @@ example plan covering every store of the person's listed above.
 
 `lamp_setup::wifi` is V1's join (`system/network/service.go`, `SetupNetwork`;
 `setup_failure.go`) in Rust, with V1's numbers: up to 60 s for the named
-network **and** the Internet (ping `223.5.5.5`, else `8.8.8.8`, each for at most
-2 s, else, as V1's `tlsReach`, a TLS handshake with the backend the setup request
-names in `llm_base_url`, or `campaign-api.autonomous.ai:443` when it names none;
-never Google's Gemini, which is blocked in China, #6256), checked every second; on every third
+network **and** the Internet (ping `8.8.8.8`, else, as V1's `tlsReach`, a TLS
+handshake with the voice's service, `generativelanguage.googleapis.com:443`),
+checked every second; on every third
 check, two keys rejected by the router end it early as `wrong_password`. A
 failure is named as V1 names it (`wrong_password`, `association_rejected`,
 `ssid_not_found`, `no_dhcp`, `no_internet`, `ssid_too_long`,
@@ -484,15 +486,18 @@ stop, since a router can refuse a right password's first handshake: the join
 keeps waiting, a join at 20 s is kept, and one that never joins gets the whole
 minute, then `wrong_password` (#4348).
 
+**PARKED (#6386).** #6256's check for a lamp in China (ping `223.5.5.5`, then
+`8.8.8.8`, each for at most 2 s, then TLS to the backend named in `llm_base_url`
+or `campaign-api.autonomous.ai:443`, never Gemini; 5 s for the reach and the
+Wi-Fi change's broker; a journal line `the internet answered: ping 223.5.5.5 in
+48 ms`) is commented out in `crates/setup/src/{wifi,wifi_change,main}.rs`;
+re-enable when China is scheduled and stable's lamp-update carries #6810.
+
 **The TLS reach.** A TCP connection alone is not the Internet: anything that
 accepts and stays silent, or answers in plain text, would pass. So, as V1, the
 handshake must complete, and the name's lookup, the connection and the
-handshake together take at most 5 s (V1's `cloudProbeTimeout` was 3 s; 5 s
-lets a slow first lookup or a server about 450 ms away pass, #6256). A good
-network still passes on the first ping; a dead one spends at most 2 + 2 + 5 s a
-check, so the wrong-key stop on a dead network comes at about 30 s, not 20 s.
-The check that passed and its time are one journal line (`the internet
-answered: ping 223.5.5.5 in 48 ms`). The lookup
+handshake together take at most 3 s (V1's `cloudProbeTimeout`; 5 s is
+PARKED (#6386), above). The lookup
 runs on a thread of its own, since the system's has no time limit and cannot
 be stopped; one that has not come back is waited on by the next check, never
 started twice, and the whole service shares that one (`LookupSlot::process`),
@@ -707,7 +712,7 @@ setup the app changes them through root's keys helper,
 `lamp-setup keys` on `lamp-setup-keys.socket`. All of it is in
 [own-keys.md](own-keys.md).
 
-## A new lamp's first volume (#5551, built, off unless set)
+## A new lamp's first volume (#5551, on for the product)
 
 The speaker's volume is the softvol control "Speaker" on the HDMI card
 (`allwinnerhdmi`, `device_speaker` in `/etc/asound.conf`, -30 to 0 dB over
@@ -732,7 +737,8 @@ app's slider. Read from the code on 6 Nov, before this switch:
   (`lamp-cmedia-speaker.service`'s drop-in), a different control,
   re-pinned at every boot.
 
-With `LAMP_FIRST_VOLUME=on` in `lamp-setup.service`, a setup run that has
+With `LAMP_FIRST_VOLUME=on` in `lamp-setup.service` (on in the product's
+unit, `deploy/product/lamp-setup.service`), a setup run that has
 joined the Wi-Fi and saved the settings sets that control to 70 % (about
 9 dB below full) and stores that card alone (`alsactl store allwinnerhdmi`,
 so a power cut before the first clean shutdown keeps it), just before the
@@ -904,7 +910,7 @@ the end, `{"done": {"ssid"}}` or `{"refused": why}`.
    restarts the radio, as setup's join does.
 3. **Proven** = the new name is the one joined, with a station address,
    and a TCP connection to the broker `lamp-cloud` is on is made and closed
-   (5 s at most, name lookup included, #6256), within 60 s (setup's own bound). Two
+   (3 s at most, name lookup included; 5 s is PARKED (#6386)), within 60 s (setup's own bound). Two
    rejected keys stop early, as setup's join does. **Kept** only once the app
    also confirms through it: the helper writes `{"joined": {"ssid",
    "online_within_ms", "confirm_within_ms"}}`, `lamp-cloud` makes its link

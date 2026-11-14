@@ -1,57 +1,55 @@
 //! A voice make the lamp's own model couldn't make, handed to the lamp's
-//! own agent, OpenClaw or Hermes (a proposal on #6059, the owner's OK and
-//! the first builder's yes, 11 Nov): with `LAMP_MAKE_SKILL_AGENT=on`
-//! ([`ENVIRONMENT`], off unless set, in no product unit).
+//! own agent (a proposal on #6059, the owner's OK and the first builder's
+//! yes, 11 Nov): with `LAMP_MAKE_SKILL_AGENT=on` ([`ENVIRONMENT`], off
+//! unless set; on in the product's lamp-voice).
 //!
-//! The order: DeepSeek writes first ([`crate::make_skill_local`]). With an
-//! agent on the lamp it gets one try and no repairs: an answer not kept
-//! (the tidies, the check, the say-back, its own `cannot:`, or no answer)
-//! goes at once, with the same system prompt and request, to the agent,
-//! which writes the two blocks again and gets the repairs. Its answers go
-//! through the very same checks. With no agent on the lamp DeepSeek keeps
-//! its repairs, as today; with no answer from the agent within
-//! [`WRITE_WITHIN`], DeepSeek's failure stands.
+//! The order: DeepSeek writes first ([`crate::make_skill_local`]). With
+//! Hermes as the lamp's agent (the tasks part's `lamp` target; only Hermes
+//! has a namespace runner for a make today, so another engine, OpenClaw,
+//! is never handed one and DeepSeek makes it alone) it gets one try and
+//! no repairs: an answer not kept (the tidies, the check, the say-back, its
+//! own `cannot:`, or no answer) goes at once, with the same system prompt
+//! and request, to the agent, which writes the blocks again and gets the
+//! repairs. Its answers go through the very same checks. With no agent on
+//! the lamp DeepSeek keeps its repairs, as today; with no answer from the
+//! agent within [`WRITE_WITHIN`], DeepSeek's failure stands.
 //!
-//! The agent is reached the way the voice hands it any work: the tasks
-//! part's `lamp` target ([`crate::agent_tasks`], #5978, #6226), prepared on
-//! its request socket and confirmed at once on the voice's own socket (the
-//! person's spoken ask is the ask, as a voice make's always was), then
-//! read back from the task's observations, which `lamp-tasks serve
-//! --push-wait` keeps as soon as the agent ends its turn. The tasks part
-//! takes at most 2,000 bytes of text, and the system prompt is longer, so
-//! the system prompt and the brief go in a file of their own
-//! ([`RULES_DIR`]) that the task names; the task's text begins as a brief
-//! does ([`crate::made_skill::is_brief`]), so its answer is never told as
-//! news. Once read, the task is marked told, so `--close-told` closes the
-//! agent's session.
+//! The agent writes in a skill run's namespace (#6643, the first builder's
+//! guard, 12 Nov 18:15): the make goes to lamp-tasks' make socket
+//! ([`MAKE_SOCKET_NAME`], `lamp_tasks::skill_make`), which runs the lamp's
+//! Hermes exactly as a skill's `do.task` run is started (row-6443's path),
+//! through its namespace wrapper: `control.sock` alone and never
+//! `admin.sock`. Its network is kept by default, as V1's agent had it (the
+//! owner's ask, 12 Nov); lamp-tasks' `LAMP_MAKE_AGENT_NET=held` gives the
+//! strict run, `LAMP_NS_NET=run`: only `lo` and the kernel's `@NONE`
+//! tunnels, the model only through `model.sock`. It writes its answer in a
+//! make's folder of its own, which lamp-tasks reads back. Never through a
+//! Harness task with the agent's own tools: when lamp-tasks can't give that
+//! run (an older build with no make socket, the switch off, a wrapper that
+//! can't hold it off when held, or a wrapper or namespace script with no
+//! make-home line, `no_namespace`), the make is not handed over and DeepSeek's
+//! failure stands ([`NotWritten::NoMakeRun`]).
 use crate::agent_tasks;
 use serde_json::{Value, json};
 use std::{
-    io::Write,
-    os::unix::fs::{OpenOptionsExt, PermissionsExt},
-    path::{Path, PathBuf},
+    io::{BufRead, BufReader, Write},
+    os::unix::net::UnixStream,
+    path::PathBuf,
     sync::OnceLock,
-    time::{Duration, Instant},
+    time::Duration,
 };
 
 /// The switch: `on`, and nothing else.
 pub const ENVIRONMENT: &str = "LAMP_MAKE_SKILL_AGENT";
 /// The longest one of the agent's answers is waited for, from the hand-over
-/// to its answer kept.
+/// to its answer kept: the make run's own deadline.
 pub const WRITE_WITHIN: Duration = Duration::from_secs(45);
 /// The longest the agent's part of a make goes on, its repairs included: a
 /// repair is begun only while one more answer ([`WRITE_WITHIN`]) still
 /// ends within it.
 pub const MAKE_WITHIN: Duration = Duration::from_secs(120);
-/// Where the system prompt and the brief are put for the agent to read:
-/// the folder 0750 and each file 0640, both of the local agents' group
-/// ([`lamp_msgs::local_agent::GROUP`], made by the installer with the
-/// `lampagent` user), each file with a name nobody can guess, removed once
-/// the answer is in. With no such group, the folder 0700 and the file 0600,
-/// journaled.
-pub const RULES_DIR: &str = "/run/lampos-make-skill";
-/// Where the group is read.
-pub const GROUP_FILE: &str = "/etc/group";
+/// lamp-tasks' make socket in its folder (`lamp_tasks::skill_make::MAKE_SOCKET`).
+pub const MAKE_SOCKET_NAME: &str = "skill-make.sock";
 /// What the lamp says, through the say service, as the agent begins, so
 /// the person isn't left in silence.
 pub const WAITING_LINE: &str = "Let me think about that a little longer.";
@@ -60,12 +58,17 @@ pub const WAITING_LINE: &str = "Let me think about that a little longer.";
 pub const CANNOT_LINE: &str = "I couldn't make that one.";
 /// How long the waiting line may wait to be said: past it, it is old.
 const WAITING_WITHIN_MS: u64 = 15_000;
-/// The longest ending a timed-out task takes, all its tries.
-const CANCEL_WITHIN: Duration = Duration::from_millis(1_500);
-/// Between two looks at the task.
-const LOOK_EVERY: Duration = Duration::from_millis(500);
+/// How long the line may take to send.
+const SEND_WITHIN: Duration = Duration::from_secs(5);
 /// The most of an answer taken, as the lamp's own model's.
 const MOST_ANSWER_BYTES: usize = 20 * 1024;
+/// lamp-tasks' refusals that mean no make run can be had here.
+/// `no_namespace`: the wrapper or the namespace script has no make-home
+/// line yet (an older lamp-update round).
+const NOT_HELD_OFF_CODES: [&str; 3] = ["off", "not_held_off", "no_namespace"];
+/// The one engine a make is handed to: only Hermes has a namespace runner
+/// for a make today (lamp-tasks' `MakeHermes`, #6643's 19:14 ruling).
+pub const MAKE_ENGINE: &str = "Hermes";
 
 /// Whether the switch is on.
 pub fn on() -> bool {
@@ -81,24 +84,16 @@ fn on_with(value: Option<&str>) -> bool {
 /// (`--tasks-dir`).
 static TASKS: OnceLock<PathBuf> = OnceLock::new();
 
-/// Kept by the second route's worker as it starts, with a tasks part;
-/// with the switch, the rules files an earlier worker left are swept.
+/// Kept by the second route's worker as it starts, with a tasks part.
 pub fn set_tasks_dir(directory: PathBuf) {
     let _ = TASKS.set(directory);
-    if on() {
-        sweep(Path::new(RULES_DIR));
-    }
 }
 
 /// The lamp's agent, reached through the tasks part.
 #[derive(Clone, Debug)]
 pub struct Agent {
-    /// The tasks part's folder: `request.sock` and `voice.sock`.
+    /// The tasks part's folder: `request.sock` and [`MAKE_SOCKET_NAME`].
     pub tasks: PathBuf,
-    /// Where the rules file is put ([`RULES_DIR`]).
-    pub rules: PathBuf,
-    /// Where the agents' group is read ([`GROUP_FILE`]).
-    pub groups: PathBuf,
     /// The say socket the waiting line goes to; none says nothing.
     pub say: Option<PathBuf>,
     /// [`WRITE_WITHIN`], or a test's own.
@@ -112,6 +107,10 @@ pub struct Agent {
 pub enum NotWritten {
     /// The tasks part has no `lamp` target, or couldn't be asked.
     NoAgent,
+    /// lamp-tasks can't run the agent in a skill run's namespace here: an
+    /// older build with no make socket, its switch off, or (held) a wrapper
+    /// that can't hold it off. Never handed over any other way.
+    NoMakeRun,
     /// No answer within [`Agent::within`].
     Timeout,
     /// Anything else, in the lamp's own words (never the agent's).
@@ -122,6 +121,7 @@ impl std::fmt::Display for NotWritten {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NoAgent => f.write_str("no agent on the lamp"),
+            Self::NoMakeRun => f.write_str("no make run in the agent's namespace can be had here"),
             Self::Timeout => write!(f, "no answer within {} s", WRITE_WITHIN.as_secs()),
             Self::Failed(why) => f.write_str(why),
         }
@@ -138,8 +138,6 @@ impl Agent {
         let tasks = TASKS.get()?.clone();
         Some(Self {
             tasks,
-            rules: PathBuf::from(RULES_DIR),
-            groups: PathBuf::from(GROUP_FILE),
             say: Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
             within: WRITE_WITHIN,
             make_within: MAKE_WITHIN,
@@ -157,6 +155,21 @@ impl Agent {
         agent_tasks::lamp_target_in(&answer)
     }
 
+    /// The lamp's agent when it is Hermes, the one engine a make is handed
+    /// to ([`MAKE_ENGINE`]); any other (OpenClaw has no namespace runner for
+    /// a make) is journaled with its name and not handed over, so
+    /// DeepSeek's answer stands.
+    pub fn hermes(&self) -> Option<&'static str> {
+        let engine = self.engine()?;
+        if engine == MAKE_ENGINE {
+            return Some(engine);
+        }
+        eprintln!(
+            "lamp-voice: a skill made here: the lamp's agent is {engine}: only Hermes has a namespace runner for a make today: not handed over, DeepSeek makes it alone"
+        );
+        None
+    }
+
     /// Say [`WAITING_LINE`] on a thread of its own; nothing waits on it.
     pub fn say_waiting(&self) {
         let Some(socket) = self.say.clone() else {
@@ -169,215 +182,157 @@ impl Agent {
             });
     }
 
-    /// The agent's answer to `system` and `brief`, as it wrote it, within
-    /// [`Agent::within`]. With `waiting`, [`WAITING_LINE`] is said once the
-    /// hand-over is taken, never when it failed at once.
+    /// The agent's answer to `system` and `brief`, as it wrote it in its
+    /// make run, within [`Agent::within`]. With `waiting`,
+    /// [`WAITING_LINE`] is said once lamp-tasks says the run starts, never
+    /// when it was refused at once.
     pub fn write(&self, system: &str, brief: &str, waiting: bool) -> Result<String, NotWritten> {
-        let began = Instant::now();
-        let left = || self.within.saturating_sub(began.elapsed());
-        let group = agents_group(&self.groups);
-        if group.is_none() {
-            eprintln!(
-                "lamp-voice: a skill made here: no {} group: the agent's rules are kept 0600",
-                lamp_msgs::local_agent::GROUP
-            );
-        }
-        let rules = Rules::put(&self.rules, group, system, brief)
-            .map_err(|error| NotWritten::Failed(format!("its rules not written: {error}")))?;
-        let text = task_text(&rules.path);
-        let (store, session, id) = self.hand_over(&text, &left)?;
-        if waiting {
-            self.say_waiting();
-        }
-        let answer = match self.answered(id, &left) {
-            Ok(answer) => answer,
-            Err(NotWritten::Timeout) => {
-                self.cancel(id);
-                return Err(NotWritten::Timeout);
-            }
-            Err(why) => return Err(why),
-        };
-        self.told(&store, &session, id, answer.observation, &left);
-        if answer.truncated || answer.text.len() > MOST_ANSWER_BYTES {
-            return Err(NotWritten::Failed("its answer was cut".into()));
-        }
-        Ok(answer.text)
-    }
-
-    /// `text` prepared for the lamp's own target and confirmed at once:
-    /// the store, the session and the task's id.
-    fn hand_over(
-        &self,
-        text: &str,
-        left: &impl Fn() -> Duration,
-    ) -> Result<(String, String, u64), NotWritten> {
-        let request = self.tasks.join("request.sock");
-        let status = agent_tasks::ask(&request, &json!({"op":"status"}), left())
-            .ok_or(NotWritten::NoAgent)?;
-        let guard = agent_tasks::guard(&status, format!("make-{}", agent_tasks::nonce()))
-            .ok_or(NotWritten::NoAgent)?;
-        let prepared = agent_tasks::ask_until_sure(
-            &request,
-            &json!({"op":"prepare","guard":guard,"text":text,"target":agent_tasks::LAMP_TARGET}),
-            left,
-        )
-        .ok_or(NotWritten::NoAgent)?;
-        if prepared.get("error") == Some(&json!("target")) {
-            return Err(NotWritten::NoAgent);
-        }
-        let (Some(id), Some(digest)) = (
-            prepared.get("id").and_then(Value::as_u64),
-            prepared.get("prepared_digest").and_then(Value::as_str),
-        ) else {
-            return Err(NotWritten::Failed(format!(
-                "the tasks part didn't prepare it ({})",
-                code(&prepared)
-            )));
-        };
-        let status = agent_tasks::ask(&request, &json!({"op":"status"}), left())
-            .ok_or(NotWritten::NoAgent)?;
-        let (Some(guard), Some(session), Some(store)) = (
-            agent_tasks::guard(&status, format!("make-{}", agent_tasks::nonce())),
-            status["summary"]["session_id"].as_str(),
-            status["store_id"].as_str(),
-        ) else {
-            return Err(NotWritten::NoAgent);
-        };
-        let confirmed = agent_tasks::ask_until_sure(
-            &self.tasks.join("voice.sock"),
-            &json!({"op":"confirm","guard":guard,"id":id,"prepared_digest":digest,"session_id":session}),
-            left,
-        )
-        .ok_or(NotWritten::Timeout)?;
-        if confirmed.get("ok") != Some(&json!(true)) {
-            return Err(NotWritten::Failed(format!(
-                "the tasks part didn't start it ({})",
-                code(&confirmed)
-            )));
-        }
-        Ok((store.to_owned(), session.to_owned(), id))
-    }
-
-    /// Task `id`'s answer, looked at every [`LOOK_EVERY`] until its agent
-    /// ends its turn with one, stops, fails or asks, or the time is up.
-    fn answered(&self, id: u64, left: &impl Fn() -> Duration) -> Result<Answer, NotWritten> {
-        let request = self.tasks.join("request.sock");
-        let mut read = None;
-        loop {
-            if left().is_zero() {
-                return Err(NotWritten::Timeout);
-            }
-            if let Some(task) =
-                agent_tasks::ask(&request, &json!({"op":"get_task","id":id}), left())
-            {
-                let state = task["task"]["dispatch"]["state"].as_str().unwrap_or("");
-                if ["not_sent", "cancelled", "invalidated"].contains(&state) {
-                    return Err(NotWritten::Failed(format!("its work was {state}")));
-                }
-                let newest = task["observations"]
-                    .as_array()
-                    .and_then(|seen| seen.iter().filter_map(|seen| seen["id"].as_u64()).max());
-                if let Some(observation) = newest.filter(|newest| read != Some(*newest))
-                    && let Some(seen) = agent_tasks::ask(
-                        &request,
-                        &json!({"op":"get_observation","id":id,"observation_id":observation}),
-                        left(),
-                    )
-                    .filter(|seen| seen.get("data").is_some_and(Value::is_object))
+        let mut stream = UnixStream::connect(self.tasks.join(MAKE_SOCKET_NAME))
+            .map_err(|_| NotWritten::NoMakeRun)?;
+        // lamp-tasks ends the run at `within`; its answer comes just after.
+        let grace = (self.within / 2).min(Duration::from_secs(5));
+        let line = json!({
+            "op": "skill_make",
+            "rules": format!("{system}\n\n{brief}\n"),
+            "within_ms": self.within.as_millis() as u64,
+        });
+        stream
+            .set_write_timeout(Some(SEND_WITHIN))
+            .and_then(|()| stream.set_read_timeout(Some(self.within + grace)))
+            .and_then(|()| writeln!(stream, "{line}"))
+            .map_err(|error| NotWritten::Failed(format!("the make was not sent: {error}")))?;
+        let mut lines = BufReader::new(std::io::Read::take(stream, 2 * MOST_ANSWER_BYTES as u64));
+        let mut read = || -> Result<Value, NotWritten> {
+            let mut text = String::new();
+            match lines.read_line(&mut text) {
+                Ok(0) => Err(NotWritten::Failed("lamp-tasks gave no answer".into())),
+                Ok(_) => serde_json::from_str(&text)
+                    .map_err(|_| NotWritten::Failed("lamp-tasks' answer can't be read".into())),
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) =>
                 {
-                    // Only an observation read whole is not read again.
-                    read = Some(observation);
-                    let data = &seen["data"];
-                    let text = data["answer"].as_str().unwrap_or_default();
-                    match data["state"].as_str().unwrap_or("unknown") {
-                        "idle" if !text.trim().is_empty() => {
-                            return Ok(Answer {
-                                text: text.to_owned(),
-                                observation,
-                                truncated: data["truncated"] == json!(true),
-                            });
-                        }
-                        state @ ("needs-input" | "stopped" | "failed") => {
-                            return Err(NotWritten::Failed(format!("its agent {state}")));
-                        }
-                        _ => {}
-                    }
+                    Err(NotWritten::Timeout)
                 }
+                Err(error) => Err(NotWritten::Failed(format!("lamp-tasks' answer: {error}"))),
             }
-            std::thread::sleep(LOOK_EVERY.min(left()));
-        }
-    }
-
-    /// Task `id`, whose agent didn't answer in time, ended where the tasks
-    /// part can end it: `cancel`, which it takes only for work not yet
-    /// handed to the agent. It has no op that ends work the agent has, so
-    /// that is left running, journaled; its news is a brief's, never told.
-    fn cancel(&self, id: u64) {
-        let request = self.tasks.join("request.sock");
-        // One deadline for the whole cancel, so a tasks part that keeps
-        // answering busy, uncertain or timeout ends it (Twelve's P2).
-        let until = Instant::now() + CANCEL_WITHIN;
-        let left = || until.saturating_duration_since(Instant::now());
-        let answer = agent_tasks::ask(&request, &json!({"op":"status"}), left())
-            .and_then(|status| {
-                agent_tasks::guard(&status, format!("make-{}", agent_tasks::nonce()))
-            })
-            .and_then(|guard| {
-                agent_tasks::ask_until_sure(
-                    &request,
-                    &json!({"op":"cancel","guard":guard,"id":id}),
-                    left,
-                )
-            });
-        match answer {
-            Some(answer) if answer.get("ok") == Some(&json!(true)) => {
-                eprintln!("lamp-voice: a skill made here: the agent's task {id} was ended");
+        };
+        let mut answer = read()?;
+        if answer == json!({"ok": true, "started": true}) {
+            if waiting {
+                self.say_waiting();
             }
-            answer => eprintln!(
-                "lamp-voice: a skill made here: the agent's task {id} couldn't be ended ({}): \
-                 left running",
-                answer.as_ref().map_or_else(|| "no answer".to_owned(), code)
-            ),
+            answer = read()?;
         }
-    }
-
-    /// Task `id`'s answer marked told on the voice's socket, so the tasks
-    /// part closes the agent's session (`--close-told`). Best effort.
-    fn told(
-        &self,
-        store: &str,
-        session: &str,
-        id: u64,
-        observation: u64,
-        left: &impl Fn() -> Duration,
-    ) {
-        let request = self.tasks.join("request.sock");
-        let Some(status) = agent_tasks::ask(&request, &json!({"op":"status"}), left()) else {
-            return;
-        };
-        if status["store_id"].as_str() != Some(store) {
-            return;
+        if answer.get("ok") == Some(&json!(true))
+            && let Some(text) = answer.get("answer").and_then(Value::as_str)
+        {
+            return match text.len() > MOST_ANSWER_BYTES {
+                true => Err(NotWritten::Failed("its answer was cut".into())),
+                false => Ok(text.to_owned()),
+            };
         }
-        let Some(guard) = agent_tasks::guard(&status, format!("make-{}", agent_tasks::nonce()))
-        else {
-            return;
-        };
-        let _ = agent_tasks::ask(
-            &self.tasks.join("voice.sock"),
-            &json!({"op":"told","guard":guard,"id":id,"observation_id":observation,"session_id":session}),
-            left().max(Duration::from_millis(500)),
-        );
+        let code = code(&answer);
+        if NOT_HELD_OFF_CODES.contains(&code.as_str()) {
+            return Err(NotWritten::NoMakeRun);
+        }
+        Err(NotWritten::Failed(format!(
+            "lamp-tasks didn't make it ({code})"
+        )))
     }
 }
 
-/// The agent's answer as the tasks part kept it.
-struct Answer {
-    text: String,
-    observation: u64,
-    truncated: bool,
+/// Whether a make of a skill that uses a linked service is the lamp's
+/// agent's (the owner's ask, 13 Nov): with `LAMP_AGENT_SERVICES` on and a
+/// made skill's code on, as the making model is then told to make such a
+/// skill as one `do.task` for the agent (`make_skill_local::agent_services`).
+pub fn services_through_agent() -> bool {
+    crate::made_skill::agent_services_here() && crate::made_skill::scripts_on()
 }
 
-/// The tasks part's code only, never the task's words.
+/// Words that ask for a linked service whether or not it is linked, each
+/// as whole words in order, with the service's code: none of them is an
+/// everyday word for something the lamp sees or does itself.
+const SERVICE_WORDS: &[(&str, &[&str])] = &[
+    ("gmail", &["mail"]),
+    ("gmail", &["mails"]),
+    ("gmail", &["email"]),
+    ("gmail", &["emails"]),
+    ("gmail", &["emailed"]),
+    ("gmail", &["emailing"]),
+    ("gmail", &["inbox"]),
+    ("gmail", &["gmail"]),
+    ("google_calendar", &["calendar"]),
+    ("google_calendar", &["calendars"]),
+    ("google_calendar", &["meeting"]),
+    ("google_calendar", &["meetings"]),
+    ("google_calendar", &["appointment"]),
+    ("google_calendar", &["appointments"]),
+    ("google_drive", &["google", "drive"]),
+    ("google_drive", &["drive", "file"]),
+    ("google_drive", &["drive", "files"]),
+    ("google_drive", &["drive", "folder"]),
+    ("github", &["github"]),
+    ("github", &["pull", "request"]),
+    ("github", &["pull", "requests"]),
+];
+
+/// Words that ask for a linked service only when the lamp is told it is
+/// linked: a service's own name, or a word that is an everyday one too
+/// ("drive", "issue", "slack", "notion").
+const LINKED_WORDS: &[(&str, &[&str])] = &[
+    ("google_calendar", &["event"]),
+    ("google_calendar", &["events"]),
+    ("google_calendar", &["agenda"]),
+    ("google_drive", &["drive"]),
+    ("github", &["issue"]),
+    ("github", &["issues"]),
+    ("github", &["repo"]),
+    ("github", &["repository"]),
+    ("figma", &["figma"]),
+    ("linear", &["linear"]),
+    ("asana", &["asana"]),
+    ("ahrefs", &["ahrefs"]),
+    ("facebook", &["facebook"]),
+    ("slack", &["slack"]),
+    ("mondaydotcom", &["monday", "com"]),
+    ("hubspot", &["hubspot"]),
+    ("amplitude", &["amplitude"]),
+    ("notion", &["notion"]),
+];
+
+/// The code of the linked service `words` ask for, when they do: one of
+/// [`SERVICE_WORDS`], or one of [`LINKED_WORDS`] for a service `linked`
+/// (the codes `lamp-services` tells linked now, asked only when no word of
+/// the first list is there) names. Whole words only, in any case: "mail"
+/// in "voicemail" or "Monday" alone is none. None asks for none.
+pub fn service_asked(
+    words: &str,
+    linked: impl FnOnce() -> Option<Vec<String>>,
+) -> Option<&'static str> {
+    let words: Vec<String> = words
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|word| !word.is_empty())
+        .map(str::to_lowercase)
+        .collect();
+    let said = |phrase: &[&str]| {
+        words
+            .windows(phrase.len())
+            .any(|run| run.iter().zip(phrase).all(|(word, wanted)| word == wanted))
+    };
+    if let Some((code, _)) = SERVICE_WORDS.iter().find(|(_, phrase)| said(phrase)) {
+        return Some(code);
+    }
+    let linked = linked()?;
+    LINKED_WORDS
+        .iter()
+        .find(|(code, phrase)| linked.iter().any(|kept| kept == code) && said(phrase))
+        .map(|(code, _)| *code)
+}
+
+/// lamp-tasks' code only, never the run's words.
 fn code(answer: &Value) -> String {
     answer
         .get("error")
@@ -387,118 +342,20 @@ fn code(answer: &Value) -> String {
         .to_owned()
 }
 
-/// The task's text: a brief's head ([`crate::made_skill::BRIEF_HEAD`]), so
-/// it is never told as news, and where its rules and request are.
-pub fn task_text(rules: &Path) -> String {
-    format!(
-        "{}: everything you need is in the file {}. Read it and answer exactly as it says, in \
-         your reply alone: the two fenced blocks and nothing else, or its one line when the \
-         skill can't be made. Write no files, install nothing and run nothing else.",
-        crate::made_skill::BRIEF_HEAD,
-        rules.display()
-    )
-}
-
-/// One make's rules file: the system prompt, then the brief. Removed when
-/// dropped.
-struct Rules {
-    path: PathBuf,
-}
-
-impl Rules {
-    /// The file in `directory`, shared with `group` (the agents') when
-    /// there is one, else with no one.
-    fn put(
-        directory: &Path,
-        group: Option<u32>,
-        system: &str,
-        brief: &str,
-    ) -> std::io::Result<Self> {
-        let (folder, file_mode) = if group.is_some() {
-            (0o750, 0o640)
-        } else {
-            (0o700, 0o600)
-        };
-        std::fs::create_dir_all(directory)?;
-        std::os::unix::fs::chown(directory, None, group)?;
-        std::fs::set_permissions(directory, std::fs::Permissions::from_mode(folder))?;
-        let path = directory.join(format!("make-{}.md", random_name()?));
-        // Made 0600 and given its group and mode before a byte is written.
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .mode(0o600)
-            .open(&path)?;
-        let rules = Self { path };
-        std::os::unix::fs::fchown(&file, None, group)?;
-        file.set_permissions(std::fs::Permissions::from_mode(file_mode))?;
-        file.write_all(format!("{system}\n\n{brief}\n").as_bytes())?;
-        Ok(rules)
-    }
-}
-
-/// 16 random bytes as hex, from the kernel, as the voice's boot id is.
-fn random_name() -> std::io::Result<String> {
-    use std::io::Read;
-    let mut bytes = [0u8; 16];
-    std::fs::File::open("/dev/urandom")?.read_exact(&mut bytes)?;
-    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
-}
-
-/// Rules files a make left behind in `directory` (a worker stopped while
-/// the agent wrote), removed: run as the second route's worker starts,
-/// when no make of its own is under way. Only `make-*.md` files.
-pub fn sweep(directory: &Path) {
-    let Ok(entries) = std::fs::read_dir(directory) else {
-        return;
-    };
-    let mut swept = 0;
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        if name.starts_with("make-")
-            && name.ends_with(".md")
-            && entry.file_type().is_ok_and(|kind| kind.is_file())
-            && std::fs::remove_file(entry.path()).is_ok()
-        {
-            swept += 1;
-        }
-    }
-    if swept > 0 {
-        eprintln!(
-            "lamp-voice: a skill made here: {swept} old rules file(s) of the agent's removed"
-        );
-    }
-}
-
-/// The local agents' group's id in the `group` file at `path`
-/// (`name:x:gid:members`); none when it isn't there.
-fn agents_group(path: &Path) -> Option<u32> {
-    let text = std::fs::read_to_string(path).ok()?;
-    text.lines().find_map(|line| {
-        let mut fields = line.split(':');
-        (fields.next()? == lamp_msgs::local_agent::GROUP).then_some(())?;
-        fields.nth(1)?.parse().ok()
-    })
-}
-
-impl Drop for Rules {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.path);
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
-    use std::io::{BufRead, BufReader};
     use std::os::unix::net::UnixListener;
+    use std::path::Path;
     use std::sync::{Arc, Mutex};
+    use std::time::Instant;
 
     /// A stub tasks part in a folder of its own: its `lamp` target runs
-    /// `engine` (none for no target), and its agent answers each task's
-    /// rules with `answer(rules, brief)` after `after`, or never with
-    /// `None`. The lines it was sent are kept.
+    /// `engine` (none for no target; "old" for a build with no make
+    /// socket; "not_held_off" for one whose run can't be held off;
+    /// "no_namespace" for one whose wrapper has no make-home line), and
+    /// its make run answers each make's rules with `answer(rules)`, or
+    /// never with `None`. The lines it was sent are kept.
     pub(crate) struct StubTasks {
         pub dir: Folder,
         pub sent: Arc<Mutex<Vec<Value>>>,
@@ -524,27 +381,24 @@ pub(crate) mod tests {
         pub(crate) fn agent(&self) -> Agent {
             Agent {
                 tasks: self.dir.path().to_path_buf(),
-                rules: self.dir.path().join("rules"),
-                groups: self.dir.path().join("no-group"),
                 say: None,
                 within: Duration::from_millis(1_500),
                 make_within: Duration::from_secs(10),
             }
         }
 
-        pub(crate) fn prepares(&self) -> usize {
+        /// The makes handed over to the make run.
+        pub(crate) fn hand_overs(&self) -> usize {
             self.sent
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|line| line["op"] == "prepare")
+                .filter(|line| line["op"] == "skill_make")
                 .count()
         }
     }
 
     type Answers = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
-    /// Each task's text, and its agent's answer once read.
-    type Handed = Arc<Mutex<Vec<(String, Option<String>)>>>;
 
     pub(crate) fn stub(engine: Option<&'static str>, answers: Answers) -> StubTasks {
         static MADE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -556,10 +410,13 @@ pub(crate) mod tests {
         let _ = std::fs::remove_dir_all(dir.path());
         std::fs::create_dir_all(dir.path()).unwrap();
         let sent = Arc::new(Mutex::new(Vec::new()));
-        let tasks: Handed = Arc::default();
-        for name in ["request.sock", "voice.sock"] {
+        let mut sockets = vec!["request.sock"];
+        if engine != Some("old") {
+            sockets.push(MAKE_SOCKET_NAME);
+        }
+        for name in sockets {
             let listener = UnixListener::bind(dir.path().join(name)).unwrap();
-            let (sent, tasks, answers) = (sent.clone(), tasks.clone(), answers.clone());
+            let (sent, answers) = (sent.clone(), answers.clone());
             std::thread::spawn(move || {
                 for stream in listener.incoming() {
                     let Ok(mut stream) = stream else { return };
@@ -571,54 +428,28 @@ pub(crate) mod tests {
                     sent.lock().unwrap().push(asked.clone());
                     let answer = match asked["op"].as_str().unwrap_or_default() {
                         "targets" => match engine {
-                            Some("busy") => {
-                                json!({"ok":true,"targets":[{"alias":"lamp","engine":"hermes"}]})
-                            }
                             Some(engine) => {
+                                let engine = match engine {
+                                    "old" | "not_held_off" | "no_namespace" => "hermes",
+                                    engine => engine,
+                                };
                                 json!({"ok":true,"targets":[{"alias":"lamp","engine":engine}]})
                             }
                             None => json!({"ok":true,"targets":[]}),
                         },
-                        "status" => json!({"ok":true,"store_id":"s","revision":1,
-                            "summary":{"session_id":"x"}}),
-                        "prepare" if engine.is_none() => json!({"ok":false,"error":"target"}),
-                        "prepare" => {
-                            let mut tasks = tasks.lock().unwrap();
-                            tasks.push((asked["text"].as_str().unwrap().to_owned(), None));
-                            json!({"ok":true,"id":tasks.len(),"prepared_digest":"d"})
+                        "skill_make" if matches!(engine, Some("not_held_off" | "no_namespace")) => {
+                            json!({"ok":false,"error":engine.unwrap(),"message":"no"})
                         }
-                        "confirm" | "told" => json!({"ok":true}),
-                        // Work its agent has can't be cancelled; a busy
-                        // part keeps saying so.
-                        "cancel" if engine == Some("busy") => json!({"ok":false,"error":"busy"}),
-                        "cancel" => json!({"ok":false,"error":"already_attempted"}),
-                        "get_task" => {
-                            let id = asked["id"].as_u64().unwrap() as usize;
-                            let mut tasks = tasks.lock().unwrap();
-                            let (text, answer) = &mut tasks[id - 1];
-                            if answer.is_none() {
-                                // The rules file the task names, read as the agent would.
-                                let path = text
-                                    .split("in the file ")
-                                    .nth(1)
-                                    .and_then(|rest| rest.split(". Read").next())
-                                    .unwrap();
-                                let rules = std::fs::read_to_string(path).unwrap();
-                                *answer = answers(&rules);
+                        "skill_make" => {
+                            let _ = writeln!(stream, "{}", json!({"ok":true,"started":true}));
+                            match answers(asked["rules"].as_str().unwrap()) {
+                                Some(text) => json!({"ok":true,"answer":text}),
+                                None => {
+                                    // A run that never ends in the voice's time.
+                                    std::thread::sleep(Duration::from_secs(5));
+                                    continue;
+                                }
                             }
-                            let observations = if answer.is_some() {
-                                json!([{"id": id * 10, "state": "idle"}])
-                            } else {
-                                json!([])
-                            };
-                            json!({"ok":true,"task":{"dispatch":{"state":"accepted"}},
-                                "text":text,"observations":observations})
-                        }
-                        "get_observation" => {
-                            let id = asked["id"].as_u64().unwrap() as usize;
-                            let tasks = tasks.lock().unwrap();
-                            json!({"ok":true,"data":{"state":"idle",
-                                "answer":tasks[id - 1].1.clone().unwrap_or_default()}})
                         }
                         _ => json!({"ok":false,"error":"bad_request"}),
                     };
@@ -630,11 +461,11 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn the_agent_is_handed_the_rules_in_a_file_and_its_answer_read_back() {
+    fn the_agent_is_handed_the_rules_as_a_make_run_and_its_answer_read_back() {
         let tasks = stub(
             Some("hermes"),
             Arc::new(|rules: &str| {
-                assert!(rules.starts_with("SYSTEM\n\nBRIEF"), "{rules}");
+                assert_eq!(rules, "SYSTEM\n\nBRIEF\n");
                 Some("```skill.toml\nx\n```".to_owned())
             }),
         );
@@ -645,31 +476,52 @@ pub(crate) mod tests {
             "```skill.toml\nx\n```"
         );
         let sent = tasks.sent.lock().unwrap().clone();
-        let prepare = sent.iter().find(|line| line["op"] == "prepare").unwrap();
-        let text = prepare["text"].as_str().unwrap();
-        // Never told as news, and within the tasks part's bound.
-        assert!(crate::made_skill::is_brief(text), "{text}");
-        assert!(text.len() <= agent_tasks::MOST_TASK_BYTES);
-        assert_eq!(prepare["target"], "lamp");
-        assert!(sent.iter().any(|line| line["op"] == "confirm"));
-        assert!(sent.iter().any(|line| line["op"] == "told"));
-        // The rules file is gone once the answer is in.
+        let make = sent.iter().find(|line| line["op"] == "skill_make").unwrap();
+        // The make's line, as lamp-tasks' make run takes it, and
+        // never a Harness task with the agent's own tools.
+        assert_eq!(make["within_ms"], 1_500);
         assert_eq!(
-            std::fs::read_dir(tasks.dir.path().join("rules"))
-                .unwrap()
-                .count(),
-            0
+            make.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["op", "rules", "within_ms"]
         );
+        assert!(!sent.iter().any(|line| line["op"] == "prepare"));
+    }
+
+    /// The first builder's guard on #6643: no make run, no hand-over.
+    /// An older lamp-tasks with no make socket, or one whose run can't be
+    /// held off, is [`NotWritten::NoMakeRun`]; nothing is prepared.
+    #[test]
+    fn no_make_run_is_never_handed_over() {
+        for engine in ["old", "not_held_off", "no_namespace"] {
+            let tasks = stub(Some(engine), Arc::new(|_: &str| Some("x".into())));
+            assert_eq!(tasks.agent().engine(), Some("Hermes"));
+            assert_eq!(
+                tasks.agent().write("S", "B", false),
+                Err(NotWritten::NoMakeRun),
+                "{engine}"
+            );
+            assert!(
+                !tasks
+                    .sent
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .any(|line| line["op"] == "prepare")
+            );
+        }
     }
 
     #[test]
     fn no_lamp_target_is_no_agent_and_an_agent_that_never_answers_times_out() {
         let none = stub(None, Arc::new(|_: &str| None));
         assert_eq!(none.agent().engine(), None);
-        assert_eq!(
-            none.agent().write("S", "B", false),
-            Err(NotWritten::NoAgent)
-        );
+        assert_eq!(none.agent().hermes(), None);
+        // OpenClaw is the lamp's agent, but a make is Hermes's alone.
+        let openclaw = stub(Some("openclaw"), Arc::new(|_: &str| Some("A".into())));
+        assert_eq!(openclaw.agent().engine(), Some("OpenClaw"));
+        assert_eq!(openclaw.agent().hermes(), None);
+        let hermes = stub(Some("hermes"), Arc::new(|_: &str| Some("A".into())));
+        assert_eq!(hermes.agent().hermes(), Some("Hermes"));
         let silent = stub(Some("openclaw"), Arc::new(|_: &str| None));
         let began = Instant::now();
         assert_eq!(
@@ -677,85 +529,67 @@ pub(crate) mod tests {
             Err(NotWritten::Timeout)
         );
         assert!(began.elapsed() < Duration::from_secs(4));
-        // Its task is asked to end, and its rules are gone.
-        let sent = silent.sent.lock().unwrap().clone();
-        let cancel = sent.iter().find(|line| line["op"] == "cancel").unwrap();
-        assert_eq!(cancel["id"], 1);
-        assert_eq!(
-            std::fs::read_dir(silent.dir.path().join("rules"))
-                .unwrap()
-                .count(),
-            0
-        );
     }
 
-    /// The rules are shared with the local agents' group only: the file
-    /// 0640 and the folder 0750 of that group; with no such group, 0600 and
-    /// 0700.
+    /// The owner's ask, 13 Nov: a make naming mail, a calendar, Drive or
+    /// GitHub asks for a linked service, as whole words; a word that is an
+    /// everyday one too counts only for a service told linked; a make
+    /// naming none asks for none.
     #[test]
-    fn the_rules_are_for_the_agents_group_alone() {
-        use std::os::unix::fs::MetadataExt;
-        let tasks = stub(None, Arc::new(|_: &str| None));
-        let folder = tasks.dir.path().join("rules");
-        // A group this test's user is in: the folder's own.
-        let own = std::fs::metadata(tasks.dir.path()).unwrap().gid();
-        let groups = tasks.dir.path().join("group");
-        std::fs::write(
-            &groups,
-            format!(
-                "root:x:0:\n{}:x:{own}:lampagent\n",
-                lamp_msgs::local_agent::GROUP
+    fn a_linked_service_is_asked_for_in_whole_words() {
+        let none = || -> Option<Vec<String>> { None };
+        for (words, code) in [
+            ("when I leave my desk, email me that I'm out", "gmail"),
+            ("every morning at eight, read me my new mail", "gmail"),
+            ("tell me when my inbox has something new", "gmail"),
+            ("send an E-mail to Minh when I arrive", "gmail"),
+            (
+                "every evening, tell me tomorrow's calendar",
+                "google_calendar",
             ),
-        )
-        .unwrap();
-        assert_eq!(agents_group(&groups), Some(own));
-        assert_eq!(agents_group(&tasks.dir.path().join("none")), None);
-        let shared = Rules::put(&folder, Some(own), "S", "B").unwrap();
-        let file = std::fs::metadata(&shared.path).unwrap();
-        assert_eq!((file.mode() & 0o777, file.gid()), (0o640, own));
-        let dir = std::fs::metadata(&folder).unwrap();
-        assert_eq!((dir.mode() & 0o777, dir.gid()), (0o750, own));
-        drop(shared);
-        let alone = Rules::put(&folder, None, "S", "B").unwrap();
+            (
+                "glow blue five minutes before each meeting",
+                "google_calendar",
+            ),
+            ("list what's new in my Google Drive at noon", "google_drive"),
+            ("say how many pull requests wait for me", "github"),
+            ("read my GitHub notifications at nine", "github"),
+        ] {
+            assert_eq!(service_asked(words, none), Some(code), "{words}");
+        }
+        for words in [
+            "make me a skill that dims the light at 10 pm",
+            "play my voicemail jingle when I arrive",
+            "nod when someone says emailer",
+            "every Monday at nine, glow green",
+            "when there's an issue with the air, say so",
+            "glow red when I drive home",
+        ] {
+            assert_eq!(service_asked(words, none), None, "{words}");
+        }
+        let linked = || Some(vec!["github".to_owned(), "slack".to_owned()]);
         assert_eq!(
-            std::fs::metadata(&alone.path).unwrap().mode() & 0o777,
-            0o600
+            service_asked("say my new issues at nine", linked),
+            Some("github")
         );
-        assert_eq!(std::fs::metadata(&folder).unwrap().mode() & 0o777, 0o700);
-        assert_eq!(std::fs::read_to_string(&alone.path).unwrap(), "S\n\nB\n");
-    }
-
-    /// Twelve's P2 on #6439: a cancel the tasks part answers `busy` every
-    /// time still ends within its one deadline.
-    #[test]
-    fn a_cancel_always_answered_busy_ends_in_time() {
-        let busy = stub(Some("busy"), Arc::new(|_: &str| None));
-        let began = Instant::now();
-        busy.agent().cancel(1);
-        assert!(began.elapsed() < CANCEL_WITHIN + Duration::from_millis(500));
-        let tries = busy
-            .sent
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|line| line["op"] == "cancel")
-            .count();
-        assert!(tries > 1, "{tries}");
-    }
-
-    /// Rules files left behind are swept; nothing else in the folder is.
-    #[test]
-    fn old_rules_files_are_swept() {
-        let tasks = stub(None, Arc::new(|_: &str| None));
-        let folder = tasks.dir.path().join("rules");
-        std::fs::create_dir_all(&folder).unwrap();
-        std::fs::write(folder.join("make-ab.md"), "x").unwrap();
-        std::fs::write(folder.join("other.md"), "x").unwrap();
-        sweep(&folder);
-        assert!(!folder.join("make-ab.md").exists());
-        assert!(folder.join("other.md").exists());
-        // Two rules files never share a name.
-        assert_ne!(random_name().unwrap(), random_name().unwrap());
+        assert_eq!(
+            service_asked("read my Slack messages when I sit down", linked),
+            Some("slack")
+        );
+        assert_eq!(service_asked("what's on my drive at noon", linked), None);
+        assert_eq!(
+            service_asked("what's on my drive at noon", || Some(vec![
+                "google_drive".to_owned()
+            ])),
+            Some("google_drive")
+        );
+        // What is linked is asked only when no plain word is there.
+        assert_eq!(
+            service_asked("email me", || -> Option<Vec<String>> {
+                panic!("not asked")
+            }),
+            Some("gmail")
+        );
     }
 
     #[test]

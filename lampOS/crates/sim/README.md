@@ -119,8 +119,54 @@ deepgram = "..."        # LAMPOS_VOICE_DEEPGRAM_KEY
 
 The file must be a regular file you own, mode 0600 (or 0400), and not a symbolic link, as lamp-voice demands of its own credential files; otherwise `voice-keys` stops with the refusal and the `chmod 600` line that fixes it (exit 2). A name lamp-sim does not know is refused by its line only (a key pasted where a name belongs would otherwise be echoed), and a known key that is not quoted text by its name and line; a value is never shown. A key is never written, logged or put in a lamp's folder, and its type prints only its name, where it came from and its length.
 
+## A local speech service (`lamp-sim speech`)
+
+```sh
+lamp-sim speech ~/.lampsim/b [--listen 127.0.0.1:7732] [--engine resident|say] [--language en-US]   # the token is written to ~/.lampsim/b/speech.token (0600)
+```
+
+A text-to-speech service in the host's own voice for the real voice's SECOND
+route (sim-3-P4 step 1, `speech.rs`): it answers the OpenAI-compatible
+`POST /audio/speech` (or `/v1/audio/speech`) the route already calls, with
+`response_format` `pcm` only (24 kHz mono S16LE, chunked); `model` and `voice`
+are read past. It listens on loopback only (another address is refused at
+start) and speaks only for a request whose `Authorization: Bearer` is the run's
+token, at most 4 lines at once (more are answered 503), a line at most 4,096
+characters. Each line says on stderr its characters, when its first bytes went
+and how much sound it made.
+
+On macOS the engine is the **resident synthesizer** (`apple_speech.rs`, step
+1b): Apple's `AVSpeechSynthesizer`, kept for the service's life and holding
+the main thread (its callbacks come only with the main run loop running; the
+HTTP side runs on another thread), writing each line to buffers made into
+24 kHz S16LE as they come (from its 22,050 Hz, linear). Measured on macOS 26
+(arm64) through this service, 5 requests each a second apart, medians, first
+bytes after 19 ms for "Hi there.", 13 ms for 8 words and 18 ms for 20 (the
+whole line after 29, 32 and 61 ms); the first line after start about 290 ms;
+whisper.cpp (`base.en`) wrote back a 15-word line's output word for word. A
+line ends at the synthesizer's empty end buffer, or 300 ms after its last
+buffer if that never comes (it did not on macOS 14, Heron's read on #6961);
+at rest the main thread waits on the channel and runs no run loop. It is
+the only `unsafe` in lamp-sim: one module, `#[allow(unsafe_code)]` on it alone,
+a SAFETY note on each of its 11 blocks (the first builder's conditions, #6811 21:28); its
+`objc2` packages are macOS-only dependencies (MIT, or Zlib/Apache/MIT).
+
+`--engine say` (and any system other than macOS) uses macOS's `say` instead,
+one process a line, rendered whole before the first byte; each `say` is started before its line comes (it waits on its
+stdin), so a line pays only its rendering, not the ~0.4 s start. Measured on
+macOS 26 (arm64) through this service, 5 requests each a second apart,
+medians, first bytes after 371 ms for "Hi there.", 517 ms for 8 words and
+828 ms for 20 (715, 887 and 1,298 ms with a `say` started with the line); a
+second line at the same moment starts its own and takes about 0.9 s. A killed
+run's leftover files are cleared at the next start. Off macOS there is no engine yet: a request is answered 503 with the reason (`say` is not found).
+
+The real lamp-voice cannot use it yet: its service URLs must be https and it
+trusts only its built-in roots. A loopback switch for it is ten's step 3, and
+`lamp-sim run --real-voice=local` (step 4) will start this service with it.
+
 ## Known gaps
 
 - No ears or eyes models run: hands, sound classes and phrases are made by hand (above); no name, touch or real face events.
 - The body's home, folded-arm and stand counts are lamp-fc4b's unless `LAMP_SIM_ARM=75c9` (a bad value stops lamp-sim): 75c9's are shoulder 2076 / elbow 2045 folded and 2639 / 2570 at the stand (`get body` read on 10 Nov, as in `docs/lamp.model.json` "measured"), head pitch/roll/yaw home 1791 / 2057 / 2000 and at the stand 1780 / 2057 / 2026 (the real lamp-body's own journal reads of lamp-75c9 on 11 Nov: standing 17:35 [1780, 2057, 2026], folded 17:42 [1756-1760, 2057, 2000], folded 18:05 [1785, 2057, 1999]; the folded pitch is the 10 Nov `get body` 1791, 6 counts over the 18:05 read, and 17:42's pitch reads as mid-move). `LAMP_SIM_ARM=75c9` (the body's counts) and `LAMP_SIM_SERVO_RANGES=75c9` (the stored angle limits) are two settings that combine: both together are all of 75c9's known numbers. The camera's warp (`pose.rs`) still takes fc4b's home and stand as its zero: a stood 75c9's head is 11 counts under its home pitch (about 1 degree) and 26 over its home yaw (about 2.3 degrees).
-- Windows and macOS: not built or tried (`lamp-body`'s runtime is Linux only).
+- macOS (arm64): lamp-sim, lamp-body, lamp-control and lamp-skills build, and lamp-sim's own tests pass (CI: `sim-macos` in `.github/workflows/lampos-sim.yml`). `lamp-sim run` starts and a program pairs with the real lamp-control, but the lamp ends after about 15 s: lamp-body's serial runtime is Linux only (`the body requires Linux; no device was opened`; ten makes it portable), and lamp-sim gives up after five ends. The bus's datagrams over 2048 bytes (speaker, microphone and camera blocks) are refused on macOS until the bus raises its sockets' buffers (sim-3-P3); the two speaker-stream tests are skipped there until then. The pty's modes are not set on its master on macOS (the system refuses it); the body's own open makes the port raw. Not tried there: the AVFoundation camera and microphone, the SDK tour.
+- Windows: not built or tried (the bus is Unix sockets).

@@ -184,7 +184,7 @@ timeline through both. The product's lamp-controls turns it on (29 Oct,
 Controls'. Tests:
 `crates/controls/tests/it/head_pet.rs`.
 
-**Asked aloud (#3748, `LAMP_SLEEP_ASKED=on`, off unless on).** "Lamp, go
+**Asked aloud (#3748, `LAMP_SLEEP_ASKED=on`, off unless on; on in the product since #6853).** "Lamp, go
 to sleep" is the voice's own function `go_to_sleep`, on both routes. The
 model is told to say only "Going to sleep. Tap my head to wake me.". Once
 that turn ends heard whole (as a say's `spoken`), the voice asks the same

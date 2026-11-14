@@ -5,6 +5,7 @@ use rustix::event::{PollFd, PollFlags, Timespec, poll};
 use rustix::fs::{OFlags, fcntl_setfl};
 use rustix::io::Errno;
 use rustix::pty::{OpenptFlags, grantpt, openpt, ptsname, unlockpt};
+#[cfg(not(target_os = "macos"))]
 use rustix::termios::{OptionalActions, tcgetattr, tcsetattr};
 use std::{
     fs::File,
@@ -28,10 +29,17 @@ impl Port {
         grantpt(&master).map_err(io::Error::from)?;
         unlockpt(&master).map_err(io::Error::from)?;
         let name = ptsname(&master, Vec::new()).map_err(io::Error::from)?;
-        // Raw on this side too, so nothing is echoed back to the body.
-        let mut modes = tcgetattr(&master).map_err(io::Error::from)?;
-        modes.make_raw();
-        tcsetattr(&master, OptionalActions::Now, &modes).map_err(io::Error::from)?;
+        // Raw on this side too, so nothing is echoed back to the body. macOS
+        // refuses termios on a pty's master (ENOTTY, so `lamp-sim run` ended
+        // at start), and a mode set through its slave is reset when the last
+        // slave closes: there the body's own open makes the port raw, as
+        // lamp-body does on every port it opens.
+        #[cfg(not(target_os = "macos"))]
+        {
+            let mut modes = tcgetattr(&master).map_err(io::Error::from)?;
+            modes.make_raw();
+            tcsetattr(&master, OptionalActions::Now, &modes).map_err(io::Error::from)?;
+        }
         Ok(Port {
             master: File::from(master),
             slave: PathBuf::from(name.to_string_lossy().into_owned()),
@@ -115,4 +123,42 @@ pub fn relink(slave: &Path, link: &Path) -> io::Result<()> {
     let _ = std::fs::remove_file(&next);
     std::os::unix::fs::symlink(slave, &next)?;
     std::fs::rename(&next, link)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // A port opens on every Unix lamp-sim runs on (on macOS the master's
+    // termios call ended `lamp-sim run` at start), and what a body writes on
+    // its raw slave reaches the bus's side unchanged.
+    #[test]
+    fn a_port_opens_and_a_raw_slaves_bytes_reach_the_master() {
+        let mut port = Port::open().expect("the pty opens");
+        assert!(port.slave.exists(), "{}", port.slave.display());
+        let mut slave = std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&port.slave)
+            .expect("the slave opens");
+        let mut modes = rustix::termios::tcgetattr(&slave).expect("the slave's modes");
+        modes.make_raw();
+        rustix::termios::tcsetattr(&slave, rustix::termios::OptionalActions::Now, &modes)
+            .expect("the slave is raw");
+        let packet = [0xff, 0xff, 0x01, 0x02, 0x01, 0xfb, b'\n', b'\r', 0x03];
+        slave.write_all(&packet).expect("the body's write");
+        let mut got = Vec::new();
+        let mut buffer = [0u8; 64];
+        let until = Instant::now() + Duration::from_secs(2);
+        while got.len() < packet.len() && Instant::now() < until {
+            match port.master.read(&mut buffer) {
+                Ok(n) => got.extend_from_slice(&buffer[..n]),
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Err(e) => panic!("the master's read: {e}"),
+            }
+        }
+        assert_eq!(got, packet);
+    }
 }

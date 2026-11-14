@@ -632,7 +632,8 @@ pub fn line_in_echo_tail(request: u64) {
     kept::pending(|pending| echo_tail_in(pending, request));
 }
 
-/// The line of `request` heard no words, or its answer only declined so
+/// The line of `request` heard no words, however it is asked (as the name,
+/// "Lamp.", when a call was heard in it), or its answer only declined so
 /// the words it cut short are answered in its place (`second_provider`,
 /// `LAMP_CUT_ASK_ANSWERED`): the lamp's words in it answer no new request
 /// of the person's, so they never make it the read-back's one answer
@@ -879,6 +880,17 @@ pub fn answer_awaited(words: &str) -> bool {
         })
 }
 
+/// Whether a write waits now for the reply its uncut read-back asked for
+/// ([`answers_the_read_back`]), wherever the line began: a call heard with
+/// no words then is not answered as the name (`second_provider`, #6363).
+pub fn awaits_an_answer() -> bool {
+    kept::pending(|pending| {
+        pending
+            .as_ref()
+            .is_some_and(|kept| answers_the_read_back(kept, Instant::now()))
+    })
+}
+
 /// Whether a line now is the reply the waiting write `kept` asked for
 /// (Thirteen's P2 on #5967): the very next line after its read-back, uncut,
 /// nothing the lamp answered between, within [`PENDING_FOR`].
@@ -911,6 +923,19 @@ pub fn waiting_note(request: u64, owner: Option<&str>, now: Instant) -> Option<S
                 && now.saturating_duration_since(kept.at) <= PENDING_FOR
         })?;
         Some(note_of(kept))
+    })
+}
+
+/// Whether a write waits for its yes at `now`, within [`PENDING_FOR`]: the
+/// voice's own prepared send (a mail read back, #6009) or a skill run's
+/// held write read back ([`wait_for_run_yes`], #6432), whoever asked. A line
+/// said then is never read for a skill by its name or its asks
+/// ([`crate::skill_named`], Heron's P2 on #6842): "Send it." is the write's.
+pub fn write_waits(now: Instant) -> bool {
+    kept::pending(|pending| {
+        pending
+            .as_ref()
+            .is_some_and(|kept| now.saturating_duration_since(kept.at) <= PENDING_FOR)
     })
 }
 

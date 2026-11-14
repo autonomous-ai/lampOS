@@ -76,6 +76,11 @@ pub struct Asks {
     /// folder as it went on and the `grants` said
     /// ([`crate::make_skill_local::code_approve`]); never approves a send.
     pub code: bool,
+    /// A made skill the person asked to remove by voice (#6960,
+    /// [`crate::made_remove`]): the yes removes it, by its name and
+    /// `sha256`; `say_back` is the one question asked, nothing else is
+    /// approved.
+    pub remove: bool,
 }
 
 /// A made skill's writes waiting for the yes.
@@ -96,6 +101,9 @@ pub struct Waiting {
     /// told in [`waiting_note`] alike, and every wait's yes is the owner's
     /// only (`make_skill_local::not_owners_yes_refused`).
     pub noted: bool,
+    /// The person's answer to it was read as unclear once ([`answered`]):
+    /// a second unclear keeps nothing and ends the wait.
+    pub unclear: bool,
 }
 
 /// A skill's task, or a made skill's code, just agreed to (#6749 A): its
@@ -165,7 +173,7 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
         rand_u32(&asks.skill, request, now) // not a secret: only matched here
     );
     let count = asks.writes.len();
-    let code = asks.code;
+    let (code, remove) = (asks.code, asks.remove);
     kept::agreed(|agreed| *agreed = None);
     kept::waiting(|waiting| {
         *waiting = Some(Waiting {
@@ -176,9 +184,14 @@ fn wait_for_yes_with(asks: Asks, request: u64, now: Instant, noted: bool) -> Str
             echoes: Vec::new(),
             said: VecDeque::new(),
             noted,
+            unclear: false,
         });
     });
-    if code {
+    if remove {
+        eprintln!(
+            "lamp-voice: request {request}: a made skill's remove waits for the person's yes (#6960)"
+        );
+    } else if code {
         eprintln!(
             "lamp-voice: request {request}: a made skill with code of its own waits for the person's yes (#6307)"
         );
@@ -240,6 +253,17 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
         let waiting = waiting.as_ref().filter(|waiting| {
             request > waiting.request && now.saturating_duration_since(waiting.at) <= YES_WITHIN
         })?;
+        // A remove (#6960): the lamp asked its one question, and the
+        // person's answer is the call's, whatever it is.
+        if waiting.asks.remove {
+            return Some(format!(
+                "(For you to know, not to answer: the lamp just asked them \"{}\" and waits for \
+                 their answer, approve_id \"{}\". Call make_skill with only that approve_id and \
+                 answer: \"yes\" only if they agree, \"no\" if they decline or wait, \"unclear\" \
+                 if you can't tell. Nothing is removed but on their yes.)",
+                waiting.asks.say_back, waiting.id
+            ));
+        }
         let before = if waiting.asks.code {
             "before it runs any code"
         } else if waiting.asks.grants.is_some() {
@@ -251,9 +275,16 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
             "(For you to know, not to answer: the skill {} that the lamp just said back waits \
              for their yes {before}, approve_id \"{}\". If they agree, in any words, call \
              make_skill with only that approve_id. If they decline, wait or change it, don't \
-             call it: it stays off.)",
+             call it: it stays off.{answer})",
             crate::made_skill::spoken_name(&waiting.asks.skill),
-            waiting.id
+            waiting.id,
+            answer = if answer_forced(waiting) {
+                " For this one, always give answer with that approve_id: \"yes\" only if they \
+                 agree, \"no\" if they decline or wait, \"unclear\" if you can't tell; left \
+                 out, it is read as unclear."
+            } else {
+                ""
+            }
         ))
     })
 }
@@ -269,6 +300,16 @@ pub fn clear_for_test() {
 /// a task's or an app make's code alike.
 pub fn waits(id: &str) -> bool {
     kept::waiting(|waiting| waiting.as_ref().is_some_and(|waiting| waiting.id == id))
+}
+
+/// Whether the wait `id` is the one waiting and a made skill's remove
+/// (#6960).
+pub fn removes(id: &str) -> bool {
+    kept::waiting(|waiting| {
+        waiting
+            .as_ref()
+            .is_some_and(|waiting| waiting.id == id && waiting.asks.remove)
+    })
 }
 
 /// The wait `id` dropped: its yes was not the owner's (Heron's P1 on
@@ -317,6 +358,154 @@ pub fn answer_awaited(request: u64, now: Instant) -> bool {
                         !cut && crate::services::read_back_said(&waiting.asks.say_back, said)
                     })
         })
+    })
+}
+
+/// The `make_skill` argument beside [`APPROVE_ID`] that says what the
+/// person answered the say-back (#6835 gap 2): [`ANSWERS`]. Code decides
+/// when the call is made ([`approve_force`]); the model decides what it
+/// says.
+pub const ANSWER: &str = "answer";
+/// What [`ANSWER`] takes. Left out, it reads as `yes`, as before.
+pub const ANSWERS: [&str; 3] = ["yes", "no", "unclear"];
+
+/// The force the second route's chat is given with a skill's tasks on and
+/// `make_skill` declared (`second_provider::net::Chat::forcing`, #6835
+/// gap 2, the first builder's option (b) on #6811): the round 1 of the
+/// person's line right after a skill's task said back is made to call
+/// `make_skill`, the call that takes its `approve_id` and the person's
+/// [`ANSWER`]. Only while a task's wait, or a made skill's remove (#6960;
+/// never a make's writes or code) holds, within [`YES_WITHIN`], and the lamp's newest answer kept toward it
+/// held the whole say-back uncut: so one round only (the round's own answer
+/// is newer, and is no say-back), never after a cut or partial read-back,
+/// never with nothing waiting, and never in the say-back's own written turn
+/// (no answer kept yet). On lamp-52e6 (13 Nov, row-photo2) the model,
+/// after a `use_skill` it started itself and the read-back said unasked,
+/// answered "Yes." with "Want me to go ahead with that?" and called
+/// nothing, so no yes was kept.
+pub fn approve_force() -> crate::second_provider::net::Force {
+    std::sync::Arc::new(|messages: &[crate::second_provider::net::Message]| {
+        messages.last().filter(|message| message.role == "user")?;
+        if !approve_forced_now(Instant::now()) {
+            return None;
+        }
+        eprintln!(
+            "lamp-voice second: the line after a skill's task said back whole: its first round must call {}",
+            crate::made_skill::MAKE
+        );
+        Some(crate::second_provider::net::Forced {
+            name: crate::made_skill::MAKE,
+            only: None,
+        })
+    })
+}
+
+/// Whether `waiting` is a skill's task's wait, or a made skill's remove
+/// (#6960): the ones [`approve_force`] forces, whose call always says what
+/// the person answered (never a made skill's writes or code).
+fn answer_forced(waiting: &Waiting) -> bool {
+    waiting.asks.remove || (waiting.asks.grants.is_some() && !waiting.asks.code)
+}
+
+/// Whether [`approve_force`] forces a request at `now`.
+pub fn approve_forced_now(now: Instant) -> bool {
+    kept::waiting(|waiting| {
+        waiting.as_ref().is_some_and(|waiting| {
+            answer_forced(waiting)
+                && now.saturating_duration_since(waiting.at) <= YES_WITHIN
+                && waiting
+                    .said
+                    .iter()
+                    .max_by_key(|(id, ..)| *id)
+                    .is_some_and(|(id, said, cut)| {
+                        *id >= waiting.request
+                            && !cut
+                            && crate::services::read_back_said(&waiting.asks.say_back, said)
+                    })
+        })
+    })
+}
+
+/// What the model is told when the person declined the say-back.
+pub const DECLINED_NEXT: &str = "Nothing was agreed. Say only, in the conversation's language, \
+     that it stays off: nothing runs or is sent. Ask nothing, call nothing.";
+/// What the model is told when the person declined a remove (#6960): it
+/// stays, by its spoken name.
+pub fn remove_declined_next(spoken: &str) -> String {
+    format!(
+        "Nothing was removed. Say only, in a few words, in the conversation's language, that \
+         {spoken} stays. Ask nothing, call nothing."
+    )
+}
+/// What the model is told when the answer to a remove was unclear, once:
+/// its one question again, short.
+pub fn remove_unclear_next(spoken: &str) -> String {
+    format!(
+        "Nothing was removed yet: their answer wasn't clear. Ask them once, short, in the \
+         conversation's language: remove {spoken}, yes or no? Call nothing now."
+    )
+}
+/// What the model is told when the person's answer was unclear, once.
+pub const UNCLEAR_NEXT: &str = "Nothing was agreed yet: their answer wasn't clear. Ask them \
+     once, short, in the conversation's language, whether it may go ahead, yes or no. Call \
+     nothing now.";
+
+/// The person's `answer` ([`ANSWER`]) to the wait `id` in `request`, when
+/// it is not a yes: a no ends the wait and keeps nothing; an unclear one
+/// keeps nothing and asks once more, and a second unclear ends the wait as
+/// a no. What the model is told; none for a yes (or no answer given), so
+/// [`approve`] takes it with every guard, and none for an id not waiting.
+pub fn answered(id: &str, request: u64, answer: Option<&str>) -> Option<Value> {
+    if answer == Some("yes") {
+        return None;
+    }
+    kept::waiting(|kept| {
+        let waiting = kept.as_mut().filter(|waiting| waiting.id == id)?;
+        // Left out: a yes for a made skill's writes or code, as before;
+        // for a skill's task, whose approval call code forces whatever the
+        // person said ([`approve_force`]), unclear, so a forced call with
+        // no answer never keeps a yes nobody gave.
+        let answer = match answer {
+            Some(answer) => answer,
+            None if answer_forced(waiting) => "unclear",
+            None => return None,
+        };
+        let skill = waiting.asks.skill.clone();
+        let remove = waiting.asks.remove;
+        let spoken = crate::made_skill::spoken_name(&skill);
+        if answer == "unclear" && !waiting.unclear {
+            waiting.unclear = true;
+            eprintln!(
+                "lamp-voice: request {request}: the answer to {skill}'s say-back was unclear: nothing kept, asked once more"
+            );
+            let next = if remove {
+                remove_unclear_next(&spoken)
+            } else {
+                UNCLEAR_NEXT.to_owned()
+            };
+            return Some(json!({ "approved": false, "next": next }));
+        }
+        *kept = None;
+        if remove {
+            eprintln!(
+                "lamp-voice: request {request}: the answer to removing {skill} was {}: it stays",
+                if answer == "unclear" {
+                    "unclear again"
+                } else {
+                    "no"
+                }
+            );
+            return Some(json!({ "approved": false, "next": remove_declined_next(&spoken) }));
+        }
+        eprintln!(
+            "lamp-voice: request {request}: the answer to {skill}'s say-back was {}: nothing kept, it stays off",
+            if answer == "unclear" {
+                "unclear again"
+            } else {
+                "no"
+            }
+        );
+        Some(json!({ "approved": false, "next": DECLINED_NEXT }))
     })
 }
 
@@ -505,6 +694,18 @@ pub const NOT_SAID_WHOLE: &str =
 /// asking again ends at `make_skill_local::yes_not_here` (App Only's P3 on
 /// #6250).
 pub const NOT_HERE: &str = "Not approved: this live voice can't take that yes. Say plainly that nothing was sent, and that I take that yes only on my other voice: in a normal conversation with me, not this live one.";
+/// What the model is told when a remove's yes is not taken (#6960):
+/// nothing removed, and it may be asked again.
+pub const REMOVE_NOT_TAKEN: &str = "Not removed: that was not the person's own answer to the lamp's question, or it came too late. Say in a few words that nothing was removed, and that they can ask me again.";
+/// What the model is told when a remove's yes came on the Live route.
+pub const REMOVE_NOT_HERE: &str = "Not removed: this live voice can't take that answer. Say plainly that nothing was removed, and that I remove a skill only on my other voice: in a normal conversation with me, not this live one.";
+/// What the model is told once a remove is done (#6960).
+pub fn removed_next(spoken: &str) -> String {
+    format!(
+        "Say only, in a few words, in the conversation's language, that {spoken} is removed. \
+         Ask nothing, call nothing."
+    )
+}
 /// What the model is told once approved: it sends at its next trigger,
 /// never now (#6749 A, as [`crate::skill_task_yes::APPROVED_NEXT`]).
 pub const APPROVED_NEXT: &str = "Say only, in the conversation's language, that it'll send as it \
@@ -567,9 +768,16 @@ pub fn approve(
     now: Instant,
     approve: impl FnOnce(&Asks) -> Result<Value, String>,
 ) -> Value {
+    /// Which wait is told to wait on: a made skill's writes or code, a
+    /// skill's task, or a remove (#6960).
+    enum Kind {
+        Make,
+        Task,
+        Remove,
+    }
     enum Took {
         Nothing,
-        NotSaid(String, String, bool, String),
+        NotSaid(String, String, Kind, String),
         Waiting(Box<Waiting>),
     }
     let took = kept::waiting(|kept| {
@@ -580,10 +788,17 @@ pub fn approve(
             && sends_here
             && !said_whole_before(waiting, request)
         {
+            let kind = if waiting.asks.remove {
+                Kind::Remove
+            } else if waiting.asks.grants.is_some() {
+                Kind::Task
+            } else {
+                Kind::Make
+            };
             return Took::NotSaid(
                 waiting.id.clone(),
                 waiting.asks.say_back.clone(),
-                waiting.asks.grants.is_some(),
+                kind,
                 not_said_whole_line(waiting, request),
             );
         }
@@ -595,31 +810,72 @@ pub fn approve(
             eprintln!("lamp-voice: request {request}: a made skill's yes found nothing waiting");
             return json!({ "error": NOT_APPROVED });
         }
-        Took::NotSaid(id, say_back, task, line) => {
+        Took::NotSaid(id, say_back, kind, line) => {
             eprintln!("{line}");
-            let wait = if task {
-                crate::skill_task_yes::then_wait(&id)
-            } else {
-                then_wait(&id)
+            let (error, say, wait) = match kind {
+                Kind::Remove => (
+                    "Not removed yet: the lamp's question was not said in full, or it was cut. Nothing is removed.",
+                    crate::made_remove::say_question(&say_back),
+                    crate::made_remove::then_wait(&id),
+                ),
+                Kind::Task => (
+                    NOT_SAID_WHOLE,
+                    say_whole(&say_back),
+                    crate::skill_task_yes::then_wait(&id),
+                ),
+                Kind::Make => (NOT_SAID_WHOLE, say_whole(&say_back), then_wait(&id)),
             };
             return json!({
-                "error": NOT_SAID_WHOLE,
-                "next": format!("{} {wait}", say_whole(&say_back)),
+                "error": error,
+                "next": format!("{say} {wait}"),
             });
         }
         Took::Waiting(waiting) => waiting,
     };
+    let remove = waiting.asks.remove;
     if let Some(why) = refused(&waiting, request, heard, now) {
         eprintln!("lamp-voice: request {request}: a made skill's yes not taken: {why}");
-        return json!({ "error": NOT_APPROVED });
+        return json!({ "error": if remove { REMOVE_NOT_TAKEN } else { NOT_APPROVED } });
     }
     if !sends_here {
         eprintln!(
             "lamp-voice: request {request}: a made skill's yes not taken: this route has no echo judge"
         );
-        return json!({ "error": NOT_HERE });
+        return json!({ "error": if remove { REMOVE_NOT_HERE } else { NOT_HERE } });
     }
     match approve(&waiting.asks) {
+        // A remove (#6960): the made skill taken off and dropped.
+        Ok(result) if remove => {
+            eprintln!(
+                "lamp-voice: request {request}: a made skill removed on the person's yes (#6960){}",
+                if result["still_listed"] == true {
+                    ": off the lamp, still listed among the made skills"
+                } else {
+                    ""
+                }
+            );
+            // Taken off but still listed (#6969): its own words, as it is.
+            let next = result["next"].as_str().map_or_else(
+                || removed_next(&crate::made_skill::spoken_name(&waiting.asks.skill)),
+                str::to_owned,
+            );
+            let mut told = json!({
+                "approved": true,
+                "removed": waiting.asks.skill,
+                "next": next,
+            });
+            if result["still_listed"] == true {
+                told["still_listed"] = json!(true);
+            }
+            told
+        }
+        Err(why) if remove => {
+            eprintln!("lamp-voice: request {request}: a made skill's remove failed: {why}");
+            json!({
+                "error": format!("Not removed: {why}."),
+                "next": "Say it wasn't removed, and why, in a few words. Call nothing."
+            })
+        }
         // Code of its own (#6307): that package put on, nothing sent, and
         // its task kept when the lamp hands tasks over (#6305).
         Ok(result) if waiting.asks.code => {
@@ -639,12 +895,17 @@ pub fn approve(
             json!({ "approved": true, "on": true, "task": task, "next": next })
         }
         // A skill's task (#6305): its grants and folder kept, as said.
-        Ok(_) if waiting.asks.grants.is_some() => {
+        Ok(result) if waiting.asks.grants.is_some() => {
             agreed_in(&waiting.asks.skill, request, now);
             eprintln!(
                 "lamp-voice: request {request}: a skill's task approved on the person's yes (#6305)"
             );
-            json!({ "approved": true, "next": crate::skill_task_yes::APPROVED_NEXT })
+            // An agent skill's first run asked it: run now, as asked.
+            let next = match result["call"].as_str() {
+                Some(tool) => crate::upload_agent::approved_next(tool),
+                None => crate::skill_task_yes::APPROVED_NEXT.to_owned(),
+            };
+            json!({ "approved": true, "next": next })
         }
         Ok(result) => {
             eprintln!(
@@ -697,6 +958,7 @@ mod tests {
             say_back: SAY_BACK.to_owned(),
             grants: None,
             code: false,
+            remove: false,
         }
     }
 
@@ -802,6 +1064,7 @@ mod tests {
                 grants: Some(vec!["light".to_owned()]),
                 writes: Vec::new(),
                 code,
+                remove: false,
                 ..asks("desk-check", &[])
             };
             let id = wait_for_yes(task, 4, now);
@@ -870,6 +1133,7 @@ mod tests {
         );
         let code = Asks {
             code: true,
+            remove: false,
             writes: Vec::new(),
             ..asks("desk-watch", &[])
         };
@@ -1063,6 +1327,13 @@ mod tests {
             crate::skill_task_yes::yes_not_here("photo booth"),
             crate::skill_task_yes::unread("photo booth"),
             crate::make_skill_local::TASKS_READ_BACK_TOLD.to_owned(),
+            crate::make_skill_local::BOTH_READ_BACK_TOLD.to_owned(),
+            crate::make_skill_local::REMOVE_TOLD.to_owned(),
+            REMOVE_NOT_TAKEN.to_owned(),
+            REMOVE_NOT_HERE.to_owned(),
+            removed_next("moon fact"),
+            remove_declined_next("moon fact"),
+            remove_unclear_next("moon fact"),
         ];
         for line in &lines {
             let words: Vec<String> = line

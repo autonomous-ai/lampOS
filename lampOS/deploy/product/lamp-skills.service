@@ -43,6 +43,9 @@ Environment=LAMP_SKILL_READS=on
 Environment=LAMP_SKILL_TASKS=on
 # Where a `do.task` is handed to lamp-tasks (its skill-task.sock, #6306); without it nothing is handed over.
 Environment=LAMP_SKILLS_TASKS_SOCKET=/run/lampos-tasks/skill-task.sock
+# A skill made here is the person's own (#6059, docs/skills.md "A made skill loosened"): a made say's cooldown
+# as asked, at least a minute. The same line in lamp-voice and lamp-skills-manage@.
+Environment=LAMP_MADE_SKILL_LOOSE=on
 # "I'm unplugging you" folds the arm first (#1674, unplug.md): set on Body, Expression, Skills and Voice together
 # (#5747); lamp-52e6 20 Oct, #1699 row 1: ask, fold 6.7 s, head and base home, ready, Expression asleep.
 Environment=LAMP_UNPLUG=on

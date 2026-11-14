@@ -180,6 +180,7 @@ pub const TMPFILES_SHIPPED: &[&str] = &[
     "f3872bf1d378b9317e3a9f9110326497ed4e04eded0f6a67cf1bcf78988b1e84",
     "ad24d035e529484036c125f33346748634ad5e34af0a5774cf6194a4a6a1ed54",
     "3d381dfd6e253a23aa7afc668fea5e9b29e50f26484a15f8e41a1220585df325",
+    "782ae07da92cca1ad00cddf7799314f19b42502f2b41703ed0822db68191faae",
 ];
 
 /// Whether `sha` at `path` is the build's before: its record, the one

@@ -2,13 +2,12 @@
 // grant and then each grant removed in turn, a row either runs with its defaults and answers, or is disabled with a reason.
 // None is silent: no row is enabled and then refused for a grant it was said to have.
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { startTwin } from './twin-start.js';
 import { WebSocket } from 'ws';
 import { CONTROLS, checked, describe } from '../examples/twin/controls.js';
 import { FakeLamp } from '../src/testing.js';
@@ -101,16 +100,9 @@ test('the server refuses a raw call of a disabled row, and runs an enabled one',
   t.after(() => rmSync(folder, { recursive: true, force: true }));
   const glb = join(folder, 'lamp.glb');
   writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
-  const port = await new Promise((resolve) => { const p = createServer(); p.listen(0, '127.0.0.1', () => { const { port: n } = p.address(); p.close(() => resolve(n)); }); });
   const server = fileURLToPath(new URL('../examples/twin/server.js', import.meta.url));
   // The fake lamp grants no microphone.
-  const child = spawn(process.execPath, [server, '--fake', '--port', String(port), '--glb', glb, '--stim-dir', folder, '--lamp-sim', '/bin/true'], { stdio: ['ignore', 'pipe', 'inherit'] });
-  t.after(() => child.kill('SIGTERM'));
-  const token = await new Promise((resolve, reject) => {
-    let text = '';
-    child.stdout.on('data', (chunk) => { text += chunk; const found = /\?t=(\S+)/.exec(text); if (found) resolve(found[1]); });
-    child.on('close', (code) => reject(new Error(`the server ended (${code})`)));
-  });
+  const { port, token } = await startTwin(t, server, (port) => ['--fake', '--port', String(port), '--glb', glb, '--stim-dir', folder, '--lamp-sim', '/bin/true']);
   const socket = new WebSocket(`ws://127.0.0.1:${port}/live?t=${token}`, { headers: { origin: `http://127.0.0.1:${port}` } });
   const got = [];
   socket.on('message', (data) => got.push(JSON.parse(data)));

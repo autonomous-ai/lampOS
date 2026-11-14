@@ -708,5 +708,68 @@ class IgnoredReads(unittest.TestCase):
             os.unlink(wf)
 
 
+class Always(unittest.TestCase):
+    """13 Nov (the lead): with --always every PR needs two signed readers, asked or not."""
+    def test_one_read_on_an_unasked_pr_is_short(self):
+        items = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00")]
+        self.assertEqual(two_reads(items, HEAD, W), "none")
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "short 1")
+
+    def test_one_reader_restating_is_still_one(self):
+        items = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00"),
+                 c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 19:16")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "short 1")
+
+    def test_two_signed_readers_on_one_login_meet_it(self):
+        items = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00"),
+                 c("writer-a", "READ-OK " + HEAD + "\n\nSixth, 18:30")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "met 2")
+
+    def test_a_one_read_opt_out_does_not_lower_it(self):
+        items = [{"login": "", "body": "ONE READ: docs only", "pr_body": True},
+                 c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "short 1")
+
+    def test_the_cli_flag(self):
+        with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
+            f.write("writer-a\n"); path = f.name
+        try:
+            line = json.dumps(c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00")) + "\n"
+            run = lambda *a: subprocess.run([sys.executable, "-I", os.path.join(HERE, "reads2.py"), "--writers", path, *a, HEAD],
+                                            input=line, capture_output=True, text=True).stdout.strip()
+            self.assertEqual(run(), "none")
+            self.assertEqual(run("--always"), "short 1")
+        finally:
+            os.unlink(path)
+
+
+class DigitNames(unittest.TestCase):
+    """14 Nov: a builder's name may carry digits ("sim-3"), and still signs."""
+    def test_sim_3_signs(self):
+        self.assertEqual(signer("READ-OK " + HEAD + "\n\nsim-3, 22:5x GMT+7, read the diff"), "sim-3")
+        self.assertEqual(signer("sim-2, 23:10: READ-OK " + HEAD), "sim-2")
+
+    def test_two_sim_readers_on_one_login_meet_two_reads(self):
+        items = [c("writer-a", "sim-3, to ten: READ-OK " + HEAD + "\nsim-3, 22:5x GMT+7, read the diff"),
+                 c("writer-a", "READ-OK " + HEAD + "\n\nsim-2, 23:10 GMT+7")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "met 2")
+
+    def test_labels_never_sign(self):
+        # Heron's table on #6979: each was "" on lamp-voice and must stay so.
+        for body in ("READ-OK " + HEAD + "\n\nP3: the doc", "READ-OK " + HEAD + "\n\nP2s, none blocking: x",
+                     "READ-OK " + HEAD + "\nH2: x", "P1: READ-OK " + HEAD, "READ-OK " + HEAD + " P2: one",
+                     "READ-OK " + HEAD + "\n\nARM64: green", "READ-OK " + HEAD + "\n\nIPv6: ok",
+                     "READ-OK " + HEAD + "\n\nP1, 22:50: one"):
+            self.assertEqual(signer(body), "", body)
+
+    def test_a_label_restate_is_not_a_second_reader(self):
+        items = [c("writer-a", "READ-OK " + HEAD + "\n\nReviewer-lead, 18:00"),
+                 c("writer-a", "READ-OK " + HEAD + "\n\nP3: the doc")]
+        self.assertEqual(two_reads(items, HEAD, W, always=True), "short 1")
+
+    def test_a_time_alone_is_still_no_name(self):
+        self.assertEqual(signer("READ-OK " + HEAD + "\n\n12, 22:50"), "")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

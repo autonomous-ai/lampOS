@@ -26,7 +26,7 @@ const BEFORE: &[&str] = &[
 /// "Can you …", "Could you …": an ask, even ending in a question mark.
 const ASKING: &[&str] = &["can", "could", "would", "will"];
 /// The plain asks to keep something, at a sentence's start.
-const ASKS: &[&[&str]] = &[
+pub(crate) const ASKS: &[&[&str]] = &[
     &["remember", "that"],
     &["remember", "my"],
     &["remember", "i"],

@@ -83,6 +83,9 @@ pub fn read_back_sha256(read_back: &str) -> String {
         .map(|byte| format!("{byte:02x}"))
         .collect()
 }
+/// The fixed-write runs kept, one send each ([`Services::run_fixed_write`]):
+/// one run at a time on the lamp, so more than enough.
+pub const FIXED_RUNS_KEPT: usize = 32;
 /// What a skill run's prepared write tells it: nothing went.
 pub const RUN_HELD: &str = "Nothing is sent. The lamp reads it back to the person and sends it only if they say yes; say nothing of it as sent.";
 /// The most a skill run's whole answer line may be, its line break with
@@ -301,6 +304,14 @@ pub struct Services<H, M> {
     /// its send, whoever confirms it, counts against the skills' bounds
     /// ([`skill_writes::Ledger`]).
     run_held: Mutex<Option<(String, String)>>,
+    /// `LAMP_SKILL_WRITE_AGENT=on` (13 Nov): a run whose token
+    /// `lamp-control` minted for a skill's fixed write
+    /// ([`skill_writes::FIXED_WRITE_RUN`]) sends through
+    /// [`Services::skill_write`] ([`Services::run_fixed_write`]).
+    pub skill_write_agent: bool,
+    /// The fixed-write runs that sent, the latest [`FIXED_RUNS_KEPT`]: one
+    /// send a run.
+    fixed_runs: Mutex<std::collections::VecDeque<String>>,
     /// `LAMP_CALENDAR_EDITS=on`: a Google Calendar event may be changed or
     /// cancelled by its id, read back and sent as any write.
     pub calendar_edits: bool,
@@ -320,16 +331,17 @@ pub struct Services<H, M> {
 
 /// What a call to a service not linked is told, after its name: and where
 /// the person links it, so the lamp says the way, not only the lack.
-pub const NOT_LINKED: &str =
-    "isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors.";
+pub const NOT_LINKED: &str = "isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts.";
 
 /// What a write the link doesn't allow is told, after "<Service> is linked
 /// without permission to <what>": what to do about it.
-pub const NO_PERMISSION: &str = "link it again in the app (Skills, then Connectors) and allow it.";
+pub const NO_PERMISSION: &str =
+    "link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it.";
 
 /// What a call naming a service the lamp has no connector for is told,
 /// after "The lamp can't link <name> yet.": where the ones it can are.
-pub const CANT_LINK: &str = "The services it can link are in the app: Skills, then Connectors.";
+pub const CANT_LINK: &str =
+    "The services it can link are in the app: open this lamp, then Settings, then Linked accounts.";
 
 /// The words for a write `service` is linked without permission for.
 fn no_permission(service: &catalog::Service, what: &str) -> String {
@@ -419,6 +431,8 @@ impl<H: Http, M: Mail> Services<H, M> {
             skill_send: Mutex::new(()),
             skill_tasks: false,
             run_held: Mutex::new(None),
+            skill_write_agent: false,
+            fixed_runs: Mutex::new(std::collections::VecDeque::new()),
             calendar_edits: false,
             draft_edits: false,
             linked_tools: None,
@@ -481,6 +495,12 @@ impl<H: Http, M: Mail> Services<H, M> {
         self
     }
 
+    /// With `LAMP_SKILL_WRITE_AGENT` as `on` gives it.
+    pub fn with_skill_write_agent(mut self, on: bool) -> Self {
+        self.skill_write_agent = on;
+        self
+    }
+
     /// Whether a peer in `cgroup` is `lamp-control` on the tools' door with
     /// `LAMP_SKILL_TASKS=on`: then [`Self::run_tool`] answers it.
     pub fn run_caller(&self, door: Door, cgroup: &str) -> bool {
@@ -514,6 +534,17 @@ impl<H: Http, M: Mail> Services<H, M> {
         let Some(skill) = skill else {
             return refused("the call names no skill");
         };
+        // A skill's fixed write run through the lamp's agent: lamp-control
+        // minted its token for that write and says so with the run's id.
+        if let Some(run) = serde_json::from_str::<Value>(line)
+            .ok()
+            .and_then(|call| call.get(skill_writes::FIXED_WRITE_RUN).cloned())
+        {
+            return match self.run_fixed_write(&name, &skill, &run, &args).await {
+                Ok(result) => json!({"ok": true, "result": result}),
+                Err(why) => refused(&why),
+            };
+        }
         let Some(asked) = args
             .get("service")
             .and_then(Value::as_str)
@@ -567,6 +598,57 @@ impl<H: Http, M: Mail> Services<H, M> {
         } else {
             refused("the answer was too long to give")
         }
+    }
+
+    /// A skill's fixed write sent by its run on the lamp's agent
+    /// (`LAMP_SKILL_WRITE_AGENT`, the owner's ruling, 13 Nov): `args` the
+    /// run's `service_write` as lamp-control sends it on (the skill's own
+    /// write, held from the mint, when the call named no content of its
+    /// own, `lamp_control::runs::FixedWrite`; else as asked), which goes
+    /// only through [`Self::skill_write`] (the owner's kept yes to that
+    /// exact content, the link it was said under, the day's bounds and the
+    /// sent-log), never held for a spoken yes, and once a run: a second,
+    /// whatever it says, is refused ([`skill_writes::ONCE_A_RUN`]). The
+    /// run's other calls, and any with the switch off here, are refused.
+    async fn run_fixed_write(
+        &self,
+        name: &str,
+        skill: &str,
+        run: &Value,
+        args: &Value,
+    ) -> Result<Value, String> {
+        if !self.skill_write_agent {
+            return Err(format!(
+                "not sent: a skill's fixed write through the lamp's agent is off on this lamp ({} is not on)",
+                skill_writes::AGENT_ENVIRONMENT
+            ));
+        }
+        if name != tools::WRITE {
+            return Err("a skill's fixed write's run only sends its write".into());
+        }
+        let Some(run) = run
+            .as_str()
+            .filter(|run| !run.is_empty() && run.len() <= 64)
+        else {
+            return Err("not sent: the run is not named".into());
+        };
+        {
+            let mut sent = self
+                .fixed_runs
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            if sent.iter().any(|one| one == run) {
+                eprintln!("lamp-services: a skill's write refused: its run sent once already");
+                return Err(skill_writes::ONCE_A_RUN.into());
+            }
+            // Taken as it is tried: a refused try is the run's one too.
+            if sent.len() >= FIXED_RUNS_KEPT {
+                sent.pop_front();
+            }
+            sent.push_back(run.to_owned());
+        }
+        self.skill_write(&json!({"skill": skill, "write": args}))
+            .await
     }
 
     /// The code a skill run's call goes to, for catalog code `code`: a run's
@@ -3548,7 +3630,7 @@ mod tests {
         ));
         assert_eq!(
             answer["error"],
-            "Notion isn't linked to this lamp yet. It can be linked in the app: Skills, then Connectors."
+            "Notion isn't linked to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts."
         );
         let connected = run(services.tool(r#"{"op":"call","name":"services_connected"}"#));
         assert!(!connected.to_string().contains("planted"));
@@ -4091,6 +4173,83 @@ mod tests {
         );
     }
 
+    /// `service_write` as lamp-control sends it on for a run whose token
+    /// it minted for a skill's fixed write: the run's id beside it.
+    fn fixed_write_line(run_id: &str, write: &Value) -> String {
+        json!({"op":"call","name":"service_write","args":write,"skill":"arrive-mail",
+               skill_writes::FIXED_WRITE_RUN: run_id})
+        .to_string()
+    }
+
+    /// LAMP_SKILL_WRITE_AGENT (the owner's ruling, 13 Nov): a skill's fixed
+    /// write sent by its run on the lamp's agent goes only as the owner's
+    /// kept yes has it, once a run, within the day's bounds, into the
+    /// sent-log; changed content is refused, never held for a spoken yes;
+    /// with the switch off here, nothing is sent.
+    #[test]
+    fn a_fixed_writes_run_sends_the_approved_content_once_within_the_bounds() {
+        let dir = tempfile::tempdir().unwrap();
+        let on = approved(dir.path())
+            .with_skill_tasks(true)
+            .with_skill_write_agent(true);
+        let sent = run(on.run_tool(&fixed_write_line("task-1-1-1", &arrival_mail())));
+        assert_eq!(sent["result"]["sent"], true, "{sent}");
+        assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
+        // The same run again: refused, whatever it sends.
+        let again = run(on.run_tool(&fixed_write_line("task-1-1-1", &arrival_mail())));
+        assert_eq!(again["error"], skill_writes::ONCE_A_RUN, "{again}");
+        // Another content, or another skill's fixed write: refused, and
+        // nothing waits for a spoken yes.
+        let mut changed = arrival_mail();
+        changed["text"] = json!("I'm at my desk, call me.");
+        let refused = run(on.run_tool(&fixed_write_line("task-1-1-2", &changed)));
+        assert_eq!(refused["error"], skill_writes::NOT_APPROVED, "{refused}");
+        assert!(!refused.to_string().contains("call me"));
+        assert_eq!(on.run_waiting(Instant::now())["waiting"], Value::Null);
+        // Nor anything but its write.
+        let read = run(on.run_tool(
+            &json!({"op":"call","name":"service_read","args":{"service":"gmail","what":"recent"},
+                    "skill":"arrive-mail", skill_writes::FIXED_WRITE_RUN: "task-1-1-3"})
+            .to_string(),
+        ));
+        assert_eq!(read["ok"], false, "{read}");
+        assert_eq!(on.mail.sent.lock().unwrap().len(), 1);
+        // The skill's day's bound: the send past it is refused.
+        for n in 1..skill_writes::PER_SKILL {
+            let id = format!("task-1-1-{}", 3 + n);
+            let sent = run(on.run_tool(&fixed_write_line(&id, &arrival_mail())));
+            assert_eq!(sent["result"]["sent"], true, "{sent}");
+        }
+        let over_id = format!("task-1-1-{}", 3 + skill_writes::PER_SKILL);
+        let over = run(on.run_tool(&fixed_write_line(&over_id, &arrival_mail())));
+        assert!(
+            over["error"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("at most {}", skill_writes::PER_SKILL)),
+            "{over}"
+        );
+        assert_eq!(on.mail.sent.lock().unwrap().len(), skill_writes::PER_SKILL);
+        let log = run(on.tool(r#"{"op":"call","name":"skill_writes_sent"}"#));
+        assert_eq!(
+            log["result"]["sent"].as_array().unwrap().len(),
+            skill_writes::PER_SKILL,
+            "{log}"
+        );
+        // The switch off here: nothing is sent.
+        let other = tempfile::tempdir().unwrap();
+        let off = approved(other.path()).with_skill_tasks(true);
+        let refused = run(off.run_tool(&fixed_write_line("task-1-1-7", &arrival_mail())));
+        assert!(
+            refused["error"]
+                .as_str()
+                .unwrap()
+                .contains(skill_writes::AGENT_ENVIRONMENT),
+            "{refused}"
+        );
+        assert!(off.mail.sent.lock().unwrap().is_empty());
+    }
+
     /// The link the owner said yes under: unlinked, or linked again as
     /// another account, stops the skill's writes; the same account linked
     /// again still goes.
@@ -4464,11 +4623,11 @@ mod tests {
             ),
             (
                 json!({"error":{"code":403,"status":"PERMISSION_DENIED","details":[{"reason":"ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}).to_string(),
-                "not made: Google Drive is linked without permission to make this change: link it again in the app (Skills, then Connectors) and allow it.",
+                "not made: Google Drive is linked without permission to make this change: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it.",
             ),
             (
                 refused("insufficientPermissions"),
-                "not made: Google Drive is linked without permission to make this change: link it again in the app (Skills, then Connectors) and allow it.",
+                "not made: Google Drive is linked without permission to make this change: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it.",
             ),
             (
                 "not json".to_owned(),
@@ -6180,7 +6339,7 @@ mod tests {
         )
     }
 
-    const GMAIL_NO_SEND: &str = "Gmail is linked without permission to send mail: link it again in the app (Skills, then Connectors) and allow it.";
+    const GMAIL_NO_SEND: &str = "Gmail is linked without permission to send mail: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it.";
 
     /// "For write permission, or anything that has no Connector yet, the
     /// lamp must tell the user": a send the link's scopes don't allow is
@@ -6230,7 +6389,7 @@ mod tests {
             "end":"2026-11-10T10:00:00+07:00"}});
         assert_eq!(
             run(services.tool(&event.to_string()))["error"],
-            "Google Calendar is linked without permission to add calendar events: link it again in the app (Skills, then Connectors) and allow it."
+            "Google Calendar is linked without permission to add calendar events: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it."
         );
     }
 
@@ -6306,7 +6465,7 @@ mod tests {
         };
         let cant = |name: &str| {
             format!(
-                "The lamp can't link {name} yet. The services it can link are in the app: Skills, then Connectors."
+                "The lamp can't link {name} yet. The services it can link are in the app: open this lamp, then Settings, then Linked accounts."
             )
         };
         assert_eq!(ask(json!("Outlook")), cant("Outlook"));
@@ -6358,7 +6517,7 @@ mod tests {
         }
         assert_eq!(
             ask("Outlook", mail.clone())["error"],
-            "The lamp can't link Outlook yet. The services it can link are in the app: Skills, then Connectors."
+            "The lamp can't link Outlook yet. The services it can link are in the app: open this lamp, then Settings, then Linked accounts."
         );
         run(services.admin(&set_line(
             "github",
@@ -6382,6 +6541,51 @@ mod tests {
             "{sent}"
         );
         assert!(services.http.calls.lock().unwrap().is_empty());
+    }
+
+    /// On a Lamp 2 the app's Connectors is the "Linked accounts" row on the
+    /// lamp's Settings page, not inside Skills (#5867): every line that
+    /// tells where to link a service says that way, and the old path comes
+    /// back nowhere in the crates or the skills, however a line is wrapped.
+    #[test]
+    fn where_to_link_is_the_lamps_linked_accounts() {
+        for told in [
+            NOT_LINKED,
+            NO_PERMISSION,
+            CANT_LINK,
+            reads::GMAIL_APP_NO_READS,
+            writes::DRIVE_NO_WRITE_SCOPE,
+        ] {
+            assert!(
+                told.contains("open this lamp, then Settings, then Linked accounts"),
+                "{told}"
+            );
+            assert!(!told.contains("Skills"), "{told}");
+        }
+        let old = ["Skills,", "then", "Connectors"].join(" ");
+        let lamp_os = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let mut dirs = vec![lamp_os.join("crates"), lamp_os.join("skills")];
+        let mut seen = 0;
+        while let Some(dir) = dirs.pop() {
+            for entry in std::fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    if path.file_name().is_some_and(|name| name != "target") {
+                        dirs.push(path);
+                    }
+                    continue;
+                }
+                let Some("rs" | "md" | "toml") = path.extension().and_then(|e| e.to_str()) else {
+                    continue;
+                };
+                let text = std::fs::read_to_string(&path).unwrap();
+                let flat = text.replace("\\\n", " ");
+                let flat = flat.split_whitespace().collect::<Vec<_>>().join(" ");
+                assert!(!flat.contains(&old), "{}", path.display());
+                seen += 1;
+            }
+        }
+        assert!(seen > 100, "{seen}");
     }
 
     /// An app password, a personal key or a link listing no scopes is not

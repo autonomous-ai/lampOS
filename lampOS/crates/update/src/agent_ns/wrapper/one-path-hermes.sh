@@ -14,6 +14,7 @@ agent_env() {
   LAMP_HERMES_TOKEN=$T HERMES_HOME=/var/lib/lampos-hermes/.hermes
   export LAMP_HERMES_TOKEN HERMES_HOME
   unset T HERMES_YOLO_MODE
+  case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_MAKE ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) LAMP_NS_MAKE=$LAMP_NS_HOME HERMES_HOME="$LAMP_NS_HOME/.hermes"; export LAMP_NS_MAKE HERMES_HOME ;; *) unset LAMP_NS_MAKE ;; esac
   :
 }
 agent_run_env() {
@@ -21,6 +22,10 @@ agent_run_env() {
   HERMES_YOLO_MODE=1
   export HERMES_YOLO_MODE
   :
+}
+agent_task() {
+  M=$(cat -- "$1") && [ -n "$M" ] || fail "no task in $1"
+  agent_start chat -q "$M"
 }
 # The run path, the same for every agent:
 fail() { echo "$E: $1" >&2; exit 1; }
@@ -72,4 +77,17 @@ logger -t "$E" "Harness hooks aren't available inside the lamp's agent namespace
 LAMP_NS_UID=$(id -u) && LAMP_NS_GID=$(id -g) || exit 1
 LAMP_NS_ENGINE=$E LAMP_NS_ENGINE_BIN=$X LAMP_NS_HOME=$H
 export LAMP_NS_UID LAMP_NS_GID LAMP_NS_ENGINE LAMP_NS_ENGINE_BIN LAMP_NS_HOME
-exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/agent-ns "$@"
+agent_start() {
+  exec /usr/bin/unshare --map-root-user $N --mount --pid --kill-child --mount-proc --propagation private /usr/local/lib/lampos/agent-ns "$@"
+}
+# A skill's run lamp-tasks starts with no Harness (#6685): `--lamp-task` alone, in the run's own folder. The agent's data
+# (agent_task) turns the folder's task file into the agent's own arguments and starts it with agent_start.
+if [ "${1-}" = --lamp-task ]; then
+  [ -n "$R" ] && [ $# -eq 1 ] || fail "--lamp-task is only for a skill's run, started by lamp-tasks in its own folder"
+  case $(command -V agent_task 2>/dev/null) in *function*) ;; *) fail "it takes no skill's task without Harness yet" ;; esac
+  Q=$P/task
+  [ -f "$Q" ] && [ ! -L "$Q" ] || fail "no task at $Q"
+  agent_task "$Q"
+  fail "its data started no task"
+fi
+agent_start "$@"

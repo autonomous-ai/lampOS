@@ -504,6 +504,11 @@ pub enum WatchEvent {
     Failed,
     /// Stopped; `watch` exits 4 after it.
     Stopped,
+    /// Idle, with background commands it started still running (Harness
+    /// 0.6.52, openharness#4229): sent in place of `done`, and again when
+    /// their number changes; `done` follows once none runs. Still at work
+    /// (#5689).
+    Background,
 }
 
 impl WatchEvent {
@@ -516,6 +521,7 @@ impl WatchEvent {
             "idle" => Self::Idle,
             "failed" => Self::Failed,
             "stopped" => Self::Stopped,
+            "background" => Self::Background,
             _ => return None,
         })
     }
@@ -529,12 +535,13 @@ impl WatchEvent {
             Self::Idle => "idle",
             Self::Failed => "failed",
             Self::Stopped => "stopped",
+            Self::Background => "background",
         }
     }
     /// Whether the agent has settled, for now or for good: its task is read
-    /// at once.
+    /// at once. Background commands still running are work (#5689).
     pub fn settled(self) -> bool {
-        !matches!(self, Self::Started | Self::Working)
+        !matches!(self, Self::Started | Self::Working | Self::Background)
     }
 }
 
@@ -2679,12 +2686,22 @@ impl Cli {
     /// waits on this read but the close itself, and a slow computer must
     /// not leave every finished harness open. A read that runs out is
     /// `timeout`, as any other, and closes nothing.
+    ///
+    /// An agent idle while background commands it started still run
+    /// (Harness 0.6.52, #5689) is not done: the read fails with
+    /// `background_commands`, so the close is tried again later, read first,
+    /// and never left to the person as another turn would be.
     pub fn observe_to_close(&self, machine: &str, agent_id: &str) -> Result<Observation, String> {
-        self.observe_within(
+        let bytes = self.show_within(
             machine,
             agent_id,
             CLOSE_READ_TIMEOUT.min(self.config.launch_timeout),
-        )
+        )?;
+        match parse_show(&bytes, agent_id) {
+            Ok((_, Some(_))) => Err(BACKGROUND_COMMANDS.into()),
+            Ok((observation, None)) => Ok(observation),
+            Err(code) => Err(code.into()),
+        }
     }
 
     fn observe_within(
@@ -2693,6 +2710,17 @@ impl Cli {
         agent_id: &str,
         timeout: Duration,
     ) -> Result<Observation, String> {
+        let bytes = self.show_within(machine, agent_id, timeout)?;
+        parse_reading(&bytes, agent_id).map_err(str::to_string)
+    }
+
+    /// `harness show --json` of one agent, its stdout once it exits 0.
+    fn show_within(
+        &self,
+        machine: &str,
+        agent_id: &str,
+        timeout: Duration,
+    ) -> Result<Vec<u8>, String> {
         if !machine_id(machine) {
             return Err("invalid_machine".into());
         }
@@ -2717,7 +2745,7 @@ impl Cli {
         if !reply.success {
             return Err("observe_failed".into());
         }
-        parse_observation(&reply.stdout, agent_id).map_err(str::to_string)
+        Ok(reply.stdout)
     }
 
     /// Close a harness this lamp started, once its result has been told
@@ -2764,6 +2792,37 @@ impl Cli {
         self.close_with(machine, agent_id, within, true)
     }
 
+    /// The agent `harness show <id> --json` names for one harness of this
+    /// lamp's (its `agent`, as "Hermes" or "Terminal"): read after a skill's
+    /// run ends, since Harness keeps a pane whose engine exited before it
+    /// was ready as a shell, the same id with agent "Terminal", and `wait`
+    /// then reads it idle (OpenHarness, #6835 gap 1). `Err` is a show that
+    /// wasn't answered or names another id or no agent.
+    pub fn shown_agent(&self, machine: &str, agent_id: &str) -> Result<String, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        if !self::agent_id(agent_id) {
+            return Err("invalid_agent_id".into());
+        }
+        let reply = self
+            .run(
+                &[
+                    "show".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    agent_id.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("show_failed".into());
+        }
+        shown_agent(&reply.stdout, agent_id).ok_or_else(|| "show_invalid_reply".into())
+    }
+
     /// `harness close`, with `--now` only when asked ([`Cli::close_now`]).
     fn close_with(
         &self,
@@ -2801,6 +2860,13 @@ impl Cli {
         let reply = self
             .run(&args, within)
             .map_err(|error| error.code.to_string())?;
+        // Harness 0.6.52 refuses a close without `--now` while background
+        // commands still run (openharness#4229): not done, so tried again
+        // later, whatever its exit code; never closed with `--now` for it
+        // (#5689).
+        if !now && !reply.success && background_refusal(&reply.stdout, &reply.stderr) {
+            return Err(CLOSE_BACKGROUND_COMMANDS.into());
+        }
         closed(reply.code)
     }
 
@@ -2856,6 +2922,32 @@ impl Cli {
             return Err("status_failed".into());
         }
         parse_ps_names(&reply.stdout).map_err(str::to_string)
+    }
+
+    /// The agents live in `folder` on one machine, from one `ps` (#6432: a
+    /// skill run's real Hermes, which Harness may list apart from the
+    /// agent it gave the run). A read only.
+    pub fn live_in(&self, machine: &str, folder: &str) -> Result<Vec<String>, String> {
+        if !machine_id(machine) {
+            return Err("invalid_machine".into());
+        }
+        let _guard = self.operation.try_lock().map_err(|_| "busy".to_string())?;
+        let reply = self
+            .run_bounded(
+                &[
+                    "ps".into(),
+                    "--machine".into(),
+                    machine.into(),
+                    "--json".into(),
+                ],
+                self.config.read_timeout,
+                PS_STDOUT_LIMIT,
+            )
+            .map_err(|error| error.code.to_string())?;
+        if !reply.success {
+            return Err("status_failed".into());
+        }
+        parse_ps_live_in(&reply.stdout, folder).map_err(str::to_string)
     }
 
     /// Whether Harness is signed in to the person's account (`harness auth
@@ -4780,6 +4872,27 @@ fn shown_row(bytes: &[u8], id: &str, kept: &Value) -> Option<Value> {
     Some(serde_json::json!({"id": id, "name": name, "state": state}))
 }
 
+/// The `agent` of `harness show <id> --json`'s answer of `id`: plain
+/// letters, digits, spaces and `-`, at most 32; `None` for another id, a
+/// refusal, or none.
+pub fn shown_agent(bytes: &[u8], id: &str) -> Option<String> {
+    let shown = serde_json::from_slice::<Value>(bytes).ok()?;
+    if shown["ok"] == false || !shown["error"].is_null() || shown["id"] != id {
+        return None;
+    }
+    shown["agent"]
+        .as_str()
+        .map(str::trim)
+        .filter(|agent| {
+            !agent.is_empty()
+                && agent.len() <= 32
+                && agent
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b' ' | b'-'))
+        })
+        .map(str::to_owned)
+}
+
 /// Whether a refused `harness show` says the session is no longer there:
 /// `UNKNOWN_HARNESS` (no harness of that name or id) or `GONE` (no longer
 /// on its machine), Harness 0.6.12's `target`.
@@ -5370,9 +5483,60 @@ struct ShowReply {
     tools: u64,
     ok: Option<bool>,
     error: Option<Value>,
+    /// Background commands an idle agent still runs (Harness 0.6.52,
+    /// openharness#4229): a number, or `null` when Harness can't tell
+    /// (Codex, OpenClaw, Windows). Absent before 0.6.52. Anything but a
+    /// whole number is read as unknown.
+    #[serde(default, rename = "backgroundCommands")]
+    background_commands: Option<Value>,
 }
 
-fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'static str> {
+/// An idle agent's background commands still running, as `show` said
+/// them (#5689); none when it is not idle, or Harness can't tell.
+fn background_running(reply: &ShowReply) -> Option<u64> {
+    if reply.state != "idle" {
+        return None;
+    }
+    reply
+        .background_commands
+        .as_ref()
+        .and_then(Value::as_u64)
+        .filter(|count| *count > 0)
+}
+
+/// The state [`Cli::observe`] gives an agent `idle` while background
+/// commands it started still run (#5689). Only the engine reads it: it
+/// holds such a read as `working` for a while, then as `idle`
+/// (`engine::BACKGROUND_HOLD_MS`). It is never stored.
+pub const BACKGROUND_STATE: &str = "background";
+
+/// `show` read as an [`Observation`] (#5689): an agent `idle` while
+/// background commands it started still run (Harness 0.6.52,
+/// openharness#4229) has not finished, so it is read as `working`: never
+/// settled, never asked a reply. Unknown (`null`) or absent (Harness
+/// before 0.6.52) is read as before.
+pub(crate) fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'static str> {
+    let mut observation = parse_reading(bytes, expected)?;
+    if observation.state == BACKGROUND_STATE {
+        observation.state = "working".into();
+    }
+    Ok(observation)
+}
+
+/// [`parse_observation`] for the engine's reads ([`Cli::observe`]): an
+/// agent idle with background commands running is [`BACKGROUND_STATE`],
+/// so the engine can bound how long it holds the answer.
+pub(crate) fn parse_reading(bytes: &[u8], expected: &str) -> Result<Observation, &'static str> {
+    let (mut observation, background) = parse_show(bytes, expected)?;
+    if background.is_some() {
+        observation.state = BACKGROUND_STATE.into();
+    }
+    Ok(observation)
+}
+
+/// `show` as Harness said it, with the background commands an idle agent
+/// still runs ([`background_running`]).
+fn parse_show(bytes: &[u8], expected: &str) -> Result<(Observation, Option<u64>), &'static str> {
     let reply: ShowReply = serde_json::from_slice(bytes).map_err(|_| "invalid_observation")?;
     if reply.ok == Some(false) || reply.error.is_some() {
         return Err("invalid_observation");
@@ -5398,19 +5562,23 @@ fn parse_observation(bytes: &[u8], expected: &str) -> Result<Observation, &'stat
     {
         return Err("invalid_observation");
     }
+    let background = background_running(&reply);
     let ask = match reply.ask {
         Value::Null => None,
         Value::String(ask) if ask.len() <= MAX_ASK_BYTES && !ask.contains('\0') => Some(ask),
         _ => return Err("invalid_observation"),
     };
-    Ok(Observation {
-        state: state_of(&reply.id, reply.state, Some(&reply.answer)),
-        agent_id: reply.id,
-        ask,
-        answer: reply.answer,
-        truncated: reply.truncated,
-        tools: reply.tools,
-    })
+    Ok((
+        Observation {
+            state: state_of(&reply.id, reply.state, Some(&reply.answer)),
+            agent_id: reply.id,
+            ask,
+            answer: reply.answer,
+            truncated: reply.truncated,
+            tools: reply.tools,
+        },
+        background,
+    ))
 }
 
 #[derive(Deserialize)]
@@ -5426,6 +5594,27 @@ struct PsRow {
     last_active: Option<String>,
     #[serde(default)]
     about: Option<String>,
+}
+
+/// The read before a close found the agent idle with background commands
+/// still running (#5689): `observe_background_commands` once the close
+/// prefixes it.
+pub const BACKGROUND_COMMANDS: &str = "background_commands";
+/// Harness refused the close itself for background commands still running
+/// (#5689).
+pub const CLOSE_BACKGROUND_COMMANDS: &str = "close_background_commands";
+
+/// Whether a refused `close` says background commands still run: Harness
+/// 0.6.52's `N background commands running; --now closes anyway`, in its
+/// `--json` reply or on stderr, in any case.
+pub fn background_refusal(stdout: &[u8], stderr: &[u8]) -> bool {
+    const SAID: &[u8] = b"background commands running";
+    [stdout, stderr].iter().any(|bytes| {
+        bytes
+            .to_ascii_lowercase()
+            .windows(SAID.len())
+            .any(|window| window == SAID)
+    })
 }
 
 /// `harness close`'s exit code (Harness 0.4.18's CLI): 0 closed, 5 refused
@@ -5589,6 +5778,37 @@ pub fn parse_ps_names(bytes: &[u8]) -> Result<Vec<PsSession>, &'static str> {
                 folder: row["folder"].as_str().map(str::to_owned),
             })
         })
+        .collect())
+}
+
+/// `harness ps --json`'s agent ids working in `folder` and not ended
+/// (`stopped`, `failed`, `closed`, `gone`, or no state), the reply bounded
+/// as [`parse_ps`]'s ([`Cli::live_in`], #6432).
+pub fn parse_ps_live_in(bytes: &[u8], folder: &str) -> Result<Vec<String>, &'static str> {
+    if bytes.len() > PS_STDOUT_LIMIT {
+        return Err("status_invalid_reply");
+    }
+    let reply: Value = serde_json::from_slice(bytes).map_err(|_| "status_invalid_reply")?;
+    let rows = reply["harnesses"]
+        .as_array()
+        .ok_or("status_invalid_reply")?;
+    if rows.len() > MOST_LISTED {
+        return Err("status_invalid_reply");
+    }
+    let folder = folder.trim_end_matches('/');
+    Ok(rows
+        .iter()
+        .filter(|row| {
+            row["folder"]
+                .as_str()
+                .is_some_and(|at| at.trim_end_matches('/') == folder)
+                && !matches!(
+                    row["state"].as_str(),
+                    None | Some("stopped" | "failed" | "closed" | "gone")
+                )
+        })
+        .filter_map(|row| row["id"].as_str().filter(|id| agent_id(id)))
+        .map(str::to_owned)
         .collect())
 }
 

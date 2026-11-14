@@ -127,6 +127,14 @@ impl Pending {
 pub const MOST_FILE_BYTES: usize = 8 * 1_024;
 
 pub const TOO_LONG: &str = "one of its files is longer than 8 KiB";
+/// With [`AGENT_ENVIRONMENT`] on: a bare `SKILL.md` is an agent skill's
+/// file, run by the lamp's agent (`lamp_voice::upload_agent`), at most
+/// [`MOST_AGENT_BYTES`].
+pub const AGENT_ENVIRONMENT: &str = "LAMP_UPLOAD_TO_AGENT";
+/// The most bytes of a bare `SKILL.md` with [`AGENT_ENVIRONMENT`] on
+/// (`lamp_voice::upload_agent::MOST_BYTES`).
+pub const MOST_AGENT_BYTES: usize = 64 * 1_024;
+pub const AGENT_TOO_LONG: &str = "its SKILL.md is longer than 64 KiB";
 pub const FROM_THE_STORE: &str =
     "this skill carries the Skills Store's signature: add it from the Skill Store";
 pub const NO_CODE: &str = "it carries code (run.py), which a skill added from a file can't";
@@ -152,8 +160,9 @@ pub const REFUSED_BY_ITS_CHECKS: &str =
 /// is, anything else [`REFUSED_BY_ITS_CHECKS`], so a skill's name or words
 /// never reach the journal.
 pub fn journaled(why: &str) -> &str {
-    const FIXED: [&str; 14] = [
+    const FIXED: [&str; 15] = [
         TOO_LONG,
+        AGENT_TOO_LONG,
         FROM_THE_STORE,
         NO_CODE,
         OTHER_FILES,
@@ -210,6 +219,9 @@ pub struct Uploads {
     pub retry_within: Duration,
     /// [`STATE_FILE`]'s path; none keeps what is in flight in memory only.
     pub state: Option<PathBuf>,
+    /// [`AGENT_ENVIRONMENT`]: a bare `SKILL.md` of at most
+    /// [`MOST_AGENT_BYTES`] goes to the voice as an agent skill's file.
+    pub to_agent: bool,
     busy: AtomicBool,
     done: Mutex<Vec<Outcome>>,
     /// The uploads in flight, as [`STATE_FILE`] has them.
@@ -275,6 +287,7 @@ impl Uploads {
             settle_within: SETTLE_WITHIN,
             retry_within: RETRY_WITHIN,
             state: None,
+            to_agent: std::env::var(AGENT_ENVIRONMENT).is_ok_and(|value| value == "on"),
             busy: AtomicBool::new(false),
             done: Mutex::new(Vec::new()),
             pending: Mutex::new(Vec::new()),
@@ -564,8 +577,14 @@ impl Uploads {
         if (format == "skill_md") != toml.is_none() {
             return Err(NOT_A_SKILL.into());
         }
+        // An agent skill's file (`LAMP_UPLOAD_TO_AGENT`): its own bound,
+        // lamp-voice's, which reads the line with room for it.
+        if toml.is_none() && self.to_agent {
+            if card.len() > MOST_AGENT_BYTES {
+                return Err(AGENT_TOO_LONG.into());
+            }
         // lamp-voice's own bound on each file, so the line it reads is whole.
-        if card.len() > MOST_FILE_BYTES
+        } else if card.len() > MOST_FILE_BYTES
             || toml
                 .as_ref()
                 .is_some_and(|toml| toml.len() > MOST_FILE_BYTES)
@@ -620,6 +639,9 @@ impl Uploads {
             "version": kept["version"],
             "sha256": kept["sha256"],
             "may_use": crate::skills::may_use(&permissions),
+            // An agent skill's grants, as lamp-voice read them from the
+            // file (`LAMP_UPLOAD_TO_AGENT`); null for any other.
+            "grants": kept["grants"],
         }))
     }
 

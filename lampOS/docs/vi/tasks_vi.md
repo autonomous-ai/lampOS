@@ -225,8 +225,8 @@ lần chạy, và được trả lời khi lần chạy kết thúc
 - **Câu trả lời:** `{"ok":true,"id":N}` khi lần chạy đã kết thúc, hoặc
   `{"ok":false,"error","message"}`: `off` (công tắc không phải `on`),
   `bad_request`, `too_long` (quá 8192 byte), `no_token` (lamp-control không
-  cấp token một lần chạy), `run_failed`, hoặc `busy` (việc của một kỹ năng
-  khác đang chạy: mỗi lúc chỉ chạy một việc).
+  cấp token một lần chạy), `run_failed`, hoặc `busy` (việc của
+  một kỹ năng khác đang chạy: mỗi lúc chỉ chạy một việc).
 - **Token một lần chạy** (điều kiện 12:45 của người xây dựng đầu tiên trên
   #6071): với mỗi lần chạy, lamp-tasks xin lamp-control (#6304, PR #6408)
   một token trên socket quản trị `/run/lampos-control/admin.sock`
@@ -268,7 +268,19 @@ lần chạy, và được trả lời khi lần chạy kết thúc
   lệnh chính xác chạy script từ thư mục chỉ đọc của kỹ năng,
   `PYTHONPATH=/usr/local/lib/lampos/sdk-python python3 <folder>/<run>`
   (đường dẫn của SDK nằm ngay trong lệnh, để `lampos` import được dù shell
-  của Hermes làm gì với môi trường của lần chạy, #6684), quy tắc chạy
+  của Hermes làm gì với môi trường của lần chạy, #6684; launcher của Hermes
+  thay `PYTHONPATH` nó được khởi động với, nên lamp-tasks còn ghi file
+  `/usr/local/lib/lampos/hermes-run-env.sh` của lamp-update vào
+  `terminal.shell_init_files` của Hermes, sau ba file mặc định
+  `~/.profile`, `~/.bash_profile`, `~/.bashrc` khi nó tạo danh sách, trừ khi
+  `terminal.auto_source_bashrc` tắt theo cách Hermes đọc (`false`, `no`,
+  `off`, `null` hoặc `0`; `'false'` có ngoặc là bật); danh sách rỗng
+  (`shell_init_files:` trống, `null`, `[]`) cũng nhận ba file mặc định;
+  danh sách người dùng tự đặt được giữ nguyên; một `terminal:` không gộp
+  được (flow style, anchor) được để nguyên và ghi journal, phần còn lại
+  vẫn được gộp; terminal của Hermes source file đó trước snapshot đăng nhập, và
+  file chỉ đặt SDK lên đầu `PYTHONPATH` khi có `LAMP_CONTROL_SOCKET`, tức
+  chỉ trong lần chạy kỹ năng), quy tắc chạy
   script đúng như nó là, không bao giờ sửa, chép hay viết lại file của kỹ
   năng, và đường duy nhất tới đèn (`SkillRun::prompt`), qua trait `Runner`, trait này chờ lần chạy kết thúc.
   Việc của kỹ năng được đưa vào như dữ liệu (một chuỗi JSON, "as data, not
@@ -288,7 +300,13 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     tên (#6506). Socket điều khiển, SDK và bridge trong namespace của các
     engine khác là bước 2b. Không có đích của đèn, hay Harness chưa sẵn sàng (không
     có chương trình Harness, hay phần này đang khởi động), cũng bị từ chối
-    bằng lời. Khi không có đích của đèn, hay Harness không khởi động lần
+    bằng lời. Unit sản phẩm không còn `ConditionPathExists=/usr/local/bin/harness`
+    (có từ #811; #6685 PR 3, theo câu hỏi của first builder): trên đèn không
+    có chương trình Harness, systemd vẫn khởi động phần này, chỉ marker của
+    setup giữ nó lại; mọi việc giao đi bị từ chối là `no_harness`, health
+    của nó vẫn ok, và Harness cài sau được dùng khi lệnh cài của lamp-update
+    khởi động lại phần này (test
+    `the_product_unit_starts_the_part_with_no_harness_program`). Khi không có đích của đèn, hay Harness không khởi động lần
     chạy (`harness new` không gửi được hoặc không chắc), lamp-tasks đọc
     trạng thái đăng nhập của Harness một lần (`harness auth status
     --json`); nếu chưa đăng nhập, lời từ chối nói lý do bằng lời cho người
@@ -366,6 +384,67 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     <engine>` trong thư mục riêng của nó (bên dưới). Các thông báo sau khi
     khởi động nói "the lamp's default agent". Tắt: mọi lần chạy là của
     Hermes của đèn qua wrapper riêng của nó, như trên (giai đoạn tạm).
+  - **Không có tài khoản Harness: agent của chính đèn, do lamp-tasks tự
+    khởi động** (#6685 PR 3, với `LAMP_SKILL_DEFAULT_AGENT=on`). Khách hàng
+    không có tài khoản Harness vẫn có việc của kỹ năng: agent của chính đèn
+    là sản phẩm. Khi nào dùng (`skill_task::starts_without_harness`): công
+    tắc bật, và Harness được đọc là đã đăng xuất qua các lượt xem đăng nhập
+    của chính phần này (`harness auth status`, `serve --set-up-later`, giữ
+    bởi `skill_task::harness_sign_in_read`; chỉ tính là đăng xuất khi
+    Harness đã được thiết lập ở đây và lượt quét lúc khởi động đã xong),
+    hoặc không có chương trình Harness nào (sau một lượt quét các thư mục
+    và file token mà lần khởi động trước để lại,
+    `skill_task::sweep_without_harness`; lượt quét và các lần đọc này chỉ
+    được dựng khi switch bật, nên khi tắt, đèn không có chương trình Harness
+    không quét gì, P3 của Thirteen trên #6829; `ConditionPathExists=/usr/local/bin/harness`
+    của unit sản phẩm vẫn giữ lamp-tasks tắt trên đèn như vậy cho tới #6849). Đã đăng
+    nhập, đăng nhập nhưng đang offline, hay chưa đọc: qua Harness như trên.
+    Lúc bắt đầu lần chạy không hỏi gì: trạng thái đăng nhập là lần đọc gần
+    nhất, nên việc bắt đầu không chờ mạng và không gọi Harness. Agent mặc
+    định vẫn như vậy (`runtime::lamp_default`), nếu không thì engine đầu
+    tiên được bật của bản build (`runtime::lamp_order`), nếu không thì
+    engine của đích của đèn; không có thì bị từ chối ("the lamp has no
+    default agent yet …").
+    - **Một lần kiểm tra, rồi một cách khởi động cho mọi agent**
+      (`skill_task::default_agent_takes_tasks`): kiểm tra đường chạy duy
+      nhất ở trên, và lối vào việc của wrapper (`TASK_ENTRY_LINES`: `if [
+      "${1-}" = --lamp-task ]` và `agent_task "$Q"`, cùng các dòng cho mọi
+      agent) với `agent_task` trong phần dữ liệu của agent, trước đường
+      chạy (`AGENT_TASK_LINE`). Wrapper không có chúng (lamp-update cũ hơn,
+      hay agent chưa có việc của riêng nó) bị từ chối bằng lời, có ghi
+      nhật ký: "the lamp's default agent (<engine>) isn't set up for a
+      skill's run yet (its wrapper /usr/local/bin/<engine> takes no skill's
+      run without Harness: …), so nothing was started", không tạo hay khởi
+      động gì. Hiện tại phần dữ liệu của Hermes có `agent_task` (`chat -q`
+      với lời của việc, như Harness và một lần make khởi động nó); Claude
+      Code và các agent thường khác chưa có; OpenClaw hoàn toàn chưa có
+      wrapper đường chạy duy nhất, nên bị từ chối như trên.
+    - **Cùng thư mục và file token.** `skill-<run-id>` (0700) trong cùng
+      project Harness, file token của lần chạy được ghi trước khi khởi động
+      (`RunTokenFile`), và lời của việc trong file `task` của thư mục (0600,
+      `TASK_FILE`). Rồi lamp-tasks tự khởi động wrapper của agent:
+      `/usr/local/bin/<engine> --lamp-task` trong thư mục đó, môi trường
+      chỉ còn `PATH`, `HOME` và `SHELL`, stdin, stdout và stderr là null,
+      trong một process group riêng. Wrapper đọc file token một lần rồi
+      xoá, cho lần chạy token, socket, SDK và `--net` (cùng các dòng nhận
+      lần chạy), và `agent_task` của nó biến file việc thành các đối số
+      riêng của agent, khởi động bằng cùng một `unshare` vào `agent-ns`
+      (docs/install.md, "The one run path"). Token không nằm trong đối số
+      nào và trong môi trường nào lamp-tasks đưa.
+    - **Kết thúc.** Wrapper thoát, tới hạn của lần chạy (14 phút) hay
+      lamp-tasks dừng, cái nào tới trước, xem mỗi 50 ms (`RUN_TICK`). Thoát
+      0 là `{"ok":true,"id":0}`; trạng thái khác là `run_failed` "the
+      lamp's default agent ended with status <n>"; tới hạn là "the run was
+      ended at its deadline, 840 s"; khi dừng là "the run was ended as
+      lamp-tasks stops". Dù kết thúc thế nào, guard của nó trước hết cho
+      lamp-control kết thúc token, rồi giết cả process group của lần chạy
+      (`unshare --kill-child` của wrapper kéo theo namespace của agent) và
+      thu dọn nó, rồi xoá thư mục (cả file việc) và file token. Không giữ
+      gì lần chạy in ra. Các process của nó vẫn ở trong cgroup và giới hạn
+      của `lamp-tasks.service`. Test:
+      `signed_out_the_default_agent_starts_with_no_harness_and_leaves_nothing`,
+      `a_run_with_no_harness_is_ended_at_its_deadline_or_the_stop_and_its_status_said`,
+      `signed_in_a_skill_run_still_goes_through_harness`.
   - **Thư mục riêng.** lamp-tasks tạo `skill-<run-id>` (0700,
     `RUN_FOLDER_PREFIX`) trong project Harness của nó
     `/var/lib/lampos-tasks/harnesses/lamp-tasks` (tạo 0700 khi chưa có),
@@ -388,11 +467,51 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     `WAIT_RETRY`) cho tới khi nó kết thúc hoặc hạn chót (14 phút, đời của
     token) huỷ nó. Kết thúc `idle`, `stopped`, `closed` hay `gone` là
     `{"ok":true,"id":0}`; `failed`, hay `needs-input` (không ai trả lời lần
-    chạy của kỹ năng), là `run_failed`. Ở hạn chót, lần chạy bị đóng bằng
+    chạy của kỹ năng), là `run_failed`. Một `stopped` chỉ được tính khi
+    `harness show` thấy một phiên (một câu hỏi, một câu trả lời hay một
+    công cụ; #6432): đôi khi Harness giữ pid của wrapper `hermes` ngay
+    trước khi nó `exec` vào namespace, báo `stopped` khoảng 2,5 s sau, và
+    liệt kê Hermes thật, còn đang nạp, thành một agent khác trong thư mục
+    của lần chạy. Khi chưa có phiên, lamp-tasks xem `harness ps` mỗi 0,5 s,
+    tối đa 5 s (`LOST_START_LOOK`), tìm một agent còn sống trong chính thư
+    mục của lần chạy, và chờ agent đó thay vào, kết thúc của nó là kết thúc
+    của lần chạy (guard đóng nó). Không thấy agent nào là `run_failed`
+    "Harness lost the lamp's Hermes as it started", cũng ghi trong nhật ký.
+    Không khởi động Hermes thứ hai. Việc gắn lại thuộc về Harness; đây là
+    phía đèn. Test: `a_skill_run_whose_agent_stopped_before_a_session_*`.
+    Ở hạn chót, lần chạy bị đóng bằng
     `harness close --machine <lamp> <agent> --now --json`
     (`Cli::close_now`) và là `run_failed` "the run was ended at its
     deadline, 840 s". `new` không khởi động được (`not_sent`, `uncertain`,
     hay một lần tạo `pending`) cũng là `run_failed`.
+  - **Lần chạy không tới được agent của nó** (#6835 gap 1). Khi engine
+    thoát trước khi sẵn sàng, Harness giữ pane của lần chạy làm một shell:
+    cùng agent id, agent "Terminal", và `wait` đọc nó là `idle` trong vài
+    giây. Vì vậy khi `wait` kết thúc (và phiên không `closed` hay `gone`),
+    lamp-tasks hỏi `harness show --machine <lamp> <agent> --json`
+    (`Cli::shown_agent`); không hỏi lại khi `show` của chính lần kết thúc
+    `stopped` (#6432) đã thấy phiên được gắn, tức agent đã bắt đầu.
+    Agent "Terminal" nghĩa là Harness không thấy tiến
+    trình của engine, không phải agent đã không làm gì: lần chạy không bao
+    giờ là `{"ok":true}`. Token của nó được kết thúc và phiên được đóng, và
+    nó là `run_failed` "the skill's task may not have run: Harness kept the
+    run's pane as a shell (agent Terminal, not hermes) …", nói thành lời,
+    thêm "its session was not closed" khi đóng phiên thất bại. Nó không bao
+    giờ được tạo lần thứ hai, vì một Hermes có thể đã bắt đầu nó (first
+    builder, #6811), và việc ghi cố định của nó không bao giờ là
+    `not_started`: agent của nó có thể đã bắt đầu (`SkillRun::started`).
+    Một `show` nêu đúng
+    engine, hay không được trả lời, để lần chạy được xét theo kết thúc của
+    `wait` như trước. Kiểm thử:
+    `a_run_harness_kept_as_a_shell_never_started_and_is_not_said_done`,
+    `a_run_harness_kept_as_a_shell_is_run_failed_and_never_run_again`.
+  - **Một dòng nhật ký cho mỗi lần chạy**: `[lamp-tasks] skill task
+    <run-id>: ended, Harness says <state>, after <n> s; its agent: started
+    (Hermes)`, hoặc `never started (Harness shows a shell, agent
+    Terminal)`, hoặc `not known (<why>)` (`show` không được trả lời, phiên
+    đã mất, hay việc chờ kết thúc ở hạn chót hoặc khi dừng, ghi `Harness
+    says none`). Kiểm thử:
+    `a_runs_journal_line_says_its_end_its_time_and_whether_its_agent_started`.
   - **Dù kết thúc thế nào**, guard của nó trước hết nhờ lamp-control kết
     thúc token của lần chạy (`{"end":{"run"}}`, một lần), rồi đóng phiên
     (`close --now`, một lần; không đóng phiên Harness báo đã `closed` hay
@@ -614,6 +733,185 @@ chạy của một kỹ năng có script chạy `curl https://example.com` thì 
 cùng lần chạy được trả lời và lệnh gọi `control.sock` của nó chạy được với
 token.
 
+### Một lần tạo bằng giọng nói trong namespace của lần chạy kỹ năng (`skill_make`, #6643)
+
+Điều kiện của first builder trên #6643 (12/11 18:15): một lần tạo bằng giọng
+nói mà DeepSeek không giữ được, được giao cho agent của đèn
+(`LAMP_MAKE_SKILL_AGENT`, [skills_vi.md](skills_vi.md), "Giao cho agent của
+đèn khi DeepSeek thất bại"), chạy trong namespace của lần chạy kỹ
+năng và không bao giờ chạy như một task Harness có công cụ riêng của
+agent (`lamp_tasks::skill_make`).
+
+- **Socket:** khi có `LAMP_SKILL_TASKS=on` (công tắc mà các chỉnh sửa
+  namespace của lamp-update dùng), `serve` mở
+  `/run/lampos-tasks/skill-make.sock` (`MAKE_SOCKET`) cạnh
+  `skill-task.sock`, tạo như các socket khác của nó. Nó chỉ nhận dòng từ
+  `lamp-voice.service` chạy bằng root, theo tên người gọi mà kernel cho;
+  người gọi khác bị đóng mà không được trả lời. Mỗi lần chỉ chạy một lần
+  tạo; lần thứ hai bị từ chối `busy`. Socket được mở theo
+  `LAMP_SKILL_TASKS`, không chỉ khi việc giao được bật: công tắc giao,
+  `LAMP_MAKE_SKILL_AGENT`, chỉ thuộc về lamp-voice (đặt trong unit của
+  lamp-voice, và kiểm tra unit giữ nó ở đó), nên lamp-tasks không thấy
+  được; một socket không ai giao lần tạo thì không nhận gì, vì chỉ
+  lamp-voice chạy bằng root được gọi nó. Khi khởi động, lamp-tasks quét
+  bỏ các thư mục `make-*` (cùng home của chúng) mà một lamp-tasks dừng
+  giữa chừng để lại (`skill_make::sweep`).
+- **Dòng:** `{"op":"skill_make","rules","within_ms"}`, được kiểm tra trọn
+  vẹn (`MakeLine::parse`): không có trường nào khác, luật (system prompt và
+  brief) tối đa 48 KiB và không có NUL, `within_ms` từ 1 đến 120 giây.
+- **Lần chạy: chỉ Hermes** (quyết định của first builder, 12/11 19:14):
+  Hermes của đèn được khởi động đúng như một lần chạy `do.task` của kỹ
+  năng (`skill_task::HermesRunner` bên trong `skill_make::MakeHermes`,
+  đường của row-6443), qua wrapper namespace của nó: chỉ thư mục riêng,
+  thư mục làm việc và các kỹ năng, và chỉ `control.sock` của lamp-control,
+  không bao giờ `admin.sock`. Hiện chỉ Hermes có trình chạy namespace, nên
+  một lần tạo không bao giờ chạy bằng engine khác; giọng nói chỉ giao lần
+  tạo khi target `lamp` là Hermes. Không token nào được tạo và môi trường
+  của lần chạy chỉ mang home riêng của nó: một lần tạo không có quyền nào.
+  Lần chạy bị giết khi hết `within_ms`, cùng cả nhóm tiến trình.
+- **Một home mới của riêng nó:** mỗi lần tạo có `make-<run id>/home`,
+  0700, mới và trống ngoài cấu hình nhà cung cấp,
+  `home/.hermes/config.yaml` (`hermes_config::merge_config` với cổng của
+  bộ chuyển tiếp, khóa được gọi bằng tên biến, `LAMP_HERMES_TOKEN`, không
+  bao giờ là một khóa, cùng bốn thiết lập Hermes của lamp-update,
+  `MAKE_CONFIG`, một kiểm thử giữ chúng bằng `hermes_install::CONFIG`:
+  không kiểm tra cập nhật, không language server, lần chạy `chat -q` kết
+  thúc cùng lượt của nó; thiết lập nào có khối cấp trên cùng đã có trong
+  config nhà cung cấp, `terminal:`, được đặt vào đúng khối đó, vì Hermes từ
+  chối tệp có một khóa hai lần), và không có gì từ bộ nhớ, phiên hay trạng thái
+  của Hermes; bên cạnh đó là hai liên kết tới runtime đã chuẩn bị của
+  Hermes trong home lâu dài, `home/.hermes/installs` (bản ghi phụ thuộc và
+  các môi trường, `installs/<key>/facts.json`) và `home/.hermes/tools` (uv,
+  Python và trình quản lý gói), để một lần tạo không bao giờ tự chuẩn bị
+  môi trường riêng. Hermes 0.22.2 giữ trạng thái phụ thuộc theo từng data
+  root (`pm/environments.py`, `<HERMES_HOME>/installs/<key>`): khi một
+  `HERMES_HOME` mới không có, nó đồng bộ một môi trường trước ("preparing
+  dependencies for this data root"), việc mà lần chạy của một lần tạo
+  không thể làm xong, và kết thúc `run_failed` trong chưa tới một giây trên
+  lamp-c0a4 (#6643). Dùng liên kết, không dùng bind mount: Hermes chỉ nhận
+  một môi trường đã ghi khi, sau khi resolve, nó nằm dưới
+  `<HERMES_HOME>/installs/<key>/environments`, và một liên kết resolve về
+  đúng đường dẫn lâu dài mà bản ghi ghi tên. Lần chạy nhận `HOME`, `HERMES_HOME` (`home/.hermes`) và
+  `LAMP_NS_HOME` trỏ tới đó. Wrapper của lamp-update chỉ nhận
+  `LAMP_NS_HOME` khi đường dẫn khớp
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home` và không có
+  `..` (`WRAPPER_HOME_LINE`), rồi script namespace đặt `HOME` thành nó,
+  che home lâu dài của Hermes (`/var/lib/lampos-hermes/.hermes`: bộ nhớ,
+  phiên, trạng thái) dưới một tmpfs trống chỉ đọc, chỉ cho thấy lại bản
+  checkout, `tools` (Python mà Hermes chạy trên đó) và `installs` (bản ghi
+  phụ thuộc của nó), chỉ đọc, để các liên kết resolve được và không gì
+  trong đó bị thay đổi ngoài những gì Hermes phải ghi ở mỗi lần khởi động,
+  được bind lại đọc-ghi: mỗi `installs/<key>/.install.lock`
+  (`runtime_lock` trong `hermes_cli/runtime_state.py` mở nó
+  `O_CREAT|O_RDWR` và flock; khi chỉ đọc, `EROFS` làm một lần tạo kết thúc
+  `run_failed` sau 0,4 giây trên một đèn) và `.leases` của mỗi generation
+  có lease, `installs/<key>/environments/<gen>/.leases` (các lease của
+  `lease_directory`), và, khi có runtime PM của Hermes,
+  `installs/<key>/pm-runtime/.prepare.lock` (`prepare_runtime` trong
+  `pm/runtime.py`) cùng `.leases` của các generation của nó, còn
+  `facts.json`, `pm-runtime/selected.json`, các môi trường và `tools` vẫn
+  chỉ đọc; không có install lock nào (Hermes lâu dài chưa từng khởi động)
+  thì dừng trước khi Hermes chạy. Các dòng này mount bằng `mount -n`: chúng
+  chạy sau khi `/run` đã chỉ đọc, nơi util-linux không ghi được utab. Nó để thư mục của Hermes và thư mục làm việc ở chế độ
+  chỉ đọc, và che phần còn lại của `lamp` trong thư mục làm việc dưới một
+  tmpfs khác, chỉ thư mục của lần tạo được đưa lại, đọc-ghi
+  (`NS_HOME_LINE`; docs/install.md).
+  Home bị xóa cùng thư mục của lần tạo dù lần tạo kết thúc thế nào: có câu
+  trả lời, thất bại, quá hạn hay panic.
+- **Dấu của wrapper, cách ly hay không:** trước mỗi lần tạo, lamp-tasks
+  kiểm tra `/usr/local/bin/hermes` có `WRAPPER_HOME_LINE` và
+  `/usr/local/lib/lampos/hermes-ns` có `NS_HOME_LINE`; nếu không, lần tạo
+  bị từ chối `no_namespace` trước khi bất cứ gì được tạo; lần tạo mà thư
+  mục làm việc không phải `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`
+  (`MAKE_WORK`), nơi wrapper nhận home của lần tạo, cũng vậy. Cho tới khi một
+  vòng lamp-update viết lại wrapper và script, mọi lần tạo đều bị từ chối
+  như vậy và vẫn là của DeepSeek.
+- **Với đường chạy chung (`LAMP_SKILL_DEFAULT_AGENT` bật trong lamp-update):**
+  `/usr/local/bin/hermes` là wrapper của đường chạy chung và chạy
+  `/usr/local/lib/lampos/agent-ns`, `hermes-ns` bị gỡ bỏ; đường chạy đặt
+  `LAMP_NS_HOME` thành home riêng của agent ở đó, nên dữ liệu wrapper của
+  Hermes chuyển home của lần tạo đi tiếp dưới tên `LAMP_NS_MAKE`
+  (`hermes_install::ONE_PATH_HOME_LINE`: cùng mẫu đường dẫn, có `..` hay
+  giá trị khác thì không đặt, `HERMES_HOME` nằm dưới nó), và `agent-ns`
+  chạy các dòng tạo của Hermes (`hermes_install::ONE_PATH_NS_MAKE_LINES`,
+  các bước của `NS_HOME_LINE`) chỉ cho agent và home có trong danh sách dữ
+  liệu (`agent_ns::wrapper::MAKE_HOMES`, so khớp dạng `<engine>:<home>` như
+  `OWN_HOMES`); mọi `LAMP_NS_MAKE` khác không rỗng, hay một agent khác được
+  đưa một home, đều kết thúc trước khi agent chạy. Khi đó lamp-tasks coi
+  wrapper là sẵn sàng khi nó là wrapper đường chạy chung cho Hermes
+  (`skill_task::wrapper_takes_runs`) có `ONE_PATH_HOME_LINE`, và `agent-ns`
+  có `ONE_PATH_NS_MAKE_LINES`. Đường chạy chung chỉ cách ly mạng cho lần
+  chạy kỹ năng, nên lần tạo `held` bị từ chối `not_held_off` ở đó.
+- **Mạng của nó (`LAMP_MAKE_AGENT_NET`, không unit nào đặt):** mặc định giữ
+  mạng, như agent của V1 (yêu cầu của chủ sở hữu, 12/11; quyết định của first
+  builder, 12/11 19:14). Khi đó mô hình được gọi qua bộ chuyển
+  tiếp của lamp-cloud trên `127.0.0.1:7741`, chính nơi `model.sock` nối tới.
+  Đúng giá trị `held` cho lần chạy nghiêm ngặt, `LAMP_NS_NET=run`: chỉ `lo`
+  và các tunnel `@NONE` của kernel, mô hình chỉ qua `model.sock`. Khi
+  `held`, wrapper không có các dòng mạng (`WRAPPER_NET_LINES`) bị từ chối
+  `not_held_off` trước khi bất cứ gì được tạo (`Runner::ready`). lamp-tasks
+  ghi nhật ký chế độ nó dùng khi khởi động.
+- **Thư mục của lần tạo:** `make-<run id>` trong thư mục làm việc của đèn
+  (thư mục mà lần chạy kỹ năng bắt đầu trong đó, namespace của Hermes cho
+  thấy), 0700, luật nằm trong `rules.md`, 0600. Lần chạy bắt đầu ở đó và được
+  bảo ghi câu trả lời vào `answer.md` ở đó và không gì khác. Khi lần chạy đã
+  kết thúc, `answer.md` được đọc bằng `openat` từ descriptor riêng của thư
+  mục, lấy khi thư mục được tạo, `O_NOFOLLOW` trên từng phần (một tệp
+  thường, không bao giờ đi theo liên kết, tối đa 20 KiB), nên một thư mục bị
+  thay bằng liên kết không bao giờ được đọc qua. Thư mục bị xóa dù lần tạo
+  kết thúc thế nào.
+- **Các câu trả lời:** `{"ok":true,"started":true}` khi lần chạy sắp bắt đầu
+  (giọng nói chỉ nói câu chờ khi đó), rồi `{"ok":true,"answer"}`. Nếu không,
+  một lời từ chối: `off`, `bad_request`, `too_long`, `busy`, `not_held_off`,
+  `no_namespace`, `run_failed` hoặc `no_answer`. Giọng nói không giao gì
+  khi gặp `off`, `not_held_off`, `no_namespace` hoặc không có socket (bản
+  cũ). Nhật ký chỉ ghi kết quả:
+  `[lamp-tasks] skill make: refused <code>: <why>`, lý do dạng cố định của
+  lời từ chối (`journal_line`), không bao giờ ghi luật hay câu trả lời.
+- **Kiểm thử:** `skill_make::tests`: một lần tạo chạy trong thư mục riêng,
+  luật nằm ở đó và câu trả lời được đọc lại, môi trường chỉ có home riêng,
+  thư mục bị xóa; home của mỗi lần tạo lúc bắt đầu chỉ có cấu hình nhà cung
+  cấp, lần tạo thứ hai không bao giờ thấy những gì lần đầu để lại trong
+  home, và home biến mất sau câu trả lời, thất bại, quá hạn và panic; lần
+  chạy không cách ly được hoặc không có dòng make-home thì không khởi động
+  gì và không tạo thư mục; không có câu trả lời, câu trả lời là liên kết,
+  thư mục bị thay bằng liên kết, công tắc tắt và mọi dòng sai đều bị từ
+  chối; lần tạo được khởi động qua wrapper và script phải có các dòng
+  make-home dù cách ly hay không, và các dòng mạng khi cách ly, với
+  `LAMP_NS_NET=run` chỉ khi cách ly, không có token và không có admin
+  socket trong môi trường, trong thư mục của lần tạo, với `HOME` và
+  `HERMES_HOME` riêng; các dòng đúng từng chữ của lamp-update; thư mục làm
+  việc khác với của wrapper bị từ chối; cấu hình mới có bốn thiết lập của
+  lamp-update, bằng đúng của nó; thư mục tạo cũ được quét bỏ khi khởi
+  động; `a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder`
+  của lamp-update (mount giả lập) và, trên Linux,
+  `inside_a_makes_namespace_hermess_lasting_memory_is_not_there` (namespace
+  thật: không thấy bộ nhớ lâu dài, chỉ thư mục của lần tạo ghi được); văn bản namespace của lamp-update chỉ cho thấy `control.sock` và
+  không bao giờ nhắc `admin.sock`; chỉ lamp-voice chạy bằng root được giao
+  một lần tạo; socket nói `started`, rồi câu trả lời; mặc định giữ mạng mà
+  vẫn không cho thấy admin socket, và `held` cho `LAMP_NS_NET=run`.
+
+**Các dòng kiểm tra trên đèn (chưa chạy):** trên lamp-9adf với bản này, hỏi
+"Hey Lamp, make me a skill that checks the weather every morning". Câu trả
+lời của DeepSeek không được giữ, và nhật ký ghi "handed to the agent". Trong
+lúc lần tạo chạy, tìm Hermes của nó và xem từ bên trong namespace:
+
+```sh
+P=$(pgrep -u lampos -f 'hermes chat -q Everything you need' | head -1)
+sudo nsenter -t "$P" -m ls /run/lampos-control                # chỉ control.sock, không có admin.sock
+sudo nsenter -t "$P" -n ip -o link show                       # các link của mạng
+sudo nsenter -t "$P" -n curl -sS -m 5 -o /dev/null -w '%{http_code}\n' https://example.com; echo "exit $?"
+```
+
+- **Mặc định (giữ mạng):** `curl` trả 200 (mã thoát 0), và
+  `/run/lampos-control` chỉ có `control.sock`.
+- **Held** (`sudo systemctl edit lamp-tasks` với
+  `Environment=LAMP_MAKE_AGENT_NET=held`, rồi khởi động lại; nhật ký ghi "is
+  held off the network"): `ip` chỉ cho thấy `lo` và các tunnel `@NONE`,
+  `curl` thất bại (mã thoát 6 hoặc 7), `/run/lampos-control` vẫn chỉ có
+  `control.sock`, và lần tạo vẫn kết thúc với câu trả lời qua relay mô hình.
+  Sau đó xóa drop-in.
+
 **Wrapper của mọi engine (#6510 phần 1, bước 1, tắt trừ khi
 `LAMP_AGENT_NS=on`):** wrapper chung của lamp-update cho mọi engine
 (docs/install.md, "One agent namespace for every engine") mang cùng các
@@ -632,6 +930,102 @@ còn báo engine đó đã cài hoặc không còn chương trình riêng nào c
 trên `PATH` đăng nhập của `lampos` (lần tìm thất bại thì giữ lại); một dòng
 vẫn đúng qua nhiều vòng chỉ được ghi log một lần. Lần chạy của kỹ năng vẫn
 chỉ tới Hermes (`HarnessRunner`, ở trên).
+
+### Lệnh ghi cố định của một kỹ năng tự tạo trên Hermes của đèn (`LAMP_SKILL_WRITE_AGENT`, tắt)
+
+Quyết định của chủ đèn (13/11): mọi thứ chạm vào một dịch vụ đã liên kết
+đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`,
+không bật trong unit sản phẩm nào) và `LAMP_AGENT_SERVICES=on` trong
+lamp-tasks, socket trao việc cũng nhận lệnh ghi cố định của một kỹ năng tự
+tạo (`do.write`, docs/skills.md) như một lượt chạy
+(`skill_task::WriteHandOver`, `answer_with`):
+
+- **Dòng:** `{"op":"skill_write","skill","folder","grants","write"}`, cần
+  mọi trường và không nhận trường nào khác. `skill` và `folder` được kiểm
+  như của một task; `grants` đúng một quyền, `-write` của chính dịch vụ của
+  lệnh ghi (`gmail-app` và `figma-api` là `gmail` và `figma`); `write` là
+  một object có `service` và `action`, tối đa 8 KiB dạng JSON. Mọi thứ khác
+  là `bad_request`, và không xin token nào.
+- **Lượt chạy** là của một task (`run_on_token`, cùng việc cấp token, kiểm
+  quyền, kết thúc và runner): lamp-control cấp token cho đúng một quyền đó
+  (docs/control.md), và Hermes được bảo, kèm tên kỹ năng và id của lượt
+  chạy, gọi `service_write` của `lamp-services` một lần chỉ nêu dịch vụ và
+  action của lệnh ghi (`{"service":"gmail-app","action":"send_mail"}`),
+  không gọi lại dù nó trả lời gì. lamp-control đưa cho lệnh gọi đó lệnh ghi
+  của kỹ năng theo token của lượt chạy (`runs::FixedWrite`), và
+  lamp-services chỉ gửi như lời đồng ý đã giữ của chủ, một lần mỗi lượt
+  chạy (docs/services.md, "Through the lamp's agent").
+- **Không bao giờ có nội dung trong lời nhắc** (P2 của Reviewer-lead trên
+  #6824 và #6879): lời nhắc là argv của tác tử (`harness new --task`, hoặc
+  `hermes chat -q` khi không có Harness, đọc được trong
+  `/proc/<pid>/cmdline`) và transcript của Harness, nên không người nhận,
+  tiêu đề hay nội dung nào của lệnh ghi có trong đó
+  (`WriteHandOver::prompt`). `Debug` của `SkillRun` chỉ in độ dài của lời
+  nhắc, với cả lượt chạy của một task.
+- **Tắt** (một trong hai công tắc), dòng `skill_write` bị từ chối như
+  trước: `bad_request`, "not a skill's task line".
+- **Chưa bắt đầu** (#6823): lượt chạy của một lệnh ghi cố định thất bại
+  trước khi tác tử có thể đã bắt đầu (`SkillRun::started`, do runner đặt khi
+  nó nhờ Harness launch, trừ khi Harness chưa hề gửi, hoặc khi Hermes đã
+  được spawn: không có Harness, không có target, wrapper cũ) bị từ chối
+  `not_started` (`skill_task::NOT_STARTED`) bằng lời của runner, nên
+  lamp-skills tự gửi thẳng lệnh ghi; lượt thất bại sau đó là `run_failed`,
+  không biết lần gửi ra sao, và lamp-skills không thử gì thêm. Lượt chạy của
+  một task vẫn là `run_failed` trong cả hai trường hợp, như trước. Test:
+  `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
+  `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
+
+### Lần chạy của kỹ năng agent và quyền `net` (`LAMP_UPLOAD_TO_AGENT`, `LAMP_TASK_NET`, tắt)
+
+Người xây dựng đầu tiên đồng ý lúc 19:44 (12/11), cả hai công tắc tắt và
+không đặt trong unit nào; xây trên đường `skill_make` của #6643, để chuyển
+sang runner chung của #6510 bước 2 mà không cần luật mới.
+
+- **`net`** (`skill_task::NET_SWITCH`): một quyền của lần chạy, không phải
+  của lamp-control. Lần chạy có `net` đi qua runner của lần tạo, giữ mạng
+  (`skill_make::lamp_runner(home, false)`); lần khác vẫn `LAMP_NS_NET=run`.
+  lamp-control giữ `net` trong lời đồng ý nhưng không bao giờ đặt nó vào
+  token, nên sau khi tạo token lamp-tasks hỏi lamp-control
+  (`task_yes_check` với SHA-256 thư mục và các quyền của dòng): chỉ khi
+  lời đồng ý có `net` cho thư mục đúng như hiện tại thì lần chạy mới giữ
+  mạng, nếu không thì `no_token` và không chạy gì. Tắt: `net` bị từ chối
+  trước khi có token.
+- **Lần chạy của kỹ năng agent** (`run` = `scripts/SKILL.md`) chỉ làm theo
+  tệp trong phạm vi các quyền và mạng của nó: token chỉ mang quyền của
+  lamp-control, và mạng bị giữ trừ khi lời đồng ý của lamp-control có `net`. Hermes được
+  bảo đọc tệp đó và làm theo, chỉ chạm tới đèn qua `control.sock` với token
+  của lần chạy, không bao giờ hỏi khóa hay token bằng giọng nói. Nó đi qua
+  runner của lần tạo, bị giữ ngoài mạng (`skill_make::lamp_runner(home, true)`)
+  trừ khi có `net`. Môi trường chỉ có socket, token, đường dẫn SDK và home
+  mới bên dưới: không có khóa.
+- **Mọi lần chạy của kỹ năng agent, và mọi lần chạy có `net`, bắt đầu trong
+  một home mới, dữ liệu Hermes của người dùng bị ẩn**, như một lần tạo
+  (lỗi P1 mà #6643 đã đóng cho lần tạo): `make-<run id>` trong thư mục làm
+  việc, chỉ có `home/.hermes/config.yaml` (nhà cung cấp của đèn, khóa chỉ là
+  tên biến, và bốn thiết lập của lamp-update, `MAKE_CONFIG`), bị xóa dù lần
+  chạy kết thúc thế nào (`skill_make::fresh_home`). `HOME` và `HERMES_HOME`
+  là của home đó và `LAMP_NS_HOME` gọi tên nó, nên wrapper nhận nó
+  (`make-*/home`) và script namespace phủ home lâu dài của Hermes (ký ức và
+  phiên) bằng tmpfs, đặt lại bản checkout chỉ đọc, và để thư mục làm việc
+  chỉ đọc, ẩn trừ thư mục riêng của lần chạy. Runner của lần tạo kiểm tra
+  các dòng của wrapper và namespace trước mỗi lần chạy (báo
+  `NO_RUN_NAMESPACE`, home riêng của lần chạy agent); không có thư mục
+  làm việc hay runner của lần tạo thì lần chạy bị từ chối `run_failed`
+  (`NO_FRESH_HOME`) trước khi có token. Lần chạy script không có `net` giữ
+  nguyên.
+- **Lần chạy của kỹ năng agent được cấp một dịch vụ đã liên kết**
+  (`gmail-read`, `skill_task::is_service_grant`; phán quyết của chủ, 13/11:
+  mọi thứ chạm tới các kết nối đều đi qua agent của đèn từ đầu đến cuối) có
+  các kết nối của đèn trong config của home mới, khi `LAMP_AGENT_SERVICES=on`
+  trong lamp-tasks (`Agent::services`, `skill_make::fresh_home_for`):
+  `mcp_servers.lamp-services`, đúng mục lamp-tasks ghi trong config lâu dài
+  của Hermes (`hermes_config::mcp_entry`), socket và token do Hermes điền từ
+  môi trường của lần chạy, không bao giờ được ghi ra. Vì vậy agent chỉ tới
+  dịch vụ qua lamp-control với token riêng của lần chạy và các quyền của nó,
+  mỗi lần gửi chỉ sau lời đồng ý bằng giọng nói của chủ. Lời giao việc nêu
+  các dịch vụ được dùng và nói chúng đi qua các công cụ đó, không cần khóa.
+  Tắt, hoặc không được cấp dịch vụ nào: config không có mục này, như của
+  một lần tạo.
 
 ## Harness của đèn đang thế nào (#6061 phần B, tắt trừ khi `LAMP_TASKS_HARNESS_STATUS=on`)
 
@@ -805,7 +1199,9 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   start_agent_task now to hand the work to Hermes; never do it yourself"),
   và journal ghi `request N: named agent, no start_agent_task: asked
   again`, rồi kết quả (`…: asked again: start_agent_task called`, `…: still
-  no call, said it wasn't done`, hoặc `…: called <tên>, not start_agent_task`).
+  no call: the heard words are handed over in code to <agent>, said back
+  for a yes`, `…: still no call, said it wasn't done` cho lời đọc lại không
+  nêu agent, hoặc `…: called <tên>, not start_agent_task`).
   Nếu vòng 1 chỉ gọi các công cụ riêng của đèn ("Hermes, look up the
   weather" được trả lời bằng `weather`: P1 của V2 trên 12587), không công
   cụ nào được chạy: mỗi lệnh gọi được trả lời là không chạy, lời không được
@@ -829,17 +1225,32 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   nối). Câu mới bắt đầu trong cửa sổ sẽ kết thúc lượt này, journal ghi
   `…: a newer line began within the join window: not asked again`. Mỗi
   request chỉ một lần (`agent_tasks::AskedAgain`, giữ 8 request gần nhất):
-  lời của vòng 2 cũng bị giữ, chỉ nói khi có gọi hàm; nếu vẫn chỉ trả lời
-  bằng lời, lời đó không được nói mà đèn nói câu rõ ràng "Sorry, I didn't
-  do that. Could you ask me again?" (`action_claim::NOT_DONE_LINE`, theo
-  ngôn ngữ của chủ đèn). Request đã hỏi lại trước đó được nói kèm dòng
-  `…: asked again before, said as it came`; không bao giờ lặp. Vòng 1 có gọi bất kỳ hàm nào (`start_agent_task`,
+  lời của vòng 2 cũng bị giữ, chỉ nói khi có gọi hàm. Nếu vẫn chỉ trả lời
+  bằng lời (hoặc được hỏi lại sau một công cụ riêng và không gọi hàm nào),
+  lời đó không được nói và code tự giao việc (#6547 nguyên nhân 3, first
+  builder đồng ý): code gọi `start_agent_task` với nhiệm vụ là đúng lời
+  người nói đã nghe, không thêm gì khác, nên agent và nơi làm được đặt từ
+  chính lời đó như với lệnh gọi của model, và một máy tính được nêu khi
+  chưa ghép đôi vẫn bị từ chối như cũ (`NO_COMPUTER_PAIRED`, #6786). Lệnh
+  gọi này chỉ chuẩn bị: câu trả lời của nó đi vào vòng sau, vòng đó đọc
+  lại việc và hỏi có bắt đầu không; không gì bắt đầu trước tiếng yes của
+  người nói, và họ vẫn có thể huỷ. Câu không nêu agent nào (lần bắt đọc
+  lại bên dưới) mà vẫn chỉ trả lời bằng lời thì đèn nói câu rõ ràng "Sorry,
+  I didn't do that. Could you ask me again?" (`action_claim::NOT_DONE_LINE`,
+  theo ngôn ngữ của chủ đèn); vòng được hỏi lại mà tự gọi
+  `start_agent_task` thì code không tạo thêm lệnh nào. Request đã hỏi lại
+  trước đó được nói kèm dòng `…: asked again before, said as it came`;
+  không bao giờ lặp. Vòng 1 có gọi bất kỳ hàm nào (`start_agent_task`,
   `not_for_me`, một skill) thì như trước, lời của nó được nói khi hết vòng;
   câu không nêu agent nào thì không bị đụng tới và vẫn phát luồng như
   trước. Route Live không được bắt. Test:
   `second_provider::tests::agent_tasks_named`
   (`named_with_no_start_is_asked_again_once`,
-  `named_with_no_start_twice_says_it_was_not_done`,
+  `named_with_no_start_twice_is_handed_over_in_code_and_said_back`,
+  `named_answered_by_an_own_tool_then_nothing_is_handed_over_in_code`,
+  `a_computer_agent_named_with_none_paired_is_refused_as_before`,
+  `named_with_start_when_asked_again_makes_none_in_code`,
+  `not_named_no_start_twice_makes_none_in_code`,
   `named_with_start_is_untouched`,
   `not_named_and_a_question_about_an_agent_are_untouched`,
   `a_request_asked_again_before_is_not_asked_again`,
@@ -1268,6 +1679,22 @@ lại hơn 7 phút trong `epoll_wait`.
   làm) chỉ dành cho lần chạy skill do chính lamp-tasks mở
   (`HarnessRunner`, #6510 Part 1 bước 2), lúc hết hạn hay khi xong. Việc
   đóng ở trên không bao giờ dùng `--now`.
+- **Lệnh nền còn chạy** (#5689, Harness 0.6.52, openharness#4229): `show`
+  của agent `idle` có `backgroundCommands` lớn hơn 0 được đọc là `working`,
+  nên chưa được giữ, chưa kể tin cho tới khi không còn lệnh nào chạy, trong
+  tối đa 10 phút từ lần đọc như vậy đầu tiên liên tiếp trong lần khởi động
+  này (`BACKGROUND_HOLD_MS`); khi đó tin được kể một lần. Quá thời gian đó
+  thì được đọc là `idle`, được giữ và kể như mọi câu trả lời khác, để một
+  dev server hay `tail -f` còn chạy không giấu câu trả lời; việc đóng vẫn
+  chờ các lệnh đó xong (bên dưới), không bao giờ dùng `--now`. `null` (Codex, OpenClaw, Windows) hay
+  không có trường này (Harness trước 0.6.52) thì như trước. Sự kiện
+  `background` của `watch --json` là còn đang làm: không đọc, chờ `done`
+  sau nó. Nếu lần đọc trước khi đóng thấy lệnh nền
+  (`observe_background_commands`), hay `close` từ chối với `N background
+  commands running` (`close_background_commands`), việc đóng được thử lại
+  sau một phút, đọc trước, không bao giờ dùng `--now`, và không tính vào ba
+  lần thử, trong tối đa một ngày sau khi câu trả lời được giữ trong lần
+  khởi động này (sau đó thì tính như mọi lỗi khác).
 - **Test:** `the_lamps_own_agent_is_closed_once_done_its_news_untold`. Đang
   làm, hay idle chưa có câu trả lời: để mở. Xong mà chưa kể: để mở dưới một
   phút, rồi đóng. Trên máy tính: chờ kể.

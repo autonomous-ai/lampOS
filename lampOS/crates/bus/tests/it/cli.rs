@@ -403,7 +403,16 @@ fn record_then_replay_gives_a_subscriber_the_messages_again_at_their_spacing() {
     let at = |n: u64| 1_000_000 + n * 40_000;
     for n in 0..6u64 {
         let outcome = pose.publish_json(at(n), &json!({"yaw": n})).unwrap();
-        assert_eq!(outcome.delivered, 1);
+        // Train 890 (14 Nov, ARM64 3/3) and a loaded x86 host (banana, 1 in
+        // 30) saw a pose delivered to none, with the recorder's sockets there.
+        // The cause isn't known yet: say which send, and what the publisher
+        // knew of its subscribers, so the next failure names it.
+        assert_eq!(
+            outcome.delivered,
+            1,
+            "pose {n} of 6: {outcome:?}, subscribers {:?}",
+            pose.subscribers()
+        );
     }
     let every_byte: Vec<u8> = (0..=255).collect();
     let text_of = json!({"text": "hello"});

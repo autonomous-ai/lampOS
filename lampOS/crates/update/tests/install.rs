@@ -1495,7 +1495,7 @@ fn every_part_of_the_lamp_waits_for_setups_marker_itself() {
             );
         }
     }
-    assert_eq!(gated.len(), 26, "{gated:?}");
+    assert_eq!(gated.len(), 27, "{gated:?}");
     for outside in ["lamp-update.service", "lamp-records.timer"] {
         assert!(!gated.contains(&outside), "{outside}");
     }
@@ -1651,6 +1651,19 @@ fn the_product_keeps_nothing_personal_while_nobody_is_known() {
         "Environment=LAMP_MEMORY_FORGET_ASKS=on",
     ] {
         assert!(service.contains(&line), "the voice lacks {line}");
+    }
+}
+
+/// The tiered store beside Days stays off in the product (`LAMP_MEMORY_TIERS`,
+/// #4746): until its played test over days and two reads, no product file
+/// sets it, so lamp-memory serves Days alone.
+#[test]
+fn the_product_leaves_the_tiered_memory_off() {
+    for (file, text) in install::PRODUCT {
+        assert!(
+            !text.contains("LAMP_MEMORY_TIERS"),
+            "{file} sets the tiered memory"
+        );
     }
 }
 
@@ -1930,6 +1943,41 @@ fn the_product_lets_a_made_skill_read_a_linked_service() {
     }
 }
 
+/// A made skill loosened (#6059): `LAMP_MADE_SKILL_LOOSE=on` alike in the
+/// three units that read it, `lamp-voice` (makes the skill, both routes),
+/// `lamp-skills` and its manage helper (a made say's cooldown at least a
+/// minute as it is put on, `made_skill::capped`), each once, and no other
+/// product unit names it: with it on in the voice alone, a made say under
+/// an hour apart would be refused at install.
+#[test]
+fn the_product_loosens_a_made_skill_alike_in_its_three_units() {
+    let owners = [
+        "lamp-voice.service",
+        "lamp-skills.service",
+        "lamp-skills-manage@.service",
+    ];
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_MADE_SKILL_LOOSE=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_MADE_SKILL_LOOSE"))
+            .count();
+        let owner = owners.contains(unit);
+        assert_eq!(on, usize::from(owner), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
+    for owner in owners {
+        assert!(
+            install::PRODUCT.iter().any(|(unit, _)| *unit == owner),
+            "{owner}"
+        );
+    }
+}
+
 /// A made skill's write goes out after its owner's yes in the product
 /// (#6066, #6142): the owner's ask on 11 Nov, so the testers can try it.
 /// `LAMP_SKILL_WRITES=on` in the four units that read it, `lamp-services`
@@ -2080,6 +2128,42 @@ fn the_product_tells_the_app_a_skill_needs_a_connector() {
     }
 }
 
+/// A voice make the lamp's own model can't keep goes to the lamp's own agent
+/// (#6059's proposal, `make_skill_agent`): on in lamp-voice alone, once,
+/// whose second route's worker reads it, beside the maker and the tasks part
+/// it hands the make over.
+#[test]
+fn the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent() {
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        // Off again in every unit (14 Nov, the first builder, #1711): a voice
+        // make with code ran out its 45 s on 9adf, until a code make passes there.
+        let wanted = 0;
+        assert_eq!(
+            service
+                .iter()
+                .filter(|line| line.contains("LAMP_MAKE_SKILL_AGENT"))
+                .count(),
+            wanted,
+            "{unit}"
+        );
+        if wanted == 0 {
+            continue;
+        }
+        for line in [
+            "Environment=LAMP_MAKE_SKILL_AGENT=on",
+            "Environment=LAMP_MAKE_SKILL=on",
+            "Environment=LAMP_TASKS_DIR=/run/lampos-tasks",
+        ] {
+            assert_eq!(
+                service.iter().filter(|set| **set == line).count(),
+                1,
+                "the voice lacks {line}"
+            );
+        }
+    }
+}
+
 /// A stop always gets its one line (#4710: on lamp-06c1 on 30 Oct a stop
 /// left the lamp quiet mid-story), and a cut-in with no words gets its
 /// question (the memory owner's call, 4 Nov; the lamp's own echo can still
@@ -2175,6 +2259,29 @@ fn the_product_never_says_an_action_no_call_made() {
         service.contains(&"Environment=LAMP_ACTION_CLAIM_CHECKED=on"),
         "the voice lacks LAMP_ACTION_CLAIM_CHECKED"
     );
+}
+
+/// A line that is only an installed skill's name said plainly ("photo
+/// booth", "run photo booth") calls that skill in code as round 1
+/// (`LAMP_SKILL_NAMED`, #6772, #6782): on lamp-52e6 at 12587 (13 Nov)
+/// "photo booth" was answered "I don't have a camera" over the photo-booth
+/// skill it was offered, with no call. On in lamp-voice alone, once, whose
+/// second route's worker reads it, and named by no other product unit.
+#[test]
+fn the_product_runs_a_skill_named_plainly() {
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_SKILL_NAMED=on")
+            .count();
+        let mentioned = text
+            .lines()
+            .filter(|line| !line.starts_with('#') && line.contains("LAMP_SKILL_NAMED"))
+            .count();
+        assert_eq!(on, usize::from(*unit == "lamp-voice.service"), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+    }
 }
 
 /// A thing the person already keeps, said again, is that kept thing, not a
@@ -3902,7 +4009,9 @@ fn the_tasks_part_waits_for_harness_rather_than_failing() {
         .unwrap()
         .1;
     let unit = section(tasks, "Unit");
-    assert!(unit.contains(&format!("ConditionPathExists={}", install::HARNESS).as_str()));
+    // Started without Harness too (#6685 PR 3): `--set-up-later` runs it with
+    // hand-overs off, so its unit no longer waits for the file.
+    assert!(!unit.contains(&format!("ConditionPathExists={}", install::HARNESS).as_str()));
     let exec = section(tasks, "Service")
         .into_iter()
         .find(|line| line.starts_with("ExecStart="))
@@ -7851,6 +7960,7 @@ fn the_v2_image_keeps_cloudflare_and_google_and_never_names_chinas_servers() {
 }
 
 #[test]
+#[ignore = "PARKED (#6386): install no longer sets the name and time servers; re-enable when China is scheduled and stable's lamp-update carries #6810"]
 fn a_lamp_placed_in_china_lists_chinas_name_and_time_servers_after_the_routers() {
     let mut lamp = Lamp::new(188, &[]);
     fs::create_dir_all(lamp.on("/etc")).unwrap();
@@ -7929,6 +8039,7 @@ fn any_other_lamp_keeps_its_fallback_and_gets_no_time_drop_in() {
 }
 
 #[test]
+#[ignore = "PARKED (#6386): install no longer sets the name and time servers; re-enable when China is scheduled and stable's lamp-update carries #6810"]
 fn a_lamp_no_longer_placed_in_china_gets_the_images_fallback_back() {
     let mut lamp = Lamp::new(188, &[]);
     fs::create_dir_all(lamp.on("/etc")).unwrap();
@@ -7965,6 +8076,7 @@ fn a_lamp_no_longer_placed_in_china_gets_the_images_fallback_back() {
 }
 
 #[test]
+#[ignore = "PARKED (#6386): lamp-region's units are out of the product; re-enable when China is scheduled and stable's lamp-update carries #6810"]
 fn the_region_units_run_lamp_update_region_as_root_at_boot_and_on_a_change() {
     let unit = |name: &str| {
         install::PRODUCT
@@ -7986,4 +8098,26 @@ fn the_region_units_run_lamp_update_region_as_root_at_boot_and_on_a_change() {
     ] {
         assert!(service.lines().any(|kept| kept == line), "{line}");
     }
+}
+
+/// PARKED (#6386): a lamp-update before #6810 (stable 12587's, 12635's)
+/// refuses a build when a unit it would add starts through a `current`
+/// link that is there and that no installed part's unit starts through
+/// ("{link_path} is there, and no unit of this lamp starts through it").
+/// On a product lamp every part's link is owned by its unit except
+/// `update/current`, which only lamp-update's own unit (never added, never
+/// counted as a part) starts through. So no product unit but that one may
+/// start through `update/current`, or the fleet cannot take the build.
+#[test]
+fn no_product_unit_an_old_updater_would_add_starts_through_update_current() {
+    let through_update: Vec<&str> = PRODUCT
+        .iter()
+        .filter(|(name, _)| *name != lamp_update::round::OWN_UNIT)
+        .filter(|(_, text)| {
+            lamp_update::unit::linked(text)
+                .is_some_and(|(builds, _)| builds == lamp_update::own::FOLDER)
+        })
+        .map(|(name, _)| *name)
+        .collect();
+    assert_eq!(through_update, Vec::<&str>::new());
 }

@@ -1202,6 +1202,10 @@ impl Adapter for Production {
 /// and the engine tries it again a minute later, read first again, no more
 /// than [`CLOSE_TRIES`] times in all. Read and close share one
 /// [`CLOSE_BUDGET`], so the job lane is held no longer than one launch.
+/// An agent idle with background commands still running (Harness 0.6.52,
+/// #5689), found by the read or by Harness refusing the close, is not done:
+/// `observe_background_commands` or `close_background_commands`, tried
+/// again the same way without counting as a try.
 fn close_told(adapter: &impl Adapter, job: &CloseJob) -> Result<Closed, String> {
     let began = Instant::now();
     let now = adapter
@@ -1222,11 +1226,17 @@ fn close_told(adapter: &impl Adapter, job: &CloseJob) -> Result<Closed, String> 
 
 /// The journal's line for one close: which task's harness, which try of
 /// [`CLOSE_TRIES`], and how it went. The last try failing says so, and that
-/// the harness is left open on the computer: it is never asked again.
-fn close_line(job: &CloseJob, result: &Result<Closed, String>) -> String {
+/// the harness is left open on the computer: it is never asked again. A
+/// try the engine doesn't count (`uncounted`, #5689) says background
+/// commands still run.
+fn close_line(job: &CloseJob, result: &Result<Closed, String>, uncounted: bool) -> String {
     let id = job.task_id;
     let tries = job.tries;
     match result {
+        Err(code) if uncounted => format!(
+            "tasks: closing task {id}'s harness: try {tries} not done ({code}); \
+             background commands still run, tried again in a minute, read first"
+        ),
         Err(code) if tries >= CLOSE_TRIES => format!(
             "tasks: closing task {id}'s harness: try {tries} of {CLOSE_TRIES} failed ({code}); \
              giving up, the harness is left open"
@@ -1331,6 +1341,8 @@ impl SetUp {
     /// A read of Harness's sign-in that answered: kept, and the failures
     /// counted from naught again.
     fn sign_in_read(&mut self, sign_in: SignIn) {
+        // What a skill's run reads at its start (#6685 PR 3), never asked there.
+        crate::skill_task::harness_sign_in_read(Some(sign_in));
         self.sign_in = Some(sign_in);
         self.sign_in_answered = true;
         self.sign_in_failures = 0;
@@ -1342,7 +1354,11 @@ impl SetUp {
     /// True when it is let go.
     fn sign_in_not_read(&mut self) -> bool {
         self.sign_in_failures = self.sign_in_failures.saturating_add(1);
-        self.sign_in_failures >= SIGN_IN_FAILED_READS && self.sign_in.take().is_some()
+        let let_go = self.sign_in_failures >= SIGN_IN_FAILED_READS && self.sign_in.take().is_some();
+        if let_go {
+            crate::skill_task::harness_sign_in_read(None);
+        }
+        let_go
     }
 }
 enum Job {
@@ -1826,7 +1842,8 @@ fn owner<C: Clock>(
                 Outcome::Close(job, result) => {
                     // One line a close, so the journal says which harness
                     // the lamp closed and how it went ([`close_line`]).
-                    eprintln!("{}", close_line(&job, &result));
+                    let uncounted = engine.close_uncounted(&job, &result, &now);
+                    eprintln!("{}", close_line(&job, &result, uncounted));
                     engine.finish_close(&job, result, &now)
                 }
                 Outcome::Machines(read) => {
@@ -3972,6 +3989,80 @@ impl HarnessSwitches {
 
 /// Production adapter. CLI configuration and environment are inspected only
 /// after the default-off check. Harness owns account/session provisioning.
+/// Where the lamp's own target is read at each run: the targets file
+/// `serve --set-up-later` reads, else the targets given.
+fn lamp_target_of(config: &Config) -> Box<dyn Fn() -> Option<Target> + Send + Sync> {
+    match config.set_up_later.as_ref() {
+        Some(later) => {
+            let file = later.targets.clone();
+            Box::new(move || {
+                read_targets(&file)
+                    .ok()
+                    .and_then(|mut targets| targets.remove(LAMP_TARGET))
+            })
+        }
+        None => {
+            let lamp = config.targets.get(LAMP_TARGET).cloned();
+            Box::new(move || lamp.clone())
+        }
+    }
+}
+
+/// What a skill's run with no Harness account reads at its start (#6685
+/// PR 3), put in `slot`: the lamp's default agent ([`lamp_default`], else
+/// the build's first switched on, [`lamp_order`], else the lamp target's
+/// own engine), lamp-tasks' `home`, and Harness's sign-in as the part's
+/// looks last read it. With no Harness program (`absent`), the runs an
+/// earlier start left are swept first, on a thread of its own (no Harness
+/// to close a session with: folders and token files, each run's token
+/// ended), and only then is Harness said absent; until then a run is
+/// refused as before ("Harness isn't set up on this lamp yet").
+fn set_no_harness(
+    slot: &crate::skill_task::NoHarnessSlot,
+    config: &Config,
+    side: Option<LampSide>,
+    absent: bool,
+    home: PathBuf,
+) {
+    let target = lamp_target_of(config);
+    let default_engine = Box::new(move || {
+        side.as_ref()
+            .and_then(|side| lamp_default(side).or_else(|| lamp_order(side).first().copied()))
+            .or_else(|| target().map(|lamp| lamp.engine))
+    });
+    let swept = Arc::new(AtomicBool::new(false));
+    let here = {
+        let swept = swept.clone();
+        Box::new(move || {
+            if !absent {
+                crate::skill_task::harness_sign_in()
+            } else if swept.load(Ordering::Acquire) {
+                crate::skill_task::HarnessHere::Absent
+            } else {
+                crate::skill_task::HarnessHere::Unknown
+            }
+        })
+    };
+    let sweep_home = home.clone();
+    let _ = slot.set(crate::skill_task::NoHarness {
+        here,
+        default_engine,
+        home,
+    });
+    if absent
+        && let Err(error) = thread::Builder::new()
+            .name("skill-sweep".into())
+            .spawn(move || {
+                crate::skill_task::sweep_without_harness(&sweep_home);
+                swept.store(true, Ordering::Release);
+            })
+    {
+        eprintln!(
+            "tasks: a skill's run with no Harness stays off: the start's sweep not started: {error}"
+        );
+    }
+}
+
 pub fn serve<C: Clock>(
     config: Config,
     clock: C,
@@ -3988,13 +4079,20 @@ pub fn serve<C: Clock>(
     // The Harness a skill's run is started through (#6510 Part 1 step 2):
     // set below once Harness is, as spoken tasks have it.
     let skill_harness: crate::skill_task::SkillHarnessSlot = Arc::default();
+    // A skill's run with no Harness account (#6685 PR 3): set below, once
+    // the lamp's default agent can be read.
+    let no_harness: crate::skill_task::NoHarnessSlot = Arc::default();
     // Joined at the stop, so a skill's run is ended before the process exits.
     let mut skill_served: Option<thread::JoinHandle<()>> = None;
     let skill_stop = stop.clone();
     match std::env::var_os("HOME").map(PathBuf::from) {
         Some(home) if skill_tasks => {
-            match crate::skill_task::HandOvers::lamp(&home, skill_harness.clone())
-                .start(true, stop.clone())
+            match crate::skill_task::HandOvers::lamp(
+                &home,
+                skill_harness.clone(),
+                no_harness.clone(),
+            )
+            .start(true, stop.clone())
             {
                 Ok(served) => {
                     eprintln!(
@@ -4004,6 +4102,16 @@ pub fn serve<C: Clock>(
                     skill_served = served;
                 }
                 Err(error) => eprintln!("tasks: a skill's tasks stay off: {error}"),
+            }
+            // A voice make handed to the lamp's Hermes runs in the same
+            // namespace as a skill's run (#6643, the first
+            // builder's guard): with the same switch, or not at all.
+            match crate::skill_make::MakeHandOvers::lamp(&home).start(true, stop.clone()) {
+                Ok(_) => eprintln!(
+                    "tasks: a voice make's runs are taken on {}",
+                    crate::skill_make::MAKE_SOCKET
+                ),
+                Err(error) => eprintln!("tasks: a voice make's runs stay off: {error}"),
             }
         }
         None if skill_tasks => eprintln!("tasks: a skill's tasks stay off: no HOME"),
@@ -4024,21 +4132,7 @@ pub fn serve<C: Clock>(
     let dir = config.dir.clone();
     // Where a skill's run finds the lamp's own target at each run: the
     // targets file `serve --set-up-later` reads, else the targets given.
-    let lamp_target: Box<dyn Fn() -> Option<Target> + Send + Sync> =
-        match config.set_up_later.as_ref() {
-            Some(later) => {
-                let file = later.targets.clone();
-                Box::new(move || {
-                    read_targets(&file)
-                        .ok()
-                        .and_then(|mut targets| targets.remove(LAMP_TARGET))
-                })
-            }
-            None => {
-                let lamp = config.targets.get(LAMP_TARGET).cloned();
-                Box::new(move || lamp.clone())
-            }
-        };
+    let lamp_target = lamp_target_of(&config);
     let from_machines = config
         .set_up_later
         .as_ref()
@@ -4068,6 +4162,19 @@ pub fn serve<C: Clock>(
             .is_some_and(|side| side.order.contains(&engine))
     };
     let (hermes_on, openclaw_on) = (lamp_has(EngineKind::Hermes), lamp_has(EngineKind::Openclaw));
+    // Only with LAMP_SKILL_DEFAULT_AGENT on (Thirteen's P3 on #6829): off, a
+    // lamp with no Harness program (#6849 starts the part there) neither
+    // sweeps leftover runs nor reads Harness as absent; nothing changes.
+    if skill_tasks
+        && crate::skill_task::on(
+            std::env::var(crate::skill_task::DEFAULT_AGENT_SWITCH)
+                .ok()
+                .as_deref(),
+        )
+        && let Some(home) = std::env::var_os("HOME").map(PathBuf::from)
+    {
+        set_no_harness(&no_harness, &config, lamp_side.clone(), absent, home);
+    }
     if hermes_on {
         eprintln!(
             "{}",
@@ -4971,21 +5078,31 @@ mod tests {
             tries: 1,
         };
         let failed = Err("observe_timeout".to_string());
-        let line = close_line(&job, &failed);
+        let line = close_line(&job, &failed, false);
         assert!(
             line.contains("try 1 of 3 failed (observe_timeout)"),
             "{line}"
         );
         assert!(line.contains("tried again"), "{line}");
         job.tries = CLOSE_TRIES;
-        let line = close_line(&job, &failed);
+        let line = close_line(&job, &failed, false);
         assert!(
             line.contains("giving up, the harness is left open"),
             "{line}"
         );
         assert_eq!(
-            close_line(&job, &Ok(Closed::Closed)),
+            close_line(&job, &Ok(Closed::Closed), false),
             "tasks: closing task 7's harness: try 3: Closed"
+        );
+        // Background commands (#5689): the line follows whether the engine
+        // counted the try, so a counted last one still gives up.
+        let background = Err("close_background_commands".to_string());
+        let line = close_line(&job, &background, true);
+        assert!(line.contains("background commands still run"), "{line}");
+        let line = close_line(&job, &background, false);
+        assert!(
+            line.contains("giving up, the harness is left open"),
+            "{line}"
         );
     }
 

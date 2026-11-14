@@ -293,6 +293,11 @@ before using an existing store.
     <dir>/<person>/journal-YYYY-MM-DD.jsonl   {"id":1,"at_unix_ms":1791892800000,"heard":"...","said":"..."}
     <dir>/<person>/kept.jsonl                 {"id":2,"at_unix_ms":1791892800000,"text":"..."}
 
+With `LAMP_MEMORY_TIERS` set (off unless set), `<dir>/memory-tiers.d/` holds
+the tiered store beside Days ([below](#the-tiered-store-beside-days-lamp_memory_tiers)).
+Its dot keeps it from ever being read as a person's directory. A
+`--memory-days` start with the switch off removes one left there.
+
 Directories are 0700, files 0600. A person id is `[a-z0-9_-]{1,32}`; anything
 else is refused before it is near a path. The day is the local day of
 `at_unix_ms`, `--utc-offset-minutes` east of UTC (default 0; 420 for UTC+7),
@@ -791,7 +796,12 @@ the model is told it is still kept; it never runs in the room's scope
 silence or 30 s passing keeps it; a yes from another face, or an unseen yes outside the private room,
 runs nothing. A bare forget, several or no matching kept things, two faces
 in view (the line is nobody's by one face) and the Live route are refused or
-run as before. A TV saying "forget my umbrella" is therefore asked, never run. **Nor
+run as before. A one-face forget it does not ask about is journaled with why
+("…names no one kept thing of theirs: not asked: two or more kept things
+match the words (2)", or forget-all off, the model named a `source_id` on a
+line that names no subject, listing failed, listing may be cut, no kept
+thing matches; ids and counts only, never the words they asked to
+forget; `remember::ForgetNotAsked`, Thirteen's row on #5627). A TV saying "forget my umbrella" is therefore asked, never run. **Nor
 anything destructive, or acting for them beyond saving and recall** (the
 privacy read on #5592): a `remember` that corrects a kept thing by id
 (`replaces`, `remember::corrects`) is refused like a forget, and without an
@@ -965,7 +975,11 @@ it wins over `LAMP_CONVERSATION_CARRIED_SAVES`. It never forgets, retires or
 changes: no forget of any kind, no correction (`replaces`), no rule kept,
 listed or forgotten and no yes runs on it, and the lamp is told to ask them
 to look at it and say it again (`ScopeLease::forgets_need_mouth`,
-`second_provider::one_face_refused`); it holds no forget for a yes. Its
+`second_provider::one_face_refused`); it holds no forget for a yes. One
+exception, with `LAMP_NAMES_RENAME_YES`: a face rename asked on it is held
+for P, and P's yes on it runs a rename held for P
+(`held_rename::carried_one_face`, docs/eyes.md; the memory owner's OK on 13
+Nov, #6859). Its
 exchange is still kept out of the journal, the rolling summary and talk
 notes (`ScopeLease::reads_carried`). It needs the one-face rule's tracker
 (`LAMP_PERSON_SCOPE_ONE_FACE` on and acting) showing no other voice in the
@@ -1174,6 +1188,145 @@ about last week") is told at most two of their chapters (`chapters`). Never
 the room's; a forget of anything under it, forget everything and forgetting
 the person take it; it closes 90 days after its week. Rules and limits:
 [memory-days.md](memory-days.md), "Weekly chapters".
+
+## The tiered store beside Days (`LAMP_MEMORY_TIERS`)
+
+Off unless set, and not set by the product's units. With `--memory-days`,
+lamp-memory reads `LAMP_MEMORY_TIERS` at start (#4746/#4747; the design is
+[memory-design.md](memory-design.md), "Wiring into lamp-memory"):
+
+- **unset, empty or `off`:** Days alone, exactly as before. Any other value
+  but `shadow` or `on` is said (`LAMP_MEMORY_TIERS is not off, shadow or on;
+  the tiers stay off`) and the tiers stay off. Set without `--memory-days`,
+  it is said and ignored.
+- **`shadow`:** every exchange and kept thing Days takes is also written to
+  the tiered store (`crates/memory-tiers`), every removal Days makes is
+  applied there too, and the nightly sleep runs. Every answer is Days', byte
+  for byte. The start line is `tiers mode=shadow`.
+- **`on`:** as `shadow`, and a `recall` or `search` that Days answered, for a
+  mirrored scope and with a `query`, also carries `"tiers"`: `{"items":
+  [{"kind","text","strength","ids"}],"timed_out"}`, what the tiered store
+  recalls for the same words, each with the Days ids it came from. It is
+  spliced onto Days' line, whose bytes are otherwise unchanged, and waited
+  for at most 50 ms (`tiers::ANSWER_WAIT`); later, it is left out and
+  counted. Today's voice reads no such field, so `on` changes nothing the
+  person hears until a voice reads it. The wait was measured only on a Mac
+  (median 9 to 21 ms): it must be measured on a lamp's eMMC before `on` is
+  set.
+- **Off:** a `--memory-days` start with the switch off, or set to an unknown
+  value, removes a `memory-tiers.d` an earlier `shadow` or `on` left, since
+  no forget made while off would reach it: `tiers off: a left tiered copy
+  removed stores= files=`, counts only. Days' answers are unchanged.
+
+How it is wired (`crates/memory/src/tiers.rs`, `tiers_log.rs`):
+
+- **The change log.** With the switch set, Days' connection gets temporary
+  triggers that write each added, removed or moved (`adopt`) exchange and kept
+  thing to an in-memory table, in the same transaction as the change. Every
+  removal deletes the entry's row (a forget by id, selective or not,
+  `forget_last`, `forget_all`, `forget_person`, `forget_said`, the
+  forgotten-source sweep, a kept thing taking the exchange it came up in,
+  the days kept running out), so every one is told. After each request the
+  table is taken and queued for the tiers' thread with one `try_send`: no
+  file is read or written for the tiers on the request's path, and nothing
+  of the request is parsed again (the op and scope come from the answer's
+  log line). Switch off, none of it exists.
+- **Its own thread, a bounded queue.** All tiered-store work (writes,
+  forgets, the night, `on`'s lookups) runs on the `memory-tiers` thread, 256
+  jobs deep. A change that does not fit moves the queue's epoch on: the
+  thread drops everything queued before it and empties the tiered store, so
+  a forget is never lost to a full queue. If the thread stops (a panic),
+  the request side empties `memory-tiers.d` the first time a job can't be
+  sent, so no later forget is lost either. If the tiers can't start after
+  Days' change log did, the log's triggers are dropped, so nothing heard or
+  said piles up in memory untaken. A tiered store that fails is said
+  in the journal (`tiers ... failed: ...`, no words of memory) and counted,
+  and never changes a Days answer.
+- **What is mirrored.** Each known person's scope and rules scope, one
+  SQLite store each under `<dir>/memory-tiers.d/<scope>.sqlite3` with its
+  fingerprint key (`.forget-key`), all 0600 in a 0700 directory, and
+  `mirror.sqlite3`, which maps each tiered record to the Days entry it came
+  from (ids only). The room's scope (`everyone`, `r-everyone`) is never
+  mirrored: an unplaced voice's words are no one's evidence. An exchange's
+  heard words are the scope owner's record, its said words the lamp's; a
+  kept thing is the owner's record kept at once as a fact (the tiers'
+  explicit remember). Talk notes and observations are Days' own model
+  output and are not copied: the tiers keep raw records and derive their
+  own at night.
+- **Forgets reach the tiers.** A removal in Days removes the mapped records
+  with the library's own forget, which takes every fact quoting them, every
+  owner-model or other line citing those facts, and every episode's topic,
+  gist and detail, and fingerprints the words so a later night can't learn
+  them again. It may take more than was named (a record sharing five words
+  with a forgotten one), never less. A forget of everything of a scope
+  (`forget_all`, `forget_person`) deletes that scope's store with its key,
+  fingerprints and map rows; a `forget_person` deletes the person's rules
+  scope's store and key too. A forget that fails deletes the scope's whole
+  store, and so does one whose map can't be read (`tiers map read failed`).
+  Each start
+  removes whatever the tiers hold that Days no longer does (a forget the
+  last process didn't live to apply, a set-aside database) and any record no
+  map row names (a crash between a record and its row).
+- **The night.** Once per local day between 03:00 and 06:00, for each
+  mirrored scope: its open episode ends (also at `session_close` and
+  `conversation_end`), expiry and fading run, and its bounded sleep input is
+  prepared. lamp-memory has no network (`PrivateNetwork=yes`), so the input
+  is queued as a job for the voice (`tiers night person=<scope>
+  model=queued records= facts= lines= episodes=`, counts only); the voice
+  does the model call ([second-voice.md](second-voice.md), "The memory's
+  night"). A model in this process is a `tiers::Sleeper`; the tests and
+  the bench give one.
+- **The night's two ops** (main socket only, and only with the switch set;
+  Days alone refuses them as any unknown op; the narrow socket takes
+  `forget_person` only):
+  - `{"op":"tiers_sleep_take"}` → `{"ok":true,"job":null}`,
+    `{"ok":true,"job":null,"busy":true}`, or
+    `{"ok":true,"job":{"id":"<16 hex>","system":"<the tiered store's
+    prompt>","input":{...}}}`: the oldest job never given out. `input` is
+    the store's bounded sleep input (at most 64 KiB) less its `owner`: one
+    scope's words, without its name. The id is opaque.
+  - `{"op":"tiers_sleep_give","job":"<id>","reply":{...}}` →
+    `{"ok":true,"outcome":"applied"|"invalid"|"stale"|"unknown"|"busy"}`.
+    The job is removed first, so whatever the outcome it is never given
+    out again. `reply` that is no JSON object (`null` from a voice that
+    could not read the model's answer) is `invalid`. Memory checks that
+    every source record is still in the store and still mapped to a Days
+    entry, then applies it with the store's own validator (`apply_sleep`):
+    a failing check is `invalid`, a store changed since is `stale`.
+    `unknown` is a job that is gone: expired, dropped by a forget, or never
+    queued. `busy`: the tiers' thread did not answer within 100 ms
+    (`tiers::NIGHT_OP_WAIT`). The server answers one connection at a time,
+    so a night op never holds the socket longer than that, well under a
+    turn's first read (`remember::FIRST_READ`, 300 ms) or a spoken forget:
+    the night stays off the turn's path, its socket included
+    (`a_recall_during_a_slow_give_is_answered_within_a_turns_first_read`).
+    A take the thread answers after that wait gave up is put back, untaken,
+    for the next take (`jobs_put_back`), never left held by no one until
+    its lease ends. A busy give that was queued is still applied, once,
+    when the thread reaches it; one that could not be queued is not. The
+    voice gives it again (every 5 s, at most 6 tries,
+    `tiers_night::GIVE_AGAIN_AFTER`, `GIVE_TRIES`), and memory keeps the
+    latest gives' outcomes by job id (`tiers::GIVEN_KEPT`, 64; ids and
+    outcomes only), so a give again is told the same outcome and nothing
+    is applied twice. An applied pass with more records pending
+    queues the scope's next pass (at most 4 a night).
+  - Jobs are bounded: at most 16 (`tiers::NIGHT_JOBS`; a night that finds
+    the queue full is not queued, counted `jobs_expired` and
+    `nights_failed`; a later pass that finds it full, `jobs_expired`
+    only); a job taken and not given back within
+    120 s (`tiers::JOB_LEASE`) is dropped; at 06:00, or on another day,
+    every job is dropped (`tiers night jobs expired=N untaken=N`). A night
+    whose first job no voice took is counted `unconfigured`. Any forget in
+    a scope, its reset and a full wipe drop that scope's jobs (counted
+    stale). The tally counts `jobs_queued`, `jobs_taken`, `jobs_applied`,
+    `jobs_invalid`, `jobs_stale`, `jobs_expired` and `jobs_put_back`.
+
+What is not done yet: no backfill of what Days held before the switch was
+set; a kept thing replaced (`replaces`) stays a fact in the tiers beside its
+replacement (the library has no retire without a fingerprint); the tiers'
+`Access.alone` is taken as given (Days already answers a scope to whoever
+the voice asks for); and the weekly reflection does not run. The played
+test is in [switches.md](switches.md) (`LAMP_MEMORY_TIERS`).
 
 ## Limits, and what happens at each
 
@@ -1633,6 +1786,37 @@ passed. Tests: the notes' exact texts in `remember::tests`.
     (likes/like, 5/five, an English sentence for Vietnamese speech, a
     spelling such as "favorite") also keeps what was heard: never less than
     was said.
+  - **With `LAMP_MEMORY_ASK_NEAR_HEARD`: a near spelling is asked about**
+    (C37, lamp-06c1, 5 Nov; off unless set, the second route only). Speech
+    to text heard "renunculus"; the model's `remember` wrote "ranunculus",
+    so the rule above kept "They said: my favorite flower is a renunculus."
+    while the lamp said "Kept: your favorite flower is a ranunculus.", and
+    nobody was asked. With the switch, on a line that asked to keep
+    (`remember::asked::asks_to_keep`), when every key word of the model's
+    sentence that was not heard is a near spelling of a heard word
+    (`remember::heard::near_heard`, the doubted-keep check's
+    `doubted::misheard_as`: the same first letter, at most half the letters
+    changed; at most two such words), the `remember` is not run. A word
+    that differs from a heard one only by an English inflection (-s, -es,
+    -ed, -ing, "likes" or "liking" for "like", "peanuts" for "peanut") or a
+    British spelling ("favorite color" for "favourite colour") counts as
+    heard, never as near, so it asks nothing. It is held
+    as a carried line's keep is (`second_provider::hold_near_heard_keep`):
+    the model is told nothing is kept yet and to ask once, "Is that
+    ranunculus?", and the hold stands only when its answer offers that word
+    or offers to keep (`heard::asks_about_near`). The same known person's
+    plain yes, their face seen saying it, within 60 s keeps the model's
+    sentence; a no, anything else or silence keeps nothing. Every key word
+    heard keeps the model's sentence at once; a word near nothing heard
+    ("tulip" for "renunculus") keeps the heard line as before. Not for a
+    correction (`replaces`), nobody known, or without the eyes' speaking
+    check: then as before. A keep the line didn't ask for is never held:
+    with `LAMP_KEEP_QUIETLY` (`keep_quietly::unheard`) a word not heard
+    keeps nothing, so a yes about a spelling is never consent to keep. The
+    journal says held or why not, with counts only. Tests:
+    `remember::heard::tests::a_near_spelling_of_a_heard_word_is_asked_about`,
+    `remember::heard::tests::an_inflection_or_british_spelling_is_heard_not_near`,
+    `second_provider::tests::held_forget::a_keep_with_a_near_spelling_of_a_heard_word_waits_for_their_yes`.
   - **The lamp's name heard as another word is no name** (#3504 finding
     N4). On lamp-06c1 the name was written "Ramon", "Edeland", "Elan" and
     "Hey, mom"; the lamp called the person by it, and "Edeland, my dog is

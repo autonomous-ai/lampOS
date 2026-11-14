@@ -144,10 +144,20 @@ fn main() -> ExitCode {
     if linked_tools {
         say("linked tools on: the voice is offered only the linked services");
     }
+    // A made skill's fixed write sent by its run on the lamp's agent (13 Nov).
+    let skill_write_agent = on(std::env::var(skill_writes::AGENT_ENVIRONMENT)
+        .ok()
+        .as_deref());
+    if skill_write_agent {
+        say(
+            "a skill's fixed write through the lamp's agent on: its run sends it once, as the owner said yes to it",
+        );
+    }
     let services = serve::Services::new(store::Store(store), Https, Gmail, backend, write_on)
         .with_skill_reads(skill_reads)
         .with_skill_writes(skill_writes)
         .with_skill_tasks(skill_tasks)
+        .with_skill_write_agent(skill_write_agent)
         .with_calendar_edits(calendar_edits)
         .with_draft_edits(draft_edits);
     let tools_dir = run.join("tools");

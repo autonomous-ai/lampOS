@@ -2400,7 +2400,37 @@ pub fn serve(
         crate::tools::skill_asked::force(offered)
     });
     let set = first_force(set, skill);
-    let net = match first_force(named, first_force(remember, first_force(keep, set))) {
+    // A line that plainly asks the lamp to make a skill must call
+    // make_skill, so a script skill is never refused in the model's own
+    // words (`LAMP_MAKE_SKILL_ASKED`, #6835 gap 3). Only with make_skill on.
+    let make = (crate::tools::make_skill_asked::on() && tools.make_skill).then(|| {
+        eprintln!(
+            "lamp-voice second: a line that plainly asks the lamp to make a skill must call {} in its first round ({})",
+            crate::made_skill::MAKE,
+            crate::tools::make_skill_asked::ENVIRONMENT
+        );
+        crate::tools::make_skill_asked::force()
+    });
+    // The person's line right after a skill's task said back, or a made
+    // skill's remove asked (#6960), must call make_skill, the call that
+    // takes its approve_id and their answer (#6835 gap 2): code decides
+    // when, the model what. First of all. A remove is part of make_skill
+    // (`LAMP_MAKE_SKILL`), so the force is on wherever make_skill is; with
+    // a skill's tasks off it forces only a remove's answer.
+    let task_yes = tools.make_skill.then(|| {
+        eprintln!(
+            "lamp-voice second: the line right after a skill's task said back whole, or a made skill's remove asked, must call {} in its first round",
+            crate::made_skill::MAKE
+        );
+        crate::skill_write_yes::approve_force()
+    });
+    let net = match first_force(
+        task_yes,
+        first_force(
+            named,
+            first_force(remember, first_force(make, first_force(keep, set))),
+        ),
+    ) {
         Some(force) => net.forcing(force),
         None => net,
     };
@@ -2935,6 +2965,18 @@ pub fn serve(
     // A skill the heard words ask what it uses, by name, read back in code
     // with the voice's own `make_skill` (V2 on #6413).
     let reads_back_by_words = tools.make_skill;
+    // A skill the heard words plainly ask for by its name, called in code
+    // as round 1 with the skills as they are offered now (#6772): with a
+    // skills' folder and `LAMP_SKILL_NAMED=on`. The start says it once.
+    let skills_named = (crate::skill_named::on()
+        && !crate::tools::every_skills_folder(&tools).is_empty())
+    .then(|| {
+        eprintln!(
+            "lamp-voice second: a spoken line that plainly asks for an installed skill by its name calls it in round 1, in code ({})",
+            crate::skill_named::ENVIRONMENT
+        );
+        tools.clone()
+    });
     // A plain ask for news, a score, a price, hours or the weather starts
     // its search from the words heard, while the model's first round runs
     // (#1712).
@@ -3288,7 +3330,7 @@ pub fn serve(
             .is_ok_and(|value| value == "on")
         {
             eprintln!(
-                "lamp-voice second: a carried line is read and kept as that person's, a keep written at once; no forget, correction, rule or yes runs on it, never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
+                "lamp-voice second: a carried line is read and kept as that person's, a keep written at once; no forget, correction or rule runs on it, and no yes but to a face rename held for them (LAMP_NAMES_RENAME_YES), never journalled (LAMP_CONVERSATION_CARRIED_MEMORY)"
             );
             engine = engine.reading_carried(true);
         }
@@ -3632,8 +3674,29 @@ pub fn serve(
         }
         engine = engine.undoing_doubted_keeps(by_id);
     }
+    // A keep whose sentence has a near spelling of a heard word is held for
+    // their yes to that word (`LAMP_MEMORY_ASK_NEAR_HEARD`, C37). Only with
+    // `LAMP_MEMORY_KEEP_HEARD`, whose silent keep of the heard line it
+    // replaces.
+    if crate::remember::heard::near_on() {
+        let on = crate::remember::heard::on();
+        eprintln!(
+            "lamp-voice second: {} is on{}",
+            crate::remember::heard::NEAR_ENVIRONMENT,
+            if on {
+                ": a keep with a near spelling of a heard word waits for their yes"
+            } else {
+                ", but LAMP_MEMORY_KEEP_HEARD is not: keeps are as before"
+            }
+        );
+        engine = engine.asking_near_heard_words(on);
+    }
     if reads_back_by_words {
         engine = engine.reading_back_by_words(Arc::new(crate::make_skill_local::read_back_heard));
+    }
+    if let Some(settings) = skills_named {
+        let named = crate::skill_named::Heard::new(settings);
+        engine = engine.calling_skills_named(Arc::new(move |heard: &str| named.heard(heard)));
     }
     if let Some(place) = named_ask {
         engine = engine.asking_by_name(Arc::new(move |words: &str| {
@@ -13960,6 +14023,7 @@ mod tests {
                         say_back: say_back.into(),
                         grants: Some(vec!["light".into()]),
                         code: true,
+                        remove: false,
                     },
                     1,
                     answered,

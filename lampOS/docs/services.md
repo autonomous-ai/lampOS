@@ -507,8 +507,8 @@ account's identity and `gmail.send` only, no `gmail.readonly`.
   Google refuses is first told at a send.
 - **Reads:** none. A `service_read` of `gmail-app`, linked or not, answers
   "This Gmail link, made with Google sign-in, can only send mail. To read
-  mail, link Gmail with an app password in the app: Skills, then
-  Connectors.", unless `gmail` is linked with an app password (below). Its
+  mail, link Gmail with an app password in the app: open this lamp, then
+  Settings, then Linked accounts.", unless `gmail` is linked with an app password (below). Its
   read list is empty, so no read route is ever called with its token.
 - **Writes:** `send_mail`, read back and sent as `gmail`'s, on a spoken
   "send": one `POST /gmail/v1/users/me/messages/send` from the account
@@ -1115,8 +1115,8 @@ each scope taken whole); otherwise, and when a link records no scopes at
 all (one set before scopes were kept, or by hand), the first call is
 refused before any read-back, nothing held or called:
 `writes::DRIVE_NO_WRITE_SCOPE`, "This Google Drive link can't make files.
-To let the lamp make one, link Google Drive again in the app: Skills, then
-Connectors." No scopes is refused because such a link may be read-only,
+To let the lamp make one, link Google Drive again in the app: open this lamp, then
+Settings, then Linked accounts." No scopes is refused because such a link may be read-only,
 and the person would dictate the whole file to hear only a failure;
 linking again through the app records the scopes.
 
@@ -1146,7 +1146,7 @@ create (#5825) refuses a bare `drive.file`; that check is to call the same
 helper once #5825 lands. Only Google's links record their scopes in this
 form, so no other service is in the table. With
 none of them, the call fails with "<Service> is linked without permission to
-<what>: link it again in the app (Skills, then Connectors) and allow it."
+<what>: link it again in the app (open this lamp, then Settings, then Linked accounts) and allow it."
 (`serve::NO_PERMISSION`, after the colon), `<what>` being "send mail", "add
 calendar events", "change calendar events" or "delete calendar events": nothing is held, nothing is called. An app password, a
 personal key (`pat`) or a link recording no scopes is not checked, as
@@ -1501,6 +1501,17 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   only to a line known to have begun clear of the lamp's words; one begun
   over its voice, within 1.5 s (`own_echo::TAIL_US`) of its words' end, or
   with no hearing hook to say when it began is judged as any other line.
+- **A yes that came back empty** (#6840). If speech to text's final words
+  for such a line come back empty but its words on the way, all of the
+  line's results together and not its last segment alone, are a plain yes
+  or no, those words are taken as said while the write waits
+  (`second_provider::answer_on_the_way`, docs/not-speech.md): "Wait, not
+  that one." then "Okay." is no answer. Any other words on the way are
+  thrown away and counted in the journal. Those words are read for a line
+  in the clear only with `LAMP_SECOND_UNFINISHED_WAIT` on; without it,
+  nothing changes. On lamp-9adf
+  on 13 Nov the owner's "Yes." to a calendar move came back as 0 words and
+  the write was dropped at the next line.
 - **No nudge, no lamp-said cancel.** The lamp's own "Say 'send it' to send
   it." nudge (`SAY_SEND_IT`, `nudge_waiting`; a draft's "Say 'save it' to
   save the draft.", `SAY_SAVE_IT`) and its own "Okay, cancelled. Nothing was
@@ -1560,7 +1571,15 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   (`services::answered_in_place`, `Pending.in_place`, as the lamp asking
   once more is not): on a tester's lamp on 11 Nov a 0-word noise cut the
   lamp's answer to the yes, was answered in its place, and the next yes
-  dropped the write. A line with words of its own answered in a held line's
+  dropped the write. So is a line of no words heard as a call and asked as
+  the name ("Lamp."), unless said by the name just before; and while the
+  write waits for the answer its read-back asked for, such a call is not
+  answered at all but left as a sound (`services::awaits_an_answer`,
+  journal "only the lamp's name, and no words of it came back, while a
+  write waits for its answer: not answered as a call"): on a tester's lamp
+  on 13 Nov a line of no words at the second of the lamp's own arrival move
+  was answered as the name, and the one "Yes." after it found the mail
+  dropped (#6363). A line with words of its own answered in a held line's
   place (a real question cut short) still counts as another request (the
   Reviewer-lead's P3 on #6367).
 - **The lamp's own echo is no line of the person's** (#5846). A line the
@@ -1729,7 +1748,7 @@ answers, the cap refuses a made skill's `services`. With it on, see the next
 section.
 
 A call to a service that isn't linked fails with "<Service> isn't linked to
-this lamp yet. It can be linked in the app: Skills, then Connectors."
+this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts."
 (`serve::NOT_LINKED`), so the lamp says where to link it, not only that it
 isn't.
 
@@ -1742,7 +1761,7 @@ call then gets that service's answer, or its `NOT_LINKED` words.
 
 A call naming a service the lamp has no connector for (no code or name in
 the catalogue matches) fails with "The lamp can't link <name> yet. The services it can
-link are in the app: Skills, then Connectors." (`serve::CANT_LINK`, after the
+link are in the app: open this lamp, then Settings, then Linked accounts." (`serve::CANT_LINK`, after the
 first sentence). `<name>` is the name the call gave, said only when it is at
 most 40 characters, all letters, digits, spaces, `-` or `_`; any other name,
 or none, is said as "that service". `services_connected`'s description names
@@ -1920,7 +1939,7 @@ with its `--state-dir`; off, [switches.md](switches.md)). A read refused
 because the service isn't linked (`NOT_LINKED`; never "couldn't be
 reached" or another refusal) is said once, as exact words through the say
 socket after the gate is judged again: "Gmail isn't linked to this lamp
-yet. It can be linked in the app: Skills, then Connectors." The skill's
+yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts." The skill's
 name is kept in the state folder's `link-noted`, so no later read and no
 restart says it again; a read that succeeds takes it out, so a link lost
 later is told once more. The journal's "not read" line adds "told once",
@@ -1977,8 +1996,8 @@ before, and:
 - made by voice, the make's answer carries `needs_link`
   (`[{"code", "name"}]`), and after the line that it's on the model is
   asked to tell the person, in its own words and the conversation's
-  language, that the skill will start once Gmail is linked in the app,
-  under Skills, then Connectors (`made_skill::needs_link_ask`; the owner,
+  language, that the skill will start once Gmail is linked in the app:
+  open this lamp, then Settings, then Linked accounts (`made_skill::needs_link_ask`; the owner,
   10 Nov, "đồng bộ luôn": never a fixed English sentence said as it is);
 - made from the app, the ask keeps it, and `skills.made` tells it as
   `needs_link: [{"code": "gmail", "name": "Gmail"}]` ([cloud.md](cloud.md),
@@ -2223,6 +2242,81 @@ whole):
 - A contact named without an address: the lamp keeps no contact book, so
   the making model asks for the address.
 
+### Through the lamp's agent (`LAMP_SKILL_WRITE_AGENT`, off)
+
+The owner's ruling (13 Nov, here in chat; the first builder's task asked on
+Queue #6809): everything that touches a linked service runs through the
+lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`, on in no
+product unit), and `LAMP_AGENT_SERVICES=on`, a made skill's fixed write is
+sent by a skill's run on the lamp's Hermes, not by `lamp-skills`:
+
+- **lamp-skills** never calls this program for it. It hands the write to
+  lamp-tasks on the `do.task` socket as
+  `{"op":"skill_write","skill","folder","grants":["<code>-write"],"write":<the exact content>}`
+  (`service_write::hand`), one grant, its service's `-write`
+  (`skill_writes::run_grant`, `gmail-app` as `gmail`).
+- **lamp-tasks** checks the line as a task's (its skill, its folder, the one
+  grant matching the write's service, at most 8 KiB of content) and runs it
+  as a task (`skill_task::WriteHandOver`): a token minted by lamp-control and
+  held to that one grant, and Hermes told, with the skill's name and the
+  run's id, to call `service_write` once naming only the write's service
+  and action (`{"service":"gmail-app","action":"send_mail"}`). **Never its
+  content** (the Reviewer-lead's P2 on #6824 and #6879): the words are the
+  agent's argv (`harness new --task`, or `hermes chat -q` without Harness,
+  readable in `/proc/<pid>/cmdline`) and Harness's transcript, so no
+  recipient, subject or text is ever in them. `SkillRun`'s `Debug` prints
+  the words' length only.
+- **lamp-control** mints a skill with no task yes whose only `[[do]]` step
+  is a fixed write (`service_write::fixed_write_of`) its one `-write` grant
+  (`task_yes::KeptYes::fixed_write_grant`) and marks the run a fixed
+  write's, holding that write as the skill's file has it for the run's life
+  (`runs::FixedWrite`, whose `Debug` never shows it). Its `service.write`
+  comes here with the run's id (`fixed_write_run`). A call naming no content
+  of its own (no field, or only fields equal to the held write's, such as
+  its `action`: `FixedWrite::covers`) is given the held write by the run's
+  token, so the agent never sees it; a call naming any other content goes
+  as asked and is refused here, as below. No yes is read there: the owner's
+  yes to the write is this program's.
+- **Here**, a call carrying `fixed_write_run` goes only through the same
+  `skill_write` as `lamp-skills`' call (`serve::Services::run_fixed_write`):
+  the owner's kept yes matched on that exact content (a run that changes a
+  field is refused "not sent: this write is not the one the owner said yes
+  to", never held for a spoken yes), the link it was said under, the day's
+  bounds (10 a skill, 30 in all) and the sent-log, and **once a run**: a
+  second try, whatever it sends, is refused ("not sent: a skill's fixed
+  write is sent once a run …"). The agent is told "Sent, as the owner said
+  yes to it." Any other call of that run is refused, and with the switch
+  off here such a call is refused and nothing is sent.
+- **The direct send stays the fallback** (the first builder's ruling on
+  #6823: no lamp loses a send it has today). When the agent couldn't take
+  the write, `lamp-skills` sends it straight to this program as with the
+  switch off, with every check above, and journals one line: "the lamp's
+  agent couldn't take its write (…), so it goes straight to lamp-services".
+  That is: no folder or no `--tasks-socket`, lamp-tasks not connected, or
+  lamp-tasks refusing it before its agent began (`off`, `bad_request`,
+  `too_long`, `no_token`, `busy`, or `not_started`: Harness signed out or
+  not set up, no Hermes target, a launch Harness never sent;
+  `service_write::NOT_TAKEN`). **Never two sends:** once the run may have
+  begun (`run_failed`, its answer lost or unreadable) nothing more is
+  tried, and a run that ended is its outcome, its send refused here for
+  its content or a cap among it.
+- **Off** (the default), the write goes as above, byte for byte as before.
+  It stays off until a 9adf row shows a send on arrival, a changed content
+  refused, the 11th send refused and the fallback with Harness signed out;
+  a lamp with no Harness falls back on every write until a run can go
+  without Harness (#6685's PR 3).
+
+Set it alike in lamp-skills, lamp-tasks, lamp-control and lamp-services.
+Tests: `a_fixed_write_is_handed_to_lamp_tasks_with_its_one_grant`,
+`a_write_the_agent_couldnt_take_is_sent_straight_once`,
+`no_straight_send_once_the_agents_run_began`,
+`a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
+`a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`,
+`a_fixed_writes_run_is_minted_its_one_write_grant`,
+`a_fixed_writes_run_names_its_run_to_lamp_services`,
+`a_fixed_writes_contentless_call_is_given_the_skills_write`,
+`a_fixed_writes_run_sends_the_approved_content_once_within_the_bounds`.
+
 ## A skill's run on the lamp's Hermes (#6432, `LAMP_SKILL_TASKS`, on in the product)
 
 A skill that uses a linked service is run by the lamp's Hermes with that
@@ -2430,7 +2524,10 @@ never through an open socket.
   owner's yes: nothing is sent". The voice reads the held write back
   (`run_write_yes`, "Your <skill> skill wants to send: …") and waits for the
   owner's plain spoken yes (#6558's wait); only then does this program send
-  it, counted in the skills' bounds (3 a day a skill, 10 across them).
+  it, counted in the skills' bounds (3 a day a skill, 10 across them). A
+  made skill's fixed write run through the agent (`LAMP_SKILL_WRITE_AGENT`,
+  off) is the one write sent on a run's call, and only as the owner's kept
+  yes has it, once ("A made skill's write", "Through the lamp's agent").
 - **The journal** gets a refusal's length only from the server; the parts it
   calls journal the service and the `what` or `action`, never the text, an
   address or a subject.

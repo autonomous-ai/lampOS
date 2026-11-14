@@ -23,7 +23,7 @@
   customer-lamp gaps in [gotchas.md](gotchas.md)).
 
 A `busy` with `retry_ms` after a gesture or move on stable 10824 or older is
-the last motion still playing: wait `retry_ms` (11450 replaces it instead). A
+the last motion still playing: wait `retry_ms` (from 11048 a new motion replaces it instead). A
 `look` that ended `cut_short` "something holds the head" on a resting lamp,
 with no hand on it, was a stable 10824 fault, fixed from 11048: on older lamps
 treat close to the target as arrived, or ask again.

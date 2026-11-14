@@ -48,7 +48,7 @@ echo "$*" >> "$FAKE_DIR/calls.log"
 case "$*" in
   "pr diff"*) cat "$FAKE_DIR/files.txt" ;;
   *collaborators*) echo w1 ;;
-  *issues/4710/comments*|*issues/5385/comments*|*issues/6059/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; [ -f "$FAKE_DIR/queue-fail-$n" ] && exit 1; cat "$FAKE_DIR/queue-$n.json" 2>/dev/null; exit 0 ;;
+  *issues/4710/comments*|*issues/5385/comments*|*issues/6059/comments*|*issues/6809/comments*|*issues/6811/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; [ -f "$FAKE_DIR/queue-fail-$n" ] && exit 1; cat "$FAKE_DIR/queue-$n.json" 2>/dev/null; exit 0 ;;
   *issues/*/comments*) a="$*"; n=${a#*issues/}; n=${n%%/*}; cat "$FAKE_DIR/comments-$n.json" ;;
   *"--state all"*) echo 23 ;;
   *"--json headRefName --jq"*) cat "$FAKE_DIR/open.txt" 2>/dev/null ;;
@@ -166,8 +166,12 @@ class Repo(unittest.TestCase):
         self.git("push", "-q", "-f", "origin", "HEAD:refs/pull/%d/head" % n)
         self.git("fetch", "-q", "origin", "+refs/pull/%d/head:refs/remotes/pr/%d" % (n, n))
         self.fakefile("head-%d.txt" % n, h + "\n")
-        self.fakefile("comments-%d.json" % n, json.dumps({"login": "w1", "body": "READ-OK " + h,
-                                                          "created_at": "2026-11-04T01:00:00Z"}) + "\n")
+        # 13 Nov: every PR needs two signed readers (reads2.py --always), so a ready PR here has two.
+        self.fakefile("comments-%d.json" % n,
+                      json.dumps({"login": "w1", "body": "READ-OK " + h + "\n\nReviewer-lead, 01:00",
+                                  "created_at": "2026-11-04T01:00:00Z"}) + "\n"
+                      + json.dumps({"login": "w1", "body": "READ-OK " + h + "\n\nHeron, 01:05",
+                                    "created_at": "2026-11-04T01:05:00Z"}) + "\n")
         return h
 
     def gain(self, f):
@@ -535,6 +539,30 @@ class BotDryRound(Repo):
         r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("#8: its commits can't be listed", r.stdout)
+
+    # 13 Nov (Heron's P3 on #6959): every PR needs two signed readers, in the bot and in still-eligible.sh.
+    def one_read(self, n):
+        with open(os.path.join(self.fake, "head-%d.txt" % n)) as f:
+            h = f.read().strip()
+        self.fakefile("comments-%d.json" % n, json.dumps({"login": "w1", "body": "READ-OK " + h + "\n\nReviewer-lead, 01:00",
+                                                          "created_at": "2026-11-04T01:00:00Z"}) + "\n")
+
+    def test_a_pr_with_one_signed_read_sits_out(self):
+        r, lines = self.bot(before=lambda: self.one_read(7))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("#7 left out: two reads needed, short 1", r.stderr)
+        self.assertIn("dry: crate lane: would carry 8 9 onto " + self.base[:9], lines)
+        self.assertNothingChanged()
+
+    def test_still_eligible_fails_on_one_signed_read(self):
+        self.pr(8, ["lampOS/crates/x/src/lib.rs"])
+        os.makedirs(self.state, exist_ok=True)
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.one_read(8)
+        r = run(["zsh", os.path.join(HERE, "still-eligible.sh"), "8"], self.work, env=self.env, check=False)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("#8: TWO READS short 1", r.stdout)
 
     def test_either_queue_unread_makes_nothing_eligible(self):
         for issue in QUEUE:

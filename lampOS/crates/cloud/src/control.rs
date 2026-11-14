@@ -236,7 +236,8 @@ fn code(door: &Door, data: &Value, say: &mut dyn FnMut(&str)) -> Result<Option<V
     })))
 }
 
-/// `{}` → `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}]}`.
+/// `{}` → `{"clients": [{"id", "name", "grants", "paired_at_unix_ms"}], "shown", "listening"}`, `listening`
+/// whether the door listens on the network (left out by a lamp-control that does not say).
 fn clients(door: &Door, say: &mut dyn FnMut(&str)) -> Result<Option<Value>, String> {
     let listed = ask(
         &door.socket,
@@ -277,6 +278,15 @@ fn clients(door: &Door, say: &mut dyn FnMut(&str)) -> Result<Option<Value>, Stri
     let mut answer = json!({"clients": clients});
     if let Some(shown) = listed.get("shown").filter(|shown| shown.is_object()) {
         answer["shown"] = shown.clone();
+    }
+    // Whether the door listens on the network: an admin socket with no door behind it (lamp-control
+    // serving only the owner's side and skill runs) must not read as "On" in the app (#5299). An
+    // older lamp-control says nothing, and the field is then left out.
+    if let Some(listening) = listed
+        .get("listening")
+        .filter(|listening| listening.is_boolean())
+    {
+        answer["listening"] = listening.clone();
     }
     Ok(Some(answer))
 }
@@ -723,6 +733,26 @@ mod tests {
         );
         assert_eq!(asked.recv().unwrap(), json!({"clients": true}));
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// Whether the door listens comes through as lamp-control says it; an older lamp-control says none and
+    /// the answer has no `listening` (#5299: the app must not read the admin socket as an open door).
+    #[test]
+    fn whether_the_door_listens_comes_with_the_list() {
+        let dir = folder("clients-listening");
+        let (door, _asked) = admin(&dir, |_| json!({"clients": [], "listening": false}));
+        assert_eq!(
+            answer(&door, "control.clients", &json!({})),
+            Ok(Some(json!({"clients": [], "listening": false})))
+        );
+        let other = folder("clients-listening-text");
+        let (door, _asked) = admin(&other, |_| json!({"clients": [], "listening": "yes"}));
+        assert_eq!(
+            answer(&door, "control.clients", &json!({})),
+            Ok(Some(json!({"clients": []})))
+        );
+        let _ = std::fs::remove_dir_all(dir);
+        let _ = std::fs::remove_dir_all(other);
     }
 
     /// The words for every grant, once per answer, when lamp-control says them

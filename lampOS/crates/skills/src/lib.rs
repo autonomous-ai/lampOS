@@ -228,6 +228,12 @@ struct SkillFile {
     ask: Option<AskFile>,
     /// A function the model may call, which runs the steps.
     tool: Option<String>,
+    /// The phrases that ask for the skill (#6772): a heard line that is one
+    /// of them, said plainly, calls its tool in code on the voice's second
+    /// route (`LAMP_SKILL_NAMED`), as its tool's name said does
+    /// ([`checked_asks`]).
+    #[serde(default)]
+    asks: Vec<String>,
     /// A file of the skill's folder whose section the choice names is told
     /// to the tool's call after its note (#5790, [`knowledge`]).
     knowledge: Option<String>,
@@ -1959,6 +1965,9 @@ pub struct Skill {
     /// The function the model may call to run the steps, described to it
     /// with the skill's description.
     pub tool: Option<String>,
+    /// `asks = [...]`: the phrases that ask for its tool (#6772,
+    /// [`checked_asks`]); empty without them.
+    pub asks: Vec<String>,
     choice: Option<ChoiceFile>,
     flag: Option<FlagFile>,
     again: Option<Again>,
@@ -2010,6 +2019,15 @@ impl Skill {
     pub fn task_step(&self) -> Option<&task::TaskStep> {
         self.steps.iter().find_map(|(_, step)| match step {
             Step::Call(Call::Task(task)) => Some(task.as_ref()),
+            _ => None,
+        })
+    }
+
+    /// Its write to a linked service, if it has one ([`service_write`],
+    /// #6066): a skill's only step.
+    pub fn write_step(&self) -> Option<&service_write::WriteStep> {
+        self.steps.iter().find_map(|(_, step)| match step {
+            Step::Call(Call::ServiceWrite(write)) => Some(write.as_ref()),
             _ => None,
         })
     }
@@ -3011,6 +3029,61 @@ pub fn duration_us(text: &str) -> Result<u64, String> {
         .ok_or_else(|| format!("{text:?} is not a duration: a whole number of ms, s, m or h"))
 }
 
+/// The most phrases a skill's `asks` lists (#6772).
+pub const MOST_ASKS: usize = 8;
+/// The fewest and the most words an ask phrase is said in.
+pub const ASK_WORDS: std::ops::RangeInclusive<usize> = 2..=8;
+
+/// `asks` as a skill may give them (#6772, the first builder's ruling on
+/// #6059): only beside a tool that takes no choice and no flag, since the
+/// voice calls it with nothing (`plain_tool`); at most [`MOST_ASKS`], each [`ASK_WORDS`]
+/// words of letters, digits and apostrophes, one space between them, and
+/// none the same as another, whatever its letters' case. Never ordinary
+/// speech (Thirteen's P1 and P2s and the Reviewer-lead's P2 on #6842): a
+/// phrase that is or holds a yes, a no or a consent's words, a negation or
+/// a question, a stop, the lamp's own words for what it does itself or its
+/// first-round rules' phrases, or only words said around an ask, is
+/// refused by the voice's own check, which matches it
+/// (`lamp_voice::skill_named::ask_refused`). One that holds another
+/// skill's name is left out of the tools file ([`tools_file_summary`]).
+fn checked_asks(asks: &[String], plain_tool: bool) -> Result<(), String> {
+    if asks.is_empty() {
+        return Ok(());
+    }
+    if !plain_tool {
+        return Err(
+            "asks are the phrases that call the skill's tool with nothing: a skill with a tool and no choice or flag"
+                .into(),
+        );
+    }
+    if asks.len() > MOST_ASKS {
+        return Err(format!("asks lists at most {MOST_ASKS} phrases"));
+    }
+    let mut seen = BTreeSet::new();
+    for ask in asks {
+        let words: Vec<&str> = ask.split(' ').collect();
+        if !ASK_WORDS.contains(&words.len())
+            || words.iter().any(|word| {
+                word.is_empty()
+                    || !word
+                        .chars()
+                        .all(|letter| letter.is_alphanumeric() || letter == '\'')
+            })
+        {
+            return Err(format!(
+                "ask {ask:?}: 2 to 8 words of letters, digits and apostrophes, one space between them"
+            ));
+        }
+        if !seen.insert(ask.to_lowercase()) {
+            return Err(format!("ask {ask:?} is listed twice"));
+        }
+        if let Some(why) = lamp_voice::skill_named::ask_refused(ask) {
+            return Err(format!("ask {ask:?}: {why}"));
+        }
+    }
+    Ok(())
+}
+
 fn plain_name(name: &str) -> bool {
     (1..=64).contains(&name.len())
         && name.bytes().all(|byte| {
@@ -3728,6 +3801,10 @@ fn manifest(
             return Err("a skill with a tool has a description of at most 1,024 bytes".into());
         }
     }
+    checked_asks(
+        &file.asks,
+        file.tool.is_some() && file.choice.is_none() && file.flag.is_none(),
+    )?;
     let argument = |name: &str, about: &str| -> Result<(), String> {
         if file.tool.is_none() {
             return Err("a choice or a flag is an argument of the skill's tool".into());
@@ -4993,6 +5070,7 @@ fn manifest(
         conditions,
         policy,
         tool: file.tool,
+        asks: file.asks,
         choice: file.choice,
         flag: file.flag,
         again,
@@ -9652,6 +9730,7 @@ pub fn tools_file_summary(
     summary: bool,
 ) -> Value {
     let mut whens = serde_json::Map::new();
+    let mut asks = serde_json::Map::new();
     let mut tools: Vec<Value> = Vec::new();
     let mut moving: Vec<&str> = Vec::new();
     let mut core: Vec<&str> = Vec::new();
@@ -9711,6 +9790,27 @@ pub fn tools_file_summary(
             }
             if let Some(when) = &skill.when {
                 whens.insert(name.clone(), json!(when));
+            }
+            // Never one that holds another skill's name, its function's or
+            // its own, core and with a choice included ("dance for me"
+            // beside the lamp's `dance`): the voice drops it too
+            // (`lamp_voice::skill_named`, Thirteen's P2 on #6842).
+            let kept: Vec<&String> = skill
+                .asks
+                .iter()
+                .filter(|ask| {
+                    !skills
+                        .iter()
+                        .filter(|other| other.name != skill.name)
+                        .any(|other| {
+                            std::iter::once(&other.name)
+                                .chain(&other.tool)
+                                .any(|theirs| lamp_voice::skill_named::ask_holds_name(ask, theirs))
+                        })
+                })
+                .collect();
+            if !kept.is_empty() {
+                asks.insert(name.clone(), json!(kept));
             }
             tools.push(tool);
         }
@@ -9807,6 +9907,11 @@ pub fn tools_file_summary(
     if summary && !whens.is_empty() {
         // By name, as the tools are.
         file["when"] = json!(whens.into_iter().collect::<BTreeMap<_, _>>());
+    }
+    // Each tool's ask phrases (#6772), by name: none given, and the file
+    // is as before, byte for byte.
+    if !asks.is_empty() {
+        file["asks"] = json!(asks.into_iter().collect::<BTreeMap<_, _>>());
     }
     file
 }

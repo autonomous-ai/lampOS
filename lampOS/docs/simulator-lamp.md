@@ -7,8 +7,8 @@ indistinguishable to the SDK (Python, JS) and lamp-mcp.
 
 ## Decided by the first builder (PM), 10 Nov 17:20, on #5385
 - The body is the real `lamp-body` on a simulated servo bus (a small crate, `crates/sim`), not a
-  copy of the body core in lamp-sim: one body, no second copy to drift. Making `lamp-body`'s runtime
-  portable (so macOS runs it) is a later change to ten's crate, planned with ten.
+  copy of the body core in lamp-sim: one body, no second copy to drift. `lamp-body`'s runtime
+  was made portable (so macOS runs it) in ten's crate: #6931, #6953, #6965.
 - First step: Linux only, the `lamp-sim` skeleton, the sockets and the twin. macOS after.
 - The test is the conformance script (the SDK's tour steps against the fake, the sim and a real lamp).
 - The design is yes; open the first PR. Questions 3 to 10 were not answered one by one: the
@@ -127,8 +127,9 @@ stream`, `microphone.stream`, privacy rules) run on them unchanged.
 
 ## 5. Packaging
 v1: Linux only: `lamp-sim run DIR` starts everything from the lampOS binaries built for the host
-(`crates/sim/README.md`). macOS after `lamp-body`'s runtime is portable; Windows and a desktop
-shell (single installer) later.
+(`crates/sim/README.md`). macOS: `lamp-body`'s runtime is portable (#6931, #6953, #6965) and runs there; lamp-sim's own side
+builds and is tested on macOS arm64 since sim-3-P2 (13 Nov), what is missing there is in the README's
+"Known gaps". Windows and a desktop shell (single installer) later.
 
 ## 6. v1 vs later
 v1: pair + all body/light/gesture ops with real limits, viewer with 5 joints and ring,

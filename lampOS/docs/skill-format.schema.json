@@ -80,6 +80,16 @@
       "type": "string",
       "pattern": "^[a-z][a-z0-9_]{0,47}$"
     },
+    "asks": {
+      "description": "The phrases that ask for the skill (#6772): a heard line that is one of them, said plainly, calls its tool in code on the voice's second route. Only beside a tool with no choice and no flag; 2 to 8 words, one space between; that they are letters, digits and apostrophes, and none is listed twice whatever its case, is lamp-skills' load check.",
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[^ ]+( [^ ]+){1,7}$"
+      }
+    },
     "knowledge": {
       "description": "A file of the skill's folder told to the tool's call after its note, the section its choice names (#5790).",
       "type": "string",

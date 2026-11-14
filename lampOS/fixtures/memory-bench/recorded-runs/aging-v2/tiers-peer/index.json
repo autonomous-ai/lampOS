@@ -1,0 +1,15 @@
+{
+  "label": "independently supplied recorded plumbing; not accuracy or fading evidence",
+  "scores": null,
+  "runner_revision": "6420a2f490263df664a12c8f8848c95421c30abd",
+  "adapter_revision": "7d6d0a2364bc2052c323327334633a97450b12b3",
+  "registration_sha256": "b63ebe7f390451c43fc299b31c97b32b7b012163013286710f87064aa7fa4f50",
+  "manifest_sha256": "6dac5e79eb712a94d0213279347364d382d39ec0f3f336db7cbd114d761cd784",
+  "ledger_sha256": "dbc549b53619bbce1947f99baed1a59d82e7ff3d34340b550b9e80d31852ca24",
+  "verification": {
+    "entries": 5332,
+    "terminal": "completed",
+    "final_hash": "ebcc58a1cf37299d1cedad736a7c5fc592501612f59dd38cae18b60757db6e28"
+  },
+  "coverage": "empty consolidation; fading prerequisites not established"
+}

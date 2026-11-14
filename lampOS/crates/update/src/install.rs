@@ -134,6 +134,12 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-mood.service",
         include_str!("../../../deploy/product/lamp-mood.service"),
     ),
+    // What the lamp sees for its skills (#6543, docs/seen.md); off unless
+    // LAMP_SEEN_ACTIVITY=on. Before the eyes, whose frame link it keeps.
+    (
+        "lamp-seen.service",
+        include_str!("../../../deploy/product/lamp-seen.service"),
+    ),
     // The developers' door (#3504, docs/control.md); off unless the owner's
     // setting writes LAMP_CONTROL=on.
     (
@@ -261,17 +267,24 @@ pub const PRODUCT: &[(&str, &str)] = &[
         "lamp-setup-recover.service",
         include_str!("../../../deploy/product/lamp-setup-recover.service"),
     ),
-    // China's name and time servers on a lamp placed in China only
-    // (#6256, #6414, [`region_servers`]): at boot and on each region change.
-    // Its unit is lamp-update's own to a round ([`REGION_UNIT`]).
-    (
-        "lamp-region.service",
-        include_str!("../../../deploy/product/lamp-region.service"),
-    ),
-    (
-        "lamp-region.path",
-        include_str!("../../../deploy/product/lamp-region.path"),
-    ),
+    // PARKED (#6386): China's name and time servers on a lamp placed in
+    // China only (#6256, #6414, [`region_servers`]): at boot and on each
+    // region change. Its unit starts through `update/current`, which a
+    // lamp-update before #6810 (stable 12587's, 12635's) refuses to add, so
+    // no build carrying it could be promoted. Re-enable when China is
+    // scheduled and stable's lamp-update carries #6810: uncomment these two
+    // entries, install's `region_servers` call, `lamp-update region`,
+    // "lamp-region.path" in [`enabled`], "lamp-region.service" in
+    // [`EXIT_NOTE_UNITS`] and lamp_cloud::reports::UNITS, and every other
+    // `PARKED (#6386)` (`git grep -n 'PARKED (#6386)'`).
+    // (
+    //     "lamp-region.service",
+    //     include_str!("../../../deploy/product/parked/lamp-region.service"),
+    // ),
+    // (
+    //     "lamp-region.path",
+    //     include_str!("../../../deploy/product/parked/lamp-region.path"),
+    // ),
 ];
 
 /// The fixed services whose stops Cloud may report. The install fixture
@@ -298,8 +311,10 @@ pub const EXIT_NOTE_UNITS: &[&str] = &[
     "lamp-peek.service",
     "lamp-policy.service",
     "lamp-records.service",
-    "lamp-region.service",
+    // PARKED (#6386): re-enable when China is scheduled and stable's lamp-update carries #6810.
+    // "lamp-region.service",
     "lamp-schedule.service",
+    "lamp-seen.service",
     "lamp-selftest.service",
     "lamp-services.service",
     "lamp-setup-change@.service",
@@ -678,6 +693,7 @@ pub const RESET_PLAN: &str = include_str!("../../setup/fixtures/reset-plan-produ
 /// build's is written over it. Add the new one first whenever the fixture
 /// changes; never remove one.
 pub const RESET_PLAN_SHIPPED: &[&str] = &[
+    "622eb88154730d0ee596b9ef048e2120ce9eb67ee33393b1503a1a4d53cdf199", // #6543: lamp-seen's state folder and its opt-in, seen-activity.json
     "ca5d00537b7b28afcffc8465df192928ebdde49411310b0706b83977505e74f1", // #5883: the owner's dev monitor (lamp-peek's drop-in)
     "857a152d4b052f9dffc5cdeed5817b6590405806d32bfd5318d3922a7c89b7fa", // #6343: Hermes's and OpenClaw's work folder
     "b3fc8a01c4e8efb457ddbf784bff558bc6bd52d2a4c1770f7512f79c78789041", // the owner's local agent switch: its drop-in (agent.conf)
@@ -1125,7 +1141,8 @@ pub(crate) fn enabled() -> Vec<String> {
             "lamp-selftest.timer",
             "lamp-update-back.timer",
             "lampos-setup-done.path",
-            "lamp-region.path",
+            // PARKED (#6386): re-enable when China is scheduled and stable's lamp-update carries #6810.
+            // "lamp-region.path",
             "lamp-skills-manage.socket",
             "lamp-setup-change.socket",
             "lamp-setup-wifi.socket",
@@ -1978,11 +1995,13 @@ pub fn install(
             "the body waits for this lamp's own poses in /etc/lampOS/body/lamp.env (docs/install.md)",
         );
     }
+    // PARKED (#6386): install no longer touches the name or time servers
+    // (#6256 F3/F4); re-enable when China is scheduled and stable's lamp-update carries #6810.
     // Side files, not the product's: a write that fails is said, never the
     // end of the install.
-    if let Err(why) = region_servers(&config.root, host, &mut changed, say) {
-        say(&format!("the region's name and time servers: {why}"));
-    }
+    // if let Err(why) = region_servers(&config.root, host, &mut changed, say) {
+    //     say(&format!("the region's name and time servers: {why}"));
+    // }
 
     let before = state.clone();
     let build = Build {
@@ -3497,14 +3516,10 @@ mod tests {
         // setup's three helpers (the names', the Wi-Fi's and its boot
         // restore) share one binary, and so do the air and its bus clock,
         // the skills and their manage helper, the eyes and their camera
-        // helper (#2892), and lamp-update and its region one-shot (#6256);
-        // every other service is a part.
+        // helper (#2892); every other service is a part. lamp-update's
+        // region one-shot (#6256) is PARKED (#6386): with it, `services - 10`.
         let services = PRODUCT.iter().filter(|(name, _)| linked(name)).count();
-        assert_eq!(
-            parts.len(),
-            services - 10,
-            "every product service is a part"
-        );
+        assert_eq!(parts.len(), services - 9, "every product service is a part");
         for part in &parts {
             let name = part.binary.trim_start_matches("lamp-");
             assert_eq!(part.folder, format!("/opt/lampOS/{name}/"), "{part:?}");

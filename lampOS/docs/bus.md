@@ -438,6 +438,9 @@ of each, and its kind and period as a declaration, are in
 | `humans/hands/wanted` | Whether anyone wants a hand looked for | latched | lamp-control | When a computer's look at a hand starts or ends |
 | `humans/familiar` | How familiar the remembered person at the lamp is, as a level, with no name | latched | Eyes, with `--visits on` (#1670) | At each recognition, every 2 s |
 | `humans/seems` | How the near face seems, as a kind and a confidence, for measuring; Mood reads its kind with `LAMP_MOOD_SEEMS=on` (#1671, mood.md); the second voice tells a known person's turn how they seem with `LAMP_SECOND_SEEMS=on` (second-voice.md) | latched | Eyes, with `--seems` or `--seems-blendshapes` (#1671) | At most every 2 s while a face is near |
+| `humans/doing` | What the person at the desk was last seen doing this sitting: seconds since a drink, eating or a stretch was seen (from the desk arrival when none was, so always said), the last seen and how sure (#6543) | latched | `lamp-seen` ([seen.md](seen.md), #6543 phase 2; off unless `LAMP_SEEN_ACTIVITY=on`, no product unit yet) | Every 30 s while a sitting lasts, and at once after a burst that saw something; each good for 90 s; begun again on `room/stood_up` |
+| `humans/doing_seen` | One activity newly seen, drinking, eating or a break, and how sure (#6543) | event | `lamp-seen` ([seen.md](seen.md), #6543 phase 2; off unless `LAMP_SEEN_ACTIVITY=on`) | Once for each kind newly seen, not seen in the burst before |
+| `humans/posture` | How the person at the desk has sat over the current window: its length, the share of samples read as bad, and the region most often bad (#6543) | latched | `lamp-seen` ([seen.md](seen.md#phase-3-posture), #6543 phase 3; off unless `LAMP_SEEN_POSTURE=on`) | Every 30 s while someone sits; each good for 90 s |
 | `voice/heard`, `voice/said` | What was heard and what was said, as text | stream | Voice | With each thing said |
 | `voice/state` | Resting, listening, thinking or speaking | latched | Voice | When it changes, and once a second |
 | `voice/turn` | A turn's verdict: its request, and whether it was `answered` or its answer `held_back` as not said to the lamp, as the voice's journal says it (#1155, [policy.md](policy.md#the-quiet-counts-talk-to-the-lamp-1155)) | stream | Voice, on the bus as `room/state` is | Once for each turn the rule judged, as its answer is let out or held back; again, `held_back`, when the model declines the line (`not_for_me`) |
@@ -456,7 +459,7 @@ of each, and its kind and period as a declaration, are in
 | `light/test`, `light/drawn` | A self-test's colour, shown for 2 s at most; the light the ring actually drew | latched | The self-test; the ring's owner | Asked once a colour; drawn when it changes, and once a second |
 | `light/request` | A light asked for that lapses, with its asker, priority and time, how it moves (`pattern`: breathe, candle or one pulse, #940), and how slowly it is faded into (`fade_ms`, #1677) | event | Skills and other parts (`lamp-cloud`'s preview, [cloud.md](cloud.md)) | Asked, and asked again to keep it, at most 30 s ahead |
 | `light/reached` | A requested light the ring has shown at rest for 350 ms, with its asker (#1146) | event | The ring's owner, with `LAMP_LIGHT_REQUESTS=on` | When a request's light has been shown 350 ms, and again after each renewal while it is; never inside a turn |
-| `light/mark` | A computer seeing or hearing through the lamp: its asker, `camera` or `microphone`, and a `blink` for a snapshot ([control.md](control.md), "The camera") | event | `lamp-control` | Each second while a stream runs, at most 3 s ahead; once for a snapshot |
+| `light/mark` | A computer seeing or hearing through the lamp: its asker, `camera` or `microphone`, and a `blink` for a snapshot ([control.md](control.md), "The camera"); and `lamp-seen`'s camera blink before each frame ([seen.md](seen.md)) | event | `lamp-control`; `lamp-seen` | Each second while a stream runs, at most 3 s ahead; once for a snapshot; `lamp-seen`, once for each frame it would send, 1 s ahead, and again each second while not drawn |
 | `light/mark_drawn` | The ring drew an asker's mark: its `source` and when, on the boot's clock | event | the voice's ring worker | At most every 250 ms each, only after a frame with the mark is shown |
 | `light/outranked` | A request the ring holds but doesn't show: its asker, and `by`, the asker shown over it or `person` (#940) | event | The ring's owner, with `LAMP_LIGHT_REQUESTS=on` | When it is taken hidden, loses its place, or what is over it changes, and again after each renewal while it stays hidden |
 | `diagnostics` | Each part's health: ok, warning, error or stale | stream | Every part | Once a second |
@@ -519,6 +522,7 @@ that owns it:
 | `room/state` | the voice's provider worker, on each change and once a second | the policy, and Expression |
 | `room/presence` | the eyes, with `LAMP_PRESENCE=on`, from their looks and `voice/heard` ([presence.md](presence.md)) | `lamp-skills` (Light out when you leave; Who was here's record, #1685); Messages (#1673) |
 | `room/activity`, `room/stood_up` | the eyes, with `LAMP_ACTIVITY=on`, from their looks ([eyes.md](eyes.md)) | `lamp-skills` (Stretch break waits for a look up); "watches you leave" (#1669) |
+| `humans/doing`, `humans/doing_seen`, `humans/posture` | `lamp-seen` (`lamp_seen`), from pictures sent to be labelled (#6543); declared in `lamp_msgs::doing_topics()`; `humans/doing` and `humans/doing_seen` published by `lamp-seen` from phase 2 (off unless `LAMP_SEEN_ACTIVITY=on`), `humans/posture` by nobody yet | the voice, memory, the policy and skills, each as it is built (#6543); a skill names them in `[permissions] topics`, the `seen` use ([cloud.md](cloud.md)) |
 | `voice/timing`, `voice/activity`, `voice/playout` | the voice, with `LAMP_EXPRESSION_OUT=on` ([expression.md](expression.md), "What the voice says, as built") | Expression |
 | `expression/rest_request` | `lamp-skills`, with `LAMP_SKILL_ROUTINES=on` and an enabled routine | Expression, with `LAMP_REST_REQUESTS=on` |
 | `expression/rest_state` | `lamp-expression`, with `LAMP_REST_REQUESTS=on` | Skills' routine manager |
@@ -536,8 +540,8 @@ that owns it:
 | `light/drawn` | the voice's ring worker, from its own write receipts ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | the self-test |
 | `light/request` | `lamp-skills`, a skill's light, with `LAMP_LIGHT_REQUESTS=on` ([skills.md](skills.md)); `lamp-cloud`, the app's preview ([cloud.md](cloud.md)) | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` |
 | `light/reached` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | nothing yet; `lamp-skills`, to wait for a skill's light before its look (#1146) |
-| `light/mark` | `lamp-control`, while a computer streams the camera or the microphone, and once for each snapshot ([control.md](control.md), "The camera", "The microphone") | the voice's ring worker, whenever it has the bus: one small steady red dot over every face, a turn's included |
-| `light/mark_drawn` | the voice's ring worker, after each frame it shows with the mark | `lamp-control`: a camera frame or a microphone block goes only within 1 s of one for its computer, so an undrawn mark stops the pictures and the sound |
+| `light/mark` | `lamp-control`, while a computer streams the camera or the microphone, and once for each snapshot ([control.md](control.md), "The camera", "The microphone"); `lamp-seen`, a camera blink before each frame it would send ([seen.md](seen.md)) | the voice's ring worker, whenever it has the bus: one small steady red dot over every face, a turn's included |
+| `light/mark_drawn` | the voice's ring worker, after each frame it shows with the mark | `lamp-control`: a camera frame or a microphone block goes only within 1 s of one for its computer, so an undrawn mark stops the pictures and the sound; `lamp-seen`: no frame is asked for or passed unless the ring drew its mark after its ask and within 1 s ([seen.md](seen.md)) |
 | `light/outranked` | the voice's ring worker, with `LAMP_LIGHT_REQUESTS=on` ([ring-choreography.md](ring-choreography.md), "The lamp's own light") | `lamp-skills`, a run's own subscription: the run says what was over its light in its journal and at its give-back ([skills.md](skills.md)) |
 | `diagnostics` | every part that says how it is: the voice, the eyes, the body, the policy, and the board through the health program | the health program |
 | `lamp/health`, `board/state` | the health program ([health.md](health.md)) | `lamp-health`, the command; `lamp-skills` (Not feeling well reads `lamp/health`'s `level` and `quiet_ms`, [skills.md](skills.md)) |
@@ -745,11 +749,23 @@ Not exercised at all:
   between messages, within wide bounds (10 to 101 a second), not against a
   clock.
 
-Socket buffers are the system's defaults, which
-the standard library cannot change. On this Mac a subscriber that does not
-read held 25 messages of 141 bytes, or 5 pieces of sound, before the next was
-dropped, and the system takes no datagram over 2,048 bytes: the test of a
-60,000-byte message asserts delivery on Linux and that refusal here. Each subscriber is sent to from a socket of its own
+Socket buffers are the system's defaults on Linux. On macOS the bus sets its
+own (`room.rs`, sim-3-P3): the system sends a local datagram no longer than the
+socket's send buffer, 2,048 bytes by default (`net.local.dgram.maxdgram`), and
+takes in no more than the receive buffer, 4,096 (`recvspace`), so every
+speaker, microphone and camera block was refused there. A publisher's socket
+gets 64,096 bytes to send with and a subscriber's 256,384 to take in (four
+longest datagrams, about Linux's default); both are the socket's own and need
+no privilege. If the system refuses to raise one (a `kern.ipc.maxsockbuf` set
+below them, say), the trouble comes at once, not at the first long message: a
+subscriber is not made (`receive buffer of <its socket>: <why>`), and a
+publisher stops linking at that subscriber: it and any not yet linked after it
+get nothing until the publisher's next look tries again, and the publish says
+so once, as it does any root it cannot use (the first builder's P3 on #6933;
+one send size for all, so a refusal hits every new link alike). The test of a 60,000-byte message asserts delivery on both. Before
+that change, a subscriber on a Mac that did not read held 25 messages of 141
+bytes, or 5 pieces of sound, before the next was dropped; with the larger
+receive buffer it holds more, and how many has not been measured. Each subscriber is sent to from a socket of its own
 because Linux charges a queued datagram to its sender (`unix(7)`), so one
 socket for all would let one stuck subscriber starve the rest: that is read,
 not measured, and macOS charges the receiver, so no test here tells the two

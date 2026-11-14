@@ -1181,6 +1181,14 @@ fn worker_command(
             role,
             var(crate::tools::skill_asked::ENVIRONMENT).as_deref(),
         ))
+        .envs(skill_named_worker_environment(
+            role,
+            var(crate::skill_named::ENVIRONMENT).as_deref(),
+        ))
+        .envs(make_skill_asked_worker_environment(
+            role,
+            var(crate::tools::make_skill_asked::ENVIRONMENT).as_deref(),
+        ))
         .envs(memory_observe_worker_environment(
             role,
             var(crate::remember::OBSERVE_ENVIRONMENT).as_deref(),
@@ -1326,6 +1334,14 @@ fn worker_command(
             role,
             var(crate::made_skill::CODE_AT_ONCE_ENVIRONMENT).as_deref(),
         ))
+        .envs(upload_agent_worker_environment(
+            role,
+            var(crate::upload_agent::ENVIRONMENT).as_deref(),
+        ))
+        .envs(task_net_worker_environment(
+            role,
+            var(crate::skill_task_yes::NET_ENVIRONMENT).as_deref(),
+        ))
         .envs(skill_loose_worker_environment(
             role,
             var(crate::made_skill::LOOSE_ENVIRONMENT).as_deref(),
@@ -1456,6 +1472,27 @@ fn skill_tasks_worker_environment(
 ) -> Option<(&'static str, &'static str)> {
     (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
         .then_some((crate::skill_task_yes::ENVIRONMENT, "on"))
+}
+
+// An agent skill added from a file (`upload_agent::on`), passed the same
+// narrow way: the exact `on`, to the two routes whose tool call asks its
+// first run's yes and whose `make_skill` takes it.
+fn upload_agent_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::upload_agent::ENVIRONMENT, "on"))
+}
+
+// A task's `net` grant (`skill_task_yes::net_on`), passed the same narrow
+// way: the exact `on`, to the two routes that say a task's grants back.
+fn task_net_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (matches!(role, "provider" | "second") && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::skill_task_yes::NET_ENVIRONMENT, "on"))
 }
 
 // A made skill loosened (#6059, `made_skill::loose_on`), passed the same
@@ -1946,6 +1983,28 @@ fn skill_asked_worker_environment(
         .then_some((crate::tools::skill_asked::ENVIRONMENT, "on"))
 }
 
+// A plain ask for an installed skill by its name calls it in round 1, in
+// code (`skill_named`, #6772), passed the same narrow way: the exact `on`,
+// to the second route alone.
+fn skill_named_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::skill_named::ENVIRONMENT, "on"))
+}
+
+// A plain ask to make a skill calls make_skill (`tools::make_skill_asked`,
+// #6835), passed the same narrow way: the exact `on`, to the second route,
+// whose chat can be made to call a function.
+fn make_skill_asked_worker_environment(
+    role: &str,
+    value: Option<&std::ffi::OsStr>,
+) -> Option<(&'static str, &'static str)> {
+    (role == "second" && value == Some(std::ffi::OsStr::new("on")))
+        .then_some((crate::tools::make_skill_asked::ENVIRONMENT, "on"))
+}
+
 // The clock's switch (#830), passed the same narrow way: the exact `on`, to
 // the two workers that tell the time and judge the night. Cleared, it never
 // reached them, so a lamp whose clock was not set took its saved 22:00 as
@@ -2128,6 +2187,9 @@ fn second_route_worker_environment(
         crate::second_config::DEEPSEEK_BASE_URL_ENV,
         crate::second_config::SPEECH_BASE_URL_ENV,
         crate::second_config::LISTENING_BASE_URL_ENV,
+        // A desktop-only switch (never in a product unit): plain loopback
+        // addresses for the two addresses above, checked by the worker.
+        crate::second_config::LOOPBACK_SERVICES_ENV,
         crate::second_config::SPEECH_MODEL_ENV,
         crate::second_config::KEY_TERMS_ENV,
         // The owner's language (#4473): the worker's speech and character.
@@ -2210,6 +2272,8 @@ fn second_route_worker_environment(
         crate::dont_know::ENVIRONMENT,
         // A keep the round after it doubts is taken back for their yes (C37).
         crate::remember::doubted::UNDOES_ENVIRONMENT,
+        // A keep with a near spelling of a heard word asks first (C37).
+        crate::remember::heard::NEAR_ENVIRONMENT,
         crate::second_provider::SKILL_LOOK_ENVIRONMENT,
         crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
         // Untied talk keeps no conversation going (#3882).
@@ -2505,6 +2569,7 @@ mod tests {
             crate::second_provider::NAMED_ALWAYS_ENVIRONMENT,
             crate::dont_know::ENVIRONMENT,
             crate::remember::doubted::UNDOES_ENVIRONMENT,
+            crate::remember::heard::NEAR_ENVIRONMENT,
             crate::second_provider::SKILL_LOOK_ENVIRONMENT,
             crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT,
             crate::untied_going_on::ENVIRONMENT,
@@ -2668,6 +2733,14 @@ mod tests {
             ),
             (
                 crate::made_skill::CODE_AT_ONCE_ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::upload_agent::ENVIRONMENT,
+                ["provider", "second"].as_slice(),
+            ),
+            (
+                crate::skill_task_yes::NET_ENVIRONMENT,
                 ["provider", "second"].as_slice(),
             ),
             (
@@ -3068,6 +3141,20 @@ mod tests {
                         "LAMP_SKILL_ASKED",
                         ["second"].as_slice(),
                     ),
+                    // A plain ask for a skill by its name calls it in code:
+                    // the second route alone.
+                    (
+                        skill_named_worker_environment,
+                        "LAMP_SKILL_NAMED",
+                        ["second"].as_slice(),
+                    ),
+                    // A plain ask to make a skill calls make_skill: the
+                    // second route alone (#6835).
+                    (
+                        make_skill_asked_worker_environment,
+                        "LAMP_MAKE_SKILL_ASKED",
+                        ["second"].as_slice(),
+                    ),
                     // The observation pass, the route with a model (#1693 (2)).
                     (
                         memory_observe_worker_environment,
@@ -3372,6 +3459,8 @@ mod tests {
                     crate::tools::schedule_asked::ENVIRONMENT,
                     crate::tools::reminders_asked::ENVIRONMENT,
                     crate::tools::skill_asked::ENVIRONMENT,
+                    crate::skill_named::ENVIRONMENT,
+                    crate::tools::make_skill_asked::ENVIRONMENT,
                     crate::remember::THREADS_ENVIRONMENT,
                     crate::remember::EVENTS_ENVIRONMENT,
                     crate::remember::OBSERVE_ENVIRONMENT,
@@ -3439,6 +3528,8 @@ mod tests {
                     || name == crate::second_config::LISTENING_BASE_URL_ENV
                 {
                     "https://near.example.invalid/ai"
+                } else if name == crate::second_config::LOOPBACK_SERVICES_ENV {
+                    "on"
                 } else if name == crate::second_config::SPEECH_MODEL_ENV {
                     "gemini-3.8-flash-lite-tts"
                 } else if name == crate::second_provider::SPEECH_SOCKET_MODEL_ENVIRONMENT {
@@ -3487,6 +3578,7 @@ mod tests {
                     || name == crate::remember::HITS_ENVIRONMENT
                     || name == crate::dont_know::ENVIRONMENT
                     || name == crate::remember::doubted::UNDOES_ENVIRONMENT
+                    || name == crate::remember::heard::NEAR_ENVIRONMENT
                     || name == crate::second_provider::SKILL_LOOK_ENVIRONMENT
                     || name == crate::second_provider::GOING_ON_NOT_OWN_ENVIRONMENT
                     || name == crate::untied_going_on::ENVIRONMENT
@@ -3664,6 +3756,8 @@ mod tests {
                     "LAMP_LIGHT_TOLD=on",
                     "LAMP_MAKE_SKILL=on",
                     "LAMP_MAKE_SKILL_AGENT=on",
+                    "LAMP_MAKE_SKILL_ASKED=on",
+                    "LAMP_MEMORY_ASK_NEAR_HEARD=on",
                     "LAMP_MEMORY_DAYS=on",
                     "LAMP_MEMORY_DONT_KNOW_RECALLS=on",
                     "LAMP_MEMORY_DOUBT_UNDOES=on",
@@ -3778,6 +3872,7 @@ mod tests {
                     "LAMP_SERVICE_REDO=on",
                     "LAMP_SHORT_DONE=on",
                     "LAMP_SKILL_ASKED=on",
+                    "LAMP_SKILL_NAMED=on",
                     "LAMP_STOP_WORDS_KEYTERM=on",
                     "LAMP_TASKS_NAMED_ASK=on",
                     "LAMP_TASKS_TOLD=/var/lib/lampOS/voice/tasks-told",
@@ -3787,6 +3882,7 @@ mod tests {
                     "LAMP_UNTIED_ANSWER_GRACE=on",
                     "LAMP_UNTIED_CALLER_SPEAKING=on",
                     "LAMP_UNTIED_GOING_ON=on",
+                    "LAMP_VOICE_LOOPBACK_SERVICES=on",
                     "LAMP_WINDOW_FROM_START=on",
                 ],
             ),

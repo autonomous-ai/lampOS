@@ -20,6 +20,7 @@ use rustix::{
     },
 };
 use serde::Serialize;
+#[cfg_attr(not(target_os = "linux"), allow(unused_imports))]
 use std::{
     fs::File,
     io::{self, Read},
@@ -34,9 +35,11 @@ use std::{
 pub mod motion;
 
 const BAUD: u32 = 1_000_000;
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 const CAP_SYS_ADMIN_BIT: u64 = 1 << 21;
 const MAX_PATH_BYTES: usize = 4096;
 const MAX_COMPONENTS: usize = 64;
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 const MAX_STATUS_BYTES: u64 = 16_384;
 
 /// No implicit device, unit identifier, lock location or calibration fallback.
@@ -123,6 +126,7 @@ pub struct SerialSettings {
 }
 
 impl SerialSettings {
+    #[cfg(target_os = "linux")]
     fn read(value: &Termios) -> Self {
         use SpecialCodeIndex as S;
         let keys = [
@@ -158,6 +162,89 @@ impl SerialSettings {
             hangup_on_close: value.control_modes.contains(ControlModes::HUPCL),
         }
     }
+}
+
+impl SerialSettings {
+    /// The same report on a platform without Linux's line discipline and its `VSWTC` character:
+    /// the discipline reads 0 and the missing slot 0, so the report keeps its one shape.
+    #[cfg(not(target_os = "linux"))]
+    fn read(value: &Termios) -> Self {
+        use SpecialCodeIndex as S;
+        let keys = [
+            Some(S::VINTR),
+            Some(S::VQUIT),
+            Some(S::VERASE),
+            Some(S::VKILL),
+            Some(S::VEOF),
+            Some(S::VTIME),
+            Some(S::VMIN),
+            None,
+            Some(S::VSTART),
+            Some(S::VSTOP),
+            Some(S::VSUSP),
+            Some(S::VEOL),
+            Some(S::VREPRINT),
+            Some(S::VDISCARD),
+            Some(S::VWERASE),
+            Some(S::VLNEXT),
+            Some(S::VEOL2),
+        ];
+        Self {
+            input_baud: value.input_speed(),
+            output_baud: value.output_speed(),
+            input_flags_raw: value.input_modes.bits() as u32,
+            output_flags_raw: value.output_modes.bits() as u32,
+            control_flags_raw: value.control_modes.bits() as u32,
+            local_flags_raw: value.local_modes.bits() as u32,
+            line_discipline: 0,
+            vmin: value.special_codes[S::VMIN],
+            vtime: value.special_codes[S::VTIME],
+            control_characters: keys.map(|key| key.map_or(0, |key| value.special_codes[key])),
+            hangup_on_close: value.control_modes.contains(ControlModes::HUPCL),
+        }
+    }
+}
+
+/// `stat` field widths differ by platform (Linux: `st_mode` u32, `st_dev` and `st_rdev` u64; macOS: u16, i32, i32):
+/// widened here to the report's types, with the sign extension `std`'s own `MetadataExt` does. On Linux each is the
+/// identity.
+#[allow(clippy::unnecessary_cast)]
+mod stat_width {
+    pub fn mode(raw: rustix::fs::RawMode) -> u32 {
+        raw as u32
+    }
+    pub fn dev(raw: rustix::fs::Dev) -> u64 {
+        raw as u64
+    }
+    pub fn to_dev(raw: u64) -> rustix::fs::Dev {
+        raw as rustix::fs::Dev
+    }
+}
+
+/// The line discipline of a termios: Linux's `c_line`; a platform without one reads 0 (the default discipline).
+fn line_discipline(termios: &Termios) -> u8 {
+    #[cfg(target_os = "linux")]
+    {
+        termios.line_discipline
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = termios;
+        0
+    }
+}
+
+/// The control modes `desired` clears: Linux's `CMSPAR` (mark/space parity) exists only there.
+fn control_modes_cleared() -> ControlModes {
+    let cleared = ControlModes::CSIZE
+        | ControlModes::CSTOPB
+        | ControlModes::PARENB
+        | ControlModes::PARODD
+        | ControlModes::CRTSCTS
+        | ControlModes::HUPCL;
+    #[cfg(target_os = "linux")]
+    let cleared = cleared | ControlModes::CMSPAR;
+    cleared
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -517,22 +604,33 @@ fn trusted_lock_directory(
     checkpoint(origin, cancelled)?;
     let mut directory = fs::open("/", flags, Mode::empty())?;
     let root = fs::fstat(&directory)?;
-    trusted_metadata(root.st_mode, root.st_uid, uid, false)?;
+    trusted_metadata(stat_width::mode(root.st_mode), root.st_uid, uid, false)?;
     for part in path.components() {
         if let Component::Normal(name) = part {
             checkpoint(origin, cancelled)?;
             let next = fs::openat(&directory, name, flags, Mode::empty())?;
             let metadata = fs::fstat(&next)?;
-            trusted_metadata(metadata.st_mode, metadata.st_uid, uid, false)?;
+            trusted_metadata(
+                stat_width::mode(metadata.st_mode),
+                metadata.st_uid,
+                uid,
+                false,
+            )?;
             directory = next;
         }
     }
     checkpoint(origin, cancelled)?;
     let metadata = fs::fstat(&directory)?;
-    trusted_metadata(metadata.st_mode, metadata.st_uid, uid, true)?;
+    trusted_metadata(
+        stat_width::mode(metadata.st_mode),
+        metadata.st_uid,
+        uid,
+        true,
+    )?;
     Ok(directory)
 }
 
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn effective_capabilities(status: &str) -> io::Result<u64> {
     let mut fields = status
         .lines()
@@ -551,6 +649,7 @@ fn effective_capabilities(status: &str) -> io::Result<u64> {
     u64::from_str_radix(value, 16).map_err(|_| invalid("invalid effective capability field"))
 }
 
+#[cfg(target_os = "linux")]
 fn reject_exclusive_bypass() -> io::Result<()> {
     let mut bytes = Vec::with_capacity(2048);
     File::open("/proc/thread-self/status")?
@@ -564,6 +663,18 @@ fn reject_exclusive_bypass() -> io::Result<()> {
     if effective_capabilities(text)? & CAP_SYS_ADMIN_BIT != 0 {
         return Err(denied(
             "CAP_SYS_ADMIN bypasses tty exclusivity; use an unprivileged worker",
+        ));
+    }
+    Ok(())
+}
+
+/// A platform without Linux's capabilities: a process with root's effective id can open a tty another holds
+/// despite `TIOCEXCL` (the same bypass), so it is refused the same way.
+#[cfg(not(target_os = "linux"))]
+fn reject_exclusive_bypass() -> io::Result<()> {
+    if rustix::process::geteuid().is_root() {
+        return Err(denied(
+            "root bypasses tty exclusivity; use an unprivileged worker",
         ));
     }
     Ok(())
@@ -624,8 +735,8 @@ impl Owner {
                 filesystem_device: expected.dev(),
                 inode: expected.ino(),
                 character_device: expected.rdev(),
-                major: fs::major(expected.rdev()),
-                minor: fs::minor(expected.rdev()),
+                major: fs::major(stat_width::to_dev(expected.rdev())),
+                minor: fs::minor(stat_width::to_dev(expected.rdev())),
             };
             report.resolved_device = Some(path.clone());
             report.device_identity = Some(identity);
@@ -652,9 +763,9 @@ impl Owner {
             let fd = self.fd.as_ref().expect("tty was opened");
             stage = "tty_identity";
             let actual = fs::fstat(fd)?;
-            if actual.st_dev != identity.filesystem_device
+            if stat_width::dev(actual.st_dev) != identity.filesystem_device
                 || actual.st_ino != identity.inode
-                || actual.st_rdev != identity.character_device
+                || stat_width::dev(actual.st_rdev) != identity.character_device
                 || FileType::from_raw_mode(actual.st_mode) != FileType::CharacterDevice
             {
                 return Err(denied(
@@ -675,7 +786,7 @@ impl Owner {
             // Hardware flow-control transitions and non-N_TTY disciplines
             // also require separate qualification; do not change them here.
             if prior.output_speed() == 0
-                || prior.line_discipline != 0
+                || line_discipline(&prior) != 0
                 || prior.control_modes.contains(ControlModes::CRTSCTS)
             {
                 return Err(invalid(
@@ -689,15 +800,7 @@ impl Owner {
             desired
                 .input_modes
                 .remove(InputModes::IXON | InputModes::IXOFF | InputModes::IXANY);
-            desired.control_modes.remove(
-                ControlModes::CSIZE
-                    | ControlModes::CSTOPB
-                    | ControlModes::PARENB
-                    | ControlModes::PARODD
-                    | ControlModes::CMSPAR
-                    | ControlModes::CRTSCTS
-                    | ControlModes::HUPCL,
-            );
+            desired.control_modes.remove(control_modes_cleared());
             desired
                 .control_modes
                 .insert(ControlModes::CS8 | ControlModes::CREAD | ControlModes::CLOCAL);

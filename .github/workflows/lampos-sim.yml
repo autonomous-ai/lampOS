@@ -112,3 +112,49 @@ jobs:
         run: bash lampOS/tools/lamp-sim-check.sh "$GITHUB_WORKSPACE/lampOS/target/release"
       - name: every SDK example against the virtual lamp
         run: bash lampOS/tools/lamp-sim-conformance.sh "$GITHUB_WORKSPACE/lampOS/target/release"
+
+  # lamp-sim's own side on macOS arm64 (sim-3-P2, the first builder on #6811, 13 Nov 18:15): it
+  # builds, is clippy-clean under macOS's cfg, and its tests pass there; lamp-body's too. Not the whole lamp yet:
+  # lamp-body's serial runtime now builds on macOS (#6931, #6953 and the run() step after them), but nothing
+  # yet runs the whole lamp there, so no tour runs here. The two
+  # speaker-stream tests are skipped until the bus takes datagrams over 2048 bytes on macOS
+  # (sim-3-P3: SO_SNDBUF and SO_RCVBUF on the bus's sockets; the sysctl's default is 2048).
+  # Free on this public repository.
+  sim-macos:
+    name: lampOS virtual lamp — lamp-sim builds and tests on macOS arm64
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust 1.96.0
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.96.0
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+      - name: restore the registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: lampos-sim-macos-registry-${{ hashFiles('lampOS/Cargo.lock') }}
+          restore-keys: lampos-sim-macos-registry-
+      - name: build lamp-sim and the parts it starts
+        working-directory: lampOS
+        run: cargo build --locked -p lamp-sim -p lamp-body -p lamp-control -p lamp-skills
+      - name: clippy for lamp-sim under macOS's cfg
+        working-directory: lampOS
+        run: cargo clippy --locked -p lamp-sim --all-targets -- -D warnings
+      # lamp-body on macOS, while ten makes its runtime portable (#6931 and after; ten's ask on #6931): clippy
+      # under macOS's cfg and its tests, so a change to crates/body that breaks the Mac shows here first.
+      - name: clippy for lamp-body under macOS's cfg
+        working-directory: lampOS
+        run: cargo clippy --locked -p lamp-body --all-targets -- -D warnings
+      - name: lamp-body's tests
+        working-directory: lampOS
+        run: cargo test --locked -p lamp-body
+      - name: lamp-sim's tests
+        working-directory: lampOS
+        run: |
+          cargo test --locked -p lamp-sim -- \
+            --skip voice::tests::a_speaker_stream_is_opened_counted_told_in_stats_and_ends_when_the_door_closes \
+            --skip voice::tests::a_player_that_never_reads_holds_neither_the_stats_nor_the_doors_closing_and_is_waited_for

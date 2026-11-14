@@ -546,8 +546,8 @@ nó chỉ là danh tính của tài khoản và `gmail.send`, không có `gmail.
   và một token bị Google từ chối được báo lần đầu ở một lần gửi.
 - **Đọc:** không có. Một `service_read` của `gmail-app`, đã liên kết hay
   chưa, đều trả lời "This Gmail link, made with Google sign-in, can only send
-  mail. To read mail, link Gmail with an app password in the app: Skills,
-  then Connectors.", trừ khi `gmail` được liên kết bằng mật khẩu ứng dụng
+  mail. To read mail, link Gmail with an app password in the app: open this lamp,
+  then Settings, then Linked accounts.", trừ khi `gmail` được liên kết bằng mật khẩu ứng dụng
   (xem dưới). Danh sách đọc của nó rỗng, nên không route đọc nào được gọi
   với token của nó.
 - **Ghi:** `send_mail`, được đọc lại và gửi như của `gmail`, khi có câu
@@ -1184,7 +1184,7 @@ scope được so nguyên vẹn); nếu không, và khi liên kết không ghi s
 (đặt trước khi scope được lưu, hoặc đặt tay), lệnh gọi đầu tiên bị từ chối
 trước mọi phần đọc lại, không giữ hay gọi gì: `writes::DRIVE_NO_WRITE_SCOPE`,
 "This Google Drive link can't make files. To let the lamp make one, link
-Google Drive again in the app: Skills, then Connectors." Không có scope thì
+Google Drive again in the app: open this lamp, then Settings, then Linked accounts." Không có scope thì
 bị từ chối vì liên kết đó có thể chỉ đọc, và người dùng sẽ đọc cả tệp chỉ để
 nghe một lỗi; liên kết lại qua app sẽ ghi các scope.
 
@@ -1214,8 +1214,8 @@ phép gì, như phần tạo tệp của Google Drive (#5825) từ chối một 
 trần; kiểm tra đó sẽ gọi cùng hàm này khi #5825 vào. Chỉ liên kết của Google
 ghi scope theo dạng này, nên không dịch vụ nào khác có trong bảng.
 Không có scope nào trong số đó thì lệnh gọi thất bại với "<Service> is linked
-without permission to <what>: link it again in the app (Skills, then
-Connectors) and allow it." (`serve::NO_PERMISSION`, sau dấu hai chấm),
+without permission to <what>: link it again in the app (open this lamp, then
+Settings, then Linked accounts) and allow it." (`serve::NO_PERMISSION`, sau dấu hai chấm),
 `<what>` là "send mail", "add calendar events", "change calendar events"
 hoặc "delete calendar events": không gì được giữ, không
 gì được gọi. Một mật khẩu ứng dụng, một khoá cá nhân (`pat`) hoặc một liên kết
@@ -1578,6 +1578,17 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   giọng của đèn, trong vòng 1.5 s (`own_echo::TAIL_US`) sau khi lời của đèn
   kết thúc, hoặc khi không có hook nghe để biết lúc nó bắt đầu, được xét như
   mọi câu khác.
+- **Một cái "có" trả về rỗng** (#6840). Nếu chữ cuối cùng của speech to
+  text cho một câu như vậy trả về rỗng nhưng các chữ trên đường đi của nó,
+  mọi kết quả của câu gộp lại chứ không chỉ đoạn cuối, là một câu "có" hay
+  "không" trơn, các chữ đó được tính là đã nói khi lệnh ghi còn chờ
+  (`second_provider::answer_on_the_way`, docs/not-speech.md): "Wait, not
+  that one." rồi "Okay." không phải câu trả lời. Mọi chữ khác trên đường đi
+  bị bỏ và được đếm trong journal. Với một câu bắt đầu khi đèn im, các chữ
+  đó chỉ được đọc khi bật `LAMP_SECOND_UNFINISHED_WAIT`; tắt thì không gì
+  thay đổi. Trên lamp-9adf ngày 13/11
+  câu "Yes." của chủ đèn cho một lần dời lịch trả về 0 chữ và lệnh ghi bị
+  bỏ ở câu kế tiếp.
 - **Không lời nhắc, không câu huỷ của đèn.** Lời nhắc riêng của đèn "Say
   'send it' to send it." (`SAY_SEND_IT`, `nudge_waiting`; với một bản nháp
   "Say 'save it' to save the draft.", `SAY_SAVE_IT`) và câu riêng
@@ -1639,9 +1650,18 @@ cầu; ở mọi chỗ khác, ai nói cũng được.
   lời như thế (`services::answered_in_place`, `Pending.in_place`, như lời
   đèn hỏi lại cũng không phải): trên đèn của một người thử ngày 11/11, một
   tiếng ồn 0 từ đã cắt câu trả lời của đèn cho câu đồng ý, được trả lời thay
-  cho nó, và câu đồng ý kế tiếp đã bỏ lần ghi. Một câu có lời riêng được trả
-  lời thay cho một câu bị giữ (một câu hỏi thật bị cắt ngang) vẫn tính là một
-  yêu cầu khác (P3 của Reviewer-lead trên #6367).
+  cho nó, và câu đồng ý kế tiếp đã bỏ lần ghi. Một câu không có từ nào được
+  nghe là một lời gọi và được hỏi như tên ("Lamp.") cũng vậy, trừ khi nó
+  được nói bởi cái tên ngay trước đó; và khi lần ghi đang chờ câu trả lời mà
+  phần đọc lại đã hỏi, lời gọi như thế không được trả lời mà để lại như một
+  âm thanh (`services::awaits_an_answer`, nhật ký "only the lamp's name, and
+  no words of it came back, while a write waits for its answer: not answered
+  as a call"): trên đèn của một người thử ngày 13/11, một câu không có từ
+  nào vào đúng giây của động tác chào khi có người đến của chính đèn đã được
+  trả lời như tên, và câu "Yes." duy nhất sau đó thấy thư đã bị bỏ (#6363).
+  Một câu có lời riêng được trả lời thay cho một câu bị giữ (một câu hỏi thật
+  bị cắt ngang) vẫn tính là một yêu cầu khác (P3 của Reviewer-lead trên
+  #6367).
 - **Tiếng vọng của chính đèn không phải câu của người nói** (#5846). Một câu
   mà tuyến thứ hai giữ lại là lời của chính đèn vọng lại (`own_echo`,
   `Echo::Held`) được báo qua thread (`Thread::own_echo_held` →
@@ -1813,7 +1833,7 @@ kỹ năng tự tạo. Khi bật, xem
 phần "Một kỹ năng tự tạo đọc dịch vụ".
 
 Một lệnh gọi đến dịch vụ chưa liên kết thất bại với "<Service> isn't linked
-to this lamp yet. It can be linked in the app: Skills, then Connectors."
+to this lamp yet. It can be linked in the app: open this lamp, then Settings, then Linked accounts."
 (`serve::NOT_LINKED`), để đèn nói chỗ liên kết, không chỉ nói là chưa có.
 
 `service` của một lệnh gọi đến một dịch vụ theo đúng mã của nó (mỗi mã Gmail
@@ -1826,7 +1846,7 @@ trắng và `-` được đọc là `_` ("Google Drive", "GMAIL", "google calend
 
 Một lệnh gọi nêu một dịch vụ mà đèn không có connector (không mã hay tên nào
 trong catalogue khớp) thất bại với "The lamp can't link <name> yet. The services it can
-link are in the app: Skills, then Connectors." (`serve::CANT_LINK`, sau câu
+link are in the app: open this lamp, then Settings, then Linked accounts." (`serve::CANT_LINK`, sau câu
 đầu). `<name>` là tên lệnh gọi đưa ra, chỉ được nói khi nó tối đa 40 ký tự,
 toàn chữ cái, chữ số, khoảng trắng, `-` hoặc `_`; mọi tên khác, hoặc không có
 tên, được nói là "that service". Mô tả của `services_connected` nêu các dịch
@@ -2005,7 +2025,7 @@ cùng `--state-dir` của nó; tắt, [switches.md](../switches.md)). Một lầ
 bị từ chối vì dịch vụ chưa liên kết (`NOT_LINKED`; không bao giờ "couldn't
 be reached" hay một lời từ chối khác) được nói một lần, như lời chính xác qua
 socket nói sau khi cổng được xét lại: "Gmail isn't linked to this lamp yet.
-It can be linked in the app: Skills, then Connectors." Tên kỹ năng được giữ
+It can be linked in the app: open this lamp, then Settings, then Linked accounts." Tên kỹ năng được giữ
 trong `link-noted` của thư mục trạng thái, nên không lần đọc sau và không lần
 khởi động lại nào nói lại; một lần đọc thành công bỏ nó ra, nên một liên kết
 mất về sau được báo thêm một lần. Dòng "not read" của journal thêm "told
@@ -2060,8 +2080,8 @@ hỏi như trước, và:
 - tạo bằng giọng nói, câu trả lời của việc tạo có `needs_link`
   (`[{"code", "name"}]`), và sau câu báo đã bật, mô hình được dặn nói với
   người dùng, bằng lời của nó và bằng ngôn ngữ của cuộc trò chuyện, rằng kỹ
-  năng sẽ chạy khi Gmail được liên kết trong ứng dụng, ở Skills, rồi
-  Connectors (`made_skill::needs_link_ask`; chủ đèn, 10/11, "đồng bộ luôn":
+  năng sẽ chạy khi Gmail được liên kết trong ứng dụng: mở đèn này, rồi
+  Settings, rồi Linked accounts (`made_skill::needs_link_ask`; chủ đèn, 10/11, "đồng bộ luôn":
   không bao giờ là một câu tiếng Anh cố định nói nguyên văn);
 - tạo từ ứng dụng, lời yêu cầu giữ nó, và `skills.made` báo nó là
   `needs_link: [{"code": "gmail", "name": "Gmail"}]`, `[]` khi không thiếu
@@ -2316,6 +2336,88 @@ toàn bộ):
 - Một người liên hệ được nêu tên mà không có địa chỉ: đèn không giữ danh
   bạ, nên mô hình tạo kỹ năng xin địa chỉ.
 
+### Qua tác tử của đèn (`LAMP_SKILL_WRITE_AGENT`, tắt)
+
+Quyết định của chủ đèn (13/11, trong cuộc trò chuyện này; việc do first
+builder mở, hỏi trên Queue #6809): mọi thứ chạm vào một dịch vụ đã liên kết
+đều chạy qua tác tử của đèn. Khi `LAMP_SKILL_WRITE_AGENT=on` (đúng `on`,
+không bật trong unit sản phẩm nào) và `LAMP_AGENT_SERVICES=on`, lệnh ghi cố
+định của một kỹ năng tự tạo được gửi bởi một lượt chạy của kỹ năng trên
+Hermes của đèn, không phải bởi `lamp-skills`:
+
+- **lamp-skills** không bao giờ gọi chương trình này cho lệnh ghi đó. Nó
+  trao lệnh ghi cho lamp-tasks qua socket của `do.task` dưới dạng
+  `{"op":"skill_write","skill","folder","grants":["<code>-write"],"write":<đúng nội dung>}`
+  (`service_write::hand`), một quyền duy nhất, `-write` của dịch vụ đó
+  (`skill_writes::run_grant`, `gmail-app` là `gmail`).
+- **lamp-tasks** kiểm tra dòng như của một task (kỹ năng, thư mục, một quyền
+  khớp với dịch vụ của lệnh ghi, nội dung tối đa 8 KiB) và chạy nó như một
+  task (`skill_task::WriteHandOver`): token do lamp-control cấp, giữ đúng một
+  quyền đó, và Hermes được bảo, kèm tên kỹ năng và id của lượt chạy, gọi
+  `service_write` một lần chỉ nêu dịch vụ và action của lệnh ghi
+  (`{"service":"gmail-app","action":"send_mail"}`). **Không bao giờ có nội
+  dung** (P2 của Reviewer-lead trên #6824 và #6879): lời nhắc là argv của
+  tác tử (`harness new --task`, hoặc `hermes chat -q` khi không có Harness,
+  đọc được trong `/proc/<pid>/cmdline`) và transcript của Harness, nên không
+  người nhận, tiêu đề hay nội dung nào có trong đó. `Debug` của `SkillRun`
+  chỉ in độ dài của lời nhắc.
+- **lamp-control** cấp cho một kỹ năng không có lời đồng ý task nào mà bước
+  `[[do]]` duy nhất là một lệnh ghi cố định
+  (`service_write::fixed_write_of`) một quyền `-write` của nó
+  (`task_yes::KeptYes::fixed_write_grant`) và đánh dấu lượt chạy là của một
+  lệnh ghi cố định, giữ lệnh ghi đó như tệp của kỹ năng ghi trong suốt lượt
+  chạy (`runs::FixedWrite`, `Debug` của nó không bao giờ hiện nội dung).
+  `service.write` của lượt đó tới đây kèm id của lượt chạy
+  (`fixed_write_run`). Lệnh gọi không nêu nội dung riêng nào (không trường
+  nào, hoặc chỉ các trường bằng đúng của lệnh ghi đã giữ, như `action`:
+  `FixedWrite::covers`) được đưa lệnh ghi đã giữ theo token của lượt chạy,
+  nên tác tử không bao giờ thấy nó; lệnh gọi nêu bất kỳ nội dung nào khác
+  đi đúng như đã hỏi và bị từ chối ở đây, như dưới. Ở đó không đọc lời đồng
+  ý nào: lời đồng ý của chủ cho lệnh ghi là của chương trình này.
+- **Ở đây**, một lệnh gọi mang `fixed_write_run` chỉ đi qua cùng
+  `skill_write` như lệnh gọi của `lamp-skills`
+  (`serve::Services::run_fixed_write`): lời đồng ý đã giữ của chủ khớp đúng
+  nội dung đó (lượt chạy đổi một trường nào bị từ chối "not sent: this write
+  is not the one the owner said yes to", không bao giờ bị giữ chờ lời đồng ý
+  nói ra), liên kết lúc đồng ý, giới hạn trong ngày (10 mỗi kỹ năng, 30 cho
+  tất cả) và nhật ký đã gửi, và **một lần mỗi lượt chạy**: lần thử thứ hai,
+  dù gửi gì, cũng bị từ chối ("not sent: a skill's fixed write is sent once
+  a run …"). Tác tử được báo "Sent, as the owner said yes to it." Mọi lệnh
+  gọi khác của lượt đó bị từ chối, và khi công tắc tắt ở đây thì lệnh gọi
+  như vậy bị từ chối và không gì được gửi.
+- **Gửi thẳng vẫn là đường dự phòng** (quyết định của first builder trên
+  #6823: không đèn nào mất một lần gửi nó có hôm nay). Khi tác tử không nhận
+  được lệnh ghi, `lamp-skills` gửi thẳng tới chương trình này như khi công
+  tắc tắt, với mọi bước kiểm ở trên, và ghi một dòng journal: "the lamp's
+  agent couldn't take its write (…), so it goes straight to lamp-services".
+  Tức là: không biết thư mục hay không có `--tasks-socket`, không kết nối
+  được lamp-tasks, hoặc lamp-tasks từ chối trước khi tác tử bắt đầu (`off`,
+  `bad_request`, `too_long`, `no_token`, `busy`, hoặc `not_started`: Harness
+  đã đăng xuất hoặc chưa cài, không có target Hermes, một lần launch Harness
+  chưa hề gửi; `service_write::NOT_TAKEN`). **Không bao giờ gửi hai lần:**
+  một khi lượt chạy có thể đã bắt đầu (`run_failed`, câu trả lời bị mất hay
+  không đọc được) thì không thử gì thêm, và một lượt chạy đã kết thúc là kết
+  quả của nó, kể cả khi lần gửi bị chương trình này từ chối vì nội dung hay
+  vì giới hạn.
+- **Tắt** (mặc định), lệnh ghi đi như trên, giống hệt từng byte như trước.
+  Nó vẫn tắt cho tới khi một hàng kiểm tra trên 9adf cho thấy gửi lúc về tới,
+  nội dung đổi bị từ chối, lần gửi thứ 11 bị từ chối và đường dự phòng khi
+  Harness đã đăng xuất; một đèn không có Harness dùng đường dự phòng cho mọi
+  lệnh ghi cho tới khi lượt chạy đi được mà không cần Harness (PR 3 của
+  #6685).
+
+Đặt nó như nhau trong lamp-skills, lamp-tasks, lamp-control và
+lamp-services. Test:
+`a_fixed_write_is_handed_to_lamp_tasks_with_its_one_grant`,
+`a_write_the_agent_couldnt_take_is_sent_straight_once`,
+`no_straight_send_once_the_agents_run_began`,
+`a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
+`a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`,
+`a_fixed_writes_run_is_minted_its_one_write_grant`,
+`a_fixed_writes_run_names_its_run_to_lamp_services`,
+`a_fixed_writes_contentless_call_is_given_the_skills_write`,
+`a_fixed_writes_run_sends_the_approved_content_once_within_the_bounds`.
+
 ## Lượt chạy của một kỹ năng trên Hermes của đèn (#6432, `LAMP_SKILL_TASKS`, bật trong sản phẩm)
 
 Một kỹ năng dùng một dịch vụ đã liên kết được Hermes của đèn chạy với dịch
@@ -2531,6 +2633,10 @@ qua một socket mở.
   (`run_write_yes`, "Your <skill> skill wants to send: …") và chờ lời đồng ý
   nói rõ của chủ (cơ chế chờ của #6558); chỉ khi đó chương trình này mới gửi,
   tính vào giới hạn của kỹ năng (3 lần một ngày mỗi kỹ năng, 10 cho tất cả).
+  Lệnh ghi cố định của một kỹ năng tự tạo chạy qua tác tử
+  (`LAMP_SKILL_WRITE_AGENT`, tắt) là lệnh ghi duy nhất được gửi theo lệnh gọi
+  của một lượt chạy, và chỉ như lời đồng ý đã giữ của chủ, một lần ("Một kỹ
+  năng tự tạo ghi vào dịch vụ", "Qua tác tử của đèn").
 - **Nhật ký** từ máy chủ chỉ ghi độ dài của lời từ chối; các phần nó gọi ghi
   dịch vụ và `what` hay `action`, không bao giờ ghi nội dung, địa chỉ hay
   tiêu đề.

@@ -191,6 +191,80 @@ Natural behavior is part of acceptance: apply preferences quietly; ask a
 follow-up once when appropriate; accept stillness and silence; never read
 out the owner model, invent a fact, or turn recall into an unasked interview.
 
+## Wiring into lamp-memory
+
+The first builder's rule for any of this reaching a lamp (#4710, 2 November):
+wiring into lamp-memory behind a switch, a played test over days, and two
+reads. The wiring is `LAMP_MEMORY_TIERS` (off unless set; the product sets
+it nowhere), read by lamp-memory at start with `--memory-days`. Its contract
+is in [memory.md](memory.md#the-tiered-store-beside-days-lamp_memory_tiers);
+the shape and what it leaves open:
+
+- **Days stays the answer.** `shadow` mirrors every exchange and kept thing
+  into the tiered store and every removal out of it, runs the nightly sleep,
+  and answers from Days byte for byte. `on` adds the tiers' recall beside a
+  `recall` or `search` answer as `"tiers"`, waited for at most 50 ms. The
+  design's recall belongs in voice, started while speech is in progress and
+  used only if ready at the answer deadline; that voice change, and the
+  session-start owner snapshot, are later work behind their own switch, so
+  `on` serves the field and measures it, and today's voice ignores it.
+- **The record's attribution.** Each known person's scope (and rules scope)
+  is its own tiered store, owned by that scope; heard words are its owner's
+  records, said words the lamp's. The room's scope is never mirrored: Days
+  could not place that voice, so its words are no one's evidence (the
+  attribution rule above). What the room keeps reaches a person's store
+  only through Days' own `adopt`.
+- **Forgetting.** The tiers hold a subset of Days, by construction: Days'
+  connection logs every added, removed or moved entry inside the change's
+  own transaction (temporary triggers, as the health counts use), and every
+  removal of every kind deletes the entry's row. A removal runs the library's
+  forget on the mapped records, which takes their facts, lines and episodes'
+  derived text and fingerprints them; a forget of everything of a scope
+  deletes its store and key ("Reset deletes the key as well as the store"),
+  and a person's removal their rules scope's too; a failing forget deletes
+  the scope's store; a queue overflow, or a worker that stopped, empties all
+  stores; each start removes what Days no longer holds and any record no map
+  names. The days kept running out also removes the tiered copy, through the
+  same fingerprinting forget: the library has no plain retention delete.
+- **Off the reply path.** One worker thread and a 256-job queue own every
+  tiered store; a request only takes Days' in-memory change log and
+  `try_send`s it. The worker's writes share the lamp's disk with Days'
+  synchronous commits, which the played test must measure.
+- **The night, through the voice.** lamp-memory stays offline
+  (`PrivateNetwork=yes`, no HTTP client, no relay key): the memory owner's
+  choice (option A, 3 November), with the first builder's bounds (#4710).
+  Each night ends episodes, expires and fades, prepares the bounded input,
+  and queues it as a job (at most 16, all scopes). The voice, with the same
+  switch in its own unit, takes a job on memory's socket
+  (`tiers_sleep_take`) only while the lamp is idle at night: 03:00 to 06:00
+  local, nobody heard or handed a line for 20 minutes, the privacy slide
+  open. It asks the relay's DeepSeek (thinking off, the relay's credential,
+  as the observation pass does) within 60 s a call and at most 16 calls,
+  1 MiB and 200,000 tokens a night for this pass alone (the `nightly`
+  pass keeps its own budget: with `LAMP_MEMORY_NIGHTLY` set too, a night
+  may ask the relay up to twice that; which pass runs is the memory
+  owner's call before the switch goes on), and gives the reply back
+  (`tiers_sleep_give`). The tiered store's validator checks it; memory also
+  checks that every source record is still held by the store and by Days.
+  Speech, a line handed on or the slide closing stops a call at once, the
+  call cancelled and its job dropped (its prompt already sent); no call
+  starts in the night's last 5 minutes. Memory answers each night op
+  within 100 ms (`busy` past it, a give then given again and applied
+  once), so the night never holds its one-at-a-time socket near a turn's
+  first read. A job is given out once: a reply that
+  fails the checks, one the voice could not read, a timed-out call, a job
+  not given back within its 120 s lease, and every job left at 06:00 are
+  dropped and counted, never retried; their records wait for the next
+  night. A forget in a scope drops its jobs. Nothing of the night is ever
+  said or shown. The job carries one scope's words without the scope's
+  name; neither side journals any of its text.
+
+Left open: backfill of earlier Days history; retiring a replaced kept thing
+without a fingerprint; the tiers' `alone` presence condition, which memory
+cannot establish (Days already answers a scope to whoever the voice asks
+for); the weekly reflection; and the bench's diagnostics (#4777) and topic
+segmentation (#4783), which build on the same store.
+
 ## Build order and release ruling
 
 1. Commit the fake month, questions, and scorers before any arm result.

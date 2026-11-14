@@ -88,6 +88,9 @@ Environment=LAMP_BUS_ROOT=/run/lampos-bus
 Environment=LAMP_BUS_AUDIO=on
 Environment=LAMP_ATTENTION=busy-near
 Environment=LAMP_AIR_FACTS=on
+# Asked how it is, the lamp names its unwell parts and keeps quiet about them otherwise (#1681, docs/health.md).
+# On lamp-06c1 on 13 Nov (12587, #6860): three parts stopped, "How are you?" named all three, the time question none.
+Environment=LAMP_HEALTH_FACTS=on
 Environment=LAMP_RING_EYE=strong
 Environment=LAMP_SHORT_SOUNDS=quiet-room-checked
 # The end-of-turn worker lowers itself to round-robin 10 and its ONNX Runtime threads don't spin while they wait,
@@ -319,6 +322,9 @@ Environment=LAMP_HEAD_TOUCH=on
 # #6028): the speech cache's kept line at the hold's 2 s mark, the breath in the quiet hours (22:00 to 07:00) or
 # while the line is not kept yet. The mute comes once the cue has played, at most 6 s after the hold.
 Environment=LAMP_SLEEP_LINE=on
+# "Lamp, go to sleep" asks the same sleep the 3 s hold asks, with the same kept line (#3748, controls.md): played on
+# lamp-52e6 on 2 Nov 09:18-09:24, PASS, and the one-breath fix 4/4 there (#4886). On in the product for #6853.
+Environment=LAMP_SLEEP_ASKED=on
 Environment=LAMP_RESTORED_MUTE=on
 # The privacy slide is the lamp's sleep and wake (migrate-P4, #5182): closing it lays the lamp down, and open for 1 s
 # it wakes as at a tap, with no touch; a POWER mute stays. The lead's yes on 6 Nov, after lamp-e82d's row at 10441.
@@ -358,6 +364,10 @@ Environment=LAMP_TASKS_WHO=on
 # Work goes only to the agent named: one named who isn't set up is said so, never given to another (#1722; the
 # 27 Oct demo, where "have Hermes do it" went to Claude Code unsaid, #3504). Checked on lamp-75c9 on 22 Oct.
 Environment=LAMP_TASKS_NAMED_ONLY=on
+# After a read-back, "no, I said tea" prepares the corrected ask in place of the one waiting, and only a later yes starts
+# it (#2838, #6857). Played on lamp-75c9 at 12728, 13 Nov: the correction then yes started only the corrected ask; a plain
+# no, a reworded repeat and "yes, and also" each started nothing.
+Environment=LAMP_TASKS_CORRECT=on
 # Harness signed in from the owner's app by its 8-digit code (#5198), with the voice's own sign-in under it (#1676),
 # which the app's needs; in the voice the code is said digit by digit, and a sign-in the app started is never said.
 # lamp-tasks.service runs with --sign-in-by-code --app-socket, lamp-cloud.service with the same switch. The PM's
@@ -451,6 +461,10 @@ Environment=LAMP_MADE_SCRIPTS=on
 # spoken yes; passed to both routes. The same line in lamp-tasks, lamp-skills, lamp-skills-manage@ and
 # lamp-control. On in the product (owner, 13 Nov).
 Environment=LAMP_AGENT_SERVICES=on
+# A skill made here, by voice or in the app, is the person's own (#6059, docs/skills.md "A made skill loosened"):
+# what the check refuses is left out and said, no limits added unless asked, a say as often as asked (at least a
+# minute); passed to the provider and second routes. The same line in lamp-skills and lamp-skills-manage@.
+Environment=LAMP_MADE_SKILL_LOOSE=on
 # A due reminder is timed by the Reminders skill (lampOS/skills/reminders): the voice keeps its words and
 # its acknowledgement, and says it itself when no ask has come within 10 s, so none is lost (#939).
 Environment=LAMP_SCHEDULE_SPEAK=skill
@@ -478,6 +492,13 @@ Environment=LAMP_REMINDERS_ASKED=on
 # And a line that is only a plain ask for a light scene or a light show calls its skill (lamp-52e6, 9 Nov: "movie
 # light" and "show me a light show" were answered in words and no call, and the light never changed).
 Environment=LAMP_SKILL_ASKED=on
+# And a line that is only an installed skill's name said plainly ("photo booth", "run photo booth") calls it in
+# code as round 1, for a non-core skill that takes no choice or yes-or-no (#6772, #6782, docs/skills.md; lamp-52e6
+# at 12587, 13 Nov: "photo booth" got "I don't have a camera" over the skill it was offered); the second route alone.
+Environment=LAMP_SKILL_NAMED=on
+# And a line that plainly asks the lamp to make a skill, saying what it does, calls make_skill (lamp-52e6, 13 Nov,
+# build 12635: a make of a skill that checks the processor temperature was answered "I can't" with no call, #6835).
+Environment=LAMP_MAKE_SKILL_ASKED=on
 # A line is a known person's only when their own face was seen speaking it, else the room's (#3437, reviewer-three's
 # P1 and P2 on #3435): so what the memory keeps without being asked, and "forget everything about me", reach only
 # the person who said it.

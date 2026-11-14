@@ -59,15 +59,78 @@ pub(super) struct HeldRenames {
 /// Whom a rename is held for, or whose yes runs one: the line's session and
 /// known person, its own ([`forget_asker`]) or theirs only by their face
 /// alone in view with no other voice heard
-/// (`memory_scope::ScopeLease::by_one_face`). Never a line held only by a
-/// face's gap, nor one carried into a conversation going on, which may be
-/// someone else's (the 29e7 requests 19 to 24).
+/// (`memory_scope::ScopeLease::by_one_face`). A line carried into a
+/// conversation going on counts only when read as its carried person's
+/// ([`carried_one_face`]); any other may be someone else's (the 29e7
+/// requests 19 to 24). Never a line held only by a face's gap, nor one
+/// whose keep waits for a yes (`saves_carried`, a keep-only carry among
+/// them).
 fn rename_asker(scope: Option<&crate::memory_scope::ScopeLease>) -> Option<(u64, String)> {
     let lease = scope?;
-    if held_by_gap(scope) || lease.carried_for().is_some() || lease.saves_carried().is_some() {
+    if held_by_gap(scope) || lease.saves_carried().is_some() {
         return None;
     }
+    if lease.carried_for().is_some() {
+        return carried_one_face(lease).map(|person| (lease.key().session, person));
+    }
     forget_asker(scope).or_else(|| Some((lease.key().session, lease.kept_by_one_face()?)))
+}
+
+/// The carried person a line carried in full into their conversation going
+/// on is read and kept as (`LAMP_CONVERSATION_CARRIED_MEMORY`,
+/// `ScopeLease::read_carried`): their own face the one face in view through
+/// it, none seen saying it, no other voice shown, and no narrow after
+/// (`ScopeLease::kept_by_one_face`). Such a line may ask a face rename for
+/// them and give their yes to one held for them, the one-face risk accepted
+/// for the rename extended to it (the memory owner's OK of 13 Nov on #6859:
+/// on lamp-52e6 the yes and the second ask were carried lines, and both
+/// were dropped). Never a line whose keep waits for a yes
+/// (`saves_carried`), and no forget runs on it (`forgets_need_mouth`).
+fn carried_one_face(lease: &crate::memory_scope::ScopeLease) -> Option<String> {
+    let carried = lease.carried_for()?;
+    if lease.saves_carried().is_some() || !lease.reads_carried() {
+        return None;
+    }
+    lease.kept_by_one_face().filter(|person| person == carried)
+}
+
+/// Whether a line is carried and not read as its carried person's
+/// ([`carried_one_face`]), or its keep waits for a yes: its yes is refused
+/// ([`verdict`]). One read as theirs is left to [`spoke_it`]'s one-face
+/// test, which takes it only from the asker.
+fn carried_line(scope: Option<&crate::memory_scope::ScopeLease>) -> bool {
+    scope.is_some_and(|scope| {
+        scope.saves_carried().is_some()
+            || (scope.carried_for().is_some() && carried_one_face(scope).is_none())
+    })
+}
+
+/// What the journal adds for a line carried and read as theirs
+/// ([`carried_one_face`]): ids only, so a wrong rename can be traced.
+fn on_carried(scope: Option<&crate::memory_scope::ScopeLease>) -> &'static str {
+    if scope.and_then(carried_one_face).is_some() {
+        ", on a carried line read as theirs, their one face in view and no other voice (LAMP_NAMES_RENAME_YES, LAMP_CONVERSATION_CARRIED_MEMORY)"
+    } else {
+        " (LAMP_NAMES_RENAME_YES)"
+    }
+}
+
+/// The journal line for a rename held for its yes ([`after_face_save`]).
+fn held_line(request: u64, scope: Option<&crate::memory_scope::ScopeLease>) -> String {
+    format!(
+        "lamp-voice second: request {request}: held the face rename for the yes to its question{}",
+        on_carried(scope)
+    )
+}
+
+/// The journal line for a yes that runs the rename held in `held` ([`take`]).
+fn runs_line(request: u64, held: u64, scope: Option<&crate::memory_scope::ScopeLease>) -> String {
+    let carried = scope
+        .and_then(carried_one_face)
+        .map_or("", |_| on_carried(scope));
+    format!(
+        "lamp-voice second: request {request}: their yes runs the face rename held in request {held}{carried}"
+    )
 }
 
 /// The faces seen speaking a line, and the known person with their face.
@@ -83,7 +146,8 @@ pub(super) struct YesTurn<'a> {
     pub session: Option<u64>,
     /// Held only by a face's gap ([`held_by_gap`]).
     pub gap: bool,
-    /// Carried into a conversation going on.
+    /// Carried into a conversation going on and not read as its carried
+    /// person's, or its keep waiting for a yes ([`carried_line`]).
     pub carried: bool,
     pub too_late: bool,
     /// The faces the eyes saw speaking the line, with the known person and
@@ -99,9 +163,10 @@ pub(super) struct YesTurn<'a> {
 /// (left untold, it made up a reason on lamp-52e6, Fifth's run B on #5415).
 /// Runs only on a yes to the new name (`known_faces::rename_agreed`) from
 /// the asker, within [`HELD_RENAME_FOR`], in the same session, on a line
-/// neither gap-held nor carried, and either their face the one seen saying
-/// it, or no face seen saying it and theirs alone in view with no other
-/// voice heard (the person's call, 6 Nov).
+/// neither gap-held nor carried (a carried line read as theirs aside,
+/// [`carried_one_face`]), and either their face the one seen saying it, or
+/// no face seen saying it and theirs alone in view with no other voice
+/// heard (the person's call, 6 Nov).
 pub(super) fn verdict(turn: &YesTurn) -> Result<(), (&'static str, bool)> {
     if turn.too_late {
         return Err(("too late", false));
@@ -169,9 +234,7 @@ pub(super) fn after_face_save(
         .filter(|name| !name.is_empty());
     match (asked, name, rename_asker(scope)) {
         (Some(from), Some(name), Some(asker)) => {
-            eprintln!(
-                "lamp-voice second: request {request}: held the face rename for the yes to its question (LAMP_NAMES_RENAME_YES)"
-            );
+            eprintln!("{}", held_line(request, scope));
             let now = (shared.clock)();
             renames.asked = Some(RenameAsked {
                 to: name.to_owned(),
@@ -291,18 +354,14 @@ pub(super) fn take(
         asker: &held.asker,
         session: scope.map(|scope| scope.key().session),
         gap: held_by_gap(scope),
-        carried: scope
-            .is_some_and(|scope| scope.carried_for().is_some() || scope.saves_carried().is_some()),
+        carried: carried_line(scope),
         too_late: now.saturating_duration_since(held.at) > HELD_RENAME_FOR,
         seen,
         one_face: one_face.as_deref(),
     };
     match verdict(&turn) {
         Ok(()) => {
-            eprintln!(
-                "lamp-voice second: request {request}: their yes runs the face rename held in request {}",
-                held.request
-            );
+            eprintln!("{}", runs_line(request, held.request, scope));
             Taken::Runs(held.call)
         }
         Err((why, told)) => {
@@ -578,8 +637,9 @@ mod tests {
         assert!(verdict(&someone_else).is_err());
     }
 
-    /// Carried lines stay refused (the 29e7 requests 19 to 24, the person's
-    /// call): a yes on a line carried into a conversation going on, a
+    /// Carried lines not read as theirs stay refused (the 29e7 requests 19
+    /// to 24, the person's call): a yes on a line carried into a
+    /// conversation going on and not read as the asker's, a
     /// gap-held line, another session or too late runs nothing, and the
     /// model is not told it was a yes.
     #[test]
@@ -629,6 +689,155 @@ mod tests {
         ] {
             assert_eq!(verdict(&turn), Err((why, false)));
         }
+    }
+
+    /// A lease of the asker's session 7 for `request`, admitted as `admitted`.
+    fn scope_of(
+        request: u64,
+        admitted: crate::memory_scope::ScopeSnapshot,
+    ) -> crate::memory_scope::RequestScope {
+        crate::memory_scope::RequestScope::new(
+            crate::memory_scope::RequestKey {
+                worker: lamp_turn_owner::BootId::new([45; 16]).unwrap(),
+                session: 7,
+                request,
+            },
+            admitted,
+        )
+    }
+
+    /// A line carried in full into Tove's conversation going on and read as
+    /// theirs (`LAMP_CONVERSATION_CARRIED_MEMORY`, `ScopeLease::read_carried`):
+    /// their one face in view, no other voice shown.
+    fn carried_read_as(name: &str, request: u64) -> crate::memory_scope::RequestScope {
+        let person = crate::known_faces::memory_person(name);
+        let scope = scope_of(request, crate::memory_scope::ScopeSnapshot::room());
+        assert!(scope.lease().carry_conversation(&person));
+        assert!(scope.lease().read_carried());
+        scope
+    }
+
+    /// The yes turn [`take`] builds for `lease`, with no face seen saying it.
+    fn carried_turn<'a>(
+        said: &'a Said,
+        asker: &'a (u64, String),
+        lease: &crate::memory_scope::ScopeLease,
+        one_face: &'a Option<String>,
+    ) -> YesTurn<'a> {
+        YesTurn {
+            name: "Marisol",
+            said,
+            asker,
+            session: Some(lease.key().session),
+            gap: held_by_gap(Some(lease)),
+            carried: carried_line(Some(lease)),
+            too_late: false,
+            seen: None,
+            one_face: one_face.as_deref(),
+        }
+    }
+
+    /// #6859, lamp-52e6, 13 Nov (u4): the yes came on a carried line read as
+    /// the asker's, their one face in view and no other voice; it runs the
+    /// rename (the memory owner's OK, 13 Nov), and the journal says it ran
+    /// on a carried one-face yes, with ids only.
+    #[test]
+    fn a_carried_line_read_as_the_askers_gives_the_yes() {
+        let yes = said("Yes.", ASKED);
+        let asker = asker();
+        let scope = carried_read_as("Tove", 19_811);
+        let lease = scope.lease();
+        let one_face = lease.kept_by_one_face();
+        assert_eq!(one_face.as_deref(), Some(asker.1.as_str()));
+        assert_eq!(
+            verdict(&carried_turn(&yes, &asker, &lease, &one_face)),
+            Ok(())
+        );
+        let line = runs_line(19_811, 19_810, Some(&lease));
+        assert_eq!(
+            line,
+            "lamp-voice second: request 19811: their yes runs the face rename held in request 19810, on a carried line read as theirs, their one face in view and no other voice (LAMP_NAMES_RENAME_YES, LAMP_CONVERSATION_CARRIED_MEMORY)"
+        );
+        assert!(
+            !line.contains("Tove") && !line.contains("Marisol"),
+            "{line}"
+        );
+        // A line not carried says nothing of it.
+        assert!(!runs_line(19_811, 19_810, None).contains("carried"));
+    }
+
+    /// #6859 (u1): a carried line read as theirs asking a rename holds it for
+    /// their yes, as their own line's ask does.
+    #[test]
+    fn a_carried_line_read_as_theirs_holds_the_ask() {
+        let scope = carried_read_as("Tove", 19_820);
+        let lease = scope.lease();
+        assert_eq!(rename_asker(Some(&lease)), Some(asker()));
+        let line = held_line(19_820, Some(&lease));
+        assert!(line.contains("on a carried line read as theirs"), "{line}");
+        assert!(!line.contains("Tove"), "{line}");
+    }
+
+    /// Still refused (the memory owner's bounds, 13 Nov, #6859): a keep-only
+    /// carry or one whose keep waits for a yes (`saves_carried`), a gap-held
+    /// line, a carried line with `LAMP_CONVERSATION_CARRIED_MEMORY` off (not
+    /// read as theirs), a carried line narrowed after (another voice), and
+    /// another person's carried line. A forget on a carried line read as
+    /// theirs stays refused (`forgets_need_mouth`).
+    #[test]
+    fn other_carried_lines_still_take_no_rename_and_no_forget() {
+        let yes = said("Yes.", ASKED);
+        let asker = asker();
+        let tove = crate::known_faces::memory_person("Tove");
+        let room = crate::memory_scope::ScopeSnapshot::room;
+        // Carried for a keep only, its keep held for a yes.
+        let keep_only = scope_of(19_830, room());
+        assert!(keep_only.lease().carry_keep_only(&tove));
+        assert!(keep_only.lease().save_carried());
+        // Carried in full, its keep held for a yes (CARRIED_SAVES).
+        let saves = scope_of(19_831, room());
+        assert!(saves.lease().carry_conversation(&tove));
+        assert!(saves.lease().save_carried());
+        // Admitted held only by a face's gap, then carried.
+        let gap = scope_of(19_832, crate::memory_scope::ScopeSnapshot::held_of("Tove"));
+        assert!(gap.lease().carry_conversation(&tove));
+        assert!(!gap.lease().read_carried());
+        // Carried in full with CARRIED_MEMORY off: never read.
+        let unread = scope_of(19_833, room());
+        assert!(unread.lease().carry_conversation(&tove));
+        // Read as theirs, then another voice narrowed it to the room's.
+        let narrowed = carried_read_as("Tove", 19_834);
+        narrowed.lease().narrow_to_room();
+        // Another person's carried line, read as theirs.
+        let other = carried_read_as("Kim", 19_835);
+        for (what, scope) in [
+            ("keep only", &keep_only),
+            ("saves", &saves),
+            ("gap", &gap),
+            ("unread", &unread),
+            ("narrowed", &narrowed),
+        ] {
+            let lease = scope.lease();
+            assert_eq!(rename_asker(Some(&lease)), None, "{what}: no ask held");
+            let one_face = lease.kept_by_one_face();
+            assert!(
+                verdict(&carried_turn(&yes, &asker, &lease, &one_face)).is_err(),
+                "{what}: no yes"
+            );
+            assert!(!runs_line(1, 0, Some(&lease)).contains("carried"), "{what}");
+        }
+        let lease = other.lease();
+        assert_ne!(
+            rename_asker(Some(&lease)).map(|(_, person)| person),
+            Some(tove.clone()),
+            "another person's line is never Tove's ask"
+        );
+        let one_face = lease.kept_by_one_face();
+        assert!(verdict(&carried_turn(&yes, &asker, &lease, &one_face)).is_err());
+        // A forget on a carried line read as theirs: still no one's.
+        let carried = carried_read_as("Tove", 19_836);
+        assert!(carried.lease().forgets_need_mouth());
+        assert_eq!(forget_asker(Some(&carried.lease())), None);
     }
 
     /// A no, another name or a lamp answer that said no new name drops it,

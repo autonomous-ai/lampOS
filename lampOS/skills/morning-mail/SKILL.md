@@ -8,8 +8,8 @@ description: Once a morning, after you have been at the desk 20 minutes between 
 Once a morning, when you have been at your desk for 20 minutes between 7:00
 and 11:00, the lamp tells you about your newest mail: how many, then who
 each of the five newest is from and its subject ("You have 5 recent mails.
-From Sam: Lunch on Friday. ..."). It needs Gmail linked in the app, under
-Skills, then Connectors.
+From Sam: Lunch on Friday. ..."). It needs Gmail linked in the app: open
+this lamp, then Settings, then Linked accounts.
 
 When it reads:
 

@@ -45,6 +45,14 @@ pub const NO_TOKEN: &str = "no token for this run";
 /// skills' own part defines where the yes lives.
 pub trait SkillYes: Send + Sync {
     fn grants(&self, skill: &str) -> Result<BTreeSet<Grant>, String>;
+    /// `skill`'s fixed write, when its token is for that write alone, run
+    /// through the lamp's agent (`LAMP_SKILL_WRITE_AGENT`,
+    /// `task_yes::KeptYes`): its run's service calls then say so to
+    /// lamp-services, and its `service.write` is given this write
+    /// ([`Run::fixed_write`]).
+    fn fixed_write(&self, _skill: &str) -> Option<FixedWrite> {
+        None
+    }
 }
 
 /// A lamp that keeps no such yes yet: every mint is refused in words.
@@ -121,6 +129,61 @@ pub struct Run {
     pub until_us: u64,
     /// Which mint this is, so an old timeout cannot end a newer token.
     pub serial: u64,
+    /// Minted for a skill's fixed write ([`SkillYes::fixed_write`]): its
+    /// `service.write` goes to lamp-services with its run's id, held there
+    /// to the owner's kept yes for that content, once a run. A call that
+    /// names none of its own content is given this write
+    /// ([`FixedWrite::covers`]), so the run's words never carry it.
+    pub fixed_write: Option<FixedWrite>,
+}
+
+/// A skill's fixed write as lamp-control read it from the skill's own file
+/// at the mint (`lamp_skills::service_write::fixed_write_of`): `service`,
+/// `action` and the action's fields. The run's agent is never given it in
+/// words (the Reviewer-lead's P2 on #6824): its `service_write` names the
+/// service alone and is given this write here, which lamp-services sends
+/// only as the owner's kept yes has it. Its `Debug` never shows it.
+#[derive(Clone, PartialEq)]
+pub struct FixedWrite(serde_json::Map<String, serde_json::Value>);
+
+impl std::fmt::Debug for FixedWrite {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("FixedWrite(..)")
+    }
+}
+
+impl FixedWrite {
+    /// The write `content`, an object naming its `service`; none otherwise.
+    pub fn of(content: &serde_json::Value) -> Option<Self> {
+        let content = content.as_object()?;
+        content.get("service")?.as_str()?;
+        Some(Self(content.clone()))
+    }
+
+    /// The service the write names.
+    pub fn service(&self) -> &str {
+        self.0
+            .get("service")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default()
+    }
+
+    /// The write's fields, its service named beside them.
+    pub fn args(&self) -> serde_json::Map<String, serde_json::Value> {
+        let mut args = self.0.clone();
+        args.remove("service");
+        args
+    }
+
+    /// Whether a run's `service.write` `args` name no content of their
+    /// own: each field they give is this write's, as it is (none, or its
+    /// `action`). Then it is given this write; any other `args` go to
+    /// lamp-services as asked, which refuses a content the owner didn't
+    /// say yes to.
+    pub fn covers(&self, args: &serde_json::Map<String, serde_json::Value>) -> bool {
+        args.iter()
+            .all(|(key, value)| key != "service" && self.0.get(key) == Some(value))
+    }
 }
 
 /// The live runs, by the digest of their token (the token itself is not kept).
@@ -156,9 +219,20 @@ impl Runs {
             grants,
             until_us: now_us.saturating_add(for_ms.saturating_mul(1000)),
             serial: self.serial,
+            fixed_write: None,
         };
         self.by_token.insert(token_key(token), live.clone());
         Ok(live)
+    }
+
+    /// Marks live run `run` as a skill's fixed write's, `write`
+    /// ([`Run::fixed_write`]).
+    pub fn mark_fixed_write(&mut self, run: &str, write: &FixedWrite) {
+        for live in self.by_token.values_mut() {
+            if live.run == run {
+                live.fixed_write = Some(write.clone());
+            }
+        }
     }
 
     /// The run `token` holds now, if it is one.

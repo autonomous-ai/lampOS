@@ -598,6 +598,9 @@ async fn lines_known(
                         .as_str()
                         .is_some_and(|about| about.contains("umbrella")))
                 .then(|| (id, text.to_owned()))
+                .ok_or(crate::remember::ForgetNotAsked::NoMatch(
+                    crate::remember::ForgetWant::About("umbrella".to_owned()),
+                ))
             },
         )),
         None => engine,
@@ -3300,6 +3303,7 @@ async fn a_yes_on_a_line_theirs_by_one_face_alone_runs_no_held_forget() {
                 line: None,
                 asked_again: false,
                 one_face: false,
+                near: None,
             });
         }
         let taken = take_held_forget(
@@ -3368,6 +3372,7 @@ async fn the_natural_answers_to_the_one_face_question_run_it_and_a_no_keeps_it()
                 line: None,
                 asked_again: false,
                 one_face: true,
+                near: None,
             });
         }
         let taken = take_held_forget(
@@ -5055,5 +5060,25 @@ async fn with_carried_memory_cut_words_answered_by_a_held_line_with_words_are_th
             .all(|(person, _)| person.as_ref() != Some(&a)),
         "the held line's note is never A's: {:?}",
         got.noted
+    );
+}
+
+/// Thirteen's row on #5627: the refusal of a forget on a one-face line
+/// says why, after the words it said before (old greps still match), and
+/// never with what they asked to forget (the Reviewer-lead's P2 on #6841).
+#[test]
+fn a_one_face_forget_not_asked_says_why_in_the_journal() {
+    let why = crate::remember::ForgetNotAsked::SeveralMatch(
+        crate::remember::ForgetWant::About("umbrella".to_owned()),
+        2,
+    );
+    let line = crate::second_provider::one_face_forget_not_asked(12, &why);
+    assert_eq!(
+        line,
+        "lamp-voice second: request 12: a forget on a one-face line names no one kept thing of theirs: not asked: two or more kept things match the words (2) (LAMP_PERSON_SCOPE_ONE_FACE_READS)"
+    );
+    assert!(
+        !line.contains("umbrella"),
+        "the about's words are never journaled: {line}"
     );
 }

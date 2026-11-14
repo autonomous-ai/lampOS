@@ -75,10 +75,9 @@ test('without the grant a row says the lamp\'s refusal, and a private lamp refus
 // The server: the picture goes to the page that pressed, as one message to it, and to no other page or log.
 test('the twin sends a row\'s picture to the page that pressed it, not to another page, and the log line has no picture', async (t) => {
   const { mkdtempSync, rmSync, writeFileSync, chmodSync } = await import('node:fs');
-  const { spawn } = await import('node:child_process');
+  const { startTwin } = await import('./twin-start.js');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
-  const { createServer } = await import('node:net');
   const WebSocket = (await import('ws')).default;
   const server = new URL('../examples/twin/server.js', import.meta.url).pathname;
   const folder = mkdtempSync(join(tmpdir(), 'try-media-'));
@@ -88,14 +87,7 @@ test('the twin sends a row\'s picture to the page that pressed it, not to anothe
   chmodSync(stub, 0o755);
   const glb = join(folder, 'lamp.glb');
   writeFileSync(glb, Buffer.from('glTF\x02\x00\x00\x00\x0c\x00\x00\x00'));
-  const port = await new Promise((resolve) => { const s = createServer().listen(0, '127.0.0.1', () => { const { port: p } = s.address(); s.close(() => resolve(p)); }); });
-  const child = spawn(process.execPath, [server, '--fake', '--port', String(port), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub], { stdio: ['ignore', 'pipe', 'inherit'] });
-  t.after(() => child.kill('SIGTERM'));
-  const token = await new Promise((resolve, reject) => {
-    let text = '';
-    child.stdout.on('data', (chunk) => { text += chunk; const found = /\?t=(\S+)/.exec(text); if (found) resolve(found[1]); });
-    child.on('close', (code) => reject(new Error(`the server ended (${code})`)));
-  });
+  const { port, token } = await startTwin(t, server, (port) => ['--fake', '--port', String(port), '--glb', glb, '--stim-dir', folder, '--lamp-sim', stub]);
   const open = () => new Promise((resolve, reject) => {
     const socket = new WebSocket(`ws://127.0.0.1:${port}/live?t=${token}`, { headers: { origin: `http://127.0.0.1:${port}` } });
     const got = [];

@@ -146,18 +146,52 @@ pub fn service_words(name: &str) -> Option<String> {
     })
 }
 
-/// `name`'s plain words, for a grant of [`GRANTS`].
+/// The switch for a task's network grant ([`NET`]), in lamp-tasks,
+/// lamp-skills and its manage helper, lamp-control and the voice. `on`
+/// only; off, `net` is no grant and every run stays off the network
+/// (`LAMP_NS_NET=run`).
+pub const NET_ENVIRONMENT: &str = "LAMP_TASK_NET";
+
+/// The task grant that keeps the run on the lamp's network (with
+/// [`NET_ENVIRONMENT`] on): never one of lamp-control's own, so it is never
+/// in a one-run token; lamp-tasks reads it from the hand-over.
+pub const NET: (&str, &str) = ("net", "reaches the internet");
+
+thread_local! {
+    /// The network grant's switch as a test of this thread sets it (other
+    /// crates' tests too, so not only under `cfg(test)`).
+    static NET_HERE: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
+}
+
+/// Whether a task's network grant is on in this process.
+pub fn net_on() -> bool {
+    if let Some(on) = NET_HERE.with(std::cell::Cell::get) {
+        return on;
+    }
+    std::env::var(NET_ENVIRONMENT).ok().as_deref() == Some("on")
+}
+
+/// The network grant's switch for this test's thread alone: tests only.
+#[doc(hidden)]
+pub fn set_net_here(on: Option<bool>) {
+    NET_HERE.with(|here| here.set(on));
+}
+
+/// [`GRANTS`], and [`NET`] while [`net_on`].
+fn known() -> impl Iterator<Item = &'static (&'static str, &'static str)> {
+    GRANTS.iter().chain(net_on().then_some(&NET))
+}
+
+/// `name`'s plain words, for a grant of [`GRANTS`] (or [`NET`], on).
 pub fn grant_words(name: &str) -> Option<&'static str> {
-    GRANTS
-        .iter()
+    known()
         .find(|(grant, _)| *grant == name)
         .map(|(_, words)| *words)
 }
 
-/// `name` as [`GRANTS`] has it, for a grant of it.
+/// `name` as [`GRANTS`] has it, for a grant of it (or [`NET`], on).
 pub fn grant_named(name: &str) -> Option<&'static str> {
-    GRANTS
-        .iter()
+    known()
         .find(|(grant, _)| *grant == name)
         .map(|(grant, _)| *grant)
 }
@@ -227,6 +261,13 @@ impl TaskAsks {
         })
     }
 
+    /// What an agent skill's yes is recorded for as it goes on, with no
+    /// spoken yes (`crate::upload_agent::went_on`): its grants only of the
+    /// ones that go on at once.
+    pub fn at_once(&self) -> Asks {
+        self.asks()
+    }
+
     /// What the yes is asked of: what must be said whole, then kept.
     fn asks(&self) -> Asks {
         Asks {
@@ -236,6 +277,7 @@ impl TaskAsks {
             say_back: said(self),
             grants: Some(self.grants.clone()),
             code: false,
+            remove: false,
         }
     }
 }
@@ -690,6 +732,7 @@ pub fn asked_in(
             say_back,
             grants: Some(grants),
             code: false,
+            remove: false,
         },
         request,
         now,
@@ -808,6 +851,13 @@ pub fn forget_by(control: &Path, name: &str) -> Result<(), String> {
     }
 }
 
+/// Whether the skill `name`, as the manage helper at `manage` reads it, is
+/// an agent skill added from a file ([`crate::upload_agent::FROM`]).
+fn read_from_file(manage: &Path, name: &str) -> bool {
+    read_by(manage, name)
+        .is_ok_and(|asks| asks.is_some_and(|asks| asks.from == crate::upload_agent::FROM))
+}
+
 /// The person's yes to `asks` recorded by lamp-control at `control`
 /// (`{"task_yes_record": {"name", "sha256", "grants"}}`), only while the
 /// skill on the lamp, read again by the manage helper at `manage`, still
@@ -828,6 +878,11 @@ pub fn approve_by(manage: &Path, control: &Path, asks: &Asks) -> Result<Value, S
         answer.get("recorded").and_then(Value::as_bool),
         answer.get("error").and_then(Value::as_str),
     ) {
+        // An agent skill added from a file (`LAMP_UPLOAD_TO_AGENT`): its
+        // first run asked this yes, so it runs now, as the person asked.
+        (Some(true), _) if crate::upload_agent::on() && read_from_file(manage, &asks.skill) => {
+            Ok(json!({ "approved": 1, "call": asks.skill.replace('-', "_") }))
+        }
         (Some(true), _) => Ok(json!({ "approved": 1 })),
         (_, Some(why)) => Err(why.to_owned()),
         _ => Err("lamp-control said nothing".to_owned()),
@@ -1083,6 +1138,106 @@ mod tests {
         assert_eq!(kept.sha256, "ab".repeat(32));
         assert_eq!(kept.grants, Some(vec!["camera".into(), "light".into()]));
         assert!(kept.writes.is_empty());
+    }
+
+    /// #6715 (c0a4, 13 Nov, 12526): a task's read-back cut by a "Yes." said
+    /// over it is no say-back, and the yes is refused. The same ask again,
+    /// with the model calling `make_skill` at once with the waiting
+    /// `approve_id` (no read-back of its own), is refused too, and that
+    /// refusal hands the whole say-back to be said again word for word; a
+    /// yes over that repeat is still refused, and a yes after it was heard
+    /// whole is taken. Asked again by name (`read_back`) instead, the
+    /// say-back is handed over whole the same way, with a new wait.
+    #[test]
+    fn a_cut_task_read_back_is_said_again_whole_before_its_yes_is_taken() {
+        let now = Instant::now();
+        let read = |request| {
+            read_back(
+                "my photo booth skill",
+                asking(request),
+                nowhere(),
+                |_| Ok(Some(booth(false))),
+                now,
+            )
+            .unwrap()
+        };
+        // What the model is told to say, word for word.
+        let quoted = |told: &Value| {
+            told["next"]
+                .as_str()
+                .unwrap()
+                .split('"')
+                .nth(1)
+                .unwrap()
+                .to_owned()
+        };
+        let say_back = said(&booth(false));
+        let told = read(6);
+        let id = told[skill_write_yes::APPROVE_ID]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let whole = quoted(&told);
+        assert!(whole.contains(&say_back), "{whole}");
+        // All but its last ten words played, then cut by the "Yes." of
+        // request 7.
+        let words: Vec<&str> = whole.split_whitespace().collect();
+        skill_write_yes::lamp_said(6, &words[..words.len() - 10].join(" "));
+        skill_write_yes::lamp_cut(6);
+        assert!(!skill_write_yes::answer_awaited(7, now));
+        assert!(!skill_write_yes::approve_forced_now(now));
+        let refused = skill_write_yes::approve(&id, 7, true, true, now, |_| panic!("approved"));
+        assert_eq!(
+            refused["error"],
+            skill_write_yes::NOT_SAID_WHOLE,
+            "{refused}"
+        );
+        // The same ask again (request 9): the model calls make_skill at
+        // once with the waiting id, and is handed the whole say-back.
+        let again = skill_write_yes::approve(&id, 9, true, true, now, |_| panic!("approved"));
+        assert_eq!(again["error"], skill_write_yes::NOT_SAID_WHOLE, "{again}");
+        assert_eq!(quoted(&again), say_back, "{again}");
+        assert!(again["next"].as_str().unwrap().contains(&id), "{again}");
+        assert!(skill_write_yes::waits(&id));
+        // A "Yes." over that repeat: cut, so refused, and handed again.
+        let repeat: Vec<&str> = say_back.split_whitespace().collect();
+        skill_write_yes::lamp_said(9, &repeat[..repeat.len() / 2].join(" "));
+        skill_write_yes::lamp_cut(9);
+        let over = skill_write_yes::approve(&id, 10, true, true, now, |_| panic!("approved"));
+        assert_eq!(over["error"], skill_write_yes::NOT_SAID_WHOLE, "{over}");
+        assert_eq!(quoted(&over), say_back, "{over}");
+        // Said whole in request 10: the yes of request 11 is taken.
+        skill_write_yes::lamp_said(10, &quoted(&over));
+        assert!(skill_write_yes::answer_awaited(11, now));
+        assert!(skill_write_yes::approve_forced_now(now));
+        let mut kept = None;
+        let told = skill_write_yes::approve(&id, 11, true, true, now, |asks| {
+            kept = Some(asks.clone());
+            Ok(json!({"approved": 1}))
+        });
+        assert_eq!(told["approved"], true, "{told}");
+        assert_eq!(kept.unwrap().say_back, say_back);
+        // Asked again by name after a cut: a new wait, the say-back handed
+        // whole, and its yes taken once it is heard whole.
+        let told = read(20);
+        let first = told[skill_write_yes::APPROVE_ID]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        skill_write_yes::lamp_said(20, &words[..10].join(" "));
+        skill_write_yes::lamp_cut(20);
+        let told = read(22);
+        let id = told[skill_write_yes::APPROVE_ID]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        assert_ne!(id, first);
+        assert!(!skill_write_yes::waits(&first));
+        assert_eq!(quoted(&told), whole);
+        skill_write_yes::lamp_said(22, &whole);
+        let told =
+            skill_write_yes::approve(&id, 23, true, true, now, |_| Ok(json!({"approved": 1})));
+        assert_eq!(told["approved"], true, "{told}");
     }
 
     /// Agreed already for this folder, it is said and nothing is asked; a

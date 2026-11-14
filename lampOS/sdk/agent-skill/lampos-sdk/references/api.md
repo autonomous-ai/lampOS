@@ -21,7 +21,7 @@ naming every public call, tool, event and error code they have.
 | find lamps on this network | `await find()` (`lampos.discovery`, the `[find]` extra) | `await find()` | — |
 | any op of the schema | `await lamp.request(op, **fields)` (`on_id=` is told its id before it is sent) | `lamp.request(op, fields)` | — |
 
-No lamp announces itself by mDNS yet (stable 11450): `find()` and `lamp find`
+No lamp announces itself by mDNS yet (any build): `find()` and `lamp find`
 return none, so give `host` (`lamp-xxxx.local` or the IP address). The
 pairing keeps it for later connects.
 
@@ -46,11 +46,11 @@ pairing keeps it for later connects.
 | `person.left` (look) | `count`: 0 | nobody in view for 5 s, after someone was |
 | `person.facing` (look) | `facing` | someone turns to the lamp, or the last one turns away |
 | `person.stood_up` (look) | `side` | someone in view stands up |
-| `hand` (look) | `seen`; when seen `x`, `y`, `size`, `open`, `confidence` | a hand seen, moved, opened, closed or gone, at most 4 a second |
+| `hand` (look) | `seen`; when seen `x`, `y`, `size`, `open`, `confidence` | a hand seen, moved, opened, closed or gone, at most 4 a second; in development: nothing publishes `humans/hands/tracked` on a customer lamp yet, so none comes |
 | `phrase.heard` (hear) | `phrase`: one of yours | a line the lamp heard holds your phrase; register up to 16 with `phrases` |
 | `name.heard` (hear) | none | someone says the lamp's name |
 | `sound.heard` (sound) | `class` (`music`, `laughter`, `door`, `footsteps`), `score` | a class's score rises past 0.5 |
-| `touch` | `kind`: `tap` or `pet` | a tap or a pet |
+| `touch` | `kind`: `tap` or `pet` | a tap (shown from 11372) or a pet (not shown on a lamp yet) |
 | `button` | `press`: `long_press` | the button is held |
 | `lamp.changed` | `lamp_state`: `talking`, `paused`, `private`, `asleep` | one of them changes |
 | `volume.changed` (speak) | `level` (0–100 of what the lamp allows), `muted` | the speaker's volume changes, whoever changed it: the person by voice or in the app, or a computer |
@@ -89,12 +89,12 @@ Parts: `body` (grant body), `light` (light), `voice` (speak). `for_ms` up to
 |---|---|---|---|---|
 | a feeling (move and light) | `await lamp.express("glad", 0.5)` (`glad`, `lively`, `low`) | `lamp.express('glad', 0.5)` | `lamp_express(feeling, strength)` | body and light |
 | a gesture | `await lamp.gesture("nod", wait=False)` | `lamp.gesture('nod', { wait })` | `lamp_gesture(name)` | body |
-| look (`face`, `name` refused on stable 11450) | `await lamp.look("ahead")`, `look(yaw=20, pitch=5)`, `look("hand")` | `lamp.look('ahead')`, `lamp.look({ yaw, pitch })` | `lamp_look(at, yaw, pitch)` | body, a body lease |
-| follow a hand | `async with lamp.follow_hand() as following:` | `lamp.withHand(async (following) => …)`, `lamp.followHand().start()` | `lamp_follow_hand(seconds)`, `lamp_follow_stop()` | body and look |
+| look (`name` refused; `hand`: the lamp doesn't track hands yet, the GUIDE's Follow a hand row; `face` is taken by lamp-control but a customer lamp's body drops it, "gaze is not measured"; refused "not in this release" on 11091 and older) | `await lamp.look("ahead")`, `look(yaw=20, pitch=5)` | `lamp.look('ahead')`, `lamp.look({ yaw, pitch })` | `lamp_look(at, yaw, pitch)` | body, a body lease |
+| follow a hand (in development: the lamp doesn't track hands yet; lamp-body refuses a hold that says `follow`) | `async with lamp.follow_hand() as following:` | `lamp.withHand(async (following) => …)`, `lamp.followHand().start()` | `lamp_follow_hand(seconds)`, `lamp_follow_stop()` | body and look |
 | a move of your own | `await lamp.move(frames, step_ms)` | `lamp.move(frames, stepMs)` | `lamp_move(step_ms, frames)` | body, a body lease |
 | a move through poses in degrees, eased | `await lamp.move_poses([{"pitch": 10}, {"yaw": -8}])` | `lamp.movePoses([{ pitch: 10 }, { yaw: -8 }])` | `lamp_move_poses(poses)` | body, a body lease |
-| a recorded move (refused on every lamp today) | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
-| aim the joints (stable 11450: all five, `roll`, `shoulder`, `elbow` while the lamp stands; 11048 and older: `yaw`, `pitch` only) | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | `lamp_joints(within_ms, pitch, roll, yaw, shoulder, elbow)` | body, the lease named |
+| a recorded move in one of your pushed skills (plays from build 12171; refused "not routed yet" on 11913 and before) | `await lamp.play(name)` | `lamp.play(name)` | `lamp_play(name)` | body, a body lease |
+| aim the joints (from build 11102: all five, `roll`, `shoulder`, `elbow` while the lamp stands; 11048 and older: `yaw`, `pitch` only) | `await lamp.joints(lease, 1000, pitch=5)` | `lamp.joints(lease, 1000, { pitch: 5 })` | `lamp_joints(within_ms, pitch, roll, yaw, shoulder, elbow)` | body, the lease named |
 | light | `await lamp.light("green", 3, 10_000, pattern="breathe")` (no `pattern`: steady) | `lamp.light('green', 3, 10000, 'breathe')` (`undefined`: steady) | `lamp_light(colour, level, for_ms, pattern)` | light |
 | ring, pixel by pixel | `await lamp.ring(pixels, for_ms=3_000, brightness=50)`: `lamp.ring_pixels` colours (`"#rrggbb"` or `(r, g, b)`), from pixel 0 around the ring | `lamp.ring(pixels, { forMs: 3000, brightness: 50 })` (`lamp.ringPixels` of them) | `lamp_ring(pixels, rgb, brightness, for_ms)` | light |
 | one colour of your own | `await lamp.light_rgb("#ff8000", for_ms=10_000, brightness=40)` | `lamp.lightRgb('#ff8000', { forMs: 10000, brightness: 40 })` | | light |
@@ -209,7 +209,7 @@ computer goes, never beyond the computer's other grants, and a revoke turns it
 off. `lamp skill push` checks the folder first, as `lamp skill check` does.
 A push needs `skills` plus every grant the skill's `[permissions]` asks, is
 1 MiB at most packed, and needs lamp-control started with `--manage-socket`.
-**On customer lamps from stable 11091 on** (11450 today): the product unit
+**On customer lamps from stable 11091 on**: the product unit
 passes it. On 11048 and older every skill op is refused, "skill push is not on
 this lamp"; try it on `lamp fake`. To try it:
 `lampOS/sdk/examples/hello-skill`, which asks only `speak`.

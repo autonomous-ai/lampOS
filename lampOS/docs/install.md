@@ -97,6 +97,7 @@ differs. Folders are what the unit makes or names.
 | services | `lamp-services --store /var/lib/lampos-services --run /run/lampos-services` (on in the product unit, `LAMP_SERVICES=on`, with writes, `LAMP_SERVICES_WRITE=on`, since 4 Nov; `services.md`) | root, group lampos, no capability | `/var/lib/lampos-services/` (0700, its `StateDirectory`; the reset plan wipes it); `/run/lampos-services/` (0750) | setup's `backend.json` and the voice's key, through `LoadCredential=`, for a token's refresh | `admin.sock` (`lamp-cloud` only), `tools/` with `tools.json` and `call.sock` (the voice only) |
 | control | `lamp-control serve` (off unless `LAMP_CONTROL=on`, `control.md`) | lampos | `/var/lib/lampos-control/` (0700, its `StateDirectory`: certificate, key, paired computers); `/run/lampos-control/` (0700, the admin socket) | none | TCP 7731 (WebSocket over TLS, paired computers only); `admin.sock`; the body's `mood.sock`, the voice's `say.sock`, the bus |
 | peek | `lamp-peek` (the owner's dev monitor, #5883: off unless `LAMP_PEEK=monitor`, which the app's `monitor.set` writes as a drop-in; outside `lampos.target`, `lamp-peek.service` is `WantedBy=multi-user.target` once setup's marker exists, `peek.md`) | lampos | `/run/lampos-peek/` (0700, the admin socket) | none | TCP 80 to the local network only, while on; `admin.sock`; reads the bus |
+| seen | `lamp-seen frame-link`, then `lamp-seen serve` (off unless `LAMP_SEEN_ACTIVITY=on`, `seen.md`); in the target before the eyes | lampos | `/var/lib/lampos-seen/` (0700, its `StateDirectory`, passed as `--state-folder`: the line said back; the reset plan wipes it); `/run/lampos-seen/` (0700, kept until the lamp restarts: the frame link's boots, `frame-link.env`, which the eyes read by `--frame-link-boots`, and `eyes-visits.env`) | setup's `backend.json` and the voice's key, through `LoadCredential=`; the opt-in, `/var/lib/lampOS/consent/seen-activity.json`, read only (the reset plan removes it) | the bus (`humans/doing`, `humans/doing_seen`, `humans/posture`, `light/mark`); the voice's `say.sock`; the eyes' frame link; the perception service, with the switch and the opt-in |
 | cloud | `lamp-cloud --bus-root /run/lampos-bus` (on in the product, `LAMP_CLOUD=on` in its unit since #1815, `cloud.md`) | lampos | `/var/lib/lampos-cloud/` (0700, its `StateDirectory`) | setup's `backend.json`, the voice's key and update's `state.json`, through `LoadCredential=` | the company broker and the backend's ping; reads the bus |
 | records | `lamp-records check` (a timer, hourly) | root | `/run/lamp-records/` | `/etc/lampOS/records.json`, which install places (`deploy/product/settings/records.json`; it does nothing without it) | `last.json` |
 | selftest | `lamp-selftest --occasion first-boot` (a timer: 5 min after the lamp starts, then every 6 h; #812) | lampos, `CAP_SYSLOG` | `/var/lib/lamp-selftest/` (its own `StateDirectory`) | none | the bus (`lamp/selftest`), its runs' reports |
@@ -296,9 +297,10 @@ would take a Live session past its 32, and its marks, called only after its look
 other installable skills, which their owner puts on; and Laugh glance,
 parked (#1669). A test
 fails on a folder in `lampOS/skills/` that is in neither list. With them a
-product lamp has 42 functions of its own: the voice's own 24 (with
+product lamp has 45 functions of its own: the voice's own 27 (with
 `LAMP_REPORTS=on`, #2862, `reports_stop` and `reports_state` among them,
-and `LAMP_MEMORY_ROLE=on`'s `set_role` and `end_role` since 9 Nov), the
+and `LAMP_MEMORY_ROLE=on`'s `set_role` and `end_role` since 9 Nov, and
+`LAMP_SLEEP_ASKED=on`'s `go_to_sleep` since #6853), the
 actions part's 17 and `use_skill`, reaching Dance's `dance` and Pose's
 `set_pose`, which comes with the product since #4135 (`PRODUCT_FUNCTIONS` in
 `crates/update/tests/functions.rs`, which fails if one is left out or the
@@ -534,7 +536,10 @@ What steps 2 and 3 build, unless an answer on #811 changes it.
   It also makes `/run/lampos-photos` (`lampos`'s, 0700), the app's photos
   for the eyes when `LAMP_PHOTO_FACES` is on (cloud.md), and
   `/run/lampos-eyes-kept` (`lampos`'s, 0700), where the eyes keep a sitting
-  across a short restart (eyes.md, "A sitting kept across a restart"). And it keeps
+  across a short restart (eyes.md, "A sitting kept across a restart"), and
+  `/run/lampos-eyes-frames` (`lampos`'s, 0700), the frame link's folder,
+  where the eyes bind lamp-seen's socket only with its switch on (seen.md,
+  "The product unit"). And it keeps
   PulseAudio out of the board user's session (#4332): it masks
   `pulseaudio.socket` and `pulseaudio.service` for every user session
   (`/etc/systemd/user/`, links to `/dev/null`) and turns libpulse's
@@ -1048,6 +1053,9 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    V1's Jev client does (#811 point 2).
    It never writes `/etc/lampOS/body/lamp.env`, and says that the body waits
    for it.
+   **PARKED (#6386): install does none of this paragraph and touches no
+   name or time server; `lamp-update region` and the two units are out of
+   the product (the units in `deploy/product/parked/`); re-enable when China is scheduled and stable's lamp-update carries #6810.**
    **Name and time servers: China's on a lamp placed in China only**
    (#6256, #6414; `install::region_servers`, also `lamp-update region`). The
    region is the one `lamp-cloud` keeps from the ping's reply in
@@ -1113,8 +1121,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
    target (`lamp-setup.service`, `lamp-waking.service`,
    `lamp-setup-wifi-restore.service` and `lamp-setup-recover.service`,
    [setup.md](setup.md)), `lamp-records.timer`, `lamp-selftest.timer`,
-   `lamp-update-back.timer`, `lampos-setup-done.path`, `lamp-region.service`
-   and `lamp-region.path` (#6256, below), and the helpers'
+   `lamp-update-back.timer`, `lampos-setup-done.path` (`lamp-region.service`
+   and `lamp-region.path`, #6256, are PARKED (#6386), above), and the helpers'
    sockets `lamp-skills-manage.socket`, `lamp-setup-change.socket`,
    `lamp-setup-wifi.socket` and `lamp-eyes-camera.socket` (`install::enabled`;
    a test holds this list to it; #2853; each template is started by its socket,
@@ -1669,7 +1677,15 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      the namespace leaves `/usr` as it is, so a run reads it and cannot change
      it). The folder holding anything but exactly this build's files counts
      as Hermes missing, so a newer build has it written again; a skill's run
-     has it on `PYTHONPATH` (`docs/tasks.md`). No fetch at run time. No unit, no
+     has it on `PYTHONPATH` (`docs/tasks.md`). Hermes's own launcher replaces
+     the `PYTHONPATH` it is started with, so the same one-shot also writes
+     `/usr/local/lib/lampos/hermes-run-env.sh` (root's, 0644, never run),
+     which lamp-tasks lists in Hermes's `terminal.shell_init_files`: Hermes's
+     terminal sources it before its login snapshot, and it puts the SDK first
+     on `PYTHONPATH` only when `LAMP_CONTROL_SOCKET` is set, which only a
+     skill run's start sets (#6684). The file missing or changed counts as
+     Hermes missing too, and the switch off takes it out with the wrapper.
+     No fetch at run time. No unit, no
      service, no gateway, nothing at boot: Harness starts `hermes` in a
      pane only when a task is sent to it.
    - **In a namespace that shows Hermes only its own folders.** Hermes
@@ -1989,6 +2005,116 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      with none of it. What only a lamp shows: `--net` with
      `--map-root-user` as `lampos`, `ip link set lo up` there, and a run's
      model call answered while `curl https://example.com` fails.
+   - **A voice make gets a fresh home, and nothing of Hermes's lasting
+     one** (#6643, the first builder's 19:14 ruling and the HOLDs of 12 Nov
+     19:58 and 20:0x; behind `LAMP_SKILL_TASKS` too). lamp-tasks starts a
+     make's run (`lamp_tasks::skill_make`, docs/tasks.md) with
+     `LAMP_NS_HOME` naming the make's own new home,
+     `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-<run id>/home`.
+     The wrapper takes it only for that path, never with `..`
+     (`WRAPPER_HOME_LINE`), and points `HERMES_HOME` under it:
+
+     ```sh
+     case ${LAMP_NS_HOME-} in *..*) unset LAMP_NS_HOME ;; /var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home) export HERMES_HOME="$LAMP_NS_HOME/.hermes" LAMP_NS_HOME ;; *) unset LAMP_NS_HOME ;; esac
+     ```
+
+     The namespace script then (`NS_HOME_LINE`, after the ids are read and
+     before Hermes runs):
+
+     ```sh
+     if [ -n "${LAMP_NS_HOME-}" ]; then
+       F=${LAMP_NS_HOME%/home} X=/tmp/.lampos-mk
+       [ -d "$LAMP_NS_HOME" ] && [ -n "$W" ] && [ "${F%/*}" = "$W/lamp" ] || fail "no $LAMP_NS_HOME"
+       mkdir -m 0700 "$X" "$X/f" "$X/c" "$X/t" "$X/i" || fail "no make staging"
+       mount -n --bind "$F" "$X/f" || fail "no $F"
+       mount -n --bind "$H/.hermes/hermes-agent" "$X/c" || fail "no Hermes checkout"
+       mount -n --bind "$H/.hermes/tools" "$X/t" || fail "no Hermes tools"
+       mount -n --bind "$H/.hermes/installs" "$X/i" || fail "no Hermes installs"
+       k=
+       for p in "$H/.hermes/installs"/*/.install.lock; do
+         [ -f "$p" ] && [ ! -L "$p" ] || continue
+         mount -n --bind "$p" "$X/i/${p#"$H/.hermes/installs/"}" || fail "Hermes install lock not shown"
+         k=1
+       done
+       [ -n "$k" ] || fail "no Hermes install lock: the lasting Hermes has not run"
+       for p in "$H/.hermes/installs"/*/pm-runtime; do
+         [ -d "$p" ] || continue
+         [ -f "$p/.prepare.lock" ] && [ ! -L "$p/.prepare.lock" ] && mount -n --bind "$p/.prepare.lock" "$X/i/${p#"$H/.hermes/installs/"}/.prepare.lock" || fail "Hermes runtime lock not shown"
+       done
+       for p in "$H/.hermes/installs"/*/environments/*/.lease-managed "$H/.hermes/installs"/*/pm-runtime/generations/*/.lease-managed; do
+         [ -f "$p" ] || continue
+         g=${p%/.lease-managed}
+         { [ -d "$g/.leases" ] || mkdir "$g/.leases"; } && [ ! -L "$g/.leases" ] && mount -n --bind "$g/.leases" "$X/i/${g#"$H/.hermes/installs/"}/.leases" || fail "Hermes leases not shown"
+       done
+       mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$H/.hermes" || fail "$H/.hermes not hidden"
+       mkdir "$H/.hermes/hermes-agent" && mount -n --move "$X/c" "$H/.hermes/hermes-agent" && ro "$H/.hermes/hermes-agent" || fail "Hermes checkout not shown"
+       mkdir "$H/.hermes/tools" && mount -n --move "$X/t" "$H/.hermes/tools" && ro "$H/.hermes/tools" || fail "Hermes tools not shown"
+       mkdir "$H/.hermes/installs" && mount -n --move "$X/i" "$H/.hermes/installs" && ro "$H/.hermes/installs" || fail "Hermes installs not shown"
+       ro "$H/.hermes"; ro "$H"; ro "$W"
+       mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$W/lamp" || fail "$W/lamp not hidden"
+       mkdir "$F" && mount -n --move "$X/f" "$F" || fail "$F not shown"
+       ro "$W/lamp"
+       rmdir "$X/f" "$X/c" "$X/t" "$X/i" "$X" || fail "make staging left"
+       cd "$F" || fail "$F not visible"
+       HOME=$LAMP_NS_HOME
+     fi
+     unset LAMP_NS_HOME F X k p g
+     ```
+
+     A make keeps the network by default, so Hermes's lasting home
+     (`/var/lib/lampos-hermes/.hermes`: memories, sessions, `state.db`,
+     `.env`) is hidden under an empty read-only tmpfs, with only the
+     checkout (`hermes-agent`, where the program runs from), `tools` (its
+     uv, Python and package manager) and `installs` (its dependency record,
+     `installs/<key>/facts.json`, and environments) shown again,
+     read-only. A make's fresh `HERMES_HOME` holds links named `installs`
+     and `tools` to those two (lamp-tasks' `skill_make::RUNTIME_LINKS`):
+     Hermes 0.22.2 keeps dependency state per data root
+     (`<HERMES_HOME>/installs/<key>`, `pm/environments.py`) and, finding
+     none, syncs its own first ("preparing dependencies for this data
+     root"), which ended a make `run_failed` in under a second on lamp-c0a4
+     (#6643). Links, not binds: Hermes takes a recorded environment only
+     under `<HERMES_HOME>/installs/<key>/environments` once resolved, and
+     a link resolves to the lasting path its record names. Inside the
+     read-only `installs`, only what Hermes must write at every start is
+     bound back read-write, from the lasting home before it is hidden (the
+     binds move with `installs`, and its read-only remount does not reach
+     them): each `installs/<key>/.install.lock`, which
+     `hermes_cli/runtime_state.py` `runtime_lock` opens `O_CREAT|O_RDWR`
+     and flocks (read-only, `EROFS` ended a make `run_failed` in 0.4 s on
+     a lamp, "run `hermes pm repair`"), so a make shares the lasting
+     Hermes's lock; and each lease-managed generation's
+     `installs/<key>/environments/<gen>/.leases` (made first when
+     missing, as Hermes would), where `lease_directory` prunes unlocked
+     leases and creates and flocks its own, so the generation a make runs
+     on is never collected under it; and, where Hermes's PM runtime is
+     there, `installs/<key>/pm-runtime/.prepare.lock`, which
+     `pm/runtime.py` `prepare_runtime` opens `a+b` and flocks (the next
+     `EROFS` the lamp hit), with each lease-managed
+     `installs/<key>/pm-runtime/generations/<gen>/.leases` it leases.
+     `facts.json`, `publication.json`, `pm-runtime/selected.json`, the
+     environments' contents and `tools` stay read-only. No install lock at
+     all (the lasting Hermes has never started), or a `pm-runtime` with no
+     `.prepare.lock`, ends it before Hermes runs. Every mount these lines
+     make is `mount -n`: they run after `/run` is read-only, where
+     util-linux cannot write its utab, and a `--move` without `-n` ended
+     the script "Hermes checkout not shown" on a lamp.
+     Hermes's folder and the work folder are left read-only, and
+     the rest of the work folder's `lamp` (the Harness project, other runs'
+     folders) is hidden under another tmpfs, with the make's own folder
+     alone moved back, read-write. Each step failing ends it before Hermes
+     runs; a home outside the work folder's `lamp` is refused. Tests: the
+     lines run by `sh` with every mount stubbed (each step in order, each
+     failing stops it, a home elsewhere refused, no make none of it), and,
+     on Linux where a user namespace is allowed, run for real: a `cat` of
+     the lasting `memories` finds nothing, the lasting home shows only the
+     checkout, `lamp` only the make's folder, and only that folder can be
+     written, and `installs` is shown read-only but for its install lock
+     and lease folders: writing those succeeds, writing `facts.json` or an
+     environment fails. What only a lamp shows:
+     Hermes running from the checkout with the lasting home hidden, on the
+     prepared runtime through the links, with no dependency sync, taking
+     the lock and a lease beside the lasting Hermes.
    - **User namespaces checked first:** before anything is made, `lampos`
      must be able to make that namespace: `runuser -u lampos --
      /usr/bin/unshare --map-root-user --mount --pid --kill-child
@@ -2447,7 +2573,9 @@ yet on a lamp.
   0755), is Hermes's (`hermes-ns`, "Hermes on the lamp": the same
   allow-list, hidden `/run`, `/var/lib` and `/etc/lampOS`, private `/tmp`,
   hidden devices, the skills and `LAMP_SKILL_TASKS` switches, and a skill
-  run's network) with the engine made data. It checks the name again and
+  run's network) with the engine made data, but for a voice make's home
+  (`LAMP_NS_HOME`, #6643), which runs Hermes only: that block is left out
+  and the variable unset. It checks the name again and
   that the program is a full path to a file, sets `HOME` to the engine's
   own folder `/var/lib/lampos-agents/<engine>` (`lampos`'s, 0700; the
   folder above it root's, 0755), binds the program back read-only at its
@@ -2546,7 +2674,14 @@ yet on a lamp.
     forwarder token read from lamp-cloud's file (none ends it) and given
     as `LAMP_HERMES_TOKEN` with `HERMES_HOME=/var/lib/lampos-hermes/.hermes`
     and `HERMES_YOLO_MODE` unset, and in a run `HERMES_YOLO_MODE=1`
-    (#6684). A plain agent's are empty;
+    (#6684). And, only for an agent that takes a skill's run with no
+    Harness (#6685 PR 3), `agent_task() { … }` (`Agent::task`): given the
+    run's task file as `$1`, it turns it into the agent's own arguments
+    and ends in `agent_start` with them. Hermes's
+    (`hermes_install::AGENT_TASK`): the file read whole (empty ends it)
+    and `agent_start chat -q "<the task's words>"`, as Harness starts the
+    lamp's Hermes with a first prompt. A plain agent's are empty, and it
+    has no `agent_task`;
   - **the run path**, after `# The run path, the same for every agent:`,
     the same bytes for every agent (a test holds it for Hermes, Claude
     Code and Codex, and pins Hermes's and Claude Code's whole wrappers in
@@ -2556,10 +2691,19 @@ yet on a lamp.
     Hermes's approvals); `agent_env`, then `agent_run_env` in a run; `N=`
     and `[ "${LAMP_NS_NET-}" != run ] || N=--net`; the program (its own,
     resolved by `readlink -f`, or the first on `PATH`); the hook stand-in's
-    journal line tagged `$E`; and `exec /usr/bin/unshare --map-root-user
-    $N --mount --pid --kill-child --mount-proc --propagation private
-    /usr/local/lib/lampos/agent-ns "$@"`, with `LAMP_NS_ENGINE`,
-    `LAMP_NS_ENGINE_BIN` and `LAMP_NS_HOME`.
+    journal line tagged `$E`; `LAMP_NS_ENGINE`, `LAMP_NS_ENGINE_BIN` and
+    `LAMP_NS_HOME` exported; `agent_start() { exec /usr/bin/unshare
+    --map-root-user $N --mount --pid --kill-child --mount-proc
+    --propagation private /usr/local/lib/lampos/agent-ns "$@"; }`; **the
+    task entry** (`wrapper::TASK_ENTRY`, #6685 PR 3): `<engine>
+    --lamp-task`, a skill's run lamp-tasks starts itself with no Harness
+    account, is taken only in a run (its token file already read), with
+    that one argument, from an agent with `agent_task`, and with the run
+    folder's `task` file a file and not a link; then `agent_task
+    "$P/task"`, and anything else ends it ("--lamp-task is only for a
+    skill's run …", "it takes no skill's task without Harness yet", "no
+    task at …") before the namespace; and last `agent_start "$@"` for
+    every other start, Harness's own among them, as before.
 
   `agent-ns` then takes the home from `LAMP_NS_HOME` instead of
   `/var/lib/lampos-agents/$E` (`ONE_PATH_NS_EDITS`), and before anything
@@ -2598,7 +2742,12 @@ replace a file that is not lamp-update's; no token file left when no
 program is found; an engine found before the wrapper (or none found) not
 present; the login lookup's argv; the programs look's argv (bounded,
 fixed text, plain names only), run with a stand-in `PATH` listing only
-the engine's own program, and its output read strictly.
+the engine's own program, and its output read strictly; the one run
+path's task entry the same lines for every agent, `agent_task` only in
+Hermes's data, Hermes started by it as `chat -q` with the task's words
+after the run's token file is read once, and nothing started by it for
+an agent with no `agent_task`, outside a run's folder, with another
+argument, or with no task file or a linked one (#6685 PR 3).
 `agent_ns::rounds::tests`: the switch
 on only for `on`; only installed, plain engines other than Hermes and
 OpenClaw written, a made-up one included; a second round writing nothing

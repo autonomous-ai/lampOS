@@ -29,8 +29,11 @@ mod pause_join;
 mod person_scope_seen;
 mod read_back_words;
 mod remember_speaker;
+mod remove_words;
 mod sent_write;
 mod short_done;
+mod skill_named_words;
+mod task_yes_words;
 mod unplayed_join;
 mod voice_confirms;
 mod wake_not_name;
@@ -14385,6 +14388,117 @@ fn words_on_the_way_count_only_for_an_empty_cut_in() {
     );
 }
 
+/// #6840: a "Yes." in the clear whose final words came back empty, with
+/// "Yes" on the way, while a read-back awaits its answer, is taken as said;
+/// a plain no too. With no answer awaited, words on the way that are no
+/// plain yes or no, or final words of its own, nothing changes, and the
+/// cut-in's stop path over the lamp's voice is as before.
+#[test]
+fn an_empty_final_with_a_yes_on_the_way_answers_an_awaited_read_back() {
+    let on = |words: &str| Some(words.to_owned());
+    assert_eq!(
+        super::answer_on_the_way("", on("Yes."), true).as_deref(),
+        Some("Yes.")
+    );
+    assert_eq!(
+        super::answer_on_the_way(" ", on("No, don't."), true).as_deref(),
+        Some("No, don't.")
+    );
+    assert_eq!(super::answer_on_the_way("", on("Yes."), false), None);
+    assert_eq!(
+        super::answer_on_the_way("", on("What's the weather?"), true),
+        None
+    );
+    assert_eq!(super::answer_on_the_way("Yes.", on("Yes."), true), None);
+    assert_eq!(super::answer_on_the_way("", None, true), None);
+    // Over the lamp's voice, as before: the clear-line path takes no part.
+    assert_eq!(
+        super::words_on_the_way("", on("Stop"), true).as_deref(),
+        Some("Stop")
+    );
+    assert_eq!(super::words_on_the_way("", on("Yes."), false), None);
+}
+
+/// Heron's P2 on #6992: speech to text sends each result's own words, one
+/// segment at a time, so the line's words on the way are all its results',
+/// an interim that only grows the one before standing in its place. "Wait,
+/// not that one." then "Okay." is no answer, though "Okay." alone is a
+/// plain yes; "Yes." then "please." is the yes "Yes. please.".
+#[test]
+fn an_empty_finals_answer_on_the_way_is_judged_on_all_the_lines_words() {
+    let line = |results: &[&str]| {
+        let mut line = Vec::new();
+        for words in results {
+            super::add_line_words(&mut line, words);
+        }
+        Some(line.join(" ")).filter(|words| !words.is_empty())
+    };
+    // Each segment once: interims growing to their final stand in place.
+    assert_eq!(
+        line(&["Wait", "Wait, not", "Wait, not that one.", "Okay", "Okay."]).as_deref(),
+        Some("Wait, not that one. Okay.")
+    );
+    assert_eq!(
+        line(&["No", "No, don't", "No, don't send it."]).as_deref(),
+        Some("No, don't send it.")
+    );
+    assert_eq!(line(&["", " "]), None);
+    // Two segments, the last a plain yes: no answer.
+    let two = line(&["Wait, not that one.", "Okay."]);
+    assert_eq!(super::answer_on_the_way("", two, true), None);
+    // Two segments, both yes: the line's yes.
+    let both = line(&["Yes.", "please."]);
+    assert_eq!(
+        super::answer_on_the_way("", both, true).as_deref(),
+        Some("Yes. please.")
+    );
+    // One segment growing to its final: as said.
+    assert_eq!(
+        super::answer_on_the_way("", line(&["Yes", "Yes."]), true).as_deref(),
+        Some("Yes.")
+    );
+}
+
+/// The same through `spoken` (`LAMP_SECOND_UNFINISHED_WAIT` on, a write
+/// waiting for its read-back's answer, the line's final words empty): the
+/// line's words on the way, not its last segment, are judged. "Yes." alone
+/// is taken as said and the chat asked; "Wait, not that one." then "Okay."
+/// is thrown away, nothing asked.
+#[tokio::test]
+async fn an_empty_final_takes_the_whole_lines_words_on_the_way_not_its_last_segment() {
+    async fn run(on_the_way: &[&str]) -> (Vec<String>, usize) {
+        crate::services::pending_for_test(Some(crate::services::Pending {
+            began_clear: true,
+            service: "gmail".to_owned(),
+            ..crate::services::Pending::new("id", 0, Instant::now(), "Send a mail.", "ann")
+        }));
+        let script = Arc::new(Script {
+            heard: Mutex::new([Ok(String::new())].into()),
+            said: Mutex::new([on_the_way.iter().map(|w| (*w).to_owned()).collect()].into()),
+            chats: Mutex::new([vec![text("Sent."), Ok(ChatEvent::Done)]].into()),
+            ..Script::default()
+        });
+        let (built, _, _) = scripted(script.clone());
+        let mut engine = built.telling_unfinished_words(true);
+        engine.submit(start(1));
+        engine.submit(audio(1, 1));
+        engine.submit(end(1));
+        let out = turn(&mut engine).await;
+        let asked = script.asked.lock().unwrap().len();
+        crate::services::pending_for_test(None);
+        (out, asked)
+    }
+    let (out, asked) = run(&["Yes", "Yes."]).await;
+    assert!(out.contains(&"heard:Yes.".to_owned()), "{out:?}");
+    assert_eq!(asked, 1, "{out:?}");
+    let (out, asked) = run(&["Wait, not that one.", "Okay."]).await;
+    assert!(
+        !out.iter().any(|label| label.starts_with("heard:Okay")),
+        "{out:?}"
+    );
+    assert_eq!(asked, 0, "{out:?}");
+}
+
 /// #1712, item 4 (`LAMP_FOLLOWS_ON`): a line begun soon after the lamp's
 /// words finished is told it may follow on from them, as the Live route
 /// tells it; not when its End marks a sound, nor when it was judged in a
@@ -14507,6 +14621,60 @@ async fn a_wordless_call_under_the_bar_is_not_answered_with_the_switch() {
         let sure = asked_with("", barred(Some(best)), start(1), true, false).await;
         assert_eq!(sure, off, "{best}");
     }
+}
+
+/// #6363, lamp-9adf on 13 Nov: a mail read back, then a line of no words
+/// at the second of the lamp's own arrival move, heard as a call, was
+/// answered as the name, and the one "Yes." after it found the mail dropped
+/// ("the lamp answered request 143 after its read-back with no send"). While
+/// the write waits for its answer such a call is left as a sound; asked as
+/// the name otherwise (here more lines came since), its answer is no other
+/// request. The yes after either sends; a worded line answered with no send
+/// still drops the write.
+#[tokio::test]
+async fn a_wordless_call_between_a_read_back_and_its_yes_keeps_the_write() {
+    use crate::services::{NOTHING_WAITING, Pending, Turn, WRITE};
+    let now = std::time::Instant::now();
+    let waiting = |lines: u32| Pending {
+        began_clear: true,
+        service: "gmail".to_owned(),
+        lines,
+        ..Pending::new("s1", 0, now, "Send a mail.", "ann")
+    };
+    let yes = Turn {
+        heard: true,
+        owner: Some("ann"),
+        sends: true,
+        seen_owner: true,
+        ..Turn::default()
+    };
+    let send = lamp_gemini::ToolCall {
+        id: "c1".to_owned(),
+        name: WRITE.to_owned(),
+        args: json!({"service": "gmail", "send_id": "s1"}),
+    };
+    let sends = |said: &str| {
+        crate::services::lamp_said(1, said, now);
+        let mut pending = crate::services::pending_for_test_take();
+        crate::services::gate(&mut pending, &send, 2, &yes, now)
+    };
+    // The answer awaited: not asked, nothing said, and the yes sends.
+    crate::services::pending_for_test(Some(waiting(0)));
+    let asked = asked_with("", |engine| engine, start(1), true, false).await;
+    assert!(asked.is_empty(), "{asked:?}");
+    assert!(sends("").is_ok(), "the yes after a held call sends");
+    // Two lines since, so no answer awaited: asked as the name, and still
+    // the yes after its answer sends.
+    crate::services::pending_for_test(Some(waiting(2)));
+    let asked = asked_with("", |engine| engine, start(1), true, false).await;
+    assert_eq!(asked[0].last(), Some(&Message::user(super::CALLED_WORDS)));
+    assert!(sends("Yes?").is_ok(), "the yes after a wordless call sends");
+    // A worded line answered with no send drops it, as before.
+    crate::services::pending_for_test(Some(waiting(0)));
+    let asked = asked_with("What time is it?", |engine| engine, start(1), false, false).await;
+    assert_eq!(asked.len(), 1);
+    let refused = sends("It's three.").unwrap_err();
+    assert_eq!(refused["error"], NOTHING_WAITING);
 }
 
 /// A line marked as only the lamp's name (`Called`) whose words came back

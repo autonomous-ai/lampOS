@@ -53,6 +53,9 @@ pub mod reminders_asked;
 #[path = "tools/skill_asked.rs"]
 pub mod skill_asked;
 
+#[path = "tools/make_skill_asked.rs"]
+pub mod make_skill_asked;
+
 #[path = "tools/schedule_whose.rs"]
 pub mod schedule_whose;
 
@@ -840,7 +843,7 @@ fn skills_after(settings: &Settings, told: &[Tool]) -> Vec<Tool> {
 }
 
 /// The voice's own functions and the executive's.
-fn core_tools(settings: &Settings) -> Vec<Tool> {
+pub(crate) fn core_tools(settings: &Settings) -> Vec<Tool> {
     core_tools_within(settings, lamp_gemini::MAX_TOOLS)
 }
 
@@ -1568,6 +1571,28 @@ pub fn skill_whens(settings: &Settings) -> std::collections::BTreeMap<String, St
     whens
 }
 
+/// Each skill's ask phrases, by its tool, from the first skills folder
+/// whose tools file gives them (`asks`, `lamp_skills::tools_file`, from its
+/// `skill.toml`'s `asks`, #6772): what [`crate::skill_named`] matches a
+/// heard line against beside the tool's name. Empty from an older file.
+pub fn skill_asks(settings: &Settings) -> std::collections::BTreeMap<String, Vec<String>> {
+    let mut asks = std::collections::BTreeMap::new();
+    for file in tools_files(settings) {
+        if let Some(given) = file["asks"].as_object() {
+            for (tool, phrases) in given {
+                let phrases: Vec<String> = phrases
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|phrase| phrase.as_str().map(str::to_owned))
+                    .collect();
+                asks.entry(tool.clone()).or_insert(phrases);
+            }
+        }
+    }
+    asks
+}
+
 /// Each skills folder's tools file that can be read, in order.
 fn tools_files(settings: &Settings) -> Vec<Value> {
     let mut files = Vec::new();
@@ -1656,6 +1681,11 @@ fn run_spoken_call_inner(
     } else if let Route::Executive(directory) = route
         && is_skills(settings, route)
     {
+        // An agent skill added from a file (`LAMP_UPLOAD_TO_AGENT`) whose
+        // task's yes isn't kept: its first run asks it, and nothing runs.
+        if let Some(told) = crate::upload_agent::first_run(&call.name, request, heard, lease) {
+            return ("the agent skill's yes", ToolAnswer::plain(told), true);
+        }
         let (answer, answered) = ask_with_context(directory, call, ASK_DEADLINE, context);
         ("the executive", answer, answered)
     } else {

@@ -680,6 +680,12 @@ impl Door {
         Ok(live)
     }
 
+    /// Marks live run `run` as a skill's fixed write's, `write`
+    /// ([`crate::runs::Run::fixed_write`]).
+    pub fn mark_fixed_write(&mut self, run: &str, write: &crate::runs::FixedWrite) {
+        self.runs.mark_fixed_write(run, write);
+    }
+
     /// Ends run `run` (and, when `serial` is given, only if it is still that
     /// mint): the run, if it was going. Its client is gone from the door.
     pub fn end_run(&mut self, run: &str, serial: Option<u64>) -> Option<crate::runs::Run> {
@@ -1023,16 +1029,31 @@ impl Door {
             // Its grant is held (above); and it is a skill run's, by the run
             // socket, whose run is still going: sent on to lamp-services,
             // which answers off the door's lock.
-            let skill = self
+            // A fixed write's run (LAMP_SKILL_WRITE_AGENT) names its run,
+            // so lamp-services holds it to the owner's kept yes, once; its
+            // write naming no content of its own is given the skill's
+            // (`FixedWrite::covers`), so the run's words never carry it.
+            let run = self
                 .runs
                 .of_client(&client, now_us)
                 .filter(|_| session.run_socket)
-                .map(|run| run.skill.clone());
-            let (Some(skill), Some(services)) = (skill, self.services.clone()) else {
+                .map(|run| {
+                    let fixed = run.fixed_write.clone().map(|held| (run.run.clone(), held));
+                    (run.skill.clone(), fixed)
+                });
+            let (Some((skill, fixed_write)), Some(services)) = (run, self.services.clone()) else {
                 return refuse(ErrorCode::NoGrant, crate::services::RUNS_ONLY.to_owned());
             };
             let write = matches!(op, Op::ServiceWrite { .. });
-            let line = crate::services::Services::line(&skill, write, service, args);
+            let mut line = match &fixed_write {
+                Some((_, held)) if write && held.covers(args) => {
+                    crate::services::Services::line(&skill, write, held.service(), &held.args())
+                }
+                _ => crate::services::Services::line(&skill, write, service, args),
+            };
+            if let Some((run, _)) = fixed_write {
+                line = crate::services::Services::fixed_write(&line, &run);
+            }
             return Outcome {
                 later: Some(Later {
                     re,
@@ -4054,6 +4075,126 @@ mod tests {
         door.end_run("r1", None);
         let outcome = door.handle(&mut session, &read_frame("gmail"), &mut fake, S, 1);
         assert!(outcome.later.is_none(), "{outcome:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// LAMP_SKILL_WRITE_AGENT: a run minted for a skill's fixed write names
+    /// its run beside its write, so lamp-services holds it to the owner's
+    /// kept yes, once; any other run's write goes as before.
+    #[test]
+    fn a_fixed_writes_run_names_its_run_to_lamp_services() {
+        use std::io::{BufRead as _, Write as _};
+        let dir =
+            std::env::temp_dir().join(format!("lamp-control-run-fixed-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let socket = dir.join("call.sock");
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let mut lines = Vec::new();
+            for _ in 0..2 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                writeln!(stream, r#"{{"ok":true,"result":{{"sent":true}}}}"#).unwrap();
+                lines.push(serde_json::from_str::<Value>(&line).unwrap());
+            }
+            lines
+        });
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], Some(socket));
+        let outcome = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        outcome.later.expect("answered off the lock").reply();
+        door.mark_fixed_write("r1", &arrival_write());
+        let outcome = door.handle(&mut session, &write_frame("gmail"), &mut fake, S, 1);
+        outcome.later.expect("answered off the lock").reply();
+        let lines = served.join().unwrap();
+        assert!(lines[0].get("fixed_write_run").is_none(), "{}", lines[0]);
+        assert_eq!(lines[1]["fixed_write_run"], "r1", "{}", lines[1]);
+        assert_eq!(lines[1]["args"], lines[0]["args"]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A skill's fixed write as lamp-control holds it for its run.
+    fn arrival_write() -> crate::runs::FixedWrite {
+        crate::runs::FixedWrite::of(&json!({"service": "gmail-app", "action": "send_mail",
+            "to": ["boss@work.test"], "subject": "In", "text": "I'm at my desk."}))
+        .unwrap()
+    }
+
+    /// The Reviewer-lead's P2 on #6824 and #6879: a fixed write's run is
+    /// never told its write in words. Its `service_write` names the service
+    /// alone (or its action too) and is given the skill's write, held from
+    /// the mint, beside its run's id: lamp-services sends that only as the
+    /// owner's kept yes has it, once a run. A write naming any content of
+    /// its own goes as asked, so lamp-services still refuses a changed one;
+    /// another run's contentless write is given nothing.
+    #[test]
+    fn a_fixed_writes_contentless_call_is_given_the_skills_write() {
+        use std::io::{BufRead as _, Write as _};
+        let dir =
+            std::env::temp_dir().join(format!("lamp-control-run-given-{}", std::process::id()));
+        let _ = std::fs::create_dir_all(&dir);
+        let socket = dir.join("call.sock");
+        let _ = std::fs::remove_file(&socket);
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        let served = std::thread::spawn(move || {
+            let mut lines = Vec::new();
+            for _ in 0..5 {
+                let (mut stream, _) = listener.accept().unwrap();
+                let mut line = String::new();
+                std::io::BufReader::new(&stream)
+                    .read_line(&mut line)
+                    .unwrap();
+                writeln!(stream, r#"{{"ok":true,"result":{{"sent":true}}}}"#).unwrap();
+                lines.push(serde_json::from_str::<Value>(&line).unwrap());
+            }
+            lines
+        });
+        let frame = |service: &str, args: Value| {
+            json!({"id": 4, "op": "service.write", "service": service, "args": args}).to_string()
+        };
+        let (mut door, mut session, mut fake) =
+            run_door(&[service("gmail", protocol::Access::Write)], Some(socket));
+        // Another run's: nothing is given.
+        let outcome = door.handle(&mut session, &frame("gmail", json!({})), &mut fake, S, 1);
+        outcome.later.expect("answered off the lock").reply();
+        door.mark_fixed_write("r1", &arrival_write());
+        let mut changed = arrival_write().args();
+        changed.insert("text".into(), json!("I'm at my desk, call me."));
+        let mut extra = serde_json::Map::new();
+        extra.insert("action".into(), json!("send_mail"));
+        extra.insert("bcc".into(), json!(["eve@else.test"]));
+        for args in [
+            json!({}),
+            json!({"action": "send_mail"}),
+            Value::Object(changed.clone()),
+            Value::Object(extra.clone()),
+        ] {
+            let outcome = door.handle(&mut session, &frame("gmail", args), &mut fake, S, 1);
+            outcome.later.expect("answered off the lock").reply();
+        }
+        let lines = served.join().unwrap();
+        assert_eq!(
+            lines[0]["args"],
+            json!({"service": "gmail"}),
+            "{}",
+            lines[0]
+        );
+        assert!(lines[0].get("fixed_write_run").is_none(), "{}", lines[0]);
+        let given = json!({"op": "call", "name": "service_write", "skill": "mail-count",
+            "fixed_write_run": "r1",
+            "args": {"service": "gmail-app", "action": "send_mail", "to": ["boss@work.test"],
+                     "subject": "In", "text": "I'm at my desk."}});
+        assert_eq!(lines[1], given);
+        assert_eq!(lines[2], given);
+        changed.insert("service".into(), json!("gmail"));
+        assert_eq!(lines[3]["args"], Value::Object(changed), "{}", lines[3]);
+        assert_eq!(lines[3]["fixed_write_run"], "r1");
+        extra.insert("service".into(), json!("gmail"));
+        assert_eq!(lines[4]["args"], Value::Object(extra), "{}", lines[4]);
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

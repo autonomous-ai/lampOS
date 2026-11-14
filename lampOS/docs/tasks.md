@@ -1118,6 +1118,14 @@ started once its answer is told:
     `Cli::close_now` (`harness close ... --now`, stopping it even while it
     works) is only for a skill's run lamp-tasks started itself
     (`HarnessRunner`, #6510 Part 1 step 2), at its deadline or end.
+  - **Background commands still running** (#5689, Harness 0.6.52): the
+    read finds the agent idle with `backgroundCommands` above zero
+    (`observe_background_commands`), or `close` itself refuses with `N
+    background commands running; --now closes anyway`, in its reply or on
+    stderr, whatever its exit (`close_background_commands`). Not done, so
+    not left: tried again a minute later, read first, never with `--now`,
+    and such a try isn't counted against the three, for up to a day after
+    the told answer was kept in this boot (then it counts as any failure).
   - **Any other turn or state:** the person went on with it at the computer,
     so it's theirs. It's left for good (`left`), never asked again.
   - **Stopped or failed already:** nothing to close (`closed`, code `gone`).
@@ -1415,6 +1423,20 @@ harness-on` left the part failing at every start (`tasks: No such file or
 directory (os error 2)`) until systemd stopped restarting it. Every file
 error at start names its path, e.g. `tasks:
 /var/lib/lampos-tasks/targets.json: No such file or directory (os error 2)`.
+**No Harness program at all** (#6685 PR 3, the first builder's ask): the
+product unit no longer has `ConditionPathExists=/usr/local/bin/harness`
+(it had since #811), so systemd starts the part on such a lamp too; only
+setup's marker holds it back. With no program at `--harness`, the part
+runs with hand-overs off: each one is refused as `no_harness` (the voice
+says `agent_tasks::NO_HARNESS`, "I can't hand work on to another computer
+yet: that isn't set up on this lamp. It can be set up later."), and its
+health item is ok, "Harness is not installed on this lamp; hand-overs are
+off until it is". A Harness installed later is used once lamp-update's
+install restarts the part. Tests:
+`set_up_later_runs_with_no_harness_and_no_targets_and_refuses_with_why` and
+`the_product_unit_starts_the_part_with_no_harness_program`
+(`crates/tasks/tests/runtime_failures.rs`).
+
 The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_them_from_the_machines`
 (`crates/update/tests/install.rs`):
 
@@ -1751,6 +1773,21 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
       reset left (`{}`, `[]`, `null`) takes the block. Anything else there
       (a nested item, an anchor, a block scalar) refuses the whole merge,
       as above, and the file is left as it is.
+    - **The SDK in a run's commands (#6684).** Hermes's launcher replaces
+      the `PYTHONPATH` it is started with, so the same merge lists
+      lamp-update's `/usr/local/lib/lampos/hermes-run-env.sh` in Hermes'
+      `terminal.shell_init_files`. Hermes's terminal sources it before its
+      session's login snapshot, and it puts the lampos SDK first on
+      `PYTHONPATH` only in a skill run (`LAMP_CONTROL_SOCKET` set). A list
+      there replaces Hermes's defaults, so when the merge makes the list it
+      puts `~/.profile`, `~/.bash_profile` and `~/.bashrc` first, as Hermes
+      would have sourced them, unless `terminal.auto_source_bashrc` is off
+      as Hermes reads it (`false`, `no`, `off`, `null` or `0`; a quoted
+      `'false'` is on). An empty list (a bare `shell_init_files:`, `null`,
+      `[]`) gets the defaults too. A list a person made is kept as it is,
+      the lamp's file added last. A `terminal:` it can't merge (flow style,
+      an anchor) is left as it is and journaled; the rest of the merge
+      still goes in.
     - **The guidance.** Each time the part keeps the lamp as a target, it
       writes `AGENTS.md` in the lamp's work folder
       (`~/harnesses/lamp-tasks/lamp`), which Hermes reads from its working
@@ -1940,7 +1977,9 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     work to Hermes; never do it yourself"), and the journal says
     `request N: named agent, no start_agent_task: asked again`, then what
     came of it (`…: asked again: start_agent_task called`, `…: still no
-    call, said it wasn't done`, or `…: called <names>, not start_agent_task`).
+    call: the heard words are handed over in code to <agent>, said back for
+    a yes`, `…: still no call, said it wasn't done` for a read-back with no
+    agent named, or `…: called <names>, not start_agent_task`).
     If round 1 calls only the lamp's own tools instead ("Hermes, look up the
     weather" answered with `weather`: V2's P1 on 12587), none of them runs:
     each is answered as not run, its words are not said, the turn is asked
@@ -1964,17 +2003,32 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     begun in the window ends the turn, journalled `…: a newer line began
     within the join window: not asked again`. Once a request
     (`agent_tasks::AskedAgain`, the last 8 requests kept): round 2's words
-    are held too, said beside a call; answered in words alone again, they
-    are not said and the plain line "Sorry, I didn't do that. Could you ask
-    me again?" (`action_claim::NOT_DONE_LINE`, in the owner's language) is
-    said instead. A request asked again before is said with `…: asked
-    again before, said as it came`; it never loops.
+    are held too, said beside a call. Answered in words alone again (or
+    asked again after an own tool and answered with no call), they are not
+    said and code hands the work over itself (#6547 cause 3, the first
+    builder's yes): it calls `start_agent_task` with the heard words as the
+    task and nothing else, so the agent and its place are set from those
+    words as for a model's call, and a computer named with none paired is
+    refused the same way (`NO_COMPUTER_PAIRED`, #6786). The call only
+    prepares: its answer goes to the next round, which says the task back
+    and asks whether to start it; nothing starts before the person's yes,
+    and they may cancel. A line naming no agent (the read-back catch below)
+    answered in words alone again says the plain line "Sorry, I didn't do
+    that. Could you ask me again?" (`action_claim::NOT_DONE_LINE`, in the
+    owner's language) instead; a round asked again that calls
+    `start_agent_task` itself has none made in code. A request asked again
+    before is said with `…: asked again before, said as it came`; it never
+    loops.
     A round 1 that calls anything (`start_agent_task`, `not_for_me`, a
     skill) goes on as before, its words said at the round's end; a line
     naming no agent is untouched and streams as before. The Live route is
     not caught. Tests: `second_provider::tests::agent_tasks_named`
     (`named_with_no_start_is_asked_again_once`,
-    `named_with_no_start_twice_says_it_was_not_done`,
+    `named_with_no_start_twice_is_handed_over_in_code_and_said_back`,
+    `named_answered_by_an_own_tool_then_nothing_is_handed_over_in_code`,
+    `a_computer_agent_named_with_none_paired_is_refused_as_before`,
+    `named_with_start_when_asked_again_makes_none_in_code`,
+    `not_named_no_start_twice_makes_none_in_code`,
     `named_with_start_is_untouched`,
     `not_named_and_a_question_about_an_agent_are_untouched`,
     `a_request_asked_again_before_is_not_asked_again`,
@@ -2770,6 +2824,66 @@ for each run, and is answered once the run ends
     Messages after the launch say "the lamp's default agent". Off, every
     run is the lamp's Hermes through its own wrapper, as above (the
     interim).
+  - **With no Harness account: the lamp's own agent, started by
+    lamp-tasks itself** (#6685 PR 3, with `LAMP_SKILL_DEFAULT_AGENT=on`).
+    A customer with no Harness account still gets a skill's tasks: the
+    lamp's own agent is the product. When it is used
+    (`skill_task::starts_without_harness`): the switch on, and Harness read
+    signed out by the part's own sign-in looks (`harness auth status`,
+    `serve --set-up-later`, kept by `skill_task::harness_sign_in_read`;
+    signed out only once Harness is set up here and its start's sweep is
+    done), or no Harness program at all (after a sweep of the folders and
+    token files an earlier start left, `skill_task::sweep_without_harness`;
+    the sweep and these looks are set up only with the switch on, so off,
+    a lamp with no Harness program sweeps nothing, Thirteen's P3 on #6829;
+    the product unit's `ConditionPathExists=/usr/local/bin/harness` still
+    keeps lamp-tasks off on such a lamp until #6849). Signed in, signed in and offline,
+    or not read yet: through Harness as above. Nothing is asked at the
+    run's start: the sign-in is the last one read, so the start waits on
+    no network and no Harness call. The default agent is the same
+    (`runtime::lamp_default`), else the build's first switched on
+    (`runtime::lamp_order`), else the lamp target's engine; none is
+    refused ("the lamp has no default agent yet …").
+    - **One check, then one start for every agent**
+      (`skill_task::default_agent_takes_tasks`): the one run path check
+      above, and the wrapper's task entry (`TASK_ENTRY_LINES`: `if [
+      "${1-}" = --lamp-task ]` and `agent_task "$Q"`, the same lines for
+      every agent) with `agent_task` in its agent's data, before the run
+      path (`AGENT_TASK_LINE`). A wrapper without them (an older
+      lamp-update, or an agent with no task of its own) is refused in
+      words and journaled: "the lamp's default agent (<engine>) isn't set
+      up for a skill's run yet (its wrapper /usr/local/bin/<engine> takes
+      no skill's run without Harness: …), so nothing was started", with
+      nothing made or started. Today Hermes's data has `agent_task`
+      (`chat -q` with the task's words, as Harness and a make start it);
+      Claude Code's and the other plain agents' have none yet; OpenClaw
+      has no one run path wrapper at all, so it is refused as above.
+    - **The same folder and token file.** `skill-<run-id>` (0700) in the
+      same Harness project, the run's token file written before the start
+      (`RunTokenFile`), and the task's words in the folder's `task` file
+      (0600, `TASK_FILE`). lamp-tasks then starts the agent's wrapper
+      itself: `/usr/local/bin/<engine> --lamp-task` in that folder, its
+      environment cleared to `PATH`, `HOME` and `SHELL`, stdin, stdout and
+      stderr null, in a process group of its own. The wrapper reads the
+      token file once and deletes it, gives the run its token, socket, SDK
+      and `--net` (the same run lines), and its `agent_task` turns the task
+      file into the agent's own arguments, started by the same `unshare`
+      into `agent-ns` (docs/install.md, "The one run path"). The token is
+      in no argument and in no environment lamp-tasks gives.
+    - **Its end.** The wrapper's exit, the run's deadline (14 minutes) or
+      lamp-tasks' stop, whichever comes first, looked at every 50 ms
+      (`RUN_TICK`). Exit 0 is `{"ok":true,"id":0}`; any other status is
+      `run_failed` "the lamp's default agent ended with status <n>"; the
+      deadline "the run was ended at its deadline, 840 s"; the stop "the
+      run was ended as lamp-tasks stops". However it ends, its guard ends
+      the token with lamp-control first, then kills the run's whole process
+      group (the wrapper's `unshare --kill-child` takes the agent's
+      namespace with it) and reaps it, then removes the folder (its task
+      file too) and the token file. Nothing the run printed is kept. Its
+      processes stay in `lamp-tasks.service`'s cgroup and caps. Tests:
+      `signed_out_the_default_agent_starts_with_no_harness_and_leaves_nothing`,
+      `a_run_with_no_harness_is_ended_at_its_deadline_or_the_stop_and_its_status_said`,
+      `signed_in_a_skill_run_still_goes_through_harness`.
   - **Its own folder.** lamp-tasks makes `skill-<run-id>` (0700,
     `RUN_FOLDER_PREFIX`) in its Harness project
     `/var/lib/lampos-tasks/harnesses/lamp-tasks` (made 0700 when missing),
@@ -2793,11 +2907,47 @@ for each run, and is answered once the run ends
     `WAIT_RETRY`) until it ends or the deadline (14 minutes, the token's
     life) cancels it. Ended `idle`, `stopped`, `closed` or `gone` is
     `{"ok":true,"id":0}`; `failed`, or `needs-input` (no one answers a
-    skill's run), is `run_failed`. At the deadline the run is closed with
+    skill's run), is `run_failed`. A `stopped` counts only once `harness
+    show` finds a session (an ask, an answer or a tool; #6432): Harness at
+    times holds the `hermes` wrapper's pid just before it `exec`s into the
+    namespace, says it `stopped` about 2.5 s later, and lists the real
+    Hermes, still loading, as another agent in the run's folder. With no
+    session, lamp-tasks looks at `harness ps` every 0.5 s for up to 5 s
+    (`LOST_START_LOOK`) for an agent live in the run's own folder, and
+    waits on that one instead, its end being the run's (the guard closes
+    it). None found is `run_failed` "Harness lost the lamp's Hermes as it
+    started", said in the journal too. No second Hermes is started. The
+    re-bind belongs in Harness; this is the lamp's side. Tests:
+    `a_skill_run_whose_agent_stopped_before_a_session_*`. At the deadline the run is closed with
     `harness close --machine <lamp> <agent> --now --json`
     (`Cli::close_now`) and is `run_failed` "the run was ended at its
     deadline, 840 s". `new` not started (`not_sent`, `uncertain`, or a
     `pending` creation) is `run_failed` too.
+  - **A run that never reached its agent** (#6835 gap 1). When the engine
+    exits before it is ready, Harness keeps the run's pane as a shell: the
+    same agent id, agent "Terminal", and `wait` reads it `idle` within
+    seconds. So once `wait` ends (and the session isn't `closed` or
+    `gone`), lamp-tasks asks `harness show --machine <lamp> <agent>
+    --json` (`Cli::shown_agent`); not asked again when a `stopped` end's own
+    `show` (#6432) already found the session bound, its agent started.
+    Agent "Terminal" means Harness never saw
+    the engine's process, not that the agent did nothing: the run is never
+    `{"ok":true}`. Its token is ended and its session closed, and it is
+    `run_failed` "the skill's task may not have run: Harness kept the run's
+    pane as a shell (agent Terminal, not hermes) …", said in words, "its
+    session was not closed" added when the close failed. It is never made
+    a second time, because a Hermes may have begun it (the first builder,
+    #6811), and a fixed write's is never `not_started`: its agent may have
+    begun (`SkillRun::started`). A `show` that names the engine, or isn't
+    answered, leaves the run judged by `wait`'s end as before. Tests:
+    `a_run_harness_kept_as_a_shell_never_started_and_is_not_said_done`,
+    `a_run_harness_kept_as_a_shell_is_run_failed_and_never_run_again`.
+  - **One journal line a run**: `[lamp-tasks] skill task <run-id>: ended,
+    Harness says <state>, after <n> s; its agent: started (Hermes)`, or
+    `never started (Harness shows a shell, agent Terminal)`, or `not known
+    (<why>)` (`show` not answered, the session gone, or the wait ended at
+    the deadline or the stop, said `Harness says none`). Test:
+    `a_runs_journal_line_says_its_end_its_time_and_whether_its_agent_started`.
   - **However it ends**, its guard first has lamp-control end the run's
     token (`{"end":{"run"}}`, once), then closes the session (`close
     --now`, once; not for one Harness says is `closed` or `gone`), removes
@@ -3012,6 +3162,184 @@ whose script runs `curl https://example.com` gets a failure (no name
 resolves, no route), while the same run's model call is answered and its
 `control.sock` call works with its token.
 
+### A voice make in a skill run's namespace (`skill_make`, #6643)
+
+The first builder's guard on #6643 (12 Nov 18:15): a voice make that
+DeepSeek couldn't keep, handed to the lamp's agent
+(`LAMP_MAKE_SKILL_AGENT`, [skills.md](skills.md), "Handed to the lamp's
+agent when DeepSeek fails"), runs in a skill run's namespace and never
+as a Harness task with the agent's own tools
+(`lamp_tasks::skill_make`).
+
+- **The socket:** with `LAMP_SKILL_TASKS=on` (the switch lamp-update's
+  namespace edits are written with), `serve` binds
+  `/run/lampos-tasks/skill-make.sock` (`MAKE_SOCKET`) beside
+  `skill-task.sock`, made as its other sockets are. It takes lines only
+  from `lamp-voice.service` run as root, as the kernel names the caller; any
+  other caller is closed with no answer. One make runs at a time; a second
+  is refused `busy`. It is bound with `LAMP_SKILL_TASKS`, not only when
+  the hand-over is on: the hand-over's switch, `LAMP_MAKE_SKILL_AGENT`, is
+  lamp-voice's alone (set in lamp-voice's unit, and the unit census keeps
+  it there), so lamp-tasks can't see it; a socket no one hands a make to
+  takes nothing, since only root lamp-voice may call it. As it starts,
+  lamp-tasks sweeps the `make-*` folders (and their homes) a lamp-tasks
+  stopped mid-make left (`skill_make::sweep`).
+- **The line:** `{"op":"skill_make","rules","within_ms"}`, checked whole
+  (`MakeLine::parse`): no other field, the rules (the system prompt and the
+  brief) at most 48 KiB with no NUL, `within_ms` from 1 to 120 s.
+- **The run: Hermes only** (the first builder's ruling, 12 Nov 19:14):
+  the lamp's Hermes started exactly as a skill's `do.task` run is
+  (`skill_task::HermesRunner` inside `skill_make::MakeHermes`, row-6443's
+  path), through its namespace wrapper: only its own folder, its work
+  folder and the skills, and lamp-control's `control.sock` alone, never
+  `admin.sock`. Only Hermes has a namespace runner today, so a make is
+  never run by another engine; the voice hands a make over only when the
+  `lamp` target is Hermes. No token is minted and the run's environment
+  carries only its own home: a make has no grants. The run is killed at
+  `within_ms`, its whole process group with it.
+- **A fresh home of its own:** each make gets `make-<run id>/home`, 0700,
+  new and empty but for the provider config,
+  `home/.hermes/config.yaml` (`hermes_config::merge_config` with the
+  forwarder's port, its key named by its variable, `LAMP_HERMES_TOKEN`,
+  never a key, and lamp-update's four Hermes settings, `MAKE_CONFIG`, a
+  test holding them equal to `hermes_install::CONFIG`: no update checks,
+  no language servers, a `chat -q` run that ends with its turn; a setting
+  whose top-level block the provider config already has, `terminal:`, goes
+  into that one block, since Hermes refuses a file with a key twice), and
+  nothing of Hermes's memory, sessions or state; beside it, two links to
+  Hermes's prepared runtime in its lasting home, `home/.hermes/installs`
+  (its dependency record and environments, `installs/<key>/facts.json`)
+  and `home/.hermes/tools` (its uv, Python and package manager), so a make
+  never prepares an environment of its own. Hermes 0.22.2 keeps
+  dependency state per data root (`pm/environments.py`,
+  `<HERMES_HOME>/installs/<key>`): with none in a fresh `HERMES_HOME` it
+  syncs one first ("preparing dependencies for this data root"), which a
+  make's run could not finish and ended `run_failed` in under a second on
+  lamp-c0a4 (#6643). Links, not bind mounts: Hermes accepts a recorded
+  environment only under `<HERMES_HOME>/installs/<key>/environments` once
+  resolved, and a link resolves to the lasting path the record names. The
+  run
+  gets `HOME`, `HERMES_HOME` (`home/.hermes`) and `LAMP_NS_HOME` set to it.
+  lamp-update's wrapper takes `LAMP_NS_HOME` only for a path matching
+  `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-*/home` with no
+  `..` (`WRAPPER_HOME_LINE`), and its namespace script then sets `HOME` to
+  it, hides Hermes's lasting home (`/var/lib/lampos-hermes/.hermes`:
+  memories, sessions, state) under an empty read-only tmpfs with only its
+  checkout, `tools` (the Python Hermes runs on) and `installs` (its
+  dependency record) shown again, read-only, so the links resolve and
+  nothing in them can be changed but what Hermes must write at every
+  start, bound back read-write: each `installs/<key>/.install.lock`
+  (`hermes_cli/runtime_state.py` `runtime_lock` opens it `O_CREAT|O_RDWR`
+  and flocks it; read-only, `EROFS` ended a make `run_failed` in 0.4 s on
+  a lamp) and each lease-managed generation's
+  `installs/<key>/environments/<gen>/.leases` (`lease_directory`'s
+  leases), and, where Hermes's PM runtime is there,
+  `installs/<key>/pm-runtime/.prepare.lock` (`pm/runtime.py`
+  `prepare_runtime`) with its generations' `.leases`, while `facts.json`,
+  `pm-runtime/selected.json`, the environments and `tools` stay
+  read-only; no install lock at all (the lasting Hermes never started)
+  ends it before Hermes runs. These lines mount with `mount -n`: they run
+  after `/run` is read-only, where util-linux cannot write its utab. It leaves Hermes's folder and the work
+  folder read-only, and hides the rest of the work folder's `lamp` under
+  another tmpfs, the make's own folder alone moved back, read-write
+  (`NS_HOME_LINE`; docs/install.md). The home goes with the make's folder
+  however the make ends: answered, failed, past its deadline or a panic.
+- **The wrapper's mark, held or not:** before every make, lamp-tasks
+  checks that `/usr/local/bin/hermes` carries `WRAPPER_HOME_LINE` and
+  `/usr/local/lib/lampos/hermes-ns` carries `NS_HOME_LINE`; otherwise the
+  make is refused `no_namespace` before anything is made; so is a make
+  whose work folder is not `/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp`
+  (`MAKE_WORK`), the one the wrapper takes a make's home in. Until a
+  lamp-update round has rewritten the wrapper and the script, every make
+  is refused so and stays DeepSeek's.
+- **With the one run path (`LAMP_SKILL_DEFAULT_AGENT` on in lamp-update):**
+  `/usr/local/bin/hermes` is the one run path's wrapper and runs
+  `/usr/local/lib/lampos/agent-ns`, with `hermes-ns` taken out; the run
+  path sets `LAMP_NS_HOME` to the agent's own home there, so Hermes's
+  wrapper data carries the make's home on as `LAMP_NS_MAKE`
+  (`hermes_install::ONE_PATH_HOME_LINE`: the same glob, `..` and anything
+  else left unset, `HERMES_HOME` under it), and `agent-ns` runs Hermes's
+  make lines (`hermes_install::ONE_PATH_NS_MAKE_LINES`, `NS_HOME_LINE`'s
+  steps) only for an agent and home in its data list
+  (`agent_ns::wrapper::MAKE_HOMES`, matched as `<engine>:<home>` like
+  `OWN_HOMES`); any other non-empty `LAMP_NS_MAKE`, or another agent
+  given one, ends it before the agent runs. lamp-tasks then takes the
+  wrapper as ready when it is the one run path's for Hermes
+  (`skill_task::wrapper_takes_runs`) with `ONE_PATH_HOME_LINE`, and
+  `agent-ns` carries `ONE_PATH_NS_MAKE_LINES`. The one run path holds only
+  a skill's run off the network, so a `held` make is refused
+  `not_held_off` there.
+- **Its network (`LAMP_MAKE_AGENT_NET`, set in no unit):** kept by default,
+  as V1's agent had it (the owner's ask, 12 Nov; the first builder's ruling,
+  12 Nov 19:14). The model is then reached at lamp-cloud's
+  forwarder on `127.0.0.1:7741`, the one `model.sock` pipes to. Exactly
+  `held` gives the strict run, `LAMP_NS_NET=run`: only `lo` and the
+  kernel's `@NONE` tunnels, the model only through `model.sock`. Held, a
+  wrapper without the network lines (`WRAPPER_NET_LINES`) is refused
+  `not_held_off` before anything is made (`Runner::ready`). lamp-tasks
+  journals which mode it serves as it starts.
+- **The make's folder:** `make-<run id>` in the lamp's work folder (the one
+  a skill's run starts in, which Hermes's namespace shows), 0700, with the
+  rules in `rules.md`, 0600. The run starts there and is told to write its
+  answer to `answer.md` there and nothing else. Once the run has ended,
+  `answer.md` is read with `openat` from the folder's own descriptor,
+  taken as the folder was made, `O_NOFOLLOW` on each part (a regular file,
+  never followed as a link, at most 20 KiB), so a folder swapped for a link
+  is never read through. The folder is removed however the make ends.
+- **The answers:** `{"ok":true,"started":true}` once the run is about to
+  start (the voice says its waiting line only then), then
+  `{"ok":true,"answer"}`. Otherwise one refusal: `off`, `bad_request`,
+  `too_long`, `busy`, `not_held_off`, `no_namespace`, `run_failed` or
+  `no_answer`. The voice hands nothing over on `off`, `not_held_off`,
+  `no_namespace` or no socket (an older build). The journal says only the
+  outcome: `[lamp-tasks] skill make: refused <code>: <why>`, the refusal's
+  fixed-form reason (`journal_line`), never the rules or the answer.
+- **Tests:** `skill_make::tests`: a make runs in its own folder, its rules
+  there and its answer read back, only its home in its environment, the
+  folder removed; each make's home holds only the provider config at its
+  start, a second make never sees what the first left in its home, and the
+  home is gone after an answer, a failure, a deadline and a panic; a run
+  not held off or with no make-home line starts nothing and makes no
+  folder; no answer, an answer that is a link, a folder swapped for a
+  link, the switch off and every bad line are refused; the make started
+  through a wrapper and script that must carry the make-home lines held or
+  not, and the network lines held, with `LAMP_NS_NET=run` only held, no
+  token and no admin socket in its environment, in its make's folder,
+  with its own `HOME` and `HERMES_HOME`; the lines are lamp-update's own,
+  word for word; a work folder other than the wrapper's is refused; the
+  fresh config carries lamp-update's four settings, equal to its own; old
+  make folders are swept at the start; lamp-update's
+  `a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder`
+  (stubbed mounts) and, on Linux,
+  `inside_a_makes_namespace_hermess_lasting_memory_is_not_there` (a real
+  namespace: the lasting memories absent, only the make's folder
+  writable); lamp-update's
+  namespace text shows `control.sock` alone and never names `admin.sock`;
+  only lamp-voice as root may hand a make over; the socket says `started`,
+  then the answer; the default keeps the network and still shows no admin
+  socket, and `held` gives `LAMP_NS_NET=run`.
+
+**The lamp rows (not yet run):** on lamp-9adf with this build, ask "Hey
+Lamp, make me a skill that checks the weather every morning". DeepSeek's
+answer is not kept, and the journal says "handed to the agent". While the
+make runs, find its Hermes and look from inside its namespace:
+
+```sh
+P=$(pgrep -u lampos -f 'hermes chat -q Everything you need' | head -1)
+sudo nsenter -t "$P" -m ls /run/lampos-control                # control.sock alone, no admin.sock
+sudo nsenter -t "$P" -n ip -o link show                       # the network's links
+sudo nsenter -t "$P" -n curl -sS -m 5 -o /dev/null -w '%{http_code}\n' https://example.com; echo "exit $?"
+```
+
+- **Default (network kept):** `curl` answers 200 (exit 0), and
+  `/run/lampos-control` holds `control.sock` alone.
+- **Held** (`sudo systemctl edit lamp-tasks` with
+  `Environment=LAMP_MAKE_AGENT_NET=held`, then a restart; the journal says
+  "is held off the network"): `ip` shows `lo` and `@NONE` tunnels only,
+  `curl` fails (exit 6 or 7), `/run/lampos-control` still holds
+  `control.sock` alone, and the make still ends with its answer through the
+  model relay. Remove the drop-in afterwards.
+
 **Every engine's wrapper (#6510 Part 1, step 1, off unless
 `LAMP_AGENT_NS=on`):** lamp-update's one wrapper for every engine
 (docs/install.md, "One agent namespace for every engine") carries the same
@@ -3030,6 +3358,119 @@ Harness no longer says that engine is installed or no program of the
 engine's own is left on `lampos`'s login `PATH` (a failed look keeps it); a
 line that stays true round after round is logged once. Skill runs still go
 to Hermes alone (`HarnessRunner`, above).
+
+### A made skill's fixed write on the lamp's Hermes (`LAMP_SKILL_WRITE_AGENT`, off)
+
+The owner's ruling (13 Nov): everything that touches a linked service runs
+through the lamp's agent. With `LAMP_SKILL_WRITE_AGENT=on` (exactly `on`,
+on in no product unit) and `LAMP_AGENT_SERVICES=on` in lamp-tasks, the
+hand-over socket also takes a made skill's fixed write (`do.write`,
+docs/skills.md) as a run (`skill_task::WriteHandOver`, `answer_with`):
+
+- **The line:** `{"op":"skill_write","skill","folder","grants","write"}`,
+  every field needed and no other taken. `skill` and `folder` are checked
+  as a task's; `grants` is exactly one, the write's own service's `-write`
+  (`gmail-app` and `figma-api` as `gmail` and `figma`); `write` is an
+  object with a `service` and an `action`, at most 8 KiB as JSON. Anything
+  else is `bad_request`, and no token is asked for.
+- **The run** is a task's (`run_on_token`, the same mint, grant check, end
+  and runner): lamp-control mints its token for that one grant
+  (docs/control.md), and Hermes is told, with the skill's name and the
+  run's id, to call `lamp-services`' `service_write` once naming only the
+  write's service and action (`{"service":"gmail-app","action":"send_mail"}`),
+  never again whatever it answers. lamp-control gives that call the
+  skill's write by the run's token (`runs::FixedWrite`), and lamp-services
+  sends it only as the owner's kept yes has it, once a run
+  (docs/services.md, "Through the lamp's agent").
+- **Never the content in the words** (the Reviewer-lead's P2 on #6824 and
+  #6879): the words are the agent's argv (`harness new --task`, or
+  `hermes chat -q` without Harness, readable in `/proc/<pid>/cmdline`) and
+  Harness's transcript, so no recipient, subject or text of the write is
+  ever in them (`WriteHandOver::prompt`). `SkillRun`'s `Debug` prints the
+  words' length only, for a task's run too.
+- **Off** (either switch), a `skill_write` line is refused as before:
+  `bad_request`, "not a skill's task line".
+- **Not started** (#6823): a fixed write's run that fails before its agent
+  may have begun (`SkillRun::started`, set by the runner as it asks
+  Harness to launch, unless Harness never sent it, or once Hermes is
+  spawned: no Harness, no target, an old wrapper) is refused `not_started`
+  (`skill_task::NOT_STARTED`) in the runner's words, so lamp-skills sends
+  the write straight itself; one that fails after is `run_failed`, its
+  send's outcome unknown, and lamp-skills tries nothing more. A task's run
+  is `run_failed` either way, as before. Tests:
+  `a_fixed_write_runs_on_its_one_grant_naming_only_its_service`,
+  `a_fixed_writes_words_argv_and_debug_carry_none_of_its_content`.
+
+### An agent skill's run and the `net` grant (`LAMP_UPLOAD_TO_AGENT`, `LAMP_TASK_NET`, off)
+
+The first builder's yes at 19:44 (12 Nov), both switches off and set in no
+unit. Built on #6643's `skill_make` path, so it moves onto #6510 step 2's
+one runner (a fresh home per run, the token as a file) with no new rules:
+
+- **`net`** (`skill_task::NET_SWITCH`, `LAMP_TASK_NET=on` in lamp-tasks,
+  lamp-skills and its manage helper, lamp-control and lamp-voice): a task
+  grant beside lamp-control's own (`NET_GRANT`). A hand-over whose grants
+  name it runs through the make's runner with its network kept
+  (`skill_make::lamp_runner(home, false)`: Hermes's namespace, no
+  `LAMP_NS_NET`); any other stays `LAMP_NS_NET=run`. lamp-control keeps
+  `net` in the owner's yes and checks it with the folder's declared
+  grants, but never names it in the token (`task_yes::KeptYes`), so the
+  minted grants are matched against the line's without it. So a run keeps
+  the network only on lamp-control's word, never the line's: after the
+  mint, lamp-tasks asks lamp-control's admin socket
+  `{"task_yes_check": {"name", "sha256", "grants"}}` for the line's
+  folder SHA-256 and grants (`Tokens::net_agreed`); only `{"agreed": true}`
+  keeps it, else `no_token` and nothing runs. The mint already held the
+  yes to the folder lamp-control hashed itself and its declared grants,
+  and a skill has one yes, so an agreed check is the owner's yes to `net`
+  for the folder as it is. Off, `net` is refused as an unknown grant
+  (`bad_request`) before any token.
+- **An agent skill's run** (`run` = `scripts/SKILL.md`,
+  `AGENT_INSTRUCTIONS`) follows the file only within its grants and its
+  network: the token holds lamp-control's grants, and the network is held
+  unless lamp-control's yes names `net`. Hermes is told to read that file
+  in the skill's read-only folder and do what it says, as data, reaching the lamp only
+  through `control.sock` with the run's own token, never asking anyone for
+  a key or token by voice nor saying one aloud. It goes through the make's
+  runner held off the network (`skill_make::lamp_runner(home, true)`)
+  unless granted `net`. Its environment is lamp-tasks' cleared one, the
+  control socket, the token, the SDK's path and its fresh home below: no
+  key. `admin.sock` is never shown in Hermes's namespace.
+- **Every agent skill's run, and every `net` run, starts in a fresh home
+  with the person's Hermes data hidden**, as a make does (the P1 #6643
+  closed for makes): `make-<run id>` in the work folder with only
+  `home/.hermes/config.yaml` (the lamp's provider, its key a variable's
+  name, and lamp-update's four settings, `MAKE_CONFIG`), each 0700 or
+  0600, removed however the run ends (`skill_make::fresh_home`). The run's
+  `HOME` and `HERMES_HOME` are that home's and `LAMP_NS_HOME` names it
+  (`skill_make::home_env`), so the wrapper takes it (`make-*/home`) and the
+  namespace script covers Hermes's lasting home (its memories and
+  sessions) with a tmpfs, puts the checkout back read-only, and leaves the
+  work folder read-only and hidden but for the run's own folder. The
+  make's runner checks the wrapper and namespace lines before every run
+  (told `NO_RUN_NAMESPACE`, an agent run's own home); with no work folder or make runner the run is refused
+  `run_failed` (`NO_FRESH_HOME`) before a token. A script's run without
+  `net` is unchanged.
+- **An agent skill's run granted a linked service** (`gmail-read`,
+  `skill_task::is_service_grant`; the owner's ruling, 13 Nov: anything
+  that touches the connectors goes to the lamp's agent end to end) has
+  the lamp's connectors in its fresh home's config, with
+  `LAMP_AGENT_SERVICES=on` in lamp-tasks (`Agent::services`,
+  `skill_make::fresh_home_for`): `mcp_servers.lamp-services`, the same
+  entry lamp-tasks writes in Hermes's lasting config
+  (`hermes_config::mcp_entry`), its socket and token Hermes's to fill in
+  from the run's own environment, never written. So the agent reaches the
+  service only through lamp-control under the run's one-run token and its
+  grants, held off the network or not, each send only on the owner's
+  spoken yes. Its words name the services it may use and say they are
+  reached through those tools, with no key. Off, or with no service
+  granted, its config has none, as a make's.
+
+Tests: `skill_task::tests::the_net_grant_keeps_the_network_and_no_grant_holds_it`,
+`a_net_run_has_a_fresh_home_of_its_own_never_the_lasting_one`,
+`a_fresh_home_is_taken_with_the_lasting_home_covered`,
+`an_agent_run_follows_its_file_in_a_fresh_home_with_no_key`,
+`an_agent_run_granted_a_service_has_the_lamps_connectors_in_its_fresh_home`.
 
 ## Devin (#1854)
 
@@ -3360,8 +3801,10 @@ the lamp listed ten machines, the lamp itself among them ("current").
 `crates/voice/src/agent_tasks.rs`, off unless the voice's unit sets
 `LAMP_TASKS_DIR` (the directory holding `request.sock` and `voice.sock`;
 `LAMP_TASKS_TARGET` names the alias, `office` unless set). On a home lamp
-without Harness the tasks part is not started (its unit's
-`ConditionPathExists`, #811). With `LAMP_TASKS_NEEDS=/usr/local/bin/harness`
+without Harness the tasks part was not started (its unit's
+`ConditionPathExists`, #811); since #6685 PR 3 it starts and refuses each
+hand-over as `no_harness`, told as `NO_HARNESS` ("Before the lamp is set
+up for hand-overs", above). With `LAMP_TASKS_NEEDS=/usr/local/bin/harness`
 (the product voice unit; `--tasks-needs` to the provider worker), a call that
 cannot reach the part while that file is missing is answered in light words
 the model can say, "I can't hand work on to another computer yet: that isn't
@@ -3512,7 +3955,17 @@ used only to say it.
   or a failure is kept on the first look. A wait longer than the second
   look still reads idle twice, and neither `show` nor Harness's own `wait`
   (two looks about 3 s apart) can tell, so after an idle answer is kept the
-  watch goes on looking every 2 minutes for 10 (`WATCH_FOLLOW_MS`). The same
+  watch goes on looking every 2 minutes for 10 (`WATCH_FOLLOW_MS`).
+  From Harness 0.6.52 (openharness#4229) `show` says it: an idle agent
+  carries `backgroundCommands`, and one idle with more than zero still
+  running is read as `working` (#5689), so it is not kept, listed settled
+  or told until none runs, for up to 10 minutes from the first such read
+  in a row in this boot (`BACKGROUND_HOLD_MS`); its news is told then,
+  once. Past that it is read as `idle` and kept and told as any, so a dev
+  server or a `tail -f` left running doesn't hide the answer; the close
+  still waits for the commands to end (below), never with `--now`.
+  `null` (Codex, OpenClaw, Windows: Harness can't tell) or no field at all
+  (Harness before 0.6.52) is read as before. The same
   answer is only seen again; a different one, confirmed the same way, is
   kept as a new observation, and the voice tells it as news of its own:
   Harness gives that answer with the earlier one at its front ("…once it
@@ -3581,7 +4034,11 @@ used only to say it.
   watch's order. `watch` prints one JSON line when the event or the turn
   changes (Harness looks every 3 s); only `event` and `id` are read, never
   the summary, ask or question, and a line for another id is passed over.
-  `started` and `working` read nothing. `done`, `failed`, `needs_person`,
+  `started` and `working` read nothing, nor does `background` (Harness
+  0.6.52: idle with background commands still running, sent in place of
+  `done` and again when their number changes; #5689): the watch is held
+  and its task read once, on the `done` that follows when none runs.
+  `done`, `failed`, `needs_person`,
   `idle` and `stopped` read the task at once (`Engine::push`, the same read
   as `--push-wait`'s, which keeps an idle answer on the spot: `done` comes
   after Harness's two idle looks). `watch` exits by itself only on

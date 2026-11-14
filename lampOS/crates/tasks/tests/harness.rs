@@ -12,7 +12,7 @@ use lamp_tasks::runtime::{
 };
 use lamp_tasks::session_index;
 use lamp_tasks::skill_task::{
-    self, HarnessRunner, Runner, SkillHarness, SkillHarnessSlot, SkillRun,
+    self, HarnessHere, HarnessRunner, NoHarness, Runner, SkillHarness, SkillHarnessSlot, SkillRun,
 };
 use serde_json::{Value, json};
 use std::{
@@ -5618,14 +5618,161 @@ fn a_watch_line_is_read_for_its_event_only() {
         "idle",
         "failed",
         "stopped",
+        "background",
     ] {
         let read = parse_watch_line(watched_line(event, AGENT).as_bytes(), AGENT).unwrap();
         let WatchLine::Event(read) = read else {
             panic!()
         };
         assert_eq!(read.name(), event);
-        assert_eq!(read.settled(), !matches!(event, "started" | "working"));
+        assert_eq!(
+            read.settled(),
+            !matches!(event, "started" | "working" | "background")
+        );
     }
+}
+
+/// #5689 (Harness 0.6.52, openharness#4229): `watch --json` sends
+/// `background` (idle, `backgroundCommands: N`) in place of `done` while an
+/// idle agent's background commands run, again when N changes, then `done`.
+/// Each is handed on; the watch is held through `background` and killed
+/// only at the `done`.
+#[test]
+fn a_watch_holds_through_background_and_ends_on_the_done_after_it() {
+    let rig = Rig::new();
+    let background = |count: u64| {
+        json!({"event":"background","id":AGENT,"state":"idle","backgroundCommands":count})
+            .to_string()
+    };
+    rig.plan(json!({"watch":{"lines":[
+        {"text":watched_line("working", AGENT)},
+        {"text":background(2),"delay_ms":50},
+        {"text":background(1),"delay_ms":50},
+        {"text":watched_line("done", AGENT),"delay_ms":50},
+    ],"after_output_ms":5000}}));
+    let cancel = AtomicBool::new(false);
+    let mut events = Vec::new();
+    let end = rig
+        .cli()
+        .watch(MACHINE, AGENT, &cancel, &mut |event| events.push(event));
+    assert_eq!(end, WatchEnd::Settled);
+    assert_eq!(
+        events,
+        vec![
+            WatchEvent::Working,
+            WatchEvent::Background,
+            WatchEvent::Background,
+            WatchEvent::Done
+        ]
+    );
+}
+
+/// #5689 (Harness 0.6.52): `show` of an agent idle while background
+/// commands it started still run is read as `background`, which the engine
+/// holds as at work for a while (`BACKGROUND_HOLD_MS`); with none
+/// running, unknown (`null`: Codex, OpenClaw, Windows) or no such field
+/// (Harness before 0.6.52) it is idle, as before. Only an idle agent's
+/// count is read, and one that isn't a whole number is unknown.
+#[test]
+fn an_idle_agent_with_background_commands_running_is_read_as_at_work() {
+    let rig = Rig::new();
+    let cases: [(Option<Value>, &str); 7] = [
+        (Some(json!(2)), "background"),
+        (Some(json!(1)), "background"),
+        (Some(json!(0)), "idle"),
+        (Some(Value::Null), "idle"),
+        (None, "idle"),
+        (Some(json!("2")), "idle"),
+        (Some(json!(-1)), "idle"),
+    ];
+    for (background, state) in cases {
+        let mut reply = shown();
+        if let Some(background) = background.clone() {
+            reply["backgroundCommands"] = background;
+        }
+        rig.show_step(step(reply));
+        let read = rig.cli().observe(MACHINE, AGENT).unwrap();
+        assert_eq!(read.state, state, "{background:?}");
+        assert_eq!(read.answer, "Observed output only");
+    }
+    // Another state is as Harness says, whatever the count.
+    let mut reply = shown();
+    reply["state"] = json!("needs-input");
+    reply["backgroundCommands"] = json!(3);
+    rig.show_step(step(reply));
+    assert_eq!(
+        rig.cli().observe(MACHINE, AGENT).unwrap().state,
+        "needs-input"
+    );
+}
+
+/// #5689: the read just before a close that finds background commands
+/// still running fails with `background_commands`, and no close is run;
+/// with none, unknown or no field, it reads idle and the close goes on.
+#[test]
+fn the_read_before_a_close_finds_background_commands_and_closes_nothing() {
+    let rig = Rig::new();
+    let mut reply = shown();
+    reply["backgroundCommands"] = json!(2);
+    rig.show_step(step(reply));
+    assert_eq!(
+        rig.cli().observe_to_close(MACHINE, AGENT),
+        Err("background_commands".into())
+    );
+    for background in [Some(json!(0)), Some(Value::Null), None] {
+        let mut reply = shown();
+        if let Some(background) = background.clone() {
+            reply["backgroundCommands"] = background;
+        }
+        rig.show_step(step(reply));
+        assert_eq!(
+            rig.cli().observe_to_close(MACHINE, AGENT).unwrap().state,
+            "idle",
+            "{background:?}"
+        );
+    }
+    assert!(rig.calls().iter().all(|call| call["args"][0] == "show"));
+}
+
+/// #5689 (Harness 0.6.52): `close` without `--now` refused because
+/// background commands still run (`N background commands running; --now
+/// closes anyway`, in the `--json` reply or on stderr, under any exit) is
+/// `close_background_commands`, tried again later, never `Refused` for
+/// good; `--now` is never added for it.
+#[test]
+fn a_close_refused_for_background_commands_is_tried_again_and_never_with_now() {
+    let said = "2 background commands running; --now closes anyway";
+    for (exit, out) in [
+        (
+            1,
+            json!({"stdout": format!("{}\n", json!({"ok":false,"error":{"code":"BACKGROUND_COMMANDS","message":said}}))}),
+        ),
+        (1, json!({"stderr": format!("{said}\n")})),
+        (
+            5,
+            json!({"stderr": format!("Error: {}\n", said.to_uppercase())}),
+        ),
+    ] {
+        let rig = Rig::new();
+        let mut close = out;
+        close["exit"] = json!(exit);
+        rig.plan(json!({ "close": close }));
+        assert_eq!(
+            rig.cli().close(MACHINE, AGENT),
+            Err("close_background_commands".into()),
+            "exit {exit}"
+        );
+        let calls = rig.calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(
+            calls[0]["args"],
+            json!(["close", "--machine", MACHINE, AGENT, "--json"])
+        );
+    }
+    // Any other refusal reads as before.
+    let rig = Rig::new();
+    rig.plan(json!({"close":{"exit":5,"stderr":"NOT_YOURS\n"}}));
+    assert_eq!(rig.cli().close(MACHINE, AGENT), Ok(Closed::Refused));
 }
 
 /// #5978, `LAMP_HERMES_ON_LAMP`: a named hand-over to the lamp's own
@@ -6628,8 +6775,10 @@ fn skill_runner_with(
         harness: slot,
         held_by: None,
         retry: Duration::from_millis(20),
+        lost_look: Duration::from_millis(600),
         stopping: std::sync::OnceLock::new(),
         default_agent: false,
+        no_harness: Default::default(),
         wrappers: None,
         agent_ns: None,
         login: None,
@@ -6649,6 +6798,8 @@ fn skill_run(deadline: Duration) -> SkillRun {
             (skill_task::TOKEN_ENV, RUN_SECRET.into()),
         ],
         deadline,
+        started: Default::default(),
+        start_in: None,
     }
 }
 
@@ -6667,6 +6818,8 @@ fn skill_ok_plan(rig: &Rig, waited_state: &str) {
         "machines":{"default":true},
         "new":{"default":true},
         "wait":{"stdout":waited(waited_state, AGENT)},
+        // Its session bound: an ask, an answer, tools.
+        "show":{"default":true},
         "close":{"exit":0},
     }));
 }
@@ -6674,8 +6827,8 @@ fn skill_ok_plan(rig: &Rig, waited_state: &str) {
 /// The run is `harness new hermes` in its own folder, `skill-<run-id>`,
 /// the positional argument, with no mode, no route and no token in any
 /// argument or environment Harness is given; then `wait` on its one
-/// agent; then, as it ended, `close --now`; and its folder and token file
-/// are gone.
+/// agent; then, as it stopped, `show` that it had a session (#6432); then
+/// `close --now`; and its folder and token file are gone.
 #[test]
 fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothing() {
     let rig = Rig::new();
@@ -6684,21 +6837,21 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
     // The token is ended before `close --now` (V2's order on #6510).
     let ended_at = std::cell::Cell::new(None);
     let end_token = || ended_at.set(Some(rig.calls().len()));
-    assert_eq!(
-        runner.run(&skill_run(Duration::from_secs(20)), &end_token),
-        Ok(0)
-    );
+    let run = skill_run(Duration::from_secs(20));
+    assert_eq!(runner.run(&run, &end_token), Ok(0));
+    // Asked of Harness: begun, so a fixed write's is never sent straight (#6823).
+    assert!(run.started.load(std::sync::atomic::Ordering::Acquire));
     assert_eq!(
         ended_at.get(),
-        Some(3),
-        "ended after machines, new, wait; before close"
+        Some(4),
+        "ended after machines, new, wait, show; before close"
     );
     let calls = rig.calls();
     let verbs: Vec<&str> = calls
         .iter()
         .map(|call| call["args"][0].as_str().unwrap())
         .collect();
-    assert_eq!(verbs, ["machines", "new", "wait", "close"]);
+    assert_eq!(verbs, ["machines", "new", "wait", "show", "close"]);
     let folder = rig.root.path().join("project/skill-task-1");
     assert_eq!(
         calls[1]["args"],
@@ -6728,8 +6881,9 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
             "--json"
         ])
     );
+    assert_eq!(calls[3]["args"][3], AGENT);
     assert_eq!(
-        calls[3]["args"],
+        calls[4]["args"],
         json!(["close", "--machine", MACHINE, AGENT, "--now", "--json"])
     );
     for call in &calls {
@@ -6745,6 +6899,213 @@ fn a_skill_run_starts_hermes_in_its_own_folder_through_harness_and_leaves_nothin
         Ok(0)
     );
     assert!(rig.calls().iter().all(|call| call["args"][0] != "close"));
+    nothing_left(&rig);
+}
+
+/// The real Hermes, as Harness lists it apart from the wrapper's agent.
+const LIVE_HERMES: &str = "33333333-3333-4333-8333-333333333333";
+
+/// `show` of `id` with no session bound: no ask, no answer, no tools.
+fn unbound_show(id: &str) -> Value {
+    step(json!({"id":id,"state":"stopped","ask":null,"answer":"","truncated":false,"tools":0}))
+}
+
+/// `ps` with `rows` of (id, state, folder).
+fn ps_rows(rows: &[(&str, &str, &str)]) -> Value {
+    let rows: Vec<Value> = rows
+        .iter()
+        .map(|(id, state, folder)| ps_row(id, "Terminal harness", state, Some(folder)))
+        .collect();
+    step(json!({"you":null,"machine":"lamp","harnesses":rows,"next":[]}))
+}
+
+/// #6432: Harness says the run's agent `stopped` before it bound a
+/// session (it held the `hermes` wrapper's pid), and lists the real
+/// Hermes, still starting, in the run's own folder. The run waits on that
+/// one, and its own end is the run's: a stop with a session is `Ok(0)`,
+/// a failure is an error. Only that one is closed, and nothing is started
+/// again.
+#[test]
+fn a_skill_run_whose_agent_stopped_before_a_session_waits_on_the_live_one_in_its_folder() {
+    for (end, ran) in [("stopped", Ok(0)), ("failed", Err("failed"))] {
+        let rig = Rig::new();
+        let folder = rig.root.path().join("project/skill-task-1");
+        let folder = folder.to_str().unwrap();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true},
+            "wait":{"by_arg":{
+                AGENT: step(json!({"harnesses":[{"id":AGENT,"state":"stopped"}]})),
+                LIVE_HERMES: step(json!({"harnesses":[{"id":LIVE_HERMES,"state":end}]})),
+            }},
+            "show":{"by_arg":{
+                AGENT: unbound_show(AGENT),
+                LIVE_HERMES: {"default":true},
+            }},
+            "ps":ps_rows(&[
+                (AGENT, "stopped", folder),
+                (CREATION, "working", "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp"),
+                (LIVE_HERMES, "starting", folder),
+            ]),
+            "close":{"exit":0},
+        }));
+        let got = skill_runner(&rig, Some(EngineKind::Hermes))
+            .run(&skill_run(Duration::from_secs(20)), &|| {});
+        match ran {
+            Ok(id) => assert_eq!(got, Ok(id), "{end}"),
+            Err(said) => assert!(got.unwrap_err().contains(said), "{end}"),
+        }
+        let calls = rig.calls();
+        let of = |verb: &str| -> Vec<Value> {
+            calls
+                .iter()
+                .filter(|call| call["args"][0] == verb)
+                .map(|call| call["args"].clone())
+                .collect()
+        };
+        assert_eq!(of("new").len(), 1, "{end}: no second Hermes");
+        let waited: Vec<Value> = of("wait").into_iter().map(|args| args[3].clone()).collect();
+        assert_eq!(waited, [AGENT, LIVE_HERMES], "{end}");
+        assert_eq!(
+            of("close"),
+            [json!([
+                "close",
+                "--machine",
+                MACHINE,
+                LIVE_HERMES,
+                "--now",
+                "--json"
+            ])],
+            "{end}"
+        );
+        nothing_left(&rig);
+    }
+}
+
+/// `harness show <AGENT> --json` as Harness answers it, naming `agent`.
+fn skill_shown(agent: &str) -> String {
+    json!({"name":"skill-task-1","id":AGENT,"agent":agent,"machine":"lamp","state":"idle",
+        "startedBy":"you","folder":null,"ask":null,"answer":"","truncated":false,"tools":0,"next":[]})
+    .to_string()
+}
+
+/// #6835 gap 1 (52e6, 12635, 12:42): Hermes exited before it was ready,
+/// Harness kept the run's pane as a shell (agent "Terminal", the same id)
+/// and `wait` read it idle. Such a run is never said done: it may not
+/// have run, its session is closed, nothing is left, and it is never made
+/// again. A run whose `show` names its engine ends as
+/// before; one whose `show` isn't read is judged by Harness's end state
+/// alone, as before.
+#[test]
+fn a_run_harness_kept_as_a_shell_never_started_and_is_not_said_done() {
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":skill_shown("Terminal")},
+        "close":{"exit":0},
+    }));
+    let runner = skill_runner(&rig, Some(EngineKind::Hermes));
+    let ended = std::cell::Cell::new(0);
+    let failed = runner
+        .run(&skill_run(Duration::from_secs(20)), &|| {
+            ended.set(ended.get() + 1)
+        })
+        .unwrap_err();
+    assert!(
+        failed.starts_with(
+            "the skill's task may not have run: Harness kept the run's pane as a shell"
+        ),
+        "{failed}"
+    );
+    assert!(ended.get() >= 1, "the token ended");
+    let verbs: Vec<String> = rig
+        .calls()
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(verbs, ["machines", "new", "wait", "show", "close"]);
+    nothing_left(&rig);
+
+    // Not closed: said so too.
+    let rig = Rig::new();
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("idle", AGENT)},
+        "show":{"stdout":skill_shown("Terminal")},
+        "close":{"exit":1},
+    }));
+    let failed = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert!(failed.contains("its session was not closed"), "{failed}");
+    nothing_left(&rig);
+
+    for (show, plan) in [
+        ("Hermes", json!({"stdout":skill_shown("Hermes")})),
+        ("unread", json!({"exit":1})),
+    ] {
+        let rig = Rig::new();
+        rig.plan(json!({
+            "machines":{"default":true},
+            "new":{"default":true},
+            "wait":{"stdout":waited("idle", AGENT)},
+            "show":plan,
+            "close":{"exit":0},
+        }));
+        assert_eq!(
+            skill_runner(&rig, Some(EngineKind::Hermes))
+                .run(&skill_run(Duration::from_secs(20)), &|| {}),
+            Ok(0),
+            "{show}"
+        );
+        nothing_left(&rig);
+    }
+}
+
+/// #6432: `stopped` with no session bound and no live agent in the run's
+/// folder (only the stopped one, and another in another folder) is an
+/// error said plainly, never task 0, within the look's bound; nothing is
+/// started again, and nothing of the run is left.
+#[test]
+fn a_skill_run_whose_agent_stopped_before_a_session_with_none_live_is_an_error() {
+    let rig = Rig::new();
+    let folder = rig.root.path().join("project/skill-task-1");
+    rig.plan(json!({
+        "machines":{"default":true},
+        "new":{"default":true},
+        "wait":{"stdout":waited("stopped", AGENT),"exit":4},
+        "show":unbound_show(AGENT),
+        "ps":ps_rows(&[
+            (AGENT, "stopped", folder.to_str().unwrap()),
+            (LIVE_HERMES, "working", "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp"),
+        ]),
+        "close":{"exit":0},
+    }));
+    let began = Instant::now();
+    let why = skill_runner(&rig, Some(EngineKind::Hermes))
+        .run(&skill_run(Duration::from_secs(20)), &|| {})
+        .unwrap_err();
+    assert_eq!(why, "Harness lost the lamp's Hermes as it started");
+    assert!(
+        began.elapsed() < Duration::from_secs(8),
+        "bounded: {:?}",
+        began.elapsed()
+    );
+    let calls = rig.calls();
+    let verbs: Vec<&str> = calls
+        .iter()
+        .map(|call| call["args"][0].as_str().unwrap())
+        .collect();
+    assert_eq!(verbs.iter().filter(|verb| **verb == "new").count(), 1);
+    assert_eq!(verbs.iter().filter(|verb| **verb == "wait").count(), 1);
+    assert!(
+        verbs.iter().filter(|verb| **verb == "ps").count() >= 2,
+        "{verbs:?}"
+    );
+    assert_eq!(verbs.last(), Some(&"close"));
     nothing_left(&rig);
 }
 
@@ -6976,6 +7337,72 @@ fn a_skill_run_goes_to_the_default_agent_by_the_one_path() {
     assert_eq!(engine_of(off, &rig), "hermes");
 }
 
+/// #6685 PR 3: with the switch on and Harness read signed in (or offline,
+/// or not read yet), a skill's run still goes through Harness, `harness
+/// new <default>`, even though the default agent's wrapper takes a run
+/// with no Harness; read signed out, lamp-tasks starts the wrapper itself
+/// and Harness is asked nothing.
+#[test]
+fn signed_in_a_skill_run_still_goes_through_harness() {
+    let ns = ns_with_runs();
+    for (here, through) in [
+        (HarnessHere::SignedIn, true),
+        (HarnessHere::Unknown, true),
+        (HarnessHere::SignedOut, false),
+    ] {
+        let rig = Rig::new();
+        skill_ok_plan(&rig, "stopped");
+        let runner = one_path_runner(
+            &rig,
+            EngineKind::Hermes,
+            &[("hermes", ONE_PATH_HERMES)],
+            Some(&ns),
+        );
+        let ran = rig.root.path().join("ran");
+        let bin = runner.wrappers.clone().unwrap();
+        if !through {
+            // lamp-update's wrapper, which only says it ran here: started by
+            // lamp-tasks itself.
+            let text = ONE_PATH_HERMES.replacen(
+                skill_task::ONE_PATH_MARK,
+                &format!(
+                    "{}touch {}\nexit 0\n",
+                    skill_task::ONE_PATH_MARK,
+                    ran.display()
+                ),
+                1,
+            );
+            let wrapper = bin.join("hermes");
+            fs::write(&wrapper, text).unwrap();
+            fs::set_permissions(&wrapper, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        let _ = runner.no_harness.set(NoHarness {
+            here: Box::new(move || here),
+            default_engine: Box::new(|| Some(EngineKind::Hermes)),
+            home: rig.root.path().to_owned(),
+        });
+        let said = runner.run(&skill_run(Duration::from_secs(20)), &|| {});
+        let calls = rig.calls();
+        if through {
+            assert_eq!(said, Ok(0), "{here:?}");
+            let new = calls
+                .iter()
+                .find(|call| call["args"][0] == "new")
+                .expect("a new");
+            assert_eq!(new["args"][1], "hermes");
+            assert!(!ran.exists());
+        } else {
+            assert_eq!(said, Ok(0), "{here:?}");
+            assert!(
+                calls.is_empty(),
+                "{here:?}: Harness asked nothing: {calls:?}"
+            );
+            assert!(ran.exists(), "the wrapper started by lamp-tasks");
+        }
+        nothing_left(&rig);
+    }
+}
+
 /// #6685: with the switch on, a default agent that can't take a run by the
 /// one path is refused in words, naming it and why, with nothing made or
 /// asked, and no other agent runs it: no wrapper, a wrapper that is not
@@ -7186,10 +7613,11 @@ fn a_skill_run_that_fails_leaves_nothing() {
 #[test]
 fn a_skill_run_is_refused_with_no_harness_or_an_old_wrapper() {
     let refused = |runner: HarnessRunner, rig: &Rig, words: &str| {
-        let why = runner
-            .run(&skill_run(Duration::from_secs(20)), &|| {})
-            .unwrap_err();
+        let run = skill_run(Duration::from_secs(20));
+        let why = runner.run(&run, &|| {}).unwrap_err();
         assert!(why.contains(words), "{why}");
+        // Never begun: a fixed write's is `not_started`, sent straight (#6823).
+        assert!(!run.started.load(std::sync::atomic::Ordering::Acquire));
         assert!(
             rig.calls().iter().all(|call| call["args"][0] == "auth"),
             "nothing asked but the sign-in"

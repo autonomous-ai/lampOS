@@ -29,12 +29,18 @@ client's config (`claude mcp add lamp -- lamp-mcp --home ~/.config/lampos`), or
 `python -m lamp_mcp` from the venv's python when the client can't find `lamp-mcp`
 on its PATH. An unpaired start says in one stderr line which folder it looked in.
 
-**On a customer lamp (stable 11450)** five things are missing: `play` and a
-look at a face or name, a motion's end (`wait=True` returns when the lamp takes
-it), limp and pose, mDNS (pair with `--host`), and local event times (`at` is
-UTC). Skill push, `joints` for `roll`, `shoulder` and `elbow` (while the lamp
-stands) and a head tap as a `touch` event are in 11450. Read
-[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-stable-11450)
+**On a customer lamp (the stable build; the GUIDE's Plan and status rows say
+the build and date each row works from)** four things are missing: limp and
+pose, mDNS (pair with `--host`), local event times (`at` is UTC), and a look at
+a face. `look` at a name is refused, and the lamp doesn't track hands yet (the
+GUIDE's Follow a hand row: in development; lamp-body refuses a hold that says
+`follow`). Skill push (from 11091), `joints` for `roll`, `shoulder` and
+`elbow` (from build 11102, while the lamp stands), a head tap as a `touch`
+event (from 11372), a motion's end (`wait=True`, from 11716) and `play` (from
+12171) are in; a look at a face is taken by lamp-control, but on a customer lamp the
+body drops it ("this lamp's gaze is not measured, so it cannot look at a
+face"): never promise one, nor a hand follow. Read
+[references/gotchas.md](references/gotchas.md#on-a-customer-lamp-today-the-stable-build)
 before promising any of them.
 
 ## Start without a lamp
@@ -64,7 +70,7 @@ owner for the grants your program needs, by what it does:
 | lights the ring | `light` |
 | speaks or plays sounds | `speak` |
 | moves (gestures, feelings, looks, moves) | `body` (a feeling needs `light` too) |
-| knows who's there, follows a hand | `look` |
+| knows who's there (a hand follow is in development) | `look` |
 | hears a phrase or its name | `hear` |
 | hears music, laughter, the door, footsteps | `sound` |
 | puts skills of its own on the lamp | `skills` |
@@ -112,7 +118,7 @@ elsewhere:
 ## The mental model (read before writing code)
 
 - **Grants:** the owner ticks what this computer may do: `body` (move),
-  `light`, `speak`, `look` (presence, hands, face/hand targets), `hear`
+  `light`, `speak`, `look` (presence; hand and face targets are not tracked on a customer lamp yet), `hear`
   (phrases, the name), `sound` (sound classes), `skills` (push skills),
   `air` (the air sensor), `device` (the lamp's own computer), `camera`
   (pictures), `microphone` (the room's sound), `speaker` (sound of
@@ -177,7 +183,7 @@ Every refusal is a `LampError` with `code` and `why`, the lamp's own words;
 ## Reading the lamp
 
 - **Events** come by edge, when something changes: `person.arrived`,
-  `person.left`, `person.facing`, `person.stood_up`, `hand`, `phrase.heard`,
+  `person.left`, `person.facing`, `person.stood_up`, `hand` (none comes on a customer lamp yet), `phrase.heard`,
   `name.heard`, `sound.heard`, `touch`, `button`, `lamp.changed`, `time`;
   `lease` and `done` come unasked. Subscribe with `lamp.on(event, handler)`.
 - **State** with `lamp.get("presence", "light", "mood", "lamp")`; the

@@ -2339,6 +2339,16 @@ order is kept. A written turn is the same from the chat on.
     scored 0.901 to 1.000 (median 0.964) and 4 had no words back, 3 of
     them under 0.99: the rule costs about 3 bare calls in 82. Test:
     `a_wordless_call_under_the_bar_is_not_answered_with_the_switch`.
+  - While a prepared write waits for the answer its read-back asked for
+    (`services::awaits_an_answer`, #6363), that line with no words is left
+    as a sound at any score, with or without the switch: the journal says
+    "only the lamp's name, and no words of it came back, while a write waits
+    for its answer: not answered as a call". Asked as the name at any other
+    time, its answer is no answer to a waiting write's read-back
+    (`services::answered_in_place`). On lamp-9adf on 13 Nov one at the
+    second of the lamp's own arrival move was answered as the name, and the
+    one "Yes." after it found the mail dropped. Test:
+    `a_wordless_call_between_a_read_back_and_its_yes_keeps_the_write`.
 - **In a busy room, a line going on waits for the Policy**
   (`LAMP_GOING_ON_ASKS=on`, with the rule and the bus, #1522; #1712, item
   4): a line the rule would let out only as a conversation going on, and
@@ -2758,6 +2768,69 @@ When the coordinator switches (below):
   session open. Read from the role held per person, filled
   by their `session_open`; nothing is asked of the memory for it. Off, the
   character is as before, byte for byte.
+
+## The memory's night (`LAMP_MEMORY_TIERS`)
+
+lamp-memory has no network, so the tiered store's nightly sleep
+([memory.md](memory.md), "The tiered store beside Days") is asked of a
+model by the voice (`tiers_night.rs`; the memory owner's option A, 3 Nov;
+the first builder's bounds on #4710). Off unless `LAMP_MEMORY_TIERS` is
+`shadow` or `on` in the voice's own unit, with `LAMP_MEMORY_SOCKET`, the
+second route's file (`LAMP_VOICE_SECOND_CONFIG`) and its relay
+(`deepseek_base_url`, or `LAMP_SECOND_DEEPSEEK_BASE_URL`). Then the
+coordinator starts one thread, `lamp-voice-tiers-night`, and says
+`tiers night on: ...` (or `tiers night off: <why>` once, with the switch
+set). It runs whether or not the second route is the lamp's voice.
+
+- **When.** Every 60 s it looks, and takes a job only when all hold:
+  03:00 to 06:00 local (memory's night hours); no speech heard and no line
+  handed to a provider for 20 minutes (`tiers_night::stir`, called where
+  the detector hears speech and where a turn's input is submitted); the
+  privacy slide open and told so within 1 s (`tiers_night::privacy`, from
+  the privacy gate); this night's calls, bytes and tokens under their caps.
+- **The call.** The relay's DeepSeek, thinking off, with the relay's
+  credential (`llm_credential_file`), never a person's own key: the
+  observation pass's client. One job a call, the system prompt and input
+  memory gave, the reply read to at most 32 KiB, within 60 s.
+- **Caps a night** (named consts), per pass: 16 calls, 1 MiB of prompt and
+  reply, 200,000 tokens (the relay's `usage`, else one token a byte; before
+  a call its prompt's bytes over 3 plus 8,192 are reserved, and a job that
+  does not fit is not asked, said once as `tiers night: a job of N bytes (R
+  tokens reserved) is more than tonight has left; spent at ...`, counts
+  only). They are this pass's own: the memory's `nightly` pass
+  (`LAMP_MEMORY_NIGHTLY`) keeps its own, so with both switches set a night
+  may ask the relay up to twice the calls, bytes and tokens, both through
+  memory's one-at-a-time socket. Which pass runs is the memory owner's call
+  before `LAMP_MEMORY_TIERS` goes on. Each call's line logs them: `tiers night: <what
+  happened>; tonight N of 16 calls, B of 1048576 bytes, T of 200000
+  tokens`. No words of the job are ever logged; the chat client's own
+  lines are sizes and times only.
+- **Stopping.** Anyone speaking, a line handed on, or the slide closing
+  stops a call at once: the call's future is dropped (cancelled in
+  flight), its job dropped, and the night waits for 20 quiet minutes
+  again. The cut call has already sent its prompt, the scope's sleep
+  input, to the relay: stopping ends the call, not what was sent. Its
+  tokens are unknown (the relay's `usage` comes at the stream's end), so
+  its reserve is counted, as for a timeout.
+- **Not near 06:00.** No call starts within 5 minutes of 06:00
+  (`tiers_night::LAST_START`), so none runs past the night's end, when
+  memory drops the job and its give would be `unknown` with its input
+  already sent.
+- **Memory busy.** Memory answers a take or a give within 100 ms
+  (`busy` past it), so the night never holds memory's one-at-a-time socket
+  near a turn's first read. A `busy` give is given again every 5 s, at
+  most 6 tries, before any new job is taken; memory applies it once and
+  tells each give of it the outcome. A `busy` take is looked at again the
+  next minute, its job put back by memory.
+- **Dropped, never retried.** A reply that does not read as one JSON object
+  (a code fence allowed), and a timed-out call, are given back as `null`,
+  which memory drops; one memory's checks refuse is dropped there; memory
+  gives a job out once. Its records wait for the next night.
+- **Never heard or seen.** The night has no speech, ring, expression or bus
+  of its own (a test reads its source for them); nothing it does reaches
+  the person.
+- **Off,** none of it starts: `stir` and `privacy` are one atomic load each
+  and nothing else.
 
 ## What the rest of the lamp sees
 

@@ -51,7 +51,7 @@ pub const HELP: &str = "lamp_help";
 /// its SKILL.md says it) and a light show (light-show's SKILL.md).
 // ponytail: two skills' asks named here, not read from the skills; a
 // skill-declared list of asks when a third skill needs one.
-const ASKS: &[(&[&str], &str)] = &[
+pub(crate) const ASKS: &[(&[&str], &str)] = &[
     (&["reading", "light"], SCENE),
     (&["focus", "light"], SCENE),
     (&["relax", "light"], SCENE),
@@ -68,7 +68,7 @@ const ASKS: &[(&[&str], &str)] = &[
 /// Only [`AROUND`] words may stand beside one, and no request: "do you know
 /// who made you" or "who made you sad" is the model's.
 // ponytail: questions named here, not read from the skill, as [`ASKS`].
-const QUESTIONS: &[(&[&str], &str)] = &[
+pub(crate) const QUESTIONS: &[(&[&str], &str)] = &[
     (&["who", "made", "you"], HELP),
     (&["who", "makes", "you"], HELP),
     (&["who", "built", "you"], HELP),
@@ -136,7 +136,7 @@ const AROUND_VI: &[&[&str]] = &[
 /// story) leaves the line to the model: a missed force only means the model
 /// answers as without the switch, while a wrong one changes the light nobody
 /// asked to change.
-const AROUND: &[&[&str]] = &[
+pub(crate) const AROUND: &[&[&str]] = &[
     &["hey"],
     &["hi"],
     &["hello"],
@@ -162,7 +162,7 @@ const AROUND: &[&[&str]] = &[
 /// "you" and "do" alone are not one, so a preference ("I like movie light")
 /// or a question ("do you like movie light?", "would you like a light
 /// show?") is the model's.
-const REQUESTS: &[&[&str]] = &[
+pub(crate) const REQUESTS: &[&[&str]] = &[
     &["can", "you"],
     &["could", "you"],
     &["would", "you"],
@@ -189,7 +189,7 @@ const REQUESTS: &[&[&str]] = &[
 ];
 
 /// How many words of `words` from `at` the first of `phrases` takes, if one.
-fn phrase_at(words: &[String], at: usize, phrases: &[&[&str]]) -> Option<usize> {
+pub(crate) fn phrase_at(words: &[String], at: usize, phrases: &[&[&str]]) -> Option<usize> {
     phrases
         .iter()
         .find(|phrase| {

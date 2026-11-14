@@ -147,11 +147,13 @@ impl Lamp {
     fn hermes_at(&self, commit: &str) {
         put_hermes(self.root(), commit);
     }
-    /// Hermes and its two entry points, as this build's install leaves them.
+    /// Hermes, its two entry points and the file its terminal sources, as
+    /// this build's install leaves them.
     fn hermes_there(&self) {
         self.hermes_at(COMMIT);
         fs::write(self.at(WRAPPER), wrapper_text(false)).unwrap();
         fs::write(self.at(NS), ns_text(false, false)).unwrap();
+        fs::write(self.at(RUN_ENV), RUN_ENV_TEXT).unwrap();
         agent_ns::write_hook_shim(self.root()).unwrap();
         // The build's own lampos SDK beside them (#6507).
         crate::sdk_tree::write(self.root()).unwrap();
@@ -166,7 +168,7 @@ impl Lamp {
         fs::write(self.records().join(ASK), "{\"version\":1}").unwrap();
     }
     fn entry_points(&self) -> Vec<&'static str> {
-        [WRAPPER, NS]
+        [WRAPPER, NS, RUN_ENV]
             .into_iter()
             .filter(|path| self.at(path).exists())
             .collect()
@@ -500,10 +502,11 @@ fn on_with_harness_there_installs_the_pinned_hermes_as_lampos() {
         names
     };
     // The namespace script, the shared hook stand-in's folder (#6530) and
-    // the build's own lampos SDK (#6507, one folder, no staging left beside).
+    // the build's own lampos SDK (#6507, one folder, no staging left beside)
+    // and the file Hermes's terminal sources for a run's SDK path (#6684).
     assert_eq!(
         names("/usr/local/lib/lampos"),
-        ["hermes-ns", "ns-bin", "sdk-python"]
+        ["hermes-ns", "hermes-run-env.sh", "ns-bin", "sdk-python"]
     );
     assert_eq!(names(agent_ns::BIN), ["harness"]);
     assert!(crate::sdk_tree::present(lamp.root()));
@@ -2207,7 +2210,7 @@ fn the_tasks_text_is_the_namespace_script_with_only_the_control_socket_added() {
     assert!(staged < hidden && hidden < shown && shown < unstaged);
     assert!(unstaged < ro_run && ro_run < hermes);
     assert_eq!(
-        on.matches("LAMP_").count() - on.matches(NET_ENV).count(),
+        on.matches("LAMP_").count() - on.matches(NET_ENV).count() - on.matches(HOME_ENV).count(),
         NS_TEXT.matches("LAMP_").count() + 1,
         "only the comment names the switch"
     );
@@ -2485,6 +2488,74 @@ fn hermes_finds_a_skill_run_by_its_folder_and_reads_its_token_once() {
     assert!(token.exists(), "off: no run, its file untouched");
 }
 
+/// The first builder's 19:14 ruling on #6643: a voice make's run gets a
+/// fresh home of its own. With [`TASKS_SWITCH`] on, the wrapper takes
+/// [`HOME_ENV`] only for a make's home ([`MAKE_HOME_GLOB`], never with
+/// `..`) and puts `HERMES_HOME` under it; the namespace script then makes
+/// it `HOME` and Hermes's lasting folder read-only. Off, neither line.
+/// Run under `sh` with a stand-in `unshare`.
+#[test]
+fn a_makes_own_home_is_taken_only_for_a_makes_folder() {
+    let on = wrapper_text(true);
+    assert_eq!(on.matches(WRAPPER_HOME_LINE).count(), 1);
+    assert!(!wrapper_text(false).contains(HOME_ENV));
+    for skills in [false, true] {
+        assert_eq!(ns_text(skills, true).matches(NS_HOME_LINE).count(), 1);
+        assert!(!ns_text(skills, false).contains(HOME_ENV));
+    }
+    assert!(WRAPPER_HOME_LINE.contains(MAKE_HOME_GLOB));
+    // The home is taken before Hermes is run, as the caller's own ids.
+    let ns = ns_text(false, true);
+    let home = ns.find(NS_HOME_LINE).unwrap();
+    assert!(home > ns.find("U=$LAMP_NS_UID").unwrap());
+    assert!(home < ns.find("exec /usr/bin/unshare --user").unwrap());
+    let folder = tempfile::tempdir().unwrap();
+    let printer = folder.path().join("unshare");
+    fs::write(
+        &printer,
+        "#!/bin/sh\necho \"home=${LAMP_NS_HOME-unset} hermes=$HERMES_HOME\"\n",
+    )
+    .unwrap();
+    fs::set_permissions(&printer, fs::Permissions::from_mode(0o755)).unwrap();
+    let token = folder.path().join("hermes-token");
+    fs::write(&token, "tok_0123456789abcdef0123456789abcdef\n").unwrap();
+    let wrapper = folder.path().join("hermes");
+    fs::write(
+        &wrapper,
+        on.replace(TOKEN, &token.to_string_lossy())
+            .replace("/usr/bin/unshare", &printer.to_string_lossy()),
+    )
+    .unwrap();
+    let ran = |home: Option<&str>| {
+        let mut command = std::process::Command::new("/bin/sh");
+        command.arg(&wrapper).args(["chat", "-q", "a"]);
+        command.env_remove(HOME_ENV).env_remove(NET_ENV);
+        if let Some(home) = home {
+            command.env(HOME_ENV, home);
+        }
+        let out = command.output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    let make = "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-task-1-2-3/home";
+    assert_eq!(
+        ran(Some(make)),
+        format!("home={make} hermes={make}/.hermes\n")
+    );
+    let lasting = "home=unset hermes=/var/lib/lampos-hermes/.hermes\n";
+    for other in [
+        None,
+        Some(""),
+        Some("/var/lib/lampos-hermes"),
+        Some(
+            "/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-x/../../../../../lampos-hermes/home",
+        ),
+        Some("/var/lib/lampos-tasks/harnesses/lamp-tasks/lamp/make-x/home/"),
+    ] {
+        assert_eq!(ran(other), lasting, "{other:?}");
+    }
+}
+
 /// OpenClaw shares Hermes's namespace script without the tasks edits, and
 /// its own wrapper: never `--net`, never the bridge or the relay.
 #[test]
@@ -2529,7 +2600,9 @@ fn both_switches_on_make_both_edits() {
     ));
     assert!(!both.contains("admin.sock"));
     assert_eq!(
-        both.matches("LAMP_").count() - both.matches(NET_ENV).count(),
+        both.matches("LAMP_").count()
+            - both.matches(NET_ENV).count()
+            - both.matches(HOME_ENV).count(),
         NS_TEXT.matches("LAMP_").count() + 2
     );
 }
@@ -3072,4 +3145,634 @@ fn with_the_one_path_hermes_runs_through_the_one_agent_namespace() {
         fs::read_to_string(lamp.records().join(ASK)).unwrap(),
         "{\"version\":1,\"skills\":true}"
     );
+}
+
+/// #6684: Hermes's launcher replaces the `PYTHONPATH` it is started with,
+/// so [`RUN_ENV`] puts the SDK back in its terminal's login snapshot, for a
+/// skill run only: with `LAMP_CONTROL_SOCKET` set, the SDK first and what
+/// was there kept, never twice; without it, `PYTHONPATH` as it was.
+#[test]
+fn the_run_env_puts_the_sdk_on_a_skill_runs_pythonpath_only() {
+    assert!(
+        RUN_ENV.starts_with("/usr/local/lib/lampos/"),
+        "beside the namespace script, root's"
+    );
+    assert_eq!(
+        RUN_ENV_TEXT.matches(SDK_PYTHONPATH).count(),
+        3,
+        "the one SDK path the wrapper gives a run"
+    );
+    let folder = tempfile::tempdir().unwrap();
+    let file = folder.path().join("hermes-run-env.sh");
+    fs::write(&file, RUN_ENV_TEXT).unwrap();
+    let sourced = |socket: Option<&str>, path: Option<&str>| {
+        let mut command = std::process::Command::new("/bin/sh");
+        command
+            .args(["-c", ". \"$1\"; . \"$1\"; printf '%s|%s' \"${PYTHONPATH-unset}\" \"$(env | grep -c '^PYTHONPATH=')\"", "sh"])
+            .arg(&file)
+            .env_clear()
+            .env("PATH", "/usr/bin:/bin");
+        if let Some(socket) = socket {
+            command.env("LAMP_CONTROL_SOCKET", socket);
+        }
+        if let Some(path) = path {
+            command.env("PYTHONPATH", path);
+        }
+        let out = command.output().unwrap();
+        assert!(out.status.success(), "{out:?}");
+        String::from_utf8(out.stdout).unwrap()
+    };
+    let socket = Some(CONTROL_SOCKET);
+    assert_eq!(
+        sourced(socket, None),
+        format!("{SDK_PYTHONPATH}|1"),
+        "exported"
+    );
+    assert_eq!(
+        sourced(socket, Some("/h/repo:/h/site")),
+        format!("{SDK_PYTHONPATH}:/h/repo:/h/site|1"),
+        "first, and Hermes's own kept"
+    );
+    assert_eq!(
+        sourced(socket, Some(SDK_PYTHONPATH)),
+        format!("{SDK_PYTHONPATH}|1")
+    );
+    assert_eq!(sourced(None, None), "unset|0", "no run, nothing set");
+    assert_eq!(
+        sourced(Some(""), Some("/a")),
+        "/a|1",
+        "an empty socket is no run"
+    );
+    assert_eq!(sourced(None, Some("/a:/b")), "/a:/b|1");
+}
+
+/// The install writes [`RUN_ENV`] root's 0644, never run, and its text is
+/// part of Hermes being there: changed or missing, it is written again.
+#[test]
+fn the_run_env_is_written_with_the_entry_points_and_counted_in_present() {
+    let lamp = Lamp::new();
+    lamp.hermes_there();
+    let shown = OFF;
+    assert!(present(lamp.root(), shown));
+    fs::write(
+        lamp.at(RUN_ENV),
+        "PYTHONPATH=/elsewhere; export PYTHONPATH\n",
+    )
+    .unwrap();
+    assert!(
+        !present(lamp.root(), shown),
+        "another text is Hermes missing"
+    );
+    fs::remove_file(lamp.at(RUN_ENV)).unwrap();
+    assert!(!present(lamp.root(), shown), "so is none");
+    write_entry_points(lamp.root(), shown).unwrap();
+    assert!(holds(lamp.root(), RUN_ENV, RUN_ENV_TEXT));
+    let mode = fs::metadata(lamp.at(RUN_ENV)).unwrap().permissions().mode() & 0o777;
+    assert_eq!(mode, 0o644);
+    assert!(present(lamp.root(), shown));
+}
+
+/// A make's lines on their own, after [`NS`]'s `fail` and `ro`, with `H`
+/// and `W` (and the staging folder) moved to `base`'s, and `after` once
+/// the lines have run.
+fn make_lines(base: &Path, after: &str) -> String {
+    let ns = ns_text(false, true);
+    let helpers: String = ns
+        .lines()
+        .filter(|line| line.starts_with("fail() ") || line.starts_with("ro() "))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    assert_eq!(helpers.lines().count(), 2);
+    format!(
+        "#!/bin/sh\n{helpers}H={b}/h W={b}/w\n{}{after}",
+        NS_HOME_LINE.replace("/tmp/.lampos-mk", &format!("{}/x", base.display())),
+        b = base.display()
+    )
+}
+
+/// Hermes's lasting home and a lamp-tasks work folder, with a make's folder
+/// in it, under `base`.
+fn a_lamp_with_a_make(base: &Path) -> PathBuf {
+    for (path, text) in [
+        ("h/.hermes/memories/MEMORY.md", "THE OWNER'S MEMORY"),
+        ("h/.hermes/state.db", "STATE"),
+        ("h/.hermes/hermes-agent/run.sh", "echo ran"),
+        ("h/.hermes/tools/python-3/bin/python3", "the interpreter"),
+        ("h/.hermes/installs/k/facts.json", "the dependency record"),
+        ("h/.hermes/installs/k/.install.lock", ""),
+        ("h/.hermes/installs/k/environments/g1/.lease-managed", ""),
+        ("h/.hermes/installs/k/environments/g1/venv/pyvenv.cfg", "V"),
+        ("h/.hermes/installs/k/environments/g2/venv/pyvenv.cfg", "V"),
+        ("h/.hermes/installs/k/pm-runtime/.prepare.lock", ""),
+        (
+            "h/.hermes/installs/k/pm-runtime/selected.json",
+            "the PM runtime record",
+        ),
+        (
+            "h/.hermes/installs/k/pm-runtime/generations/r1/.lease-managed",
+            "",
+        ),
+        (
+            "h/.hermes/installs/k/pm-runtime/generations/r1/.leases/old",
+            "",
+        ),
+        (
+            "h/.hermes/installs/old/facts.json",
+            "an install with no lock",
+        ),
+        ("h/.local/bin/README", "the program"),
+        ("w/top.md", "W"),
+        ("w/lamp/AGENTS.md", "HARNESS PROJECT"),
+        ("w/lamp/make-task-1/rules.md", "R"),
+        ("w/lamp/make-task-1/home/.hermes/config.yaml", "C"),
+    ] {
+        let path = base.join(path);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, text).unwrap();
+    }
+    base.join("w/lamp/make-task-1")
+}
+
+/// #6643's HOLDs (the Reviewer-lead 19:58, SubDarren 20:0x, 12 Nov): for
+/// a make, which keeps the network, the script hides Hermes's lasting
+/// home under an empty tmpfs with only its checkout, `tools` (the
+/// Python Hermes runs on) and `installs` (its dependency record, which a
+/// make's home links to) shown again, read-only, but for its install
+/// lock and leases, bound back read-write (Hermes writes both at every
+/// start; no lock ends it); leaves Hermes's folder and the work folder read-only; hides
+/// the rest of `W/lamp` under another tmpfs, the make's own folder alone
+/// moved back, read-write; and starts Hermes there with the make's home.
+/// Each step failing ends it before Hermes runs; a home outside `W/lamp`
+/// is refused; no make, nothing of this runs.
+#[test]
+fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder() {
+    let folder = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(folder.path()).unwrap();
+    let make = a_lamp_with_a_make(&base);
+    let stubs = base.join("stubs");
+    fs::create_dir_all(&stubs).unwrap();
+    let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n";
+    for name in ["mount", "findmnt", "mkdir", "rmdir"] {
+        let path = stubs.join(name);
+        fs::write(&path, stub).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let script = base.join("make-lines");
+    fs::write(
+        &script,
+        make_lines(&base, "echo \"HOME=$HOME PWD=$(pwd -P)\"\n"),
+    )
+    .unwrap();
+    let log = base.join("log");
+    let run = |home: Option<&Path>, fail_on: &str| {
+        let _ = fs::remove_file(&log);
+        let mut command = std::process::Command::new("/bin/sh");
+        command
+            .arg(&script)
+            .current_dir(&make)
+            .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+            .env("LOG", &log)
+            .env("FAIL_ON", fail_on)
+            .env("HOME", "/lasting");
+        match home {
+            Some(home) => command.env(HOME_ENV, home),
+            None => command.env_remove(HOME_ENV),
+        };
+        let out = command.output().unwrap();
+        let lines: Vec<String> = fs::read_to_string(&log)
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_owned)
+            .collect();
+        (out, lines)
+    };
+    let (h, w, x) = (base.join("h"), base.join("w"), base.join("x"));
+    let (h, w, x, f) = (h.display(), w.display(), x.display(), make.display());
+    let home = make.join("home");
+    let (out, lines) = run(Some(&home), "");
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!("HOME={} PWD={f}\n", home.display())
+    );
+    let ro = |path: String| {
+        [
+            format!("findmnt -no VFS-OPTIONS -M {path}"),
+            format!("mount -o remount,bind,ro,nosuid,nodev,relatime {path}"),
+        ]
+    };
+    let mut wanted = vec![
+        format!("mkdir -m 0700 {x} {x}/f {x}/c {x}/t {x}/i"),
+        format!("mount -n --bind {f} {x}/f"),
+        format!("mount -n --bind {h}/.hermes/hermes-agent {x}/c"),
+        format!("mount -n --bind {h}/.hermes/tools {x}/t"),
+        format!("mount -n --bind {h}/.hermes/installs {x}/i"),
+        // Only Hermes's install lock and a lease-managed generation's
+        // leases are bound back read-write, onto the staged `installs`
+        // before its read-only remount (`.leases` made first, as Hermes
+        // would); `g2` has no leases, `old` no lock.
+        format!("mount -n --bind {h}/.hermes/installs/k/.install.lock {x}/i/k/.install.lock"),
+        format!(
+            "mount -n --bind {h}/.hermes/installs/k/pm-runtime/.prepare.lock {x}/i/k/pm-runtime/.prepare.lock"
+        ),
+        format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
+        format!(
+            "mount -n --bind {h}/.hermes/installs/k/environments/g1/.leases {x}/i/k/environments/g1/.leases"
+        ),
+        format!(
+            "mount -n --bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases {x}/i/k/pm-runtime/generations/r1/.leases"
+        ),
+        format!("mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {h}/.hermes"),
+        format!("mkdir {h}/.hermes/hermes-agent"),
+        format!("mount -n --move {x}/c {h}/.hermes/hermes-agent"),
+    ];
+    wanted.extend(ro(format!("{h}/.hermes/hermes-agent")));
+    wanted.push(format!("mkdir {h}/.hermes/tools"));
+    wanted.push(format!("mount -n --move {x}/t {h}/.hermes/tools"));
+    wanted.extend(ro(format!("{h}/.hermes/tools")));
+    wanted.push(format!("mkdir {h}/.hermes/installs"));
+    wanted.push(format!("mount -n --move {x}/i {h}/.hermes/installs"));
+    wanted.extend(ro(format!("{h}/.hermes/installs")));
+    wanted.extend(ro(format!("{h}/.hermes")));
+    wanted.extend(ro(h.to_string()));
+    wanted.extend(ro(w.to_string()));
+    wanted.push(format!(
+        "mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {w}/lamp"
+    ));
+    wanted.push(format!("mkdir {f}"));
+    wanted.push(format!("mount -n --move {x}/f {f}"));
+    wanted.extend(ro(format!("{w}/lamp")));
+    wanted.push(format!("rmdir {x}/f {x}/c {x}/t {x}/i {x}"));
+    assert_eq!(lines, wanted);
+    for step in [
+        "mkdir -m 0700".to_owned(),
+        format!("--bind {f} "),
+        format!("--bind {h}/.hermes/hermes-agent "),
+        format!("--bind {h}/.hermes/tools "),
+        format!("--bind {h}/.hermes/installs "),
+        format!("--bind {h}/.hermes/installs/k/.install.lock "),
+        format!("--bind {h}/.hermes/installs/k/pm-runtime/.prepare.lock "),
+        format!("--bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases "),
+        format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
+        format!("--bind {h}/.hermes/installs/k/environments/g1/.leases "),
+        format!("none {h}/.hermes"),
+        format!("mkdir {h}/.hermes/hermes-agent"),
+        format!("--move {x}/c "),
+        format!("relatime {h}/.hermes/hermes-agent"),
+        format!("mkdir {h}/.hermes/tools"),
+        format!("--move {x}/t "),
+        format!("relatime {h}/.hermes/tools"),
+        format!("mkdir {h}/.hermes/installs"),
+        format!("--move {x}/i "),
+        format!("relatime {h}/.hermes/installs"),
+        format!("relatime {h}/.hermes"),
+        format!("relatime {h}"),
+        format!("relatime {w}"),
+        format!("none {w}/lamp"),
+        format!("mkdir {f}"),
+        format!("--move {x}/f "),
+        format!("relatime {w}/lamp"),
+        "rmdir".to_owned(),
+    ] {
+        let (out, _) = run(Some(&home), &step);
+        assert!(!out.status.success(), "{step}");
+        assert!(out.stdout.is_empty(), "Hermes never runs: {step}");
+    }
+    // With the lock already there, nothing is made for it; with no lock at
+    // all (the lasting Hermes never started), it ends before the lasting
+    // home is hidden and Hermes never runs.
+    let lock = base.join("h/.hermes/installs/k/.install.lock");
+    fs::remove_file(&lock).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&out.stderr)
+            .contains("no Hermes install lock: the lasting Hermes has not run")
+    );
+    assert!(
+        !lines.iter().any(|line| line.contains("tmpfs")),
+        "{lines:?}"
+    );
+    fs::write(&lock, "").unwrap();
+    // Hermes's PM runtime folder with no `.prepare.lock` ends it too.
+    let prepare = base.join("h/.hermes/installs/k/pm-runtime/.prepare.lock");
+    fs::remove_file(&prepare).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Hermes runtime lock not shown"));
+    assert!(
+        !lines.iter().any(|line| line.contains("tmpfs")),
+        "{lines:?}"
+    );
+    fs::write(&prepare, "").unwrap();
+    // A home outside the work folder's `lamp`, or missing, is refused
+    // before anything is mounted.
+    let other = base.join("other/make-task-1/home");
+    fs::create_dir_all(&other).unwrap();
+    for home in [other, make.join("gone/home")] {
+        let (out, lines) = run(Some(&home), "");
+        assert!(!out.status.success(), "{home:?}");
+        assert!(lines.is_empty(), "{lines:?}");
+    }
+    // No make: none of it.
+    let (out, lines) = run(None, "");
+    assert!(out.status.success());
+    assert!(lines.is_empty(), "{lines:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!("HOME=/lasting PWD={f}\n")
+    );
+}
+
+/// The same lines run for real in a user and mount namespace of their own
+/// (Linux, where the kernel allows one; skipped otherwise): from inside a
+/// make's namespace, a `cat` of Hermes's lasting memories finds nothing,
+/// its lasting home shows only the checkout, `tools` and `installs`, read-only, `W/lamp` shows
+/// only the make's folder, and nothing but the make's folder, Hermes's
+/// install lock and a lease-managed generation's leases can be written
+/// (never `facts.json` or an environment).
+#[cfg(target_os = "linux")]
+#[test]
+fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
+    let folder = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(folder.path()).unwrap();
+    let probe = base.join("probe");
+    fs::create_dir(&probe).unwrap();
+    let allowed = std::process::Command::new("unshare")
+        .args(["--map-root-user", "--mount", "--propagation", "private"])
+        .args(["mount", "-t", "tmpfs", "none"])
+        .arg(&probe)
+        .output()
+        .is_ok_and(|out| out.status.success());
+    if !allowed {
+        eprintln!("no user and mount namespace here: skipped");
+        return;
+    }
+    let make = a_lamp_with_a_make(&base);
+    let checks = "\
+        cat \"$H/.hermes/memories/MEMORY.md\" 2>/dev/null && echo SEEN-MEMORY\n\
+        cat \"$H/.hermes/state.db\" 2>/dev/null && echo SEEN-STATE\n\
+        echo \"lasting: $(ls -A \"$H/.hermes\" | tr '\\n' ' ')\"\n\
+        cat \"$H/.hermes/hermes-agent/run.sh\" >/dev/null && echo CHECKOUT\n\
+        cat \"$H/.hermes/tools/python-3/bin/python3\" >/dev/null && echo TOOLS\n\
+        cat \"$H/.hermes/installs/k/facts.json\" >/dev/null && echo INSTALLS\n\
+        cat \"$H/.local/bin/README\" >/dev/null && echo PROGRAM\n\
+        echo \"lamp: $(ls -A \"$W/lamp\" | tr '\\n' ' ')\"\n\
+        cat \"$W/lamp/AGENTS.md\" 2>/dev/null && echo SEEN-PROJECT\n\
+        touch \"$W/lamp/x\" 2>/dev/null && echo WROTE-LAMP\n\
+        touch \"$W/x\" 2>/dev/null && echo WROTE-W\n\
+        touch \"$H/x\" 2>/dev/null && echo WROTE-H\n\
+        touch \"$H/.hermes/x\" 2>/dev/null && echo WROTE-LASTING\n\
+        touch \"$H/.hermes/hermes-agent/x\" 2>/dev/null && echo WROTE-CHECKOUT\n\
+        touch \"$H/.hermes/tools/x\" 2>/dev/null && echo WROTE-TOOLS\n\
+        touch \"$H/.hermes/installs/x\" 2>/dev/null && echo WROTE-INSTALLS\n\
+        echo x >> \"$H/.hermes/installs/k/facts.json\" 2>/dev/null && echo WROTE-FACTS\n\
+        touch \"$H/.hermes/installs/k/environments/g1/venv/x\" 2>/dev/null && echo WROTE-ENV\n\
+        touch \"$H/.hermes/installs/k/environments/g2/.leases\" 2>/dev/null && echo WROTE-G2\n\
+        echo x >> \"$H/.hermes/installs/k/pm-runtime/selected.json\" 2>/dev/null && echo WROTE-SELECTED\n\
+        echo p >> \"$H/.hermes/installs/k/pm-runtime/.prepare.lock\" && echo WROTE-PREPARE\n\
+        touch \"$H/.hermes/installs/k/pm-runtime/generations/r1/.leases/l\" && echo WROTE-RUNTIME-LEASE\n\
+        echo l >> \"$H/.hermes/installs/k/.install.lock\" && echo WROTE-LOCK\n\
+        touch \"$H/.hermes/installs/k/environments/g1/.leases/l\" && rm \"$H/.hermes/installs/k/environments/g1/.leases/l\" && echo WROTE-LEASE\n\
+        touch answer.md && touch \"$HOME/.hermes/memory.md\" && echo ANSWERED\n";
+    // On the lamp, Hermes's home and the work folder are mounts by now
+    // (moved from the staging); here they are made so, for `ro` to find.
+    let b = base.display();
+    let lines = make_lines(&base, checks).replacen(
+        &format!("W={b}/w\n"),
+        &format!("W={b}/w\nmount --bind {b}/h {b}/h && mount --bind {b}/w {b}/w || exit 1\n"),
+        1,
+    );
+    assert!(lines.contains("mount --bind"));
+    let script = base.join("make-lines");
+    fs::write(&script, lines).unwrap();
+    let out = std::process::Command::new("unshare")
+        .args([
+            "--map-root-user",
+            "--mount",
+            "--propagation",
+            "private",
+            "/bin/sh",
+        ])
+        .arg(&script)
+        .current_dir(&make)
+        .env(HOME_ENV, make.join("home"))
+        .output()
+        .unwrap();
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        "lasting: hermes-agent installs tools \nCHECKOUT\nTOOLS\nINSTALLS\nPROGRAM\nlamp: make-task-1 \nWROTE-PREPARE\nWROTE-RUNTIME-LEASE\nWROTE-LOCK\nWROTE-LEASE\nANSWERED\n"
+    );
+    // Outside, the make's answer is there and nothing else was touched.
+    assert!(make.join("answer.md").exists());
+    assert!(!base.join("w/lamp/x").exists() && !base.join("h/x").exists());
+    // The lock written through the make's bind is the lasting one; the
+    // dependency record is untouched.
+    assert_eq!(
+        fs::read_to_string(base.join("h/.hermes/installs/k/.install.lock")).unwrap(),
+        "l\n"
+    );
+    assert_eq!(
+        fs::read_to_string(base.join("h/.hermes/installs/k/facts.json")).unwrap(),
+        "the dependency record"
+    );
+    assert_eq!(
+        fs::read_to_string(base.join("h/.hermes/installs/k/pm-runtime/.prepare.lock")).unwrap(),
+        "p\n"
+    );
+    assert_eq!(
+        fs::read_to_string(base.join("h/.hermes/installs/k/pm-runtime/selected.json")).unwrap(),
+        "the PM runtime record"
+    );
+}
+
+/// #6643 with #6685's one run path (`LAMP_SKILL_DEFAULT_AGENT` on): Hermes's
+/// one run path wrapper hands a make's home on ([`ONE_PATH_HOME_LINE`],
+/// [`WRAPPER_HOME_LINE`]'s semantics, as [`MAKE_ENV`]) and the one agent
+/// namespace runs Hermes's make lines ([`ONE_PATH_NS_MAKE_LINES`],
+/// [`NS_HOME_LINE`]'s steps) for it, its program `X` untouched; a home
+/// outside `make-*/home`, or with `..`, is unset in the wrapper and refused
+/// in the namespace, and another agent is refused one. Off, none of it.
+#[test]
+fn with_the_one_path_a_make_still_runs_in_its_own_home() {
+    let one = Shown {
+        skills: true,
+        tasks: true,
+        one_path: true,
+    };
+    // The namespace's lines are NS_HOME_LINE's, with the make's own names,
+    // and its unset line but for the home (unset after the make's block).
+    let (body, unset) = NS_HOME_LINE
+        .split_once("then\n")
+        .and_then(|(_, rest)| rest.rsplit_once("fi\n"))
+        .unwrap();
+    let derived = body
+        .replace(HOME_ENV, MAKE_ENV)
+        .replace("X=/tmp/.lampos-mk", "Y=/tmp/.lampos-mk")
+        .replace("\"$X", "\"$Y")
+        + "  "
+        + &unset
+            .replacen(&format!("unset {HOME_ENV} "), "unset ", 1)
+            .replacen(" X ", " Y ", 1);
+    assert!(!derived.contains("$X"));
+    assert_eq!(ONE_PATH_NS_MAKE_LINES, derived);
+    let wrapper = wrapper_for(one);
+    assert_eq!(wrapper.matches(ONE_PATH_HOME_LINE).count(), 1);
+    let at = |text: &str, line: &str| text.find(line).unwrap();
+    assert!(at(&wrapper, ONE_PATH_HOME_LINE) < at(&wrapper, "LAMP_NS_HOME=$H\n"));
+    let (path, ns) = ns_for(one);
+    assert_eq!(path, agent_ns::wrapper::NS);
+    assert_eq!(ns.matches(ONE_PATH_NS_MAKE_LINES).count(), 1);
+    assert!(!ns.contains(NS_HOME_LINE));
+    assert!(at(&ns, "HOME=$H\n") < at(&ns, ONE_PATH_NS_MAKE_LINES));
+    assert!(at(&ns, ONE_PATH_NS_MAKE_LINES) < at(&ns, "unset LAMP_NS_UID"));
+    // Off: nothing of it, in either script.
+    for off in [OFF, SKILLS_ON, TASKS_ON] {
+        assert!(!wrapper_for(off).contains(MAKE_ENV));
+        assert!(!ns_for(off).1.contains(MAKE_ENV));
+        assert!(!agent_ns::wrapper::ns_text(off).contains(MAKE_ENV));
+    }
+
+    // The wrapper's line, run.
+    let make = format!(
+        "{}/make-task-1/home",
+        MAKE_HOME_GLOB.split_once("/make-").unwrap().0
+    );
+    let wrapped = |home: Option<&str>, preset: bool| {
+        let mut command = std::process::Command::new("/bin/sh");
+        command.arg("-c").arg(format!(
+            "HERMES_HOME=/lasting\n{ONE_PATH_HOME_LINE}echo \"${{LAMP_NS_MAKE-none}} $HERMES_HOME\""
+        ));
+        match home {
+            Some(home) => command.env(HOME_ENV, home),
+            None => command.env_remove(HOME_ENV),
+        };
+        if preset {
+            command.env(MAKE_ENV, &make);
+        } else {
+            command.env_remove(MAKE_ENV);
+        }
+        String::from_utf8(command.output().unwrap().stdout).unwrap()
+    };
+    assert_eq!(
+        wrapped(Some(&make), false),
+        format!("{make} {make}/.hermes\n")
+    );
+    let up = make.replace("make-task-1", "make-x/../../..");
+    for (home, preset) in [
+        (None, false),
+        (None, true),
+        (Some(PLACE), true),
+        (Some(up.as_str()), false),
+        (Some("/elsewhere/lamp/make-1/home"), false),
+        (Some(&format!("{make}/x")), false),
+    ] {
+        assert_eq!(wrapped(home, preset), "none /lasting\n", "{home:?}");
+    }
+
+    // The namespace's lines, run with stand-ins for mount and the rest.
+    let folder = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(folder.path()).unwrap();
+    let b = base.display().to_string();
+    // Hermes's lasting home with its install lock, which the lines bind
+    // back read-write, and the make's folder.
+    let made = a_lamp_with_a_make(&base).join("home");
+    let stubs = base.join("stubs");
+    fs::create_dir_all(&stubs).unwrap();
+    let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n";
+    for name in ["mount", "findmnt", "mkdir", "rmdir"] {
+        let path = stubs.join(name);
+        fs::write(&path, stub).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let helpers: String = ns
+        .lines()
+        .filter(|line| line.starts_with("fail() ") || line.starts_with("ro() "))
+        .map(|line| format!("{line}\n"))
+        .collect();
+    assert_eq!(helpers.lines().count(), 2);
+    let block = agent_ns::wrapper::one_path_make_home()
+        .replace(MAKE_HOME_GLOB, &format!("{b}/w/lamp/make-*/home"))
+        .replace("/tmp/.lampos-mk", &format!("{b}/x"));
+    assert!(ns.contains(&agent_ns::wrapper::one_path_make_home()));
+    let script = base.join("make-lines");
+    fs::write(
+        &script,
+        format!(
+            "#!/bin/sh\n{helpers}H={b}/h W={b}/w X=/the/program\n{block}\
+             echo \"HOME=$HOME X=$X MAKE=${{LAMP_NS_MAKE-none}} PWD=$(pwd -P)\"\n"
+        ),
+    )
+    .unwrap();
+    let log = base.join("log");
+    let run = |engine: &str, home: Option<&Path>| {
+        let _ = fs::remove_file(&log);
+        let mut command = std::process::Command::new("/bin/sh");
+        command
+            .arg(&script)
+            .current_dir(&base)
+            .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
+            .env("LOG", &log)
+            .env("E", engine)
+            .env("LAMP_NS_UID", "1")
+            .env("LAMP_NS_GID", "1");
+        match home {
+            Some(home) => command.env(MAKE_ENV, home),
+            None => command.env_remove(MAKE_ENV),
+        };
+        let out = command.output().unwrap();
+        let mounted = fs::read_to_string(&log).unwrap_or_default();
+        (out, mounted)
+    };
+    let (out, mounted) = run("hermes", Some(&made));
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!(
+            "HOME={} X=/the/program MAKE=none PWD={b}/w/lamp/make-task-1\n",
+            made.display()
+        )
+    );
+    assert!(
+        mounted.contains(&format!("none {b}/h/.hermes\n")),
+        "{mounted}"
+    );
+    assert!(mounted.contains(&format!("none {b}/w/lamp\n")), "{mounted}");
+    assert!(
+        mounted.contains(&format!(
+            "mount -n --bind {b}/h/.hermes/installs/k/.install.lock {b}/x/i/k/.install.lock\n"
+        )),
+        "{mounted}"
+    );
+    // No make: none of it, the agent's own home.
+    let (out, mounted) = run("hermes", None);
+    assert!(out.status.success(), "{out:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&out.stdout),
+        format!("HOME={b}/h X=/the/program MAKE=none PWD={b}\n")
+    );
+    assert!(mounted.is_empty());
+    // Refused before anything is mounted: `..`, a home elsewhere, or a
+    // make's home for an agent whose data has none.
+    let other = base.join("other/make-task-1/home");
+    fs::create_dir_all(&other).unwrap();
+    for (engine, home) in [
+        (
+            "hermes",
+            base.join("w/lamp/make-task-1/../make-task-1/home"),
+        ),
+        ("hermes", other),
+        ("claude", made.clone()),
+    ] {
+        let (out, mounted) = run(engine, Some(&home));
+        assert!(!out.status.success(), "{engine} {home:?}");
+        assert!(out.stdout.is_empty());
+        assert!(mounted.is_empty(), "{mounted}");
+    }
 }

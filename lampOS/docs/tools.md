@@ -373,6 +373,23 @@ and none of the skills' own (`crate::use_skill`):
   `a_plain_question_about_the_lamp_asks_its_help`,
   `a_plain_question_about_the_lamp_in_vietnamese_asks_its_help`,
   `a_plain_question_about_the_lamp_forces_its_help_only_when_offered`.
+- **A skill asked for by its name** (the second route,
+  `LAMP_SKILL_NAMED=on`, off unless set, on in the product's
+  `lamp-voice.service`, #6772): a line that is only an
+  installed, non-core skill's name ("photo booth", "run photo booth"), for
+  a skill that takes no choice or yes-or-no, has its function called in
+  code as round 1, through the round's call path (the Policy's hold, a
+  look its answer asks for), and the model words the result; see
+  [skills.md](skills.md#a-skill-asked-for-by-its-name-runs-in-code-6772).
+- **A plain ask to make a skill** (`LAMP_MAKE_SKILL_ASKED=on`, the second
+  route, on in the product unit; #6835): a line that is one sentence, opens with "make (me) a (new) skill" or the
+  like, says what it does, and has no word that may take it back, doubt it
+  or put it off ("no", "wait", "actually", "not", "later", …) has its first chat round sent
+  with `tool_choice` naming `make_skill`, when `make_skill` is declared
+  (`tools::make_skill_asked`; docs/skills.md, "A plain ask to make one
+  calls it"). Host tests: `a_plain_ask_to_make_a_skill_is_told_apart`,
+  `the_force_names_make_skill_for_an_ask_and_nothing_else`,
+  `the_played_make_sends_a_tool_choice_for_make_skill_when_declared`.
 - **A skill installed or removed** changes no function's name, so each skill
   `use_skill` reaches is counted as `use_skill:<skill>` against what the
   session was given, and the session is renewed for it as for any change.
@@ -541,10 +558,11 @@ a skill cut for it is named on the setup line (#1706).
 
 The switch declares two functions, `reports_stop` and `reports_state`
 (below), so a session is told two more than without it. The product's
-unit sets it: a product lamp's chat request offers 42 of the lamp's own
+unit sets it: a product lamp's chat request offers 45 of the lamp's own
 functions (`PRODUCT_FUNCTIONS`, `crates/update/tests/functions.rs`), the
-voice's own 24 with these two among them (and `set_role` and `end_role`
-since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov), the actions part's
+voice's own 27 with these two among them (and `set_role` and `end_role`
+since `LAMP_MEMORY_ROLE` is on in the product, 9 Nov, and `go_to_sleep`
+since `LAMP_SLEEP_ASKED` is on in the product, #6853), the actions part's
 17 and `use_skill`, which reaches Dance's `dance` and Pose's `set_pose`
 (#4135, #2826), Light show's `light_show` (#5745), and Light scenes'
 `light_scene` and Point the light's `point_light` (#5744). At the bound a core skill's function is never the one cut (the

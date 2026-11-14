@@ -35,6 +35,26 @@ use std::os::unix::net::UnixDatagram;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+/// Spawn a thread that never takes a signal. A part that blocks SIGTERM in
+/// `main` to read it from a signalfd blocks it only there and in threads
+/// made after; a thread made before, unblocked, is where the kernel sends
+/// the process's SIGTERM, and its default ends the process (lamp-52e6,
+/// 2026-10-15, the log relay; a customer lamp, #6834, the body's unplug
+/// worker: no easing back and no exit report). Made with every signal
+/// blocked, it inherits that mask from its first instruction.
+pub fn spawn_without_signals<F, T>(name: &str, f: F) -> io::Result<std::thread::JoinHandle<T>>
+where
+    F: FnOnce() -> T + Send + 'static,
+    T: Send + 'static,
+{
+    use nix::sys::signal::SigSet;
+    let before = SigSet::thread_get_mask().map_err(io::Error::from)?;
+    SigSet::all().thread_block().map_err(io::Error::from)?;
+    let spawned = std::thread::Builder::new().name(name.into()).spawn(f);
+    before.thread_set_mask().map_err(io::Error::from)?;
+    spawned
+}
+
 /// Maximum accepted application payload, including its caller-defined envelope.
 pub const MAX_DATAGRAM_BYTES: usize = 8192;
 /// Requested kernel buffer sizes. The OS may clamp or account these differently;

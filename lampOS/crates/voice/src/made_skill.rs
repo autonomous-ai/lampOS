@@ -682,7 +682,7 @@ pub fn repair_brief(request: &str, lines: &str) -> Result<String, &'static str> 
 pub struct Refused(pub String, pub Option<String>);
 
 impl Refused {
-    fn new(why: impl Into<String>) -> Self {
+    pub(crate) fn new(why: impl Into<String>) -> Self {
         Self(why.into(), None)
     }
 }
@@ -1428,7 +1428,7 @@ pub fn needs_link(uses: &Uses, linked: impl FnOnce() -> Option<Vec<String>>) -> 
 /// in its own words and the conversation's language, never a fixed
 /// English sentence the lamp says as it is (the owner, 10 Nov: "đồng bộ
 /// luôn", as the `cannot:` reason is the model's own): that the skill
-/// starts once they are linked in the app, under Skills, then Connectors.
+/// starts once they are linked in the app: open this lamp, then Settings, then Linked accounts.
 /// The services themselves go with it as `needs_link`. None with none.
 pub fn needs_link_ask(needs: &[Value]) -> Option<String> {
     let names: Vec<&str> = needs
@@ -1444,8 +1444,8 @@ pub fn needs_link_ask(needs: &[Value]) -> Option<String> {
     );
     Some(format!(
         "Then tell the person, in your own words and in the language of the conversation, \
-         that the skill will start once {names} {are} linked in the app, under Skills, then \
-         Connectors (needs_link)."
+         that the skill will start once {names} {are} linked in the app: open this lamp, then \
+         Settings, then Linked accounts (needs_link)."
     ))
 }
 
@@ -1493,6 +1493,9 @@ pub fn capped_with(text: &str, reads: bool) -> Result<(String, Uses), Refused> {
         Refused(why, Some(lines))
     })
 }
+
+/// Why a made skill with `asks` is refused ([`held`]).
+pub const MADE_ASKS: &str = "it gives asks, the phrases that call a skill, which only a skill from the Store or your computer gives; leave asks out";
 
 /// What a repair is told when [`capped`] refused.
 const CAPPED_ONLY: &str = "kind = \"installable\", version = \"1.0.0\", no [tool]; \
@@ -2095,6 +2098,20 @@ pub fn tidied(text: &str) -> String {
             text = tidied;
             table = expected;
         }
+    }
+    // (g) Its `asks` (#6772): the phrases that would call a skill in code
+    // are a skill's from the Store or the owner's computer, never the
+    // model's to claim for one it makes (the Reviewer-lead's P3 2 on
+    // #6842). Taken out whole; one written so it can't be is refused
+    // ([`held`]).
+    if table.contains_key("asks") {
+        tidy(
+            &mut text,
+            &mut table,
+            &|table| Some(table),
+            "asks",
+            "asks, the phrases that call a skill, which a made skill never gives".to_owned(),
+        );
     }
     text
 }
@@ -3027,10 +3044,31 @@ pub const BRIEFS_OWN_REFUSALS: &[&str] = &[
     "deleting or changing what is in your services",
 ];
 
+/// The brief's own refusals ([`BRIEFS_OWN_REFUSALS`]) of a send: with a
+/// service skill made as a task for the lamp's agent
+/// ([`AGENT_SERVICES_ENVIRONMENT`] and a made skill's code on) the agent
+/// sends through its `lamp-services` tools, so a DeepSeek `cannot:` with
+/// one of them goes to the agent and is not said as it is (lamp-9adf, 13
+/// Nov: 3 of 3 voice makes that send mail refused by DeepSeek, never
+/// handed over).
+pub const BRIEFS_SEND_REFUSALS: &[&str] = &["sending a message", SENDS_ON_ITS_OWN];
+
+/// Whether the model's `cannot:` reason `why` is one of the brief's own
+/// refusals of a send ([`BRIEFS_SEND_REFUSALS`]), as
+/// [`briefs_own_refusal`] reads it.
+pub fn briefs_send_refusal(why: &str) -> bool {
+    briefs_own_refusal_in(why, BRIEFS_SEND_REFUSALS)
+}
+
 /// Whether the model's `cannot:` reason `why` is one of the brief's own
 /// refusals ([`BRIEFS_OWN_REFUSALS`]), in any case, a verb's "-ing" said
 /// as the prompt says it ("hearing what is said" for "hear what is said").
 pub fn briefs_own_refusal(why: &str) -> bool {
+    briefs_own_refusal_in(why, BRIEFS_OWN_REFUSALS)
+}
+
+/// [`briefs_own_refusal`], against `refusals`.
+fn briefs_own_refusal_in(why: &str, refusals: &[&str]) -> bool {
     let plain = |text: &str| {
         text.to_lowercase()
             .replace("hearing ", "hear ")
@@ -3038,9 +3076,81 @@ pub fn briefs_own_refusal(why: &str) -> bool {
             .replace("sending ", "send ")
     };
     let why = plain(why);
-    BRIEFS_OWN_REFUSALS
+    refusals.iter().any(|refusal| why.contains(&plain(refusal)))
+}
+
+/// The verbs of an ask the lamp itself would have to carry out, each with
+/// the forms a request says it in: a skill's say beginning with one of
+/// them, when the request asked the lamp to do it, tells the person to do
+/// what they asked for ([`echoes_the_ask`]).
+const ASKED_VERBS: [(&str, &[&str]); 7] = [
+    ("check", &["check", "checks", "checking"]),
+    ("look up", &["look up", "looks up", "looking up"]),
+    ("find", &["find", "finds", "finding"]),
+    ("read", &["read", "reads", "reading"]),
+    ("search", &["search", "searches", "searching"]),
+    (
+        "summarize",
+        &["summarize", "summarizes", "summarizing", "summarise"],
+    ),
+    ("get", &["get", "gets", "getting"]),
+];
+
+/// How a request asks to be told to do something itself: a reminder, never
+/// the lamp's own work.
+const TOLD_TO: [&str; 5] = [
+    "remind me",
+    "tell me to",
+    "ask me to",
+    "nudge me to",
+    "get me to",
+];
+
+/// Why a made skill is refused when its say only hands the ask back
+/// ([`echoes_the_ask`]): the lamp's own "can't do that yet", so the person
+/// hears it plainly and, with `LAMP_MAKE_SKILL_AGENT`, the make goes to the
+/// lamp's agent (lamp-9adf, 12 Nov 18:10: "check the weather and tell me if
+/// I need an umbrella" was kept as a say "Check the weather now, please.").
+pub const ECHOES_THE_ASK: &str =
+    "I can't do that yet: doing that itself, rather than telling you to do it";
+
+/// Whether a made skill's `toml` only tells the person to do what the
+/// request `words` asked the lamp to do: a say beginning (after "please"
+/// or "now") with one of [`ASKED_VERBS`] that the request says too, in a
+/// request that asks for no reminder ([`TOLD_TO`]) and doesn't give those
+/// words to say itself. Its say text and verb, for the repair's lines.
+pub fn echoes_the_ask(toml: &str, words: &str) -> Option<(String, &'static str)> {
+    let table: toml::Table = toml::from_str(toml).ok()?;
+    let ask = words_of(words);
+    let phrase = |text: &str| text.split(' ').map(str::to_owned).collect::<Vec<_>>();
+    if TOLD_TO.iter().any(|told| said_in(&phrase(told), &ask)) {
+        return None;
+    }
+    table
+        .get("do")?
+        .as_array()?
         .iter()
-        .any(|refusal| why.contains(&plain(refusal)))
+        .filter_map(|step| say_text(step.get("say")?))
+        .find_map(|text| {
+            let said = words_of(&text);
+            // Words the person gave the lamp to say are theirs.
+            if said_in(&said, &ask) {
+                return None;
+            }
+            let mut said = &said[..];
+            while let [lead, rest @ ..] = said
+                && ["please", "now"].contains(&lead.as_str())
+            {
+                said = rest;
+            }
+            ASKED_VERBS
+                .iter()
+                .find(|(verb, forms)| {
+                    said.starts_with(&phrase(verb))
+                        && forms.iter().any(|form| said_in(&phrase(form), &ask))
+                })
+                .map(|(verb, _)| (text.clone(), *verb))
+        })
 }
 
 /// [`CANT_YET`] with what: "I can't do that yet: sending a message".
@@ -3125,6 +3235,13 @@ fn carries_task(table: &toml::Table) -> bool {
 /// skill added from a file ([`capped_added`]), or with `reads` on for one
 /// that reads a linked service.
 fn held(table: &toml::Table, added: bool, reads: bool) -> Result<(String, Uses), Refused> {
+    // A skill's own ask phrases (#6772) are never a made one's, from the
+    // voice or the app ([`tidied`] takes them out where it can): the model
+    // writing it never claims what calls a skill in code (the
+    // Reviewer-lead's P3 2 on #6842).
+    if table.contains_key("asks") {
+        return Err(Refused::new(MADE_ASKS));
+    }
     match table.get("kind").map(|kind| kind.as_str()) {
         None | Some(Some("installable")) => {}
         _ => {
@@ -6258,9 +6375,15 @@ pub fn pushed_folder(installed: &Path) -> PathBuf {
 /// replace, once the manage helper removed it): dropped from the index,
 /// its package with it, so it is never told as on again.
 pub fn forget_named(directory: &Path, name: &str) {
-    if let Err(error) = forget_others(directory, name, "") {
+    if let Err(error) = forget_named_checked(directory, name) {
         eprintln!("lamp-voice: a replaced made skill wasn't dropped from the index: {error}");
     }
+}
+
+/// [`forget_named`], saying why when the index could not be written (a
+/// made skill removed by voice, `crate::made_remove::removed`).
+pub fn forget_named_checked(directory: &Path, name: &str) -> Result<(), String> {
+    forget_others(directory, name, "").map_err(|error| error.to_string())
 }
 
 /// The made skill `sha256`, kept and not on, dropped from the index, its
@@ -6435,6 +6558,23 @@ pub fn keep_asked(
         });
     }
     let (_, uses) = capped(&files.toml)?;
+    // A say that only tells the person to do what they asked the lamp to
+    // do is no skill of it (lamp-9adf, 12 Nov 18:10): refused with its
+    // lines, so it is repaired or goes to the lamp's agent.
+    let words = match request.heard {
+        Some(heard) => format!("{} {heard}", request.request),
+        None => request.request.to_owned(),
+    };
+    if let Some((text, verb)) = echoes_the_ask(&files.toml, &words) {
+        eprintln!("lamp-voice: a made skill was not kept: its say tells the person to {verb}");
+        return Err(Refused(
+            ECHOES_THE_ASK.into(),
+            Some(format!(
+                "say \"{text}\" tells the person to {verb}, which the request asks the skill \
+                 to do: no step does it, so answer one line, {CANNOT} and one short sentence"
+            )),
+        ));
+    }
     // Its code only with a task step to run it, and that step's file one
     // it wrote (#6307).
     code_matches(&files, &uses)?;
@@ -7097,6 +7237,80 @@ pub fn keep_added(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, 
         Ok(does),
         true,
     )
+}
+
+/// An agent skill added from a file (`crate::upload_agent`,
+/// `LAMP_UPLOAD_TO_AGENT`): its `skill.toml` held to
+/// [`crate::upload_agent::capped`], its card (the lamp's own words, its
+/// description the tool's note) marked `made: here`, [`ADDED_FROM_FILE`]
+/// and [`crate::upload_agent::MARK`], the file kept whole as its
+/// instructions beside them, checked and packed by `lamp-skills pack` and
+/// kept from `from` as an added skill, its index entry marked `agent`.
+pub fn keep_agent(files: &Files, from: &str, keeping: &Keeping) -> Result<Made, Refused> {
+    let unkept = |why: io::Error| {
+        eprintln!("lamp-voice: an agent skill added from a file was not kept: {why}");
+        Refused::new(NOT_KEPT_HERE)
+    };
+    ensure_private(&keeping.directory).map_err(unkept)?;
+    drop_unfinished(&keeping.directory);
+    if let Some(made) = kept(&keeping.directory, from) {
+        return Ok(made);
+    }
+    let (version, uses) = crate::upload_agent::capped(&files.toml)?;
+    let grants = crate::upload_agent::grants_of_toml(&files.toml);
+    let does = format!(
+        "Only when you ask for it, the lamp's agent follows the file you added, and {}, and never \
+         on its own.",
+        crate::skill_task_yes::uses_said(&grants)
+    );
+    let (name, marked) = card_marked(
+        &files.card,
+        &written_description(&files.card).unwrap_or_default(),
+        &format!(
+            "made: here\n{MADE_BY}: {}\n{ADDED_FROM_FILE}\n{}",
+            Maker::App.key(),
+            crate::upload_agent::MARK
+        ),
+    )?;
+    let made = packed_and_kept(
+        keeping,
+        from,
+        Card {
+            toml: &files.toml,
+            name,
+            marked,
+            version,
+            uses,
+            scripts: &files.scripts,
+        },
+        Ok(does),
+        true,
+    )?;
+    let mut entries = index(&keeping.directory);
+    for entry in &mut entries {
+        if entry["sha256"] == made.sha256.as_str() {
+            entry["agent"] = json!(true);
+            entry["grants"] = json!(grants);
+        }
+    }
+    write_index(&keeping.directory, &entries).map_err(unkept)?;
+    Ok(made)
+}
+
+/// The grants of the kept agent skill `sha256` in `directory`, as
+/// [`keep_agent`] marked its index entry; none for another skill.
+pub fn agent_grants(directory: &Path, sha256: &str) -> Option<Vec<String>> {
+    index(directory)
+        .into_iter()
+        .find(|entry| entry["sha256"] == sha256 && entry["agent"] == true)
+        .map(|entry| {
+            entry["grants"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|grant| grant.as_str().map(str::to_owned))
+                .collect()
+        })
 }
 
 /// The most of an added skill's card description: a tool's is at most
@@ -8184,6 +8398,57 @@ fn cut_chars(text: &str, most: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A say that hands the ask back as an instruction (lamp-9adf, 12 Nov
+    /// 18:10) is caught; a reminder the person asked to be told, or words
+    /// they gave to say, is not.
+    #[test]
+    fn a_say_handing_the_ask_back_is_caught_and_a_reminder_is_not() {
+        let with = |say: &str| {
+            format!(
+                "kind = \"installable\"\nversion = \"1.0.0\"\n\n[permissions]\nspeak = true\n\n\
+                 [[do]]\nsay = {{ text = \"{say}\" }}\n"
+            )
+        };
+        let umbrella =
+            "every morning at eight, check the weather and tell me if I need an umbrella";
+        assert_eq!(
+            echoes_the_ask(&with("Check the weather now, please."), umbrella),
+            Some(("Check the weather now, please.".to_owned(), "check"))
+        );
+        assert_eq!(
+            echoes_the_ask(
+                &with("Please look up the news."),
+                "at nine, look up the news for me"
+            )
+            .map(|(_, verb)| verb),
+            Some("look up")
+        );
+        assert_eq!(
+            echoes_the_ask(&with("Read your mail."), "read my mail every morning")
+                .map(|(_, verb)| verb),
+            Some("read")
+        );
+        for (say, ask) in [
+            (
+                "Time to drink some water.",
+                "remind me to drink water every hour",
+            ),
+            (
+                "Stand up and stretch.",
+                "tell me to stand up and stretch at three",
+            ),
+            ("Check your mail.", "remind me to check my mail at nine"),
+            ("Get ready for lunch.", "at noon say get ready for lunch"),
+            (
+                "Check the weather now, please.",
+                "say hello when I sit down",
+            ),
+            ("It may rain today.", umbrella),
+        ] {
+            assert_eq!(echoes_the_ask(&with(say), ask), None, "{say} / {ask}");
+        }
+    }
 
     /// What a made skill does, as [`plainly`] says it, before how often it
     /// starts on its own.
@@ -11393,8 +11658,8 @@ light = { colour = "green", level = 3, for = "20s" }
         assert!(
             ask.contains("in your own words and in the language of the conversation")
                 && ask.contains(
-                    "the skill will start once Gmail is linked in the app, under \
-                                 Skills, then Connectors"
+                    "the skill will start once Gmail is linked in the app: open \
+                                 this lamp, then Settings, then Linked accounts"
                 ),
             "{ask}"
         );
@@ -11914,6 +12179,27 @@ light = { colour = "green", level = 3, for = "20s" }
                 .contains("turns to the face it sees"),
             "{paced_made}"
         );
+    }
+
+    /// The Reviewer-lead's P3 2 on #6842: a made skill (voice or app) never
+    /// carries `asks`, so the model writing it claims no phrase that calls
+    /// a skill in code. Tidied, it is taken out and the skill is as without
+    /// it; written so it can't be taken out, the cap refuses it.
+    #[test]
+    fn a_made_skills_asks_are_taken_out_or_refused() {
+        let stood = "topic = \"room/stood_up\"\nfield = \"sitting_s\"\nabove = 0\n";
+        let nod = made_with(stood, "body = { gesture = \"nod\" }");
+        let asking = format!("asks = [\"take a photo\", \"yes please\"]\n{nod}");
+        assert!(capped_with(&nod, false).is_ok());
+        assert_eq!(
+            capped_with(&asking, false).unwrap_err().0,
+            MADE_ASKS,
+            "the cap refuses asks"
+        );
+        let tidy = tidied(&asking);
+        assert_eq!(tidy, nod);
+        assert!(capped_with(&tidy, false).is_ok());
+        assert!(!paced(&asking).contains("asks"), "the voice's make path");
     }
 
     /// lamp-74ff, 11 Nov 09:48-09:50: "nod when I stand up", made from the

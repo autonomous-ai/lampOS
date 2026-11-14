@@ -1,0 +1,234 @@
+//! A resident speech synthesizer for `lamp-sim speech` on macOS (sim-3-P4
+//! step 1b; the first builder on #6811, 13 Nov 21:28, option (c)): Apple's
+//! `AVSpeechSynthesizer`, kept for the service's life, writing each line to
+//! buffers (`writeUtterance:toBufferCallback:`) that are made into 24 kHz
+//! S16LE as they come. Measured on macOS 26 (arm64) from Rust before this
+//! module: the first buffer of a warm line in about 8 ms whatever its length,
+//! the first line after start in about 330 ms; `say` takes 370 to 830 ms.
+//!
+//! Its callbacks come only while the **main thread's** run loop runs (a worker
+//! thread's own run loop got none in 60 s), so [`serve_on_main_thread`] owns the
+//! main thread: the HTTP side runs elsewhere and hands lines over a channel.
+//!
+//! The only `unsafe` in lamp-sim is here: every AVFAudio binding is an
+//! `unsafe fn`. Each block says why its call is sound.
+#![allow(unsafe_code)]
+
+use crate::speech::{Engine, ToRoute};
+use block2::RcBlock;
+use objc2_avf_audio::{
+    AVAudioBuffer, AVAudioPCMBuffer, AVSpeechSynthesisVoice, AVSpeechSynthesizer, AVSpeechUtterance,
+};
+use objc2_foundation::{NSDate, NSDefaultRunLoopMode, NSRunLoop, NSString};
+use std::{
+    io,
+    ptr::NonNull,
+    sync::mpsc,
+    time::{Duration, Instant},
+};
+
+/// The longest a line may take to be spoken whole.
+const LINE_WAIT: Duration = Duration::from_secs(30);
+/// How long the main thread's run loop runs between looks while a line is
+/// written.
+const PUMP: f64 = 0.005;
+/// A line whose last buffer came this long ago is done, even with no empty
+/// end buffer: the synthesizer writes far faster than speech (a 22-word line
+/// whole in about 40 ms here), and on macOS 14 the empty end buffer never
+/// came (Heron's read on #6961), so every line waited out its 30 s. The
+/// longest gap between two buffers measured on macOS 26 (arm64): 0.7 ms on
+/// three 4,096-character lines (the bound), and 9.6 ms at worst over nine lines
+/// of 432 to 864 words, so 300 ms is over 30 times the widest (nine's P3).
+const QUIET_END: Duration = Duration::from_millis(300);
+
+/// What the synthesizer hands back for a line.
+enum Piece {
+    Samples { rate: f64, samples: Vec<f32> },
+    End,
+    Failed(String),
+}
+
+/// A line to speak and where its pieces go.
+pub struct Line {
+    text: String,
+    out: mpsc::Sender<Piece>,
+    /// When the HTTP side stops waiting: a line still queued after it is
+    /// dropped unspoken, not spoken to nobody ahead of the lines behind it.
+    until: Instant,
+}
+
+/// The engine the HTTP side holds: it hands each line to the main thread.
+pub struct Resident {
+    lines: mpsc::Sender<Line>,
+}
+
+/// The resident engine, and the receiving end [`serve_on_main_thread`] takes.
+pub fn resident() -> (Resident, mpsc::Receiver<Line>) {
+    let (lines, receiver) = mpsc::channel();
+    (Resident { lines }, receiver)
+}
+
+impl Engine for Resident {
+    fn speak(&self, text: &str, out: &mut dyn FnMut(&[u8]) -> io::Result<()>) -> io::Result<()> {
+        let (pieces, receiver) = mpsc::channel();
+        let until = Instant::now() + LINE_WAIT;
+        self.lines
+            .send(Line {
+                text: text.to_owned(),
+                out: pieces,
+                until,
+            })
+            .map_err(|_| io::Error::other("the synthesizer has stopped"))?;
+        let mut to_route: Option<ToRoute> = None;
+        loop {
+            let left = until.saturating_duration_since(Instant::now());
+            match receiver.recv_timeout(left) {
+                Ok(Piece::Samples { rate, samples }) => {
+                    let bytes = to_route
+                        .get_or_insert_with(|| ToRoute::new(rate))
+                        .piece(&samples);
+                    out(&bytes)?;
+                }
+                Ok(Piece::End) => return Ok(()),
+                Ok(Piece::Failed(why)) => return Err(io::Error::other(why)),
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    return Err(io::Error::other("the synthesizer has stopped"));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    return Err(io::Error::other(format!(
+                        "no whole line from the synthesizer in {} s",
+                        LINE_WAIT.as_secs()
+                    )));
+                }
+            }
+        }
+    }
+}
+
+/// Owns the main thread: one synthesizer, each line written to buffers, and
+/// the run loop kept running so their callbacks come. Returns when every
+/// sender is gone.
+pub fn serve_on_main_thread(lines: mpsc::Receiver<Line>, language: &str) -> io::Result<()> {
+    // The SAFETY notes below rely on this being the main thread: refuse otherwise.
+    if objc2::MainThreadMarker::new().is_none() {
+        return Err(io::Error::other(
+            "the resident synthesizer runs on the main thread only",
+        ));
+    }
+    // SAFETY: `new` makes a fresh synthesizer; it is used on this thread only.
+    let synthesizer = unsafe { AVSpeechSynthesizer::new() };
+    // SAFETY: a plain class method taking a valid NSString; it returns a voice
+    // or nil, and nil (no such language) leaves the system's default voice.
+    let voice =
+        unsafe { AVSpeechSynthesisVoice::voiceWithLanguage(Some(&NSString::from_str(language))) };
+    // Idle, the thread waits on the channel: callbacks come only while a line
+    // is written, so the run loop is run only then (no wakeups at rest). Each
+    // line in an autorelease pool of its own, so what it makes is let go.
+    while let Ok(line) = lines.recv() {
+        objc2::rc::autoreleasepool(|_| speak_line(&synthesizer, voice.as_deref(), line));
+    }
+    Ok(())
+}
+
+/// Runs the main thread's run loop for a moment, so callbacks come.
+fn pump() {
+    // SAFETY: called on the main thread; `currentRunLoop` is that thread's run
+    // loop, and `runMode:beforeDate:` with the default mode and a date a few
+    // milliseconds on returns once that date passes or a source fires.
+    unsafe {
+        let date = NSDate::dateWithTimeIntervalSinceNow(PUMP);
+        NSRunLoop::currentRunLoop().runMode_beforeDate(NSDefaultRunLoopMode, &date);
+    }
+}
+
+fn speak_line(
+    synthesizer: &AVSpeechSynthesizer,
+    voice: Option<&AVSpeechSynthesisVoice>,
+    line: Line,
+) {
+    // Its caller has stopped waiting: nobody would hear it.
+    if Instant::now() >= line.until {
+        return;
+    }
+    // SAFETY: a class method making an utterance from a valid NSString.
+    let utterance =
+        unsafe { AVSpeechUtterance::speechUtteranceWithString(&NSString::from_str(&line.text)) };
+    // SAFETY: sets a property of the utterance just made, to a voice from
+    // `voiceWithLanguage` or none.
+    unsafe { utterance.setVoice(voice) };
+    let (done, finished) = mpsc::channel::<()>();
+    let out = line.out.clone();
+    // When the last buffer with samples came, in microseconds from `began`; 0: none yet.
+    let began = Instant::now();
+    let last_buffer = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let last_seen = std::sync::Arc::clone(&last_buffer);
+    let block = RcBlock::new(move |buffer: NonNull<AVAudioBuffer>| {
+        // SAFETY: AVFoundation passes a valid buffer, alive for this call.
+        let buffer: &AVAudioBuffer = unsafe { buffer.as_ref() };
+        let Some(pcm) = buffer.downcast_ref::<AVAudioPCMBuffer>() else {
+            return;
+        };
+        // SAFETY: reads properties of a valid PCM buffer.
+        let (frames, rate) = unsafe { (pcm.frameLength() as usize, pcm.format().sampleRate()) };
+        if frames == 0 {
+            // The last buffer of a line is empty.
+            let _ = out.send(Piece::End);
+            let _ = done.send(());
+            return;
+        }
+        // SAFETY: for a PCM buffer with `frames` frames, a non-null
+        // `floatChannelData` (or `int16ChannelData`) points to one pointer per
+        // channel, each to at least `frames` samples, valid for this call; the
+        // first channel is read and copied out before returning.
+        let samples = unsafe {
+            let floats = pcm.floatChannelData();
+            let shorts = pcm.int16ChannelData();
+            if !floats.is_null() {
+                std::slice::from_raw_parts((*floats).as_ptr(), frames).to_vec()
+            } else if !shorts.is_null() {
+                std::slice::from_raw_parts((*shorts).as_ptr(), frames)
+                    .iter()
+                    .map(|sample| f32::from(*sample) / 32_768.0)
+                    .collect()
+            } else {
+                let _ = out.send(Piece::Failed("a buffer with no samples".to_owned()));
+                let _ = done.send(());
+                return;
+            }
+        };
+        let _ = out.send(Piece::Samples { rate, samples });
+        let at = began.elapsed().as_micros().max(1) as u64;
+        last_seen.store(at, std::sync::atomic::Ordering::SeqCst);
+    });
+    // SAFETY: `block` is a valid heap block and the utterance is valid; the
+    // synthesizer retains (copies) the block for as long as it may call it, so
+    // a call after this function has returned still finds it alive (and sends
+    // to a channel nobody reads, which is harmless).
+    unsafe {
+        synthesizer.writeUtterance_toBufferCallback(&utterance, &*block as *const _ as *mut _);
+    }
+    while finished.try_recv().is_err() {
+        let last = last_buffer.load(std::sync::atomic::Ordering::SeqCst);
+        if last != 0 && began.elapsed().saturating_sub(Duration::from_micros(last)) >= QUIET_END {
+            // Samples came and then nothing: the line is done. The synthesizer
+            // is told to stop, so the next line starts clean.
+            // SAFETY: stops the synthesizer this thread owns, at once.
+            unsafe {
+                synthesizer.stopSpeakingAtBoundary(objc2_avf_audio::AVSpeechBoundary::Immediate);
+            }
+            let _ = line.out.send(Piece::End);
+            return;
+        }
+        if Instant::now() >= line.until {
+            // SAFETY: stops the synthesizer this thread owns, at once.
+            unsafe {
+                synthesizer.stopSpeakingAtBoundary(objc2_avf_audio::AVSpeechBoundary::Immediate);
+            }
+            let _ = line
+                .out
+                .send(Piece::Failed("the line did not end".to_owned()));
+            return;
+        }
+        pump();
+    }
+}

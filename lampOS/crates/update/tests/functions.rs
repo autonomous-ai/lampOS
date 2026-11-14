@@ -41,7 +41,7 @@ const UNPLUG: &str = "unplug: ";
 
 /// The lamp's own functions a product lamp's chat request offers now, on the
 /// product's route (`LAMP_VOICE_ROUTE=second`, bound
-/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 26 (with
+/// `lamp_voice::second_provider::MAX_TOOLS`): the voice's own 27 (with
 /// onboarding's two and memory's `forget_everything` since 25 Oct,
 /// reports' `reports_stop` and `reports_state` since #2862, a made
 /// skill's `make_skill` since fourteen-P15 (its `put_on_made_skill` gone
@@ -52,7 +52,9 @@ const UNPLUG: &str = "unplug: ";
 /// product, the memory owner's call of 9 Nov, and a face from a photo's
 /// `photo_face_yes` and `photo_face_no` since `LAMP_PHOTO_FACES` is on in
 /// the product, #5750, and Harness's `harness_status` since
-/// `LAMP_TASKS_HARNESS_STATUS` is on in the product, #6061), the
+/// `LAMP_TASKS_HARNESS_STATUS` is on in the product, #6061, and the asked
+/// sleep's `go_to_sleep` since `LAMP_SLEEP_ASKED` is on in the product,
+/// #6853: 45 with the route's 3 is the bound of 48 exactly), the
 /// actions part's 17 and the skills' 1: `use_skill`, which reaches every
 /// skill's function (`LAMP_USE_SKILL=on` since #2826; Dance's `dance`,
 /// Pose's `set_pose` and the wellbeing skills' `[stop]`, `wellbeing_nudges`,
@@ -63,7 +65,7 @@ const UNPLUG: &str = "unplug: ";
 /// are installed, the skills' stay 1. The test prints this split. A change
 /// to it is a change to what every session is told: say in its pull
 /// request what is left out past the bound, if anything.
-const PRODUCT_FUNCTIONS: usize = 44;
+const PRODUCT_FUNCTIONS: usize = 45;
 
 /// Every `Environment=` of a voice unit's `[Service]`.
 fn voice_environment(unit: &str) -> Vec<(String, String)> {
