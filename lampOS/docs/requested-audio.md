@@ -155,14 +155,23 @@ game" do not authorize recordings. A recording mentioned later in
 an unrelated clause does not count: "turn on the light so I can read sheet
 music" and "play chess while I listen to music" are refused.
 "Something" instead accepts a calm-mood adjective, "to relax/unwind/sleep",
-or "to help me relax/unwind/sleep", with only please/now/on afterward.
+"relax/unwind/sleep" with the "to" lost in speech to text (#5749), or
+"to help me relax/unwind/sleep", with only please/now/on afterward.
 "Lamp, play me something to relax." and "Play something to help me sleep."
 ask; "Play something like chess to relax." and "Play something with me to
 relax." do not. A line with "don't", "not", "never", "no", "stop", "cancel",
 "actually", "wait", "maybe", "đừng", "thôi" or a whole-word phrase
 "forget it", "scratch that" or "changed my mind" anywhere, in any sentence,
 does not ask. These phrases override an earlier request; "scratch" or
-"changed" alone does not cancel a request. Otherwise Voice drops the offer and
+"changed" alone does not cancel a request. A line the grammar misses still
+asks when it holds, as words in a row anywhere, one of the called skill's own
+`asks` phrases (from its `skill.toml`, `lamp_voice::tools::skill_asks`) that
+is itself an ask by these rules and that the skill-name matcher does not
+refuse, with no word or phrase above that cancels (#5749,
+`asks_to_play_or_skill_ask`): on lamp-52e6 at 13059, "Hey Lamp, play me
+something to relax." heard with a word lost was refused. A noun phrase ask
+such as "relaxing music" never counts on its own, so the talk below stays
+refused. Otherwise Voice drops the offer and
 tells the model `{"error": NOT_ASKED_TO_PLAY}`: nothing plays, and it must
 not say it is playing. It is never told the skill's confirmation. This
 check is in code, so a skill's "only when explicitly asked" text is no longer

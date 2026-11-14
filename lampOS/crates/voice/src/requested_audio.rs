@@ -176,6 +176,13 @@ fn audio_object(mut words: &[String]) -> bool {
                 .is_some_and(|word| matches!(word.as_str(), "relax" | "unwind" | "sleep"))
         {
             2
+        } else if rest
+            .first()
+            .is_some_and(|word| matches!(word.as_str(), "relax" | "unwind" | "sleep"))
+        {
+            // "Play me something relax": the "to" lost in speech to text
+            // (#5749, lamp-52e6 at 13059, case on5ctl).
+            1
         } else {
             return false;
         };
@@ -248,14 +255,7 @@ fn audio_object(mut words: &[String]) -> bool {
 // another language or phrasing is refused (the model is told so, and the
 // person can say it plainly). Widen ASKS when a lamp run shows one.
 pub fn asks_to_play(said: &str) -> bool {
-    let whole = crate::known_faces::folded_words(said);
-    if whole.iter().any(|word| NOT.contains(&word.as_str()))
-        || RETRACTIONS.iter().any(|phrase| {
-            whole
-                .windows(phrase.len())
-                .any(|words| starts_with_words(words, phrase))
-        })
-    {
+    if taken_back(said) {
         return false;
     }
     said.split(['.', '!', '?', ';']).any(|sentence| {
@@ -311,6 +311,35 @@ pub fn read_sound(path: &Path) -> Result<CheckedSound, String> {
     let samples = crate::say::decode_sound_with_limit(&bytes, MOST_FRAMES)?;
     let sha256 = format!("{:x}", Sha256::digest(&bytes));
     Ok(CheckedSound { samples, sha256 })
+}
+
+/// Whether a word of the whole line is one of [`NOT`], or the line holds
+/// one of [`RETRACTIONS`]: never an ask, whatever else it says.
+fn taken_back(said: &str) -> bool {
+    let whole = crate::known_faces::folded_words(said);
+    whole.iter().any(|word| NOT.contains(&word.as_str()))
+        || RETRACTIONS.iter().any(|phrase| {
+            whole
+                .windows(phrase.len())
+                .any(|words| starts_with_words(words, phrase))
+        })
+}
+
+/// [`asks_to_play`], or (#5749) a line that holds, as words in a row, one
+/// of `asks`, the called skill's own ask phrases
+/// ([`crate::tools::skill_asks`]), that is itself an ask to play
+/// ([`asks_to_play`]) and never refused as an ask
+/// ([`crate::skill_named::line_holds_ask`]); no word of the line one of
+/// [`NOT`] and no [`RETRACTIONS`]. On lamp-52e6 at 13059 (case on5ctl)
+/// "Hey Lamp, play me something to relax." was heard with a word lost and
+/// its `use_skill` refused. A noun phrase such as "relaxing music" is never
+/// an ask on its own: "I listened to some relaxing music" stays refused.
+pub fn asks_to_play_or_skill_ask(said: &str, asks: &[String]) -> bool {
+    asks_to_play(said)
+        || (!taken_back(said)
+            && asks
+                .iter()
+                .any(|ask| asks_to_play(ask) && crate::skill_named::line_holds_ask(said, ask)))
 }
 
 #[cfg(test)]
@@ -502,8 +531,41 @@ mod tests {
             "Play something to help me sleep.",
             "Put on something calm.",
             "Could you put on something to help me unwind?",
+            // #5749: lamp-52e6 at 13059, case on5ctl, "to" lost.
+            "Hey Lamp play me something relax",
+            "Play something unwind, please.",
         ] {
             assert!(asks_to_play(ask), "{ask}");
+        }
+    }
+
+    /// #5749: a line the grammar misses ("Hey Lamp" heard as one word) is
+    /// an ask when it holds the called skill's own ask to play; a skill's
+    /// noun phrase, a line that holds none, a no and a retraction are not.
+    #[test]
+    fn a_line_with_the_called_skills_ask_to_play_is_an_ask() {
+        let asks = [
+            "relaxing music".to_owned(),
+            "play me something to relax".to_owned(),
+        ];
+        assert!(!asks_to_play("Halamp play me something to relax"));
+        assert!(asks_to_play_or_skill_ask(
+            "Halamp play me something to relax",
+            &asks
+        ));
+        assert!(asks_to_play_or_skill_ask(
+            "Lamp, can you play some relaxing music?",
+            &[]
+        ));
+        for talk in [
+            "I want to relax",
+            "Lamp, I listened to some relaxing music on the train this morning, it was really nice.",
+            "I love relaxing music.",
+            "Halamp don't play me something to relax",
+            "Halamp play me something to relax. Forget it.",
+            "Halamp play me something to",
+        ] {
+            assert!(!asks_to_play_or_skill_ask(talk, &asks), "{talk}");
         }
     }
 }

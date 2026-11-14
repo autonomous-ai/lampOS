@@ -1483,6 +1483,10 @@ pub type ReadBackAsked = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
 /// The call a heard line plainly asks for by an installed skill's name, as
 /// its name and arguments, or none (`crate::skill_named::heard`, #6772).
 pub type SkillNamed = Arc<dyn Fn(&str) -> Option<(String, Value)> + Send + Sync>;
+/// An installed skill's own ask phrases, by its function's name
+/// (`crate::tools::skill_asks`, #5749): what a called skill's recording
+/// may play for besides a line that asks to play.
+pub type SkillAsks = Arc<dyn Fn(&str) -> Vec<String> + Send + Sync>;
 /// The agent a spoken line's own words name to do the work, as the person
 /// calls it, or none (#6547 (1b), `crate::agent_tasks::named_for_work`).
 pub type NamedAgent = Arc<dyn Fn(&str) -> Option<String> + Send + Sync>;
@@ -1835,6 +1839,9 @@ struct Shared {
     /// The skill a heard line plainly asks for by its name: called in code
     /// as round 1 ([`Engine::calling_skills_named`]).
     skill_named: Option<SkillNamed>,
+    /// A called skill's own ask phrases: a line that holds one that asks to
+    /// play is an ask for its recording ([`Engine::playing_for_skill_asks`]).
+    skill_asks: Option<SkillAsks>,
     /// With the tasks part: the agent a spoken line's words name for the
     /// work, whose round 1 answered in words alone is asked again once
     /// ([`Engine::catching_named_agents`], #6547 (1b)).
@@ -4610,6 +4617,7 @@ impl Engine {
                 named_ask: None,
                 read_back_asked: None,
                 skill_named: None,
+                skill_asks: None,
                 named_agent: None,
                 named_asked_again: crate::agent_tasks::AskedAgain::default(),
                 #[cfg(test)]
@@ -6313,6 +6321,17 @@ impl Engine {
     pub fn calling_skills_named(mut self, named: SkillNamed) -> Self {
         if let Some(shared) = Arc::get_mut(&mut self.shared) {
             shared.skill_named = Some(named);
+        }
+        self
+    }
+
+    /// With the skills' files: a called skill's recording also plays for a
+    /// line that holds one of that skill's own ask phrases that asks to
+    /// play (`crate::requested_audio::asks_to_play_or_skill_ask`, #5749).
+    /// Before any turn only.
+    pub fn playing_for_skill_asks(mut self, asks: SkillAsks) -> Self {
+        if let Some(shared) = Arc::get_mut(&mut self.shared) {
+            shared.skill_asks = Some(asks);
         }
         self
     }
@@ -18101,8 +18120,18 @@ async fn answer(
                             // lamp-52e6 on 9 Nov, the skill's "only when …
                             // explicitly asks" left to the model. Refused, and
                             // the model told so, never its "next" confirmation.
+                            // A line that holds the called skill's own ask to
+                            // play asks too (#5749).
                             if answer.requested_audio.is_some()
                                 && !crate::requested_audio::asks_to_play(&heard_words)
+                                && !shared.skill_asks.as_ref().is_some_and(|asks| {
+                                    crate::requested_audio::asks_to_play_or_skill_ask(
+                                        &heard_words,
+                                        &asks(crate::skill_named::function_of(
+                                            &call.name, &call.args,
+                                        )),
+                                    )
+                                })
                             {
                                 eprintln!(
                                     "lamp-voice second: request {request}: {} offered a recording for a line that did not ask to play; refused",
