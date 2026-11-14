@@ -1,10 +1,12 @@
-//! The two yeses another part reads (#5500, `docs/onboarding.md`, "Face
-//! expressions" and "Room sounds"): face expressions for lamp-eyes and, on a
-//! lamp with no privacy slide, room sounds for lamp-ears. Each is a file in
+//! The yeses another part reads (#5500, `docs/onboarding.md`, "Face
+//! expressions" and "Room sounds"): face expressions for lamp-eyes, on a
+//! lamp with no privacy slide room sounds for lamp-ears, and with
+//! `LAMP_SEEN_ACTIVITY=on` the owner's yes to seen activity for lamp-seen
+//! (#6543), given by voice at any time, not at onboarding. Each is a file in
 //! [`FOLDER`], present only while the yes stands:
 //! `{"version":1,KEY:"yes","at_unix_s":N,"by":BY}`, `root:lampos` 0640.
 //!
-//! The voice's onboarding writes one on a spoken yes (`"by":"voice"`), and
+//! The voice writes one on a spoken yes (`"by":"voice"`), and
 //! root's helper (`lamp-setup change`) on the owner's switch in the app
 //! (`"by":"app"`, `consent.set` with `LAMP_APP_CONSENT=on`). One copy of the
 //! names and the file's shape, read by `lamp-cloud`, the helper and the
@@ -30,10 +32,15 @@ pub const FACE_EXPRESSIONS: &str = "face_expressions";
 /// The room sounds yes's key, in the file and on the wire.
 pub const ROOM_SOUNDS: &str = "room_sounds";
 
+/// The owner's yes to seen activity's key (#6543), in the file and on the
+/// wire: lamp-seen may look, now and then, at what they do at the desk.
+pub const SEEN_ACTIVITY: &str = "seen_activity";
+
 /// The keys, each with its file's name in [`FOLDER`].
-pub const FILES: [(&str, &str); 2] = [
+pub const FILES: [(&str, &str); 3] = [
     (FACE_EXPRESSIONS, "face-expressions.json"),
     (ROOM_SOUNDS, "room-sounds.json"),
+    (SEEN_ACTIVITY, "seen-activity.json"),
 ];
 
 /// `by` for a yes given in the app.
@@ -136,6 +143,10 @@ mod tests {
         std::fs::write(&file, vec![b' '; MOST_BYTES as usize + 1]).unwrap();
         assert!(!read(&file, FACE_EXPRESSIONS).yes, "too long");
         assert_eq!(file_in(&folder, "camera"), None);
+        assert_eq!(
+            file_in(&folder, SEEN_ACTIVITY),
+            Some(folder.join("seen-activity.json"))
+        );
         let _ = std::fs::remove_dir_all(folder);
     }
 }

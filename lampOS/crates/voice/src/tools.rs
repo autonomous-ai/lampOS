@@ -248,6 +248,11 @@ pub struct Settings {
     /// The person may put the lamp to sleep by voice
     /// ([`crate::sleep_asked`], `LAMP_SLEEP_ASKED=on`, #3748).
     pub sleep_asked: bool,
+    /// The owner may turn seen activity on by voice, and anyone off
+    /// ([`crate::seen_yes`], `LAMP_SEEN_ACTIVITY=on`, #6543).
+    pub seen_activity: bool,
+    /// With it, posture too: the offer names it (`LAMP_SEEN_POSTURE=on`).
+    pub seen_posture: bool,
     /// The app's off button turns the lamp off (`LAMP_SHUTDOWN=on`,
     /// shutdown.md): only then is a model with no `prepare_to_unplug` told
     /// to say so ([`crate::without_a_tool`], #4595).
@@ -328,6 +333,12 @@ pub fn arguments_from_environment() -> Vec<String> {
     ));
     flags.extend(crate::without_a_tool::arguments(
         std::env::var(lamp_msgs::SHUTDOWN_SWITCH).ok().as_deref(),
+    ));
+    flags.extend(crate::seen_yes::arguments(
+        std::env::var(crate::seen_yes::ENVIRONMENT).ok().as_deref(),
+        std::env::var(crate::seen_yes::POSTURE_ENVIRONMENT)
+            .ok()
+            .as_deref(),
     ));
     flags.extend(crate::services::arguments(
         std::env::var(crate::services::ENVIRONMENT).ok().as_deref(),
@@ -549,6 +560,18 @@ pub fn take(flags: &[String]) -> std::io::Result<(Settings, &[String])> {
         && flag == crate::without_a_tool::SHUTDOWN_FLAG
     {
         settings.shutdown_from_app = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::seen_yes::FLAG
+    {
+        settings.seen_activity = true;
+        flags = rest;
+    }
+    if let [flag, rest @ ..] = flags
+        && flag == crate::seen_yes::POSTURE_FLAG
+    {
+        settings.seen_posture = true;
         flags = rest;
     }
     if let [flag, rest @ ..] = flags
@@ -891,6 +914,9 @@ fn core_tools_within(settings: &Settings, bound: usize) -> Vec<Tool> {
     if settings.sleep_asked {
         tools.push(crate::sleep_asked::tool());
     }
+    if settings.seen_activity {
+        tools.extend(crate::seen_yes::tools());
+    }
     // The connected services' functions, before the executive's: never the
     // ones the executive or a skill names (`voices_own`).
     if let Some(folder) = &settings.services {
@@ -962,6 +988,7 @@ fn voices_own(name: &str) -> bool {
         || crate::reports_stop::is_tool(name)
         || crate::reports_stop::is_state_tool(name)
         || crate::sleep_asked::is_tool(name)
+        || crate::seen_yes::is_tool(name)
         || crate::services::is_tool(name)
 }
 
@@ -1077,6 +1104,10 @@ pub enum Route {
     /// answered here, at once, with the line to say, or not now while
     /// onboarding is under way.
     Sleep,
+    /// The owner's yes to seen activity kept, or any "stop looking" taking
+    /// it back ([`crate::seen_yes`], #6543). True when the offer also names
+    /// posture (`LAMP_SEEN_POSTURE`).
+    SeenActivity(bool),
     /// A connected service's function, through `lamp-services`' tools
     /// folder ([`crate::services`]): held to the voice's own rules, and
     /// waited for [`crate::services::DEADLINE`].
@@ -1198,6 +1229,13 @@ pub fn route(settings: &Settings, name: &str) -> Route {
     if crate::sleep_asked::is_tool(name) {
         return if settings.sleep_asked {
             Route::Sleep
+        } else {
+            Route::Nobody
+        };
+    }
+    if crate::seen_yes::is_tool(name) {
+        return if settings.seen_activity {
+            Route::SeenActivity(settings.seen_posture)
         } else {
             Route::Nobody
         };
@@ -2415,6 +2453,13 @@ fn run_call_with_scope(
             "the services",
             crate::services::run(folder, call, request, heard, lease),
         ),
+        Route::SeenActivity(posture) => (
+            "the seen activity yes",
+            (
+                crate::seen_yes::run(call, request, heard, lease, *posture),
+                true,
+            ),
+        ),
         Route::Decline | Route::Clock | Route::ReportsState | Route::Sleep | Route::Nobody => {
             ("nobody", (unavailable(), false))
         }
@@ -3176,6 +3221,8 @@ mod tests {
     fn with_every_switch_on_the_voices_own_functions_are_a_list_the_link_takes() {
         let settings = Settings {
             sleep_asked: false,
+            seen_activity: false,
+            seen_posture: false,
             shutdown_from_app: false,
             services: None,
             decline: true,
@@ -3531,6 +3578,8 @@ mod tests {
             settings,
             Settings {
                 sleep_asked: false,
+                seen_activity: false,
+                seen_posture: false,
                 shutdown_from_app: false,
                 services: None,
                 decline: true,
@@ -5257,6 +5306,52 @@ mod tests {
         let walking = answer_inner(&on, &call, 70_002, true, None, None, true);
         assert_eq!(walking.told, crate::sleep_asked::told(true));
         assert!(!walking.sleep);
+    }
+
+    /// #6543: the seen activity functions are declared and routed only
+    /// with `LAMP_SEEN_ACTIVITY=on`, their flags taken after the shutdown's,
+    /// and a yes with no offer just before keeps nothing.
+    #[test]
+    fn the_seen_activity_yes_is_the_voices_own_and_only_the_owners() {
+        let untouched = ["--session".to_owned(), "7".to_owned()];
+        let mut flags = crate::without_a_tool::arguments(Some("on"));
+        flags.extend(crate::seen_yes::arguments(Some("on"), Some("on")));
+        flags.extend(untouched.clone());
+        let (on, rest) = take(&flags).unwrap();
+        assert!(on.seen_activity && on.seen_posture && on.shutdown_from_app);
+        assert_eq!(rest, untouched);
+        let (off, _) = take(&untouched).unwrap();
+        assert!(!off.seen_activity);
+        for name in [
+            crate::seen_yes::OFFER,
+            crate::seen_yes::LOOK,
+            crate::seen_yes::STOP,
+        ] {
+            let named =
+                |settings: &Settings| core_tools(settings).iter().any(|tool| tool.name == name);
+            assert!(named(&on) && !named(&off), "{name}");
+            assert!(voices_own(name));
+            assert_eq!(route(&on, name), Route::SeenActivity(on.seen_posture));
+            assert_eq!(route(&off, name), Route::Nobody);
+            assert_eq!(answer(&off, &call(name), 7, true), unavailable());
+        }
+        // An ordinary "look at my desk, where are my keys" called as a
+        // yes, spoken or typed: no offer was said, so nothing is kept.
+        let look = call(crate::seen_yes::LOOK);
+        assert_eq!(
+            answer_typed(&on, &look, crate::messages::REQUESTS_FROM + 1)["note"],
+            crate::seen_yes::OFFER_FIRST
+        );
+        assert_eq!(
+            answer(&on, &look, 70_101, true)["note"],
+            crate::seen_yes::OFFER_FIRST
+        );
+        // The offer names posture with its switch.
+        let offer = call(crate::seen_yes::OFFER);
+        assert_eq!(
+            answer(&on, &offer, 70_102, false)["say"],
+            crate::seen_yes::SEEN_DISCLOSURE_POSTURE
+        );
     }
 
     /// The reviewer on #1706: the setup line's two notes with `use_skill`,

@@ -15,7 +15,11 @@
 //! `lamp-cloud` knows that from its own `LAMP_PRIVACY_CONTROLS`, set beside
 //! Controls', Voice's and Ears' on such a lamp; anything but `no-slide`
 //! exactly (the product's slide lamps leave it unset) is a slide lamp.
-use lamp_msgs::consent::{FACE_EXPRESSIONS, ROOM_SOUNDS};
+//!
+//! Seen activity (#6543) is said, and taken, the same way: only where
+//! lamp-seen looks, a lamp whose `lamp-cloud` has `LAMP_SEEN_ACTIVITY=on`
+//! exactly, as lamp-seen's own unit has.
+use lamp_msgs::consent::{FACE_EXPRESSIONS, ROOM_SOUNDS, SEEN_ACTIVITY};
 use serde_json::{Map, Value, json};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -28,6 +32,10 @@ pub const PRIVACY_ENVIRONMENT: &str = "LAMP_PRIVACY_CONTROLS";
 
 /// The privacy route on a lamp with no slide: room sounds applies.
 pub const NO_SLIDE: &str = "no-slide";
+
+/// lamp-seen's switch, read here only to know whether seen activity
+/// applies: `on` exactly.
+pub const SEEN_ENVIRONMENT: &str = "LAMP_SEEN_ACTIVITY";
 
 /// How long the helper is waited on: it writes or removes one small file
 /// and answers before any restart, and the broker's loop waits on it
@@ -44,6 +52,8 @@ pub struct Place {
     pub wait: Duration,
     /// Room sounds applies: the lamp has no slide.
     pub room_sounds: bool,
+    /// Seen activity applies: lamp-seen is switched on.
+    pub seen_activity: bool,
 }
 
 /// Whether both kinds are taken: `LAMP_CLOUD=on` and `LAMP_APP_CONSENT=on`.
@@ -60,15 +70,19 @@ impl Place {
             socket: crate::settings::SOCKET.into(),
             wait: WAIT,
             room_sounds: var(PRIVACY_ENVIRONMENT).as_deref() == Some(NO_SLIDE),
+            seen_activity: var(SEEN_ENVIRONMENT).as_deref() == Some("on"),
         })
     }
 
-    /// The keys this lamp has: face expressions, and room sounds only with
-    /// no slide.
+    /// The keys this lamp has: face expressions, room sounds only with no
+    /// slide, and seen activity only with lamp-seen on.
     pub fn keys(&self) -> Vec<&'static str> {
         let mut keys = vec![FACE_EXPRESSIONS];
         if self.room_sounds {
             keys.push(ROOM_SOUNDS);
+        }
+        if self.seen_activity {
+            keys.push(SEEN_ACTIVITY);
         }
         keys
     }
@@ -103,6 +117,9 @@ pub fn line(place: &Place, data: &Value) -> Result<String, String> {
     if key == ROOM_SOUNDS && !place.room_sounds {
         return Err("room sounds is not on this lamp: it has a privacy slide".into());
     }
+    if key == SEEN_ACTIVITY && !place.seen_activity {
+        return Err("seen activity is not on this lamp".into());
+    }
     if !place.keys().contains(&key.as_str()) {
         return Err(why());
     }
@@ -130,6 +147,7 @@ pub fn place_in(folder: &Path, socket: &Path, room_sounds: bool) -> Place {
         socket: socket.into(),
         wait: WAIT,
         room_sounds,
+        seen_activity: false,
     }
 }
 
@@ -174,6 +192,24 @@ mod tests {
             line(&slide, &json!({"room_sounds": true}))
                 .unwrap_err()
                 .contains("privacy slide")
+        );
+        // Seen activity only where lamp-seen is on (#6543).
+        assert_eq!(
+            line(&slide, &json!({"seen_activity": true})).unwrap_err(),
+            "seen activity is not on this lamp"
+        );
+        let seen = Place {
+            seen_activity: true,
+            ..place(false)
+        };
+        assert_eq!(seen.keys(), [FACE_EXPRESSIONS, SEEN_ACTIVITY]);
+        assert_eq!(
+            line(&seen, &json!({"seen_activity": true})).unwrap(),
+            r#"{"consent":{"seen_activity":true}}"#
+        );
+        assert_eq!(
+            line(&seen, &json!({"seen_activity": false})).unwrap(),
+            r#"{"consent":{"seen_activity":false}}"#
         );
         let no_slide = place(true);
         assert_eq!(
@@ -223,6 +259,21 @@ mod tests {
         .unwrap();
         // A slide lamp never says room sounds, even with a file there.
         assert_eq!(get(&slide), json!({"face_expressions": true}));
+        // Nor a lamp with lamp-seen off seen activity (#6543).
+        std::fs::write(
+            folder.join("seen-activity.json"),
+            lamp_msgs::consent::bytes(SEEN_ACTIVITY, 5, lamp_msgs::consent::BY_VOICE),
+        )
+        .unwrap();
+        assert_eq!(get(&slide), json!({"face_expressions": true}));
+        let seen = Place {
+            seen_activity: true,
+            ..slide.clone()
+        };
+        assert_eq!(
+            get(&seen),
+            json!({"face_expressions": true, "seen_activity": true})
+        );
         assert_eq!(
             get(&no_slide),
             json!({"face_expressions": true, "room_sounds": true})

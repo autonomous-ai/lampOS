@@ -231,7 +231,7 @@ pub fn parse(line: &str, config: &Config) -> Result<Change, String> {
         )),
         // Checked again here, whatever lamp-cloud sent (#5500).
         "consent" => {
-            let why = "consent holds one of face_expressions or room_sounds, true or false";
+            let why = "consent holds one of face_expressions, room_sounds or seen_activity, true or false";
             let asked = given
                 .as_object()
                 .filter(|asked| asked.len() == 1)
@@ -492,10 +492,10 @@ pub fn apply(change: &Change, config: &Config) -> io::Result<Done> {
             } else if !*yes {
                 remove(&path)?;
             }
-            let words = if *key == lamp_msgs::consent::ROOM_SOUNDS {
-                "room sounds"
-            } else {
-                "face expressions"
+            let words = match *key {
+                lamp_msgs::consent::ROOM_SOUNDS => "room sounds",
+                lamp_msgs::consent::SEEN_ACTIVITY => "seen activity",
+                _ => "face expressions",
             };
             Ok(Done {
                 data: json!({ key.to_string(): *yes }),
