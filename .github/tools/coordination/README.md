@@ -14,14 +14,16 @@ Each script keeps its dated comments. They are the history of each rule.
 | `train-bot.sh` | Builds merge trains onto `lamp-voice`, back to back, in two lanes (see "Two lanes" below). It picks every eligible PR, cherry-picks its commits, pushes `first/train-N` (a no-crates train: `first/train-nc-N`), opens the train PR, waits for the checks and merges by rebase. `DRY=1` prints each eligible PR's lane and what one round of each lane would carry, and stops. Since 12 Nov (#6556 B, C): a PR whose own head has any red check sits out, read again just before its cherry-pick into a train; a train's failure is read from each failed job's own log (a sharded run's other jobs may still run), looked at again up to 3 times, 20 s apart, while any red job's log comes back empty; a train red only in a non-ARM64 workflow sits out, on their current heads, the carried PRs that workflow takes (`$LAMP_COORD_STATE/train-bot.sitout`, no HOLD; each PR sits out on the head the train carried and is told why once, a new head brings it back, and a closed or pushed PR leaves the file; a workflow's `paths` or `paths-ignore`, block or inline, decide which PRs it takes, and one that takes every PR names nobody) and the rest go again, else the bot stops and its post names the red check; and each PR's head, comments, reviews and body are kept in `$LAMP_COORD_STATE/elig-cache/`, keyed by its head and `updatedAt` and at most 10 minutes old, so an unchanged PR costs no call (each round logs its time and how many came from the cache; `still-eligible.sh` reads fresh before every merge). |
 | `merge-when-green.sh PR [--behind-unrelated] [--no-crates] [--precheck PR...]` | Used by the bot. Waits for a PR's checks, then merges it by rebase, pinned to its head, only if it is green and contains `lamp-voice`'s tip. Green: at least two ARM64 build-and-test and clippy checks, every one completed with `SUCCESS`, and every other check that ran (SDK, virtual lamp, doc links; skipped and neutral jobs left out) completed with `SUCCESS` too; any other completed conclusion (a null one too) on any check fails it, and the first one ends the wait at once (#6556 B, 12 Nov). A PR no file of which the ARM64 run takes (read from `lampos-arm64.yml`'s own `pull_request` paths on the PR's head) waits instead for every check that starts on it; one whose files no workflow takes (skipped docs, `lampOS/builders/`) waits for none. `--no-crates` (the no-crates lane) passes `--no-crates` to `behind-unrelated.sh`. `MWG_POLL` sets the seconds between looks (default 30). With `--behind-unrelated` (the bot passes it), a PR behind `lamp-voice` goes on waiting and merges as it is when `behind-unrelated.sh` says so; a merge as is that GitHub refuses exits 3, not 4. A merge GitHub answers with `HTTP 5xx` is looked at (a 5xx can follow a merge that went through), then after `MWG_RETRY_S` (default 30) the tip and the precheck are read again and it is tried again, at most 3 tries. Three 5xx exit 7, so the bot builds the same PRs again, and stops after two such trains in a row (train 662, 5 Nov). A gh timeout or reset names no 5xx, so it stays a refused merge. With `--precheck`, it runs `still-eligible.sh` on those PRs just before merging. `DRY=1`: waits and decides as usual, but skips `lv-quiet.sh` and the merge and prints what it would do; `LV_AT=<sha>` (dry only) stands in for `lamp-voice`'s tip, to replay a past case. Exit codes: 0 merged, 2 failed, 3 behind `lamp-voice`, 4 refused, 5 not done in 45 min, 6 precheck failed. |
 | `behind-unrelated.sh [--no-crates] TRAIN_HEAD [LAMP_VOICE]` | Used by `merge-when-green.sh --behind-unrelated`. Read-only. Prints `merge as is: ...` (exit 0) or `rebuild: <reason>` (exit 1); see "A green train behind lamp-voice" below. |
-| `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of two signed readers, or can't be fetched. |
+| `still-eligible.sh PR...` | Used before a merge. Fails if any carried PR is now held (on the PR or on the Queue), unread, short of two signed readers, without its lamp row (`rows.py`), or can't be fetched. |
 | `lv-quiet.sh` | Used by `merge-when-green.sh`. Waits (at most 45 min) until no `lamp-voice` push build is still running. |
 | `markers.py [--writers FILE] [--held] [PR]` | Reads a PR's comments and review bodies as JSON lines `{login, body}` on stdin. Prints `HELD`, `READ-OK <sha>` or nothing. With `--held`, a held PR that has a READ-OK prints `<READ-OK sha> <key>=<commit> …`, one per standing HOLD (the train bot logs it once per head), else nothing. With `--ignored`, it prints `READ-OK <sha7> by <login> ignored: not a writer` for each READ-OK skipped because its login isn't a writer (the train bot logs each once per head). `markers.py --merge COMMENTS REVIEWS` merges the two fetches into one list in time order (`lib.sh`). |
 | `reads2.py [--always] [--writers FILE] [--queue QUEUE_JSONL --pr N] HEAD_SHA [EARLIER_HEAD...]` | Reads the PR body, comments and review bodies as JSON lines, and the Queue's comments with `--queue`. Prints `none`, `met N` or `short N` for a TWO READS ask. A READ-OK for an earlier head given (the bot gives those with the same patch) counts as one for the head. |
+| `rows.py [--writers FILE] --pr N HEAD_SHA [EARLIER_HEAD...]` | Reads the PR's comments and review bodies as JSON lines. Prints `row`, `no-row-needed` or `none`: whether the PR has its lamp row (see "A lamp row before a train" below). |
 | `qholds.py [--writers FILE] HEAD QUEUE_JSONL` | Reads the PR's comments and review bodies as JSON lines `{login, body, created_at}` on stdin, and the Queue's from the file. Prints the time of a Queue HOLD that holds this head, or nothing. |
 | `lib.sh` | Sourced by the scripts: the writers list and the fetches, each failing closed, and the build-input and lane tests (`coord_input`, `coord_lane`), read from `lampos-arm64.yml`'s and `lampos-sdk.yml`'s `pull_request` paths. |
 | `lane.sh PR...` | Prints the lane each PR goes to, as the bot decides it. Read-only but for local fetches. |
 | `tests/test_markers.py` | Tests for the three readers. Run `python3 tests/test_markers.py` from this folder. |
+| `tests/test_rows.py` | Tests for `rows.py`. Run with the others. |
 | `tests/test_red_checks.py` | Tests for #6556 B and C: a red check of any kind ends `merge-when-green.sh`'s wait, a failed job's own log is read (`coord_red_jobs`), the PRs a red workflow takes (`coord_prs_taken`), a PR with a red check on its own head sits out (also when it went red between the round's read and the cut), a PR the ARM64 run takes waits for its own head's ARM64 run all green, and the bot's per-PR cache. Run with the others. |
 | `tests/test_behind_unrelated.py`, `tests/test_lanes.py` | Tests for `behind-unrelated.sh`, `merge-when-green.sh`, the lanes and the bot's dry round, on a temporary repository with a stand-in `gh`. Run all: `python3 -I -m pytest -q .github/tools/coordination/tests` from the repo root. |
 | `asks-for-me.sh [HH:MM]` | Prints, in full, every comment on the Queue (#3997, #4710, #5385, #6059, #6809, #6811) and the lead's channel (#1711) that names the first builder. With no time it starts 5 min before its own last run. |
@@ -47,8 +49,8 @@ Get a copy from the first builder and point `ROWS_SOURCE` at it.
 | `ROWS_SOURCE` | `$LAMP_COORD_STATE/review-page/build.py` | the review page |
 | `PRIVATE_NAMES` | `$LAMP_COORD_STATE/private-names.txt` | names the rows file must never hold |
 | `HOLDS_LIFTED` | `$LAMP_COORD_STATE/holds-lifted.tsv` | HOLDs lifted in words |
-| `PYTHON` | `python3` | running `markers.py`, `reads2.py`, `qholds.py`, `gen-build-rows.py` |
-| `LAMP_COORD_WRITERS` | none | the writers file for `markers.py`, `reads2.py` and `qholds.py` run by hand (the bot passes `--writers`) |
+| `PYTHON` | `python3` | running `markers.py`, `reads2.py`, `rows.py`, `qholds.py`, `gen-build-rows.py` |
+| `LAMP_COORD_WRITERS` | none | the writers file for `markers.py`, `reads2.py`, `rows.py` and `qholds.py` run by hand (the bot passes `--writers`) |
 
 `REPO_DIR`'s `origin` must be `autonomous-ai/lampOS`.
 `WORKTREE` and `WORKTREE_NC` must not be `REPO_DIR`, its top level, the repository's main worktree or each other: the bot refuses to start.
@@ -64,6 +66,7 @@ State never lives in the repo. It lives in `$LAMP_COORD_STATE`:
 - `train-first.txt`: PR numbers that go first, in that order.
 - `train-hold.txt`: PR numbers that sit out.
 - `train-only.txt`: while it exists, a train carries only the PRs it names.
+  Each PR either file leaves out is said in the log once per head (`#N left out: named in train-hold.txt`, `#N left out: not named in train-only.txt`; 14 Nov: trains 905-907 left out #7016 and #7022 with no line).
 - `holds-lifted.tsv`: HOLDs lifted in words. See `holds-lifted.tsv.example` for the format.
   Its keys hold account logins, so it stays out of the repo. Copy the first builder's file.
 - `private-names.txt`: one regex a line. See `private-names.txt.example`. `build-rows-pr.sh` stops without it.
@@ -173,9 +176,17 @@ A review's state (APPROVED, CHANGES_REQUESTED, ...) is never a read. A review wi
 
 **Fetches fail closed.** If a PR's head, comments, reviews or body can't be fetched, that PR is not eligible.
 If any Queue issue (#4710, #5385, #6059, #6809 or #6811) can't be fetched, no PR is eligible that round.
-`still-eligible.sh` rechecks the markers, the Queue HOLDs and TWO READS just before a train merges.
+`still-eligible.sh` rechecks the markers, the Queue HOLDs, TWO READS and the lamp row just before a train merges.
 
 **Two readers for every PR (13 Nov, the lead).** The train bot and `still-eligible.sh` call `reads2.py --always`, so every PR needs READ-OKs from two different signed readers on its head, asked or not. A reader who restates is still one reader, and two names on one shared login are two readers. A ONE READ line no longer lowers it.
+
+**A lamp row before a train (14 Nov, the lead).** A PR's lamp row comes before its train. The train bot and `still-eligible.sh` call `rows.py`, and a PR is eligible only when a writer's comment has one of these:
+
+- a first line opening with `ROW` (bold allowed): `ROW <PR> <head> on build N …`, with the journal line;
+- `lamp row for #N`, for this PR, in its first 300 characters (a tester's row: "Fifth, 09:51 GMT+7: lamp row for #6907 on lamp-52e6 …");
+- "no row needed" in a READ-OK whose first line is the marker, for the PR's head (or an earlier head with the same patch). This is for docs, tests, or code behind a switch that's off. A DEFAULT-ON always needs its row.
+
+None of them counts on a quoted line or inside a fenced code block. Without one, the PR sits out: `#N left out: no ROW line and no reader's "no row needed" on head <sha>`, once per head. Any other answer from `rows.py` leaves the PR out too (fail closed).
 
 **Markers.**
 
