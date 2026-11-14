@@ -372,6 +372,8 @@ async fn held_reports_never_dispatch_music_or_supply_its_private_context() {
 /// its offer. An offer for a line that does not ask to play is refused: no
 /// recording goes to the coordinator, and the model is told nothing plays,
 /// never the skill's confirmation. A line that asks still gets its offer.
+/// The skill's own asks are given (#5749): a line that holds its ask to
+/// play is an ask, and every line that does not ask stays refused.
 #[tokio::test]
 async fn talk_about_music_gets_no_recording_and_the_model_is_told_so() {
     for (words, asks) in [
@@ -415,6 +417,10 @@ async fn talk_about_music_gets_no_recording_and_the_model_is_told_so() {
         ("Play music, please.", true),
         ("Lamp, mở nhạc thư giãn đi.", true),
         ("Bật nhạc cho mình nhé.", true),
+        // #5749: lamp-52e6 at 13059, case on5ctl, a word lost.
+        ("Hey Lamp play me something relax", true),
+        ("Halamp play me something to relax", true),
+        ("I want to relax", false),
     ] {
         for wrapped in [false, true] {
             let script = Arc::new(Script {
@@ -432,7 +438,16 @@ async fn talk_about_music_gets_no_recording_and_the_model_is_told_so() {
                 ..Default::default()
             });
             let (engine, calls) = recording_engine(script.clone());
-            let mut engine = engine;
+            let mut engine = engine.playing_for_skill_asks(Arc::new(|function: &str| {
+                if function == MUSIC {
+                    vec![
+                        "relaxing music".to_owned(),
+                        "play me something to relax".to_owned(),
+                    ]
+                } else {
+                    Vec::new()
+                }
+            }));
             engine.submit(start(REQUEST));
             engine.submit(audio(REQUEST, 1));
             engine.submit(end(REQUEST));
