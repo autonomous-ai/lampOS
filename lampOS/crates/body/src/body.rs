@@ -60,6 +60,17 @@ const LEAVE: Duration = Duration::from_secs(3);
 /// How stiffly the commanded pose follows the wanted one, in radians a
 /// second: it arrives in well under a second without overshoot.
 const FOLLOW: f32 = 7.0;
+/// The fastest the head's roll goal moves above energy level 1, counts a
+/// second (`Limits::for_roll`): level 1's own speed (the product unit's
+/// `--speed 300`), however fast the level moves the rest of the pose. At
+/// level 5's 800 the standing roll (170 counts each side) swapped sides at
+/// about 750 a second; the servo (its profile 1,000 a second, acceleration
+/// 60) trailed its goal by about 95 counts at a load of about 210, and the
+/// head met resistance and stopped pushing on head_roll 1 and 3 times in two
+/// windows against 0 at level 1 (lamp-52e6, row-6893g, 15 Nov). A swap of
+/// 340 counts at 300 a second still takes about 1.2 s. Calibration: lower it
+/// if a lamp's roll still stops at level 5.
+pub const ROLL_SPEED: f32 = 300.0;
 /// At rest for this many steps, a joint within `REST_SLACK` counts of its
 /// goal is given its own position as the goal. A servo stops a few counts
 /// short of a goal and goes on pushing at it: on lamp-4ace the yaw servo sat
@@ -1211,6 +1222,19 @@ impl Limits {
             stand_roll: self
                 .stand_roll
                 .max(f32::from(crate::energy::of(level).stand_roll)),
+            ..self
+        }
+    }
+
+    /// What the head's roll follows at under these limits (`at`'s) for a
+    /// body given `base`: never faster than [`ROLL_SPEED`], nor accelerating
+    /// more than six times it, unless `base` itself is faster. Level 1 (these
+    /// are `base`) is `base` exactly.
+    pub fn for_roll(self, base: Self) -> Self {
+        let speed = self.speed.min(base.speed.max(ROLL_SPEED));
+        Self {
+            speed,
+            acceleration: self.acceleration.min(base.acceleration.max(speed * 6.0)),
             ..self
         }
     }
@@ -7087,7 +7111,13 @@ fn run_on_dyn<P: PortIo, R: Runtime>(
                 wanted - commanded[index],
                 velocity[index],
                 &mut pulled[index],
-                &limits,
+                // The head's roll at level 1's pace whatever the level
+                // (`ROLL_SPEED`).
+                &if index == 1 {
+                    limits.for_roll(base)
+                } else {
+                    limits
+                },
                 step,
             );
             let (floor, ceiling) = (
