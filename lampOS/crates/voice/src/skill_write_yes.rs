@@ -268,13 +268,15 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
         // choice 1): no yes is taken yet, so the note neither says it
         // waits for one nor gives the approve_id, which steered the model
         // to send it on a repeated ask and lose a refused round; it hands
-        // the say-back to say again whole first.
+        // the say-back to say again whole first. A no keeps it off and
+        // doesn't bring the say-back back (Thirteen's P3 on #7038).
         if cut_unsaid(waiting, request) {
             return Some(format!(
                 "(For you to know, not to answer: the say-back of the skill {} was cut, so it \
-                 was not heard whole, and no yes to it is taken yet. If they answer it or ask for \
-                 it, say it again, word for word, before any yes, and call nothing now. {} End \
-                 as it ends, asking nothing.)",
+                 was not heard whole, and no yes to it is taken yet. If they agree to it or ask for \
+                 it, say it again, word for word, before any yes, and call nothing now. If they \
+                 decline or wait, say it stays off, and call nothing. {} End as it ends, asking \
+                 nothing.)",
                 crate::made_skill::spoken_name(&waiting.asks.skill),
                 say_whole(&waiting.asks.say_back)
             ));
