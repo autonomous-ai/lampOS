@@ -846,9 +846,18 @@ runs on the PM's machine, one bot at a time. A pull request is carried when:
   (a plain rebase keeps a read, and TWO READS count the reads on an earlier
   head with the same patch);
 - its ARM64 and clippy runs are green, and a lamp test has passed where one
-  was needed; and
+  was needed;
+- it has its **lamp row** (below); and
 - its branch has **no merge commit**. A pull request rebased onto a merge of
   `lamp-voice`, rather than onto `lamp-voice`, has one: rebase it again.
+
+**A lamp row comes before the train** (the lead, 14 November). Before a
+behaviour pull request rides a train, post its row on the pull request: a
+comment whose first line is `ROW <PR> <head> on build N …`, with the
+journal line that shows it. A docs, tests or switched-off change needs no
+row: then a reader writes "no row needed" in the `READ-OK` on this head. A
+default-on pull request always needs its row. The bot enforces it: without
+either, the pull request sits out, and the log says so once per head.
 
 A `HOLD` stands until the same reader's later `READ-OK` (it is keyed by the
 reader's account and signed name). A `HOLD <sha>` as the first line of a
