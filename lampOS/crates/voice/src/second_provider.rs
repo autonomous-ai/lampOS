@@ -14740,6 +14740,38 @@ async fn cue(shared: &Shared, request: u64, clip: Vec<i16>) -> Result<(), Stop> 
     Ok(())
 }
 
+/// A call's answer, `answering`; for a voice make (`made`, #6749) the
+/// make's waiting line ([`crate::make_skill_agent::WAITING_LINE`]) is said
+/// in this turn once its agent begins ([`crate::make_skill_agent::waiting_due`]),
+/// after the turn's words so far, as the lamp's words. Asked through the
+/// say service it waited for the turn to end, as every say does, while
+/// the make held the turn: on lamp-9adf, 14 Nov, it was `Some(Expired)`
+/// 2 of 2 and the person waited about 49 s in silence. Said once at most;
+/// a turn gone while it is said ends here, the make going on as for any
+/// cut (`worker::made_running`).
+async fn said_while_made<T>(
+    queue: &mut Queue<'_>,
+    request: u64,
+    made: bool,
+    answering: impl std::future::Future<Output = T>,
+) -> Result<T, Stop> {
+    if !made {
+        return Ok(answering.await);
+    }
+    let mut in_turn = crate::make_skill_agent::waiting_in_turn(request);
+    tokio::pin!(answering);
+    tokio::select! {
+        answer = &mut answering => return Ok(answer),
+        Ok(()) = &mut in_turn.due => {}
+    }
+    let line = queue.shared.fixed(crate::make_skill_agent::WAITING_LINE);
+    eprintln!(
+        "lamp-voice second: request {request}: the make's agent began: its waiting line is said in this turn"
+    );
+    queue.push(line.to_owned()).await?;
+    Ok(answering.await)
+}
+
 /// One answer's limit on offers to keep ([`crate::keep_quietly::Quiet`]),
 /// with `LAMP_KEEP_QUIETLY` on, for a spoken line in a known person's own
 /// scope that they were seen saying ([`crate::keep_quietly::own_seen`]; one
@@ -17829,80 +17861,88 @@ async fn answer(
                     held_rename::forgot(shared, request);
                     forget_carried_context(shared);
                 }
-                let mut answer = match (&shared.requested_audio, spoken) {
-                    (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
-                        let context = lamp_msgs::RequestedAudioContext {
-                            worker_boot: worker_boot.clone(),
-                            provider_session: turn.session,
-                            request,
-                            privacy_generation: turn.privacy_generation,
-                            call_id: call.id.clone(),
-                            issued_us: called_us,
-                        };
-                        let mut answer = match scope
-                            .as_ref()
-                            .filter(|scope| audio_scope_current(scope, &context))
-                        {
-                            Some(scope) => {
-                                let (attempt, args) =
-                                    send_attempt_in_context(shared, call, context_epoch);
-                                let running = runner(
-                                    context.clone(),
-                                    lamp_gemini::ToolCall {
-                                        id: call.id.clone(),
-                                        name: call.name.clone(),
-                                        args,
-                                    },
-                                    scope.clone(),
+                // A voice make's waiting line is said in this turn as the
+                // agent begins ([`said_while_made`], #6749).
+                let made_call = call.name == crate::made_skill::MAKE;
+                let answering = async {
+                    match (&shared.requested_audio, spoken) {
+                        (Some((worker_boot, runner)), Some(turn)) if turn.captured => {
+                            let context = lamp_msgs::RequestedAudioContext {
+                                worker_boot: worker_boot.clone(),
+                                provider_session: turn.session,
+                                request,
+                                privacy_generation: turn.privacy_generation,
+                                call_id: call.id.clone(),
+                                issued_us: called_us,
+                            };
+                            let mut answer = match scope
+                                .as_ref()
+                                .filter(|scope| audio_scope_current(scope, &context))
+                            {
+                                Some(scope) => {
+                                    let (attempt, args) =
+                                        send_attempt_in_context(shared, call, context_epoch);
+                                    let running = runner(
+                                        context.clone(),
+                                        lamp_gemini::ToolCall {
+                                            id: call.id.clone(),
+                                            name: call.name.clone(),
+                                            args,
+                                        },
+                                        scope.clone(),
+                                    );
+                                    sending(
+                                        shared,
+                                        (request, attempt),
+                                        call,
+                                        running,
+                                        |answer: &crate::tools::ToolAnswer| answer.told.clone(),
+                                    )
+                                    .await
+                                }
+                                None => {
+                                    crate::tools::ToolAnswer::plain(crate::tools::unavailable())
+                                }
+                            };
+                            let now = monotonic_us();
+                            answer.requested_audio = answer.requested_audio.filter(|offer| {
+                                offer.check().is_ok()
+                                    && offer.context == context
+                                    && now >= offer.issued_us
+                                    && now < offer.start_before_us
+                            });
+                            // A recording plays only for a line that asks to
+                            // play (#5764): talk about music got one on
+                            // lamp-52e6 on 9 Nov, the skill's "only when …
+                            // explicitly asks" left to the model. Refused, and
+                            // the model told so, never its "next" confirmation.
+                            if answer.requested_audio.is_some()
+                                && !crate::requested_audio::asks_to_play(&heard_words)
+                            {
+                                eprintln!(
+                                    "lamp-voice second: request {request}: {} offered a recording for a line that did not ask to play; refused",
+                                    call.name
                                 );
-                                sending(
-                                    shared,
-                                    (request, attempt),
-                                    call,
-                                    running,
-                                    |answer: &crate::tools::ToolAnswer| answer.told.clone(),
-                                )
-                                .await
+                                answer = crate::tools::ToolAnswer::plain(serde_json::json!({
+                                    "error": crate::requested_audio::NOT_ASKED_TO_PLAY
+                                }));
                             }
-                            None => crate::tools::ToolAnswer::plain(crate::tools::unavailable()),
-                        };
-                        let now = monotonic_us();
-                        answer.requested_audio = answer.requested_audio.filter(|offer| {
-                            offer.check().is_ok()
-                                && offer.context == context
-                                && now >= offer.issued_us
-                                && now < offer.start_before_us
-                        });
-                        // A recording plays only for a line that asks to
-                        // play (#5764): talk about music got one on
-                        // lamp-52e6 on 9 Nov, the skill's "only when …
-                        // explicitly asks" left to the model. Refused, and
-                        // the model told so, never its "next" confirmation.
-                        if answer.requested_audio.is_some()
-                            && !crate::requested_audio::asks_to_play(&heard_words)
-                        {
-                            eprintln!(
-                                "lamp-voice second: request {request}: {} offered a recording for a line that did not ask to play; refused",
-                                call.name
-                            );
-                            answer = crate::tools::ToolAnswer::plain(serde_json::json!({
-                                "error": crate::requested_audio::NOT_ASKED_TO_PLAY
-                            }));
+                            answer
                         }
-                        answer
+                        _ => crate::tools::ToolAnswer::plain(
+                            run_tool_in_context(
+                                shared,
+                                request,
+                                heard,
+                                call,
+                                scope.as_ref(),
+                                context_epoch,
+                            )
+                            .await,
+                        ),
                     }
-                    _ => crate::tools::ToolAnswer::plain(
-                        run_tool_in_context(
-                            shared,
-                            request,
-                            heard,
-                            call,
-                            scope.as_ref(),
-                            context_epoch,
-                        )
-                        .await,
-                    ),
                 };
+                let mut answer = said_while_made(&mut queue, request, made_call, answering).await?;
                 if scope.as_ref().is_some_and(|scope| !scope.is_current()) {
                     return Err(Stop::Gone);
                 }

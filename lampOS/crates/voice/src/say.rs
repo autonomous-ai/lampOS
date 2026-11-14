@@ -5095,6 +5095,52 @@ mod tests {
         answer
     }
 
+    /// lamp-9adf, 14 Nov (#6749): a voice make's waiting line asked at
+    /// priority 5 with 15 s to begin, the lamp's own "I'll make it now"
+    /// ending as it was read, needs the whole [`QUIET_US`] after that turn:
+    /// by then its wait is over, and it is `expired`, never said. Asked
+    /// urgent, as the make's say-socket line now is, it is taken once the
+    /// urgent quiet has passed, well within the same wait.
+    #[test]
+    fn a_makes_waiting_line_at_normal_priority_expires_before_its_quiet() {
+        let line = |priority: u8| {
+            format!(
+                "{{\"skill\":\"voice-make\",\"text\":\"Let me think about that a little longer.\",\"priority\":{priority},\"expires_in_ms\":15000}}\n"
+            )
+        };
+        for (priority, said) in [(NORMAL_PRIORITY, false), (URGENT_FROM, true)] {
+            let dir = socket_dir(&format!("wait{priority}"));
+            let path = dir.join("say.sock");
+            let mut says = Says::serve(&path, None, &dir, Recordings::none()).unwrap();
+            let client = {
+                let (path, line) = (path.clone(), line(priority));
+                thread::spawn(move || exchange(&path, &line))
+            };
+            // The lamp's own turn ends as the ask comes in.
+            let last_turn_us = loop {
+                let now = lamp_ipc::monotonic_us();
+                says.poll(now);
+                if says.quiet_needed_us().is_some() {
+                    break now;
+                }
+                thread::sleep(Duration::from_millis(5));
+            };
+            // The coordinator's gate: the quiet the ask's priority needs.
+            let quiet = says.quiet_needed_us().unwrap();
+            let at = last_turn_us + quiet;
+            says.poll(at);
+            assert_eq!(says.take(at).is_some(), said, "priority {priority}");
+            if said {
+                drop(says);
+                let _ = client.join();
+            } else {
+                assert_eq!(client.join().unwrap(), "{\"outcome\":\"expired\"}\n");
+                drop(says);
+            }
+            let _ = fs::remove_dir_all(&dir);
+        }
+    }
+
     /// The reviewer on #954: sixteen clients each sending a little of a line
     /// every 300 ms never finish it. Each is refused a second after it was
     /// taken, its place given back, and an ask that comes after them is

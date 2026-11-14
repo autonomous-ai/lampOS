@@ -820,6 +820,70 @@ async fn a_tool_call_is_run_and_its_result_answered() {
     );
 }
 
+/// lamp-9adf, 14 Nov (#6749): a voice make handed to the agent asked its
+/// waiting line through the say service, which waits for the turn to end,
+/// while the make held the turn: `Some(Expired)` 2 of 2, about 49 s of
+/// silence. Its agent begun (`make_skill_agent::waiting_due`), the line is
+/// said in the make's own turn, after its words so far and before the
+/// make's answer; a make that never begins its agent says none.
+#[tokio::test]
+async fn a_makes_waiting_line_is_said_in_its_own_turn_as_its_agent_begins() {
+    let said = |agent: bool| async move {
+        let asked = call("c1", crate::made_skill::MAKE, json!({"request": "x"}));
+        let script = Arc::new(Script {
+            chats: Mutex::new(
+                [
+                    vec![
+                        text("I'll make it now."),
+                        Ok(ChatEvent::ToolCalls(vec![asked])),
+                        Ok(ChatEvent::Done),
+                    ],
+                    vec![text("Made."), Ok(ChatEvent::Done)],
+                ]
+                .into(),
+            ),
+            ..Script::default()
+        });
+        let tools: ToolRunner = Arc::new(move |request, _, name, _| {
+            Box::pin(async move {
+                if name == crate::made_skill::MAKE {
+                    tokio::time::sleep(Duration::from_millis(20)).await;
+                    if agent {
+                        assert!(crate::make_skill_agent::waiting_due(request));
+                    }
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+                json!({"ok": true})
+            })
+        });
+        let mut engine = Engine::with_clock(
+            script,
+            Arc::new(|| "SYSTEM".to_owned().into()),
+            tools,
+            Arc::new(Instant::now),
+        );
+        engine.submit(written(
+            if agent { 6_749_001 } else { 6_749_002 },
+            "Make me x.",
+        ));
+        turn(&mut engine)
+            .await
+            .into_iter()
+            .filter(|label| label.starts_with("said:"))
+            .map(|label| label.replacen("said: ", "said:", 1))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        said(true).await,
+        [
+            "said:I'll make it now.".to_owned(),
+            format!("said:{}", crate::make_skill_agent::WAITING_LINE),
+            "said:Made.".into(),
+        ]
+    );
+    assert_eq!(said(false).await, ["said:I'll make it now.", "said:Made."]);
+}
+
 /// lamp-4ace, 20 Oct 21:31: "Lamp, what's my name?" was answered with
 /// `recall`, then `forget_my_face` and `forget`. A forget of any kind the
 /// person's spoken words don't ask for is not run, and the model is told

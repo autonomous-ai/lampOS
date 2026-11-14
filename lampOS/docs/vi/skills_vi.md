@@ -1660,7 +1660,7 @@ cả hai người viết.
   bằng giọng nói có gửi thư ("when I leave my desk, email me that I'm out")
   bằng một `cannot:` mà brief yêu cầu, nên chúng không bao giờ được giao.
   Khi agent không trả lời (không có lần chạy tạo ở đây, không trả lời trong
-  45 giây, lỗi), DeepSeek khi đó được hỏi một lần, không được sửa, và câu
+  90 giây, lỗi), DeepSeek khi đó được hỏi một lần, không được sửa, và câu
   trả lời của nó là kết quả, như khi DeepSeek thất bại trước thì câu trả
   lời duy nhất của nó giữ nguyên. Khi đèn không có agent Hermes thì không
   đổi gì: DeepSeek tự tạo với các lần sửa của nó. Tắt một trong hai công
@@ -1749,29 +1749,48 @@ cả hai người viết.
   vẫn giữ nguyên và được nói rõ ràng. Nhật ký ghi "can't be run in a skill
   run's namespace here".
 - **Agent im lặng.** lamp-tasks giết cả nhóm tiến trình của lần chạy khi
-  hết 45 giây. Giọng nói chờ chừng đó và thêm một chút (tối đa 5 giây), rồi
+  hết 90 giây. Giọng nói chờ chừng đó và thêm một chút (tối đa 5 giây), rồi
   thất bại vẫn giữ nguyên.
-- **Giới hạn.** Mỗi câu trả lời của agent trong 45 giây
-  (`make_skill_agent::WRITE_WITHIN`); một lần sửa chỉ bắt đầu khi thêm một
-  câu trả lời vẫn vừa 120 giây của agent (`make_skill_agent::MAKE_WITHIN`).
-  Agent không trả lời trong 45 giây, lỗi, hay không có câu trả lời đầu: kỹ
+- **Giới hạn.** Mỗi câu trả lời của agent trong 90 giây
+  (`make_skill_agent::WRITE_WITHIN`, trong mức tối đa 120 giây của
+  lamp-tasks, `lamp_tasks::skill_make::MOST_WITHIN`). Trước đây là 45 giây:
+  trên lamp-9adf, 14/11 (bản 12958), một lần tạo có code hết giờ ở 45 giây
+  2 trên 2, trong khi riêng `hermes chat -q "Say OK."` đã mất khoảng 24,5
+  giây trên Orange Pi đó, khoảng 13 giây trước khi phiên của Hermes bắt
+  đầu, và một lần tạo gmail không có script mất 30 giây trên một đèn khác;
+  90 giây chừa khoảng một phút cho việc tạo sau khi Hermes đã chạy. Một lần
+  sửa chỉ bắt đầu khi thêm một câu trả lời vẫn vừa 120 giây của agent
+  (`make_skill_agent::MAKE_WITHIN`, không đổi), nên chỉ có lần sửa sau một
+  câu trả lời đầu trong vòng 30 giây.
+  Agent không trả lời trong 90 giây, lỗi, hay không có câu trả lời đầu: kỹ
   năng không được tạo, và điều được nói là thất bại của câu trả lời duy nhất
   của DeepSeek, vốn không được sửa (khi đèn có agent DeepSeek không được sửa
   lần nào), nên đây không phải thất bại sau 3 lần sửa như hôm nay. Một lần
   tạo có thể kéo dài tới 240 giây, và tuyến thứ hai chờ câu của lần tạo theo
   đúng mức đó (`make_skill_local::longest_make`).
 - **Người dùng nghe gì.** "I'll make it now" vẫn nói ngay, không đổi. Khi
-  lamp-tasks báo lần chạy tạo đầu tiên của agent bắt đầu, đèn nói "Let me think about that a
-  little longer." qua dịch vụ nói (`app_make::say_waiting_at`, một lần,
-  không bắt đầu sau 15 giây); không bao giờ khi lần giao thất bại ngay, hay
-  khi lượt đã bị cắt. Câu báo đã tạo không đổi.
+  lamp-tasks báo lần chạy tạo đầu tiên của agent bắt đầu (nó báo ngay khi
+  khởi chạy Hermes, trước phần khởi động của Hermes), đèn nói "Let me think
+  about that a little longer." ngay trong lượt của lần tạo, sau những lời
+  của lượt cho tới lúc đó, như lời của đèn: worker của tuyến thứ hai được
+  báo câu này đến lúc nói (`make_skill_agent::waiting_due`, được
+  `made_running` giữ theo request của lượt) và đưa nó vào lời nói của lượt
+  (`second_provider::said_while_made`). Trước đây câu này đi qua dịch vụ
+  nói với mức ưu tiên 5 và 15 giây để bắt đầu, mà một lần nói phải chờ lượt
+  kết thúc, như mọi lần nói, rồi chờ thêm 15 giây yên lặng: trên lamp-9adf,
+  14/11, nó là `Some(Expired)` 2 trên 2 và người dùng chờ khoảng 49 giây
+  trong im lặng. Một lần tạo không có lượt giọng nói nào chờ nó vẫn hỏi dịch
+  vụ nói, nay ở mức khẩn (`app_make::LINE_PRIORITY`), nên có thể bắt đầu một
+  giây sau lượt cuối của đèn (`app_make::say_waiting_at`, một lần, không
+  bắt đầu sau 15 giây). Không bao giờ khi lần giao thất bại ngay, hay khi
+  lượt đã bị cắt. Câu báo đã tạo không đổi.
 - **Nhật ký.** "made by DeepSeek", "it asks for a linked service (gmail):
   straight to the agent (Hermes), DeepSeek not asked" (mã của dịch vụ,
   không bao giờ là lời của người dùng), "the agent (Hermes) made none
   (...): DeepSeek is asked once, given no repairs", "DeepSeek's cannot is
   a send, which the agent makes with its lamp-services tools", "DeepSeek
   failed: handed to the agent (Hermes)", "made by the agent (Hermes)", "the agent's (Hermes) wasn't
-  kept", "the agent (Hermes) made none (no answer within 45 s): DeepSeek's
+  kept", "the agent (Hermes) made none (no answer within 90 s): DeepSeek's
   one answer, given no repairs, stands as not made", "DeepSeek's cannot is
   one the brief asks for: not handed to the agent", "no agent on the lamp:
   DeepSeek makes it alone"; lần sửa của agent ghi "by the agent".
