@@ -1929,8 +1929,12 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     the computer staff (Claude Code when none is read); never a fixed list
     of agents. A name counts only as the doer: after "ask", "have", "tell",
     "get" or "let", or "with", "using", "via" or "use" (not "don't ask …",
-    "did you ask …"), or first in the line before a comma ("Hey Lamp,
-    Hermes, …"); any case, its words together or apart ("Open Claw"). One
+    "did you ask …"), or first in the line (after an opening: hey, hi, ok,
+    okay, lamp, please; a stop before it is fine) with a comma after it
+    ("Hey Lamp, Hermes, …") or, as speech to text often hears it, with a
+    work verb (`WORK_VERBS`) right after it, after "please" or a stop too
+    ("Hey Lamp Hermes look up …", "Hermes. Look up …", #7023); any case,
+    its words together or apart ("Open Claw"). One
     of the lamp's engines named: `where` `lamp` and that `engine`, whatever
     the model sent. One of the staff named: `where` `computer`, `who` them,
     no `engine`. A name on both the lamp and a computer is the lamp's,
@@ -1952,6 +1956,7 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     A turn where the model calls no `start_agent_task` is caught on the
     second route (next point).
     Tests: `agent_tasks::tests::the_heard_words_name_the_doer_and_the_place`,
+    `agent_tasks::tests::a_name_called_first_is_the_doer_as_heard`,
     `agent_tasks::tests::an_agent_on_both_works_on_the_lamp_unless_the_computer_is_needed`,
     `agent_tasks::tests::the_heard_words_set_where_engine_and_who`,
     `agent_tasks::tests::the_heard_words_set_the_engine_and_place_over_the_model`.
@@ -1960,7 +1965,8 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     an agent for the work, read exactly as above (the doer only, from the
     lamp's engines while the lamp has its target and the staff, Claude Code
     when none is read; a mention such as "What is Hermes?" names nothing;
-    an agent only called by name first in the line, "Hermes, …", counts
+    an agent only called by name first in the line, "Hermes, …" or
+    "Hermes look up …", counts
     only when the rest of the line asks for work: a work verb such as
     write, make, fix, list or look (`WORK_VERBS`), or at least
     `WHOLE_ASK_FEWEST` (4) ask words beside the words of consent, as
