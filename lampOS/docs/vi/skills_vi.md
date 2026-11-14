@@ -2635,7 +2635,14 @@ camera, so I can't take photos…" với `calls=none`.
   kỹ năng theo tên hay theo cụm xin (`lamp_awaits_answer` của
   `second_provider`). Vòng 1 là của model, và nó quyết định theo ngữ cảnh
   "Sounds good." hay "Yes please." là câu trả lời cho đèn hay là lời xin
-  một kỹ năng. Một lời đồng ý tiếng Việt ("Được.", "Ừ, làm đi.") cũng được
+  một kỹ năng. Nhật ký ghi lại điều đó ("the heard words named a skill
+  (…), not called in code:" và lý do), và sau một câu hỏi (không có lời
+  đồng ý nào đang giữ) vòng 1 được báo câu đó còn đọc như lời xin gì
+  (`skill_named::awaited_note`: "what they said also reads as an ask for
+  …; if it answers what you asked, go on with that; if it is a new ask
+  for …, call it now"). Không được báo, một lời xin mới sau một câu hỏi
+  chỉ được nói chuyện về nó (on5 của #5749, lamp-52e6, 14/11: "Lamp, can
+  you play some relaxing music?" ra `calls=none`). Một lời đồng ý tiếng Việt ("Được.", "Ừ, làm đi.") cũng được
   giữ như vậy. `remarks::lamp_asked` chỉ nhận ra một câu hỏi tiếng Việt qua
   dấu `?` ("Mình bắt đầu nhé?"); câu viết không có dấu đó ("Mình bắt đầu
   nhé.") không được coi là câu hỏi.
