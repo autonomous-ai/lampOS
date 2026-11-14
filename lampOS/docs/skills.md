@@ -1681,7 +1681,15 @@ task = { task = "Take a photo and send it to my phone", run = "scripts/main.py" 
   say-back whole, and a `make_skill` the model calls at once with the
   waiting `approve_id` is refused once more and handed the say-back too. A
   yes over that repeat is refused again; only a yes after an answer that
-  held every word of the say-back, uncut, is taken. The journal says what
+  held every word of the say-back, uncut, is taken. While a cut say-back
+  waits with none heard whole since, the note each later heard line gets
+  (`skill_write_yes::waiting_note`) no longer says the skill the lamp just
+  said back waits for a yes, nor gives its `approve_id`: it says the
+  say-back was cut and not heard whole, that no yes is taken yet, and that
+  it must be said again, word for word, before any yes, with the whole
+  say-back to say; then to end as it ends and ask nothing. Once an uncut
+  answer has held it whole, the note is the usual one again, with the
+  `approve_id`. The journal says what
   was kept: "a made skill's yes not taken: its say-back was not heard
   whole (kept: r6 cut=true 28 words; first missing word in r6: 29 of 34)",
   each answer kept by request, cut or not and its word count, then where

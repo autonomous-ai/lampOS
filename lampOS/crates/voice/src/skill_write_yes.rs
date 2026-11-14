@@ -264,6 +264,21 @@ fn waiting_now(request: u64, now: Instant) -> Option<String> {
                 waiting.asks.say_back, waiting.id
             ));
         }
+        // Cut, and not heard whole since (#6715, the first builder's
+        // choice 1): no yes is taken yet, so the note neither says it
+        // waits for one nor gives the approve_id, which steered the model
+        // to send it on a repeated ask and lose a refused round; it hands
+        // the say-back to say again whole first.
+        if cut_unsaid(waiting, request) {
+            return Some(format!(
+                "(For you to know, not to answer: the say-back of the skill {} was cut, so it \
+                 was not heard whole, and no yes to it is taken yet. If they answer it or ask for \
+                 it, say it again, word for word, before any yes, and call nothing now. {} End \
+                 as it ends, asking nothing.)",
+                crate::made_skill::spoken_name(&waiting.asks.skill),
+                say_whole(&waiting.asks.say_back)
+            ));
+        }
         let before = if waiting.asks.code {
             "before it runs any code"
         } else if waiting.asks.grants.is_some() {
@@ -578,6 +593,17 @@ fn said_whole_before(waiting: &Waiting, request: u64) -> bool {
     waiting.said.iter().any(|(id, said, cut)| {
         *id < request && !cut && crate::services::read_back_said(&waiting.asks.say_back, said)
     })
+}
+
+/// Whether one of the lamp's answers toward `waiting` before `request` was
+/// cut and none before it held the whole say-back uncut (#6715): a cut
+/// say-back still to be said again.
+fn cut_unsaid(waiting: &Waiting, request: u64) -> bool {
+    !said_whole_before(waiting, request)
+        && waiting
+            .said
+            .iter()
+            .any(|(id, _, cut)| *id < request && *cut)
 }
 
 /// Where `said` first falls short of `say_back`, as
