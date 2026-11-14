@@ -2353,7 +2353,10 @@ order is kept. A written turn is the same from the chat on.
     answered as a call, with or without `LAMP_SECOND_NAME_CARRIES`, its
     answer is no answer to a waiting write's read-back
     (`services::answered_in_place`), unless said by the name just before,
-    so the yes after it still sends. On lamp-9adf on 14 Nov "Hey Lamp"
+    so the yes after it still sends. Only the name alone: a call with a
+    word past it ("Hey Lamp, no.") or one word asked as the name ("No.")
+    still drops the write, so a stray "Yes." never sends what was just
+    declined. On lamp-9adf on 14 Nov "Hey Lamp"
     between an event's read-back and its "Yes." was answered as a call, and
     the yes found the event dropped (#6363). Test:
     `a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write`.

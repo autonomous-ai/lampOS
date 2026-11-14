@@ -14684,7 +14684,9 @@ async fn a_wordless_call_between_a_read_back_and_its_yes_keeps_the_write() {
 /// is only the name, with or without its carry and the coordinator's mark,
 /// is answered as a call, and its answer is no other request: the yes after
 /// it sends. A worded line begun with the name and answered with no send
-/// still drops the write.
+/// still drops the write, and so does a call with a word past the name
+/// ("Hey Lamp, no."), or one word asked as the name ("No."), whose decline
+/// a stray "Yes." must not undo.
 #[tokio::test(start_paused = true)]
 async fn a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write() {
     use crate::services::{NOTHING_WAITING, Pending, Turn, WRITE};
@@ -14742,6 +14744,13 @@ async fn a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write() {
         let asked = asked(words, carries, marked).await;
         assert!(asked[0].contains(&called), "{words}: {:?}", asked[0]);
         assert!(sends("Yes?").is_ok(), "{words}: the yes after a call sends");
+    }
+    for (words, carries, marked) in [("Hey Lamp, no.", false, true), ("No.", true, true)] {
+        crate::services::pending_for_test(Some(waiting()));
+        let asked = asked(words, carries, marked).await;
+        assert!(asked[0].contains(&called), "{words}: {:?}", asked[0]);
+        let refused = sends("Yes?").unwrap_err();
+        assert_eq!(refused["error"], NOTHING_WAITING, "{words}");
     }
     crate::services::pending_for_test(Some(waiting()));
     let asked = asked("Hey Lamp, what time is it?", true, false).await;

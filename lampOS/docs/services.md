@@ -1582,7 +1582,10 @@ on #6009, below): there the asker's voice; anywhere else, whoever says it.
   dropped (#6363). So too a line that is only the lamp's name ("Hey
   Lamp", told to the model as only the name and answered as a call, with or
   without `LAMP_SECOND_NAME_CARRIES`), unless said by the name just before:
-  it is answered, and the yes after it still sends. On a tester's lamp on
+  it is answered, and the yes after it still sends. Only the name alone
+  counts: a call with a word past it ("Hey Lamp, no.") or one word asked as
+  the name ("No.") still drops the write, so a stray "Yes." never sends
+  what was just declined. On a tester's lamp on
   14 Nov "Hey Lamp" between an event's read-back and its "Yes." was
   answered as a call, and the yes found the event dropped (#6363). Test:
   `a_name_only_line_between_a_read_back_and_its_yes_keeps_the_write`. A

@@ -9261,6 +9261,9 @@ async fn spoken(
     // The name alone is answered as a call: the name for one word misheard,
     // else its words, told it was a call as without the switch. A short
     // line begun with the name is answered as it is.
+    // Whether its words, before any are asked as the name, are the name
+    // alone ("Hey Lamp"), not "Hey Lamp, no.", nor one word asked as it.
+    let only_the_name = name_alone(&text);
     let (text, called) = match name_waits {
         true if !name_first(&text) && past_a_greeting(&text).len() <= 1 => {
             (CALLED_WORDS.to_owned(), true)
@@ -9292,14 +9295,15 @@ async fn spoken(
     }
     let empty = text.trim().is_empty();
     // A line of no words, even one asked as the name ("Lamp."), or one that
-    // was only the lamp's name (`called`, as the model is told below:
-    // "Hey Lamp"): the lamp's answer to it is no answer of a new request's
+    // was a call of the lamp's name alone (`called` and `only_the_name`:
+    // "Hey Lamp", never "Hey Lamp, no.", whose decline drops the write, nor
+    // a lone "No." asked as the name): the lamp's answer to it is no answer of a new request's
     // to a waiting write's read-back (`services::answered_in_place`), so
     // the yes after it still sends (lamp-9adf, 14 Nov: "Hey Lamp" between
     // an event's read-back and its "Yes." was answered as a call, and the
     // yes found the event dropped, #6363). Not one said by the name just
     // before, whose words go with it.
-    if empty || ((heard_none || called) && name_of.is_none()) {
+    if empty || ((heard_none || (called && only_the_name)) && name_of.is_none()) {
         crate::services::answered_in_place(request);
     }
     // Only the lamp's name, or said by it (`LAMP_SECOND_NAME_CARRIES`): it
