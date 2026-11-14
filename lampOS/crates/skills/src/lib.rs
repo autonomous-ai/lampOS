@@ -700,6 +700,10 @@ struct TriggerFile {
     gap: Option<String>,
     rearm: Option<RearmFile>,
     cooldown: Option<String>,
+    /// Its `cooldown` and `rearm` follow the character's energy level
+    /// (`lamp_body::energy::GESTURE`, #6893): level 1 as written.
+    #[serde(default)]
+    lively: bool,
     /// A chance held back by a `[[while]]` condition waits this long, while
     /// the trigger still holds, for the conditions to hold.
     wait: Option<String>,
@@ -2526,6 +2530,9 @@ pub struct Trigger {
     /// And, with a line, only after its field stayed past it for a while.
     pub rearm_line: Option<Rearm>,
     pub cooldown_us: u64,
+    /// Its cooldown and rearm follow the energy level ([`Engine::set_energy`],
+    /// #6893); level 1, these as written.
+    pub lively: bool,
     /// How long a chance held back by a `[[while]]` condition is kept, while
     /// the trigger still holds, and taken the moment the conditions hold:
     /// someone talking when the moment comes, and the lamp acts once the
@@ -3493,6 +3500,7 @@ fn trigger(file: TriggerFile) -> Result<Trigger, String> {
         rearm,
         rearm_line,
         cooldown_us: optional(&file.cooldown)?,
+        lively: file.lively,
         wait_us,
         rise,
         during,
@@ -6341,6 +6349,8 @@ pub struct Engine {
     holds: Option<holds::Keeper>,
     /// The holds read at the start, taken back at the first load of skills.
     restoring: Option<holds::Restored>,
+    /// The character's energy level ([`Engine::set_energy`], #6893).
+    energy: u8,
 }
 
 /// What a write skill's start spent, as it was before (#6066): what
@@ -6562,7 +6572,15 @@ impl Engine {
             picked: std::sync::Mutex::default(),
             holds: None,
             restoring: None,
+            energy: 0,
         }
+    }
+
+    /// The character's energy level (`character/energy`, read under
+    /// `LAMP_BODY_ENERGY=on`, #6893): a `lively` trigger's cooldown and
+    /// rearm follow it (`lamp_body::energy::GESTURE`); 0 or 1, as written.
+    pub fn set_energy(&mut self, level: u8) {
+        self.energy = level;
     }
 
     /// A `[[while]]` with `through` carries its clock through a spell of
@@ -8199,6 +8217,17 @@ impl Engine {
             // it is judged at this message.
             let mut instead: Option<&String> = None;
             for (index, trigger) in skill.triggers.iter().enumerate() {
+                // A `lively` trigger's cooldown and rearm at the energy
+                // level (#6893); every other trigger's, and level 1, as written.
+                let (rearm, cooldown_us) = if trigger.lively {
+                    (
+                        lamp_body::energy::lively_rearm(trigger.rearm, self.energy),
+                        lamp_body::energy::lively_cooldown_us(trigger.cooldown_us, self.energy),
+                    )
+                } else {
+                    (trigger.rearm, trigger.cooldown_us)
+                };
+                let rearm_line = trigger.rearm_line.as_ref().filter(|_| rearm);
                 if let Some(other) = instead.take()
                     && let Some(at) = skill
                         .triggers
@@ -8361,7 +8390,7 @@ impl Engine {
                     rose = watch.readings.rose(reading, now_us, rise);
                 }
                 watch.unknown_us = None;
-                if let Some(line) = &trigger.rearm_line {
+                if let Some(line) = rearm_line {
                     if !line.test.holds(&value) {
                         watch.past_line_us = None;
                     } else if now_us - *watch.past_line_us.get_or_insert(now_us) >= line.for_us {
@@ -8451,31 +8480,33 @@ impl Engine {
                 watch.visited_us = Some(now_us);
                 // Once each time it holds: a chance held back now waits for
                 // the next time.
-                let once = trigger.when == When::Appears || trigger.rearm;
+                let once = trigger.when == When::Appears || rearm;
                 if (once || watch.unwritten) && watch.spent {
                     continue;
                 }
-                if watch.disarmed {
-                    if let Some(line) = &trigger.rearm_line {
-                        dropped(
-                            &mut self.dropped,
-                            watch,
-                            &skill.name,
-                            "rearm",
-                            now_us,
-                            || {
-                                format!(
-                                    "not rearmed: {} for {} s first",
-                                    line.test.shows(),
-                                    line.for_us / 1_000_000
-                                )
-                            },
-                        );
-                    }
+                // A level that keeps no rearm takes the chance though an
+                // earlier level disarmed it.
+                if watch.disarmed
+                    && let Some(line) = rearm_line
+                {
+                    dropped(
+                        &mut self.dropped,
+                        watch,
+                        &skill.name,
+                        "rearm",
+                        now_us,
+                        || {
+                            format!(
+                                "not rearmed: {} for {} s first",
+                                line.test.shows(),
+                                line.for_us / 1_000_000
+                            )
+                        },
+                    );
                     continue;
                 }
                 watch.spent = once;
-                if trigger.rearm_line.is_some() {
+                if rearm_line.is_some() {
                     watch.disarmed = true;
                     watch.past_line_us = None;
                 }
@@ -8497,11 +8528,8 @@ impl Engine {
                     );
                     continue;
                 }
-                if let Some(ran) = watch
-                    .ran_us
-                    .filter(|ran| now_us - ran < trigger.cooldown_us)
-                {
-                    let rest = trigger.cooldown_us - (now_us - ran);
+                if let Some(ran) = watch.ran_us.filter(|ran| now_us - ran < cooldown_us) {
+                    let rest = cooldown_us - (now_us - ran);
                     dropped(
                         &mut self.dropped,
                         watch,
@@ -10088,7 +10116,7 @@ pub fn replay_with(
     tools: &[ToolCall],
     clock: Option<&str>,
 ) -> Result<Vec<Made>, String> {
-    replay_skill(load_with(dir, false)?, recording, tools, clock)
+    replay_skill(load_with(dir, false)?, recording, tools, clock, 1)
 }
 
 /// [`replay_with`] of a skill already loaded: a case with `present = true`
@@ -10100,6 +10128,7 @@ fn replay_skill(
     recording: &Path,
     tools: &[ToolCall],
     clock: Option<&str>,
+    energy: u8,
 ) -> Result<Vec<Made>, String> {
     skill.enabled = true;
     // A name the skill's tool is not, nor its `[stop]` function's, would
@@ -10117,6 +10146,7 @@ fn replay_skill(
         ));
     }
     let mut engine = Engine::new(vec![skill], true);
+    engine.set_energy(energy);
     let messages = read_recordings(recording)?;
     let first_us = messages.first().map_or(0, |message| message.header.at_us);
     // On a real date (1 January 2026, UTC), since a trigger's `during`
@@ -10401,6 +10431,12 @@ fn matches(expected: &ExpectedCall, made: &Made) -> Result<bool, String> {
 /// says `none = true`. How many passed and how many have no recording yet,
 /// or the first that did not pass.
 pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
+    run_tests_at(dir, 1)
+}
+
+/// [`run_tests`] with the character's energy level set (#6893): a `lively`
+/// trigger's cooldown and rearm follow it. A watch is replayed as ever.
+pub fn run_tests_at(dir: &Path, energy: u8) -> Result<(usize, usize), String> {
     let watches = load_with(dir, false)?.watch.is_some();
     let mut cases: Vec<PathBuf> = fs::read_dir(dir.join("tests"))
         .map_err(|error| format!("tests/: {error}"))?
@@ -10445,6 +10481,7 @@ pub fn run_tests(dir: &Path) -> Result<(usize, usize), String> {
                 case,
                 &expect.call_tool,
                 expect.clock.as_deref(),
+                energy,
             )?
         };
         let names: Vec<_> = made

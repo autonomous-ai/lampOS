@@ -147,6 +147,10 @@ struct May {
     /// A skill made on this lamp (`made: here`, `lamp_skills::usage::made_by`):
     /// its say is asked `made`, quoted with no functions (#6062).
     made: bool,
+    /// A skill with a `lively` trigger above energy level 1 (#6893): its
+    /// gestures and moves say `"lively": true`, so the body drops them while
+    /// lamp-control holds it.
+    lively: bool,
 }
 
 impl May {
@@ -982,6 +986,11 @@ fn serve(
         (None, None)
     };
     let mut engine = Engine::new(Vec::new(), skip_ask);
+    // The character's energy level, read as the body reads it, under its
+    // switch (`LAMP_BODY_ENERGY=on`, #6893): a `lively` trigger's cooldown
+    // and rearm follow it. Off, level 1: as written.
+    let mut energy = lamp_body::energy_in::enabled_from_environment()
+        .then(|| lamp_body::energy_in::EnergyIn::on(bus.clone()));
     // A sound heard as no words is slept through, only with
     // LAMP_REST_THROUGH_SOUNDS=on (#1672).
     if watch::switched_on(
@@ -1158,6 +1167,8 @@ fn serve(
         permissions: RefCell::new(HashMap::new()),
         unplug: RefCell::default(),
         made: RefCell::default(),
+        lively: RefCell::default(),
+        energy: Cell::new(1),
         tasks: RefCell::new(Tasks {
             of: HashMap::new(),
             state: options.state.clone(),
@@ -1410,6 +1421,11 @@ fn serve(
                     .map(|skill| (skill.name.clone(), skill.permissions.clone()))
                     .collect();
                 *runner.made.borrow_mut() = made_here(&skills, dir);
+                *runner.lively.borrow_mut() = skills
+                    .iter()
+                    .filter(|skill| skill.triggers.iter().any(|trigger| trigger.lively))
+                    .map(|skill| skill.name.clone())
+                    .collect();
                 // A pushed skill's folder is the developer folder's. A fixed
                 // write's too, when it runs through the lamp's agent.
                 let writes_handed = lamp_skills::service_write::agent();
@@ -1560,6 +1576,11 @@ fn serve(
                     eprintln!("lamp-skills: night sleep's claim not said: {error}");
                 }
             }
+        }
+        if let Some(energy) = energy.as_mut() {
+            let level = energy.level();
+            engine.set_energy(level);
+            runner.energy.set(level);
         }
         let made = engine.clock_tick(now_us);
         say_dropped(&mut engine);
@@ -1900,6 +1921,10 @@ struct Runner {
     /// The skills made on this lamp, as of the last load (#6062): their
     /// says are asked quoted, with no functions ([`say_ask`]).
     made: RefCell<HashSet<String>>,
+    /// The skills with a `lively` trigger, as of the last load, and the
+    /// energy level last read (#6893, `LAMP_BODY_ENERGY=on`; else 1).
+    lively: RefCell<HashSet<String>>,
+    energy: Cell<u8>,
     /// The skills with a `do.task` (#6305), as of the last load, and where
     /// their tasks are handed over.
     tasks: RefCell<Tasks>,
@@ -2503,6 +2528,7 @@ impl Runner {
                 .unwrap_or_default(),
             unplug: self.unplug.borrow().get(skill).cloned(),
             made: self.made.borrow().contains(skill),
+            lively: self.energy.get() > 1 && self.lively.borrow().contains(skill),
         };
         sockets
     }
@@ -5652,6 +5678,15 @@ impl lamp_skills::service_read::Room for LampRoom {
     }
 }
 
+/// A body ask marked `"lively": true` for a lively skill's run above energy
+/// level 1 (#6893); any other, as it was.
+fn lively(mut ask: serde_json::Value, may: &May) -> serde_json::Value {
+    if may.lively {
+        ask["lively"] = json!(true);
+    }
+    ask
+}
+
 /// Makes one call and says how it went. A gesture or a move says it is
 /// `asker`'s, a skill's name, with `LAMP_BODY_REQUESTS=on` (#940).
 fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> String {
@@ -5681,12 +5716,12 @@ fn make(call: &Call, sockets: &Sockets, bus: &Bus, asker: Option<&str>) -> Strin
         ),
         Call::Gesture(name) => tell(
             &format!("gesture {name}"),
-            body_ask(json!({ "gesture": name }), asker),
+            body_ask(lively(json!({ "gesture": name }), &sockets.may), asker),
             &sockets.mood,
         ),
         Call::Move(clip) => tell(
             &format!("move {}", clip.name),
-            body_ask(json!({ "move": clip }), asker),
+            body_ask(lively(json!({ "move": clip }), &sockets.may), asker),
             &sockets.mood,
         ),
         Call::Light {
@@ -6288,6 +6323,7 @@ mod tests {
                 permissions,
                 unplug: Some(unplug_lines()),
                 made: false,
+                lively: false,
             },
         }
     }
@@ -6849,6 +6885,8 @@ mod tests {
             looks: RefCell::default(),
             unplug: RefCell::default(),
             made: RefCell::default(),
+            lively: RefCell::default(),
+            energy: Cell::new(1),
             tasks: RefCell::default(),
             local_time: None,
             trust_clock: false,
@@ -6999,6 +7037,40 @@ mod tests {
             refused.contains("not in [permissions] actions"),
             "{refused}"
         );
+    }
+
+    /// A lively skill's run above energy level 1 (#6893) marks its gestures
+    /// and moves `"lively": true`, for the body to drop under lamp-control's
+    /// lease; any other run's are sent exactly as before.
+    #[test]
+    fn a_lively_runs_body_asks_say_so_and_any_other_is_as_before() {
+        let dir = tempfile::tempdir().unwrap();
+        let bus = Bus::new(dir.path().join("bus")).unwrap();
+        let mut sockets = nowhere(
+            dir.path(),
+            Permissions {
+                body: true,
+                ..Permissions::default()
+            },
+        );
+        let body = UnixDatagram::bind(&sockets.mood).unwrap();
+        let mut sent = |lively: bool| {
+            sockets.may.lively = lively;
+            make(
+                &Call::Gesture("nod".into()),
+                &sockets,
+                &bus,
+                Some("music-sway"),
+            );
+            let mut datagram = [0u8; 256];
+            let length = body.recv(&mut datagram).unwrap();
+            serde_json::from_slice::<serde_json::Value>(&datagram[..length]).unwrap()
+        };
+        assert_eq!(
+            sent(false),
+            json!({"gesture": "nod", "source": "skill:music-sway", "priority": "skill"})
+        );
+        assert_eq!(sent(true)["lively"], json!(true));
     }
 
     /// A step the skill may not make is not sent, and not counted as made:
@@ -7256,6 +7328,8 @@ mod tests {
                     ends: RefCell::default(),
                     unplug: RefCell::default(),
                     made: RefCell::default(),
+                    lively: RefCell::default(),
+                    energy: Cell::new(1),
                     tasks: RefCell::default(),
                     local_time: None,
                     trust_clock: false,
@@ -7337,6 +7411,8 @@ mod tests {
             ends: RefCell::default(),
             unplug: RefCell::default(),
             made: RefCell::default(),
+            lively: RefCell::default(),
+            energy: Cell::new(1),
             tasks: RefCell::default(),
             local_time: None,
             trust_clock: false,

@@ -3258,6 +3258,7 @@ fn gesture_run_full(
                 asleep: false,
                 woken: false,
                 replace: false,
+                lively: false,
                 energy: 0,
             }
         },
@@ -3390,6 +3391,7 @@ fn expression_run_with(
             asleep: false,
             woken: false,
             replace: false,
+            lively: false,
             energy: 0,
         },
         |glimpse| seen.push((seen_at.get(), glimpse.goals)),
@@ -3563,6 +3565,7 @@ fn speaking_run_with(
             asleep: false,
             woken: false,
             replace: false,
+            lively: false,
             energy: 0,
         },
         |glimpse| seen.push((seen_at.get(), *glimpse)),
@@ -4279,6 +4282,7 @@ fn rest_glances_watched(
             asleep: false,
             woken: false,
             replace: false,
+            lively: false,
             energy: 0,
         },
         |glimpse| {
@@ -5358,6 +5362,7 @@ fn a_lamp_is_not_stood_up_farther_back_than_v1s_line() {
             asleep: false,
             woken: false,
             replace: false,
+            lively: false,
             energy: 0,
         },
         |glimpse| steps.push((glimpse.goals, glimpse.arm_goals, glimpse.stand)),
@@ -5432,6 +5437,7 @@ fn a_gesture_waits_for_a_lamp_that_is_rising_and_is_forgotten_by_one_that_is_not
             asleep: false,
             woken: false,
             replace: false,
+            lively: false,
             energy: 0,
         },
         |_| {},
@@ -5524,6 +5530,7 @@ fn the_heads_pitch_is_never_asked_under_its_floor_whatever_adds_up() {
                 asleep: false,
                 woken: false,
                 replace: false,
+                lively: false,
                 energy: 0,
             }
         },
@@ -5955,6 +5962,7 @@ fn it_stands_up_for_somebody_in_front_of_it_and_stays_up_while_they_are_there() 
                     asleep: false,
                     woken: false,
                     replace: false,
+                    lively: false,
                     energy: 0,
                 }
             },
@@ -6042,6 +6050,7 @@ fn paused_with_somebody_still_in_front_of_it_a_standing_lamp_folds() {
                 asleep: false,
                 woken: false,
                 replace: false,
+                lively: false,
                 energy: 0,
             }
         },
@@ -6134,6 +6143,7 @@ fn put_to_sleep_by_the_head_with_somebody_in_front_of_it_a_standing_lamp_folds_n
                 night_woke: false,
                 aim_from_home: false,
                 replace: false,
+                lively: false,
                 energy: 0,
             }
         },
@@ -9129,6 +9139,7 @@ fn called_run(
                 asleep: false,
                 woken: false,
                 replace: false,
+                lively: false,
                 energy: 0,
             }
         },
@@ -17704,6 +17715,7 @@ fn replace_run_in(
                 let asked = Asked {
                     gesture: Some(*clip),
                     replace: replace.is_some(),
+                    lively: false,
                     ..Asked::default()
                 };
                 let told = (asked, *by, replace.and_then(Source::new));
@@ -18756,4 +18768,38 @@ fn a_gestures_roll_at_level_five_plays_under_the_servos_speed() {
         .max()
         .unwrap();
     assert!(fastest <= 21, "{fastest}");
+}
+
+/// A gesture only an energy level above 1 starts of itself (`lively`, the
+/// voice's fill, a lively skill's run, #6893) is dropped while lamp-control
+/// holds the body; the same nod not marked plays under the lease, as today.
+#[test]
+fn a_lively_gesture_is_dropped_under_the_lease_and_a_plain_one_plays() {
+    for lively in [true, false] {
+        let mut asked = false;
+        let (report, fates, _) = skill_run(
+            14,
+            standing(100, 5),
+            gesture_limits(),
+            |_| {},
+            // Spoken to, it stands; the lease never stands it up itself.
+            || Some((Mood::Speaking, 60)),
+            move |now| {
+                let due = !asked && now >= Duration::from_secs(8);
+                asked |= due;
+                Asked {
+                    held: true,
+                    lively: due && lively,
+                    gesture: due.then_some(&crate::clips::NOD),
+                    ..Asked::default()
+                }
+            },
+        );
+        if lively {
+            assert_eq!(report.gestures, 0, "{report:?}");
+            assert_eq!(fates, [("nod", "dropped: lamp-control holds it")]);
+        } else {
+            assert_eq!(report.gestures, 1, "{report:?} {fates:?}");
+        }
+    }
 }

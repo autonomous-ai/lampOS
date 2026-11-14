@@ -6895,7 +6895,14 @@ fn conversation_with_gate_inner(
     let news_by_skill = crate::task_news::by_skill();
     let mut reminder_held: Option<(String, u64)> = None;
     let mut news_held: Option<(String, u64)> = None;
-    let mut gesture_cue = crate::body_link::Cue::default();
+    let mut gesture_cue = crate::body_link::Cue::seeded(monotonic_us());
+    // The character's energy level, read as the body reads it, under its
+    // switch (`LAMP_BODY_ENERGY=on`, #6893): above 1 an answer with no
+    // gesture of its own may get a small fill. Off, level 1: as before.
+    let mut energy = lamp_body::energy_in::enabled_from_environment()
+        .then(|| lamp_bus::Bus::from_environment().ok())
+        .flatten()
+        .map(lamp_body::energy_in::EnergyIn::on);
     leases.keep(rig, owner, &mut stalls)?;
     // What the voice is doing, heard and said, for whoever listens on the
     // lamp's bus. Nothing here waits for a listener.
@@ -9277,20 +9284,27 @@ fn conversation_with_gate_inner(
                     // The lamp's own words, as its answer begins: a nod
                     // with a yes, a shake with a no, when it has a body.
                     // Held words are not its own yet.
+                    gesture_cue.level = energy.as_mut().map_or(1, |energy| energy.level());
                     if !held
                         && let (Some(turn), Some(body)) = (request, body_link.as_mut())
-                        && let Some(gesture) = gesture_cue.heard(turn, &text, finished)
+                        && let Some((gesture, lively)) =
+                            gesture_cue.heard_lively(turn, &text, finished, monotonic_us())
                     {
-                        body.gesture(gesture);
+                        if lively {
+                            body.lively_gesture(gesture);
+                        } else {
+                            body.gesture(gesture);
+                        }
                         // The face's accent with the move (#940).
                         if let Some(choreography) = choreography.as_mut() {
                             choreography
                                 .set_accent(crate::ring_face::accent_code(gesture), monotonic_us());
                         }
-                        record(
-                            trace,
-                            json!({"kind":"body_gesture_asked","turn":turn,"gesture":gesture,"at_us":monotonic_us()}),
-                        )?;
+                        let mut asked = json!({"kind":"body_gesture_asked","turn":turn,"gesture":gesture,"at_us":monotonic_us()});
+                        if lively {
+                            asked["lively"] = json!(true);
+                        }
+                        record(trace, asked)?;
                     }
                     record(
                         trace,
@@ -11552,10 +11566,16 @@ fn conversation_with_gate_inner(
                             if let Some(bus) = bus_out.as_mut() {
                                 bus.said(turn, &text, finished, monotonic_us());
                             }
+                            gesture_cue.level = energy.as_mut().map_or(1, |energy| energy.level());
                             if let Some(body) = body_link.as_mut()
-                                && let Some(gesture) = gesture_cue.heard(turn, &text, finished)
+                                && let Some((gesture, lively)) =
+                                    gesture_cue.heard_lively(turn, &text, finished, monotonic_us())
                             {
-                                body.gesture(gesture);
+                                if lively {
+                                    body.lively_gesture(gesture);
+                                } else {
+                                    body.gesture(gesture);
+                                }
                                 // The face's accent with the move (#940).
                                 if let Some(choreography) = choreography.as_mut() {
                                     choreography.set_accent(
@@ -11563,10 +11583,11 @@ fn conversation_with_gate_inner(
                                         monotonic_us(),
                                     );
                                 }
-                                record(
-                                    trace,
-                                    json!({"kind":"body_gesture_asked","turn":turn,"gesture":gesture,"at_us":monotonic_us()}),
-                                )?;
+                                let mut asked = json!({"kind":"body_gesture_asked","turn":turn,"gesture":gesture,"at_us":monotonic_us()});
+                                if lively {
+                                    asked["lively"] = json!(true);
+                                }
+                                record(trace, asked)?;
                             }
                         }
                         // An answer that opened with nothing said ends

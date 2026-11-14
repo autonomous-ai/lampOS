@@ -1070,7 +1070,28 @@ while it speaks (`energy.rs` `TABLE`):
   lamp is given way to; a strain sits it down as ever, and V1's anti-tip rule cuts any lean back past
   its line (on the host, a stand at the line keeps the arm where level 1 has it).
 
-How often gestures play per level lives outside the body.
+How often clips start of themselves per level is `energy.rs` `GESTURE`, read under the same switch by
+the voice, Expression and lamp-skills (each with `energy_in::EnergyIn`, the body's reader):
+
+| level | fill (answers with no cue) | fill gap, s | pause nod gap, s | `lively` cooldown | rearm |
+|---|---|---|---|---|---|
+| 1 | none | - | the catalogue's (4) | as written (music sway 30 min) | as written |
+| 2 | 10% | 60 | 3.75 | 20 min | as written |
+| 3 | 20% | 45 | 3.5 | 15 min | as written |
+| 4 | 30% | 30 | 3.25 | 10 min | none |
+| 5 | 40% | 20 | 3 | 6 min | none |
+
+- **Fill.** The voice (`body_link::Cue::heard_lively`): an answer whose opening `cue_for` gives no
+  gesture gets a nod, an acknowledge or a curious at the level's share, never within the gap of the
+  last fill and never the last fill again. A matched cue is sent as before at every level.
+- **Pause nod.** Expression's pause clip waits `pause_cooldown_us`: the catalogue's cooldown at level 1,
+  else the level's gap, never longer than the catalogue's and never under 3 s.
+- **Music.** A skill trigger with `lively = true` (Music sway, [skills.md](skills.md)): its cooldown at
+  most the level's, never longer than written; from level 4 its rearm is dropped.
+- **Under lamp-control's lease.** A fill, and a lively skill's gesture or move above level 1, say
+  `"lively": true` on the mood socket (`Asked::lively`): the body drops it while lamp-control holds it
+  (`dropped: lamp-control holds it`). Every other gesture is taken under the lease as before, so level 1
+  is today exactly.
 
 ### A stand asked by voice
 
@@ -1706,7 +1727,8 @@ first words of what the lamp itself says (`crates/voice/src/body_link.rs`,
 `cue_for`): a nod with "yes", "sure", "of course", "okay"; a shake with "no",
 "nope", "I don't think"; a greeting with "hello", "hi", "good morning"; a
 laugh with "haha"; the shy dip with "thank you". Most answers begin with
-none of these and get no gesture. "No problem" and "no worries" get none.
+none of these and get no gesture (above energy level 1, a small fill:
+"How lively it moves" above). "No problem" and "no worries" get none.
 The same in Vietnamese: a nod with "ừ", "dạ", "vâng", "đúng rồi", "có chứ";
 a shake with "không", "chưa"; a greeting with "chào", "xin chào"; a laugh
 with "hihi"; the shy dip with "cảm ơn"; none for "không sao" and "không có
