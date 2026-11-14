@@ -1845,6 +1845,22 @@ The gestures need the servos' own speed bound out of the way:
 `--servo-speed 1000`. The shoulder's and the elbow's are written as 800 or
 more for a lamp that stands.
 
+### Energy: gestures under the servo's speed, an S-curve follower (`LAMP_BODY_ENERGY=on`, #6893)
+
+Off unless exactly `on`, set in no unit; off, nothing here changes. Not yet run on a lamp. On (`Limits::energy`):
+
+- **A gesture's step never outruns the servo.** Each step from one frame to the next whose
+  biggest joint move would go faster than `--servo-speed` counts a second (the servo's own goal
+  speed, 1,000 in the product unit) is stretched to take `largest move / --servo-speed`; a step
+  under it keeps its time (V1's stretch, `Clip::at_within`, `Clip::duration_within_us`). The
+  1,300 counts a second a clip may ask of head roll above is the one that does: played under the
+  servo instead of lagging and snapping. The lamp stays up for the stretched length.
+- **The pose follower's acceleration slews.** The critically damped follower ("What moves it")
+  still pulls at most `acceleration` (six times `--speed`), but its pull changes by at most six
+  times that a second (`follow_step`, `JERK`), an S-curve in place of a step; a joint at rest
+  starts from none, and one held at `--speed` eases its pull off. The `--speed` cap itself
+  still cuts sharply.
+
 ### Moves from files
 
 With `--moves DIR` (#940, [skills.md](skills.md)) the body also reads the
