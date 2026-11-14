@@ -602,8 +602,10 @@ pub enum Reexec {
 /// process was started in place for already ([`REEXECED`]).
 pub fn reexec(root: &Path, self_exe: &Path, records: &Path, marker: Option<&str>) -> Reexec {
     // Both resolved: the link's target, and the file this process runs.
+    // A binary removed since it started (its build folder cleaned away)
+    // does not resolve: Linux reads it as `<path> (deleted)`, another file.
     let (Ok(running), Ok(wanted)) = (
-        self_exe.canonicalize(),
+        self_exe.canonicalize().or_else(|_| fs::read_link(self_exe)),
         on_root(root, CURRENT).join(BINARY).canonicalize(),
     ) else {
         return Reexec::Same;
@@ -722,5 +724,17 @@ mod tests {
         fs::write(other.join(BINARY), "x").unwrap();
         std::os::unix::fs::symlink("not-a-build", &link).unwrap();
         assert_eq!(reexec(root.path(), &exe, &records, None), Reexec::Same);
+    }
+
+    #[test]
+    fn a_serve_whose_own_binary_was_removed_still_goes_to_current() {
+        // The old build's folder cleaned away while it served: its
+        // /proc/self/exe no longer resolves.
+        let (root, exe, records) = lamp(B, A);
+        fs::remove_dir_all(on_root(root.path(), FOLDER).join(A)).unwrap();
+        assert!(matches!(
+            reexec(root.path(), &exe, &records, None),
+            Reexec::To { build, .. } if build == B
+        ));
     }
 }
