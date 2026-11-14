@@ -148,7 +148,7 @@ dịch vụ.
 | `LAMP_SKILL_WRITES=on` (#6066; bật trong bốn unit của sản phẩm từ 11/11) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không ghi vào dịch vụ nào: kỹ năng có bước `write` hay quyền `"write"` không được nạp, `lamp-services` từ chối `skill_write` và `skill_write_approve`, và giọng nói không tạo kỹ năng như vậy ("I can't do that yet: sending or writing on its own") cũng không nhận lời đồng ý ("Một kỹ năng tự tạo ghi vào dịch vụ", bên dưới) |
 | `LAMP_SKILL_READS=on` (bật trong bốn unit của sản phẩm) | `lamp-services`, `lamp-skills` (và helper `lamp-skills-manage@` của nó) và `lamp-voice` | Kỹ năng tự tạo không chạm đến dịch vụ nào: `lamp-services` từ chối `lamp-skills` trên socket tools của nó, bước `read` của một kỹ năng không làm gì lúc chạy ("not made: LAMP_SKILL_READS is not on"), và mô hình tạo kỹ năng được dặn trả lời `cannot:` cho một yêu cầu tạo kỹ năng nêu một dịch vụ ("Một kỹ năng tự tạo đọc dịch vụ", bên dưới) |
 | `LAMP_SKILL_TASKS=on` (#6432; bật trong các unit của sản phẩm) | `lamp-services`, `lamp-control` (và `lamp-tasks`, nơi chạy việc) và `lamp-voice` | Một lượt chạy của kỹ năng không chạm đến dịch vụ nào: lamp-control trả lời `service.read` và `service.write` bằng `off`, `lamp-services` từ chối cgroup `lamp-control.service` trên socket tools của nó và lệnh `run_write_waiting` của giọng nói, và giọng nói không đọc lại lần ghi nào của lượt chạy ("Lượt chạy của một kỹ năng trên Hermes của đèn", bên dưới) |
-| `LAMP_SERVICE_READ_IDS_KEPT=on` (dòng C132 của bảng theo dõi; tắt trong mọi unit của sản phẩm) | tuyến thứ hai của `lamp-voice`, với `LAMP_SERVICES=on` | Một lần đọc lịch không giữ gì: dời hay huỷ một sự kiện từ cuộc nói chuyện trước sẽ đọc trong mỗi yêu cầu và bị quy tắc sau khi đọc từ chối ở đó ("Sau một lần đọc", bên dưới) |
+| `LAMP_SERVICE_READ_IDS_KEPT=on` (dòng C132 của bảng theo dõi; bật trong unit lamp-voice của sản phẩm, cùng #6410) | tuyến thứ hai của `lamp-voice`, với `LAMP_SERVICES=on` | Một lần đọc lịch không giữ gì: dời hay huỷ một sự kiện từ cuộc nói chuyện trước sẽ đọc trong mỗi yêu cầu và bị quy tắc sau khi đọc từ chối ở đó ("Sau một lần đọc", bên dưới) |
 
 Một lần ghi, và một lần đọc được nói đầy đủ, còn cần khuôn mặt của chủ đèn
 được thấy đang nói câu đó, nên cần `LAMP_SECOND_SPEAKING_FACE=on` và
@@ -1780,8 +1780,9 @@ bị bỏ cùng `says_send`), và nó được lưu, không bao giờ được g
   của phiên Live đó, mà mô hình giữ đến hết phiên; chỉ luồng hội thoại và
   những gì dựng từ nó là không có nó.
 - **Mã sự kiện của một lần đọc lịch, giữ cho yêu cầu kế tiếp
-  (`LAMP_SERVICE_READ_IDS_KEPT`, tắt trừ khi bật; tắt trong sản phẩm cho
-  đến khi qua kiểm tra trên đèn; dòng C132 của bảng theo dõi).** Trên
+  (`LAMP_SERVICE_READ_IDS_KEPT`, tắt trừ khi bật; bật trong sản phẩm từ
+  khi qua kiểm tra trên đèn, lần huỷ 2/2 của Fourteen trên #6410; dòng C132
+  của bảng theo dõi).** Trên
   lamp-06c1 ngày 12/11 (dòng X1) một sự kiện tạo từ cuộc nói chuyện trước
   không huỷ được: mô hình không có `event_id`, nên đọc trước; quy tắc ở trên
   từ chối lệnh ghi trong yêu cầu đó, và yêu cầu sau lại đọc lần nữa và lại
