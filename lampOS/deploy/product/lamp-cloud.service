@@ -78,6 +78,9 @@ Environment=LAMP_SKILLS_SHARE=on
 # go up as unasked news (visit times and lengths, never a name, picture or sound; kept 90 days for the owner).
 # LAMP_MESSAGES stays off: no app texts onto chat/in, no text turns. Shown on lamp-9adf, 7 Nov 15:33-15:42.
 Environment=LAMP_SKILL_MESSAGES=on
+# Guard mode on and off from the owner's app (#2562, #6855): guard.on and guard.off on the lamp's own account
+# channel, handed to lamp-skills' call socket (/run/lampos-skills, below); the same line in lamp-skills.service.
+Environment=LAMP_GUARD_FROM_APP=on
 # A skill added from a file in the app, on a spoken yes (#5080): skills.upload, the file fetched from the backend
 # and handed to lamp-voice's app-make socket, the same line there.
 Environment=LAMP_SKILL_UPLOAD=on

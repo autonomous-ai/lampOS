@@ -7932,8 +7932,9 @@ fn the_product_runs_who_was_heres_reads_with_times_only() {
 
 /// Guard mode, an installable skill from the Store (#5752, #1685): the
 /// product carries its texts with skills' lines alone and describes its
-/// tool off first, and opens nothing more of it. Texts from the app, names,
-/// arrivals by sound and turning it on from the app stay off.
+/// tool off first. Turning it on from the app is on in both units and
+/// names on a yes in lamp-skills (#6855); texts from the app and arrivals
+/// by sound stay off.
 #[test]
 fn the_product_carries_guard_modes_texts_alone_and_its_off_first_words() {
     let unit = |name: &str| {
@@ -7954,13 +7955,18 @@ fn the_product_carries_guard_modes_texts_alone_and_its_off_first_words() {
         skills.contains(&"Environment=LAMP_GUARD_WORDS_V2=on"),
         "the skills lack LAMP_GUARD_WORDS_V2=on"
     );
+    for (name, lines) in [("cloud", &cloud), ("skills", &skills)] {
+        assert!(
+            lines.contains(&"Environment=LAMP_GUARD_FROM_APP=on"),
+            "the {name} lack LAMP_GUARD_FROM_APP=on"
+        );
+    }
+    assert!(
+        skills.contains(&"Environment=LAMP_GUARD_NAMES=on"),
+        "the skills lack LAMP_GUARD_NAMES=on"
+    );
     for line in cloud.iter().chain(&skills) {
-        for closed in [
-            "LAMP_MESSAGES=",
-            "LAMP_GUARD_NAMES=",
-            "LAMP_GUARD_SOUNDS=",
-            "LAMP_GUARD_FROM_APP=",
-        ] {
+        for closed in ["LAMP_MESSAGES=", "LAMP_GUARD_SOUNDS="] {
             assert!(!line.contains(&format!("Environment={closed}")), "{line}");
         }
     }
