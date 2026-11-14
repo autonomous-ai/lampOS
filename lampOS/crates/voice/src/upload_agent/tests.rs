@@ -478,7 +478,8 @@ fn photobooth_with_names() -> String {
 /// `LAMP_SKILL_SECRETS`: the file's variables' names (never a value) are
 /// its `skill.toml`'s `secrets`, said to the app with the upload, the
 /// tool's note says a key is never taken by voice, and the cap holds them.
-/// Off, no name is read and the file is as before.
+/// Off, a file naming one is refused in plain words, never a name or
+/// value in the refusal, and a file naming none is as before.
 #[test]
 fn with_the_keys_switch_a_files_variables_are_its_secrets_by_name() {
     switches(true, true);
@@ -524,9 +525,12 @@ fn with_the_keys_switch_a_files_variables_are_its_secrets_by_name() {
         );
         assert!(capped(&toml).is_err(), "{bad}");
     }
-    // Off: no names read, the toml as before.
+    // Off: a file naming a key is refused plainly; one naming none is as before.
     set_secrets_here(Some(false));
-    let (off, _) = super::files(&photobooth_with_names()).unwrap();
+    let why = super::files(&photobooth_with_names()).unwrap_err().0;
+    assert_eq!(why, NEEDS_SECRETS);
+    assert!(!why.contains("GEMINI_API_KEY"), "{why}");
+    let (off, _) = super::files(&photobooth()).unwrap();
     assert!(!off.toml.contains("secrets"));
     assert!(!off.card.contains("by voice"));
     let _ = std::fs::remove_dir_all(&root);

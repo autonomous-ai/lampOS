@@ -50,7 +50,8 @@
 //!   environment file, read once; the refusal says to take the value out
 //!   and add it in the app ([`HAS_SECRET_VALUE`]), and the tool's note and
 //!   its call say a key is never taken by voice ([`NEVER_BY_VOICE`],
-//!   [`keys_missing`]).
+//!   [`keys_missing`]). Off, a file naming one is refused in plain words
+//!   ([`NEEDS_SECRETS`]), since its run could never be given it.
 use crate::made_skill::{self, Files, Keeping, Made, Refused};
 use serde_json::Value;
 use std::path::Path;
@@ -88,6 +89,12 @@ pub const HAS_SECRET: &str = "it carries what looks like a key or a token; a ski
 pub const HAS_SECRET_VALUE: &str = "its SKILL.md carries a key or token itself: take the value \
                                     out of the file (leave its name, like GEMINI_API_KEY) and add \
                                     the value in the app instead";
+/// What a file naming a key or token by name is told with
+/// `LAMP_SKILL_SECRETS` off: its run could never be given one, so it is
+/// said plainly at the upload rather than left to fail at its run (the
+/// first builder on #6911, 14 Nov).
+pub const NEEDS_SECRETS: &str = "it needs a key or token, which a skill added from a file can't be \
+                                 given on this lamp yet (LAMP_SKILL_SECRETS is off)";
 /// What a file naming more keys than a skill may need is told.
 pub const TOO_MANY_SECRETS: &str = "it needs more than 16 keys or tokens";
 /// What the tool's note says of a skill that needs keys, with
@@ -449,11 +456,14 @@ pub fn files(card: &str) -> Result<(Files, Vec<String>), Refused> {
         }));
     }
     // The variables its run needs, by name only (`LAMP_SKILL_SECRETS`).
-    let secrets = if secrets_on() {
-        lamp_services::skill_secrets::names_in(&card)
-    } else {
-        Vec::new()
-    };
+    let secrets = lamp_services::skill_secrets::names_in(&card);
+    if !secrets.is_empty() && !secrets_on() {
+        eprintln!(
+            "lamp-voice: an agent skill added from a file was refused: it names a key or token \
+             (LAMP_SKILL_SECRETS is off)"
+        );
+        return Err(Refused::new(NEEDS_SECRETS));
+    }
     if secrets.len() > lamp_services::skill_secrets::MOST_NAMES {
         return Err(Refused::new(TOO_MANY_SECRETS));
     }
