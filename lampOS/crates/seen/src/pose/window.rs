@@ -8,8 +8,9 @@
 //! - the **region** is the one most often high among the bad samples, ties
 //!   to the first of neck, trunk, upper arm, lower arm (V1's order; wrist is
 //!   left out, the server fixes it at 1);
-//! - under [`MIN_SAMPLES`] samples the window says nothing yet: a share of 0
-//!   and no region.
+//! - under [`MIN_SAMPLES`] samples the window says nothing at all: no
+//!   value, so a `bad_share` of 0 is said only over at least three samples
+//!   (V1 said a share of 0 there; `humans/posture` holds back instead).
 //!
 //! Nothing of the frame or the answer is kept: a sample is its time, one
 //! flag and four bits, and the window lives in memory only for one sitting
@@ -126,18 +127,14 @@ impl Window {
     }
 
     /// The window at `now_us`, as `humans/posture` says it; none before the
-    /// sitting begins.
+    /// sitting begins or while it holds fewer than [`MIN_SAMPLES`] samples.
     pub fn summary(&mut self, now_us: u64) -> Option<HumanPosture> {
         let started = self.started_us?;
         self.prune(now_us);
         let window_s = (now_us.saturating_sub(started).min(WINDOW_US) / 1_000_000) as u32;
         let window_s = window_s.min(HumanPosture::LONGEST_WINDOW_S);
         if self.samples.len() < MIN_SAMPLES {
-            return Some(HumanPosture {
-                window_s,
-                bad_share: 0.0,
-                region: PostureRegion::Nothing,
-            });
+            return None;
         }
         let bad: Vec<&Sample> = self.samples.iter().filter(|sample| sample.bad).collect();
         let bad_share = (bad.len() as f32 / self.samples.len() as f32).clamp(0.0, 1.0);
@@ -220,21 +217,20 @@ mod tests {
     }
 
     #[test]
-    fn nothing_is_said_before_the_sitting_and_zero_at_its_start() {
+    fn nothing_is_said_before_the_sitting_nor_under_three_samples() {
         let mut window = Window::default();
         assert_eq!(window.summary(5 * S), None);
         window.begin(10 * S);
-        let start = window.summary(10 * S).unwrap();
-        assert_eq!(start.window_s, 0);
-        assert_eq!(start.bad_share, 0.0);
-        assert_eq!(start.region, PostureRegion::Nothing);
-        // Two bad samples are not yet a share: V1's three at least.
+        assert_eq!(window.summary(10 * S), None, "no sample: nothing");
+        // Two bad samples are not yet a share: V1's three at least, and
+        // no fresh 0 said for them either.
         window.add(20 * S, &neck());
+        assert_eq!(window.summary(20 * S), None);
         window.add(50 * S, &neck());
-        let early = window.summary(55 * S).unwrap();
-        assert_eq!((early.window_s, early.bad_share), (45, 0.0));
+        assert_eq!(window.summary(55 * S), None);
         window.add(80 * S, &good());
         let three = window.summary(80 * S).unwrap();
+        assert_eq!(three.window_s, 70);
         assert!((three.bad_share - 2.0 / 3.0).abs() < 1e-6);
         assert_eq!(three.region, PostureRegion::Neck);
         three.check().unwrap();

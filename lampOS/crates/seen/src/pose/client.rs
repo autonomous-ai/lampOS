@@ -13,8 +13,9 @@
 //!    kept of the frame.
 //!
 //! Every wait is bounded ([`crate::wire::ANSWER_WITHIN_S`]), and a cancel
-//! (the gate closed) is seen within [`POLL`]: the socket is closed, and a
-//! frame not yet sent is never sent.
+//! (the gate closed) is seen before each connect and within [`POLL`] of
+//! every read: the socket is closed, and a frame not yet sent is never
+//! sent. A connect or write already begun runs to its own 15 s bound.
 //!
 //! The server's key is `<base>/crypto/public-key` (V1's
 //! `DL_PUBLIC_KEY_URL`), raw PEM, or a local file (V1's
@@ -330,15 +331,21 @@ impl Client {
         &self.address
     }
 
-    fn open(&self) -> Result<Stream, Failure> {
+    /// The stream to the service. A cancel seen after the name is resolved,
+    /// before each connect, returns without connecting; a connect begun
+    /// still runs to its own 15 s bound.
+    fn open(&self, cancel: &AtomicBool) -> Result<Stream, Stop> {
         let addresses = (
             self.address.host.trim_matches(['[', ']']),
             self.address.port,
         )
             .to_socket_addrs()
-            .map_err(|_| Failure::Connect)?;
+            .map_err(|_| Stop::Failed(Failure::Connect))?;
         let mut tcp = None;
         for address in addresses {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(Stop::Cancelled);
+            }
             if let Ok(stream) =
                 TcpStream::connect_timeout(&address, Duration::from_secs(ANSWER_WITHIN_S))
             {
@@ -346,18 +353,18 @@ impl Client {
                 break;
             }
         }
-        let tcp = tcp.ok_or(Failure::Connect)?;
+        let tcp = tcp.ok_or(Stop::Failed(Failure::Connect))?;
         tcp.set_read_timeout(Some(POLL))
             .and_then(|()| tcp.set_write_timeout(Some(Duration::from_secs(ANSWER_WITHIN_S))))
             .and_then(|()| tcp.set_nodelay(true))
-            .map_err(|_| Failure::Connect)?;
+            .map_err(|_| Stop::Failed(Failure::Connect))?;
         if !self.address.tls {
             return Ok(Stream::Plain(tcp));
         }
         let name = rustls::pki_types::ServerName::try_from(self.address.host.clone())
-            .map_err(|_| Failure::Connect)?;
-        let connection =
-            rustls::ClientConnection::new(tls_config()?, name).map_err(|_| Failure::Connect)?;
+            .map_err(|_| Stop::Failed(Failure::Connect))?;
+        let connection = rustls::ClientConnection::new(tls_config().map_err(Stop::Failed)?, name)
+            .map_err(|_| Stop::Failed(Failure::Connect))?;
         Ok(Stream::Tls(Box::new(rustls::StreamOwned::new(
             connection, tcp,
         ))))
@@ -392,7 +399,7 @@ impl Client {
     /// `fetch_public_key`: a 200's body is the PEM.
     fn fetch_public_key(&self, cancel: &AtomicBool) -> Result<String, Stop> {
         let deadline = Instant::now() + PUBLIC_KEY_WITHIN;
-        let mut stream = self.open().map_err(Stop::Failed)?;
+        let mut stream = self.open(cancel)?;
         let head = Zeroizing::new(format!(
             "GET {}{PUBLIC_KEY_PATH} HTTP/1.1\r\nHost: {}\r\nX-API-Key: {}\r\nAccept: */*\r\nUser-Agent: lamp-seen\r\nConnection: close\r\n\r\n",
             self.address.prefix,
@@ -461,7 +468,7 @@ impl Client {
     ) -> Result<Outcome, Stop> {
         let deadline = Instant::now() + Duration::from_secs(ANSWER_WITHIN_S);
         waiting(cancel, deadline, Failure::Timeout)?;
-        let stream = self.open().map_err(Stop::Failed)?;
+        let stream = self.open(cancel)?;
         let mut request = self
             .address
             .pose_url()
@@ -754,6 +761,34 @@ mod tests {
             client.request("AAAA", &cancel),
             Outcome::Failed(Failure::PublicKey)
         );
+    }
+
+    #[test]
+    fn a_cancel_before_connecting_connects_nothing() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let base = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let cancel = AtomicBool::new(true);
+        // The key not known yet: the fetch's open sees the cancel first.
+        let fetching = Client::new(
+            Address::parse(&base).unwrap(),
+            Zeroizing::new("account-key".into()),
+            None,
+        );
+        assert_eq!(
+            fetching.request("AAAA", &cancel),
+            Outcome::Cancelled { frame_sent: false }
+        );
+        // The socket's own open, past the exchange's first look.
+        let known = Client::new(
+            Address::parse(&base).unwrap(),
+            Zeroizing::new("account-key".into()),
+            None,
+        )
+        .with_public_key(super::super::mock::public());
+        assert!(matches!(known.open(&cancel), Err(Stop::Cancelled)));
+        let accepted = listener.accept().map(|_| ()).map_err(|error| error.kind());
+        assert_eq!(accepted, Err(io::ErrorKind::WouldBlock), "no connection");
     }
 
     #[test]
