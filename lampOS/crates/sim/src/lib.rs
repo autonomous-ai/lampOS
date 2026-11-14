@@ -60,6 +60,7 @@ fn macos_boot_session() -> Option<String> {
 
 #[cfg(target_os = "macos")]
 pub mod apple_speech;
+pub mod bus_speaker;
 pub mod camera;
 pub mod controls;
 pub mod keys;
