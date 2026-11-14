@@ -3287,8 +3287,8 @@ as a Harness task with the agent's own tools
   generation folder skips that
   lock or ends the make; each bound lock or `.leases` is checked again
   after its mount, its `stat -c %d:%i` before the bind against the bind
-  target's after it, so a link swapped in between is unmounted and ends
-  the make the same way). These lines mount with `mount -n`: they run
+  target's after it, and a target that is a link is refused too, so a
+  link swapped in between is unmounted and ends the make the same way). These lines mount with `mount -n`: they run
   after `/run` is read-only, where util-linux cannot write its utab. It leaves Hermes's folder and the work
   folder read-only, and hides the rest of the work folder's `lamp` under
   another tmpfs, the make's own folder alone moved back, read-write
