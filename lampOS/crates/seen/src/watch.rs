@@ -40,6 +40,26 @@ pub const FAMILIAR_LAST_US: u64 = 5_000_000;
 /// `expression/state`'s declared lifespan.
 pub const EXPRESSION_LAST_US: u64 = ExpressionState::LASTS_US;
 
+/// The one face in view: its passing id (`f3`, the eyes', gone with the
+/// face) and its box (xmin, ymin, xmax, ymax, fractions of the picture).
+#[derive(Clone, Debug, PartialEq)]
+pub struct Track {
+    pub id: String,
+    pub edges: [f32; 4],
+}
+
+/// What the pause reads ([`Readings::on_track`]).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct OnTrack {
+    /// The one face in view; `None` for no face, two, or not known.
+    pub track: Option<Track>,
+    /// The newest `humans/familiar` is fresh, says nobody remembered, and
+    /// came after that face came into view alone: a stranger reading on it.
+    pub stranger: bool,
+    /// When the newest `humans/familiar` came, fresh or not.
+    pub reading_at: Option<u64>,
+}
+
 /// The newest reading of each topic, and when it came (this process's
 /// monotonic microseconds).
 #[derive(Clone, Debug, Default)]
@@ -47,9 +67,10 @@ pub struct Readings {
     privacy: Option<(Option<bool>, u64)>,
     presence: Option<(Option<bool>, u64)>,
     faces: Option<(Option<usize>, u64)>,
-    /// The one face in view, by its passing id, and when it came into view
-    /// as the only face; `None` while not exactly one valid face.
-    alone: Option<(String, u64)>,
+    /// The one face in view, by its passing id, when it came into view as
+    /// the only face, and its box in the newest list; `None` while not
+    /// exactly one valid face.
+    alone: Option<(String, u64, [f32; 4])>,
     familiar: Option<(bool, u64)>,
     asleep: Option<(Option<bool>, u64)>,
 }
@@ -76,10 +97,13 @@ impl Readings {
         let count = faces.check().is_ok().then_some(faces.faces.len());
         self.faces = Some((count, now_us));
         self.alone = match (count, faces.faces.first()) {
-            (Some(1), Some(face)) => match self.alone.take() {
-                Some((id, since)) if id == face.id => Some((id, since)),
-                _ => Some((face.id.clone(), now_us)),
-            },
+            (Some(1), Some(face)) => {
+                let edges = [face.xmin, face.ymin, face.xmax, face.ymax];
+                match self.alone.take() {
+                    Some((id, since, _)) if id == face.id => Some((id, since, edges)),
+                    _ => Some((face.id.clone(), now_us, edges)),
+                }
+            }
             _ => None,
         };
     }
@@ -99,8 +123,29 @@ impl Readings {
     /// now in view came into view alone.
     fn familiar_after_alone(&self) -> bool {
         match (self.familiar, &self.alone) {
-            (Some((_, said)), Some((_, since))) => said >= *since,
+            (Some((_, said)), Some((_, since, _))) => said >= *since,
             _ => false,
+        }
+    }
+
+    /// The one face in view and what the newest `humans/familiar` says of
+    /// it, for the pause ([`crate::pause`]): its passing id and box while
+    /// the newest list is fresh and has exactly one face.
+    pub fn on_track(&self, now_us: u64) -> OnTrack {
+        let one = fresh(self.faces, FACES_LAST_US, now_us).flatten() == Some(1);
+        let track = self
+            .alone
+            .as_ref()
+            .filter(|_| one)
+            .map(|(id, _, edges)| Track {
+                id: id.clone(),
+                edges: *edges,
+            });
+        let familiar = fresh(self.familiar, FAMILIAR_LAST_US, now_us);
+        OnTrack {
+            stranger: track.is_some() && familiar == Some(false) && self.familiar_after_alone(),
+            reading_at: self.familiar.map(|(_, at)| at),
+            track,
         }
     }
 
