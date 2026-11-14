@@ -149,6 +149,14 @@ impl BodyLink {
         let message = format!(r#"{{"gesture":"{name}"}}"#);
         let _ = self.socket.send_to(message.as_bytes(), &self.path);
     }
+
+    /// The same for a gesture only an energy level above 1 starts (a
+    /// [`Cue`] fill, #6893): marked so the body drops it while lamp-control
+    /// holds it.
+    pub fn lively_gesture(&mut self, name: &str) {
+        let message = format!(r#"{{"gesture":"{name}","lively":true}}"#);
+        let _ = self.socket.send_to(message.as_bytes(), &self.path);
+    }
 }
 
 /// The gesture that goes with how an answer begins, as a person's head does:
@@ -327,12 +335,23 @@ pub fn cue_for(opening: &str) -> Option<&'static str> {
     }
 }
 
+/// The small gestures an energy level above 1 fills an answer with when its
+/// opening has none of its own (#6893).
+pub const FILLS: [&str; 3] = ["nod", "acknowledge", "curious"];
+
 /// Decides once per answer, from its first words as they arrive.
 #[derive(Default)]
 pub struct Cue {
     turn: Option<u64>,
     opening: String,
     decided: bool,
+    /// The character's energy level (`lamp_body::energy`), 0 or 1 for
+    /// today: no fill is ever drawn.
+    pub level: u8,
+    /// The fills' draws (splitmix64).
+    seed: u64,
+    /// The last fill sent: when, and which.
+    filled: Option<(u64, &'static str)>,
 }
 
 impl Cue {
@@ -356,6 +375,60 @@ impl Cue {
         }
         self.decided = true;
         cue_for(&self.opening)
+    }
+
+    /// Fills drawn from `seed`.
+    pub fn seeded(seed: u64) -> Self {
+        Self {
+            seed,
+            ..Self::default()
+        }
+    }
+
+    /// As [`Cue::heard`], and whether the gesture is a fill: above level 1,
+    /// an answer whose opening gives none gets a small one at the level's
+    /// share (`lamp_body::energy::GESTURE`), never sooner than its gap after
+    /// the last fill and never the last fill again. Level 1 is [`Cue::heard`].
+    pub fn heard_lively(
+        &mut self,
+        turn: u64,
+        text: &str,
+        finished: bool,
+        now_us: u64,
+    ) -> Option<(&'static str, bool)> {
+        let undecided = self.turn != Some(turn) || !self.decided;
+        if let Some(gesture) = self.heard(turn, text, finished) {
+            return Some((gesture, false));
+        }
+        if !(undecided && self.decided) {
+            return None;
+        }
+        let rate = lamp_body::energy::gesture(self.level);
+        if rate.fill <= 0.0 {
+            return None;
+        }
+        let gap_us = u64::from(rate.fill_gap_s) * 1_000_000;
+        if self
+            .filled
+            .is_some_and(|(at, _)| now_us.saturating_sub(at) < gap_us)
+        {
+            return None;
+        }
+        let mut draw = || {
+            self.seed = self.seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut z = self.seed;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            z ^ (z >> 31)
+        };
+        if (draw() >> 11) as f64 / (1u64 << 53) as f64 >= f64::from(rate.fill) {
+            return None;
+        }
+        let last = self.filled.map(|(_, name)| name);
+        let choices: Vec<_> = FILLS.iter().filter(|name| Some(**name) != last).collect();
+        let fill = *choices[(draw() % choices.len() as u64) as usize];
+        self.filled = Some((now_us, fill));
+        Some((fill, true))
     }
 }
 
@@ -680,6 +753,57 @@ mod tests {
         );
     }
 
+    /// `count` answers with no gesture of their own, `apart_s` seconds
+    /// apart, at `level`: the fills they got, by answer.
+    fn fills(level: u8, count: u64, apart_s: u64) -> Vec<(u64, &'static str)> {
+        let mut cue = Cue::seeded(7);
+        cue.level = level;
+        (0..count)
+            .filter_map(|turn| {
+                let at = turn * apart_s * 1_000_000;
+                cue.heard_lively(turn, "Seven days in a week, yes.", true, at)
+                    .map(|(gesture, fill)| {
+                        assert!(fill);
+                        (at, gesture)
+                    })
+            })
+            .collect()
+    }
+
+    /// Level 1 (and 0, nothing said) fills nothing: the voice as today.
+    /// Level 5 fills about 40% of the answers with none, never within 20 s
+    /// of the last fill and never the same twice in a row; a matched cue is
+    /// still sent at every level, and is no fill.
+    #[test]
+    fn an_answer_with_no_gesture_is_filled_only_above_level_one() {
+        for level in [0, 1] {
+            assert!(fills(level, 1_000, 30).is_empty(), "level {level}");
+        }
+        let spaced = fills(5, 1_000, 30);
+        assert!(
+            (350..=450).contains(&spaced.len()),
+            "{} of 1000",
+            spaced.len()
+        );
+        let close = fills(5, 1_000, 5);
+        assert!(!close.is_empty());
+        for pair in close.windows(2).chain(spaced.windows(2)) {
+            assert!(pair[1].0 - pair[0].0 >= 20_000_000, "{pair:?}");
+            assert_ne!(pair[1].1, pair[0].1, "{pair:?}");
+        }
+        assert!(fills(2, 1_000, 30).len() < fills(3, 1_000, 30).len());
+        for level in 1..=5 {
+            let mut cue = Cue::seeded(7);
+            cue.level = level;
+            assert_eq!(
+                cue.heard_lively(1, "Yes, it is.", true, 0),
+                Some(("nod", false))
+            );
+            // Decided once: the rest of the answer gets nothing more.
+            assert_eq!(cue.heard_lively(1, " More.", true, 0), None);
+        }
+    }
+
     #[test]
     fn a_gesture_is_asked_of_the_body_in_exactly_this_text() {
         let path = std::env::temp_dir().join(format!("lamp-body-gesture-{}", std::process::id()));
@@ -690,8 +814,14 @@ mod tests {
         link.gesture("nod");
         let mut datagram = [0u8; 64];
         let length = body.recv(&mut datagram).unwrap();
-        std::fs::remove_file(&path).unwrap();
         assert_eq!(&datagram[..length], br#"{"gesture":"nod"}"#);
+        link.lively_gesture("curious");
+        let length = body.recv(&mut datagram).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(
+            &datagram[..length],
+            br#"{"gesture":"curious","lively":true}"#
+        );
     }
 
     #[test]
