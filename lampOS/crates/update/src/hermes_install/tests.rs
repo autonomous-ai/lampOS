@@ -3314,11 +3314,20 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
                 if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
                 case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n";
-    for name in ["mount", "findmnt", "mkdir", "rmdir"] {
+    for name in ["mount", "umount", "findmnt", "mkdir", "rmdir"] {
         let path = stubs.join(name);
         fs::write(&path, stub).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
     }
+    // `stat` answers one device and inode for every path, but another for
+    // the path named in the `swap` file: a bind target whose mount followed
+    // a link swapped in after the check.
+    let swap = base.join("swap");
+    let stat = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
+                if [ -n \"$FAIL_ON\" ]; then case \"${0##*/} $*\" in *\"$FAIL_ON\"*) exit 1;; esac; fi\n\
+                if [ -f \"$SWAP\" ] && [ \"$3\" = \"$(cat \"$SWAP\")\" ]; then echo 2:2; else echo 1:1; fi\n";
+    fs::write(stubs.join("stat"), stat).unwrap();
+    fs::set_permissions(stubs.join("stat"), fs::Permissions::from_mode(0o755)).unwrap();
     let script = base.join("make-lines");
     fs::write(
         &script,
@@ -3335,6 +3344,7 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
             .env("PATH", format!("{}:/usr/bin:/bin", stubs.display()))
             .env("LOG", &log)
             .env("FAIL_ON", fail_on)
+            .env("SWAP", &swap)
             .env("HOME", "/lasting");
         match home {
             Some(home) => command.env(HOME_ENV, home),
@@ -3372,18 +3382,28 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         // Only Hermes's install lock and a lease-managed generation's
         // leases are bound back read-write, onto the staged `installs`
         // before its read-only remount (`.leases` made first, as Hermes
-        // would); `g2` has no leases, `old` no lock.
+        // would); `g2` has no leases, `old` no lock. Each is checked
+        // again after its bind: the source's device and inode before it,
+        // the target's after (#7011 P3).
+        format!("stat -c %d:%i {h}/.hermes/installs/k/.install.lock"),
         format!("mount -n --bind {h}/.hermes/installs/k/.install.lock {x}/i/k/.install.lock"),
+        format!("stat -c %d:%i {x}/i/k/.install.lock"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/.prepare.lock"),
         format!(
             "mount -n --bind {h}/.hermes/installs/k/pm-runtime/.prepare.lock {x}/i/k/pm-runtime/.prepare.lock"
         ),
+        format!("stat -c %d:%i {x}/i/k/pm-runtime/.prepare.lock"),
         format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/environments/g1/.leases"),
         format!(
             "mount -n --bind {h}/.hermes/installs/k/environments/g1/.leases {x}/i/k/environments/g1/.leases"
         ),
+        format!("stat -c %d:%i {x}/i/k/environments/g1/.leases"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases"),
         format!(
             "mount -n --bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases {x}/i/k/pm-runtime/generations/r1/.leases"
         ),
+        format!("stat -c %d:%i {x}/i/k/pm-runtime/generations/r1/.leases"),
         format!("mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
         format!("mount -n --move {x}/c {h}/.hermes/hermes-agent"),
@@ -3417,6 +3437,14 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         format!("--bind {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases "),
         format!("mkdir {h}/.hermes/installs/k/environments/g1/.leases"),
         format!("--bind {h}/.hermes/installs/k/environments/g1/.leases "),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/.install.lock"),
+        format!("stat -c %d:%i {x}/i/k/.install.lock"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/.prepare.lock"),
+        format!("stat -c %d:%i {x}/i/k/pm-runtime/.prepare.lock"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/environments/g1/.leases"),
+        format!("stat -c %d:%i {x}/i/k/environments/g1/.leases"),
+        format!("stat -c %d:%i {h}/.hermes/installs/k/pm-runtime/generations/r1/.leases"),
+        format!("stat -c %d:%i {x}/i/k/pm-runtime/generations/r1/.leases"),
         format!("none {h}/.hermes"),
         format!("mkdir {h}/.hermes/hermes-agent"),
         format!("--move {x}/c "),
@@ -3527,6 +3555,53 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
     );
     fs::remove_file(&environments).unwrap();
     fs::rename(&elsewhere, &environments).unwrap();
+    // Thirteen's P3 on #7011: the `-L` checks and the bind are two steps,
+    // and `mount --bind` follows a link the lasting Hermes's user swapped
+    // in between. A bind target whose device and inode are not the
+    // source's from before the bind is unmounted at once, and the make
+    // ends the same way, before the lasting home is hidden.
+    for (target, refusal) in [
+        (
+            format!("{x}/i/k/.install.lock"),
+            "Hermes install lock not shown",
+        ),
+        (
+            format!("{x}/i/k/pm-runtime/.prepare.lock"),
+            "Hermes runtime lock not shown",
+        ),
+        (
+            format!("{x}/i/k/environments/g1/.leases"),
+            "Hermes leases not shown",
+        ),
+        (
+            format!("{x}/i/k/pm-runtime/generations/r1/.leases"),
+            "Hermes leases not shown",
+        ),
+    ] {
+        fs::write(&swap, &target).unwrap();
+        let (out, lines) = run(Some(&home), "");
+        assert!(!out.status.success(), "{target}");
+        assert!(out.stdout.is_empty(), "Hermes never runs: {target}");
+        assert!(
+            String::from_utf8_lossy(&out.stderr).contains(refusal),
+            "{target} {out:?}"
+        );
+        let bound = lines
+            .iter()
+            .position(|line| {
+                line.starts_with("mount -n --bind ") && line.ends_with(&format!(" {target}"))
+            })
+            .expect(&target);
+        assert_eq!(
+            lines[bound + 1..],
+            [
+                format!("stat -c %d:%i {target}"),
+                format!("umount -n {target}")
+            ],
+            "{target}"
+        );
+    }
+    fs::remove_file(&swap).unwrap();
     // A home outside the work folder's `lamp`, or missing, is refused
     // before anything is mounted.
     let other = base.join("other/make-task-1/home");
@@ -3649,6 +3724,95 @@ fn inside_a_makes_namespace_hermess_lasting_memory_is_not_there() {
     );
 }
 
+/// Thirteen's P3 on #7011, for real in a user and mount namespace of its
+/// own (Linux, where the kernel allows one; skipped otherwise): a
+/// generation's `.leases` swapped for a link to another folder after the
+/// `-L` checks, as the lasting Hermes's user could while a make starts, is
+/// followed by `mount --bind`; the target's device and inode then differ
+/// from the source's, so the target is unmounted, nothing stays bound
+/// there, and the make ends "Hermes leases not shown" before Hermes runs.
+#[cfg(target_os = "linux")]
+#[test]
+fn a_leases_folder_swapped_for_a_link_after_the_check_is_refused() {
+    let folder = tempfile::tempdir().unwrap();
+    let base = fs::canonicalize(folder.path()).unwrap();
+    let probe = base.join("probe");
+    fs::create_dir(&probe).unwrap();
+    let allowed = std::process::Command::new("unshare")
+        .args(["--map-root-user", "--mount", "--propagation", "private"])
+        .args(["mount", "-t", "tmpfs", "none"])
+        .arg(&probe)
+        .output()
+        .is_ok_and(|out| out.status.success());
+    if !allowed {
+        eprintln!("no user and mount namespace here: skipped");
+        return;
+    }
+    let make = a_lamp_with_a_make(&base);
+    let b = base.display();
+    let leases = base.join("h/.hermes/installs/k/environments/g1/.leases");
+    fs::create_dir(&leases).unwrap();
+    let elsewhere = base.join("elsewhere");
+    fs::create_dir(&elsewhere).unwrap();
+    // A `stat` that, right after it reads the source (after the `-L`
+    // checks, before the bind), swaps that source for a link.
+    let stubs = base.join("stubs");
+    fs::create_dir(&stubs).unwrap();
+    fs::write(
+        stubs.join("stat"),
+        format!(
+            "#!/bin/sh\n/usr/bin/stat \"$@\" || exit\n\
+             if [ \"$3\" = {l} ]; then mv {l} {l}-real && ln -s {e} {l}; fi\n",
+            l = leases.display(),
+            e = elsewhere.display()
+        ),
+    )
+    .unwrap();
+    fs::set_permissions(stubs.join("stat"), fs::Permissions::from_mode(0o755)).unwrap();
+    let target = format!("{b}/x/i/k/environments/g1/.leases");
+    let lines = make_lines(&base, "echo HERMES-RAN\n")
+        .replacen(
+            &format!("W={b}/w\n"),
+            &format!(
+                "W={b}/w\nmount --bind {b}/h {b}/h && mount --bind {b}/w {b}/w || exit 1\n\
+                 fail() {{ echo \"hermes-ns: $1\" >&2; grep -qF -e \" {target} \" -e \" {e} \" /proc/self/mountinfo && echo STILL-BOUND; exit 1; }}\n",
+                e = elsewhere.display()
+            ),
+            1,
+        );
+    let script = base.join("make-lines");
+    fs::write(&script, lines).unwrap();
+    let out = std::process::Command::new("unshare")
+        .args([
+            "--map-root-user",
+            "--mount",
+            "--propagation",
+            "private",
+            "/bin/sh",
+        ])
+        .arg(&script)
+        .current_dir(&make)
+        .env(
+            "PATH",
+            format!("{}:/usr/sbin:/usr/bin:/sbin:/bin", stubs.display()),
+        )
+        .env(HOME_ENV, make.join("home"))
+        .output()
+        .unwrap();
+    assert!(!out.status.success(), "{out:?}");
+    assert!(out.stdout.is_empty(), "{out:?}");
+    assert!(
+        String::from_utf8_lossy(&out.stderr).contains("hermes-ns: Hermes leases not shown"),
+        "{out:?}"
+    );
+    assert!(
+        fs::symlink_metadata(&leases)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+}
+
 /// #6643 with #6685's one run path (`LAMP_SKILL_DEFAULT_AGENT` on): Hermes's
 /// one run path wrapper hands a make's home on ([`ONE_PATH_HOME_LINE`],
 /// [`WRAPPER_HOME_LINE`]'s semantics, as [`MAKE_ENV`]) and the one agent
@@ -3743,8 +3907,8 @@ fn with_the_one_path_a_make_still_runs_in_its_own_home() {
     let stubs = base.join("stubs");
     fs::create_dir_all(&stubs).unwrap();
     let stub = "#!/bin/sh\necho \"${0##*/} $*\" >> \"$LOG\"\n\
-                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; esac\n";
-    for name in ["mount", "findmnt", "mkdir", "rmdir"] {
+                case ${0##*/} in findmnt) echo rw,nosuid,nodev,relatime;; stat) echo 1:1;; esac\n";
+    for name in ["mount", "findmnt", "mkdir", "rmdir", "stat"] {
         let path = stubs.join(name);
         fs::write(&path, stub).unwrap();
         fs::set_permissions(&path, fs::Permissions::from_mode(0o755)).unwrap();
