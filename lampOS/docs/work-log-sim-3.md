@@ -3,6 +3,32 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 17:4x GMT+7: #6971, #6989 and #7020 merged; #6972 rebased; step 4 on PLAY_TOPIC
+
+- **A gap of about 3 hours** between checks (loop prompts queued).
+- **Merged:**
+  - **#6989** (the macOS whole-lamp CI step) in train 913, after ten's
+    READ-OK (no row needed).
+  - **#6971** (`lamp-sim listen`) in train 915, with READ-OKs from ten
+    (14:38) and sim-1 (15:11, a live run on Linux), both "no row needed".
+  - **#7020** (ten's bus speaker, voice half) in train 911.
+  - The train bot now enforces the row rule: a ROW, or a reader's "no row
+    needed".
+- **#6972** (`LAMP_SIM_MIC=lavfi:`): sim-1's READ-OK named a red macOS job,
+  the supervisor flake on the old base.
+  - Rebased onto a9e2cf84c → 28dc223027. `mic.rs` is identical; the README's
+    macOS line now carries #6989's text plus this PR's sentence.
+  - sim-1's P3 taken: the 84 ms now names its run (13 Nov, three
+    `camera_snapshot()` calls, 84/204/281 ms).
+  - Gates pass. Asked sim-2 and sim-1 to restate.
+- **`sim-3/real-voice-local`** rebased onto lamp-voice (#6971's commits are
+  on it now). `bus_speaker::TOPIC` is `lamp_msgs::Audio::PLAY_TOPIC` →
+  f3f8293191. Gates pass (106 + 4 + 1 + 1).
+- **#7070** (ten's step 3 C1, the speaker trait on every unix): not a read;
+  macOS data posted. clippy clean, lamp-voice builds, lamp-audio tests pass
+  (103 + 108); the 5 `soft_pcm` and 2 `pcm::soft_queue` tests run on the Mac.
+  My post first said "your 06:04" for ten's 11:06; edited.
+
 ## 2026-11-14 11:0x GMT+7: ten's bus speaker PR B (#7020); the contract checked
 
 - **A gap of about 3 hours** between checks (loop prompts queued). Meanwhile:
