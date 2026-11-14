@@ -388,9 +388,9 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     vòng của nó chưa chạy): không tạo hay khởi động gì, nên một lần chạy
     không bao giờ bắt đầu mà không có token trên mạng của đèn.
   - **Agent mặc định của đèn, theo một đường chạy duy nhất, với
-    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, tắt trong sản phẩm: không unit
-    sản phẩm nào và cả `/etc/lampOS/update.env` đều không đặt nó, cho tới khi
-    hàng trên c0a4 đạt và có hai lượt đọc). Một cách chạy kỹ năng cho mọi agent trong
+    `LAMP_SKILL_DEFAULT_AGENT=on`** (#6685, bật trong sản phẩm từ 13/11:
+    trong unit của lamp-tasks, và trong unit của lamp-update cùng tệp công
+    tắc mà mỗi bản dựng mang theo `/etc/lampOS/update.env`). Một cách chạy kỹ năng cho mọi agent trong
     Harness của đèn: không có code riêng cho từng agent và không có tên
     engine nào trong đường chạy. lamp-tasks đọc engine mặc định của đèn ở
     mỗi lần chạy (`runtime::lamp_default`, lựa chọn trong app trước; trước
@@ -1136,6 +1136,17 @@ nằm trong thư mục kỹ năng.
 
 ## Lần chạy kỹ năng trên một gateway agent (#6685 bước 4, phương án (a), tắt trừ khi `LAMP_SKILL_DEFAULT_AGENT=on` và `LAMP_SKILL_GATEWAY_RUNS=on`)
 
+`LAMP_SKILL_GATEWAY_RUNS` được đặt bật trong sản phẩm từ 14/11 (#7019):
+`Environment=` trong unit của lamp-tasks và của lamp-update, và một dòng
+trong tệp công tắc mà lamp-update mang theo `/etc/lampOS/update.env`. P1
+của Reviewer-lead trên #6882 (bên dưới, "Những gì một lần chạy trên
+gateway không chặn") đã được first builder chấp nhận bằng văn bản ([#6882
+issuecomment-6870830613](https://github.com/autonomous-ai/lampOS/pull/6882#issuecomment-6870830613)); công tắc được tính là bật khi đã có hàng
+trên c0a4, như DEFAULT-ON của first builder cho #6685 (13/11 14:13) yêu
+cầu. Nó chỉ được đọc khi `LAMP_SKILL_DEFAULT_AGENT` bật, công tắc này cũng
+bật trong sản phẩm từ 13/11 ở cùng các unit và tệp đó; `off` trong môi trường của
+một trong hai unit giữ nó tắt ở đó.
+
 Một lần ghi cố định của kỹ năng tự tạo (`LAMP_SKILL_WRITE_AGENT`, ở trên)
 không bao giờ là lần chạy của gateway agent: nó không có script cho
 `start` của lần chạy, nên bị từ chối trước khi bắt đầu (`not_started`), và
@@ -1261,6 +1272,68 @@ trước mỗi lượt (bước 3 ở trên): `agents.lamp-skill-run` có
 (`openclaw_config::skill_run_approvals`, giống `fence-entry` của
 lamp-update).
 
+### Hàng rào của gateway dừng ở đâu và hàng rào của Hermes bắt đầu ở đâu
+
+Mỗi lần chạy kỹ năng nằm sau đúng một trong hai hàng rào, không bao giờ cả
+hai và không bao giờ cái này rồi cái kia. Việc chọn cái nào diễn ra một
+lần, lúc lần chạy bắt đầu, theo dữ liệu riêng của agent mặc định chứ không
+theo tên của nó (`skill_task::default_agent_takes_runs`,
+`crates/tasks/src/skill_task.rs:1591`): wrapper có dữ liệu gateway là một
+gateway agent (`AgentRun::Gateway`, `skill_task.rs:1613`), wrapper của
+đường chạy chung là một agent theo từng lần chạy (`AgentRun::PerRun`,
+`skill_task.rs:1632`). Lần chạy trên gateway chỉ tiếp tục khi
+`LAMP_SKILL_GATEWAY_RUNS` bật (`skill_task.rs:2550`,
+`skill_task::gateway_runs_allowed` ở `skill_task.rs:1661`) và được giao
+cho `GatewayRunner` (`skill_task.rs:2566`); lần chạy theo từng lần không
+bao giờ tới đoạn code đó (`skill_task.rs:2539`). Không bên nào lùi về bên
+kia.
+
+- **Hàng rào của Hermes (theo từng lần chạy) bao quanh cả agent.** Agent
+  được khởi động chỉ cho lần chạy này, và model, công cụ của nó cùng
+  script đều nằm trong một `unshare` có mạng riêng chỉ gồm `lo` và cầu
+  model của lamp-tasks (`--net` khi `LAMP_NS_NET=run`:
+  `crates/update/src/agent_ns/wrapper.rs:331`, được lamp-tasks kiểm như
+  `AGENT_NS_NET_LINES`, `skill_task.rs:1520`; dòng socket và cầu model
+  `AGENT_NS_TASKS_LINE`, `skill_task.rs:1530`).
+- **Hàng rào của gateway bao quanh script và công cụ exec, không bao quanh
+  agent.** Gateway, model của nó và mọi agent OpenClaw khác ở ngoài: chúng
+  giữ mạng bình thường của đèn và dùng chung một user và namespace. Hàng
+  rào bắt đầu ở danh sách cho phép exec của agent rào (chỉ `start` của lần
+  chạy: `openclaw_config::skill_run_approvals`,
+  `crates/tasks/src/openclaw_config.rs:305`, được ghi lúc lamp-tasks khởi
+  động bởi `write_skill_run_fence`, `openclaw_config.rs:331`, và được kiểm
+  trước mỗi lượt bởi `GatewayRunner::ensure_fence`,
+  `crates/tasks/src/gateway_run.rs:696`). Nó tiếp tục ở script, mà `start`
+  chạy trong user, network (chỉ `lo`), mount và PID namespace riêng với các
+  đường dẫn trạng thái bị che (`gateway_run::start_text`,
+  `gateway_run.rs:343`; `HIDDEN`, `gateway_run.rs:285`).
+- **Ở giữa hai đường đó** (tiến trình của gateway, model của nó, các agent
+  OpenClaw khác của người dùng) chỉ có kiểm tra token một lần chạy của
+  lamp-control là giữ, và bất kỳ agent nào trong namespace của gateway
+  cũng lấy được token đó trong lúc lần chạy còn diễn ra. Chúng chạy cùng
+  user trong PID namespace của chính gateway. Trước `start`, tệp 0600 của
+  token trong thư mục lần chạy đọc được bởi user đó. Sau đó, token nằm
+  trong môi trường của `unshare` do `start` chạy (`gateway_run.rs:369`,
+  `gateway_run.rs:371`; tiến trình này sống suốt lần chạy, làm cha của
+  các tiến trình bên trong), của shell hàng rào và của script kỹ năng
+  (`gateway_run.rs:324`), và `/proc/<pid>/environ` cho user đó thấy nó.
+  PID namespace của lần chạy chỉ ngăn script nhìn ra ngoài, không ngăn
+  gateway nhìn vào. Với agent mặc định, điều này không cho nó thêm gì so
+  với Hermes: một lần chạy trên gateway là một lượt của OpenClaw, agent
+  mặc định của đèn, chạy kỹ năng đó, và với Hermes agent có token của
+  lần chạy trong môi trường của chính nó suốt lần chạy (xem "Phạm vi
+  token" bên dưới). Bất kỳ agent nào khác trong namespace của gateway có
+  thể dùng quyền của kỹ năng đó cho tới khi lần chạy kết thúc. First
+  builder đã chấp nhận rủi ro này bằng văn bản cho lần giao đèn
+  ([#6882 issuecomment-6870830613](https://github.com/autonomous-ai/lampOS/pull/6882#issuecomment-6870830613)),
+  vì OpenClaw của một đèn sản phẩm chỉ chạy agent mặc định của nó
+  (`openclaw_config.rs` chỉ ghi `agents.defaults`, cùng agent hàng rào
+  của chính lampOS). Cho các agent khác user riêng là follow-up (b), sau
+  lần giao đèn. Token không còn sau lần chạy: `start` xóa tệp của
+  nó khi đọc (`gateway_run.rs:364`), token được kết thúc với lamp-control
+  trước tiên dù lần chạy kết thúc thế nào (`gateway_run.rs:512`), rồi thư
+  mục của lần chạy bị xóa (`gateway_run.rs:541`).
+
 ### Hàng rào của gateway chặn và không chặn gì, so với `--net` của Hermes
 
 - **Mạng.** Lần chạy của Hermes ở trong network namespace riêng chỉ có
@@ -1306,10 +1379,19 @@ lamp-update).
   OpenClaw khác trên đèn (`main` và các agent người dùng thêm) chạy cùng
   user `lampos` trong namespace của gateway: các agent đó cũng thấy socket
   của lamp-control và skills-dev khi công tắc bật. Chỉ các kiểm tra token
-  lần chạy của chính lamp-control là còn giữ trước chúng. Vì vậy
-  `LAMP_SKILL_GATEWAY_RUNS` (switches.md) vẫn tắt cho tới khi hàng rào
-  được kiểm trên đèn hoặc first builder chấp nhận điều này bằng văn bản;
-  khi tắt, lamp-update để wrapper và namespace của OpenClaw như trước
+  lần chạy của chính lamp-control là còn giữ trước chúng, và chúng lấy
+  được token đó trong lúc một lần chạy còn diễn ra ("Ở giữa hai đường đó"
+  ở trên). Vì vậy
+  `LAMP_SKILL_GATEWAY_RUNS` (switches.md) tắt cho tới khi điều này được
+  giải quyết. First builder đã chấp nhận nó bằng văn bản (P1 của
+  Reviewer-lead trên #6882, phương án (a), cho lần giao đèn mặc định
+  OpenClaw thứ Hai 16/11: [#6882 issuecomment-6870830613](https://github.com/autonomous-ai/lampOS/pull/6882#issuecomment-6870830613)): OpenClaw
+  của một đèn sản phẩm không có agent nào khác trừ khi chủ thêm vào, và
+  lamp-control kiểm token của mọi lời gọi trong mọi trường hợp. Các dòng
+  trong sản phẩm có từ 14/11 (#7019), bật khi đã có hàng trên c0a4 (script
+  của lần chạy không tới được config hay token của gateway, và token không
+  còn sau lần chạy), cùng các điều kiện DEFAULT-ON khác của first builder
+  (#6685, 13/11 14:13: hai lượt đọc, ranh giới này được nói rõ). Khi tắt, lamp-update để wrapper và namespace của OpenClaw như trước
   đường chạy chung, và lamp-tasks từ chối lần chạy đó bằng lời.
 - **Exec.** Lần chạy của Hermes được chạy mọi lệnh trong namespace của nó
   (danh sách cấm cứng vẫn giữ, approvals tắt). Công cụ duy nhất của agent
@@ -1325,8 +1407,11 @@ lamp-update).
   kỹ năng và quyền của lần chạy đó, kết thúc với lamp-control khi lần chạy
   kết thúc, chỉ đưa vào môi trường của script. Với Hermes, token nằm trong
   môi trường của chính agent suốt lần chạy; trên gateway nó nằm trong một
-  file 0600 trong thư mục lần chạy cho tới khi `start` đọc một lần, nên
-  model không có công cụ nào để đọc nó, và sau lần start đầu nó đã mất.
+  file 0600 trong thư mục lần chạy cho tới khi `start` đọc một lần, và
+  sau lần start đầu file đó đã mất. Trong lúc lần chạy còn diễn ra, token
+  nằm trong môi trường của các tiến trình của `start`, mà bất kỳ agent nào
+  trong namespace của gateway cũng đọc được ("Ở giữa hai đường đó" ở
+  trên).
 - **Chạy đồng thời.** Lần chạy của Hermes là một tiến trình riêng, bị kill
   cùng group. Một lượt trên gateway dùng chung gateway duy nhất với các
   việc nói cho OpenClaw của người dùng: một lượt dài lấy CPU và bộ nhớ
