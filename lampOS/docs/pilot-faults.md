@@ -759,7 +759,7 @@ Two of the voice's start-up failures, found on lamp-52e6 and lamp-4ace on
   the clipped expiry froze and every lease lapsed before the lapsed
   capture lease cut the turn; the privacy worker ending on a lapsed
   granting lease is by design (fail-closed). With
-  `LAMP_PRIVACY_RIDES_STALL=on` (#5611, off by default) a granting lease's
+  `LAMP_PRIVACY_RIDES_STALL=on` (#5611, on in the product unit) a granting lease's
   lapse is ridden closed for at most 1.5 s instead, publishing nothing
   (`privacy-switch.md`), so a lapse of that kind no longer ends the worker
   unless it outlasts that bound. The coordinator now cuts a

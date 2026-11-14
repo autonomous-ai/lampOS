@@ -244,7 +244,8 @@ gone or late, ends the worker as before. A worker that ended abnormally
 still ends the wait with an error that is not an unreadable switch, so the
 voice exits and the restart guard counts it.
 
-With `LAMP_PRIVACY_RIDES_STALL=on` (#5611; off by default, only exactly `on`,
+With `LAMP_PRIVACY_RIDES_STALL=on` (#5611; off unless set, only exactly `on`,
+on in the product unit (#5611),
 passed to the privacy worker and the second worker in their cleared
 environments) a lapse of a lease that grants the microphones or the camera is
 ridden the same way, so the voice stays up and unmuted through a short stall
@@ -283,7 +284,18 @@ switch on:
   reopen waits for the gate's 60 ms steady time (`REOPEN_STABLE_US`), and
   that wait counts inside the 1.5 s, so a stall under about 1.44 s is
   ridden; a longer one ends the voice as before, failing closed. Its
-  trace's `privacy_gap` `began` row then carries `"stall":true`.
+  trace's `privacy_gap` `began` row then carries `"stall":true`. On
+  lamp-06c1 at 14:32:11 on 12 Nov (12226), with the switch off, a 274 ms
+  coordinator stall as the first session after a five-minute muted wait
+  began ended both workers with exit 1 and the voice on `privacy.c.p:
+  Connection refused; verified cleanup failed` (#5224). A session after
+  the wait is a new one, so its stall lands early in it. In the loop
+  harness a 275 ms stall 60 ms or more into a session ends the voice off
+  and is ridden on; one in its first 40 ms ends nothing either way, as no
+  reading has gone stale yet. Seeding the first pass from the prologue's
+  last keep (`GapRide::last_pass_us`) was proposed and dropped: no stall
+  position (0, 2, 6, 10, 20, 40, 60, 100, 200, 400 ms) was misjudged with
+  the switch on.
 
 Past that bound (a stall over about 1.44 s, whose open reading is not
 steady within 1.5 s of its start) everything ends exactly as without the
