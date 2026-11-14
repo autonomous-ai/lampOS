@@ -5156,6 +5156,44 @@ mod tests {
         engine.state.tasks.last().unwrap().launch.target.engine
     }
 
+    /// The Reviewer-lead's P2 on #7036: before a look, the app's choice of
+    /// a third engine (outside the switched-on Hermes/OpenClaw order) can't
+    /// be checked, so it is not overruled by the build's order: the lamp's
+    /// work runs on the targets file's engine, which the last look wrote
+    /// from that choice. `LAMP_LAMP_ENGINE`'s choice the same.
+    #[test]
+    fn before_a_look_an_app_choice_of_a_third_engine_keeps_the_targets_files_engine() {
+        use crate::runtime::{LampSide, lamp_default, lamp_order};
+        for by_app in [true, false] {
+            let mut side = LampSide::new(std::path::PathBuf::new());
+            if by_app {
+                *side.app.lock().unwrap() = Some(EngineKind::Claude);
+            } else {
+                side.chosen = Some(EngineKind::Claude);
+            }
+            assert_eq!(side.reported(), None);
+            assert_eq!(lamp_default(&side), None, "by_app {by_app}");
+            let targets = BTreeMap::from([(
+                crate::runtime::LAMP_TARGET.to_owned(),
+                Target {
+                    machine_id: "cccccccccccccccccccccccccccccccc".into(),
+                    project: crate::runtime::LAMP_PROJECT.into(),
+                    engine: EngineKind::Claude,
+                },
+            )]);
+            let mut engine =
+                Engine::open(Memory::default(), targets, STORE, SESSION, &clock(0)).unwrap();
+            engine.set_lamp_engines(lamp_order(&side), lamp_default(&side));
+            let request = lamp_prepare(&engine, "lamp", None);
+            engine.handle(&request, &clock(0), false).unwrap();
+            assert_eq!(
+                launched_engine(&engine),
+                EngineKind::Claude,
+                "by_app {by_app}"
+            );
+        }
+    }
+
     #[test]
     fn a_named_engine_runs_the_lamps_work_on_it_even_when_not_first() {
         use EngineKind::{Hermes, Openclaw};
