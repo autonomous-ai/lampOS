@@ -94,10 +94,14 @@ below). An ordinary bedtime request belongs to the bedtime skill.
    with its core grant (#940, the first move of "Everything is a skill",
    21 Oct). Every line but `ready` goes to Voice as exact words (`text` with
    `"exact": true`, say.rs): rendered as written, never a turn for the chat
-   model, and held while someone talks with the lamp rather than dropped
+   model, and held while the lamp speaks or owes an answer rather than dropped
    (#5777: on lamp-52e6, 10 Nov 12:43, the model refused the `ask_off` line,
    "it isn't mine to say", and the `stay` note was dropped as
-   `user_interrupted`). An owner's language other than English hears them in
+   `user_interrupted`). A conversation going on doesn't hold them, as it holds
+   a computer's exact line: they answer the person's own unplug conversation
+   (`Says::exact_answers`, #6899: on lamp-52e6 at 12200, 12 Nov, "Yes." under
+   an update lock got the model's own turn, and the `updating` line waited out
+   its 30 s behind it and was never said). An owner's language other than English hears them in
    its own words: each is a fixed line (`language::FIXED_LINES`, second-voice.md,
    "The fixed lines"; #5777's P3). Once one is played to `spoken`, Voice keeps
    it in the thread as the lamp's own line, so the chat model's next turn has it

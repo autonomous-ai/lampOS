@@ -1309,6 +1309,53 @@ fn a_skills_exact_line_waits_for_the_rooms_quiet_then_is_said() {
     assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
 }
 
+/// #6899 (row-5747n D, lamp-52e6, build 12200, 12 Nov 09:13): "Yes." to the
+/// turn-off ask under an update lock, and the voice model answered it in a
+/// turn of its own. The skill's update line then waited out its 30 s while
+/// that conversation went on, and was never said. The prepare-unplug
+/// skill's exact lines answer the person's own unplug conversation: they
+/// don't wait for it, only for the lamp's speaker. Another's exact line
+/// still waits.
+#[test]
+fn the_unplug_skills_exact_line_answers_the_conversation_it_is_in() {
+    let mut owner = resting_owner();
+    let (mut reply, mut trace) = (None, SessionState::default());
+    let admission = InputAdmission::default();
+    let (mut other, other_answered) = crate::say::Says::exact_for_test("control", vec![400; 480]);
+    let talking = crate::say::SoundNow {
+        conversing: true,
+        ..sound_now(&mut owner, &reply, &admission, &other)
+    };
+    assert!(!take_exact(
+        &mut other, &talking, &mut owner, &mut reply, &mut trace
+    ));
+    assert!(other_answered.try_recv().is_err(), "still waiting");
+    let (mut says, answered) = crate::say::Says::words_for_test(
+        "prepare-unplug",
+        crate::say::Words::ExactSound {
+            samples: vec![400; 480],
+            text: Some(crate::language::UNPLUG_UPDATING.to_owned()),
+        },
+        8,
+    );
+    let speaking = crate::say::SoundNow {
+        playing: true,
+        ..talking
+    };
+    assert!(
+        !take_exact(&mut says, &speaking, &mut owner, &mut reply, &mut trace),
+        "it waits for the lamp's own words to end"
+    );
+    assert!(take_exact(
+        &mut says, &talking, &mut owner, &mut reply, &mut trace
+    ));
+    assert_eq!(
+        reply.as_ref().unwrap().notice.origin(),
+        SpeechOrigin::ExactLine
+    );
+    assert!(matches!(answered.try_recv(), Ok(Answer::Begun(_))));
+}
+
 /// An exact line asked while the lamp is muted is refused at once, with
 /// why, and nothing plays.
 #[test]
