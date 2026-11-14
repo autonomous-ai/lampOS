@@ -865,10 +865,13 @@ ROW #7031 0a997fa7f3 on lamp-c0a4 build 13031: PASS 3/3
 ```
 ````
 
-The bot reads the lamp (`lamp-` and four letters or digits) and the build
-(a five-digit sequence, or `build <commit>`) in the comment's first 400
-characters, and the journal from a fenced block, or from a quoted line
-(`> …`) that names the lamp. A row that
+The bot reads the lamp and the build in the comment's first 400
+characters. The lamp is its hostname: `lamp-` and four hex characters with
+at least one digit (`lamp-c0a4`). A part's name, such as `lamp-body`, is
+not a lamp. The build is five digits right after `build`, `installed` or
+`on` (`build 13031`, `installed **12987**`, `on 13000`), or `build
+<commit>`. The journal is a fenced block with a non-empty line, or a quoted
+line (`> …`) with `lamp-` in it. A row that
 says `FAIL` or `VOID` (or `FAILED`, `VOIDED`), and not `PASS`, is not a
 row. A docs, tests or switched-off change needs no row: then a reader
 writes "no row needed" in the `READ-OK` on this head. A pull request that

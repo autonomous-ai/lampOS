@@ -4,7 +4,7 @@ import json, os, subprocess, sys, tempfile, unittest
 sys.dont_write_bytecode = True
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
-from rows import rows
+from rows import rows, missing
 
 HEAD = "e2b57f1f48c0ffee00112233445566778899aabb"
 EARLIER = "abcdef0123456789abcdef0123456789abcdef01"
@@ -113,17 +113,26 @@ class Parts(unittest.TestCase):
             self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7031"), "row-incomplete " + want, body)
 
     def test_what_names_a_lamp(self):
-        for lamp, ok in (("lamp-52e6", True), ("lamp-9adf", True), ("lamp-voice", False), ("lamp-52E6", False),
-                         ("lamp-52e", False), ("xlamp-52e6", False), ("lamp-52e6x", False)):
+        # 14 Nov (both readers' P2 on #7062): the fleet's lamps count; a part's name doesn't.
+        fleet = ("c0a4", "52e6", "06c1", "4ace", "75c9", "cb94", "9adf", "a0ae", "0c89")
+        parts = ("body", "eyes", "ears", "seen", "peek", "keep", "name", "test", "face", "abcd")
+        for lamp, ok in ([("lamp-" + x, True) for x in fleet] + [("lamp-" + x, False) for x in parts]
+                         + [("lamp-voice", False), ("lamp-52E6", False), ("lamp-52e", False), ("xlamp-52e6", False),
+                            ("lamp-52e6x", False), ("lamp-52g6", False)]):
             body = "ROW #7031 on %s build 13031: PASS" % lamp + JN
             self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7031"), "row" if ok else "row-incomplete lamp", lamp)
 
     def test_what_names_a_build(self):
-        for build, ok in (("build 13031", True), ("**13031**", True), ("build 70474a2102", True), ("build `70474a2102`", True),
-                          ("build 1303", False), ("build 130310", False), ("#13031", False), ("build 70474a", False),
-                          ("run 43561597", False)):
+        # 14 Nov (the Reviewer-lead's P3 on #7062): five digits count after build, installed or on.
+        for build, ok in (("build 13031", True), ("installed **12987**", True), ("on 13000", True), ("Build `13031`", True),
+                          ("build 70474a2102", True), ("build `70474a2102`", True), ("**13031**", False), ("20000 counts", False),
+                          ("12345 ms", False), ("build 1303", False), ("build 130310", False), ("#13031", False),
+                          ("build 70474a", False), ("run 43561597", False), ("on #13031", False)):
             body = "ROW #7031 on lamp-c0a4, %s: PASS" % build + JN
             self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7031"), "row" if ok else "row-incomplete build", build)
+
+    def test_a_part_name_is_no_lamp(self):
+        self.assertEqual(missing("ROW #1 abc1234 on build 13031, lamp-body moved: PASS\n```\nx\n```"), ["lamp"])
 
     def test_lamp_and_build_past_400_characters_do_not(self):
         body = "ROW #7031: PASS " + "x" * 400 + " on lamp-c0a4 build 13031" + J
