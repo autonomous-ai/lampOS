@@ -466,9 +466,14 @@ either's). One frame and one blink can serve both.
   message are wiped when the request ends (the encrypted copy handed to the
   socket library is not).
 - **The gate closing stops it.** The frames tell the sink when the gate
-  closes, and the request is cancelled within 0.1 s: the socket is closed,
-  a frame not yet sent is never sent, and an answer that still comes is
-  dropped. A cancel is not a failure.
+  closes, and the request is cancelled: a wait on a read sees the cancel
+  within 0.1 s and closes the socket, no connect begins after it (the
+  socket's open looks at the cancel before each connect), a connect or
+  write already begun runs to its own 15 s bound, a frame not yet sent is
+  never sent, and an answer that still comes is dropped. A cancel is not a
+  failure. The gate is judged once per 100 ms tick, and the request's last
+  look at the cancel is just before it sends, so a frame captured just
+  before the slide closes can still go out within about one tick.
 - **Busy and failures**, as activity's bursts take them (`backoff::Retreat`,
   one of its own).
   WebSocket streams never get a 503, only `{"error":"busy"}`. Busy drops
@@ -482,8 +487,8 @@ either's). One frame and one blink can serve both.
 - **The window** (`pose/window.rs`), V1's rules (`pose.py` `_aggregate`):
   - a sample is bad when `risk_level` is 2 or more, or any region's
     subscore on either side is 4 or more;
-  - `bad_share` is the share of bad samples over the last ten minutes, 0
-    until there are 3 samples;
+  - `bad_share` is the share of bad samples over the last ten minutes,
+    said only over at least 3 samples (V1's minimum; V1 said 0 under it);
   - `region` is the region most often high among the bad samples, with
     ties going to neck, trunk, upper arm, then lower arm. Wrist counts
     toward a bad sample, as in V1, but is never the region: the server
@@ -498,17 +503,19 @@ either's). One frame and one blink can serve both.
   holds it unsaid for at most 5 s.
 - **Said on `humans/posture`** (`lamp_msgs/HumanPosture` v1:
   `{window_s, bad_share, region}`) every 30 s while posture's gate is
-  open and the window holds at least one sample: as soon as the sitting's
-  first sample lands, then every 30 s. Closed, the topic says nothing and
+  open and the window holds at least 3 samples: as soon as the sitting's
+  third sample lands, then every 30 s. Closed, the topic says nothing and
   its last value runs out, so no old sample is said while the privacy is
-  on. **With no sample, nothing is said either** (#6839's review): frames
-  not going out (the opt-in off, the slide shut), the server busy or
-  failing, no body found, or the window just wiped (any closing, the privacy,
-  sleep, `room/stood_up`). The topic runs out, so a skill holding on it
-  with `unknown = "holds_stale"` (Sit back) runs as it did, rather than
-  reading a fresh `bad_share` of 0 that would hold it quiet. Under three
-  samples a value said has `bad_share` 0 and region `none` (V1's minimum).
-- **Health.** `diagnostics` adds `sends: pose`, `pose` (`idle`, `sending`
+  on. **Under 3 samples, nothing is said either** (#6839's and #6660's
+  reviews): frames not going out (the opt-in off, the slide shut), the
+  server busy or failing, no body found, the sitting just begun, or the
+  window just wiped (any closing, the privacy, sleep, `room/stood_up`).
+  The topic runs out, so a skill holding on it with
+  `unknown = "holds_stale"` (Sit back) runs as it did, rather than reading
+  a fresh `bad_share` of 0 that would hold it quiet: a `bad_share` of 0 is
+  said only over at least 3 samples.
+- **Health.** `diagnostics` says `sends: activity+pose` (in place of
+  `activity`), and adds `pose` (`idle`, `sending`
   or `backing_off`), the counts sent, answered, with no body, busy, failed
   and cancelled, the window's samples, the frames skipped as not the
   camera's own JPEG (`pose_wrong_frame`), and the last failure's kind.

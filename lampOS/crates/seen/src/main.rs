@@ -355,8 +355,14 @@ fn health(
         None => diagnostic.with("sends", "none"),
         Some(activity) => {
             let counts = activity.counts();
+            // Posture runs only beside activity: `activity+pose` with it.
+            let sends = if posture.is_some() {
+                "activity+pose"
+            } else {
+                "activity"
+            };
             diagnostic
-                .with("sends", "activity")
+                .with("sends", sends)
                 .with("bursts", counts.bursts)
                 .with("answered", counts.answered)
                 .with("busy", counts.busy)

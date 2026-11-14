@@ -23,8 +23,10 @@
 //!   gate and the ring never wait. The frame's Base64 is wiped when the
 //!   request ends.
 //! - **The gate closing stops it** ([`Sink::stopped`]): the request is
-//!   cancelled, its socket closed within [`client::POLL`], a frame not yet
-//!   sent never sent, and whatever comes back is dropped.
+//!   cancelled, its socket closed within [`client::POLL`] of a read (a
+//!   connect or write already begun runs to its 15 s bound; none begins
+//!   after the cancel), a frame not yet sent never sent, and whatever comes
+//!   back is dropped.
 //! - **Busy and failures**, as activity's bursts take them
 //!   ([`crate::backoff::Retreat`]): busy drops the frame; three busy in a
 //!   row or any failure pause 60 s doubling to 10 min with jitter, and
@@ -37,11 +39,12 @@
 //!   then it is held, unsaid, for at most 5 s. No frame and no
 //!   per-person history is kept.
 //! - **Said** on `humans/posture` ([`HumanPosture`]) every 30 s while the
-//!   gate is open and the window holds at least one sample: from the first
-//!   sample of a sitting. The gate closed, nothing is said, so no old
-//!   sample is said under the privacy. With no sample (frames not going
-//!   out, the server busy, no body found, a wipe), nothing is said either:
-//!   the topic runs out, and a skill holding on it runs as it did.
+//!   gate is open and the window holds at least [`window::MIN_SAMPLES`]
+//!   samples: from the third sample of a sitting. The gate closed, nothing
+//!   is said, so no old sample is said under the privacy. Under three
+//!   samples (frames not going out, the server busy, no body found, a
+//!   wipe, or the sitting just begun), nothing is said either: the topic
+//!   runs out, and a skill holding on it runs as it did.
 //!
 //! Off unless `LAMP_SEEN_POSTURE=on` beside `LAMP_SEEN_ACTIVITY=on`.
 pub mod client;
@@ -251,7 +254,7 @@ impl Pose {
         }
         if gate.is_ok() {
             if self.open_at_us.is_none() {
-                // A new sitting: due at once, said with its first sample.
+                // A new sitting: due at once, said with its third sample.
                 self.next_said_us = now_us;
             }
             self.window.begin(now_us);
@@ -263,16 +266,15 @@ impl Pose {
         if !sitting || now_us < self.next_said_us {
             return None;
         }
-        let posture = self.window.summary(now_us);
-        // Not said while the window holds no sample (frames not going out,
-        // the server busy or failing, no body found, just wiped): the topic
-        // runs out and a skill holding on it runs as it did. Still due, so
-        // the first sample is said as soon as it lands.
-        if self.window.is_empty() {
-            return None;
-        }
+        // Not said while the window holds fewer than three samples (frames
+        // not going out, the server busy or failing, no body found, just
+        // wiped or just begun): the topic runs out and a skill holding on it
+        // runs as it did, as doing.rs's "a `bad_share` of 0 is said only
+        // over samples" reads. Still due, so the third sample is said as
+        // soon as it lands.
+        let posture = self.window.summary(now_us)?;
         self.next_said_us = now_us.saturating_add(us(HumanPosture::EVERY));
-        posture.filter(|posture| posture.check().is_ok())
+        Some(posture).filter(|posture| posture.check().is_ok())
     }
 
     /// Forget the window and stop the running request: its answer is

@@ -80,11 +80,7 @@ fn one_frame_every_30_s_each_on_its_own_socket_closed_after() {
     );
     send(&mut pose, 0);
     let said = settle(&mut pose, S, Ok(()));
-    assert_eq!(
-        said.iter().map(|p| p.window_s).collect::<Vec<_>>(),
-        [1],
-        "said with the sitting's first sample"
-    );
+    assert!(said.is_empty(), "one sample is not yet said: {said:?}");
     assert_eq!(pose.counts().answered, 1);
     assert_eq!(pose.samples(), 1);
     for at in [S, 10 * S, 30 * S - 1] {
@@ -128,10 +124,13 @@ fn the_window_reaches_the_topic_every_30_s() {
         send(&mut pose, at * S);
         said.extend(settle(&mut pose, at * S, Ok(())));
     }
-    // Said with the first sample at 0 s, then at 30 and 60 s: under three
-    // samples until the third.
-    assert_eq!(said.len(), 3);
-    assert!(said.iter().all(|p| p.bad_share == 0.0));
+    // Nothing said under three samples; the third, at 60 s, said at once.
+    assert_eq!(
+        said.iter()
+            .map(|p| (p.window_s, p.bad_share, p.region))
+            .collect::<Vec<_>>(),
+        [(60, 1.0, PostureRegion::Neck)]
+    );
     assert!(
         pose.step(89 * S, Ok(()), false).is_none(),
         "not before 30 s"
@@ -294,19 +293,12 @@ fn the_window_resets_whenever_the_gate_closes_or_on_standing_up() {
         assert_eq!(pose.counts().resets, resets + 1);
         assert!(!pose.ready(at + 200 * S), "no frame taken: {closed:?}");
         // Nothing said while it stays closed, though the 30 s came, nor
-        // once open again until a sample lands.
+        // once open again while the new window holds under three samples.
         assert!(pose.step(at + 100 * S, Err(closed), false).is_none());
         assert!(pose.step(at + 201 * S, Ok(()), false).is_none());
         send(&mut pose, at + 201 * S);
         let again = settle(&mut pose, at + 201 * S, Ok(()));
-        assert_eq!(
-            again
-                .iter()
-                .map(|p| (p.window_s, p.bad_share))
-                .collect::<Vec<_>>(),
-            [(0, 0.0)],
-            "{closed:?}"
-        );
+        assert!(again.is_empty(), "{closed:?}: {again:?}");
         at += 1_000 * S;
     }
     fill(&mut pose, at);
@@ -316,12 +308,15 @@ fn the_window_resets_whenever_the_gate_closes_or_on_standing_up() {
         !pose.ready(at + 70 * S),
         "the last frame went at {at} + 60 s"
     );
-    send(&mut pose, at + 90 * S);
-    let fresh = settle(&mut pose, at + 90 * S, Ok(()));
+    let mut fresh = Vec::new();
+    for later in [90, 120, 150] {
+        send(&mut pose, at + later * S);
+        fresh.extend(settle(&mut pose, at + later * S, Ok(())));
+    }
     assert_eq!(
         fresh.iter().map(|p| p.window_s).collect::<Vec<_>>(),
-        [20],
-        "a new sitting from 70 s"
+        [80],
+        "a new sitting from 70 s, said with its third sample"
     );
 }
 
@@ -349,15 +344,22 @@ fn nothing_is_said_while_the_window_holds_no_sample() {
     for at in [0, 30, 60, 90, 120] {
         assert!(pose.step(at * S, Ok(()), false).is_none(), "{at}");
     }
-    // A sample: said at once, then every 30 s.
-    send(&mut pose, 121 * S);
-    let said = settle(&mut pose, 121 * S, Ok(()));
+    // Samples: nothing said under three (doing.rs's "a `bad_share` of 0
+    // is said only over samples"), the third said at once, then every 30 s.
+    let mut said = Vec::new();
+    for at in [121, 151] {
+        send(&mut pose, at * S);
+        said.extend(settle(&mut pose, at * S, Ok(())));
+        assert!(said.is_empty(), "{} samples: {said:?}", pose.samples());
+    }
+    send(&mut pose, 181 * S);
+    said.extend(settle(&mut pose, 181 * S, Ok(())));
     assert_eq!(said.len(), 1);
-    assert!(pose.step(150 * S, Ok(()), false).is_none());
-    assert!(pose.step(151 * S, Ok(()), false).is_some());
+    assert!(pose.step(210 * S, Ok(()), false).is_none());
+    assert!(pose.step(211 * S, Ok(()), false).is_some());
     // Wiped (a stood-up, or any closing): no longer said.
-    assert!(pose.step(152 * S, Ok(()), true).is_none());
-    for at in [181, 211, 241] {
+    assert!(pose.step(212 * S, Ok(()), true).is_none());
+    for at in [241, 271, 301] {
         assert!(pose.step(at * S, Ok(()), false).is_none(), "{at}");
     }
 }
@@ -382,16 +384,19 @@ fn nothing_is_said_while_the_privacy_is_on() {
         );
     }
     assert_eq!(pose.samples(), 0);
-    // Open again: nothing said until a sample, then a new window, nothing
-    // slumped carried.
+    // Open again: nothing said until three new samples, then a new window
+    // of its own (from 151 s), nothing carried.
     assert!(pose.step(151 * S, Ok(()), false).is_none());
-    send(&mut pose, 151 * S);
-    let back = settle(&mut pose, 151 * S, Ok(()));
+    let mut back = Vec::new();
+    for at in [151, 181, 211] {
+        send(&mut pose, at * S);
+        back.extend(settle(&mut pose, at * S, Ok(())));
+    }
     assert_eq!(
         back.iter()
             .map(|p| (p.window_s, p.bad_share))
             .collect::<Vec<_>>(),
-        [(0, 0.0)]
+        [(60, 1.0)]
     );
 }
 
@@ -418,7 +423,10 @@ fn posture_takes_no_frame_until_its_line_was_said() {
     assert_eq!(said, Ok(()));
     assert!(pose.step(S, said, false).is_none(), "no sample yet");
     send(&mut pose, S);
-    assert_eq!(settle(&mut pose, S, said).len(), 1);
+    assert!(
+        settle(&mut pose, S, said).is_empty(),
+        "one sample: not said"
+    );
     assert_eq!(pose.counts().answered, 1);
     let seen = mock.wait_for(|seen| closed_count(seen) == 1);
     assert_eq!(
@@ -508,20 +516,27 @@ fn said_while_the_gate_is_open_and_not_after() {
     let mut pose = pose(&mock);
     assert!(pose.step(0, Err(Closed::PrivacyClosed), false).is_none());
     assert!(pose.step(S, Ok(()), false).is_none(), "no sample yet");
-    send(&mut pose, S);
-    assert_eq!(settle(&mut pose, S, Ok(())).len(), 1);
-    assert!(pose.step(2 * S, Ok(()), false).is_none());
-    assert!(pose.step(31 * S, Ok(()), false).is_some());
+    let mut said = Vec::new();
+    for at in [1, 31, 61] {
+        send(&mut pose, at * S);
+        said.extend(settle(&mut pose, at * S, Ok(())));
+    }
+    assert_eq!(said.len(), 1, "said with the third sample");
+    assert!(pose.step(62 * S, Ok(()), false).is_none());
+    assert!(pose.step(91 * S, Ok(()), false).is_some());
     // Asleep: forgotten, and nothing said while it lasts.
-    assert!(pose.step(61 * S, Err(Closed::Asleep), false).is_none());
-    assert!(pose.step(91 * S, Err(Closed::Asleep), false).is_none());
-    // Awake: nothing said until a new sample, in a new window.
-    assert!(pose.step(122 * S, Ok(()), false).is_none());
-    send(&mut pose, 122 * S);
-    let back = settle(&mut pose, 122 * S, Ok(()));
+    assert!(pose.step(92 * S, Err(Closed::Asleep), false).is_none());
+    assert!(pose.step(122 * S, Err(Closed::Asleep), false).is_none());
+    // Awake: nothing said until three new samples, in a new window.
+    assert!(pose.step(152 * S, Ok(()), false).is_none());
+    let mut back = Vec::new();
+    for at in [152, 182, 212] {
+        send(&mut pose, at * S);
+        back.extend(settle(&mut pose, at * S, Ok(())));
+    }
     assert_eq!(
         back.iter().map(|p| p.window_s).collect::<Vec<_>>(),
-        [0],
+        [60],
         "a new window"
     );
 }
