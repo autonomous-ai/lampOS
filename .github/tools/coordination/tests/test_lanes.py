@@ -675,8 +675,25 @@ class BotDryRound(Repo):
     def test_coord_switch_on_reads_product_units_only(self):
         for files, body, want in ((["lampOS/deploy/product/sub/lamp-y.conf"], "[Service]\nEnvironment=LAMP_Y=on\n", "on"),
                                   (["lampOS/deploy/other/lamp-y.service"], "Environment=LAMP_Y=on\n", "off"),
-                                  (["lampOS/deploy/product/lamp-y.service"], "Environment=LAMP_Y=only\n", "off"),
+                                  (["lampOS/deploy/product/lamp-y.service"], "Environment=LAMP_Y=off\n", "off"),
                                   (["lampOS/deploy/product/lamp-y.service"], "# Environment=LAMP_Y=on\n", "off")):
+            h = self.pr(8, files, body=body)
+            r = self.switch_on(h)
+            self.assertEqual((r.returncode, r.stdout.strip()), (0, want), (files, body))
+
+    def test_coord_switch_on_reads_settings_and_any_value_but_off(self):
+        # 14 Nov (the Reviewer-lead's P3s on #7041): the settings files count, and so does a switch set to a word.
+        env = ["lampOS/deploy/product/settings/x.env"]
+        unit = ["lampOS/deploy/product/lamp-y.service"]
+        for files, body, want in ((env, "LAMP_X=on\n", "on"), (env, "LAMP_NAMES=checked\n", "on"),
+                                  (env, "LAMP_ATTENTION=busy-near\n", "on"), (env, 'LAMP_SHORT_SOUNDS="quiet-room-checked"\n', "on"),
+                                  (env, "LAMP_ACTIVITY='place'\n", "on"), (unit, "Environment=LAMP_ACTIVITY=place\n", "on"),
+                                  (unit, 'Environment="LAMP_X=on"\n', "on"),
+                                  (env, "LAMP_X=off\n", "off"), (env, "LAMP_X=0\n", "off"), (env, "LAMP_X=false\n", "off"),
+                                  (env, "LAMP_X=\n", "off"), (env, 'LAMP_X=""\n', "off"), (unit, "Environment=LAMP_X=Off\n", "off"),
+                                  (env, "# LAMP_X=on\n", "off"), (env, "#LAMP_X=checked\n", "off"),
+                                  (["lampOS/deploy/other/x.env"], "LAMP_X=on\n", "off"),
+                                  (["lampOS/deploy/product/lamp-y.service"], "LAMP_X=on\n", "on")):
             h = self.pr(8, files, body=body)
             r = self.switch_on(h)
             self.assertEqual((r.returncode, r.stdout.strip()), (0, want), (files, body))

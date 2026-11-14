@@ -69,10 +69,19 @@ coord_body() {
 # `Environment=LAMP_…=on` to a product unit (lampOS/deploy/product/, a .service or .conf file), else "off"; fails when
 # the diff can't be read (fail closed). 14 Nov (the readers' P3s on #7034): such a PR needs a real lamp row (rows.py
 # --switch-on), not a reader's "no row needed". A git pathspec's * crosses folders, so units in subfolders count too.
+# 14 Nov (the Reviewer-lead's P3s on #7041): the settings files (lampOS/deploy/product/settings/*.env, lines
+# `LAMP_X=value` with no `Environment=`) count too, and so does any value but off, 0, false or empty, as switches take
+# words ("LAMP_NAMES=checked", "LAMP_ATTENTION=busy-near"). A value may be quoted, the assignment too
+# (`Environment="LAMP_X=on"`); a comment line (`#…`) never counts.
 coord_switch_on() {
   local d
-  d=$(git diff --no-color --no-ext-diff -U0 origin/lamp-voice...$1 -- 'lampOS/deploy/product/*.service' 'lampOS/deploy/product/*.conf' 2>/dev/null) || return 1
-  if grep -qE '^\+Environment=LAMP_[A-Z0-9_]*=on([^A-Za-z0-9_]|$)' <<< "$d"; then print on; else print off; fi
+  d=$(git diff --no-color --no-ext-diff -U0 origin/lamp-voice...$1 -- 'lampOS/deploy/product/*.service' 'lampOS/deploy/product/*.conf' \
+    'lampOS/deploy/product/settings/*.env' 2>/dev/null) || return 1
+  awk -v q="'" '
+    BEGIN { lead = "^[+][ \t]*(Environment=)?[\"" q "]?LAMP_[A-Z0-9_]+="; trim = "^[ \t\"" q "]+|[ \t\"" q "]+$"; on = 0 }
+    $0 ~ lead { v = $0; sub(lead, "", v); gsub(trim, "", v); v = tolower(v)
+                if (v != "off" && v != "0" && v != "false" && v != "") on = 1 }
+    END { print (on ? "on" : "off") }' <<< "$d"
 }
 
 # patch_of COMMIT: the commit's patch-id from its merge base with origin/lamp-voice. 31 Oct 04:0x (Fourth, 03:23): with

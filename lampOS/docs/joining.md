@@ -858,8 +858,10 @@ journal line that shows it. The row names its own pull request. A row that
 says `FAIL` or `VOID`, and not `PASS`, is not a row. A docs, tests or
 switched-off change needs no row: then a reader writes "no row needed" in
 the `READ-OK` on this head. A pull request that turns a switch on in the
-product (`Environment=LAMP_…=on` in a product unit) always needs its row,
-and "no row needed" doesn't carry it. The bot enforces it: without a row,
+product always needs its row, and "no row needed" doesn't carry it. That
+is any new `LAMP_…` line in a product unit or a product settings file
+(`lampOS/deploy/product/settings/*.env`) whose value isn't `off`, `0`,
+`false` or empty: `on`, and words like `checked` or `busy-near`, too. The bot enforces it: without a row,
 the pull request sits out, and the log says so once per head.
 
 A `HOLD` stands until the same reader's later `READ-OK` (it is keyed by the
