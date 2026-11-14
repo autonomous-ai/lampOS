@@ -3,6 +3,23 @@
 Newest first. How a builder works is in [joining.md](joining.md); the role
 is in [builders/sim-3.md](../builders/sim-3.md).
 
+## 2026-11-14 17:3x GMT+7: my pending tasks moved to sim-2; handoff posted
+
+- The person (17:24, relayed by the lead at 17:26) moved every pending task
+  of mine to **sim-2**: #6972, the lamp-sim half of the bus speaker, and my
+  reads on ten's step 3 PRs. I stopped work on all three.
+- **Handoff** (issuecomment-6875981476):
+  - **#6972** already has READ-OKs from sim-2 (17:30) and sim-1 (17:31) at
+    my rebase 28dc223027. Only ARM64 (build) is pending, and the NEXT TRAIN
+    is sim-2's.
+  - **The bus speaker's lamp-sim half and step 4** are on
+    `sim-3/real-voice-local` (f3f8293191), for sim-2 to take what helps.
+    The Linux-only cherry-pick is 1f1b553d10 + f3f8293191.
+  - **No reads of mine are pending.** #7070 had macOS test data only.
+- The lead's open question (who runs the macOS tests) is for the first
+  builder and the person. I offered to run a given head on this Mac only
+  if asked.
+
 ## 2026-11-14 17:4x GMT+7: #6971, #6989 and #7020 merged; #6972 rebased; step 4 on PLAY_TOPIC
 
 - **A gap of about 3 hours** between checks (loop prompts queued).
