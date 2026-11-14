@@ -837,6 +837,10 @@ fn late_month_when(persona: &Persona, key: &[Evidence], out: &mut Vec<Question>)
         Ok::<_, crate::Error>(())
     };
     // Day 30, the month's last day: the first mention, four weeks back.
+    // `kept` keeps persona order and the forgotten facts are the last two, so
+    // its first 20 are fact-01..fact-20, which the day-7 "when" probes
+    // already ask about (the first ten are also revised on day 15). Skipping
+    // 20 takes the first two facts no earlier "when" probe uses.
     for f in kept.iter().skip(20).take(2) {
         let first = *days(f)
             .first()
@@ -857,7 +861,9 @@ fn late_month_when(persona: &Persona, key: &[Evidence], out: &mut Vec<Question>)
     let monday = 30
         - u32::try_from(persona.local_date(30)?.weekday().to_monday_zero_offset())
             .map_err(|_| invalid("invalid weekday"))?;
-    let week = (monday - 7)..monday;
+    let week = monday
+        .checked_sub(7)
+        .ok_or_else(|| invalid("last week starts before the month"))?..monday;
     let mut n = 0;
     for f in &kept {
         if n == 2 || used.contains(&f.id) {
