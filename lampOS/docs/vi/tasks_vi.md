@@ -328,7 +328,7 @@ lần chạy, và được trả lời khi lần chạy kết thúc
     Harness của đèn: không có code riêng cho từng agent và không có tên
     engine nào trong đường chạy. lamp-tasks đọc engine mặc định của đèn ở
     mỗi lần chạy (`runtime::lamp_default`, lựa chọn trong app trước; trước
-    khi Harness báo, engine của đích của đèn) và kiểm tra một lần, như nhau
+    khi Harness báo, thứ tự của bản build, #7019) và kiểm tra một lần, như nhau
     cho mọi engine (`skill_task::default_agent_takes_runs`):
     - agent chạy trên cloud của nhà làm ra nó (`EngineKind::cloud`, Devin
       Cloud) không bao giờ chạy trên đèn;
@@ -1103,7 +1103,12 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   Harness (`lamp_order`): lựa chọn của chủ trong app khi nó nằm trong số
   đó, nếu không thì của `LAMP_LAMP_ENGINE` (tên bất kỳ engine nào), nếu
   không thì của bản build (engine đầu tiên đang bật của `lamp_engines`),
-  nếu không thì engine đầu tiên trong số đó. Mục `lamp` trong câu trả lời
+  nếu không thì engine đầu tiên trong số đó. Engine mặc định vẫn như vậy
+  trước mọi lần xem (`lamp_default`, #7019): sau khi khởi động, khi lần xem
+  đầu chưa về (khoảng 30 s) hoặc bị hết giờ, việc không nêu engine chạy
+  trên nó (Hermes trước, theo thứ tự của bản build), không bao giờ trên
+  engine của target `lamp` còn lại trong file targets; engine đó chỉ dùng
+  khi đèn không có engine nào của riêng nó. Mục `lamp` trong câu trả lời
   `targets` báo engine mặc định là `engine` của nó và liệt kê tất cả, mặc
   định đứng đầu:
   `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
@@ -1136,13 +1141,26 @@ OpenClaw ra khi Harness trên đèn cũ hơn 0.6.11.
   nêu một engine Harness khởi động không kèm việc thì là chưa chọn. Một lựa
   chọn không còn nằm trong các engine của đèn (Harness không còn báo nó,
   hoặc công tắc của nó tắt) bị bỏ qua, không bị xoá. Reset của đèn xoá nó
-  cùng thư mục tasks. Có trong test:
+  cùng thư mục tasks. Khi lựa chọn của app mất đi (#7019), `engine` của
+  target `lamp` trong file targets được ghi ngay thành engine mặc định của
+  đèn (`runtime::lamp_target_to_default`), không chờ tới lần xem máy kế
+  tiếp: lúc khởi động khi không có lựa chọn nào được lưu (không có file,
+  hoặc file không hợp lệ), và khi đang chạy khi file bị xoá (ở mỗi lần xem
+  targets, ít nhất mỗi 60 s: `runtime::app_choice_dropped`, chỉ khi không tìm thấy
+  file, nên lỗi đọc vẫn giữ lựa chọn). Chỉ file targets do phần này ghi từ
+  các máy (có dấu bên cạnh) mới được ghi, dấu được ghi trước như ở đó; file
+  ghi tay hay do ghép đôi, các target khác và máy của target của đèn được
+  giữ nguyên. Một dòng journal: `no app choice: the lamp's target written on
+  its default engine, hermes`. Có trong test:
   `engine::tests::a_named_engine_runs_the_lamps_work_on_it_even_when_not_first`,
   `engine::tests::a_named_engine_not_in_the_lamps_order_is_refused_never_moved`,
   `engine::tests::no_engine_named_runs_on_the_lamps_default_and_another_target_ignores_it`,
+  `engine::tests::with_no_app_choice_and_no_look_yet_the_builds_default_wins_over_the_targets_file`,
   `engine::tests::a_third_engine_harness_reports_on_the_lamp_can_be_named_and_be_the_default`,
   `runtime::tests::the_apps_engine_default_is_kept_used_at_once_and_read_again`,
   `runtime::tests::the_lamps_engines_are_harness_s_the_default_first_then_harness_s_order`,
+  `runtime::tests::a_first_look_that_times_out_leaves_the_builds_default_hermes`,
+  `runtime::tests::when_the_apps_choice_goes_the_lamp_targets_engine_is_rewritten_to_the_default`,
   `runtime::tests::the_lamp_is_kept_only_with_hermes_chosen_for_it`,
   `readiness::tests::the_lamps_installed_engines_keep_harness_s_order`,
   `protocol::tests::a_prepare_may_name_an_engine_and_the_app_sets_the_default`.

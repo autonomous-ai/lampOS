@@ -379,15 +379,13 @@ fn lamp_default_of(side: &LampSide, order: &[EngineKind]) -> Option<EngineKind> 
 }
 
 /// The lamp's default engine now (#6492): the first of [`lamp_order`].
-/// Before Harness has reported the lamp's engines, only the app's choice
-/// (the targets file's engine otherwise, as before).
+/// Before Harness has reported the lamp's engines (a start's first look
+/// not back yet, or timed out), the same: the app's choice, else
+/// [`LAMP_ENGINE`]'s, else the build's order (Hermes first). The targets
+/// file's engine, possibly left from an app choice since gone, never wins
+/// (#7019). None only when the lamp has no engine.
 pub fn lamp_default(side: &LampSide) -> Option<EngineKind> {
-    let order = lamp_order(side);
-    if side.reported().is_some() {
-        order.first().copied()
-    } else {
-        side.app_choice().filter(|app| order.contains(app))
-    }
+    lamp_order(side).first().copied()
 }
 
 /// Whether the lamp may offer `engine` as one of its own (#6492): any
@@ -429,19 +427,104 @@ fn refresh_lamp_reported(side: &LampSide, known: &Known, listed: &[AccountMachin
     }
 }
 
-/// Whether the app's choice went while the part runs (#7019): not yet
-/// built, nothing goes.
-pub fn app_choice_dropped(_side: &LampSide, _engine_default: &Path) -> bool {
-    false
+/// Whether the app's choice went while the part runs (#7019): the side
+/// holds one, and its file ([`ENGINE_DEFAULT_FILE`]) is no longer there.
+/// The choice is then dropped from the side, with one journal line, and
+/// the lamp's default is the build's again ([`lamp_default`]). Only a file
+/// not found drops it: a file there that can't be read now keeps the
+/// choice, so a passing read error never moves the lamp's work.
+pub fn app_choice_dropped(side: &LampSide, engine_default: &Path) -> bool {
+    if side.app_choice().is_none() {
+        return false;
+    }
+    match fs::metadata(engine_default) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        _ => return false,
+    }
+    let Ok(mut app) = side.app.lock() else {
+        return false;
+    };
+    *app = None;
+    eprintln!("tasks: the app's choice of the lamp's default engine is gone");
+    true
 }
 
-/// The lamp target's engine in the targets file put to the lamp's default
-/// (#7019): not yet built, nothing is written.
-pub fn lamp_target_to_default(_targets: &Path, _side: &LampSide) -> io::Result<Written> {
+/// With no app choice (#7019: none kept at start, or one gone,
+/// [`app_choice_dropped`]), the lamp target's `engine` in the targets file
+/// written as the lamp's default ([`lamp_default`]), so a stale engine left
+/// from a choice since gone is not kept until the next machines' look.
+/// Only a file this part wrote from the machines
+/// ([`write_targets_from_machines`], its mark beside it) is written, the
+/// mark first as there; a file written by hand or a pairing is left as it
+/// is, as are the other targets and the lamp target's machine. Nothing is
+/// written with no targets file, no lamp target, no engine of the lamp's,
+/// or the engine already the default. A change writes the lamp's folder
+/// guidance for the default too.
+pub fn lamp_target_to_default(targets: &Path, side: &LampSide) -> io::Result<Written> {
+    let said = |changed: bool, said: &str| {
+        Ok(Written {
+            changed,
+            said: said.into(),
+        })
+    };
+    let Some(default) = lamp_default(side) else {
+        return said(false, "the lamp has no engine: its target is left as it is");
+    };
+    let present = match fs::read(targets) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return said(false, "no task targets: the lamp's target is not written");
+        }
+        Err(error) => return Err(error),
+    };
+    let mark = written_mark(targets);
+    let marked = match fs::read_to_string(&mark) {
+        Ok(text) => text.lines().map(str::to_owned).collect::<Vec<_>>(),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error),
+    };
+    if !marked.contains(&sha256_hex(&present)) {
+        return said(
+            false,
+            "the targets file was not written from the machines; the lamp's target is left as it is",
+        );
+    }
+    let mut current = read_targets(targets)?;
+    match current.get_mut(LAMP_TARGET) {
+        None => return said(false, "no lamp target: nothing to write"),
+        Some(lamp) if lamp.engine == default => {
+            return said(false, "the lamp's target is on its default engine already");
+        }
+        Some(lamp) => lamp.engine = default,
+    }
+    let mut bytes =
+        serde_json::to_vec(&json!({"version":1,"targets":current})).map_err(io::Error::other)?;
+    bytes.push(b'\n');
+    let new = sha256_hex(&bytes);
+    write_atomically(
+        &mark,
+        format!("{}\n{new}\n", sha256_hex(&present)).as_bytes(),
+    )?;
+    write_atomically(targets, &bytes)?;
+    write_atomically(&mark, format!("{new}\n").as_bytes())?;
+    make_lamp_folder(&side.home, default);
     Ok(Written {
-        changed: false,
-        said: String::new(),
+        changed: true,
+        said: format!(
+            "no app choice: the lamp's target written on its default engine, {}",
+            default.argument()
+        ),
     })
+}
+
+/// [`lamp_target_to_default`], with one journal line when it wrote or
+/// failed.
+fn lamp_target_defaulted(targets: &Path, side: &LampSide) {
+    match lamp_target_to_default(targets, side) {
+        Ok(written) if written.changed => eprintln!("tasks: {}", written.said),
+        Ok(_) => {}
+        Err(error) => eprintln!("tasks: the lamp's target not written on its default: {error}"),
+    }
 }
 
 /// The file in the tasks folder where the owner's choice of the lamp's
@@ -1682,6 +1765,15 @@ fn owner<C: Clock>(
         );
         *app = Some(chosen);
     }
+    // No app choice kept (#7019: none made, or its file removed before
+    // this start): the lamp's target is written on the lamp's default now,
+    // not left on an engine from a choice since gone until the first
+    // machines' look, which may be late or time out.
+    if let (Some(later), Some(side)) = (set_up_later.as_ref(), lamp.as_ref())
+        && side.app_choice().is_none()
+    {
+        lamp_target_defaulted(&later.targets, side);
+    }
     let mut requests = 0u64;
     let mut busy = false;
     // Declared before `waits`, so dropped after it, but still before the
@@ -1777,6 +1869,13 @@ fn owner<C: Clock>(
             && Instant::now() >= targets_due
         {
             targets_due = Instant::now() + later.every;
+            // The app's choice gone while running (#7019, its file
+            // removed): the lamp's target on the default before it is read.
+            if let Some(side) = later.lamp.as_ref()
+                && app_choice_dropped(side, &engine_default)
+            {
+                lamp_target_defaulted(&later.targets, side);
+            }
             look_at_targets(&mut engine, &later.targets, &mut targets_seen, found);
             found.here = engine
                 .targets()
