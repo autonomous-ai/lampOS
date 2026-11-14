@@ -918,6 +918,9 @@
         "cooldown": {
           "$ref": "#/$defs/duration"
         },
+        "lively": {
+          "type": "boolean"
+        },
         "wait": {
           "$ref": "#/$defs/duration"
         },

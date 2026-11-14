@@ -8,7 +8,7 @@ use lamp_msgs::{
 };
 use lamp_skills::{
     Admission, BODY_STEP_US, CLIP_GAP_US, Call, Engine, Permissions, SkillKind, clip_us, load,
-    load_all, read_recordings, run_tests, tools_file,
+    load_all, read_recordings, run_tests, run_tests_at, tools_file,
 };
 use std::{
     ffi::OsStr,
@@ -16093,4 +16093,80 @@ fn a_when_over_its_bound_is_left_out() {
     let stop = load(&folder).unwrap().stop.unwrap();
     assert_eq!(stop.tool, "wellbeing_nudges");
     assert_eq!(stop.when, None);
+}
+
+/// Music sway's trigger is `lively` (#6893): at level 1 its recorded cases
+/// pass as written; at level 5 its cooldown is 6 minutes and it keeps no
+/// rearm, so a second piece 7 minutes on sways again and 20 minutes of one
+/// playlist sway at 0:20, 6:20, 12:20 and 18:20. Those level-5 cases fail at
+/// level 1, which keeps the 30 minutes and the rearm.
+#[test]
+fn music_sway_follows_the_energy_level_and_level_one_is_as_written() {
+    use base64::Engine as _;
+    let skill = skills_root().join("music-sway");
+    let written = run_tests_at(&skill, 1).unwrap();
+    assert_eq!(written, run_tests(&skill).unwrap());
+    assert!(written.0 >= 14, "{written:?}");
+    let dir = tempfile::tempdir().unwrap();
+    let lively = dir.path().join("music-sway");
+    copy(&skill, &lively);
+    let second = lively.join("tests/a-second-piece-within-half-an-hour-gets-nothing/expect.toml");
+    let expect = fs::read_to_string(&second).unwrap();
+    fs::write(
+        &second,
+        format!("{expect}\n[[expect]]\nat = \"440s\"\nwithin = \"1s\"\ncall = \"body.move\"\nargs = {{ move = \"sway\" }}\n"),
+    )
+    .unwrap();
+    // One playlist, 20 minutes at 0.85, the voice resting.
+    let case = lively.join("tests/twenty-minutes-of-one-playlist");
+    fs::create_dir_all(&case).unwrap();
+    let from = skill.join("tests/a-second-piece-within-half-an-hour-gets-nothing");
+    fs::copy(
+        from.join("voice_state.jsonl"),
+        case.join("voice_state.jsonl"),
+    )
+    .unwrap();
+    let recorded = fs::read_to_string(from.join("ears_classes.jsonl")).unwrap();
+    let mut lines = vec![recorded.lines().next().unwrap().to_owned()];
+    for seq in 1..=2_400u64 {
+        let at_us = (seq - 1) * 500_000 + 1;
+        let payload = serde_json::json!({
+            "status": "scored",
+            "model_id": "yamnet-qai-v0.59.0",
+            "window": {"start_us": at_us.saturating_sub(966_000), "end_us": at_us, "completed_us": at_us + 3_000, "capture_epoch": 1},
+            "scores": {"speech": 0.1, "music": 0.85, "laughter": 0.0},
+            "own_voice": "unknown",
+        });
+        lines.push(
+            serde_json::json!({
+                "header": {"topic": "ears/classes", "kind": "latest", "enc": "json", "type": "lamp_msgs/SoundClasses", "source": "ears", "boot": "5e1f0a7c3b9d2e41", "seq": seq, "at_us": at_us, "at_unix_ms": 1_792_400_000_000u64 + at_us / 1_000, "expires_ms": 1500},
+                "payload_b64": base64::engine::general_purpose::STANDARD.encode(payload.to_string()),
+            })
+            .to_string(),
+        );
+    }
+    fs::write(case.join("ears_classes.jsonl"), lines.join("\n") + "\n").unwrap();
+    let sways: String = ["20s", "380s", "740s", "1100s"]
+        .iter()
+        .map(|at| format!("[[expect]]\nat = \"{at}\"\nwithin = \"1s\"\ncall = \"body.move\"\nargs = {{ move = \"sway\" }}\n\n"))
+        .collect();
+    fs::write(
+        case.join("expect.toml"),
+        format!("clock = \"10:00\"\n\n{sways}"),
+    )
+    .unwrap();
+    assert_eq!(
+        run_tests_at(&lively, 5).unwrap(),
+        (written.0 + 1, written.1)
+    );
+    let why = run_tests_at(&lively, 1).unwrap_err();
+    assert!(why.contains("a-second-piece-within-half-an-hour"), "{why}");
+    fs::remove_file(second).unwrap();
+    fs::remove_dir_all(lively.join("tests/a-second-piece-within-half-an-hour-gets-nothing"))
+        .unwrap();
+    let why = run_tests_at(&lively, 1).unwrap_err();
+    assert!(
+        why.contains("twenty-minutes-of-one-playlist") && why.contains("made 1 calls, 4 expected"),
+        "{why}"
+    );
 }
