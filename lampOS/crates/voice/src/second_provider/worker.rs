@@ -5449,9 +5449,12 @@ fn made_running(
     let watched = std::sync::Arc::downgrade(&turn);
     tokio::task::spawn_blocking(move || {
         crate::make_skill_local::set_turn(watched);
+        // The agent's waiting line goes to this request's turn (#6749).
+        crate::make_skill_agent::set_made_for(request);
         // Nothing an earlier call left on this thread is taken as this one's.
         let _ = crate::make_skill_local::take_said_line();
         let answer = work();
+        crate::make_skill_agent::set_made_for(0);
         let line = crate::make_skill_local::take_said_line();
         if given.send(answer).is_ok() {
             drop(pending);
