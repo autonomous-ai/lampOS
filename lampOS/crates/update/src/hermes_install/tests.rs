@@ -3506,6 +3506,27 @@ fn a_makes_namespace_hides_hermess_lasting_home_and_the_rest_of_the_work_folder(
         "{lines:?}"
     );
     fs::remove_file(&linked).unwrap();
+    // Heron's P3 on #7011: `-L` looks only at the path's last part, so the
+    // folder holding a generation is checked too. An `environments` that
+    // is a link, to a real folder elsewhere with the same generation, ends
+    // it before the lasting home is hidden, and nothing is bound or made
+    // through it.
+    let environments = installs.join("k/environments");
+    let elsewhere = base.join("elsewhere");
+    fs::rename(&environments, &elsewhere).unwrap();
+    std::os::unix::fs::symlink(&elsewhere, &environments).unwrap();
+    let (out, lines) = run(Some(&home), "");
+    assert!(!out.status.success());
+    assert!(out.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Hermes leases not shown"));
+    assert!(
+        !lines.iter().any(|line| line.contains("tmpfs")
+            || line.contains("environments/g1/.leases")
+            || line.contains("elsewhere")),
+        "{lines:?}"
+    );
+    fs::remove_file(&environments).unwrap();
+    fs::rename(&elsewhere, &environments).unwrap();
     // A home outside the work folder's `lamp`, or missing, is refused
     // before anything is mounted.
     let other = base.join("other/make-task-1/home");
