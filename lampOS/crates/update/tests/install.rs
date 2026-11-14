@@ -1921,6 +1921,33 @@ fn the_product_sends_to_the_linked_services_held_to_the_owners_voice() {
     }
 }
 
+/// A Google Calendar event is moved or cancelled in the product (#6067; the
+/// lamp-3e83 tester's report, 10 Nov): `LAMP_CALENDAR_EDITS=on` once in
+/// `lamp-services`, the only unit that reads it, beside its writes, and no
+/// other product unit names it.
+#[test]
+fn the_product_moves_and_cancels_a_calendar_event() {
+    for (unit, text) in install::PRODUCT {
+        let service = section(text, "Service");
+        let on = service
+            .iter()
+            .filter(|line| **line == "Environment=LAMP_CALENDAR_EDITS=on")
+            .count();
+        let mentioned = service
+            .iter()
+            .filter(|line| line.contains("LAMP_CALENDAR_EDITS"))
+            .count();
+        assert_eq!(on, usize::from(*unit == "lamp-services.service"), "{unit}");
+        assert_eq!(mentioned, on, "{unit}");
+        if on == 1 {
+            assert!(
+                service.contains(&"Environment=LAMP_SERVICES_WRITE=on"),
+                "{unit} lacks LAMP_SERVICES_WRITE"
+            );
+        }
+    }
+}
+
 /// A made skill reads a linked service to its owner alone (#5288, #5303):
 /// `LAMP_SKILL_READS=on` in the four units that read it, `lamp-services`
 /// (lets `lamp-skills` onto its tools socket), `lamp-skills` (runs the
