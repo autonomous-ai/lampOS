@@ -72,7 +72,7 @@ fn built(skills: &[Tool]) -> Tool {
     let names: Vec<&str> = skills.iter().map(|skill| skill.name.as_str()).collect();
     Tool {
         name: NAME.to_owned(),
-        description: "Use one of your skills, listed under \"Your skills\" in your instructions, each with when to use it. Call this when what someone asks is what a skill's line says: give the skill's name, and its choice and its yes-or-no only when its line names them. The call runs the skill: then do what its answer tells you, and don't call it again for the same ask unless its answer tells you to.".to_owned(),
+        description: "Use one of your skills, listed under \"Your skills\" in your instructions, each with when to use it. Call this when what someone asks is what a skill's line says: give the skill's name, and its choice and its yes-or-no only when its line names them. The call runs the skill: then do what its answer tells you, and don't call it again in this turn for the same ask unless its answer tells you to; a new ask in a later line is a call of its own.".to_owned(),
         parameters: Some(json!({
             "type": "object",
             "properties": {
@@ -584,7 +584,7 @@ mod tests {
         let tool = function(&installed()).unwrap();
         assert!(
             tool.description
-                .ends_with("don't call it again for the same ask unless its answer tells you to."),
+                .ends_with("don't call it again in this turn for the same ask unless its answer tells you to; a new ask in a later line is a call of its own."),
             "{}",
             tool.description
         );

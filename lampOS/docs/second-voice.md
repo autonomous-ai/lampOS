@@ -2125,8 +2125,16 @@ order is kept. A written turn is the same from the chat on.
   to that scope's turns; a request with no kept words keeps none, and a
   forget drops them. They are not written to the thread file (an older
   build would set the file aside, #1505): after a restart, earlier
-  exchanges are words only. Any other call that took arguments (a keep, a
-  skill's) is never kept: its arguments are the person's words, and told
+  exchanges are words only. A skill's call through `use_skill` is kept
+  with its `skill`, `choice` and `flag` only (`SKILL_KEPT_FIELDS`: a
+  skill's name, a word from its own list, a yes-or-no), and only when it
+  has no other field, its result told "(done earlier: the skill ran then.
+  The rest of its result was not kept. A new ask for it needs its own
+  call.)" (`SKILL_RAN_EARLIER`; #7076: on lamp-52e6 on 14 Nov a second
+  "Lamp, I'm unplugging you now." 8 s after a prepare-unplug run was
+  answered in words, `calls=none`, the earlier asks told as words alone).
+  Any other call that took arguments (a keep, a skill's by its own
+  function) is never kept: its arguments are the person's words, and told
   bare it would teach calling it bare (Fourteen's P3 on #5018). A light's,
   volume's or Schedule's call whose arguments pass 256 bytes is kept bare
   if its function takes none, else not at all (every Schedule function
