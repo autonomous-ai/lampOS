@@ -8259,8 +8259,12 @@ impl ToolProgram {
         let mut heard = self.heard.lock().unwrap();
         heard
             .get_or_insert_with(|| {
+                // Looks for new subscribers at every line: a publisher looks
+                // at most every 200 ms, so words said within that of a
+                // search's or a show's own subscriber would be lost to it.
                 Bus::new(self._dir.path().join("bus"))
                     .unwrap()
+                    .rescan_every(Duration::ZERO)
                     .publisher_declared(
                         lamp_msgs::Speech::TOPICS[0],
                         &lamp_msgs::Speech::declaration(),
@@ -8902,9 +8906,9 @@ show = "short"
 }
 
 /// A light show asked in turn 23, with the voice listening to a line of
-/// turn 24 during its first frame, `words` heard in it: the run's done
+/// turn `turn` during its first frame, `words` heard in it: the run's done
 /// event, and the colours asked for in the 600 ms after the line.
-fn show_over_a_line(words: &str) -> (Vec<String>, SkillEvent) {
+fn show_over_a_line(words: &str, turn: u64) -> (Vec<String>, SkillEvent) {
     let show = r#"
 tool = "light_show"
 [[do]]
@@ -8913,9 +8917,8 @@ show = "short"
     let mut program = ToolProgram::with("show", show, &[("short", SHORT_SHOW)]);
     let bus = Bus::new(program._dir.path().join("bus")).unwrap();
     let mut events = bus.subscribe(SkillEvent::TOPIC, "test").unwrap();
+    // Read by the program's loop before the call: no wait is needed.
     program.heard_in("lamp, a party light show", Some(23));
-    // The program's loop reads the asking turn before the call.
-    std::thread::sleep(Duration::from_millis(100));
     assert_eq!(program.call("light_show", "{}")["ok"], true);
     assert_eq!(program.colours(1), ["purple"]);
     program
@@ -8927,7 +8930,7 @@ show = "short"
             },
         )
         .unwrap();
-    program.heard_in(words, Some(24));
+    program.heard_in(words, Some(turn));
     program.clock.skip(Duration::from_millis(400));
     let after = program.colours_within(1, Duration::from_millis(600));
     let deadline = Instant::now() + Duration::from_secs(10);
@@ -8950,7 +8953,7 @@ show = "short"
 /// all its frames and says so.
 #[test]
 fn a_line_with_no_words_does_not_stop_a_light_show() {
-    let (after, done) = show_over_a_line("");
+    let (after, done) = show_over_a_line("", 24);
     // Nothing given back in the frame the line came in.
     assert_eq!(after, Vec::<String>::new(), "{}", done.why);
     assert!(
@@ -8965,11 +8968,26 @@ fn a_line_with_no_words_does_not_stop_a_light_show() {
 /// frame they come in, and the light is given back then.
 #[test]
 fn a_later_turns_words_stop_a_light_show() {
-    let (after, done) = show_over_a_line("stop");
+    let (after, done) = show_over_a_line("stop", 24);
     assert_eq!(after, ["blue"], "{}", done.why);
     assert!(
         done.why
             .contains("show short: stopped in frame 1 of 3, someone spoke to the lamp"),
+        "{}",
+        done.why
+    );
+}
+
+/// Thirteen's HOLD on #7061: on Live the last pieces of the line that
+/// asked for the show can come after the call. Words of the asking turn do
+/// not stop it, as they do not end a search: the program reads what was
+/// heard before a show's call too, so the asking turn is known.
+#[test]
+fn the_asking_turns_late_words_do_not_stop_a_light_show() {
+    let (after, done) = show_over_a_line("light show please", 23);
+    assert_eq!(after, Vec::<String>::new(), "{}", done.why);
+    assert!(
+        done.why.contains("show short: 3 frames shown"),
         "{}",
         done.why
     );
