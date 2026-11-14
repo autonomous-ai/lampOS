@@ -730,6 +730,7 @@ impl Peers {
                     &lamp_msgs::Hand {
                         pushed: true,
                         since_us: 1,
+                        moved: None,
                     },
                 )
                 .unwrap();

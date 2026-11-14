@@ -375,7 +375,11 @@ mod tests {
 
     #[test]
     fn each_fresh_push_is_taken_once() {
-        let hand = |pushed, since_us| lamp_msgs::Hand { pushed, since_us };
+        let hand = |pushed, since_us| lamp_msgs::Hand {
+            pushed,
+            since_us,
+            moved: None,
+        };
         let mut taken = None;
         assert!(!new_push(hand(false, 0), 10, &mut taken));
         assert!(new_push(hand(true, 500), 10, &mut taken));
@@ -405,6 +409,7 @@ mod tests {
             &lamp_msgs::Hand {
                 pushed: true,
                 since_us: 7,
+                moved: None,
             },
         )
         .unwrap();
