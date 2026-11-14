@@ -1009,7 +1009,12 @@ async fn session(
                     tcp_failures = 0;
                 }
                 if let Some(changes) = &changes {
-                    changes.set_broker(account.mqtt_endpoint.trim(), account.mqtt_port);
+                    // The port connected to (`port_for`), so a Wi-Fi change's own
+                    // check never opens TCP to the TLS port with TLS off.
+                    changes.set_broker(
+                        account.mqtt_endpoint.trim(),
+                        port_for(account.mqtt_port, tls_on()),
+                    );
                     changes.online();
                 }
                 let _ = client.try_subscribe(account.fa_channel.as_str(), QoS::AtLeastOnce);
