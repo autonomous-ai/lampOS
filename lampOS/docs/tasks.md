@@ -2195,7 +2195,13 @@ The product unit's test is `the_tasks_part_starts_with_no_targets_and_learns_the
     a start, while the first look is not back (about 30 s) or when it times
     out, work naming no engine runs on it (Hermes first, by the build's
     order), never on the `lamp` target's engine left in the targets file;
-    that engine is used only while the lamp has no engine of its own.
+    that engine is used only while the lamp has no engine of its own, or
+    while the owner's choice (the app's, else `LAMP_LAMP_ENGINE`'s) is an
+    engine outside the switched-on order, such as a third engine Harness
+    reports on the lamp: that can't be checked before a look, so the
+    targets file's engine, which the last look wrote from it, is kept
+    (the Reviewer-lead's P2 on #7036; shown in
+    `engine::tests::before_a_look_an_app_choice_of_a_third_engine_keeps_the_targets_files_engine`).
     The `targets` answer's `lamp` entry says the default as its `engine`
     and lists them all, default first:
     `{"alias":"lamp","engine":"claude","engines":["claude","hermes","openclaw"]}`
