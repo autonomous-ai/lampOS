@@ -784,7 +784,10 @@ fn the_voices_own_mail_waiting_leaves_go_for_it_to_it() {
 /// ask Claude Code to fix it?", its newest words in the turn's history, as
 /// the thread gives them), "Sounds good." and "Yes please." are the model's
 /// to read in context, even when a pushed skill's `asks` hold them: nothing
-/// runs in code and round 1 is the model's chat. After a line that asked
+/// runs in code and round 1 is the model's chat, told that the line also
+/// reads as the skill's ask ([`crate::skill_named::awaited_note`]), so a
+/// new ask after a question is called by the model, not only talked about
+/// (#5749's on5, lamp-52e6, 14 Nov). After a line that asked
 /// nothing, or none, the same line runs the skill by its ask.
 #[tokio::test]
 async fn after_the_lamp_asks_a_yes_goes_to_the_model() {
@@ -858,6 +861,16 @@ async fn after_the_lamp_asks_a_yes_goes_to_the_model() {
                         .words()
                         .is_none_or(|words| !words.contains("by its name"))),
                     "{answer}: no skill was named"
+                );
+                // Told what the line also reads as, to judge (#5749's on5:
+                // a new ask after a question was only talked about).
+                assert!(
+                    script.asked.lock().unwrap()[0].iter().any(|message| message
+                        .words()
+                        .is_some_and(
+                            |words| words == crate::skill_named::awaited_note("photo booth")
+                        )),
+                    "{answer}: the model is told the line also reads as the skill's ask"
                 );
             } else {
                 assert_eq!(

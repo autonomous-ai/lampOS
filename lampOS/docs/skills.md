@@ -1283,7 +1283,14 @@ camera, so I can't take photos…" with `calls=none`.
   send), no line is read for a skill by its name or its asks
   (`second_provider`'s `lamp_awaits_answer`). Round 1 is the model's, and
   it decides in context whether "Sounds good." or "Yes please." answers
-  the lamp or asks for a skill. A Vietnamese yes ("Được.", "Ừ, làm đi.")
+  the lamp or asks for a skill. The journal says so ("the heard words
+  named a skill (…), not called in code:" and why), and after a question
+  (no yes held) round 1 is told what the line also reads as
+  (`skill_named::awaited_note`: "what they said also reads as an ask for
+  …; if it answers what you asked, go on with that; if it is a new ask
+  for …, call it now"). Untold, a new ask after a question was only talked
+  about (#5749's on5, lamp-52e6, 14 Nov: "Lamp, can you play some relaxing
+  music?" got `calls=none`). A Vietnamese yes ("Được.", "Ừ, làm đi.")
   is held the same way. `remarks::lamp_asked` sees a Vietnamese question
   only by its `?` ("Mình bắt đầu nhé?"); one written without it
   ("Mình bắt đầu nhé.") is not taken as a question.

@@ -662,6 +662,21 @@ pub fn ran_note(spoken: &str) -> String {
     )
 }
 
+/// The note the turn is asked with when the heard words read as an ask
+/// for the skill `spoken` but the lamp's last words asked something
+/// (`second_provider`'s `lamp_awaits_answer`): nothing is called in code,
+/// and whether the line answers the lamp or asks for the skill is the
+/// model's to judge (the owner's ruling on #6842). Untold, a new ask after
+/// a question was only talked about (#5749's on5, lamp-52e6, 14 Nov:
+/// "Lamp, can you play some relaxing music?" got `calls=none`).
+pub fn awaited_note(spoken: &str) -> String {
+    format!(
+        "(For you to know: what they said also reads as an ask for {spoken}, one of your skills, \
+         but your last words asked them something, so nothing is called for them. If it answers \
+         what you asked, go on with that; if it is a new ask for {spoken}, call it now.)"
+    )
+}
+
 /// What a model's call of the skill the heard words ran already is told
 /// ([`same_skill_again`]): not run twice, and the first run's result.
 pub fn ran_already(told: &Value) -> Value {

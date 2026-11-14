@@ -15886,10 +15886,32 @@ async fn answer(
         // Never while the lamp waits for an answer (the owner's ruling on
         // #6842): its last words asked something, or a yes is held
         // ([`lamp_awaits_answer`]); the model reads the line in context.
+        // Journaled, and after a question the model is told what the line
+        // also reads as, to judge (#5749's on5, lamp-52e6, 14 Nov: a new
+        // ask after a question was dropped silently and only talked about).
+        let held = yes_held || yes_taken;
+        let awaits = lamp_awaits_answer(held, &messages);
+        if let Some((name, args)) = skill_named
+            .as_ref()
+            .filter(|_| !forgot_before_question && awaits)
+        {
+            let function = crate::skill_named::function_of(name, args);
+            let why = if held {
+                "a yes is held"
+            } else {
+                "the lamp's last words asked something"
+            };
+            eprintln!(
+                "lamp-voice second: request {request}: the heard words named a skill ({function}), not called in code: {why}"
+            );
+            if !held {
+                messages.push(Message::system(crate::skill_named::awaited_note(
+                    &crate::skill_named::spoken(function),
+                )));
+            }
+        }
         let mut named_call: Option<net::ToolCall> = skill_named
-            .filter(|_| {
-                !forgot_before_question && !lamp_awaits_answer(yes_held || yes_taken, &messages)
-            })
+            .filter(|_| !forgot_before_question && !awaits)
             .map(|(name, args)| net::ToolCall {
                 extra: None,
                 id: crate::skill_named::CALL_ID.into(),
