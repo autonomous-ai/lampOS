@@ -380,12 +380,25 @@ fn lamp_default_of(side: &LampSide, order: &[EngineKind]) -> Option<EngineKind> 
 
 /// The lamp's default engine now (#6492): the first of [`lamp_order`].
 /// Before Harness has reported the lamp's engines (a start's first look
-/// not back yet, or timed out), the same: the app's choice, else
-/// [`LAMP_ENGINE`]'s, else the build's order (Hermes first). The targets
-/// file's engine, possibly left from an app choice since gone, never wins
-/// (#7019). None only when the lamp has no engine.
+/// not back yet, or timed out), the same when the owner chose nothing
+/// (the build's order, Hermes first): the targets file's engine, possibly
+/// left from an app choice since gone, never wins then (#7019). A choice
+/// (the app's, else [`LAMP_ENGINE`]'s) of an engine outside the switched-on
+/// order, such as a third engine Harness reports on the lamp, can't be
+/// checked before a look, so it gives None and the targets file's engine
+/// (which the last look wrote from that choice) is kept (the
+/// Reviewer-lead's P2 on #7036). None also when the lamp has no engine.
 pub fn lamp_default(side: &LampSide) -> Option<EngineKind> {
-    lamp_order(side).first().copied()
+    let order = lamp_order(side);
+    if side.reported().is_none()
+        && side
+            .app_choice()
+            .or(side.chosen)
+            .is_some_and(|choice| !order.contains(&choice))
+    {
+        return None;
+    }
+    order.first().copied()
 }
 
 /// Whether the lamp may offer `engine` as one of its own (#6492): any
