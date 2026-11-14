@@ -2994,11 +2994,18 @@ to answer: the lamp's owner linked these services to you in the app's
 Linked accounts: Notion, Gmail. They are yours to use for the owner: read from
 one with service_read, and send, post or create with service_write, when
 they ask. Asked about one, use it, or say plainly what you can do with it;
-never say it is the app's job or that you don't know it. A service not in
-this list isn't linked to this lamp yet. It can be linked in the app: open
-this lamp, then Settings, then Linked accounts.)" (`services_told::note`,
-whose last sentence is `lamp-services`' own `NOT_LINKED`, so a service
-missing from the list is answered with where to link it, #5867). The names are what `lamp-services` last said on
+never say it is the app's job or that you don't know it. A service the
+lamp can link (Gmail, Google Calendar, Google Drive, Figma, GitHub, Linear, Asana, Ahrefs, Facebook Page, Slack, monday.com, HubSpot, Amplitude, Notion) but not in this list isn't linked to this lamp yet. It
+can be linked in the app: open this lamp, then Settings, then Linked
+accounts. Any other service the lamp can't link yet: say so. The services
+it can link are in the app: open this lamp, then Settings, then Linked
+accounts.)" (`services_told::note`). The linkable names are the
+catalogue's (`services_told::linkable`: each service once, by the name a
+person hears), and the two sentences after them are `lamp-services`' own
+`NOT_LINKED` and `CANT_LINK`, so a service of the catalogue missing from
+the list is answered with where to link it (#5867), and one outside it,
+such as Outlook, with "the lamp can't link it yet", never sent to a screen
+that has no Outlook (Thirteen's P2 on #7013). The names are what `lamp-services` last said on
 `services_connected` (its `name`, else its code; an expired link too, since
 a read renews it), asked off the line's path as each line begins
 (`services::Linked`, at most once a second, 500 ms at most) and after each
@@ -3023,9 +3030,9 @@ with `LAMP_PRIVATE_ROOM=on`: its session keeps what it was told, so with
 the private room off a guest later in the session would hear the names
 (#5598), and the Live route is told nothing there. It is told again when a
 link is made or removed, or in a fresh session; when everything it was told
-of is unlinked, it is told once that nothing is linked now, and where a
-service is linked: open this lamp, then Settings, then Linked accounts
-(`services_told::UNLINKED_NOTE`). Every call from a line not the owner's is
+of is unlinked, it is told once that nothing is linked now, and where the
+services it can link are: open this lamp, then Settings, then Linked
+accounts (`services_told::UNLINKED_NOTE`, in `CANT_LINK`'s words). Every call from a line not the owner's is
 still refused (`OWNER_ONLY`).
 
 ## What is not done yet
