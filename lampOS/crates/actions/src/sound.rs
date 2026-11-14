@@ -58,6 +58,8 @@ pub struct Volume<M> {
     observation_sequence: Option<u64>,
     /// The raw level last read from the mixer, as it is (`heard`).
     heard_raw: Option<u8>,
+    /// Told each level a person's change left (`kept_volume`, #5551).
+    keeper: Option<Box<dyn crate::kept_volume::Keep + Send>>,
 }
 
 const UNREAD: &str = "I could not read my speaker's volume.";
@@ -77,6 +79,58 @@ impl<M: Mixer> Volume<M> {
             observation_revocation: Some(0),
             observation_sequence: Some(0),
             heard_raw: None,
+            keeper: None,
+        }
+    }
+
+    /// Each level a person's change leaves is told to `keeper`; a mute and
+    /// a temporary limit are not (`kept_volume`, #5551).
+    pub fn keeping(mut self, keeper: Box<dyn crate::kept_volume::Keep + Send>) -> Self {
+        self.keeper = Some(keeper);
+        self
+    }
+
+    fn kept(&mut self, level: u8) {
+        if level > 0
+            && let Some(keeper) = self.keeper.as_mut()
+        {
+            keeper.keep(level);
+        }
+    }
+
+    /// At a start, the level kept from before, set back: never past the
+    /// ceiling and never silent. Read back, as any write, and the read-back
+    /// itself must be in 1..=ceiling: a control that rounds a point down to
+    /// silence, or up past the ceiling, is not a level set back.
+    pub fn restore(&mut self, kept: u8) -> Result<u8, String> {
+        let ceiling = self.ceiling();
+        let now = self.write(kept.clamp(1, ceiling))?;
+        if (1..=ceiling).contains(&now) {
+            Ok(now)
+        } else {
+            self.record_observation(None);
+            Err(UNCONFIRMED.to_owned())
+        }
+    }
+
+    /// [`Volume::restore`], tried again `every` while it fails, a new try
+    /// begun only before `start_by` has passed: so the whole wait, mixer
+    /// calls included, is at most `start_by` plus one try (a set and a read,
+    /// each at most [`AMIXER_WAIT`]).
+    pub fn restore_within(
+        &mut self,
+        kept: u8,
+        start_by: Duration,
+        every: Duration,
+    ) -> Result<u8, String> {
+        let started = Instant::now();
+        loop {
+            let restored = self.restore(kept);
+            let elapsed = started.elapsed();
+            if restored.is_ok() || elapsed >= start_by {
+                return restored;
+            }
+            std::thread::sleep(every.min(start_by - elapsed));
         }
     }
 
@@ -230,7 +284,10 @@ impl<M: Mixer> Volume<M> {
     /// point either way is the level asked for.
     fn change(&mut self, from: u8, to: u8, said: impl Fn(u8) -> String) -> Outcome {
         match self.write(to) {
-            Ok(now) if now != from || to == from => Outcome::Done(said(now)),
+            Ok(now) if now != from || to == from => {
+                self.kept(now);
+                Outcome::Done(said(now))
+            }
             Ok(_) => {
                 self.record_observation(None);
                 Outcome::Failed(UNCONFIRMED.into())
@@ -358,6 +415,7 @@ impl<M: Mixer> Volume<M> {
         if now > 0 {
             self.before_mute = None;
         }
+        self.kept(now);
         Ok(self.level_at(now))
     }
 }
@@ -369,7 +427,7 @@ pub struct Amixer {
     pub control: String,
 }
 
-const AMIXER_WAIT: Duration = Duration::from_millis(800);
+pub const AMIXER_WAIT: Duration = Duration::from_millis(800);
 
 impl Amixer {
     fn run(&self, arguments: &[&str]) -> io::Result<String> {
@@ -454,6 +512,125 @@ pub(crate) mod tests {
             Ok(())
         }
     }
+    /// Every level it is told, shared with the test.
+    #[derive(Clone, Default)]
+    struct Told(std::sync::Arc<std::sync::Mutex<Vec<u8>>>);
+    impl crate::kept_volume::Keep for Told {
+        fn keep(&mut self, level: u8) {
+            self.0.lock().unwrap().push(level);
+        }
+    }
+
+    #[test]
+    fn a_persons_change_is_kept_and_a_mute_or_a_limit_never_is() {
+        let told = Told::default();
+        let mut volume = at(50, 100).keeping(Box::new(told.clone()));
+        let kept = || told.0.lock().unwrap().clone();
+        said(volume.up());
+        said(volume.down());
+        assert_eq!(volume.to_share(30).unwrap().raw, 30);
+        assert_eq!(kept(), [50 + STEP, 50, 30]);
+        said(volume.mute());
+        assert_eq!(volume.to_share(0).unwrap().raw, 0);
+        assert_eq!(kept(), [50 + STEP, 50, 30], "a mute is never kept");
+        said(volume.unmute());
+        assert_eq!(kept(), [50 + STEP, 50, 30, 30]);
+        volume.set_limit(Some(20)).unwrap();
+        volume.set_limit(None).unwrap();
+        assert_eq!(
+            kept(),
+            [50 + STEP, 50, 30, 30],
+            "a limit is not the person's"
+        );
+        // Nothing changed: nothing kept.
+        let mut quiet = at(100, 100).keeping(Box::new(told.clone()));
+        assert!(matches!(quiet.up(), Outcome::Already(_)));
+        assert_eq!(kept().len(), 4);
+    }
+
+    /// Rounds each write a point the way it is told, as a real control may.
+    struct Rounding {
+        level: u8,
+        by: i8,
+    }
+    impl Mixer for Rounding {
+        fn get(&mut self) -> io::Result<u8> {
+            Ok(self.level)
+        }
+        fn set(&mut self, level: u8) -> io::Result<()> {
+            self.level = (i16::from(level) + i16::from(self.by)).clamp(0, 100) as u8;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_restore_rounded_to_silence_or_past_the_ceiling_is_not_set_back() {
+        let mut down = Volume::new(Rounding { level: 100, by: -1 }, 100);
+        assert!(down.restore(1).is_err(), "rounded to silence");
+        assert_eq!(down.observed(), None);
+        let mut up = Volume::new(Rounding { level: 100, by: 1 }, 40);
+        assert!(up.restore(90).is_err(), "rounded past the ceiling");
+        // A point's rounding inside the bounds is still a level set back.
+        let mut inside = Volume::new(Rounding { level: 100, by: -1 }, 100);
+        assert_eq!(inside.restore(56), Ok(55));
+        let mut top = Volume::new(Rounding { level: 100, by: -1 }, 40);
+        assert_eq!(top.restore(90), Ok(39));
+    }
+
+    /// Takes `wait` over every call, then fails it: a control not made yet.
+    struct Slow {
+        wait: Duration,
+        calls: u32,
+    }
+    impl Mixer for Slow {
+        fn get(&mut self) -> io::Result<u8> {
+            self.calls += 1;
+            std::thread::sleep(self.wait);
+            Err(io::Error::other("no control yet"))
+        }
+        fn set(&mut self, _: u8) -> io::Result<()> {
+            self.calls += 1;
+            std::thread::sleep(self.wait);
+            Err(io::Error::other("no control yet"))
+        }
+    }
+
+    #[test]
+    fn a_slow_failing_control_holds_the_start_for_the_budget_and_one_try_at_most() {
+        let wait = Duration::from_millis(30);
+        let mut volume = Volume::new(Slow { wait, calls: 0 }, 100);
+        let started = Instant::now();
+        let start_by = Duration::from_millis(200);
+        assert!(
+            volume
+                .restore_within(60, start_by, Duration::from_millis(10))
+                .is_err()
+        );
+        let took = started.elapsed();
+        // One try is a failed set alone here: the budget plus that.
+        assert!(took < start_by + wait * 3, "{took:?}");
+        assert!(volume.mixer.calls >= 2, "tried again");
+    }
+
+    #[test]
+    fn a_kept_level_is_set_back_within_the_ceiling_and_never_silent() {
+        let mut volume = at(100, 100);
+        assert_eq!(volume.restore(56), Ok(56));
+        assert_eq!(volume.mixer.level, 56);
+        let mut lower = at(100, 40);
+        assert_eq!(lower.restore(90), Ok(40));
+        assert_eq!(lower.restore(0), Ok(1));
+        let mut broken = Volume::new(
+            Fake {
+                level: 100,
+                unwritable: true,
+                ..Fake::default()
+            },
+            100,
+        );
+        assert!(broken.restore(56).is_err());
+    }
+
     fn at(level: u8, ceiling: u8) -> Volume<Fake> {
         Volume::new(
             Fake {

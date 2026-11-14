@@ -42,6 +42,10 @@ Environment=LAMP_REMINDERS_HIDDEN_COUNT=on
 # (LAMP_SECOND_SAY_WITH_CALL, #2135, #4700). Here only: the voice's own unit leaves LAMP_SHORT_DONE off, so with an
 # owner's language chosen it never says these English words.
 Environment=LAMP_SHORT_DONE=on
+# The person's volume kept across a power cut (#5551): a V2 lamp is unplugged, never shut down cleanly, so
+# alsa-restore never stores the mixer and every boot came back at 100%. Kept in LAMP_OUTPUT_CAPS_DIR/kept-volume
+# after each change (never a mute) and set back at the start. An older lamp-actions ignores the line.
+Environment=LAMP_VOLUME_KEPT=on
 # Music to relax (#1685, #5749): a spoken request for a skill's checked local recording plays it after the
 # confirmation; Stop, an interruption, the privacy slide or mute ends it, and nothing resumes (requested-audio.md).
 # The same line in lamp-voice, lamp-skills and lamp-actions; played on lamp-4ace on 6963 (#2793). Installing
