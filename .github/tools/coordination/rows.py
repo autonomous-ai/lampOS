@@ -24,9 +24,13 @@
 #
 # 14 Nov 15:40 (the lead): "a ROW line names the lamp, the build (seq or commit) and quotes the journal lines that show the
 # behaviour; a ROW missing any of the three doesn't count." A row (a ROW line or a "lamp row for #N") counts only with all
-# three: in its first 400 characters a lamp ("lamp-52e6": lamp- and 4 lowercase letters or digits, a whole word) and a
-# build (a five-digit sequence as a whole word, "12987", or "build <7-40 hex commit>"), and a journal: a fenced code block
+# three: in its first 400 characters a lamp ("lamp-52e6", a whole word) and a build (a five-digit sequence, "12987", or
+# "build <7-40 hex commit>"), and a journal: a fenced code block
 # with a line in it, or a quoted line ("> …") naming a lamp-. Without one, the bot says which part it lacks.
+# 14 Nov (both readers' P2 and the Reviewer-lead's P3 on #7062): a lamp is its hostname, lamp- and four hex characters
+# with at least one digit (c0a4, 52e6, 06c1, 4ace, 75c9, cb94, 9adf, a0ae, 0c89), so a part's name (lamp-body,
+# lamp-eyes, lamp-seen, lamp-test) is none; and a build's five digits follow "build", "installed" or "on" (bold or
+# backticks between: "installed **12987**", "on 13000"), so a bare number ("20000 counts", "12345 ms") is none.
 import json, os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -37,8 +41,8 @@ from markers import parse_marker, quoted, names_commit, writers_from_args, is_wr
 FAILED = re.compile(r"\b(?:FAIL|VOID)(?:ED|S)?\b")
 PASSED = re.compile(r"\bPASS\b")
 NO_ROW = re.compile(r"(?i)\bno row needed\b")
-LAMP = re.compile(r"(?<![\w-])lamp-[a-z0-9]{4}(?![\w-])")
-BUILD = re.compile(r"(?<![#\w])\d{5}(?!\w)|\bbuild[ \t]+`?[0-9a-f]{7,40}\b")
+LAMP = re.compile(r"(?<![\w-])lamp-(?=[0-9a-f]{0,3}[0-9])[0-9a-f]{4}(?![\w-])")
+BUILD = re.compile(r"\b(?i:build|installed|on)[ \t]+[*`]*\d{5}(?!\w)|\bbuild[ \t]+`?[0-9a-f]{7,40}\b")
 FENCE_OPEN = re.compile(r" {0,3}(`{3,}|~{3,})")
 
 
