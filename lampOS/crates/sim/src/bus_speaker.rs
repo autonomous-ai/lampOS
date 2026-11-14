@@ -1,6 +1,6 @@
 //! The real voice's speaker on the bus, for the local route: lamp-voice with
 //! `--speaker-device bus:speaker1` publishes what it plays on
-//! [`TOPIC`] (`lamp_msgs::Audio` header and `json+pcm`, 24 kHz mono S16LE,
+//! [`TOPIC`] (`speaker1/play`: `lamp_msgs::Audio` header and `json+pcm`, 24 kHz mono S16LE,
 //! 10 to 100 ms a block, at the voice's own real-time pace), the mirror of
 //! `bus:mic1`, and lamp-sim plays it on the host through the stand-in's
 //! player (`paplay`, `aplay`, else `ffplay`). The bus has no back-pressure:
@@ -17,9 +17,9 @@ use std::{
     time::{Duration, Instant},
 };
 
-/// The voice's played sound. The constant moves to `lamp_msgs` with the
-/// voice's half; until then this is its one place in lamp-sim.
-pub const TOPIC: &str = "speaker1/play";
+/// The voice's played sound: `lamp_msgs`' own name for it, which lamp-voice
+/// publishes with `--speaker-device bus:speaker1` (#7020).
+pub const TOPIC: &str = Audio::PLAY_TOPIC;
 /// How long a receive waits before the run's quiet is looked at.
 const WAIT: Duration = Duration::from_millis(50);
 /// No block for this long ends a run (and says its line).
