@@ -3733,7 +3733,26 @@ that code (`skill_task.rs:2539`). Neither falls back to the other.
   `gateway_run.rs:343`; `HIDDEN`, `gateway_run.rs:285`).
 - **Between the two lines** (the gateway's process, its model, the
   person's other OpenClaw agents) only lamp-control's check of the run's
-  one-run token holds. The token is gone after the run: `start` deletes
+  one-run token holds, and any agent in the gateway's namespace can take
+  that token while the run lasts. They run as the same user in the
+  gateway's own PID namespace. Before `start`, the token's 0600 file in
+  the run's folder is readable by that user. After it, the token is in
+  the environment of `start`'s `unshare` (`gateway_run.rs:369`,
+  `gateway_run.rs:371`; it stays alive as the parent for the whole run),
+  of the fence shell and of the skill's script (`gateway_run.rs:324`),
+  and `/proc/<pid>/environ` shows it to that user. The run's PID
+  namespace keeps the script from seeing out, not the gateway from
+  seeing in. For the default agent this gives nothing more than Hermes
+  has: a gateway run is a turn of OpenClaw, the lamp's default agent,
+  running the skill, and with Hermes the agent has the run's token in its
+  own environment for the whole run (see "Token scope" below). Any other
+  agent in the gateway's namespace could act with that skill's grants
+  until the run ends. The first builder accepted that risk in writing for
+  the ship ([#6882 issuecomment-6870830613](https://github.com/autonomous-ai/lampOS/pull/6882#issuecomment-6870830613)),
+  because a product lamp's OpenClaw runs only its default agent
+  (`openclaw_config.rs` writes only `agents.defaults`, plus lampOS's own
+  fence agent). Giving the other agents their own user is follow-up (b),
+  after the ship. The token is gone after the run: `start` deletes
   its file as it reads it (`gateway_run.rs:364`), the token is ended with
   lamp-control first however the run ends (`gateway_run.rs:512`), then the
   run's folder is removed (`gateway_run.rs:541`).
@@ -3785,7 +3804,9 @@ that code (`skill_task.rs:2539`). Neither falls back to the other.
   agent on the lamp (`main` and any the person added) runs as the same
   `lampos` user in the gateway's namespace: those agents see
   lamp-control's socket and skills-dev too while the switch is on. Only
-  lamp-control's own checks of the run's token hold against them. So
+  lamp-control's own checks of the run's token hold against them, and
+  they can take that token while a run lasts ("Between the two lines"
+  above). So
   `LAMP_SKILL_GATEWAY_RUNS` (switches.md) was off until this was
   settled. The first builder accepted it in writing (the Reviewer-lead's
   P1 on #6882, option (a), for the OpenClaw-default ship on Mon 16 Nov:
@@ -3810,8 +3831,10 @@ that code (`skill_task.rs:2539`). Neither falls back to the other.
   run's skill and grants, ended with lamp-control when the run ends,
   given only in the script's environment. With Hermes the token is in the
   agent's own environment for the whole run; on the gateway it is in a
-  0600 file in the run's folder until `start` reads it once, so the
-  model has no tool to read it, and after the first start it is gone.
+  0600 file in the run's folder until `start` reads it once, and after
+  the first start the file is gone. While the run lasts the token is in
+  the environment of `start`'s processes, which any agent in the
+  gateway's namespace can read ("Between the two lines" above).
 - **Concurrency.** Hermes's run is a process of its own, killed with its
   group. A gateway turn shares the one gateway with the person's spoken
   OpenClaw tasks: a long turn takes the gateway's CPU and memory from them
