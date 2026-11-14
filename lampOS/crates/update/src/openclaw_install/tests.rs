@@ -1021,8 +1021,9 @@ fn the_one_shot_installs_openclaw_after_hermes() {
     assert!(lamp.said().is_some());
 }
 
-/// Turns: Hermes's install under way holds OpenClaw's ask to a later round,
-/// and OpenClaw's holds Hermes's; one stuck past its bound holds nothing.
+/// Turns: Hermes's install under way leaves OpenClaw's ask for the same
+/// one-shot (#7019), and OpenClaw's holds Hermes's; one stuck past its
+/// bound holds nothing.
 #[test]
 fn the_two_installs_take_turns_in_the_one_shot() {
     let lamp = Lamp::new();
@@ -1035,7 +1036,7 @@ fn the_two_installs_take_turns_in_the_one_shot() {
     .unwrap();
     let mut systemd = Fake::default();
     assert_eq!(round(&lamp, &mut systemd, false, 200), None);
-    assert_eq!(lamp.asked(), None, "no ask while Hermes's runs");
+    assert!(lamp.asked().is_some(), "asked, for after Hermes's");
     assert!(!systemd.asked.contains(&"start"));
     let stuck = 100 + hermes_install::STUCK_AFTER.as_millis() as u64;
     assert_eq!(
@@ -1057,6 +1058,25 @@ fn the_two_installs_take_turns_in_the_one_shot() {
     );
     assert_eq!(held, None);
     assert!(!lamp.records().join(hermes_install::ASK).exists());
+}
+
+/// #7019: with Hermes's install under way, OpenClaw's ask is still written,
+/// so the one-shot running Hermes's reads it after Hermes and lays out
+/// OpenClaw's wrapper; no second one-shot is started.
+#[test]
+fn openclaw_asks_while_hermes_s_install_is_under_way() {
+    let lamp = Lamp::new();
+    lamp.harness_there();
+    let hermes = serde_json::json!({"install": "installing", "revision": 1, "at_unix_ms": 100});
+    fs::write(
+        lamp.records().join(hermes_install::RECORD),
+        hermes.to_string(),
+    )
+    .unwrap();
+    let mut systemd = Fake::default();
+    assert_eq!(round(&lamp, &mut systemd, false, 200), None);
+    assert!(lamp.asked().is_some(), "OpenClaw's ask is written");
+    assert!(!systemd.asked.contains(&"start"), "no second one-shot");
 }
 
 /// One watch for both: a freeze with OpenClaw's install alone under way is
