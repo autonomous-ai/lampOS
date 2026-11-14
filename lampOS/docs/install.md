@@ -2044,7 +2044,7 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
        for p in "$H/.hermes/installs"/*/environments/*/.lease-managed "$H/.hermes/installs"/*/pm-runtime/generations/*/.lease-managed; do
          [ -f "$p" ] || continue
          g=${p%/.lease-managed} r=${p#"$H/.hermes/installs/"}
-         [ ! -L "$g" ] && [ ! -L "$H/.hermes/installs/${r%%/*}" ] && { [ -d "$g/.leases" ] || mkdir "$g/.leases"; } && [ ! -L "$g/.leases" ] && mount -n --bind "$g/.leases" "$X/i/${g#"$H/.hermes/installs/"}/.leases" || fail "Hermes leases not shown"
+         [ ! -L "$g" ] && [ ! -L "${g%/*}" ] && [ ! -L "$H/.hermes/installs/${r%%/*}" ] && { [ -d "$g/.leases" ] || mkdir "$g/.leases"; } && [ ! -L "$g/.leases" ] && mount -n --bind "$g/.leases" "$X/i/${g#"$H/.hermes/installs/"}/.leases" || fail "Hermes leases not shown"
        done
        mount -n -t tmpfs -o size=4k,mode=0755,nosuid,nodev,noexec none "$H/.hermes" || fail "$H/.hermes not hidden"
        mkdir "$H/.hermes/hermes-agent" && mount -n --move "$X/c" "$H/.hermes/hermes-agent" && ro "$H/.hermes/hermes-agent" || fail "Hermes checkout not shown"
@@ -2097,7 +2097,8 @@ As root, on a lamp with the base image (`crates/update/src/install.rs`):
      all (the lasting Hermes has never started), or a `pm-runtime` with no
      `.prepare.lock`, ends it before Hermes runs. None of these is ever
      reached through a link: a lock's `installs/<key>`, a `pm-runtime`
-     folder or its key, or a generation folder or its key that is a link
+     folder or its key, or a generation folder, the `environments` or
+     `generations` folder holding it, or its key that is a link
      (only the lasting Hermes's own user could make one, and root would
      follow it) skips that lock or ends the make before Hermes runs.
      Every mount these lines
