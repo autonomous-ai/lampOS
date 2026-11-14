@@ -43,6 +43,14 @@ class Row(unittest.TestCase):
                      "ROW 7016 on build 12701: no failure, fail-first test kept", "ROW 7016 " + "x" * 300 + " FAIL"):
             self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7016"), "row", body)
 
+    def test_failed_voided_and_fails_are_no_row(self):
+        # 14 Nov (the second reader's P2 on #7041).
+        for body in ("ROW #7041 abc FAILED on build 5", "ROW #7041 abc VOIDED", "ROW #7041 abc: FAILS the timer line",
+                     "ROW #7041 abc: VOIDS the earlier run"):
+            self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7041"), "none", body)
+        for body in ("ROW #7041 abc: FAILOVER kept the voice up", "ROW #7041 abc: FAILED then PASS on a rerun"):
+            self.assertEqual(rows([c("writer-a", body)], HEAD, W, "7041"), "row", body)
+
     def test_switch_on_needs_a_real_row(self):
         ok = c("writer-a", "READ-OK %s\n\nSixth, 10:02: no row needed." % HEAD)
         self.assertEqual(rows([ok], HEAD, W, "7016", switch_on=True), "none")

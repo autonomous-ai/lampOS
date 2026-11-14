@@ -73,14 +73,22 @@ coord_body() {
 # `LAMP_X=value` with no `Environment=`) count too, and so does any value but off, 0, false or empty, as switches take
 # words ("LAMP_NAMES=checked", "LAMP_ATTENTION=busy-near"). A value may be quoted, the assignment too
 # (`Environment="LAMP_X=on"`); a comment line (`#…`) never counts.
+# 14 Nov (the second reader's P3 on #7041): every assignment on an added line is read, not only the first
+# (`Environment=FOO=1 LAMP_X=on`, `Environment="A=1" "LAMP_X=on"`), up to a `#` word.
 coord_switch_on() {
   local d
   d=$(git diff --no-color --no-ext-diff -U0 origin/lamp-voice...$1 -- 'lampOS/deploy/product/*.service' 'lampOS/deploy/product/*.conf' \
     'lampOS/deploy/product/settings/*.env' 2>/dev/null) || return 1
   awk -v q="'" '
-    BEGIN { lead = "^[+][ \t]*(Environment=)?[\"" q "]?LAMP_[A-Z0-9_]+="; trim = "^[ \t\"" q "]+|[ \t\"" q "]+$"; on = 0 }
-    $0 ~ lead { v = $0; sub(lead, "", v); gsub(trim, "", v); v = tolower(v)
-                if (v != "off" && v != "0" && v != "false" && v != "") on = 1 }
+    BEGIN { trim = "^[ \t\"" q "]+|[ \t\"" q "]+$"; on = 0 }
+    /^[+]/ { l = substr($0, 2); if (l ~ /^[ \t]*#/) next
+             n = split(l, t, /[ \t]+/)
+             for (i = 1; i <= n; i++) {
+               x = t[i]; if (x ~ /^#/) break
+               sub(/^Environment=/, "", x); gsub(trim, "", x)
+               if (x !~ /^LAMP_[A-Z0-9_]+=/) continue
+               v = x; sub(/^LAMP_[A-Z0-9_]+=/, "", v); gsub(trim, "", v); v = tolower(v)
+               if (v != "off" && v != "0" && v != "false" && v != "") on = 1 } }
     END { print (on ? "on" : "off") }' <<< "$d"
 }
 

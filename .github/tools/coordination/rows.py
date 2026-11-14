@@ -24,8 +24,9 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from markers import parse_marker, quoted, names_commit, writers_from_args, is_writer
 
-# The words a row's verdict is read from (case-sensitive).
-FAILED = re.compile(r"\b(?:FAIL|VOID)\b")
+# The words a row's verdict is read from (case-sensitive). 14 Nov (the second reader's P2 on #7041): FAILED, FAILS,
+# VOIDED and VOIDS too; FAILOVER is no verdict.
+FAILED = re.compile(r"\b(?:FAIL|VOID)(?:ED|S)?\b")
 PASSED = re.compile(r"\bPASS\b")
 NO_ROW = re.compile(r"(?i)\bno row needed\b")
 
