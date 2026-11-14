@@ -1137,6 +1137,45 @@ fn a_kept_lights_claim_is_held_beside_any_call() {
     assert!(said_anyway.is_empty(), "said: {said_anyway:?}");
 }
 
+/// GO-159 on a lamp (14 Nov, 12958): "Keep the light on until ten." got
+/// only a `keep_rule` with no end time, and each reply was said as it was.
+/// Each is held, asked again once with the limit's note, and a second such
+/// claim said not done; the honest replies beside the rule are said.
+#[test]
+fn a_kept_lights_claim_after_a_greeting_beside_a_kept_rule_is_held() {
+    let heard = "Keep the light on until ten.";
+    let mut said_anyway = Vec::new();
+    for claim in [
+        "Hello. The light will stay on until ten.",
+        "Got it: the light will stay on and won't go out by itself before ten.",
+        "Good morning. I'll keep it on until ten.",
+    ] {
+        let went = turn_with(
+            true,
+            true,
+            true,
+            heard,
+            light_kept(),
+            vec![saying(claim), saying(claim)],
+        );
+        if went.said != said(&[crate::action_claim::NOT_DONE_LINE])
+            || went.notes != [crate::action_claim::LIMIT_NOTE]
+            || went.ran != [crate::rules::KEEP_RULE]
+        {
+            said_anyway.push((claim, went.said));
+        }
+    }
+    assert!(said_anyway.is_empty(), "said: {said_anyway:?}");
+    for honest in [
+        "I'll keep it lit. Morning.",
+        "I'll keep the light on \u{2014} it won't go out by itself. Good morning.",
+    ] {
+        let went = turn_with(true, true, true, heard, light_kept(), vec![saying(honest)]);
+        assert!(went.notes.is_empty(), "{honest}: {:?}", went.notes);
+        assert_eq!(went.ran, [crate::rules::KEEP_RULE], "{honest}");
+    }
+}
+
 /// One spoken turn begun with the lamp's name to a face turned to the
 /// lamp (`answering_named_to_a_face`), so a `not_for_me` is not taken and
 /// the model is asked once more, every call of that round answered and
