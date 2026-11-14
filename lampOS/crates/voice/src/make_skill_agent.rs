@@ -1,7 +1,7 @@
 //! A voice make the lamp's own model couldn't make, handed to the lamp's
 //! own agent (a proposal on #6059, the owner's OK and the first builder's
 //! yes, 11 Nov): with `LAMP_MAKE_SKILL_AGENT=on` ([`ENVIRONMENT`], off
-//! unless set; on in the product's lamp-voice).
+//! unless set; off in the product's lamp-voice, #7014).
 //!
 //! The order: DeepSeek writes first ([`crate::make_skill_local`]). With
 //! Hermes as the lamp's agent (the tasks part's `lamp` target; only Hermes

@@ -1183,7 +1183,29 @@ mod tests {
         // request 7.
         let words: Vec<&str> = whole.split_whitespace().collect();
         skill_write_yes::lamp_said(6, &words[..words.len() - 10].join(" "));
+        // Not cut yet: the note is today's, the say-back waits for a yes.
+        let uncut = skill_write_yes::waiting_note(7, now).unwrap();
+        assert!(
+            uncut.contains("that the lamp just said back waits for their yes before its task runs"),
+            "{uncut}"
+        );
+        assert!(uncut.contains(&id), "{uncut}");
         skill_write_yes::lamp_cut(6);
+        // Cut (#6715 choice 1): the note says it was not heard whole and
+        // must be said again word for word before any yes, hands it whole,
+        // and neither says it waits for a yes nor gives the approve_id.
+        let cut = skill_write_yes::waiting_note(7, now).unwrap();
+        assert!(cut.contains("was not heard whole"), "{cut}");
+        assert!(cut.contains("say it again, word for word"), "{cut}");
+        // A no to a cut say-back keeps it off; it doesn't bring it back.
+        assert!(
+            cut.contains("If they decline or wait, say it stays off, and call nothing"),
+            "{cut}"
+        );
+        assert!(cut.contains(&say_back), "{cut}");
+        assert!(!cut.contains("waits for their yes"), "{cut}");
+        assert!(!cut.contains("just said back"), "{cut}");
+        assert!(!cut.contains(&id), "{cut}");
         assert!(!skill_write_yes::answer_awaited(7, now));
         assert!(!skill_write_yes::approve_forced_now(now));
         let refused = skill_write_yes::approve(&id, 7, true, true, now, |_| panic!("approved"));
@@ -1207,7 +1229,19 @@ mod tests {
         assert_eq!(over["error"], skill_write_yes::NOT_SAID_WHOLE, "{over}");
         assert_eq!(quoted(&over), say_back, "{over}");
         // Said whole in request 10: the yes of request 11 is taken.
+        assert!(
+            skill_write_yes::waiting_note(10, now)
+                .unwrap()
+                .contains("was not heard whole")
+        );
         skill_write_yes::lamp_said(10, &quoted(&over));
+        // Said whole since: today's note again, with the approve_id.
+        let whole_now = skill_write_yes::waiting_note(11, now).unwrap();
+        assert!(
+            whole_now.contains("just said back waits for their yes"),
+            "{whole_now}"
+        );
+        assert!(whole_now.contains(&id), "{whole_now}");
         assert!(skill_write_yes::answer_awaited(11, now));
         assert!(skill_write_yes::approve_forced_now(now));
         let mut kept = None;
