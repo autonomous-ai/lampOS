@@ -6754,7 +6754,12 @@ mod tests {
         assert_eq!(calls[0].method, Method::Get);
         assert_eq!(
             calls[0].url,
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1"
+            writes::event_read(&json!({"event_id":"evnt1"})).unwrap()
+        );
+        assert!(
+            calls[0].url.starts_with(
+                "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1"
+            )
         );
         // Anything but "send" cancels it, and nothing is changed.
         let id = moved["result"]["send_id"].as_str().unwrap().to_owned();
@@ -6852,7 +6857,12 @@ mod tests {
         assert_eq!(read.len(), calls + 1);
         assert_eq!(read[calls].method, Method::Get);
         assert!(
-            read[calls].url.ends_with(&format!("/events/{outlook}")),
+            read[calls]
+                .url
+                .split('?')
+                .next()
+                .unwrap()
+                .ends_with(&format!("/events/{outlook}")),
             "{}",
             read[calls].url
         );

@@ -1058,10 +1058,18 @@ const EVENT_ID_MOST: usize = 1_024;
 /// for it (the calendar's own `events/<id>` read).
 pub fn event_read(args: &Value) -> Result<String, String> {
     let (calendar, event) = event_named(args)?;
+    // Its times in the lamp's own zone, as a list of events reads them:
+    // without it Calendar answers in the event's stored zone, and on
+    // lamp-06c1 on 12 Nov a move read back "now from 2026-11-13T15:00:00Z"
+    // for a 22:00 +07:00 event.
+    let query: Vec<(&str, String)> = reads::zone_here()
+        .map(|zone| ("timeZone", zone))
+        .into_iter()
+        .collect();
     reads::url(
         base("google_calendar")?,
         &["calendar", "v3", "calendars", calendar, "events", event],
-        &[],
+        &query,
     )
 }
 
@@ -1603,10 +1611,19 @@ mod tests {
         }
         // The event read first is Calendar's own read of it.
         let read = event_read(&json!({"event_id":"evnt1"})).unwrap();
-        assert_eq!(
-            read,
-            "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1"
-        );
+        let bare = "https://www.googleapis.com/calendar/v3/calendars/primary/events/evnt1";
+        // Its times come in the lamp's own zone, whenever the system names one.
+        match reads::zone_here() {
+            Some(zone) => assert_eq!(
+                reqwest::Url::parse(&read)
+                    .unwrap()
+                    .query_pairs()
+                    .collect::<Vec<_>>(),
+                [("timeZone".into(), zone.into())]
+            ),
+            None => assert_eq!(read, bare),
+        }
+        assert!(read.starts_with(bare), "{read}");
         let (_, path) = crate::net::split(&read).unwrap();
         assert!(catalog::read_allowed("google_calendar", Method::Get, &path, None).is_ok());
         // The calendar's list of events is not one event.

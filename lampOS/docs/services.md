@@ -307,6 +307,11 @@ in the calendar's own zone, and on lamp-9adf on 5 Nov at 00:27 such an
 event came back as 08:00Z and was said as "8 to 9 AM your time". With the
 zone unnamed, nothing is asked, as before.
 
+The one-event read an edit makes before its read-back (`writes::event_read`)
+asks the same, so a move or a cancel reads the event's time back as
+22:00 +07:00. Without it, on lamp-06c1 on 12 Nov, a move read back "now from
+2026-11-13T15:00:00Z" for a 22:00 +07:00 event.
+
 A call may name either Gmail code: `gmail` or `gmail-app` reaches whichever
 Gmail link the lamp has, because the voice's model mixes the two (on
 lamp-9adf on 4 Nov it named `gmail` in two of four sends and the lamp said
