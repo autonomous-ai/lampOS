@@ -854,10 +854,13 @@ runs on the PM's machine, one bot at a time. A pull request is carried when:
 **A lamp row comes before the train** (the lead, 14 November). Before a
 behaviour pull request rides a train, post its row on the pull request: a
 comment whose first line is `ROW <PR> <head> on build N …`, with the
-journal line that shows it. A docs, tests or switched-off change needs no
-row: then a reader writes "no row needed" in the `READ-OK` on this head. A
-default-on pull request always needs its row. The bot enforces it: without
-either, the pull request sits out, and the log says so once per head.
+journal line that shows it. The row names its own pull request. A row that
+says `FAIL` or `VOID`, and not `PASS`, is not a row. A docs, tests or
+switched-off change needs no row: then a reader writes "no row needed" in
+the `READ-OK` on this head. A pull request that turns a switch on in the
+product (`Environment=LAMP_…=on` in a product unit) always needs its row,
+and "no row needed" doesn't carry it. The bot enforces it: without a row,
+the pull request sits out, and the log says so once per head.
 
 A `HOLD` stands until the same reader's later `READ-OK` (it is keyed by the
 reader's account and signed name). A `HOLD <sha>` as the first line of a

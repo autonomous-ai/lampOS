@@ -1,8 +1,9 @@
 # rows.py (14 Nov (the lead): "a PR's lamp row comes before its train"): whether a PR has its lamp row, read from its
-# comments as JSON lines {login, body} on stdin. argv: [--writers FILE] [--pr N] HEAD [EARLIER_HEAD...]. Prints one word:
-#   row            a writer's comment whose first line opens with ROW (bold allowed: "**ROW 7016 <head> on build N …"),
-#                  or whose first 300 characters say "lamp row for #N" for this PR, as Fifth's rows open ("Fifth, 09:51
-#                  GMT+7: lamp row for #6907 on lamp-52e6 …");
+# comments as JSON lines {login, body} on stdin. argv: [--writers FILE] [--switch-on] [--pr N] HEAD [EARLIER_HEAD...].
+# Prints one word:
+#   row            a writer's comment whose first line opens with ROW and this PR's number (bold allowed: "**ROW #7016
+#                  <head> on build N …"), or whose first 300 characters say "lamp row for #N" for this PR, as Fifth's
+#                  rows open ("Fifth, 09:51 GMT+7: lamp row for #6907 on lamp-52e6 …");
 #   no-row-needed  a writer's READ-OK whose first line is the marker, for a commit one of the heads starts with (or a
 #                  prefix of one), saying "no row needed" (docs, tests, or code behind a switch that's off);
 #   none           neither.
@@ -10,17 +11,38 @@
 # text and never counts (markers.py's quoted). Only comments from writers count (markers.py's --writers /
 # LAMP_COORD_WRITERS; none given: none count, and it prints "none"). The heads are reads2.py's: the PR's head and earlier
 # heads with the same patch (lib.sh's coord_same_patch), so a plain rebase keeps a READ-OK's "no row needed".
+#
+# 14 Nov (the readers' P3s on #7034): tighter.
+# - A ROW line names its PR: "ROW" then "#N" or "N" for --pr's N. Another PR's number is no row here, and without --pr a
+#   ROW line never counts (fail closed).
+# - A failed row is no row: a ROW or "lamp row for #N" comment whose first 300 characters say FAIL, or VOID, and not
+#   PASS (the words, in capitals) doesn't count.
+# - A switch-on needs a real row: with --switch-on (the bot passes it when the PR's diff turns a LAMP_ switch on in a
+#   product unit, lib.sh's coord_switch_on), "no row needed" never carries; only a row does.
 import json, os, re, sys
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from markers import parse_marker, quoted, names_commit, writers_from_args, is_writer
 
-ROW_LINE = re.compile(r"\**ROW\b")
+# The words a row's verdict is read from (case-sensitive).
+FAILED = re.compile(r"\b(?:FAIL|VOID)\b")
+PASSED = re.compile(r"\bPASS\b")
 NO_ROW = re.compile(r"(?i)\bno row needed\b")
 
 
 def lamp_row_re(pr):
     return re.compile(r"(?i)\blamp row for #%s(?!\d)" % re.escape(str(pr)))
+
+
+def row_line_re(pr):
+    """ROW, then this PR's number, with or without "#" (bold allowed around either)."""
+    return re.compile(r"\**ROW\b\**[ \t]+\**#?%s(?![\d])" % re.escape(str(pr)))
+
+
+def failed(body):
+    """A row whose first 300 characters say FAIL or VOID and not PASS."""
+    head = body[:300]
+    return bool(FAILED.search(head)) and not PASSED.search(head)
 
 
 def unquoted(rx, body, end=None):
@@ -30,9 +52,11 @@ def unquoted(rx, body, end=None):
 
 def has_row(c, pr):
     body = c["body"].lstrip()
-    if ROW_LINE.match(body) and not quoted(body, 0):
-        return True
-    return bool(pr) and unquoted(lamp_row_re(pr), body, 300)
+    if not pr:
+        return False
+    if not ((row_line_re(pr).match(body) and not quoted(body, 0)) or unquoted(lamp_row_re(pr), body, 300)):
+        return False
+    return not failed(body)
 
 
 def says_no_row(c, heads):
@@ -43,9 +67,10 @@ def says_no_row(c, heads):
     return unquoted(NO_ROW, body)
 
 
-def rows(items, heads, writers, pr=None):
+def rows(items, heads, writers, pr=None, switch_on=False):
     """items: dicts {login, body} in posting order. heads: the head sha, or a list of it and earlier heads with the same
-    patch. Returns "row", "no-row-needed" or "none"."""
+    patch. switch_on: the PR turns a switch on, so "no row needed" doesn't carry it. Returns "row", "no-row-needed" or
+    "none"."""
     heads = [heads] if isinstance(heads, str) else [h for h in heads if h]
     found = "none"
     for c in items:
@@ -53,22 +78,24 @@ def rows(items, heads, writers, pr=None):
             continue
         if has_row(c, pr):
             return "row"
-        if says_no_row(c, heads):
+        if not switch_on and says_no_row(c, heads):
             found = "no-row-needed"
     return found
 
 
 def main():
     writers, args = writers_from_args(sys.argv[1:], "rows")
-    pr, heads = None, []
+    pr, heads, switch_on = None, [], False
     i = 0
     while i < len(args):
-        if args[i] == "--pr" and i + 1 < len(args):
+        if args[i] == "--switch-on":
+            switch_on = True; i += 1
+        elif args[i] == "--pr" and i + 1 < len(args):
             pr = args[i + 1]; i += 2
         else:
             heads.append(args[i]); i += 1
     items = [json.loads(line) for line in sys.stdin if line.strip()]
-    print(rows(items, heads, writers, pr))
+    print(rows(items, heads, writers, pr, switch_on))
 
 
 if __name__ == "__main__":
