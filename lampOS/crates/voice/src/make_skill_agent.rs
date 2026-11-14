@@ -42,12 +42,19 @@
 //! words at most [`GUIDED_MOST_REPAIRS`] more times, within the agent's
 //! [`MAKE_WITHIN`]. Off, the line is today's, byte for byte.
 //!
-//! With the guide, the line also carries this worker's values of the
+//! With the guide, the line also carries this process's values of the
 //! switches `lamp-skills` reads as it packs a skill ([`CHECK_SWITCHES`],
 //! `"switches"`, Heron's P2 on #6768): lamp-tasks starts the make with a
 //! cleared environment, so without them the guide's check would refuse a
 //! `write` step or a `do.task`'s service grant the voice's own check
 //! accepts, and Hermes would take the asked-for step out.
+//!
+//! The app's MAKE IT (`crate::app_make`, the owner's ask, 13 Nov) makes the
+//! same way: its typed words go through the same order and this same
+//! hand-over ([`Agent::for_app`]), read from the coordinator's own
+//! environment, where the app's makes run (its `LAMP_TASKS_DIR`, the
+//! directory the second route's worker is given). No waiting line is said
+//! for it: the app shows the ask as making until it is on or not kept.
 use crate::agent_tasks;
 use serde_json::{Value, json};
 use std::{
@@ -194,10 +201,11 @@ pub fn guide_on() -> bool {
 /// The switches `lamp-skills pack` reads as it loads a skill, so that change
 /// what it refuses: a `do.task`'s linked service grants and a `write` step
 /// or permission (`lamp_tasks::skill_make::CHECK_SWITCHES`, the only names
-/// lamp-tasks takes). The voice's check runs with this worker's own
-/// environment, which has each as `on` exactly or not at all
-/// (`process::agent_services_worker_environment`,
-/// `skill_writes_worker_environment`).
+/// lamp-tasks takes). The voice's check runs with the environment of the
+/// process that makes: the second route's worker, which has each as `on`
+/// exactly or not at all (`process::agent_services_worker_environment`,
+/// `skill_writes_worker_environment`), or the coordinator for the app's
+/// MAKE IT, with lamp-voice's own unit's.
 pub const CHECK_SWITCHES: [&str; 2] = [
     crate::made_skill::AGENT_SERVICES_ENVIRONMENT,
     crate::made_skill::WRITES_ENVIRONMENT,
@@ -244,6 +252,11 @@ pub struct Agent {
     /// Whether each make asks for the lamp's skill-creator guide
     /// ([`GUIDE_ENVIRONMENT`]).
     pub guide: bool,
+    /// Whether DeepSeek gets its repairs when the agent doesn't take the
+    /// make (no make run, `busy`, or no first answer): the app's MAKE IT,
+    /// with no turn waiting ([`Agent::for_app`], Heron's P2 on #6788); a
+    /// voice make's one answer stands, as before.
+    pub repairs_if_untaken: bool,
 }
 
 /// Why the agent gave no answer to take.
@@ -280,10 +293,57 @@ impl Agent {
             return None;
         }
         let tasks = TASKS.get()?.clone();
-        let guide = guide_on();
-        Some(Self {
+        Some(Self::made_with(
             tasks,
-            say: Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
+            Some(PathBuf::from(crate::say::DEFAULT_SOCKET)),
+            guide_on(),
+        ))
+    }
+
+    /// The agent for a make typed in the app's MAKE IT
+    /// (`crate::app_make`), with the switch on and a tasks part: the
+    /// coordinator's own environment, where the app's makes run, its
+    /// `LAMP_TASKS_DIR` the directory the second route's worker is given
+    /// as `--tasks-dir`; none otherwise. The guide as [`Agent::for_voice`]
+    /// has it. No waiting line: the app shows the ask as making.
+    pub fn for_app() -> Option<Self> {
+        let var = |name: &str| std::env::var(name).ok();
+        Self::for_app_with(
+            var(ENVIRONMENT).as_deref(),
+            var(GUIDE_ENVIRONMENT).as_deref(),
+            var(agent_tasks::ENVIRONMENT).as_deref(),
+        )
+    }
+
+    /// [`Agent::for_app`] from the switch's value `switch`, the guide's
+    /// `guide` and the tasks part's directory `tasks`, absolute only.
+    pub fn for_app_with(
+        switch: Option<&str>,
+        guide: Option<&str>,
+        tasks: Option<&str>,
+    ) -> Option<Self> {
+        if !on_with(switch) {
+            return None;
+        }
+        let tasks = PathBuf::from(tasks?);
+        if !tasks.is_absolute() {
+            return None;
+        }
+        // No turn waits on the app's make: DeepSeek keeps its repairs when
+        // the agent doesn't take it.
+        Some(Self {
+            repairs_if_untaken: true,
+            ..Self::made_with(tasks, None, on_with(guide))
+        })
+    }
+
+    /// One make's agent through the tasks part at `tasks`, its waiting line
+    /// said at `say`, each answer given [`GUIDED_WRITE_WITHIN`] with the
+    /// guide and [`WRITE_WITHIN`] without, within [`MAKE_WITHIN`].
+    fn made_with(tasks: PathBuf, say: Option<PathBuf>, guide: bool) -> Self {
+        Self {
+            tasks,
+            say,
             within: if guide {
                 GUIDED_WRITE_WITHIN
             } else {
@@ -291,7 +351,8 @@ impl Agent {
             },
             make_within: MAKE_WITHIN,
             guide,
-        })
+            repairs_if_untaken: false,
+        }
     }
 
     /// The most times an answer the voice's check refused goes back to the
@@ -558,6 +619,7 @@ pub(crate) mod tests {
                 within: Duration::from_millis(1_500),
                 make_within: Duration::from_secs(10),
                 guide: false,
+                repairs_if_untaken: false,
             }
         }
 
@@ -912,6 +974,37 @@ pub(crate) mod tests {
                 ("LAMP_SKILL_WRITES", "on".to_owned())
             ]
         );
+    }
+
+    /// The app's MAKE IT (the owner's ask, 13 Nov): its makes go to the
+    /// agent only with the switch on and an absolute tasks part, the guide
+    /// only with its own switch, as the voice's; no waiting line is said.
+    #[test]
+    fn the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part() {
+        let tasks = Some("/run/lampos-tasks");
+        let agent = Agent::for_app_with(Some("on"), None, tasks).unwrap();
+        assert_eq!(agent.tasks, PathBuf::from("/run/lampos-tasks"));
+        assert_eq!(agent.say, None);
+        assert!(!agent.guide);
+        assert!(agent.repairs_if_untaken);
+        assert_eq!(agent.within, WRITE_WITHIN);
+        assert_eq!(agent.make_within, MAKE_WITHIN);
+        let guided = Agent::for_app_with(Some("on"), Some("on"), tasks).unwrap();
+        assert!(guided.guide);
+        assert_eq!(guided.within, GUIDED_WRITE_WITHIN);
+        assert_eq!(guided.most_repairs(), GUIDED_MOST_REPAIRS);
+        for (switch, folder) in [
+            (None, tasks),
+            (Some("off"), tasks),
+            (Some("ON"), tasks),
+            (Some("on"), None),
+            (Some("on"), Some("run/lampos-tasks")),
+        ] {
+            assert!(
+                Agent::for_app_with(switch, Some("on"), folder).is_none(),
+                "{switch:?} {folder:?}"
+            );
+        }
     }
 
     #[test]

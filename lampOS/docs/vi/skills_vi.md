@@ -1809,10 +1809,12 @@ cả hai người viết.
   lời vẫn vừa 120 giây, và câu vẫn bị từ chối được nói là không tạo được,
   như hôm nay. Tắt thì dòng, lời dặn lần chạy và thư mục của lần tạo giữ
   nguyên từng byte như hôm nay. Worker của tuyến thứ hai đọc nó (được
-  `process::second_route_worker_environment` chuyển cho).
+  `process::second_route_worker_environment` chuyển cho), và với MAKE IT
+  của ứng dụng thì coordinator đọc nó (bên dưới).
   - **Kiểm tra của hướng dẫn là kiểm tra của giọng nói** (P2 của Heron
     trên #6768). lamp-tasks bắt đầu lần chạy với môi trường đã xoá sạch,
-    nên dòng có hướng dẫn còn mang giá trị của worker cho hai công tắc mà
+    nên dòng có hướng dẫn còn mang giá trị của tiến trình đang tạo (của
+    worker, hoặc của coordinator với MAKE IT) cho hai công tắc mà
     `lamp-skills pack` đọc và làm đổi điều nó từ chối
     (`make_skill_agent::CHECK_SWITCHES`,
     `"switches":{"LAMP_AGENT_SERVICES":"on"|"off","LAMP_SKILL_WRITES":"on"|"off"}`,
@@ -1887,13 +1889,58 @@ cả hai người viết.
   kept", "the agent (Hermes) made none (no answer within 90 s): DeepSeek's
   one answer, given no repairs, stands as not made", "DeepSeek's cannot is
   one the brief asks for: not handed to the agent", "no agent on the lamp:
-  DeepSeek makes it alone"; lần sửa của agent ghi "by the agent".
+  DeepSeek makes it alone"; lần sửa của agent ghi "by the agent". Với MAKE
+  IT của ứng dụng, một lần tạo agent không nhận ghi "...: DeepSeek gets its
+  repairs, as without the agent" và "not taken by the agent: DeepSeek's
+  repairs".
 - **Bật trong sản phẩm** (`deploy/product/lamp-voice.service`, worker của
   tuyến thứ hai nhận nó; test kiểm kê cài đặt
   `the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent`). Tắt
   (nếu không đặt, như một unit không đặt gì): không có gì ở trên; đường đi
-  giữ nguyên từng byte như cũ. Tạo bằng cách gõ trong ứng dụng vẫn do
-  DeepSeek trong cả hai trường hợp.
+  giữ nguyên từng byte như cũ, và MAKE IT của ứng dụng vẫn do DeepSeek.
+- **MAKE IT của ứng dụng cũng vậy** (yêu cầu của chủ sở hữu, 13/11: MAKE IT
+  của ứng dụng, nơi duy nhất gõ một kỹ năng, tạo kỹ năng qua agent của đèn
+  như lần tạo bằng giọng nói). Chữ gõ trong ứng dụng (`app_make::make_here`)
+  đi qua cùng `make_skill_local::make_kept` và cùng lần giao
+  (`handed_to_agent`), với agent từ `make_skill_agent::Agent::for_app`:
+  công tắc, công tắc của hướng dẫn và `LAMP_TASKS_DIR` tuyệt đối của phần
+  tasks đọc từ môi trường của chính coordinator. Các lần tạo của ứng dụng
+  chạy trong coordinator của lamp-voice, tiến trình của chính unit, nên
+  `LAMP_MAKE_SKILL_AGENT` (khi được đặt) và `LAMP_TASKS_DIR` của unit tới được nó mà
+  không cần danh sách cho phép của worker, và lamp-tasks nhận dòng của nó,
+  vì chỉ nhận dòng của `lamp-voice.service` chạy bằng root. Cùng thứ tự
+  (DeepSeek một lần thử, rồi Hermes), cùng kiểm tra, cùng các lần sửa, giới
+  hạn và `"guide":true` khi có `LAMP_MAKE_AGENT_GUIDE`. Không nói câu chờ:
+  ứng dụng hiện lời hỏi là `making`. Kỹ năng được giữ được bật ngay như mọi
+  lần MAKE IT (kỹ năng có mã riêng như trước, `app_make::put_on_line`), và
+  kỹ năng không tạo được vẫn được nói và báo cho ứng dụng như trước;
+  `cannot:` riêng của agent là "I couldn't make that one.". Khi công tắc
+  tắt, không có phần tasks hoặc không có Hermes, nó vẫn do DeepSeek như
+  trước, với các lần sửa của nó. Có Hermes nhưng agent không nhận lần tạo
+  (không có lần chạy tạo: không có socket tạo, `no_namespace` hay
+  `not_held_off`; lamp-tasks `busy` vì một lần tạo bằng giọng nói; hoặc
+  lần chạy của agent không cho câu trả lời đầu tiên), thì DeepSeek được các
+  lần sửa của nó như khi không có agent, thời gian của lần giao không tính
+  vào giới hạn của chúng (`Agent::repairs_if_untaken`, chỉ `for_app` đặt;
+  P2 của Heron trên #6788): một lần tạo từ ứng dụng mà DeepSeek làm đúng
+  sau một lần sửa không bao giờ bị nói là không tạo được chỉ vì agent không
+  nhận. Lần tạo bằng giọng nói giữ thứ tự của nó: ở đó một câu trả lời của
+  DeepSeek giữ nguyên. Chưa có hiệu lực khi gộp: từ #7014 unit lamp-voice
+  của sản phẩm không đặt `LAMP_MAKE_SKILL_AGENT` (có đặt `LAMP_TASKS_DIR`),
+  nên MAKE IT chỉ giao các lần tạo của nó khi công tắc đó bật lại; cho đến
+  lúc đó các lần tạo của ứng dụng vẫn do DeepSeek, với các lần sửa của nó. Thời gian vừa: `skills.make` của lamp-cloud chờ tối đa 2 giây
+  (`make_skill::WAIT`), và giọng nói trả lời `{"making": true}` trước khi
+  bắt đầu tạo, trên một luồng riêng; sau đó `skills.made` đọc `making` tới
+  30 phút (`app_make::MAKING_LONGEST_MS`, mà `makingLongest` của ứng dụng
+  theo), xa hơn nhiều so với một lần thử của DeepSeek và 120 giây của
+  agent. Khi socket khởi động, nhật ký của coordinator ghi các lần tạo của
+  nó có giao cho agent không và có hướng dẫn không. Test:
+  `app_make::tests::an_app_make_goes_to_the_agent_only_with_its_switch`,
+  `make_skill_agent::tests::the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part`,
+  `app_make::tests::an_app_make_the_agent_does_not_take_keeps_deepseeks_repairs`
+  (lamp-tasks cũ, `no_namespace` và một lần chạy im lặng: câu trả lời bị từ
+  chối của DeepSeek được sửa và bật; agent của giọng nói: một câu trả lời
+  của nó giữ nguyên).
 - **Test:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
   `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
   `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`,
@@ -2094,7 +2141,11 @@ Cùng người tạo đó, từ chữ gõ trong ứng dụng; được bật nh�
 lời "có" nói thành tiếng (#5977; nút MAKE IT của ứng dụng là lời hỏi). Cần
 `LAMP_MAKE_SKILL=on` và dịch vụ nói (`LAMP_SAY=on`) để nói thành tiếng điều nó
 đã tạo; thiếu một trong hai thì socket của ứng dụng không chạy
-(`crate::app_make`). Không hỏi phần tasks nào, và không cần phần tasks.
+(`crate::app_make`). Không cần phần tasks; khi có
+`LAMP_MAKE_SKILL_AGENT=on` và có phần tasks, một lần tạo mà mô hình của đèn
+không tạo được sẽ được giao cho agent của đèn, như lần tạo bằng giọng nói
+("Giao cho agent của đèn khi DeepSeek thất bại", "MAKE IT của ứng dụng cũng
+vậy").
 Socket được mở một lần khi giọng nói khởi động, cạnh dịch vụ nói
 (`app_make::start_from_environment` trong `run_source`, với
 `Says::parked_asks`), trước khi chờ công tắc riêng tư, như dịch vụ nói

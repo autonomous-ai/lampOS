@@ -4519,10 +4519,12 @@ the same code for both writers.
   answer fits the 120 s, and one still refused is said as not made, as
   today. Off, the line, the run's words and the make's folder are today's,
   byte for byte. Read by the second route's worker (passed by
-  `process::second_route_worker_environment`).
+  `process::second_route_worker_environment`), and for the app's MAKE IT
+  by the coordinator (below).
   - **The guide's check is the voice's** (Heron's P2 on #6768). lamp-tasks
     starts the run with a cleared environment, so the guided line also
-    carries the worker's values of the two switches `lamp-skills pack`
+    carries the making process's values (the worker's, or the
+    coordinator's for MAKE IT) of the two switches `lamp-skills pack`
     reads that change what it refuses (`make_skill_agent::CHECK_SWITCHES`,
     `"switches":{"LAMP_AGENT_SERVICES":"on"|"off","LAMP_SKILL_WRITES":"on"|"off"}`,
     `on` only for an exact `on`), and lamp-tasks puts each `on` in the
@@ -4594,13 +4596,58 @@ the same code for both writers.
   DeepSeek's one answer, given no repairs, stands as not made", "DeepSeek's
   cannot is one the brief asks for: not handed to the agent", "no agent on
   the lamp: DeepSeek makes it alone"; an agent's repair says "by the
-  agent".
+  agent". For the app's MAKE IT, a make the agent didn't take says "...:
+  DeepSeek gets its repairs, as without the agent" and "not taken by the
+  agent: DeepSeek's repairs".
 - **On in the product** (`deploy/product/lamp-voice.service`, whose second
   route's worker is given it; the install census test
   `the_product_hands_a_make_deepseek_cant_keep_to_the_lamps_agent`). Off
   (unless set, as in a unit that sets nothing): nothing above; the path is
-  byte for byte the old one. The app's typed makes stay DeepSeek's either
-  way.
+  byte for byte the old one, and the app's MAKE IT stays DeepSeek's.
+- **The app's MAKE IT too** (the owner's ask, 13 Nov: the app's MAKE IT,
+  the only place a skill is typed, makes its skill through the lamp's
+  agent as the voice make does). The app's typed words
+  (`app_make::make_here`) go through the same `make_skill_local::make_kept`
+  and the same hand-over (`handed_to_agent`), with the agent from
+  `make_skill_agent::Agent::for_app`: the switch, the guide's switch and
+  the tasks part's absolute `LAMP_TASKS_DIR` read from the coordinator's
+  own environment. The app's makes run in lamp-voice's coordinator, the
+  unit's own process, so the unit's `LAMP_MAKE_SKILL_AGENT` (when it is
+  set) and `LAMP_TASKS_DIR` reach it with no worker allow-list, and lamp-tasks
+  takes its line, as it takes only `lamp-voice.service`'s run as root.
+  The same order (DeepSeek's one try, then Hermes), the same checks, the
+  same repairs, bounds and `"guide":true` with `LAMP_MAKE_AGENT_GUIDE`.
+  No waiting line is said: the app shows the ask as `making`. A kept
+  skill goes on at once as every MAKE IT does (one with code of its own as
+  before, `app_make::put_on_line`), and a skill not made is said and told
+  to the app as before; the agent's own `cannot:` is "I couldn't make that
+  one.". With the switch off, no tasks part or no Hermes, it stays
+  DeepSeek's as before, with its repairs. With Hermes but the make not
+  taken by the agent (no make run: no make socket, `no_namespace` or
+  `not_held_off`; lamp-tasks `busy` with a voice make; or no first answer
+  from the agent's run), DeepSeek then gets its repairs, as without the
+  agent, the hand-over's time not counted in their bound
+  (`Agent::repairs_if_untaken`, set by `for_app` alone; Heron's P2 on
+  #6788): an app make DeepSeek gets right on a repair is never said as not
+  made because the agent couldn't take it. A voice make keeps its order:
+  there DeepSeek's one answer stands. Not live at merge: since #7014 the
+  product's lamp-voice unit sets no `LAMP_MAKE_SKILL_AGENT` (it sets
+  `LAMP_TASKS_DIR`), so MAKE IT hands its makes over only once that switch
+  is on again; until then the app's makes stay DeepSeek's, with their
+  repairs. The
+  time fits: lamp-cloud's `skills.make` waits at most 2 s
+  (`make_skill::WAIT`), and the voice answers `{"making": true}` before the
+  make begins, on a thread of its own; `skills.made` then reads `making`
+  for up to 30 minutes (`app_make::MAKING_LONGEST_MS`, which the app's own
+  `makingLongest` follows), far past DeepSeek's one try and the agent's
+  120 s. The coordinator's journal says, as the socket starts, whether its
+  makes go to the agent and with the guide. Tests:
+  `app_make::tests::an_app_make_goes_to_the_agent_only_with_its_switch`,
+  `make_skill_agent::tests::the_apps_agent_is_had_only_with_its_switch_and_a_tasks_part`,
+  `app_make::tests::an_app_make_the_agent_does_not_take_keeps_deepseeks_repairs`
+  (an older lamp-tasks, `no_namespace` and a silent run: DeepSeek's
+  refused answer repaired and on; the voice's agent: its one answer
+  stands).
 - **Tests:** `make_skill_local::tests::deepseek_kept_hands_nothing_to_the_agent`,
   `deepseek_refused_once_goes_to_the_agent_at_once_with_no_deepseek_repair`,
   `no_agent_or_a_silent_one_leaves_deepseeks_failure_as_today`,
@@ -4805,7 +4852,10 @@ The same maker, from words typed in the app; put on as above, at once,
 with no spoken yes (#5977; the owner, 10 Nov: the app's MAKE IT is the
 ask). It needs `LAMP_MAKE_SKILL=on` and the say service (`LAMP_SAY=on`),
 to say aloud what it made; without either the app socket isn't started
-(`crate::app_make`). No tasks part is asked, and none is needed.
+(`crate::app_make`). No tasks part is needed; with
+`LAMP_MAKE_SKILL_AGENT=on` and one, a make the lamp's own model didn't
+make goes to the lamp's agent, as a voice make's does ("Handed to the
+lamp's agent when DeepSeek fails", "The app's MAKE IT too").
 
 1. `lamp-voice` listens at `LAMP_APP_MAKE_SOCKET`
    (`/run/lampos-app-make/make.sock` unset), opened to

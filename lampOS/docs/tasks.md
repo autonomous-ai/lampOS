@@ -3209,7 +3209,8 @@ resolves, no route), while the same run's model call is answered and its
 ### A voice make in a skill run's namespace (`skill_make`, #6643)
 
 The first builder's guard on #6643 (12 Nov 18:15): a voice make that
-DeepSeek couldn't keep, handed to the lamp's agent
+DeepSeek couldn't keep (and, the owner's ask, 13 Nov, an app's MAKE IT make,
+from lamp-voice's coordinator in the same unit), handed to the lamp's agent
 (`LAMP_MAKE_SKILL_AGENT`, [skills.md](skills.md), "Handed to the lamp's
 agent when DeepSeek fails"), runs in a skill run's namespace and never
 as a Harness task with the agent's own tools
@@ -5635,7 +5636,10 @@ worker's `--tasks-make-skill` flag is gone: `LAMP_MAKE_SKILL=on` alone gives
 the voice its own function, `make_skill` (`put_on_made_skill` is gone since
 #5977: a made skill goes on as soon as it is kept), with a tasks part or without one, and an
 app's typed skill (`LAMP_APP_MAKE_SKILL`) is made the same way, never handed
-over. The made skills' news words (`made`, `not_kept`) and their repair through
+over as a task. With `LAMP_MAKE_SKILL_AGENT=on`, a voice make or an app's
+MAKE IT make the lamp's own model didn't make goes to the lamp's own Hermes
+in a skill run's namespace ("A voice make in a skill run's namespace",
+below). The made skills' news words (`made`, `not_kept`) and their repair through
 a task are gone with it. A task whose words are a skill's brief, handed over
 by an earlier release, is never told: its answer is files.
 
